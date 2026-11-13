@@ -16,7 +16,7 @@ describe("Video shot card chips", () => {
     expect(page.ok).toBe(true);
     if (!page.ok) return;
     const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; label: string; group: string; icon: string; options: Array<{ value: string; label: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
-    const expected = { framing: ["Framing", 9], camera: ["Camera", 7], lens: ["Lens", 4], light: ["Light", 9], film_stock: ["Film", 6], look: ["Look", 8], grade: ["Grade", 7] } as const;
+    const expected = { framing: ["Framing", 9], camera: ["Camera", 7], light: ["Light", 9], look: ["Look", 8], grade: ["Grade", 7] } as const;
     for (const [group, count] of Object.entries(expected)) {
       const chip = bar.chips!.find((item) => item.state === `card_${group}`)!;
       expect(chip.label).toBe(count[0]);
@@ -26,6 +26,7 @@ describe("Video shot card chips", () => {
       expect(chip.options.slice(1)).toHaveLength(count[1]);
     }
     expect(bar.chips!.filter((item) => item.state.startsWith("card_")).length).toBe(Object.keys(expected).length);
+    expect(bar.chips!.length).toBeLessThanOrEqual(10); // the kit page schema's limit: more and the page does not open
   });
 
   test("Video hint displays settings and fills generate_video prompt in shot-card order", async () => {
