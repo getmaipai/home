@@ -373,7 +373,7 @@ So an express entry waits for the current lander operation (a running safety-sur
 | | DIRECT: run first, checked after | GATED: checked first, then run |
 |---|---|---|
 | For | nobody on the hub, data disposable | the family is on the live hub |
-| `land.sh` | waits for its verdict through the express lane (`--detach` and `wait` keep the normal lane) | normal lane only; `--express` is refused |
+| `land.sh` | waits for its verdict through the express lane (`--detach` and `wait` keep the normal lane); the landing runs no typecheck, no boot check and no tests and takes no check lock (section 28.2) | normal lane only; `--express` is refused |
 | Lander, safety-surface (T2) files | no tests hold the landing; the note says the nightly runs them | the safety-surface tests run before the landing, as today |
 | `ship.sh` | before green is implied (the boot check still runs) | `--before-green` refused; needs a watcher green run or the commit inside `stable`; a safety-surface change ships only once `stable` holds it; the installer's pre-upgrade copy of `data/` is the backup |
 
@@ -496,3 +496,29 @@ Proof: `scripts/ship.test.ts` "DIRECT-FAST-07": direct and stays means no wait; 
 The second real ship (20b2407) showed kept dependencies working (`Dependencies are unchanged ... kept and verified`, 7 s build) yet 44 s between "source replaced" and "tools ready". That phase holds the port probe, Bun, Deno (present, silent), the dependency hash and `clear_quarantine_and_sign`, which ran `xattr -dr com.apple.quarantine` over the whole install root. The root holds `stack/` (637k files, 450 GB of models) and 13 `data.rolled-back-*` copies. Measured on the live root (a no-op attribute removal, nothing changed): `stack` 24 s, the rolled-back copies 15 s, together 39 s of the 44 s. A direct install now walks only the entries the release brings: it skips `stack` (only when the Stack is kept running; a rebuilt Stack is walked, and cleared again by the service install), `data`, `data.rolled-back-*`, `backups`, `received-backups`, `upgrade-backups`, `data-scratch`, `.bun`, `.deno` and `node_modules` (`INSTALL_QUARANTINE_LIGHT`, set from `direct_install`; the earlier `INSTALL_DEPS_REUSE` skip list is the same). Proof of the ship.sh question (27.5) also runs the real installer: `scripts/installHome.test.ts` sources it exactly as `ship.sh` does and asks `stack_keepable` against a fixture root and a live `/healthz` (yes, a changed fingerprint, a Stack that does not answer). Other installs walk the whole root as before. Expected: about 40 s off a direct ship; "tools ready" should read about 4 s after "source replaced".
 
 Proof: `scripts/installHome.test.ts` "DIRECT-FAST-08": a direct walk visits exactly the release entries; a non-direct install walks the root once; the main-path wiring.
+
+## 28. A landing is never bounced by a lock, and the suite yields (LOCK-LANDING-01, 2026-11-12)
+
+Three express landings of one Stack pin bounced four seconds in with "worktree lock: another check is already running in .../home-lander". The first guess, that the watcher's suite held the lander's gate lock, was wrong: the watcher runs in its own checkout (`home-watcher`), `check.sh --pre` never takes the machine-wide gate lock, and the lock that refused is the per-checkout single-flight lock (`scripts/gate/worktreeLock.sh`, the file `gate-worktree.lock` in that checkout's git directory). Something in `home-lander` held descriptor 6 open (a child of an earlier check that outlived it); nothing held it a minute later, so the holder is not named in the evidence.
+
+What changed:
+
+- The lander runs its static check with `MAIPAI_WORKTREE_LOCK=off`. The lander is the only writer of its checkout and does one step at a time, so a landing needs no such lock. Normal and express landings take the same path. Other callers (`wt.sh check`, a hand run) keep the lock.
+- A refusal now names the holder (`held by pid ...`, from `lsof`), so the next stray is found instead of guessed.
+- The watcher's suite yields to a landing. It runs niced (`MAIPAI_WATCH_NICE`, default 10 instead of 0) and sets `MAIPAI_GATE_YIELD_FILE` to the lander's `current-entry` file. While that file was written in the last 20 minutes the sharder starts no new worker (running ones finish; nothing is stopped mid-test, so no timing test sees a jump), for at most `MAIPAI_GATE_YIELD_MAX` seconds (default 600) in total, then it carries on. `check.sh` and the lander's own safety tests set no yield file and never yield.
+
+The machine-wide gate lock (`gate-lock.sh`) is taken only by the full and frontend `check.sh` scopes and by the watcher's whole run; a landing's static check does not use it, so it never waits on the watcher's hold of it.
+
+Proof: `scripts/gate/worktreeLock.test.ts` (a held lock refuses with the holder named; `off` passes), `scripts/landerExpress.test.ts` "LOCK-LANDING-01" (the check sees `MAIPAI_WORKTREE_LOCK=off`), `scripts/gate/shardTests.test.ts` (`landingActive` and a run that starts nothing during the yield, then runs on).
+
+### 28.1 The two "red at c71aaf0" tests
+
+`backend/tests/house/scheduleTool.test.ts` was not load-sensitive: a one-shot schedule at `2026-11-12T23:00Z` became a past time when that moment passed, so the planner refused it. It failed alone after 23:00Z that day; the test now uses 2099. `backend/tests/activity01c.test.ts` compared the whole call list of an in-process Stack fixture and saw two extra calls (stray polls from earlier files in the same shard process); the two comparisons now look only at the job under test. The extra callers are not identified; it is listed as a former flake with that reason.
+
+### 28.2 DIRECT mode: a landing waits for nothing (LAND-FIRST-01)
+
+Owner's rule, relayed 2026-11-12: in DIRECT mode a landing is rebase, generated files, fast-forward onto main, push. No typecheck, no boot check, no safety-surface tests and no check lock stand in front of it, so only a rebase conflict (or a refused express file) can bounce it. The note says `landed; checks run after (DIRECT mode: typecheck, boot check and tests follow)`, never "tested", and no `boot-ok` marker is written (so `ship.sh` runs its own short boot check on the commit, as it always did when no marker exists).
+
+The checks move after the landing, into the watcher: before it runs the suite on a new main, a DIRECT-mode watcher runs the post-landing check in its own checkout (`check.sh --pre`, eslint, `boot-check.sh`; `MAIPAI_WATCH_POST_CMD` replaces it, `MAIPAI_WATCH_POST_SECONDS` bounds it at 900 s, niced). A failure is recorded red exactly like a failing suite (a `runs.jsonl` line with `failing: ["post-landing-check"]`, a note in `reds/`, the issue), so `pipeline.sh status` shows `main: red at <sha>`, and it never holds a landing; the suite is skipped for that head and the next head runs everything again. The watcher checks the newest main per tick, so one run covers a batch of landings. GATED and unset modes are unchanged: every check before the landing, no post-landing check.
+
+Proof: `scripts/landerExpress.test.ts` "LAND-FIRST-01" (a failing check command and a failing boot command do not bounce a DIRECT landing and write no `boot-ok`; gated still bounces), `scripts/watcherResults.test.ts` "LAND-FIRST-01" (a failing post-landing check records red and skips the suite; gated skips the check), `scripts/mode.test.ts` (status text).

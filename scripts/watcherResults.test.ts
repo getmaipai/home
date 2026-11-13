@@ -19,6 +19,29 @@ describe("main watcher", () => {
     expect(run(f, "watcher.sh", ["run-once"]).stdout).toContain("up to date");
   }, 60_000);
 
+  test("LAND-FIRST-01: in direct mode a failing post-landing check (typecheck or boot) records red and skips the suite; gated and unset skip the check", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const modeFile = join(f.scratch, "mode");
+    writeFileSync(modeFile, "direct\n");
+    mkdirSync(join(f.main, "scripts", "lib"), { recursive: true });
+    copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(f.main, "scripts", "lib", "mode.sh"));
+    const env = { ...f.env, MAIPAI_MODE_FILE: modeFile, MAIPAI_WATCH_POST_CMD: "echo typecheck error TS2322; exit 1" };
+    const sha = commit(f, "land a type error", { OK: "1\n" });
+    const out = run(f, "watcher.sh", ["run-once"], env);
+    expect(out.stdout).toContain("post-landing-check");
+    const last = records(f).at(-1);
+    expect(last.result).toBe("red");
+    expect(last.failing).toEqual(["post-landing-check"]);
+    expect(readFileSync(join(f.data, "reds", `${sha}.md`), "utf8")).toContain("TS2322");
+    expect(existsSync(join(f.data, "green", sha))).toBe(false);
+    // The same failing check in gated mode does not run: the suite decides.
+    writeFileSync(modeFile, "gated\n");
+    const sha2 = commit(f, "next landing", { OK2: "1\n" });
+    expect(run(f, "watcher.sh", ["run-once"], env).stdout).toContain("green at");
+    expect(existsSync(join(f.data, "green", sha2))).toBe(true);
+  }, 90_000);
+
   test("records red, identifies the landing, writes a note and files one issue", () => {
     const f = fixture();
     expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);

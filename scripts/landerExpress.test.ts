@@ -81,6 +81,38 @@ describe("the express lane", () => {
     expect(readFileSync(join(data, "notes", "wt-ex_basic.md"), "utf8")).toContain("What was checked: starts and typechecks on top of main");
   }, 120_000);
 
+  test("LOCK-LANDING-01: the landing's static check runs with the per-checkout check lock switched off (a stray holder cannot bounce an express landing)", () => {
+    const { w, sha } = change("lockoff");
+    const seen = join(scratch, "lock-env");
+    const prior = env.MAIPAI_LAND_CHECK_CMD;
+    env.MAIPAI_LAND_CHECK_CMD = `echo "lock=$MAIPAI_WORKTREE_LOCK" > ${seen}; echo checked`;
+    try {
+      enqueue("lockoff", sha, w, { express: true });
+      expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/lockoff");
+    } finally { env.MAIPAI_LAND_CHECK_CMD = prior; }
+    expect(readFileSync(seen, "utf8").trim()).toBe("lock=off");
+  }, 120_000);
+
+  test("LAND-FIRST-01: in direct mode a landing waits for no check: a failing typecheck and a failing boot check do not bounce it, no boot-ok is written, the note says checks run after; gated still bounces", () => {
+    copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    const prior = { c: env.MAIPAI_LAND_CHECK_CMD, b: env.MAIPAI_LAND_BOOT_CMD, m: env.MAIPAI_MODE };
+    env.MAIPAI_LAND_CHECK_CMD = "echo typecheck would fail; exit 1"; env.MAIPAI_LAND_BOOT_CMD = "echo boot would fail; exit 1";
+    try {
+      env.MAIPAI_MODE = "direct";
+      const d = change("direct_first");
+      enqueue("direct_first", d.sha, d.w, { express: true });
+      expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/direct_first");
+      const n = note("direct_first") as Record<string, unknown>;
+      expect(String(n.label)).toContain("checks run after");
+      expect(String(n.label)).not.toContain("tested");
+      expect(existsSync(join(data, "boot-ok", pipelineMain()))).toBe(false);
+      env.MAIPAI_MODE = "gated";
+      const g = change("gated_first");
+      enqueue("gated_first", g.sha, g.w);
+      expect(run("lander.sh", ["run-once"]).stdout).toContain("bounced: wt/gated_first");
+    } finally { env.MAIPAI_LAND_CHECK_CMD = prior.c; env.MAIPAI_LAND_BOOT_CMD = prior.b; if (prior.m === undefined) delete env.MAIPAI_MODE; else env.MAIPAI_MODE = prior.m; }
+  }, 120_000);
+
   test("DIRECT-FAST-02: in direct mode land.sh --detach queues an express entry; gated and unset keep the normal lane; explicit --express --detach stays refused", () => {
     const land = (name: string, args: string[], mode: string) => {
       const { w } = change(name);

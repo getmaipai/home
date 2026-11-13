@@ -180,6 +180,16 @@ export function devShedActive(stateDir = hostGuardDir(), now = Date.now()): bool
   try { return now - statSync(join(stateDir, "dev-shed")).mtimeMs <= 600_000; } catch { return false; }
 }
 
+/** LOCK-LANDING-01 (2026-11-12): the watcher's post-landing suite yields to a landing. MAIPAI_GATE_YIELD_FILE names the lander's
+ * current-entry file (it exists while a landing runs); while it was written in the last 20 minutes the sharder starts no new worker
+ * (running ones finish, nothing is stopped mid-test) for at most MAIPAI_GATE_YIELD_MAX seconds (default 600) in total, so a long
+ * queue cannot starve the suite. Without the variable (check.sh, the lander's own safety tests) nothing yields. */
+export function landingActive(env = process.env, now = Date.now()): boolean {
+  const file = env.MAIPAI_GATE_YIELD_FILE;
+  if (!file) return false;
+  try { return now - statSync(file).mtimeMs <= 1_200_000; } catch { return false; }
+}
+
 /** SOURCE THROTTLE (HOST-GUARD-09). On 2026-11-12 the file-event daemon grew about 45 GB in two hours while safety-test shards
  * ran (the mechanism is unproven; the host guard records the evidence). When its footprint grows 1 GB or more in 10 minutes the
  * guard writes the source-throttle flag, and while it is fresh (10 minutes) a run uses half the workers it would otherwise start.
@@ -637,6 +647,8 @@ export async function run(opts: RunOptions): Promise<number> {
     }
   };
   let nextShard = 0;
+  let yieldedMs = 0;
+  const yieldMaxMs = (Number.isFinite(Number(process.env.MAIPAI_GATE_YIELD_MAX)) ? Number(process.env.MAIPAI_GATE_YIELD_MAX) : 600) * 1000;
   while (nextShard < plan.length || active.size > 0) {
     if (firstFail || deferred) {
       nextShard = plan.length;
@@ -665,6 +677,13 @@ export async function run(opts: RunOptions): Promise<number> {
     });
     const underPressure = tight(resources);
     if (deferred) continue;
+    if (nextShard < plan.length && yieldedMs < yieldMaxMs && landingActive(process.env, clock())) {
+      if (yieldedMs === 0) console.log("shard: a landing is running; starting no new workers until it ends");
+      const t0 = clock();
+      await Promise.race([pause(1000), ...[...active].map((shard) => shard.done)]);
+      yieldedMs += Math.max(1000, clock() - t0);
+      continue;
+    }
     // Under pressure: one worker at a time, and only with room for two worker peaks. The source throttle hook caps the rest.
     const cap = underPressure ? (roomForOne(resources) ? 1 : 0) : sourceThrottleCap(currentCap);
     if (active.size >= cap || nextShard >= plan.length) {

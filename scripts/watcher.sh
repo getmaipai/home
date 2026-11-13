@@ -140,6 +140,22 @@ with open(path, "a") as out:
 PY
 }
 
+# LAND-FIRST-01 (2026-11-12): in DIRECT mode a landing waits for no check, so the typecheck and the boot check of the landed main run
+# here, before the suite. A failure is recorded red (runs.jsonl, a note in reds/, the issue) exactly like a failing suite and never holds a
+# landing; the suite is skipped for that head (the next head runs everything again). GATED and unset modes check before landing and skip this.
+watcher_direct() {
+  local lib="$main/scripts/lib/mode.sh"
+  [[ -f "$lib" ]] || lib="$checkout/scripts/lib/mode.sh"
+  [[ -f "$lib" ]] || return 1
+  [[ "$( export MAIPAI_MODE_FILE="${MAIPAI_MODE_FILE:-$main/data-scratch/mode}"; source "$lib"; mode_get )" == direct ]]
+}
+post_landing_check() {
+  local out="$1" command="${MAIPAI_WATCH_POST_CMD:-}"
+  [[ -n "$command" ]] || command='bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache) && { [[ ! -f scripts/boot-check.sh ]] || bash scripts/boot-check.sh; }'
+  (cd "$checkout" && MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" MAIPAI_WORKTREE_LOCK=off MAIPAI_GATE_NO_FETCH=1 \
+    bounded_run "${MAIPAI_WATCH_POST_SECONDS:-900}" "post-landing check" nice -n "${MAIPAI_WATCH_NICE:-10}" bash -c "$command") >"$out" 2>&1
+}
+
 mark_green() {
   local sha="$1" tmp
   tmp="$(mktemp "$data/green/.green.XXXXXX")"
@@ -180,7 +196,7 @@ run_suite() {
       [[ "$leg_limit" =~ ^[0-9]+$ ]] || leg_limit=1500
       timed_out=""
       local_started="$(date +%s)"
-      (cd "$checkout" && export MAIPAI_GATE_MIN_SHARDS="$min_shards" MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n ${MAIPAI_WATCH_NICE:-0} bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
+      (cd "$checkout" && export MAIPAI_GATE_MIN_SHARDS="$min_shards" MAIPAI_GATE_YIELD_FILE="${MAIPAI_LAND_DATA:-$main/data-scratch/land}/current-entry" MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n ${MAIPAI_WATCH_NICE:-10} bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
       leg_pid=$!
       if (( leg_limit > 0 )); then
         ( sleep "$leg_limit"; if kill -0 "$leg_pid" 2>/dev/null; then : > "$leg_status.timeout"; kill -TERM -"$leg_pid" 2>/dev/null || true; sleep 10; kill -KILL -"$leg_pid" 2>/dev/null || true; fi ) &
@@ -244,10 +260,10 @@ failing_files() {
 
 rerun_file() {
   local file="$1" command="${MAIPAI_WATCH_RERUN_CMD:-}"
-  if [[ -n "$command" ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-0} bash -c "$command \"\$1\"" _ "$file")
-  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "${file#backend/}")
-  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "${file#frontend/}")
-  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-0} bun test --timeout 20000 "$file")
+  if [[ -n "$command" ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-10} bash -c "$command \"\$1\"" _ "$file")
+  elif [[ "$file" == backend/* ]]; then (cd "$checkout/backend" && nice -n ${MAIPAI_WATCH_NICE:-10} bun test --timeout 20000 "${file#backend/}")
+  elif [[ "$file" == frontend/* ]]; then (cd "$checkout/frontend" && nice -n ${MAIPAI_WATCH_NICE:-10} bun test --timeout 20000 "${file#frontend/}")
+  elif [[ "$file" == scripts/* ]]; then (cd "$checkout" && nice -n ${MAIPAI_WATCH_NICE:-10} bun test --timeout 20000 "$file")
   else return 1
   fi
 }
@@ -550,6 +566,22 @@ run_once_body() {
   rm -f "$data/checkout-failed"
   install_if_needed
   started="$(date +%s)"; output="$(mktemp "$data/.suite.XXXXXX")"
+  if watcher_direct; then
+    local post_rc=0
+    post_landing_check "$output" || post_rc=$?
+    if (( post_rc != 0 )); then
+      seconds=$(( $(date +%s) - started ))
+      note="$data/reds/$head.md"; note_tmp="$(mktemp "$data/reds/.red.XXXXXX")"
+      { printf '# Main post-landing check failure: %s\n\n- Main SHA: `%s`\n- Failing: post-landing-check (typecheck or boot check, DIRECT mode)\n\n## Last 60 lines of output\n\n```text\n' "$head" "$head"; tail -n 60 "$output"; printf '\n```\n'; } > "$note_tmp"
+      mv -f "$note_tmp" "$note"
+      append_run "$head" red "$seconds" "post-landing-check" ""
+      atomic_value "$data/last-run" "$head"
+      file_issue "Watcher: main red at ${head:0:7}: post-landing-check" "post-landing-check" "$note" || true
+      rm -f "$output"
+      echo "red at ${head:0:7}: post-landing-check (typecheck or boot check)"
+      return 0
+    fi
+  fi
   if [[ "${MAIPAI_WATCH_NO_LOCK:-}" == 1 ]]; then :
   elif [[ ! -f "$gate_lock" ]]; then
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) gate lock missing at $gate_lock; running watcher suite without it" >> "$data/watcher.log"

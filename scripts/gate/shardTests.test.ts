@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, jobWrapArgs, DEFERRED_EXIT, devShedActive, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, pressureWaitMs, readShardLog, reserveWorkerSlot, run, sourceThrottleCap, workerSlotCount } from "./shardTests";
+import { balance, chooseShardCount, jobWrapArgs, DEFERRED_EXIT, devShedActive, discoverTests, failedFiles, failedTests, FlakeLedger, landingActive, junitFileSeconds, parseStackBudget, parseSummary, pressureWaitMs, readShardLog, reserveWorkerSlot, run, sourceThrottleCap, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -291,6 +291,42 @@ describe("run: the gate's pass/fail meaning", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
       for (let index = 0; index < 2; index += 1) rmSync(`${marker}-${index}`, { force: true });
+    }
+  });
+
+  test("LOCK-LANDING-01: landingActive needs the variable and a fresh file; a stale or missing file does not yield", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-yield-"));
+    try {
+      const file = join(dir, "current-entry");
+      expect(landingActive({} as never)).toBe(false);
+      expect(landingActive({ MAIPAI_GATE_YIELD_FILE: file } as never)).toBe(false);
+      writeFileSync(file, "wt/x\t1\t1\tstatic check\n");
+      expect(landingActive({ MAIPAI_GATE_YIELD_FILE: file } as never)).toBe(true);
+      expect(landingActive({ MAIPAI_GATE_YIELD_FILE: file } as never, Date.now() + 21 * 60_000)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("LOCK-LANDING-01: while a landing runs no new worker starts, for at most the yield budget, then the suite runs on", async () => {
+    const dir = fixture({ "a.test.ts": `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("a",()=>{writeFileSync(process.env.YIELD_MARKER!,"ran");});` });
+    const state = mkdtempSync(join(tmpdir(), "maipai-yield-run-"));
+    const marker = join(state, "marker");
+    const saved = { f: process.env.MAIPAI_GATE_YIELD_FILE, m: process.env.MAIPAI_GATE_YIELD_MAX, k: process.env.YIELD_MARKER };
+    writeFileSync(join(state, "current-entry"), "wt/x\t1\t1\tstatic check\n");
+    process.env.MAIPAI_GATE_YIELD_FILE = join(state, "current-entry"); process.env.MAIPAI_GATE_YIELD_MAX = "3"; process.env.YIELD_MARKER = marker;
+    let clock = Date.now(); const ranDuringPause: boolean[] = [];
+    try {
+      const code = await quietRun({
+        dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), engineGb: 0, gbPerShard: 1,
+        resourceProbe: () => ({ reclaimableGb: 16, totalGb: 16, pressureLevel: 1 }),
+        now: () => clock, sleep: async (ms) => { ranDuringPause.push(existsSync(marker)); clock += ms; },
+      });
+      expect(code).toBe(0);
+      expect(ranDuringPause.length).toBeGreaterThanOrEqual(3);
+      expect(ranDuringPause.every((ran) => !ran)).toBe(true);
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      for (const [key, value] of [["MAIPAI_GATE_YIELD_FILE", saved.f], ["MAIPAI_GATE_YIELD_MAX", saved.m], ["YIELD_MARKER", saved.k]] as const) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(dir, { recursive: true, force: true }); rmSync(state, { recursive: true, force: true });
     }
   });
 

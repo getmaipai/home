@@ -369,7 +369,7 @@ run_static_check() {
   local output="$1" cap="${MAIPAI_LAND_CHECK_SECONDS:-900}" command="${MAIPAI_LAND_CHECK_CMD:-}"
   # DUP-CHECK-01 (2026-11-12): the check judges the change against the main it was rebased on (not GitHub's main, which lags by up to a
   # batch), does not fetch again (the landing just did), and does not regenerate what this landing generated a moment ago.
-  local -a check_env=(MAIPAI_GATE_NO_FETCH=1 MAIPAI_PRE_GENERATED=1)
+  local -a check_env=(MAIPAI_GATE_NO_FETCH=1 MAIPAI_PRE_GENERATED=1 MAIPAI_WORKTREE_LOCK=off)
   [[ -z "${LAND_DIFF_BASE:-}" ]] || check_env+=(MAIPAI_GATE_DIFF_BASE="$LAND_DIFF_BASE")
   [[ -z "${LAND_GEN_SETTINGS:-}" ]] || check_env+=(MAIPAI_PRE_SETTINGS_FILE="$LAND_GEN_SETTINGS")
   if [[ -n "$command" ]]; then
@@ -911,54 +911,66 @@ PY
     git -C "$checkout" -c user.name="MaiPai lander" -c user.email="lander@users.noreply.github.com" commit -m "Backlog: ${done_items[*]} done (landed by the lander)" >>"$output" 2>&1 || { last_line="$(tail -n 1 "$output" 2>/dev/null || true)"; bounce "$request" "$branch" "$sha" "backlog item update failed: ${last_line:-could not commit backlog}" "$started" "$output"; rm -f "$output"; return 0; }
   fi
   check_cmd="${MAIPAI_LAND_CHECK_CMD:-}"
-  phase "static check"
-  if static_check_cached "$base"; then entry_check_reused="$(cat "$(static_check_key_file "$base")" 2>/dev/null || echo cached)"; echo "static check: reused, this exact tree passed against this exact base" >"$output"
-  elif ! LAND_DIFF_BASE="$base" LAND_GEN_SETTINGS="$gen_settings" run_static_check "$output"; then rm -rf "$gen_scratch"; bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; fi
-  rm -rf "$gen_scratch"
-  [[ -n "$entry_check_reused" ]] || static_check_remember "$base"
+  local direct_landing=0
+  # LAND-FIRST-01 (2026-11-12, owner's word relayed by the FAST SPEECH session): in DIRECT mode nothing blocks a landing but a rebase
+  # conflict. The typecheck, the boot check and the tests run after the landing (the watcher's post-landing check, section 28.2), report
+  # red or green on the status rows, and a red never holds the next landing. GATED and unset modes keep every check before landing.
+  [[ "$(lander_mode)" == direct ]] && direct_landing=1
+  if (( direct_landing )); then
+    rm -rf "$gen_scratch"
+    safety_files=""; boot_note="boot check: after landing"
+    entry_label="landed; checks run after (DIRECT mode: typecheck, boot check and tests follow)"
+    landing_note="${landing_note:+$landing_note; }landed; checks run after (DIRECT mode)"
+  else
+    phase "static check"
+    if static_check_cached "$base"; then entry_check_reused="$(cat "$(static_check_key_file "$base")" 2>/dev/null || echo cached)"; echo "static check: reused, this exact tree passed against this exact base" >"$output"
+    elif ! LAND_DIFF_BASE="$base" LAND_GEN_SETTINGS="$gen_settings" run_static_check "$output"; then rm -rf "$gen_scratch"; bounce "$request" "$branch" "$sha" "$(static_check_reason "$output")" "$started" "$output"; rm -f "$output"; return 0; fi
+    rm -rf "$gen_scratch"
+    [[ -n "$entry_check_reused" ]] || static_check_remember "$base"
 
-  changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
-  safety_files="$(safety_surface_files "$changed_files")"
-  if [[ "$entry_express" == 1 ]]; then
-    # The express lane runs no test suite (SINGLE-WRITER-01): typecheck of the changed workspaces on top of main, then the boot check.
-    safety_files=""
-    phase "boot check"
-    if ! run_boot_check "$output"; then bounce "$request" "$branch" "$sha" "boot check failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): the rebased commit does not start; nothing was pushed" "$started" "$output"; rm -f "$output"; return 0; fi
-    boot_note="$(tail -n 1 "$output" 2>/dev/null || true)"
-    entry_label="starts and typechecks on top of main (express: no tests run)"
-    [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
-  fi
-  if [[ -n "$safety_files" && "$(lander_mode)" == direct ]]; then
-    # MODE-01: in DIRECT mode a safety-surface change is not held for its tests; the nightly run covers it (and a red nightly blocks `stable`).
-    landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests skipped (DIRECT mode: the nightly runs them)"
-    safety_files=""
-  fi
-  if [[ -n "$safety_files" ]]; then
-    # HOST-GUARD-09: under memory pressure, or while the host guard paused heavy work, the safety tests do not start; the entry is held
-    # and retried (2026-11-12: two landings paused 2,400 s at pressure 2 and died "unfinished"). The sharder itself exits 75 ("deferred
-    # (memory)") when pressure arrives mid-run; that is held the same way, never a pass and never a failure of the branch.
-    local hostmem_lib="$main/scripts/lib/hostmem.sh" t2_rc=0 gate_line=""
-    [[ -f "$hostmem_lib" ]] || hostmem_lib="$checkout/scripts/lib/hostmem.sh"
-    if [[ -f "$hostmem_lib" ]]; then
-      # shellcheck source=lib/hostmem.sh
-      source "$hostmem_lib"
-      if ! gate_line="$(hostmem_gate "Safety-surface tests" 2>&1)"; then
-        hold_entry "$request" "$branch" "deferred (memory): $gate_line"; rm -f "$output"; return 0
+    changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
+    safety_files="$(safety_surface_files "$changed_files")"
+    if [[ "$entry_express" == 1 ]]; then
+      # The express lane runs no test suite (SINGLE-WRITER-01): typecheck of the changed workspaces on top of main, then the boot check.
+      safety_files=""
+      phase "boot check"
+      if ! run_boot_check "$output"; then bounce "$request" "$branch" "$sha" "boot check failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): the rebased commit does not start; nothing was pushed" "$started" "$output"; rm -f "$output"; return 0; fi
+      boot_note="$(tail -n 1 "$output" 2>/dev/null || true)"
+      entry_label="starts and typechecks on top of main (express: no tests run)"
+      [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
+    fi
+    if [[ -n "$safety_files" && "$(lander_mode)" == direct ]]; then
+      # MODE-01: in DIRECT mode a safety-surface change is not held for its tests; the nightly run covers it (and a red nightly blocks `stable`).
+      landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests skipped (DIRECT mode: the nightly runs them)"
+      safety_files=""
+    fi
+    if [[ -n "$safety_files" ]]; then
+      # HOST-GUARD-09: under memory pressure, or while the host guard paused heavy work, the safety tests do not start; the entry is held
+      # and retried (2026-11-12: two landings paused 2,400 s at pressure 2 and died "unfinished"). The sharder itself exits 75 ("deferred
+      # (memory)") when pressure arrives mid-run; that is held the same way, never a pass and never a failure of the branch.
+      local hostmem_lib="$main/scripts/lib/hostmem.sh" t2_rc=0 gate_line=""
+      [[ -f "$hostmem_lib" ]] || hostmem_lib="$checkout/scripts/lib/hostmem.sh"
+      if [[ -f "$hostmem_lib" ]]; then
+        # shellcheck source=lib/hostmem.sh
+        source "$hostmem_lib"
+        if ! gate_line="$(hostmem_gate "Safety-surface tests" 2>&1)"; then
+          hold_entry "$request" "$branch" "deferred (memory): $gate_line"; rm -f "$output"; return 0
+        fi
       fi
+      t2_started="$(date +%s)"
+      phase "safety-surface tests"
+      run_t2_tests "$output" || t2_rc=$?
+      if (( t2_rc == 75 )); then
+        hold_entry "$request" "$branch" "deferred (memory): $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')"; rm -f "$output"; return 0
+      fi
+      if (( t2_rc != 0 )); then
+        reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)"
+        bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
+      fi
+      t2_seconds=$(( $(date +%s) - t2_started ))
+      landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests took ${t2_seconds}s"
+      entry_label="static check and safety-surface tests on top of main"
     fi
-    t2_started="$(date +%s)"
-    phase "safety-surface tests"
-    run_t2_tests "$output" || t2_rc=$?
-    if (( t2_rc == 75 )); then
-      hold_entry "$request" "$branch" "deferred (memory): $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')"; rm -f "$output"; return 0
-    fi
-    if (( t2_rc != 0 )); then
-      reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)"
-      bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
-    fi
-    t2_seconds=$(( $(date +%s) - t2_started ))
-    landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests took ${t2_seconds}s"
-    entry_label="static check and safety-surface tests on top of main"
   fi
   [[ -n "$entry_label" ]] || entry_label="static check on top of main"
 
@@ -978,7 +990,7 @@ PY
   outbox_mark_pending
   printf '%s\n' "$branch" >>"$outbox_dir/delete-branches"
   # The boot check ran on exactly this commit: ship.sh accepts it instead of booting it again.
-  if [[ "$entry_express" == 1 && "$boot_note" != "boot check: none in this tree" ]]; then mkdir -p "$data/boot-ok"; : >"$data/boot-ok/$main_sha"; fi
+  if [[ "$entry_express" == 1 && "$direct_landing" == 0 && "$boot_note" != "boot check: none in this tree" ]]; then mkdir -p "$data/boot-ok"; : >"$data/boot-ok/$main_sha"; fi
   if [[ "$entry_express" == 1 ]]; then
     phase "pushing to GitHub"
     entry_github="$(outbox_flush_sync "$main_sha")"

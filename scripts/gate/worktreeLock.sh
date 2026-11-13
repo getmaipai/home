@@ -18,6 +18,14 @@ acquire_worktree_lock() {
   worktree="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
   lock_file="$git_dir/gate-worktree.lock"
 
+  # LOCK-LANDING-01 (2026-11-12): the lander is the only writer of its own checkout and runs one step at a time, so a landing never
+  # needs this lock; it sets MAIPAI_WORKTREE_LOCK=off. A stray child of an earlier check that kept descriptor 6 open bounced three
+  # express landings in a row with "another check is already running" four seconds in.
+  if [ "${MAIPAI_WORKTREE_LOCK:-}" = off ]; then
+    echo "worktree lock: skipped for $worktree (MAIPAI_WORKTREE_LOCK=off)"
+    return 0
+  fi
+
   # A full gate invokes --pre as a child process. The exported path marker
   # is meaningful only alongside the inherited lock descriptor.
   inherited="${MAIPAI_WORKTREE_LOCK_PATH:-}"
@@ -36,6 +44,8 @@ acquire_worktree_lock() {
     return 0
   fi
   exec 6>&-
-  echo "worktree lock: another check is already running in $worktree (lock $lock_file)" >&2
+  local holders
+  holders="$(lsof -t "$lock_file" 2>/dev/null | tr '\n' ' ')"
+  echo "worktree lock: another check is already running in $worktree (lock $lock_file${holders:+; held by pid $holders})" >&2
   return 1
 }

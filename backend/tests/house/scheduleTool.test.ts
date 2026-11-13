@@ -60,7 +60,7 @@ describe("schedule asks first", () => {
     }
     const weekdays = plan({ ...everyDay, when: { time: "07:30", days: [1, 3] } });
     expect(weekdays.kind === "ask" && weekdays.prompt).toBe("Turn on Porch light in Outside on Mon, Wed at 7:30 AM?");
-    const once = plan({ ...everyDay, do: "turn_off", when: { once_at: "2026-11-12T23:00:00.000Z" } });
+    const once = plan({ ...everyDay, do: "turn_off", when: { once_at: "2099-11-12T23:00:00.000Z" } });
     expect(once.kind === "ask" && once.prompt).toBe("Turn off Porch light in Outside once on Nov 12 at 6:00 PM?");
   });
 

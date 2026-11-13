@@ -21,9 +21,9 @@ describe("scripts/mode.sh", () => {
     expect(r.stdout).toContain("mode: not set");
   });
   test("direct and gated print their one-line meaning and persist in one file", () => {
-    expect(run("direct").stdout.trim()).toBe("DIRECT: run first, checked after");
+    expect(run("direct").stdout.trim()).toBe("DIRECT: run first, checked after (a landing waits for no check; typecheck, boot check and tests run after it)");
     expect(readFileSync(file, "utf8").trim()).toBe("direct");
-    expect(run("status").stdout.trim()).toBe("DIRECT: run first, checked after");
+    expect(run("status").stdout.trim()).toBe("DIRECT: run first, checked after (a landing waits for no check; typecheck, boot check and tests run after it)");
     expect(run("gated").stdout.trim()).toBe("GATED: checked first, then run");
     expect(run("status").stdout.trim()).toBe("GATED: checked first, then run");
   });

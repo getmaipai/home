@@ -56,7 +56,8 @@ describe("ACTIVITY-01c producer adapters", () => {
       db.insert(people).values({ id: "child-1", displayName: "Child", nickname: null, bio: null, accent: null, role: "child", birthdate: null, avatarSeed: "c", source: "local", localOnly: false, createdAt: now, updatedAt: now, deletedAt: null, hlc: "1:0:abcdefgh", enabled: true, guestExpiresAt: null, memorializedAt: null } as never).run();
       const result = await startImageProducerJob({ actorId: "child-1", prompt: "private child prompt" });
       expect(result).toMatchObject({ id: "img-child-1", kind: "image", state: "done", startedBy: "child-1", forPerson: "child-1" });
-      expect(fixture.calls).toEqual(["POST /stack/v1/jobs", "GET /stack/v1/jobs/img-child-1"]);
+      // Only this job's own calls: the in-process fixture also sees stray background polls from earlier files in the same shard process (watcher reds 2026-11-12, "received +2").
+      expect(fixture.calls.filter((call) => call === "POST /stack/v1/jobs" || call.endsWith("/img-child-1"))).toEqual(["POST /stack/v1/jobs", "GET /stack/v1/jobs/img-child-1"]);
       expect(listJobsForViewer(person("child-1", "child"))).toContainEqual(expect.objectContaining({ id: "img-child-1", state: "done" }));
     } finally { fixture.stop(); }
   });
@@ -87,7 +88,7 @@ describe("ACTIVITY-01c producer adapters", () => {
       await client.post("/api/auth/setup", { displayName: "Owner", secret: "correct horse battery staple" });
       const response = await client.post("/api/jobs/stack:model-install-stop/stop", {});
       expect(response.status).toBe(200);
-      expect(fixture.calls).toEqual(["DELETE /stack/v1/jobs/model-install-stop"]);
+      expect(fixture.calls.filter((call) => call.endsWith("/model-install-stop"))).toEqual(["DELETE /stack/v1/jobs/model-install-stop"]);
     } finally { fixture.stop(); }
   });
 

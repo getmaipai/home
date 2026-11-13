@@ -66,3 +66,38 @@ test("worktree lock refuses a second check, lets nested preflight inherit, and s
     rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+test("LOCK-LANDING-01: MAIPAI_WORKTREE_LOCK=off lets a landing check run while a stray holder keeps the lock, and a refusal names the holder", async () => {
+  const scratch = mkdtempSync(join(tmpdir(), "maipai-worktree-lock-off-"));
+  const repo = join(scratch, "repo");
+  const releasePath = join(scratch, "release");
+  initializeRepo(repo);
+  const holder = Bun.spawn(["bash", "-c", `
+    source "$LOCK_LIBRARY"
+    acquire_worktree_lock >/dev/null || exit 1
+    echo holder-ready
+    while [ ! -e "$RELEASE_PATH" ]; do sleep 0.02; done
+  `], { cwd: repo, env: { ...process.env, LOCK_LIBRARY, RELEASE_PATH: releasePath }, stdout: "pipe", stderr: "pipe" });
+  const reader = holder.stdout.getReader();
+  const decoder = new TextDecoder();
+  let output = "";
+  try {
+    while (!output.includes("holder-ready")) {
+      const result = await reader.read();
+      if (result.done) throw new Error(`holder exited before locking: ${output}`);
+      output += decoder.decode(result.value, { stream: true });
+    }
+    const env = { ...process.env, LOCK_LIBRARY };
+    delete (env as Record<string, string | undefined>).MAIPAI_WORKTREE_LOCK;
+    const refused = Bun.spawnSync(["bash", "-c", `source "$LOCK_LIBRARY"; acquire_worktree_lock`], { cwd: repo, env, stdout: "pipe", stderr: "pipe" });
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr.toString()).toContain("another check is already running");
+    const skipped = Bun.spawnSync(["bash", "-c", `source "$LOCK_LIBRARY"; acquire_worktree_lock`], { cwd: repo, env: { ...env, MAIPAI_WORKTREE_LOCK: "off" }, stdout: "pipe", stderr: "pipe" });
+    expect(skipped.exitCode).toBe(0);
+    expect(skipped.stdout.toString()).toContain("skipped");
+  } finally {
+    writeFileSync(releasePath, "done");
+    expect(await holder.exited).toBe(0);
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
