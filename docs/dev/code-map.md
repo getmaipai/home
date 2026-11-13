@@ -331,12 +331,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
+| `frontend/src/shell/pages/MusicLibrary.tsx` | useWide, MusicLibrary |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
+| `frontend/src/shell/pages/MusicSongDetails.tsx` | useBedPicker, songReason, SongDetails |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, EFFECT_FAILED_LINE, NO_AUDIO_TOOL_LINE, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicVoiceCreate.tsx` | VoiceCreate |
-| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | MAKES, STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress |
+| `frontend/src/shell/pages/MusicWorkspacePage.tsx` | MAKES, STEMS_LINE, COVER_SONG_LINE, makeSoundBody, SongGallery, MusicWorkspace |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
@@ -376,6 +378,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | tilePicture, CONTINUE_SHORTCUTS, ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/MakeShelf.tsx` | MAKE_TILES, visibleMakeTiles, MakeShelf |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, isCardOld, TodaySection |
+| `frontend/src/shell/pages/musicSongStatus.tsx` | songLine, songStatusCard |
 | `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderLeft, PackageAppHeaderActions, sectionsBarEntries |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
 | `frontend/src/shell/pages/performance/EnginesHealthBody.tsx` | EnginesHealthBody |
