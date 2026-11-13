@@ -104977,7 +104977,8 @@
                           "playlist",
                           "watchlist",
                           "pins",
-                          "filter"
+                          "filter",
+                          "family_picks"
                         ]
                       },
                       "title": {
@@ -105000,6 +105001,18 @@
                             "position": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "votes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^person-[a-z0-9]{6,}$"
+                              },
+                              "default": []
+                            },
+                            "added_by": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
                             },
                             "status": {
                               "anyOf": [
@@ -105167,7 +105180,7 @@
                       "provenance"
                     ],
                     "additionalProperties": false,
-                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                   }
                 }
               }
@@ -105243,7 +105256,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -105266,6 +105280,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -105433,7 +105459,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
@@ -105484,7 +105510,8 @@
                           "playlist",
                           "watchlist",
                           "pins",
-                          "filter"
+                          "filter",
+                          "family_picks"
                         ]
                       },
                       "title": {
@@ -105507,6 +105534,18 @@
                             "position": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "votes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^person-[a-z0-9]{6,}$"
+                              },
+                              "default": []
+                            },
+                            "added_by": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
                             },
                             "status": {
                               "anyOf": [
@@ -105674,7 +105713,7 @@
                       "provenance"
                     ],
                     "additionalProperties": false,
-                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                   }
                 }
               }
@@ -105736,7 +105775,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -105759,6 +105799,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -105926,7 +105978,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
@@ -106036,7 +106088,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -106059,6 +106112,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -106226,7 +106291,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
@@ -106399,7 +106464,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -106422,6 +106488,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -106589,7 +106667,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
@@ -106679,7 +106757,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -106702,6 +106781,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -106869,7 +106960,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
@@ -106948,7 +107039,8 @@
                         "playlist",
                         "watchlist",
                         "pins",
-                        "filter"
+                        "filter",
+                        "family_picks"
                       ]
                     },
                     "title": {
@@ -106971,6 +107063,18 @@
                           "position": {
                             "type": "integer",
                             "minimum": 0
+                          },
+                          "votes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$"
+                            },
+                            "default": []
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$"
                           },
                           "status": {
                             "anyOf": [
@@ -107138,7 +107242,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match. VIDEO-LD-04: family_picks is one shared household collection where anyone adds and everyone votes; the top pick plays next."
                 }
               }
             }
