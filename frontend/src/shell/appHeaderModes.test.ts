@@ -34,3 +34,10 @@ test("the chosen mode is remembered per person and app", () => {
   expect(rememberedMode("sage", "demo")).toBe("create");
   expect(rememberedMode("marlow", "demo")).toBeNull();
 });
+
+test("the renamed Video app migrates its remembered mode from the old package key", () => {
+  localStorage.setItem("maipai.mode.v1:sage:videos", "create");
+  expect(rememberedMode("sage", "video")).toBe("create");
+  expect(localStorage.getItem("maipai.mode.v1:sage:video")).toBe("create");
+  expect(localStorage.getItem("maipai.mode.v1:sage:videos")).toBeNull();
+});

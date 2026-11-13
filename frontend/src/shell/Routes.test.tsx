@@ -81,7 +81,7 @@ describe("Routes appearance", () => {
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     try {
-      function Where() { const location = useLocation(); return <output>{location.pathname}{location.search}</output>; }
+      function Where() { const location = useLocation(); return <output>{location.pathname}{location.search}{location.hash}</output>; }
       renderWithQueryClient(
         <MemoryRouter initialEntries={["/apps/music/create?song=abc"]}>
           <ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>
@@ -92,6 +92,29 @@ describe("Routes appearance", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  test("redirects legacy Video URLs and preserves query strings", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([
+        { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      function Where() { const location = useLocation(); return <output>{location.pathname}{location.search}{location.hash}</output>; }
+      renderWithQueryClient(
+        <MemoryRouter initialEntries={["/apps/videos/watch?id=abc"]}>
+          <ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>
+          <Where />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.querySelector("output")?.textContent).toBe("/apps/video/watch?id=abc"));
+    } finally { globalThis.fetch = originalFetch; }
   });
 
   test.each([

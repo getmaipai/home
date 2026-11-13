@@ -26,7 +26,7 @@
       "share_change": {
         "add": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-add",
+            "target": "/api/plugins/video/actions/share-add",
             "args": {
               "id": "{id}",
               "person_id": "{person_id}"
@@ -35,7 +35,7 @@
         },
         "remove": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-remove",
+            "target": "/api/plugins/video/actions/share-remove",
             "args": {
               "id": "{id}",
               "person_id": "{person_id}"
@@ -44,7 +44,7 @@
         },
         "make_private": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-private",
+            "target": "/api/plugins/video/actions/share-private",
             "args": {
               "id": "{id}"
             }
@@ -66,7 +66,7 @@
           "icon": "share",
           "action": {
             "share": {
-              "to": "/apps/videos/playlist?id={share_id}",
+              "to": "/apps/video/playlist?id={share_id}",
               "title": "{title}"
             }
           }
@@ -79,13 +79,13 @@
               "prompt": "Delete {title}? The videos stay in your library.",
               "on_confirm": {
                 "call": {
-                  "target": "/api/plugins/videos/playlists/delete",
+                  "target": "/api/plugins/video/playlists/delete",
                   "args": {
                     "playlist_id": "{id}"
                   },
                   "then": {
                     "navigate": {
-                      "to": "/apps/videos/playlists"
+                      "to": "/apps/video/playlists"
                     }
                   }
                 }
@@ -119,7 +119,7 @@
       "reorder": {
         "call": {
           "call": {
-            "target": "/api/plugins/videos/playlists/reorder",
+            "target": "/api/plugins/video/playlists/reorder",
             "args": {
               "playlist_id": "{playlist_id}"
             }
@@ -133,7 +133,7 @@
           "label": "Remove from playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/playlists/remove",
+              "target": "/api/plugins/video/playlists/remove",
               "args": {
                 "playlist_id": "{playlist_id}",
                 "media_id": "{id}"
@@ -146,7 +146,7 @@
           "label": "Watch later",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/watch-later",
+              "target": "/api/plugins/video/watch-later",
               "args": {
                 "media_id": "{id}"
               }
@@ -158,7 +158,7 @@
           "label": "Share",
           "action": {
             "share": {
-              "to": "/apps/videos/watch?id={id}",
+              "to": "/apps/video/watch?id={id}",
               "title": "{title}"
             }
           }
@@ -175,7 +175,7 @@
         "text": "This playlist is empty. Use Save to playlist on a video.",
         "action": {
           "navigate": {
-            "to": "/apps/videos/index"
+            "to": "/apps/video/index"
           }
         },
         "action_label": "Browse videos"

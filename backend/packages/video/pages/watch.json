@@ -27,7 +27,7 @@
               "on_label": "Liked",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/like",
+                  "target": "/api/plugins/video/like",
                   "args": {
                     "media_id": "{id}",
                     "on": "{on}"
@@ -42,7 +42,7 @@
               "on_label": "Saved for later",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/watch-later",
+                  "target": "/api/plugins/video/watch-later",
                   "args": {
                     "media_id": "{id}",
                     "on": "{on}"
@@ -55,7 +55,7 @@
               "icon": "list-plus",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/playlists/save",
+                  "target": "/api/plugins/video/playlists/save",
                   "args": {
                     "media_id": "{id}"
                   },
@@ -68,7 +68,7 @@
               "icon": "share",
               "action": {
                 "share": {
-                  "to": "/apps/videos/watch?id={id}",
+                  "to": "/apps/video/watch?id={id}",
                   "title": "{title}"
                 }
               }
@@ -76,7 +76,7 @@
           ],
           "on_progress": {
             "call": {
-              "target": "/api/plugins/videos/progress",
+              "target": "/api/plugins/video/progress",
               "args": {
                 "media_id": "{id}",
                 "position_s": "{position_s}",
@@ -93,13 +93,13 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "film",
-            "text": "This video is not on the hub. Go back to Videos and pick another.",
+            "text": "This video is not on the hub. Go back to Video and pick another.",
             "action": {
               "navigate": {
-                "to": "/apps/videos/index"
+                "to": "/apps/video/index"
               }
             },
-            "action_label": "Back to Videos"
+            "action_label": "Back to Video"
           },
           "fields": {
             "description": "description",
@@ -129,7 +129,7 @@
             ],
             "on_save": {
               "call": {
-                "target": "/api/plugins/videos/actions/edit",
+                "target": "/api/plugins/video/actions/edit",
                 "args": {
                   "id": "{id}",
                   "title": "{title}",
@@ -140,7 +140,7 @@
             },
             "on_upload": {
               "call": {
-                "target": "/api/plugins/videos/actions/cover",
+                "target": "/api/plugins/video/actions/cover",
                 "args": {
                   "id": "{id}",
                   "file": "{file}"
@@ -176,7 +176,7 @@
           "share_change": {
             "add": {
               "call": {
-                "target": "/api/plugins/videos/actions/share-add",
+                "target": "/api/plugins/video/actions/share-add",
                 "args": {
                   "id": "{id}",
                   "person_id": "{person_id}"
@@ -185,7 +185,7 @@
             },
             "remove": {
               "call": {
-                "target": "/api/plugins/videos/actions/share-remove",
+                "target": "/api/plugins/video/actions/share-remove",
                 "args": {
                   "id": "{id}",
                   "person_id": "{person_id}"
@@ -194,7 +194,7 @@
             },
             "make_private": {
               "call": {
-                "target": "/api/plugins/videos/actions/share-private",
+                "target": "/api/plugins/video/actions/share-private",
                 "args": {
                   "id": "{id}"
                 }

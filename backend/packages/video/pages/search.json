@@ -6,8 +6,8 @@
     {
       "type": "search",
       "state": "q",
-      "label": "Search Videos",
-      "placeholder": "Search Videos",
+      "label": "Search Video",
+      "placeholder": "Search Video",
       "type_chips": {
         "state": "kind",
         "label": "Result type",
@@ -68,7 +68,7 @@
       },
       "on_select": {
         "navigate": {
-          "to": "/apps/videos/watch",
+          "to": "/apps/video/watch",
           "state": {
             "id": "{id}"
           }
@@ -80,7 +80,7 @@
           "label": "Watch later",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/watch-later",
+              "target": "/api/plugins/video/watch-later",
               "args": {
                 "media_id": "{id}"
               }
@@ -92,7 +92,7 @@
           "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/playlists/save",
+              "target": "/api/plugins/video/playlists/save",
               "args": {
                 "media_id": "{id}"
               },
@@ -105,7 +105,7 @@
           "label": "Share",
           "action": {
             "share": {
-              "to": "/apps/videos/watch?id={id}",
+              "to": "/apps/video/watch?id={id}",
               "title": "{title}"
             }
           }

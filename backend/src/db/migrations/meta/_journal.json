@@ -1345,6 +1345,13 @@
       "when": 1794300000000,
       "tag": "0192_audio_package_id",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "6",
+      "when": 1794300000001,
+      "tag": "0193_video_package_id",
+      "breakpoints": true
     }
   ]
 }

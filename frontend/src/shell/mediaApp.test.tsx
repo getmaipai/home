@@ -19,8 +19,8 @@ import { createMediaStore } from "@/shell/mediaHost";
 import type { AppRow } from "@/lib/api";
 
 const row: AppRow = {
-  package: "videos", page: "index", label: "Videos", icon: "circle-play", description: "Videos.", category: "Media", keywords: [],
-  sections: [{ page: "library", label: "Library", icon: null }, { page: "watch", label: "Watch", icon: null }], to: "/apps/videos", incognito: "unaffected",
+  package: "video", page: "index", label: "Videos", icon: "circle-play", description: "Videos.", category: "Media", keywords: [],
+  sections: [{ page: "library", label: "Library", icon: null }, { page: "watch", label: "Watch", icon: null }], to: "/apps/video", incognito: "unaffected",
 };
 const newsRow: AppRow = {
   package: "news", page: "index", label: "News", icon: "newspaper", description: "News.", category: "Info", keywords: [],
@@ -42,7 +42,7 @@ const watchPage = {
   type: "page", id: "watch", title: "Watch",
   body: [{ type: "player", bind: { source: "package", path: "item", params: { id: "$state.id" } }, kind: "video", empty_state: { type: "empty_state", icon: "film", text: "Not on the hub." } }],
 };
-const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/videos/pages/watch.json"), "utf8")) as unknown;
+const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/video/pages/watch.json"), "utf8")) as unknown;
 const musicPlayPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/audio/pages/play.json"), "utf8")) as unknown;
 const weatherIndexPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/weather/pages/index.json"), "utf8")) as unknown;
 
@@ -61,14 +61,14 @@ beforeEach(() => {
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row, newsRow, weatherRow]));
     if (url.startsWith("/api/plugins/news/pages/")) return Promise.resolve(Response.json(newsPage));
     if (url.startsWith("/api/plugins/weather/pages/")) return Promise.resolve(Response.json(weatherIndexPage));
-    if (url.startsWith("/api/plugins/videos/pages/index")) return Promise.resolve(Response.json(indexPage));
-    if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(watchPage));
-    if (url.startsWith("/api/plugins/videos/data/recent")) return Promise.resolve(Response.json([{ id: "media-aaaaaa", title: "Building a birdhouse", kind: "video", thumbnail: null }]));
-    if (url.startsWith("/api/plugins/videos/data/item")) {
+    if (url.startsWith("/api/plugins/video/pages/index")) return Promise.resolve(Response.json(indexPage));
+    if (url.startsWith("/api/plugins/video/pages/watch")) return Promise.resolve(Response.json(watchPage));
+    if (url.startsWith("/api/plugins/video/data/recent")) return Promise.resolve(Response.json([{ id: "media-aaaaaa", title: "Building a birdhouse", kind: "video", thumbnail: null }]));
+    if (url.startsWith("/api/plugins/video/data/item")) {
       itemBodies.push(String(init?.body));
       return Promise.resolve(Response.json({ id: "media-aaaaaa", title: "Building a birdhouse", src: "/api/media/items/media-aaaaaa/content", channel: "Bramble Workshop", poster: null, duration_s: 14, chapters: [{ start_s: 0, title: "Intro" }, { start_s: 4, title: "Boards" }] }));
     }
-    if (url.startsWith("/api/plugins/videos/actions/")) {
+    if (url.startsWith("/api/plugins/video/actions/")) {
       shareBodies.push(JSON.stringify({ url, body: init?.body }));
       return Promise.resolve(Response.json({ ok: true }));
     }
@@ -100,14 +100,14 @@ function open(path: string, extra: ReactNode = null) {
 describe("a media app's first tab", () => {
   test("is Home for the video apps, Listen now for the audio apps and Reading for Books", async () => {
     const { homeLabelOf, playRoute } = await import("@/shell/mediaApps");
-    expect(["videos", "shows", "podcasts", "audio", "books"].map(homeLabelOf)).toEqual(["Home", "Home", "Listen now", "Listen now", "Reading"]);
+    expect(["video", "shows", "podcasts", "audio", "books"].map(homeLabelOf)).toEqual(["Home", "Home", "Listen now", "Listen now", "Reading"]);
     expect(playRoute("podcast_episode", "media-aaaaaa")).toBe("/apps/podcasts/play?id=media-aaaaaa");
   });
 });
 
 describe("a media app in the shell", () => {
   test("the first tab is Home and a tile's play action opens the watch page with the id in the address", async () => {
-    const view = open("/apps/videos");
+    const view = open("/apps/video");
     expect(await view.findByRole("tab", { name: "Home" })).toBeTruthy();
     const tile = await view.findByRole("button", { name: /Building a birdhouse/ });
     fireEvent.click(tile);
@@ -116,7 +116,7 @@ describe("a media app in the shell", () => {
   });
 
   test("a watch page opened by link carries its query as page state, so the item call has its id", async () => {
-    open("/apps/videos/watch?id=media-aaaaaa");
+    open("/apps/video/watch?id=media-aaaaaa");
     await waitFor(() => expect(itemBodies.length).toBeGreaterThan(0));
     expect(itemBodies.every((body) => JSON.parse(body).id === "media-aaaaaa")).toBe(true);
   });
@@ -126,20 +126,20 @@ describe("a media app in the shell", () => {
     const candidates = [...recipients, { id: "person-4", name: "Elm", avatar_url: null }];
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
-      if (url.startsWith("/api/plugins/videos/data/creation")) {
+      if (url.startsWith("/api/plugins/video/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
+      if (url.startsWith("/api/plugins/video/data/creation")) {
         if (JSON.parse(String(init?.body ?? "{}")).scope === "people") return Promise.resolve(Response.json(candidates));
         return Promise.resolve(Response.json([{ id: "file-rw9pa63jd4", title: "A paper boat on a lake", creator: { name: "Jesse Torres", href: "/people/person-jesse", avatar_url: null }, made_at: "2026-10-21T12:00:00Z", description: "A paper boat glides over a bright blue lake. The morning sun shines on gentle waves. The water moves slowly along the shore. A small bird flies over the boat.", visibility: { mode: "shared", people: recipients, can_manage: true } }]));
       }
-      if (url.startsWith("/api/plugins/videos/data/item")) return Promise.resolve(Response.json({ id: "file-rw9pa63jd4", title: "A paper boat on a lake", src: "/api/files/file-rw9pa63jd4/content", channel: "Jesse", poster: null, duration_s: 14, chapters: [] }));
-      if (url.startsWith("/api/plugins/videos/data/up-next")) return Promise.resolve(Response.json([]));
-      if (url.startsWith("/api/plugins/videos/actions/")) {
+      if (url.startsWith("/api/plugins/video/data/item")) return Promise.resolve(Response.json({ id: "file-rw9pa63jd4", title: "A paper boat on a lake", src: "/api/files/file-rw9pa63jd4/content", channel: "Jesse", poster: null, duration_s: 14, chapters: [] }));
+      if (url.startsWith("/api/plugins/video/data/up-next")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/video/actions/")) {
         shareBodies.push(JSON.stringify({ url, body: init?.body }));
         return Promise.resolve(Response.json({ ok: true }));
       }
       return baseFetch(input, init);
     }) as typeof fetch;
-    const view = open("/apps/videos/watch?id=file-rw9pa63jd4");
+    const view = open("/apps/video/watch?id=file-rw9pa63jd4");
     const title = await view.findByRole("heading", { level: 1, name: "A paper boat on a lake" });
     expect(title.className).toContain("font-bold");
     const creatorLink = view.getByRole("link", { name: "Jesse Torres, open profile" });
@@ -160,7 +160,7 @@ describe("a media app in the shell", () => {
     expect(view.getByRole("dialog").textContent).toContain("Who can see this?");
     fireEvent.click(view.getByRole("switch", { name: "Elm" }));
     await waitFor(() => expect(shareBodies).toHaveLength(1));
-    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/videos/actions/share-add", body: JSON.stringify({ id: "file-rw9pa63jd4", person_id: "person-4" }) });
+    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/video/actions/share-add", body: JSON.stringify({ id: "file-rw9pa63jd4", person_id: "person-4" }) });
   });
 
   test("the shipped Music play schema renders song details and shares with the creation row file id", async () => {
@@ -202,14 +202,14 @@ describe("a media app in the shell", () => {
   test("the shipped Videos watch schema shows a private lock chip", async () => {
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
-      if (url.startsWith("/api/plugins/videos/data/creation-people")) return Promise.resolve(Response.json([]));
-      if (url.startsWith("/api/plugins/videos/data/creation")) return Promise.resolve(Response.json([{ title: "Quiet morning", creator: { name: "Jesse" }, made_at: "2026-10-21T12:00:00Z", description: "A quiet morning.", visibility: { mode: "private", people: [], can_manage: false } }]));
-      if (url.startsWith("/api/plugins/videos/data/item")) return Promise.resolve(Response.json({ id: "media-aaaaaa", title: "Quiet morning", src: "/video.mp4", duration_s: 10, chapters: [] }));
-      if (url.startsWith("/api/plugins/videos/data/up-next")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/video/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
+      if (url.startsWith("/api/plugins/video/data/creation-people")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/video/data/creation")) return Promise.resolve(Response.json([{ title: "Quiet morning", creator: { name: "Jesse" }, made_at: "2026-10-21T12:00:00Z", description: "A quiet morning.", visibility: { mode: "private", people: [], can_manage: false } }]));
+      if (url.startsWith("/api/plugins/video/data/item")) return Promise.resolve(Response.json({ id: "media-aaaaaa", title: "Quiet morning", src: "/video.mp4", duration_s: 10, chapters: [] }));
+      if (url.startsWith("/api/plugins/video/data/up-next")) return Promise.resolve(Response.json([]));
       return baseFetch(input, init);
     }) as typeof fetch;
-    const view = open("/apps/videos/watch?id=media-aaaaaa");
+    const view = open("/apps/video/watch?id=media-aaaaaa");
     expect(await view.findByRole("button", { name: "Private, view sharing" })).toBeTruthy();
   });
 
@@ -217,11 +217,11 @@ describe("a media app in the shell", () => {
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row]));
-      if (url.startsWith("/api/plugins/videos/pages/index")) return Promise.resolve(Response.json(madeIndexPage));
-      if (url.startsWith("/api/plugins/videos/data/made-at-home")) return Promise.resolve(Response.json([{ id: "file-rw9pa63jd4", title: "Paper boat", channel: "Jesse", thumbnail: null }]));
+      if (url.startsWith("/api/plugins/video/pages/index")) return Promise.resolve(Response.json(madeIndexPage));
+      if (url.startsWith("/api/plugins/video/data/made-at-home")) return Promise.resolve(Response.json([{ id: "file-rw9pa63jd4", title: "Paper boat", channel: "Jesse", thumbnail: null }]));
       return baseFetch(input, init);
     }) as typeof fetch;
-    const view = open("/apps/videos");
+    const view = open("/apps/video");
     expect(await view.findByRole("button", { name: /Paper boat/ })).toBeTruthy();
     expect(document.body.textContent).toContain("Jesse");
     expect(document.body.textContent).not.toMatch(/[{}]/);
@@ -236,7 +236,7 @@ describe("a media app in the shell", () => {
     const client = createQueryClient();
     render(
       <QueryClientProvider client={client}>
-        <MediaPlayerRegistration appId="videos" mediaId="media-aaaaaa" element={video} />
+        <MediaPlayerRegistration appId="video" mediaId="media-aaaaaa" element={video} />
       </QueryClientProvider>,
     );
     await waitFor(() => expect(itemBodies.length).toBeGreaterThan(0));
@@ -260,7 +260,7 @@ describe("a media app in the shell", () => {
 
 describe("MEDIA-POLISH-01 the docked mini bar", () => {
   test("the watch page plays in the host's element, has no app header, and the shell unloads it when it goes", async () => {
-    const view = open("/apps/videos/watch?id=media-aaaaaa");
+    const view = open("/apps/video/watch?id=media-aaaaaa");
     await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"] video')).not.toBeNull());
     const video = document.querySelector('[data-slot="player"][data-layout="video"] video') as HTMLVideoElement;
     expect(video.getAttribute("src")).toBe("/api/media/items/media-aaaaaa/content");
@@ -272,7 +272,7 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
   });
 
   test("leaving the watch page keeps the element playing in the one global mini player, in any app, which opens the player again", async () => {
-    const view = open("/apps/videos/watch?id=media-aaaaaa", <><Link to="/apps/videos">Go to Videos</Link><Link to="/apps/weather">Go to Weather</Link></>);
+    const view = open("/apps/video/watch?id=media-aaaaaa", <><Link to="/apps/video">Go to Videos</Link><Link to="/apps/weather">Go to Weather</Link></>);
     await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"] video')).not.toBeNull());
     const video = document.querySelector('[data-slot="player"][data-layout="video"] video') as HTMLVideoElement;
     video.dispatchEvent(new Event("play"));
@@ -296,14 +296,14 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
 
   test("the host keeps one element per item and unloads the old one for a new item", () => {
     const store = createMediaStore();
-    const a = store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos");
-    expect(store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos")).toBe(a);
+    const a = store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "video");
+    expect(store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "video")).toBe(a);
     document.body.appendChild(a);
-    const b = store.elementFor({ id: "m2", src: "/b", kind: "video", title: "B" }, "videos");
+    const b = store.elementFor({ id: "m2", src: "/b", kind: "video", title: "B" }, "video");
     expect(b).not.toBe(a);
     expect(a.getAttribute("src")).toBeNull();
     expect(a.isConnected).toBe(false);
-    expect(store.get()).toMatchObject({ id: "m2", appId: "videos", started: false });
+    expect(store.get()).toMatchObject({ id: "m2", appId: "video", started: false });
     store.clear();
     expect(store.get()).toBeNull();
   });
@@ -311,17 +311,17 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
 
 describe("media app helpers", () => {
   test("playRoute names the owning app's play page, and a kind no app plays has none", () => {
-    expect(playRoute("video", "media-a b")).toBe("/apps/videos/watch?id=media-a%20b");
+    expect(playRoute("video", "media-a b")).toBe("/apps/video/watch?id=media-a%20b");
     expect(playRoute("episode", "media-x")).toBe("/apps/shows/watch?id=media-x");
     expect(playRoute("track", "media-x")).toBe("/apps/audio/play?id=media-x");
     expect(playRoute("mystery", "media-x")).toBeNull();
-    expect(playPageOf("videos")).toBe("watch");
+    expect(playPageOf("video")).toBe("watch");
     expect(playPageOf("weather")).toBeNull();
   });
 
   test("mediaAppOfPath finds a media app's area and nothing else", () => {
-    expect(mediaAppOfPath("/apps/videos/watch")).toBe("videos");
-    expect(mediaAppOfPath("/apps/videos")).toBe("videos");
+    expect(mediaAppOfPath("/apps/video/watch")).toBe("video");
+    expect(mediaAppOfPath("/apps/video")).toBe("video");
     expect(mediaAppOfPath("/apps/weather")).toBeNull();
     expect(mediaAppOfPath("/chat")).toBeNull();
   });
@@ -345,7 +345,7 @@ describe("an app's first tab for the apps that are not media apps", () => {
 
 describe("family app headers", () => {
   test("usesFamilyHeader is the media apps, News and Weather; isMediaApp stays the media apps", () => {
-    expect(["videos", "shows", "audio", "podcasts", "books", "news", "weather"].every(usesFamilyHeader)).toBe(true);
+    expect(["video", "shows", "audio", "podcasts", "books", "news", "weather"].every(usesFamilyHeader)).toBe(true);
     expect(isMediaApp("news")).toBe(false);
     expect(isMediaApp("weather")).toBe(false);
   });
@@ -365,7 +365,7 @@ describe("family app headers", () => {
   });
 
   test("a media app keeps the same header", async () => {
-    const view = open("/apps/videos");
+    const view = open("/apps/video");
     await waitFor(() => expect(document.querySelector('[data-slot="rail-page-header"] h1')?.textContent).toBe("Videos"));
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
   });

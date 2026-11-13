@@ -27,10 +27,10 @@ describe("status app language and sidebar severity", () => {
   test("matches app names to nav items and suppresses healthy dots", () => {
     const apps: StatusApp[] = [
       { id: "chat", name: "Chat", state: "operational", reason: null, needs: [], history: [], uptimePercent: 100 },
-      { id: "videos", name: "Videos", state: "down", reason: "YouTube isn't reachable right now.", needs: [], history: [], uptimePercent: 95 },
+      { id: "video", name: "Video", state: "down", reason: "YouTube isn't reachable right now.", needs: [], history: [], uptimePercent: 95 },
     ];
     expect(sidebarItemStatus(apps, { name: "Chat", url: "/chat" })).toBeUndefined();
-    expect(sidebarItemStatus(apps, { name: "Videos", url: "/videos" })).toEqual({ badge: "red", level: "offline", title: "YouTube isn't reachable right now.", ariaLabel: "Videos: not working" });
+    expect(sidebarItemStatus(apps, { name: "Video", url: "/videos" })).toEqual({ badge: "red", level: "offline", title: "YouTube isn't reachable right now.", ariaLabel: "Video: not working" });
     expect(sidebarItemStatus(apps, { name: "Family", url: "/people" })).toBeUndefined();
   });
 

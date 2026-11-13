@@ -41,7 +41,7 @@ describe("the early 'Created by you' source", () => {
     expect(sourcesFromRows([legacyRow])).toEqual([]);
     expect((await client.get("/api/media/sources")).status).toBe(200);
     expect((await client.post("/api/plugins/audio/data/songs", {})).status).toBe(200);
-    expect((await client.post("/api/plugins/videos/data/recent", {})).status).toBe(200);
+    expect((await client.post("/api/plugins/video/data/recent", {})).status).toBe(200);
     expect((await client.get("/api/media/home")).status).toBe(200);
   });
 

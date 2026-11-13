@@ -10,7 +10,7 @@ import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useTabItem } from "@/shell/tabIdentity";
 
 const FALLBACK_KIND: Record<MediaSearchRow["app"], ImageFallbackKind> = {
-  videos: "video", shows: "video", audio: "music", podcasts: "music", books: "file",
+  video: "video", shows: "video", audio: "music", podcasts: "music", books: "file",
 };
 
 export function MediaSearchPage() {

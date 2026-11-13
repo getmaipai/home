@@ -41,7 +41,7 @@ describe("the audio session never sees an adult-only item", () => {
     const original = globalThis.fetch;
     globalThis.fetch = fetched as unknown as typeof fetch;
     try {
-      render(<MediaPlayerRegistration appId="videos" mediaId="clip-1" element={document.createElement("video")} adultOnly />);
+      render(<MediaPlayerRegistration appId="video" mediaId="clip-1" element={document.createElement("video")} adultOnly />);
     } finally { globalThis.fetch = original; }
     expect(fetched).not.toHaveBeenCalled();
   });

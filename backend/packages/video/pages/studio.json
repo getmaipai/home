@@ -22,14 +22,14 @@
         "label": "Back to My clips",
         "action": {
           "navigate": {
-            "to": "/apps/videos/clips"
+            "to": "/apps/video/clips"
           }
         }
       },
       "share_change": {
         "add": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-add",
+            "target": "/api/plugins/video/actions/share-add",
             "args": {
               "id": "{id}",
               "person_id": "{person_id}"
@@ -38,7 +38,7 @@
         },
         "remove": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-remove",
+            "target": "/api/plugins/video/actions/share-remove",
             "args": {
               "id": "{id}",
               "person_id": "{person_id}"
@@ -47,7 +47,7 @@
         },
         "make_private": {
           "call": {
-            "target": "/api/plugins/videos/actions/share-private",
+            "target": "/api/plugins/video/actions/share-private",
             "args": {
               "id": "{id}"
             }
@@ -69,7 +69,7 @@
       "handlers": {
         "export": {
           "call": {
-            "target": "/api/plugins/videos/actions/export",
+            "target": "/api/plugins/video/actions/export",
             "method": "POST",
             "args": {
               "clip": "{clip}",
@@ -79,7 +79,7 @@
         },
         "add": {
           "call": {
-            "target": "/api/plugins/videos/actions/add",
+            "target": "/api/plugins/video/actions/add",
             "method": "POST",
             "args": {
               "clip": "{clip}",
@@ -95,14 +95,14 @@
           "starts": "video",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/actions/another",
+              "target": "/api/plugins/video/actions/another",
               "method": "POST",
               "args": {
                 "id": "{clip}"
               },
               "then": {
                 "navigate": {
-                  "to": "/apps/videos/create"
+                  "to": "/apps/video/create"
                 }
               }
             }
@@ -135,7 +135,7 @@
         "handlers": {
           "stop": {
             "call": {
-              "target": "/api/plugins/videos/actions/cancel",
+              "target": "/api/plugins/video/actions/cancel",
               "method": "POST",
               "args": {
                 "id": "{id}"
@@ -148,14 +148,14 @@
             "label": "Spatial sound",
             "action": {
               "call": {
-                "target": "/api/plugins/videos/actions/spatial-sound",
+                "target": "/api/plugins/video/actions/spatial-sound",
                 "method": "POST",
                 "args": {
                   "id": "{id}"
                 },
                 "then": {
                   "navigate": {
-                    "to": "/apps/videos/create"
+                    "to": "/apps/video/create"
                   }
                 }
               }
@@ -165,7 +165,7 @@
             "label": "Spatial sound with 5.1 file",
             "action": {
               "call": {
-                "target": "/api/plugins/videos/actions/spatial-sound",
+                "target": "/api/plugins/video/actions/spatial-sound",
                 "method": "POST",
                 "args": {
                   "id": "{id}",
@@ -173,7 +173,7 @@
                 },
                 "then": {
                   "navigate": {
-                    "to": "/apps/videos/create"
+                    "to": "/apps/video/create"
                   }
                 }
               }
@@ -183,7 +183,7 @@
             "label": "Open in My clips",
             "action": {
               "navigate": {
-                "to": "/apps/videos/clips"
+                "to": "/apps/video/clips"
               }
             }
           }
@@ -228,7 +228,7 @@
       "hide_when_empty": true,
       "on_select": {
         "navigate": {
-          "to": "/apps/videos/studio",
+          "to": "/apps/video/studio",
           "state": {
             "clip": "{id}"
           }
@@ -240,7 +240,7 @@
         "text": "Your clips will show up here. Choose Create to make one.",
         "action": {
           "navigate": {
-            "to": "/apps/videos/create"
+            "to": "/apps/video/create"
           }
         },
         "action_label": "Make a video"

@@ -1,4 +1,4 @@
-// VIDEOS-PARITY: the muted line under a video card, "Channel, 3 days ago" (PRO-LOOK-01 section 17). It is a `byline` field added to the Videos app's
+// VIDEOS-PARITY: the muted line under a video card, "Channel, 3 days ago" (PRO-LOOK-01 section 17). It is a `byline` field added to the Video app's
 // rows after the shared host builds them, so no other app's rows change. Dates come from the household's own library only.
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";

@@ -9,8 +9,8 @@ describe("rail group mapping", () => {
   });
 
   test("routes owning a side column auto-collapse, with siblings staying open", () => {
-    expect(AUTO_COLLAPSE_PREFIXES).toEqual(["/chat", "/settings", "/files", "/apps/audio", "/apps/videos"]);
-    for (const path of ["/chat", "/chat/projects", "/settings/profile", "/files", "/apps/audio", "/apps/audio/play", "/apps/videos/edit"]) {
+    expect(AUTO_COLLAPSE_PREFIXES).toEqual(["/chat", "/settings", "/files", "/apps/audio", "/apps/video"]);
+    for (const path of ["/chat", "/chat/projects", "/settings/profile", "/files", "/apps/audio", "/apps/audio/play", "/apps/video/edit"]) {
       expect(routeAutoCollapses(path)).toBe(true);
     }
     for (const path of ["/", "/media", "/apps/weather", "/apps/news"]) expect(routeAutoCollapses(path)).toBe(false);

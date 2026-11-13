@@ -101,7 +101,7 @@ describe("media home", () => {
     const made = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([1, 2, 3]), provenance: 'music-gen:{"title":"Made at home","duration_seconds":31}', deduplicate: false });
     if (!made.ok) throw new Error(made.error);
     const rows = (await home(adult.client)).made_at_home;
-    expect(rows).toContainEqual(expect.objectContaining({ id: made.value.id, app: "audio", href: expect.stringMatching(/^\/apps\/music\/play\?id=/) }));
+    expect(rows).toContainEqual(expect.objectContaining({ id: made.value.id, app: "audio", href: expect.stringMatching(/^\/apps\/audio\/play\?id=/) }));
     expect((await home(child.client)).made_at_home).toEqual([]);
   });
 

@@ -56,7 +56,7 @@ const musicIndexPage = { type: "page", id: "index", title: "Audio", body: [{ typ
 const musicStationPage = { type: "page", id: "station", title: "Station", body: [{ type: "empty_state", icon: "radio", text: "Live radio station." }] };
 const musicAlbumPage = { type: "page", id: "album", title: "Album", body: [{ type: "empty_state", icon: "disc", text: "Album details." }] };
 const videoWatchPage = { type: "page", id: "watch", title: "Watch", body: [{ type: "empty_state", icon: "play", text: "Video details." }] };
-const mediaPageFiles = ["videos", "audio", "shows", "podcasts", "books"] as const;
+const mediaPageFiles = ["video", "audio", "shows", "podcasts", "books"] as const;
 const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
   packageId,
   JSON.parse(readFileSync(resolve(import.meta.dir, `../../../../backend/packages/${packageId}/pages/index.json`), "utf8")),
@@ -84,7 +84,7 @@ beforeEach(() => {
     if (url.startsWith("/api/plugins/audio/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
     if (url.startsWith("/api/plugins/audio/pages/station")) return Promise.resolve(Response.json(musicStationPage));
     if (url.startsWith("/api/plugins/audio/pages/album")) return Promise.resolve(Response.json(musicAlbumPage));
-    if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videoWatchPage));
+    if (url.startsWith("/api/plugins/video/pages/watch")) return Promise.resolve(Response.json(videoWatchPage));
     if (url.startsWith("/api/plugins/news/pages/story")) return Promise.resolve(Response.json(newsStoryPage));
     if (url.startsWith("/api/plugins/news/data/story")) { calls.push(String(init?.body)); return Promise.resolve(Response.json({ as_of: "x", blocks: [] })); }
     if (url.startsWith("/api/plugins/other/pages/")) return Promise.resolve(Response.json({ error: "no such app" }, { status: 404 }));
@@ -164,8 +164,8 @@ describe("a package app at /apps/<id>", () => {
     await view.findByText("Album details.");
     expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
-    rows = [{ ...musicRow, package: "videos", label: "Videos", to: "/apps/videos", sections: [] }];
-    view = open("/apps/videos/watch", 402);
+    rows = [{ ...musicRow, package: "video", label: "Video", to: "/apps/video", sections: [] }];
+    view = open("/apps/video/watch", 402);
     await view.findByText("Video details.");
     let controls = await view.findByTestId("page-controls");
     expect(controls.querySelector('button[aria-label="Back"]')).not.toBeNull();
@@ -174,8 +174,8 @@ describe("a package app at /apps/<id>", () => {
     expect(controls.querySelector('[data-testid="play-page-search"]')).toBeNull(); // no search page, no search button
     cleanup();
     // The phone bar is hidden on a watch page, so an app with a search page keeps a Search button in the controls row.
-    rows = [{ ...musicRow, package: "videos", label: "Videos", to: "/apps/videos", sections: [{ page: "library", label: "Library", icon: null }, { page: "search", label: "Search", icon: null }] }];
-    view = open("/apps/videos/watch", 402);
+    rows = [{ ...musicRow, package: "video", label: "Video", to: "/apps/video", sections: [{ page: "library", label: "Library", icon: null }, { page: "search", label: "Search", icon: null }] }];
+    view = open("/apps/video/watch", 402);
     await view.findByText("Video details.");
     controls = await view.findByTestId("page-controls");
     expect(controls.querySelector('[data-testid="play-page-search"]')).not.toBeNull();

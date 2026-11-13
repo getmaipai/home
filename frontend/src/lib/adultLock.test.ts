@@ -144,10 +144,10 @@ describe("the fetch choke point", () => {
   test("while unlocked every same-origin API call carries the proof; other addresses and a locked page carry none", async () => {
     const restore = installAdultFetch();
     try {
-      await fetch("/api/plugins/videos/data/recipes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      await fetch("/api/plugins/video/data/recipes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       expect(seen.at(-1)!.proof).toBeNull();
       setAdultProof("p9");
-      await fetch("/api/plugins/videos/data/recipes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      await fetch("/api/plugins/video/data/recipes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       expect(seen.at(-1)!.proof).toBe("p9");
       await fetch("https://example.com/api/x");
       expect(seen.at(-1)!.proof).toBeNull();
@@ -165,7 +165,7 @@ describe("the fetch choke point", () => {
     const restore = installAdultFetch();
     try {
       setAdultProof("p-secret");
-      const rows = await (await fetch("/api/plugins/videos/data/recipes", { method: "POST", body: "{}" })).json() as Array<{ src: string }>;
+      const rows = await (await fetch("/api/plugins/video/data/recipes", { method: "POST", body: "{}" })).json() as Array<{ src: string }>;
       expect(rows[0]!.src).toStartWith("blob:test/");
       expect(getAdultProof()).toBe("p-secret");
       for (const text of [JSON.stringify({ ...window.localStorage }), JSON.stringify({ ...window.sessionStorage }), document.cookie, window.location.href]) expect(text.includes("p-secret")).toBe(false);
@@ -194,7 +194,7 @@ describe("the fetch choke point", () => {
     const restore = installAdultFetch();
     try {
       setAdultProof("p");
-      const res = await fetch("/api/plugins/videos/data/recipes", { method: "POST", body: "{}" });
+      const res = await fetch("/api/plugins/video/data/recipes", { method: "POST", body: "{}" });
       expect(res.headers.get("content-length")).toBeNull();
       expect(res.headers.get("content-encoding")).toBeNull();
       expect(((await res.json()) as Array<{ src: string }>)[0]!.src).toStartWith("blob:test/");

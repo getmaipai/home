@@ -216,7 +216,7 @@ mediaRoutes.openapi(getItemRoute, (c) => {
   const item = readableItem(actor, c.req.valid("param").id);
   if (!item) {
     const id = c.req.valid("param").id;
-    const made = madeFileFor(actor, "audio", id) ?? madeFileFor(actor, "videos", id);
+    const made = madeFileFor(actor, "audio", id) ?? madeFileFor(actor, "video", id);
     if (!made) return c.json({ error: "That title is not in the library." }, 404);
     return c.json({ item: { id: made.id, kind: made.kind === "audio" ? "track" : "video", title: made.name }, parts: [], linked: [], page_count: null } as never, 200);
   }

@@ -1,11 +1,11 @@
 ---
 title: Edit a video in the Studio
-description: Cut, join and mix your own clips by hand in the Videos Studio, and export the result as a new clip.
+description: Cut, join and mix your own clips by hand in the Video Studio, and export the result as a new clip.
 ---
 
 # Edit a video in the Studio
 
-The **Studio** is a page for adults who want to cut and mix a video themselves. Open **Videos**, then **Studio**. You can also press **Open in Studio** on a clip in **Create**.
+The **Studio** is a page for adults who want to cut and mix a video themselves. Open **Video**, then **Studio**. You can also press **Open in Studio** on a clip in **Create**.
 
 1. **Pick a clip.** Choose one of your own videos under **Pick a clip to open**. It shows in the preview and on the **Video** track.
 2. **Cut it.** Drag the handles at each end of a piece to trim it. Press **Split at playhead** to cut a piece in two, and **Delete piece** to take one out.

@@ -21,7 +21,7 @@ export interface MediaSearchGroup {
 }
 
 const HEADINGS: Record<MediaAppId, string> = {
-  videos: "Videos",
+  video: "Video",
   shows: "Shows and Films",
   audio: "Audio",
   podcasts: "Podcasts",
@@ -47,7 +47,7 @@ export function searchMedia(person: PersonRow, query: string, perApp = 8): Media
       at: item.added_at,
     }));
     const rows: MediaSearchRow[] = [];
-    if (app === "audio" || app === "videos") {
+    if (app === "audio" || app === "video") {
       for (const file of madeFiles(person, app)) {
         if (!file.name.toLowerCase().includes(normalized.toLowerCase())) continue;
         rows.push({

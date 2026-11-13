@@ -22,7 +22,7 @@ day the hub arrives; the rest are for when you need them.
 - [Media](media.md): open the Videos, Shows and Films, Music, Podcasts and Books apps from one place.
 - [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
 - [Pictures](pictures.md): ask chat for a picture, stop it, change it, and choose who can make pictures and which styles are on.
-- [Videos](videos.md): make a short video in the Videos app or in chat, change it, and choose who can make videos and which styles are on.
+- [Videos](videos.md): make a short video in the Video app or in chat, change it, and choose who can make videos and which styles are on.
 - [Edit a video in the Studio](videos-studio.md): cut, join and mix your own clips by hand and export a new clip.
 - [Make a short film](videos-film.md): ask chat for a film, check the plan, press Go, and redo a shot.
 - [Adults-only videos and the lock](videos-locked.md): how adults-only videos are marked and locked, and how to open Locked items.
@@ -45,7 +45,7 @@ day the hub arrives; the rest are for when you need them.
 - [Keep copies on this device](keep-on-this-device.md): keep a video, song or audiobook on a device.
 - [Read the offline library](reference.md): open the books saved on your hub and read articles.
 - [Let Home close apps](close-apps.md): pick the apps Home may close when a big job needs room.
-- [Watch videos](watch-videos.md): open the Videos app, play a video from your hub, pick up where you stopped, and save videos for later.
+- [Watch videos](watch-videos.md): open the Video app, play a video from your hub, pick up where you stopped, and save videos for later.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
 - [People and parental controls](people.md): see who is in the Family page, manage accounts, and check in on a child.
 - [Settings](settings.md): find your way around MaiPai's settings, for the household and for you.

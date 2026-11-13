@@ -225,7 +225,7 @@ describe("the Create page's style picker (served chips)", () => {
     return undefined;
   }
   const chipsOf = async (client: { get: (p: string, h?: Record<string, string>) => Promise<Response> }, headers?: Record<string, string>): Promise<Chip[]> => {
-    const page = (await (await client.get("/api/plugins/videos/pages/create", headers)).json()) as { body: Array<Record<string, any>> };
+    const page = (await (await client.get("/api/plugins/video/pages/create", headers)).json()) as { body: Array<Record<string, any>> };
     return barOf(page.body)!.chips as Chip[];
   };
 
@@ -294,6 +294,6 @@ describe("the Create page's style picker (served chips)", () => {
     const { teen, child, row } = await household();
     stackHas(putLora(row("Sage").id, { ...STYLE }));
     engine({ max: true });
-    for (const who of [teen, child]) expect((await who.client.get("/api/plugins/videos/pages/create")).status).not.toBe(200);
+    for (const who of [teen, child]) expect((await who.client.get("/api/plugins/video/pages/create")).status).not.toBe(200);
   });
 });

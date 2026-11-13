@@ -24,14 +24,14 @@ test("apps come back in MEDIA_APP_ORDER even when the rows arrive reversed", () 
     row({ package: "audio", label: "Audio" }),
     row({ package: "image", label: "Image" }),
     row({ package: "shows", label: "Shows" }),
-    row({ package: "videos", label: "Videos" }),
+    row({ package: "video", label: "Video" }),
   ];
-  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "shows", "audio", "image", "podcasts", "books"]);
+  expect(mediaNav(rows).map((app) => app.id)).toEqual(["video", "shows", "audio", "image", "podcasts", "books"]);
 });
 
 test("an app that is missing from the rows is simply absent, and the rest keep their place", () => {
-  const rows = [row({ package: "videos", label: "Videos" }), row({ package: "audio", label: "Audio" })];
-  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "audio"]);
+  const rows = [row({ package: "video", label: "Video" }), row({ package: "audio", label: "Audio" })];
+  expect(mediaNav(rows).map((app) => app.id)).toEqual(["video", "audio"]);
 });
 
 test("undefined and an empty array both give no apps", () => {

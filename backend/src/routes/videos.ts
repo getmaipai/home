@@ -263,7 +263,7 @@ const voiceRoute = createRoute({
 videosRoutes.openapi(voiceRoute, (c) => {
   const actor = c.get("person");
   // The Studio is adult-only; a line is kept in memory for two hours and only its maker reads it.
-  const voice = laneOfPerson(actor) === "adult" && appRouteAllowed(actor, "videos", "actions", "add") ? getStudioVoice(actor.id, c.req.valid("param").id) : null;
+  const voice = laneOfPerson(actor) === "adult" && appRouteAllowed(actor, "video", "actions", "add") ? getStudioVoice(actor.id, c.req.valid("param").id) : null;
   if (!voice) return c.json({ error: "That voice line isn't available any more. Add it again." }, 404, NO_STORE) as never;
   const total = voice.bytes.byteLength;
   const headers: Record<string, string> = { "content-type": voice.mediaType, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff" };

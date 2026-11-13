@@ -46,9 +46,9 @@ export function videoSuggestions(person: PersonRow, query: string | undefined): 
   if (needle.length < SUGGEST_MIN_CHARS) return [];
   const labels: string[] = [];
   const minor = mediaBandOf(person) !== "adult";
-  for (const item of queryItems(person, "videos", { where: titleMatch(needle), limit: 30 })) labels.push(item.title);
-  for (const item of queryItems(person, "videos", { limit: 500 })) if (item.subtitle) labels.push(item.subtitle);
-  for (const file of madeFiles(person, "videos")) labels.push(file.name);
+  for (const item of queryItems(person, "video", { where: titleMatch(needle), limit: 30 })) labels.push(item.title);
+  for (const item of queryItems(person, "video", { limit: 500 })) if (item.subtitle) labels.push(item.subtitle);
+  for (const file of madeFiles(person, "video")) labels.push(file.name);
   const seen = new Set<string>();
   const fits = labels.filter((label) => {
     const lower = label.toLocaleLowerCase();
@@ -63,7 +63,7 @@ export function videoSuggestions(person: PersonRow, query: string | undefined): 
 /** The household's channels as avatar tiles: the name, how many videos, and the newest video's picture as the avatar. */
 export function channelStrip(person: PersonRow): Array<MediaRow & Record<string, unknown>> {
   const byChannel = new Map<string, { count: number; art: string | null }>();
-  for (const item of queryItems(person, "videos", { limit: 500 })) {
+  for (const item of queryItems(person, "video", { limit: 500 })) {
     if (!item.subtitle) continue;
     const entry = byChannel.get(item.subtitle) ?? { count: 0, art: null };
     entry.count += 1;

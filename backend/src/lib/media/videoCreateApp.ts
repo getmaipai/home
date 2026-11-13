@@ -1,4 +1,4 @@
-// VIDEO-CREATE-01, VIDEO-UI-06: the Videos package's Create data, added to the shared media host. The manifest's `contributes.data` is at the spec's
+// VIDEO-CREATE-01, VIDEO-UI-06: the Video package's Create data, added to the shared media host. The manifest's `contributes.data` is at the spec's
 // cap of 16 ids, so one id, `recipes`, answers by `scope`: none = the recipe list (lib/videos/recipes.ts), "showcase" = the Try this rail (VIDEO-UI-11), "feed" = the person's own Create clips
 // as result_feed rows (newest first, with the Favorites only and Type filters), "job" = one of those rows by id (what the feed's `poll_while`
 // re-reads while a clip is made), "clips" = My clips (Library files made at home, own and shared, or the person's uploaded pictures, by `view`).
@@ -97,7 +97,7 @@ function findNode(nodes: unknown, type: string): Record<string, unknown> | undef
 /** The level segment reads the Stack's video status without waiting (`peekVideoEngineStatus`), which is empty on the first page after Home starts and
  * left Max out of the segment until a reload. The page awaits one real read first, for at most this long, so a slow Stack costs the page a moment, never the page. */
 export const VIDEO_STATUS_WARM_MS = 1500;
-registerAppPageWarm("videos", "create", async () => {
+registerAppPageWarm("video", "create", async () => {
   await Promise.race([Promise.all([videoEngineStatus(), syncLoras()]).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, VIDEO_STATUS_WARM_MS))]);
 });
 
@@ -105,9 +105,9 @@ registerAppPageWarm("videos", "create", async () => {
  * Max 10 s 205 s). Never credits, memory or model names. */
 export const VIDEO_TIME_WORDS = { standard: "Standard, under a minute", boost: "Boost, about a minute", max: "Max, about four minutes" } as const;
 
-registerAppPageFill("videos", "create", (person, page) => {
+registerAppPageFill("video", "create", (person, page) => {
   // A card whose loop is not in the package (not made yet, or removed) is a plain tile with its label, never a broken video.
-  const media = (loop: string): { media?: string } => (packageAssetFile("videos", loop) ? { media: loop } : {});
+  const media = (loop: string): { media?: string } => (packageAssetFile("video", loop) ? { media: loop } : {});
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
@@ -137,7 +137,7 @@ registerAppPageFill("videos", "create", (person, page) => {
 });
 
 /** CLIPS-FEED-01: Make another opens the Create page, which is for adults; a person below that floor gets the feed without the button. */
-registerAppPageFill("videos", "clips-feed", (person, page) => {
+registerAppPageFill("video", "clips-feed", (person, page) => {
   if (meetsMinRole(person.role, "adult")) return;
   const feed = findNode(page.body, "clip_feed");
   const actions = feed?.actions as Record<string, unknown> | undefined;
@@ -146,7 +146,7 @@ registerAppPageFill("videos", "clips-feed", (person, page) => {
 
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
  * where the person acts (the page shows it beside the button), never a raw error after a press. */
-registerAppPageFill("videos", "studio", (_person, page) => {
+registerAppPageFill("video", "studio", (_person, page) => {
   const studio = findNode(page.body, "studio");
   if (!studio) return;
   studio.limits = studioLimits;
@@ -168,7 +168,7 @@ function clipRows(person: PersonRow, view: string | undefined, limit: number): A
     } while (cursor);
     return rows.slice(0, limit);
   }
-  const files = madeFiles(person, "videos");
+  const files = madeFiles(person, "video");
   const favorites = favoriteFileIds(person, files.map((file) => file.id));
   // The person's own jobs say the level and length of a clip they made; a clip shared by someone else shows its maker's name.
   const jobOf = new Map(doneVideoJobsFor(person, null, false).flatMap((job) => job.files.map((file) => [file.id, job] as const)));  // SPATIAL-04: every file of a clip, so its 5.1 sibling reads as the same clip
@@ -197,7 +197,7 @@ const SHORT_CLIP_LIMIT = 60;
  * `prompt` (the clip's own words, for Make another on the Create page) goes only to a person who may open Create and only for their own jobs. A child's first
  * row says `autoplay: false`, so nothing plays or scrolls on its own for a child (docs/design/kid-mode-app-voice-2026-10-17.md section 8). */
 export function shortClipRows(person: PersonRow): Array<Record<string, unknown>> {
-  const files = madeFiles(person, "videos").filter((file) => isShortClip(file.duration_seconds)).slice(0, SHORT_CLIP_LIMIT);
+  const files = madeFiles(person, "video").filter((file) => isShortClip(file.duration_seconds)).slice(0, SHORT_CLIP_LIMIT);
   const favorites = favoriteFileIds(person, files.map((file) => file.id));
   const mayCreate = meetsMinRole(person.role, "adult");
   const jobOf = mayCreate ? new Map(doneVideoJobsFor(person, null, false).flatMap((job) => job.files.map((file) => [file.id, job] as const))) : new Map<string, never>();
@@ -216,14 +216,14 @@ const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard
 function showcaseRows(limit = VIDEO_SHOWCASE.length): Array<Record<string, unknown>> {
   return VIDEO_SHOWCASE.slice(0, Math.min(Math.max(limit, 1), VIDEO_SHOWCASE.length)).flatMap((tile) => {
     const poster = tile.poster.replace(/\.mp4$/, ".jpg");
-    if (!packageAssetFile("videos", poster)) return [];
+    if (!packageAssetFile("video", poster)) return [];
     const look = videoLookFor(tile.look)!;
     const camera = videoRecipeFor(tile.camera);
-    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/videos/assets/${poster}`, loop: `/api/plugins/videos/assets/${tile.poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
+    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/video/assets/${poster}`, loop: `/api/plugins/video/assets/${tile.poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
   });
 }
 
-registerMediaAppData("videos", (person, dataId, params) => {
+registerMediaAppData("video", (person, dataId, params) => {
   if (dataId !== "recipes") return null;
   // CLIPS-FEED-01: the Clips page is open to every role, and it binds `recipes`, so the page-level gate no longer keeps a child or teen out of the other scopes
   // (the Create pages' feed, jobs, Studio): they answer nothing unless the person holds the Create pages' adult floor.

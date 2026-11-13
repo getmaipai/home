@@ -128,7 +128,16 @@ export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | un
 const rowsKey = (owner: string, packageId: string, path: string): string => `maipai.sidebar.v1:${owner}:${packageId}:${path}`;
 function storedRows(owner: string, packageId: string, path: string): Row[] | { rows?: Row[] } | undefined {
   if (!owner) return undefined;
-  try { const raw = localStorage.getItem(rowsKey(owner, packageId, path)); return raw ? JSON.parse(raw) as Row[] | { rows?: Row[] } : undefined; } catch { return undefined; }
+  try {
+    const currentKey = rowsKey(owner, packageId, path);
+    let raw = localStorage.getItem(currentKey);
+    if (raw === null && packageId === "video") {
+      const legacyKey = rowsKey(owner, "videos", path);
+      raw = localStorage.getItem(legacyKey);
+      if (raw !== null) { localStorage.setItem(currentKey, raw); localStorage.removeItem(legacyKey); }
+    }
+    return raw ? JSON.parse(raw) as Row[] | { rows?: Row[] } : undefined;
+  } catch { return undefined; }
 }
 function rememberRows(owner: string, packageId: string, path: string, data: unknown): void {
   if (!owner) return;

@@ -37,7 +37,7 @@ function getActor() { return db.select().from(peopleTable).where(eq(peopleTable.
 test("video package pages validate and expose adult actions on feed and clips", async () => {
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   for (const pageName of ["create", "clips"]) {
-    const page = JSON.parse(await Bun.file(join(PACKAGES_DIR, "videos", "pages", `${pageName}.json`)).text());
+    const page = JSON.parse(await Bun.file(join(PACKAGES_DIR, "video", "pages", `${pageName}.json`)).text());
     expect(ajv.validate(UI_SCHEMA as object, page), JSON.stringify(ajv.errors)).toBe(true);
     expect(JSON.stringify(page)).toContain("adult-mark");
   }
@@ -50,14 +50,14 @@ test("Create feed flags are owner only, hidden for a minor, and locked rows carr
   const job = getVideoJobFor(actor, clip.jobId)!;
   const lockedRow = (await import("@/lib/videos/feed")).feedRowOf(actor, job, new Set());
   expect(lockedRow).toEqual({ locked: true, making: false });
-  expect(mediaAppData(actor, "videos", "recipes", { scope: "clips", view: "all" }) as unknown).toEqual([{ locked: true, making: false }]);
+  expect(mediaAppData(actor, "video", "recipes", { scope: "clips", view: "all" }) as unknown).toEqual([{ locked: true, making: false }]);
   // Open the file only to verify the row flags; the locked feed remains a single tile until a valid proof is supplied.
   const updated = db.select().from(attachments).where(eq(attachments.id, clip.fileId)).get()!;
   const off = withMark(updated.provenance, { lock: "off", raiseToAdult: false })!;
   db.update(attachments).set({ provenance: off }).where(eq(attachments.id, clip.fileId)).run();
   const feed = (await import("@/lib/videos/feed")).feedRowOf(actor, getVideoJobFor(actor, clip.jobId)!, new Set());
   expect(feed).toMatchObject({ can_unmark: false, can_mark: true });
-  const clips = mediaAppData(actor, "videos", "recipes", { scope: "clips", view: "all" }) as unknown as Array<Record<string, unknown>>;
+  const clips = mediaAppData(actor, "video", "recipes", { scope: "clips", view: "all" }) as unknown as Array<Record<string, unknown>>;
   expect(clips.find((row) => row.id === clip.fileId)).toMatchObject({ can_unmark: false, can_mark: true });
   expect((await import("@/lib/videos/feed")).feedRowOf(db.select().from(peopleTable).where(eq(peopleTable.displayName, "Quill")).get()! as import("@/types").PersonRow, getVideoJobFor(actor, clip.jobId)!, new Set())).toBeNull();
   expect((await import("@/lib/videos/feed")).feedRowOf(db.select().from(peopleTable).where(eq(peopleTable.displayName, "Nova")).get()! as import("@/types").PersonRow, getVideoJobFor(actor, clip.jobId)!, new Set())).toBeNull();

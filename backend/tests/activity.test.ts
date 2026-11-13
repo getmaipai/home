@@ -37,7 +37,7 @@ describe("ACTIVITY-PAGE-01: the list", () => {
     expect(byId.get("picture:p1")).toMatchObject({ state: "making", title: "A red fox in the snow", percent: 40 });
     expect(byId.get("video:v1")).toMatchObject({ state: "waiting", percent: null });
     expect(byId.get("video:v1")?.line).toBeTruthy();
-    expect(byId.get("video:v2")).toMatchObject({ state: "failed", line: "I couldn't make that video. Try again, or ask for something simpler.", href: "/apps/videos/create" });
+    expect(byId.get("video:v2")).toMatchObject({ state: "failed", line: "I couldn't make that video. Try again, or ask for something simpler.", href: "/apps/video/create" });
     expect(byId.get("song:s1")).toMatchObject({ state: "making", title: "Rainy porch song", percent: 30, href: "/apps/audio/create?song=s1" });
   });
 

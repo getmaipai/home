@@ -282,9 +282,9 @@ describe("export", () => {
       expect(await startStudioExport(minor, { clip: refOf(a), plan })).toMatchObject({ ok: false, status: 403 });
       expect((await studioAdd(minor, { kind: "voice", ref: "say:hello there" })).ok).toBe(false);
       expect(studioRows(minor, refOf(a))).toEqual([]);
-      for (const kind of ["actions"] as const) for (const id of ["export", "add"]) expect(appRouteAllowed(minor, "videos", kind, id)).toBe(false);
+      for (const kind of ["actions"] as const) for (const id of ["export", "add"]) expect(appRouteAllowed(minor, "video", kind, id)).toBe(false);
       // CLIPS-FEED-01: the Clips page binds `recipes` and is open to every role, so the route is open; the host answers only the `short` scope below adult (tests/videoClipsFeed.test.ts).
-      expect(appRouteAllowed(minor, "videos", "data", "recipes")).toBe(true);
+      expect(appRouteAllowed(minor, "video", "data", "recipes")).toBe(true);
     }
     expect(stack.jobs).toHaveLength(0);
     expect(stack.speech).toHaveLength(0);

@@ -50,7 +50,7 @@ describe("media search", () => {
   test("finds a matching title in two apps", async () => {
     const { owner } = await setup();
     const result = await search(owner, "Garden Road");
-    expect(result.groups.map((group) => group.app)).toEqual(expect.arrayContaining(["videos", "shows"]));
+    expect(result.groups.map((group) => group.app)).toEqual(expect.arrayContaining(["video", "shows"]));
   });
 
   test("short queries and SQL LIKE wildcards return no matches", async () => {

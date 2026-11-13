@@ -1,5 +1,5 @@
 // SPATIAL-05 / SPATIAL-REACH: the one start of "Spatial sound" on a finished clip. The chat card's menu route (`POST /api/videos/jobs/{id}/spatial-sound`) and
-// the Create page's action (`POST /api/plugins/videos/actions/spatial-sound`) both call it, so the gate, the lock check and the edit are written once.
+// the Create page's action (`POST /api/plugins/video/actions/spatial-sound`) both call it, so the gate, the lock check and the edit are written once.
 import type { PersonRow } from "@/types";
 import { getVideoJobByFileFor, getVideoJobFor, type VideoJob } from "./jobs";
 import { editRefusal } from "./editGate";

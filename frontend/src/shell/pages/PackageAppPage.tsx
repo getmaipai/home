@@ -41,7 +41,7 @@ import "./packageAppWeather.css";
 function VideoDetails({ id }: { id: string }) {
   const query = useQuery({
     queryKey: ["video-details", id],
-    queryFn: () => api.appData<{ rows?: { title?: string; channel?: string; date?: string; published_at?: string; description?: string }[] }>("videos", "item", { id }),
+    queryFn: () => api.appData<{ rows?: { title?: string; channel?: string; date?: string; published_at?: string; description?: string }[] }>("video", "item", { id }),
     enabled: Boolean(id),
   });
   const item = query.data?.rows?.[0];
@@ -208,7 +208,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
     for (const id of preload.split(",")) void queryClient.prefetchQuery(appPageQuery(packageId, id));
   }, [queryClient, packageId, preload]);
 
-  // MEDIA-VIDEOS-01: a page opened by link (`/apps/videos/watch?id=...`, a reload, a shared address) starts with its query as the page
+  // MEDIA-VIDEOS-01: a page opened by link (`/apps/video/watch?id=...`, a reload, a shared address) starts with its query as the page
   // state, which is where the kit's SchemaPage reads a `navigate` action's state. The page waits one render for it, so a data call
   // never goes out without its `$state.id`.
   const location = useLocation();
@@ -294,7 +294,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         {(shown) => { const doc = sectionsBar?.searchTo && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "audio" && isMediaPlayPage(packageId, pageId) ? <div className="flex max-sm:hidden"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
-          {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
+          {packageId === "video" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "audio" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={weatherProblem} /> : null}{weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}

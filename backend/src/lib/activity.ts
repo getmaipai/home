@@ -121,7 +121,7 @@ function videoItems(actor: PersonRow): ActivityItem[] {
     if (videoJobLockState(actor, job) !== "open") continue;
     // A finished clip whose Library file is gone is not a result (the Create feed drops it the same way).
     if (job.state === "done" && (!job.files[0] || !fileIsLive(actor, job.files[0].id))) continue;
-    const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/apps/videos/create";
+    const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/apps/video/create";
     const title = job.request.refProgress ? "Video from your pictures" : titleFor(actor, "video", job.prompt, "A video");
     const base = { id: `video:${job.id}`, source: "video" as const, title, at: job.updatedAt, href };
     if (job.state === "queued") out.push({ ...base, state: "waiting", line: phaseLabel(job, audience), percent: null, typicalMinutes: null });

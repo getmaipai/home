@@ -13,7 +13,7 @@ import { api, type NotificationDeliveryView } from "@/lib/api";
 import { ACTIVITY_PATH } from "@/shell/activity";
 
 /** ACTIVITY-PAGE-01: a notification that says a job finished opens its result (existing types only; no new notification type). */
-export const NOTIFICATION_RESULT_LINKS: Readonly<Record<string, string>> = { "videos.clip_ready": "/apps/videos/create" };
+export const NOTIFICATION_RESULT_LINKS: Readonly<Record<string, string>> = { "video.clip_ready": "/apps/video/create" };
 
 /** I18N-B1: a typed notification renders from its { typeId, values } in the viewer's language; a row with no values or no template (an older
  * row, a pass-through type, a safety or child line) shows the English text it was stored with. */

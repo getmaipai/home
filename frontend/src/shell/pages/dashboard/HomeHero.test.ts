@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { chooseHomeHero } from "./HomeHero";
 import type { MediaHomeRow } from "@/lib/api";
 
-const made = (id: string): MediaHomeRow => ({ id, app: "videos", kind: "video", title: id, subtitle: null, artwork_url: `/art/${id}`, href: `/media/${id}`, percent: null, at: "2026-11-11T12:00:00Z" });
+const made = (id: string): MediaHomeRow => ({ id, app: "video", kind: "video", title: id, subtitle: null, artwork_url: `/art/${id}`, href: `/media/${id}`, percent: null, at: "2026-11-11T12:00:00Z" });
 
 describe("Home hero choice", () => {
   test("uses newest made item before companion, companion before nothing", () => {

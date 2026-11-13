@@ -1,14 +1,14 @@
 {
   "type": "page",
-  "id": "history",
-  "title": "History",
+  "id": "liked",
+  "title": "Liked videos",
   "body": [
     {
       "type": "media_shelf",
-      "heading": "History",
+      "heading": "Liked videos",
       "bind": {
         "source": "package",
-        "path": "history"
+        "path": "liked"
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -19,11 +19,23 @@
       "item_meta_field": "duration_s",
       "row_actions": [
         {
+          "icon": "thumbs-down",
+          "label": "Unlike",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/like",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        },
+        {
           "icon": "list-plus",
           "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/playlists/save",
+              "target": "/api/plugins/video/playlists/save",
               "args": {
                 "media_id": "{id}"
               },
@@ -36,20 +48,8 @@
           "label": "Share",
           "action": {
             "share": {
-              "to": "/apps/videos/watch?id={id}",
+              "to": "/apps/video/watch?id={id}",
               "title": "{title}"
-            }
-          }
-        },
-        {
-          "icon": "x",
-          "label": "Remove from history",
-          "action": {
-            "call": {
-              "target": "/api/plugins/videos/history/remove",
-              "args": {
-                "media_id": "{id}"
-              }
             }
           }
         }
@@ -65,10 +65,10 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "Videos you watch show up here.",
+        "text": "No liked videos yet. Choose Like on a video to keep it here.",
         "action": {
           "navigate": {
-            "to": "/apps/videos/index"
+            "to": "/apps/video/index"
           }
         },
         "action_label": "Browse videos"

@@ -14,7 +14,7 @@ import { owner } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
 
-const pkg = join(import.meta.dir, "..", "packages", "videos");
+const pkg = join(import.meta.dir, "..", "packages", "video");
 const manifest = JSON.parse(readFileSync(join(pkg, "manifest.json"), "utf8"));
 
 beforeEach(async () => { await resetDb(); __resetVideoJobsForTests(); });
@@ -79,13 +79,13 @@ describe("chapters for a clip made by joining", () => {
 describe("the clip-ready notice", () => {
   test("a finished Create clip tells its maker once; a chat clip does not", async () => {
     const { row } = await owner();
-    registerPackageNotificationTypes({ id: "videos", notifications: manifest.notifications });
+    registerPackageNotificationTypes({ id: "video", notifications: manifest.notifications });
     const made = job("made", row.id, { prompt: "A fox in the snow" });
     await notifyClipReady(made, row);
     await notifyClipReady(made, row);
     await notifyClipReady(job("chat", row.id, { conversationId: "conv-1" }), row);
     await notifyClipReady(job("running", row.id, { state: "running", files: [] }), row);
-    const sent = db.select().from(notificationDeliveries).all().filter((item) => item.typeId === "videos.clip_ready");
+    const sent = db.select().from(notificationDeliveries).all().filter((item) => item.typeId === "video.clip_ready");
     expect(sent.map((item) => item.repeatKey)).toEqual(["made"]);
     expect(sent[0]!.text).toBe("Your video is ready: A fox in the snow");
   });
@@ -137,7 +137,7 @@ describe("apps parity: chips, sort and search filters", () => {
     const { scanRoot } = await import("@/lib/media/scan");
     const added = await client.post("/api/media/sources", { label: "videos", path: buildMediaTree().videos, kinds: ["video"] });
     await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
-    const ask = async (id: string, body: Record<string, unknown> = {}) => (await (await client.post(`/api/plugins/videos/data/${id}`, body)).json()) as Array<Record<string, any>>;
+    const ask = async (id: string, body: Record<string, unknown> = {}) => (await (await client.post(`/api/plugins/video/data/${id}`, body)).json()) as Array<Record<string, any>>;
     const rows = await ask("library");
     const { mediaItems } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
@@ -153,7 +153,7 @@ describe("apps parity: chips, sort and search filters", () => {
     expect((await ask("library", { filter: "short" })).map((row) => row.title)).toEqual([names[0]]);
     expect((await ask("library", { filter: "long" })).map((row) => row.title)).toEqual([names[1]]);
     const started = rows.find((row) => row.title === names[2])!;
-    await client.post("/api/plugins/videos/progress", { media_id: started.id, position_s: 5, duration_s: 100 });
+    await client.post("/api/plugins/video/progress", { media_id: started.id, position_s: 5, duration_s: 100 });
     const unwatched = (await ask("library", { filter: "unwatched" })).map((row) => row.title);
     expect(unwatched).not.toContain(names[2]);
     expect(unwatched.length).toBe(names.length - 1);
@@ -214,6 +214,6 @@ describe("apps parity: chips, sort and search filters", () => {
     const player = pageOf("watch").body[0].main[0];
     expect(player).toMatchObject({ pip: true, double_tap_seek: true, long_press_speed: true });
     expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Save to playlist", "Share"]);
-    expect(player.actions[3].action.share.to).toBe("/apps/videos/watch?id={id}");
+    expect(player.actions[3].action.share.to).toBe("/apps/video/watch?id={id}");
   });
 });

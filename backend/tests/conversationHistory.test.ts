@@ -1661,7 +1661,7 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Playing jazz now.")).toBe(false);
     const note = window.messages.find((m) => m.role === "user" && m.content.includes("Playing jazz now."));
     expect(note).toBeDefined();
-    expect(note!.content).toContain("Music"); // music/manifest.json's own `display`, not the bare id "audio"
+    expect(note!.content).toContain("Audio"); // audio/manifest.json's own `display`, not the bare id "audio"
   });
 
   // A code review (2026-09-07) found this uncovered: attemptTier2Tools()

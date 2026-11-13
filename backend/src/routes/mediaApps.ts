@@ -89,7 +89,7 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
   // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
-  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "audio" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "videos" ? ["/playlists/*", "/history/*"] : [])]);
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "audio" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "video" ? ["/playlists/*", "/history/*"] : [])]);
 
   if (appId === "audio") {
     const radio = radioRoutes();
@@ -156,7 +156,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     }
     // CLIPS-FEED-01: the Clips page is open to every role and binds `recipes`; a null from the hook would fall through to the package runner (a 502), so a person below
     // the Create floor asking for any scope but `short` is answered 404 here.
-    if (appId === "videos" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && (await jsonBody(c)).scope !== "short") return c.json({ error: "no such data" }, 404);
+    if (appId === "video" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && (await jsonBody(c)).scope !== "short") return c.json({ error: "no such data" }, 404);
     const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "audio" ? { device: deviceKeyOf(c) } : {}) });
     if (value === null) return next();
     return c.json(value as never, 200);
@@ -165,21 +165,21 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   for (const [path, op] of [["share-add", "add"], ["share-remove", "remove"], ["share-private", "private"]] as const) {
     routes.post(`/actions/${path}`, requireAuth, async (c, next) => {
       const person = c.get("person");
-      if (appId !== "videos" && appId !== "audio") return next();
+      if (appId !== "video" && appId !== "audio") return next();
       if (!appRouteAllowed(person, appId, "actions", path)) return next();
       const body = await jsonBody(c);
       const id = typeof body.id === "string" ? body.id : "";
       const target = typeof body.person_id === "string" ? body.person_id : undefined;
       // MEDIA-PARITY-02: on a playlist's page the same share panel adds and removes its members.
-      const result = appId === "videos" ? (videoPlaylistFor(person, id) ? changeVideoPlaylistMembers(person, op, id, target) : changeVideoCreationShare(person, op, id, target)) : (playlistFor(person, id) ? changePlaylistMembers(person, op, id, target) : changeMusicCreationShare(person, op, id, target));
+      const result = appId === "video" ? (videoPlaylistFor(person, id) ? changeVideoPlaylistMembers(person, op, id, target) : changeVideoCreationShare(person, op, id, target)) : (playlistFor(person, id) ? changePlaylistMembers(person, op, id, target) : changeMusicCreationShare(person, op, id, target));
       return respond(c, result);
     });
   }
 
-  // VIDEO-CREATE-01: the Make a video form's submit. The page may only call under /api/plugins/videos, so the action lives here; the rule is lib/videos/make.ts.
+  // VIDEO-CREATE-01: the Make a video form's submit. The page may only call under /api/plugins/video, so the action lives here; the rule is lib/videos/make.ts.
   routes.post("/actions/make", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "make")) return next();
     const read = readMakeBody(await jsonBody(c));
     if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
@@ -190,7 +190,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // VIDEO-CREATE-01 (V1b): Another take on the newest Create clip: the same words and choices, a new seed.
   routes.post("/actions/another", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "another")) return next();
     const body = await jsonBody(c);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
@@ -207,7 +207,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // a typed line is screened and spoken here, so no speech is made for a line the gate refuses. The rules are lib/videos/studio.ts.
   routes.post("/actions/add", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "add")) return next();
     const added = await studioAdd(person, await jsonBody(c));
     return added.ok ? c.json(added.piece as never, 200) : c.json({ error: added.line, code: added.code }, added.status);
@@ -217,7 +217,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // the reply is the job's id, which the page's export card follows. The rules are lib/videos/studioExport.ts.
   routes.post("/actions/export", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "export")) return next();
     const started = await startStudioExport(person, await jsonBody(c));
     return started.ok ? c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200) : c.json({ error: started.line, code: started.code }, started.status);
@@ -226,7 +226,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.
   routes.post("/actions/cancel", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "cancel")) return next();
     const body = await jsonBody(c);
     const job = typeof body.id === "string" ? getVideoJobFor(person, body.id) : null;
@@ -237,7 +237,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/actions/adult-mark", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "adult-mark")) return next();
     const body = await jsonBody(c);
     if (typeof body.id !== "string" || (body.action !== "clear" && body.action !== "mark") || (body.ticket !== undefined && typeof body.ticket !== "string")) return c.json({ error: "Invalid action." }, 400);
@@ -250,7 +250,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // makeVideoFor, so the Max grant, the ready Max model, the words-only rule, the age and surface gate and the one-clip-at-a-time rule are the same.
   routes.post("/actions/max", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "max")) return next();
     const body = await jsonBody(c);
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
@@ -271,7 +271,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // person's own open clip, the no-sound line and the finished-clip check are written once, there. The new clip is an edit row of the same feed.
   routes.post("/actions/spatial-sound", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "spatial-sound")) return next();
     const body = await jsonBody(c);
     const started = await startSpatialSound(person, typeof body.id === "string" ? body.id : "", { surround: body.surround === true || body.surround === "true", side: body.side });
@@ -283,12 +283,12 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // cannot see in their own Library is a 404. `favorite` true or false sets the mark; left out, the mark is flipped.
   routes.post("/actions/favorite", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "videos") return next();
+    if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "favorite")) return next();
     const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : "";
     const job = id ? getVideoJobFor(person, id) : null;
-    const fileId = job ? (job.state === "done" && videoJobLockState(person, job) === "open" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "videos", id) ? id : undefined;
+    const fileId = job ? (job.state === "done" && videoJobLockState(person, job) === "open" ? job.files[0]?.id : undefined) : id && madeFileFor(person, "video", id) ? id : undefined;
     if (!fileId) return c.json({ error: "That video isn't available any more.", code: "gone" }, 404);
     const asked = body.favorite === true || body.favorite === "true" ? true : body.favorite === false || body.favorite === "false" ? false : undefined;
     return c.json({ ok: true as const, id, favorite: setFavoriteFile(person, fileId, asked) }, 200);
@@ -383,7 +383,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   }
 
   if (appId === "podcasts") routes.route("/", podcastRoutes());
-  if (appId === "videos") routes.route("/", videoPlaylistRoutes());
+  if (appId === "video") routes.route("/", videoPlaylistRoutes());
 
   return routes;
 }

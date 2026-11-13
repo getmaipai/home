@@ -105,7 +105,7 @@ in this slice. Subscription polling is not shipped yet; its future writer must h
 ## Media apps: the shared host (MEDIA-VIDEOS-01)
 
 Every media app (Videos, Shows, Music, Podcasts, Books) is a catalog `app` package (manifest `kind: "app"`, pages in `pages/*.json`,
-`contributes.data[]` of `rows: "list"`) whose pages bind to data ids served by one host. Videos is the first; the others add a package
+`contributes.data[]` of `rows: "list"`) whose pages bind to data ids served by one host. Video is the first; the others add a package
 and their own rows, never a store.
 
 **Backend.** `backend/src/lib/media/appHost.ts` holds the rules and `backend/src/routes/mediaApps.ts` the wire. `MEDIA_APPS` is the one table

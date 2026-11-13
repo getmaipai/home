@@ -72,22 +72,22 @@ describe("recipes: one list in one place", () => {
   });
   test("the package serves the list as data to an adult and not to a child or teen", async () => {
     const { adult, teen, child } = await household();
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", {})).json() as Array<{ id: string; label: string; hint: string }>;
+    const rows = await (await adult.client.post("/api/plugins/video/data/recipes", {})).json() as Array<{ id: string; label: string; hint: string }>;
     expect(rows.map((r) => r.id)).toEqual(VIDEO_RECIPES.map((r) => r.id));
     expect(rows[0]).toEqual({ id: "dolly-in", label: "Dolly in", hint: expect.any(String) });
-    for (const other of [teen, child]) expect((await other.client.post("/api/plugins/videos/data/recipes", {})).status).toBe(404);
+    for (const other of [teen, child]) expect((await other.client.post("/api/plugins/video/data/recipes", {})).status).toBe(404);
     // VIDEO-UI-06: the scopes of the three old pages are gone (the feed replaced them); an unknown scope answers nothing.
-    for (const scope of ["starters", "making", "last", "newest", "nonsense"]) expect(await (await adult.client.post("/api/plugins/videos/data/recipes", { scope })).json()).toEqual([]);
+    for (const scope of ["starters", "making", "last", "newest", "nonsense"]) expect(await (await adult.client.post("/api/plugins/video/data/recipes", { scope })).json()).toEqual([]);
   });
   test("STYLES-04: the style-suggestions scope answers matches for the typed words, nothing for empty words or a child", async () => {
     const { adult, child } = await household();
-    const q = async (text: string) => await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "style-suggestions", q: text })).json() as Array<{ id: string; name: string; kind: string }>;
+    const q = async (text: string) => await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "style-suggestions", q: text })).json() as Array<{ id: string; name: string; kind: string }>;
     expect(await q("")).toEqual([]);
     expect(await q("zzzz qqqq")).toEqual([]);
-    expect((await child.client.post("/api/plugins/videos/data/recipes", { scope: "style-suggestions", q: "clay" })).status).toBe(404);
+    expect((await child.client.post("/api/plugins/video/data/recipes", { scope: "style-suggestions", q: "clay" })).status).toBe(404);
   });
   test("STYLES-04: the Create page asks for style suggestions with the prompt", () => {
-    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "videos", "pages", "create.json"), "utf8"));
+    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "video", "pages", "create.json"), "utf8"));
     const find = (n: any): any => (n && typeof n === "object" ? (n.type === "prompt_bar" ? n : Object.values(n).map(find).find(Boolean)) : undefined);
     expect(find(page.body).style_suggest.rows.params).toEqual({ scope: "style-suggestions", q: "$state.prompt" });
   });
@@ -146,12 +146,12 @@ describe("POST /api/videos/make", () => {
     const past = await adult.client.get(clipUrl, { Range: `bytes=${size}-` });
     expect(past.status).toBe(416); expect(past.headers.get("content-range")).toBe(`bytes */${size}`);
     expect((await adult.client.get(clipUrl, { Range: `bytes=0-${size + 50}` })).headers.get("content-range")).toBe(`bytes 0-${size - 1}/${size}`);
-    const feed = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<Record<string, any>>;
+    const feed = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<Record<string, any>>;
     expect(feed).toHaveLength(1);
     expect(feed[0]).toMatchObject({ id: card.id, prompt: BOAT, status: "ready", state: "done", percent: 100, favorite: false, phase: null, error: null });
     expect(feed[0]!.src).toBe(`/api/videos/jobs/${card.id}/files/${clip.id}`);
     expect(feed[0]!.still).toContain(`/api/videos/jobs/${card.id}/files/`);
-    const made = await (await adult.client.post("/api/plugins/videos/data/made-at-home", { limit: 200 })).json() as Array<{ id: string }>;
+    const made = await (await adult.client.post("/api/plugins/video/data/made-at-home", { limit: 200 })).json() as Array<{ id: string }>;
     expect(made.map((r) => r.id)).toContain(clip.id);
   });
 
@@ -159,7 +159,7 @@ describe("POST /api/videos/make", () => {
     const { adult } = await household();
     fake.pollsToFinish = 1000;
     await adult.client.post("/api/videos/make", { prompt: BOAT });
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ prompt: string; status: string; phase: string; src: string | null }>;
+    const rows = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ prompt: string; status: string; phase: string; src: string | null }>;
     expect(rows).toHaveLength(1);
     expect(rows[0]!.prompt).toBe(BOAT);
     expect(["queued", "generating"]).toContain(rows[0]!.status);
@@ -193,7 +193,7 @@ describe("POST /api/videos/make", () => {
     let rows: Array<{ state: string; status: string; error: string }> = [];
     for (let i = 0; i < 80 && rows[0]?.state !== "failed"; i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 25));
-      rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as typeof rows;
+      rows = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as typeof rows;
     }
     expect(rows[0]?.state).toBe("failed");
     expect(rows[0]!.status).toBe("failed");
@@ -205,15 +205,15 @@ describe("the Create page and the make action", () => {
   test("shows Standard's ten-second choice while the Stack has not answered yet", async () => {
     const { adult } = await household();
     __setVideoStatusForTests(null);
-    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(page.body)!.chips.find((chip: { state: string }) => chip.state === "seconds")!.options.map((option: { value: number }) => option.value)).toEqual([QUICK_MAX_SECONDS, 10]);
   });
 
   test("the served Create page leads with a compact prompt bar and offers the recipes, lengths and allowed levels", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
-    expect(bar.submit.call.target).toBe("/api/plugins/videos/actions/make");
+    expect(bar.submit.call.target).toBe("/api/plugins/video/actions/make");
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("orientation").options.map((o: { value: string }) => o.value)).toEqual(["landscape", "portrait"]);
     expect(chip("seconds").options.map((o: { value: number }) => o.value)).toEqual([QUICK_MAX_SECONDS]);
@@ -228,7 +228,7 @@ describe("the Create page and the make action", () => {
     const segment = videoTierSegment({ ...adultRow, role: "adult" });
     expect(segment ? { ...segment, label: "Quality", presentation: "dropdown" } : null).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
-    const again = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const again = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(again.body)!.chips).toHaveLength(5);
     // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
@@ -269,12 +269,12 @@ describe("the Create page and the make action", () => {
     __setStackClientForTests({} as never);
     fake.ltx25max = "ready";
     dropVideoStatusCache();
-    const first = await (await owner.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const first = await (await owner.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     expect(promptBarOf(first.body)!.tier.tiers.map((t: { id: string }) => t.id)).toContain("max");
     // Not ready on the Stack: a cold first page shows nothing for Max rather than a stale yes.
     fake.ltx25max = undefined;
     dropVideoStatusCache();
-    const cold = await (await owner.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const cold = await (await owner.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     expect((promptBarOf(cold.body)!.tier?.tiers ?? []).map((t: { id: string }) => t.id)).not.toContain("max");
     __setStackClientForTests(null);
   });
@@ -285,7 +285,7 @@ describe("the Create page and the make action", () => {
     const person = db.select().from(peopleTable).where(eq(peopleTable.displayName, "Marlow")).get()! as PersonRow;
     const now = new Date().toISOString();
     db.insert(videoJobs).values({ id: "held-1", personId: person.id, kind: "generate", state: "running", stackJob: "stack-1", percent: 0, phase: "waiting for the computer", prompt: BOAT, request: JSON.stringify({ loras: [], create: {} }), files: "[]", createdAt: now, updatedAt: now, hlc: nextHlc() }).run();
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ status: string; phase: string }>;
+    const rows = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ status: string; phase: string }>;
     expect(rows[0]!.status).toBe("generating");
     expect(rows[0]!.phase).toBe("Waiting for the computer to finish other work. Your video starts by itself, or tap Cancel.");
     expect(rows[0]!.phase).not.toContain("Making your video");
@@ -293,32 +293,32 @@ describe("the Create page and the make action", () => {
 
   test("the prompt bar's submit args fill from the item and the action takes them", async () => {
     const { adult } = await household();
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "portrait", seconds: 10, tier: "standard", recipe: "none" });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "portrait", seconds: 10, tier: "standard", recipe: "none" });
     expect(res.status).toBe(200);
     expect(fake.submitted[0]!.size).toBe("480x832");
   });
 
   test("untouched fields arrive as {name} and mean not given; a typed shape, length and recipe name are used", async () => {
     const { adult } = await household();
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "{orientation}", seconds: "{seconds}", tier: "{tier}", recipe: "Slow orbit" });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "{orientation}", seconds: "{seconds}", tier: "{tier}", recipe: "Slow orbit" });
     expect(res.status).toBe(200);
     expect(fake.submitted[0]!.size).toBe("832x480");
     expect(String(fake.submitted[0]!.prompt)).toContain(videoRecipeFor("slow-orbit")!.wording);
   });
   test("an unknown shape or camera move is a plain 422, and a child or teen cannot reach the action", async () => {
     const { adult, teen, child } = await household();
-    const bad = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "sideways" });
+    const bad = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "sideways" });
     expect(bad.status).toBe(422);
     expect((await bad.json() as { error: string }).error).toContain("landscape or portrait");
-    expect((await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, recipe: "spin" })).status).toBe(422);
-    for (const other of [teen, child]) expect((await other.client.post("/api/plugins/videos/actions/make", { prompt: BOAT })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, recipe: "spin" })).status).toBe(422);
+    for (const other of [teen, child]) expect((await other.client.post("/api/plugins/video/actions/make", { prompt: BOAT })).status).toBe(404);
     expect(fake.submitted).toHaveLength(0);
   });
 });
 
 describe("Create is adult-only; Browse is unchanged", () => {
   const PAGES = ["create", "studio", "clips"];
-  const appRow = async (client: TestClient) => ((await (await client.get("/api/apps")).json()) as Array<Record<string, any>>).find((row) => row.package === "videos")!;
+  const appRow = async (client: TestClient) => ((await (await client.get("/api/apps")).json()) as Array<Record<string, any>>).find((row) => row.package === "video")!;
   test("the create group, the Create header mode and the three pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
     const adultApp = await appRow(adult.client);
@@ -330,19 +330,19 @@ describe("Create is adult-only; Browse is unchanged", () => {
       expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play"]);
       expect(row.sidebar.groups[0].pages.map((p: { page: string }) => p.page)).toEqual(["index", "library", "clips-feed", "history", "watch-later", "liked", "playlists"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
-      for (const page of [...PAGES, "make-video", "creations"]) expect((await other.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
-      expect((await other.client.get("/api/plugins/videos/pages/index")).status).toBe(200);
+      for (const page of [...PAGES, "make-video", "creations"]) expect((await other.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
+      expect((await other.client.get("/api/plugins/video/pages/index")).status).toBe(200);
     }
-    for (const page of PAGES) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(200);
+    for (const page of PAGES) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(200);
     // The three old pages are gone for adults too: a removed page is a plain 404, not an empty page.
-    for (const page of ["make-video", "creations"]) expect((await adult.client.get(`/api/plugins/videos/pages/${page}`)).status).toBe(404);
+    for (const page of ["make-video", "creations"]) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
   });
 });
 
 describe("V1b: look, length, voices, hint and Another take", () => {
   test("the chips come from the single lists", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").options.map((o: { value: string }) => o.value)).toEqual(VIDEO_LOOKS.map((l) => l.id));
@@ -378,13 +378,13 @@ describe("V1b: look, length, voices, hint and Another take", () => {
   test("Standard cannot make 10 seconds: it makes 5 and says so in one plain line, also on the making list", async () => {
     const { adult } = await household();
     fake.pollsToFinish = 1000;
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, tier: "standard", seconds: 10 });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, tier: "standard", seconds: 10 });
     expect(res.status).toBe(200);
     const body = await res.json() as { notice: string };
     expect(body.notice).toContain("5 seconds");
     expect(body.notice).not.toContain("\u2014");
     expect(fake.submitted[0]!.seconds).toBe(5);
-    const rows = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ phase: string; seconds: number; tags: string[] }>;
+    const rows = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ phase: string; seconds: number; tags: string[] }>;
     expect(rows[0]!.phase).toContain("5 seconds");
     expect(rows[0]!.seconds).toBe(5);
     expect(rows[0]!.tags).toContain("5 s");
@@ -392,8 +392,8 @@ describe("V1b: look, length, voices, hint and Another take", () => {
 
   test("an unknown look or voices choice is a plain 422", async () => {
     const { adult } = await household();
-    expect((await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, look: "neon" })).status).toBe(422);
-    expect((await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, voices: "loud" })).status).toBe(422);
+    expect((await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, look: "neon" })).status).toBe(422);
+    expect((await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, voices: "loud" })).status).toBe(422);
     expect(fake.submitted).toHaveLength(0);
   });
 
@@ -404,7 +404,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     // Not while it is still being made.
     expect((await adult.client.post(`/api/videos/jobs/${first.id}/another`, {})).status).toBe(404);
     await until(() => getVideoJobFor(actor, first.id)?.state === "done");
-    const last = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ id: string; prompt: string; status: string; orientation: string; look: string; camera: string }>;
+    const last = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ id: string; prompt: string; status: string; orientation: string; look: string; camera: string }>;
     expect(last[0]).toMatchObject({ id: first.id, prompt: BOAT, status: "ready", orientation: "portrait", look: "anime", camera: "handheld" });
     const res = await adult.client.post(`/api/videos/jobs/${first.id}/another`, {});
     expect(res.status).toBe(200);
@@ -417,13 +417,13 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(b!.size).toBe("480x832");
     expect(String(b!.prompt)).toStartWith(videoLookFor("anime")!.wording);
     await until(() => getVideoJobFor(actor, card.id)?.state === "done");
-    const viaAction = await adult.client.post("/api/plugins/videos/actions/another", { id: card.id });
+    const viaAction = await adult.client.post("/api/plugins/video/actions/another", { id: card.id });
     expect(viaAction.status).toBe(200);
     expect(fake.submitted).toHaveLength(3);
     // Someone else's clip, a missing one and a teen are all refused; nothing more reaches the Stack.
     expect((await teen.client.post(`/api/videos/jobs/${first.id}/another`, {})).status).toBe(404);
-    expect((await teen.client.post("/api/plugins/videos/actions/another", { id: first.id })).status).toBe(404);
-    expect((await adult.client.post("/api/plugins/videos/actions/another", { id: "nope" })).status).toBe(404);
+    expect((await teen.client.post("/api/plugins/video/actions/another", { id: first.id })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/actions/another", { id: "nope" })).status).toBe(404);
     expect(fake.submitted).toHaveLength(3);
   });
 
@@ -452,7 +452,7 @@ describe("U3: Start frame", () => {
     const { adult } = await household();
     const { id, png } = await libraryPicture(person("Marlow"), 64, 128);
     const seen = screened();
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, orientation: "landscape", start_frame: id });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "landscape", start_frame: id });
     expect(res.status).toBe(200);
     const job = getVideoJobFor(person("Marlow"), ((await res.json()) as { id: string }).id)!;
     expect(job.kind).toBe("animate");
@@ -467,7 +467,7 @@ describe("U3: Start frame", () => {
   test("an empty slot leaves {start_frame} in place and means no picture: a text clip", async () => {
     const { adult } = await household();
     const seen = screened();
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: "{start_frame}", camera: "{camera}" });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, start_frame: "{start_frame}", camera: "{camera}" });
     expect(res.status).toBe(200);
     expect(fake.submitted[0]!.image).toBeUndefined();
     expect(seen.calls).toBe(0);
@@ -481,7 +481,7 @@ describe("U3: Start frame", () => {
     const seen = screened();
     const lines = new Set<string>();
     for (const id of ["nope", theirs.id, notPicture.value.id]) {
-      const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id });
+      const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, start_frame: id });
       expect(res.status).toBe(404);
       lines.add(((await res.json()) as { error: string }).error);
     }
@@ -504,7 +504,7 @@ describe("U3: Start frame", () => {
     const { adult } = await household();
     const { id } = await libraryPicture(person("Marlow"));
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 12, label: "minor" as never, is_nude_or_sexual: true, confidence: 1 } })));
-    const res = await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id });
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, start_frame: id });
     expect(res.status).toBe(422);
     expect(fake.submitted).toHaveLength(0);
   });
@@ -514,15 +514,15 @@ describe("U3: Start frame", () => {
     const actor = person("Marlow");
     const { id } = await libraryPicture(actor);
     screened();
-    const first = await (await adult.client.post("/api/plugins/videos/actions/make", { prompt: BOAT, start_frame: id })).json() as { id: string };
+    const first = await (await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, start_frame: id })).json() as { id: string };
     await until(() => getVideoJobFor(actor, first.id)?.state === "done");
     const fileId = getVideoJobFor(actor, first.id)!.files[0]!.id;
-    const res = await adult.client.post("/api/plugins/videos/actions/another", { id: fileId });
+    const res = await adult.client.post("/api/plugins/video/actions/another", { id: fileId });
     expect(res.status).toBe(200);
     expect(fake.submitted).toHaveLength(2);
     expect(fake.submitted[1]!.image_source).toBe("uploaded");
     // The feed row of the first clip keeps the Start frame as a chip with its thumbnail, and the Remix refill carries its id.
-    const feed = await (await adult.client.post("/api/plugins/videos/data/recipes", { scope: "feed" })).json() as Array<{ id: string; src: string | null; references: Array<{ label: string; thumb: string }>; start_frame: string }>;
+    const feed = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ id: string; src: string | null; references: Array<{ label: string; thumb: string }>; start_frame: string }>;
     expect(feed).toHaveLength(2);
     const old = feed.find((row) => row.id === first.id)!;
     expect(old.src).toContain(fileId);
@@ -534,11 +534,11 @@ describe("U3: Start frame", () => {
 describe("U3: Camera and Look cards from the one lists, with their loops", () => {
   test("the served page puts the cards' loop paths on the options, from VIDEO_LOOKS and VIDEO_RECIPES, and lists no loop in the page JSON", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Record<string, any>> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     const chip = (state: string) => bar.chips.find((c: { state: string }) => c.state === state);
     expect(chip("look").variant).toBe("cards");
-    const shipped = (loop: string) => existsSync(join(PACKAGES_DIR, "videos", "assets", loop));
+    const shipped = (loop: string) => existsSync(join(PACKAGES_DIR, "video", "assets", loop));
     expect(chip("look").options).toEqual(VIDEO_LOOKS.map((l) => ({ value: l.id, label: l.id === "natural" ? "Auto" : l.label, ...(shipped(l.loop) ? { media: l.loop } : {}) })));
     expect(chip("look").options.some((o: { media?: string }) => o.media)).toBe(true);
     expect(chip("camera").variant).toBe("cards");
@@ -546,7 +546,7 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
     expect(bar.references).toHaveLength(1);
     expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", look: "{look}", start_frame: "{start_frame}" });
-    const source = await Bun.file(join(PACKAGES_DIR, "videos", "pages", "create.json")).text();
+    const source = await Bun.file(join(PACKAGES_DIR, "video", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");
     expect(VIDEO_RECIPES).toHaveLength(8);
   });
@@ -555,16 +555,16 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     const { adult, teen, child, owner } = await household();
     const loops = [...VIDEO_LOOKS, ...VIDEO_RECIPES].map((entry) => entry.loop);
     expect(new Set(loops).size).toBe(13);
-    const present = loops.filter((loop) => existsSync(join(PACKAGES_DIR, "videos", "assets", loop)));
+    const present = loops.filter((loop) => existsSync(join(PACKAGES_DIR, "video", "assets", loop)));
     expect(present.length).toBeGreaterThan(0);
     for (const loop of present) {
-      const file = join(PACKAGES_DIR, "videos", "assets", loop);
+      const file = join(PACKAGES_DIR, "video", "assets", loop);
       expect(statSync(file).size).toBeLessThan(300 * 1024);
-      const res = await adult.client.get(`/api/plugins/videos/assets/${loop}`);
+      const res = await adult.client.get(`/api/plugins/video/assets/${loop}`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("video/mp4");
-      for (const other of [teen, child]) expect((await other.client.get(`/api/plugins/videos/assets/${loop}`)).status).toBe(404);
+      for (const other of [teen, child]) expect((await other.client.get(`/api/plugins/video/assets/${loop}`)).status).toBe(404);
     }
-    expect((await owner.get(`/api/plugins/videos/assets/${present[0]}`)).status).toBe(200);
+    expect((await owner.get(`/api/plugins/video/assets/${present[0]}`)).status).toBe(200);
   });
 });

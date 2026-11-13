@@ -65,6 +65,6 @@ test("a non-media app page is not active", () => {
 
 test("enterMediaHub marks the tab so its media app pages show the flag", () => {
   enterMediaHub();
-  const view = renderAt("/apps/videos");
+  const view = renderAt("/apps/video");
   expect(view.getByTestId("flag").textContent).toBe("true");
 });

@@ -1,7 +1,7 @@
 // VIDEO-CREATE-01 (docs/design/video-create-2026-11-01.md section 6): the one list of video recipes. A recipe is tested wording for a
 // camera move or style, added to the words the Stack gets (never to the words the person typed, which stay on the card). One list in
 // one place: the Make a video page reads it through the package's `recipes` data id, the chat tool reads it by id.
-/** `loop` is the card's sample clip, a path inside the Videos package's `assets/` folder (VIDEO-CREATE-02). */
+/** `loop` is the card's sample clip, a path inside the Video package's `assets/` folder (VIDEO-CREATE-02). */
 export interface VideoRecipe { id: string; label: string; hint: string; wording: string; loop: string }
 
 // VIDEO-CREATE-02: these are the Camera cards, in the order they show. Still is the eighth (it replaced Wide establishing shot, which no card or loop used).

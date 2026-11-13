@@ -6,7 +6,7 @@ import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
 
 afterEach(cleanup);
 
-const row = (over: Partial<MediaHomeRow>): MediaHomeRow => ({ id: "r", app: "videos", kind: "video", title: "T", subtitle: null, artwork_url: null, href: "/x", percent: null, at: "2026-11-07T00:00:00Z", ...over });
+const row = (over: Partial<MediaHomeRow>): MediaHomeRow => ({ id: "r", app: "video", kind: "video", title: "T", subtitle: null, artwork_url: null, href: "/x", percent: null, at: "2026-11-07T00:00:00Z", ...over });
 const iconOf = (picture: ReturnType<typeof tilePicture>) => {
   const view = render(picture);
   return view.container.querySelector("[data-slot=safe-image-fallback] svg")?.getAttribute("class") ?? "";
@@ -17,9 +17,9 @@ describe("a Home shelf tile with no picture (AUDIT-UI-01)", () => {
     expect(iconOf(tilePicture(row({ kind: "chat" })))).toContain("message-circle");
   });
   test("a clip shows a film and a song shows a note", () => {
-    expect(iconOf(tilePicture(row({ kind: "video", app: "videos" })))).toContain("film");
+    expect(iconOf(tilePicture(row({ kind: "video", app: "video" })))).toContain("film");
     cleanup();
-    expect(iconOf(tilePicture(row({ kind: "song", app: "audio" })))).toContain("audio");
+    expect(iconOf(tilePicture(row({ kind: "song", app: "audio" })))).toContain("music");
   });
   test("the missing art is seeded and leaves the shelf overlay to draw the title", () => {
     const view = render(tilePicture(row({ title: "Lantern Road" })));

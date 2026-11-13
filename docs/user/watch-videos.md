@@ -1,13 +1,13 @@
 ---
 title: Watch videos
-description: Open the Videos app, play a video from your hub, pick up where you stopped, and save videos for later.
+description: Open the Video app, play a video from your hub, pick up where you stopped, and save videos for later.
 ---
 
-The **Videos** app plays the videos that are saved on your hub. It works like YouTube, in a dark look. Nothing here comes from the internet, so it plays with the internet off.
+The **Video** app plays the videos that are saved on your hub. It works like YouTube, in a dark look. Nothing here comes from the internet, so it plays with the internet off.
 
 ## Open it
 
-Open **Videos** from the apps list or from your favorites. A column on the left lists **Videos**, **Library**, **Watch later** and **History**. Use **Search Videos** at the top of the column to find a video by name. Videos stays dark, even when the rest of Home is light, so pictures look their best.
+Open **Video** from the apps list or from your favorites. A column on the left lists **Video**, **Library**, **Watch later** and **History**. Use **Search Video** at the top of the column to find a video by name. Video stays dark, even when the rest of Home is light, so pictures look their best.
 
 A grown-up also sees **Create**, **Studio** and **My clips** in the column. Those are for [making videos](videos.md).
 

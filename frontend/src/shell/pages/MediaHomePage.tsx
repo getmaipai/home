@@ -12,7 +12,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 
 /** The fallback tile a row without artwork gets, by the app that owns it. */
 const FALLBACK_KIND: Record<MediaHomeRow["app"], ImageFallbackKind> = {
-  videos: "video",
+  video: "video",
   shows: "video",
   audio: "music",
   podcasts: "music",

@@ -1,4 +1,4 @@
-// APPS-PARITY (2026-11-09): the Videos app's chips and sort. The kit's chip rows and sort control write page state, and the page binds it as params
+// APPS-PARITY (2026-11-09): the Video app's chips and sort. The kit's chip rows and sort control write page state, and the page binds it as params
 // (`filter`, `type`, `channel`, `sort`); the rules here narrow or order the rows the existing data ids already build. Everything reads the household's own
 // library and its made clips; nothing here makes a request.
 import { inArray } from "drizzle-orm";
@@ -59,7 +59,7 @@ export function videoRules(person: PersonRow, dataId: string, params: DataParams
   const filter = videoFilterOf(params.filter);
   const wide: DataParams = { ...params, limit: 200 };
   const query = params.query?.trim().toLocaleLowerCase() ?? "";
-  const made = (): MediaRow[] => madeFiles(person, "videos").map(madeVideoRow).filter((row) => query === "" || row.title.toLocaleLowerCase().includes(query)) as MediaRow[];
+  const made = (): MediaRow[] => madeFiles(person, "video").map(madeVideoRow).filter((row) => query === "" || row.title.toLocaleLowerCase().includes(query)) as MediaRow[];
   let rows: MediaRow[];
   if (filter === "made" || (dataId === "library" && params.type === "made")) rows = dataId === "recent" || dataId === "library" ? made() : [];
   else {

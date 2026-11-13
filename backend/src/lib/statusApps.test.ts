@@ -60,7 +60,7 @@ describe("app status derivation", () => {
   });
 
   test("internet failure masks dependent component state and hides needs from members", () => {
-    const app: StatusApp = { id: "videos", name: "Videos", needs: [
+    const app: StatusApp = { id: "video", name: "Video", needs: [
       { kind: "internet", id: "internet", name: "Internet", purpose: "Reach outside", required: true },
       { kind: "service", id: "youtube", name: "YouTube", purpose: "Play videos", required: true },
     ] };
@@ -70,7 +70,7 @@ describe("app status derivation", () => {
     ];
     const member = appResponse(app, events, false, new Date("2026-09-10T00:01:00Z"));
     expect(member.state).toBe("waiting_for_internet");
-    expect(member.reason).toBe("Videos is waiting for the internet.");
+    expect(member.reason).toBe("Video is waiting for the internet.");
     expect("needs" in member).toBe(false);
     const admin = appResponse(app, events, true, new Date("2026-09-10T00:01:00Z"));
     expect(admin.needs?.map((need) => need.state)).toEqual(["down", "waiting"]);

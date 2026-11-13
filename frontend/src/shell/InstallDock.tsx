@@ -52,7 +52,7 @@ export function makingJobs(rows: readonly HomeJobView[]): HomeJobView[] {
 
 function makingHref(row: HomeJobView): string | null {
   if (row.conversationId) return `/chat?conversation=${encodeURIComponent(row.conversationId)}`;
-  return row.kind.startsWith("video") ? "/apps/videos" : row.kind.startsWith("music") || row.kind === "song" ? "/apps/audio" : null;
+  return row.kind.startsWith("video") ? "/apps/video" : row.kind.startsWith("music") || row.kind === "song" ? "/apps/audio" : null;
 }
 
 function makingItem(row: HomeJobView): DockItem {

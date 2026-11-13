@@ -13,7 +13,7 @@ import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { buildMediaTree } from "./support/mediaTree";
 import { getSettingValueForPerson } from "@/lib/settings";
 
-const pkg = join(import.meta.dir, "..", "packages", "videos");
+const pkg = join(import.meta.dir, "..", "packages", "video");
 const pageOf = (id: string) => JSON.parse(readFileSync(join(pkg, "pages", `${id}.json`), "utf8"));
 const manifest = JSON.parse(readFileSync(join(pkg, "manifest.json"), "utf8"));
 
@@ -36,7 +36,7 @@ async function house() {
   const child = await make("Sprout", "child", "2018-03-01");
   const added = await owner.post("/api/media/sources", { label: "videos", path: buildMediaTree().videos, kinds: ["video"] });
   await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
-  const ask = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => (await (await client.post(`/api/plugins/videos/data/${id}`, body)).json()) as Row[];
+  const ask = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => (await (await client.post(`/api/plugins/video/data/${id}`, body)).json()) as Row[];
   const library = await ask(owner, "library");
   const me = ((await (await owner.get("/api/auth/me")).json()) as { id?: string; person?: { id: string } });
   return { owner, adult, teen, child, ask, library, ownerId: me.person?.id ?? me.id! };
@@ -46,18 +46,18 @@ describe("video playlists", () => {
   test("make one, save videos to it, reorder, remove and delete; Music never sees it", async () => {
     const { owner, ask, library } = await house();
     expect(library.length).toBeGreaterThanOrEqual(3);
-    const made = await (await owner.post("/api/plugins/videos/playlists/new", { title: "Rainy day" })).json() as Row;
+    const made = await (await owner.post("/api/plugins/video/playlists/new", { title: "Rainy day" })).json() as Row;
     expect(made.title).toBe("Rainy day");
-    for (const row of library.slice(0, 3)) expect((await owner.post("/api/plugins/videos/playlists/save", { media_id: row.id, playlist_id: made.id })).status).toBe(200);
+    for (const row of library.slice(0, 3)) expect((await owner.post("/api/plugins/video/playlists/save", { media_id: row.id, playlist_id: made.id })).status).toBe(200);
     const tiles = await ask(owner, "library", { scope: "playlists" });
     expect(tiles.map((t) => t.title)).toEqual(["Rainy day"]);
     expect(tiles[0]!.channel).toBe("3 videos");
     const wanted = library.slice(0, 3).map((row) => row.id as string).reverse();
-    expect((await owner.post("/api/plugins/videos/playlists/reorder", { ids: wanted })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/playlists/reorder", { ids: wanted })).status).toBe(200);
     expect((await ask(owner, "library", { scope: "playlist", id: made.id })).map((row) => row.id)).toEqual(wanted);
     const header = (await ask(owner, "library", { scope: "playlist-header", id: made.id }))[0]!;
     expect(header).toMatchObject({ title: "Rainy day", play_id: wanted[0] });
-    expect((await owner.post("/api/plugins/videos/playlists/remove", { playlist_id: made.id, media_id: wanted[0] })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/playlists/remove", { playlist_id: made.id, media_id: wanted[0] })).status).toBe(200);
     expect((await ask(owner, "library", { scope: "playlist", id: made.id })).length).toBe(2);
     // The Music playlists page and the generic list keep the two kinds apart.
     expect(await ask(owner, "library", { scope: "playlists" })).toHaveLength(1);
@@ -65,48 +65,48 @@ describe("video playlists", () => {
     expect(musicPlaylists.map((t) => t.title)).not.toContain("Rainy day");
     const stored = (await (await owner.get("/api/media/collections?kind=playlist")).json()) as Row[];
     expect(stored.find((c) => c.id === made.id)?.media_kind).toBe("video");
-    expect((await owner.post("/api/plugins/videos/playlists/delete", { playlist_id: made.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/playlists/delete", { playlist_id: made.id })).status).toBe(200);
     expect(await ask(owner, "library", { scope: "playlists" })).toEqual([]);
   });
 
   test("Save to playlist with no playlist named uses the newest one, and makes one if there is none", async () => {
     const { owner, ask, library } = await house();
-    expect((await owner.post("/api/plugins/videos/playlists/save", { media_id: library[0]!.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/playlists/save", { media_id: library[0]!.id })).status).toBe(200);
     expect((await ask(owner, "library", { scope: "playlists" })).map((t) => t.title)).toEqual(["My playlist"]);
-    expect((await owner.post("/api/plugins/videos/playlists/save", { media_id: "nope" })).status).toBe(404);
-    expect((await owner.post("/api/plugins/videos/playlists/save", { media_id: library[1]!.id, playlist_id: "mcol-missing" })).status).toBe(404);
+    expect((await owner.post("/api/plugins/video/playlists/save", { media_id: "nope" })).status).toBe(404);
+    expect((await owner.post("/api/plugins/video/playlists/save", { media_id: library[1]!.id, playlist_id: "mcol-missing" })).status).toBe(404);
   });
 
   test("a reorder without a playlist id finds the one that holds those videos", async () => {
     const { owner, ask, library } = await house();
-    const a = await (await owner.post("/api/plugins/videos/playlists/new", { title: "A" })).json() as Row;
-    const b = await (await owner.post("/api/plugins/videos/playlists/new", { title: "B" })).json() as Row;
-    await owner.post("/api/plugins/videos/playlists/save", { media_id: library[0]!.id, playlist_id: a.id });
-    for (const row of library.slice(1, 3)) await owner.post("/api/plugins/videos/playlists/save", { media_id: row.id, playlist_id: b.id });
+    const a = await (await owner.post("/api/plugins/video/playlists/new", { title: "A" })).json() as Row;
+    const b = await (await owner.post("/api/plugins/video/playlists/new", { title: "B" })).json() as Row;
+    await owner.post("/api/plugins/video/playlists/save", { media_id: library[0]!.id, playlist_id: a.id });
+    for (const row of library.slice(1, 3)) await owner.post("/api/plugins/video/playlists/save", { media_id: row.id, playlist_id: b.id });
     const flipped = [library[2]!.id, library[1]!.id];
-    expect((await owner.post("/api/plugins/videos/playlists/reorder", { ids: flipped })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/playlists/reorder", { ids: flipped })).status).toBe(200);
     expect((await ask(owner, "library", { scope: "playlist", id: b.id })).map((r) => r.id)).toEqual(flipped);
-    expect((await owner.post("/api/plugins/videos/playlists/reorder", { ids: [] })).status).toBe(400);
+    expect((await owner.post("/api/plugins/video/playlists/reorder", { ids: [] })).status).toBe(400);
   });
 
   test("members see the playlist and may add videos; only the owner reorders, removes or deletes", async () => {
     const { owner, adult, ask, library } = await house();
-    const made = await (await owner.post("/api/plugins/videos/playlists/new", { title: "Family picks" })).json() as Row;
-    await owner.post("/api/plugins/videos/playlists/save", { media_id: library[0]!.id, playlist_id: made.id });
+    const made = await (await owner.post("/api/plugins/video/playlists/new", { title: "Family picks" })).json() as Row;
+    await owner.post("/api/plugins/video/playlists/save", { media_id: library[0]!.id, playlist_id: made.id });
     expect(await ask(adult.client, "library", { scope: "shared-playlists" })).toEqual([]);
     expect(await ask(adult.client, "library", { scope: "playlist", id: made.id })).toEqual([]);
-    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: made.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/actions/share-add", { id: made.id, person_id: adult.id })).status).toBe(200);
     const shared = await ask(adult.client, "library", { scope: "shared-playlists" });
     expect(shared.map((t) => t.title)).toEqual(["Family picks"]);
     expect(shared[0]!.channel).toContain("by Sage");
-    expect((await adult.client.post("/api/plugins/videos/playlists/save", { media_id: library[1]!.id, playlist_id: made.id })).status).toBe(200);
+    expect((await adult.client.post("/api/plugins/video/playlists/save", { media_id: library[1]!.id, playlist_id: made.id })).status).toBe(200);
     expect((await ask(owner, "library", { scope: "playlist", id: made.id })).length).toBe(2);
-    expect((await adult.client.post("/api/plugins/videos/playlists/reorder", { playlist_id: made.id, ids: [library[1]!.id, library[0]!.id] })).status).toBe(403);
-    expect((await adult.client.post("/api/plugins/videos/playlists/remove", { playlist_id: made.id, media_id: library[0]!.id })).status).toBe(403);
-    expect((await adult.client.post("/api/plugins/videos/playlists/delete", { playlist_id: made.id })).status).toBe(403);
-    expect((await owner.post("/api/plugins/videos/actions/share-private", { id: made.id })).status).toBe(200);
+    expect((await adult.client.post("/api/plugins/video/playlists/reorder", { playlist_id: made.id, ids: [library[1]!.id, library[0]!.id] })).status).toBe(403);
+    expect((await adult.client.post("/api/plugins/video/playlists/remove", { playlist_id: made.id, media_id: library[0]!.id })).status).toBe(403);
+    expect((await adult.client.post("/api/plugins/video/playlists/delete", { playlist_id: made.id })).status).toBe(403);
+    expect((await owner.post("/api/plugins/video/actions/share-private", { id: made.id })).status).toBe(200);
     expect(await ask(adult.client, "library", { scope: "shared-playlists" })).toEqual([]);
-    expect((await adult.client.post("/api/plugins/videos/playlists/save", { media_id: library[2]!.id, playlist_id: made.id })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/playlists/save", { media_id: library[2]!.id, playlist_id: made.id })).status).toBe(404);
   });
 
   test("an adult-only video never enters a playlist a child or teen can read, and never reaches their eyes", async () => {
@@ -114,16 +114,16 @@ describe("video playlists", () => {
     const adultOnly = library[0]!.id as string;
     const plain = library[1]!.id as string;
     db.update(mediaItems).set({ bandOk: "adult" }).where(eq(mediaItems.id, adultOnly)).run();
-    const made = await (await owner.post("/api/plugins/videos/playlists/new", { title: "Mixed" })).json() as Row;
-    await owner.post("/api/plugins/videos/playlists/save", { media_id: adultOnly, playlist_id: made.id });
-    await owner.post("/api/plugins/videos/playlists/save", { media_id: plain, playlist_id: made.id });
+    const made = await (await owner.post("/api/plugins/video/playlists/new", { title: "Mixed" })).json() as Row;
+    await owner.post("/api/plugins/video/playlists/save", { media_id: adultOnly, playlist_id: made.id });
+    await owner.post("/api/plugins/video/playlists/save", { media_id: plain, playlist_id: made.id });
     // The teen cannot be added while the playlist holds an adult-only video.
-    const refused = await owner.post("/api/plugins/videos/actions/share-add", { id: made.id, person_id: teen.id });
+    const refused = await owner.post("/api/plugins/video/actions/share-add", { id: made.id, person_id: teen.id });
     expect(refused.status).toBe(422);
-    await owner.post("/api/plugins/videos/playlists/remove", { playlist_id: made.id, media_id: adultOnly });
-    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: made.id, person_id: teen.id })).status).toBe(200);
+    await owner.post("/api/plugins/video/playlists/remove", { playlist_id: made.id, media_id: adultOnly });
+    expect((await owner.post("/api/plugins/video/actions/share-add", { id: made.id, person_id: teen.id })).status).toBe(200);
     // Now that a teen reads it, the adult-only video is refused.
-    const again = await owner.post("/api/plugins/videos/playlists/save", { media_id: adultOnly, playlist_id: made.id });
+    const again = await owner.post("/api/plugins/video/playlists/save", { media_id: adultOnly, playlist_id: made.id });
     expect(again.status).toBe(422);
     expect(((await again.json()) as { error: string }).error).toContain("adult-only");
     // A forced row (the band changed later) is still hidden from the teen.
@@ -136,22 +136,22 @@ describe("video playlists", () => {
 
   test("a child cannot share a playlist, and a minor cannot give one a name that trips the floor", async () => {
     const { child, owner } = await house();
-    const made = await (await child.client.post("/api/plugins/videos/playlists/new", { title: "Cartoons" })).json() as Row;
+    const made = await (await child.client.post("/api/plugins/video/playlists/new", { title: "Cartoons" })).json() as Row;
     expect(made.title).toBe("Cartoons");
-    expect((await child.client.post("/api/plugins/videos/actions/share-add", { id: made.id, person_id: "person-abcdef" })).status).toBe(403);
-    expect((await child.client.post("/api/plugins/videos/playlists/new", { title: "porn" })).status).toBe(422);
-    expect((await owner.post("/api/plugins/videos/playlists/new", { title: "porn" })).status).toBe(200);
+    expect((await child.client.post("/api/plugins/video/actions/share-add", { id: made.id, person_id: "person-abcdef" })).status).toBe(403);
+    expect((await child.client.post("/api/plugins/video/playlists/new", { title: "porn" })).status).toBe(422);
+    expect((await owner.post("/api/plugins/video/playlists/new", { title: "porn" })).status).toBe(200);
   });
 
   test("another person's playlist is never read, changed or deleted by guessing its id", async () => {
     const { owner, adult, ask, library } = await house();
-    const made = await (await owner.post("/api/plugins/videos/playlists/new", { title: "Mine" })).json() as Row;
-    await owner.post("/api/plugins/videos/playlists/save", { media_id: library[0]!.id, playlist_id: made.id });
+    const made = await (await owner.post("/api/plugins/video/playlists/new", { title: "Mine" })).json() as Row;
+    await owner.post("/api/plugins/video/playlists/save", { media_id: library[0]!.id, playlist_id: made.id });
     expect(await ask(adult.client, "library", { scope: "playlist", id: made.id })).toEqual([]);
     expect(await ask(adult.client, "library", { scope: "playlist-header", id: made.id })).toEqual([]);
-    expect((await adult.client.post("/api/plugins/videos/playlists/rename", { playlist_id: made.id, title: "Taken" })).status).toBe(404);
-    expect((await adult.client.post("/api/plugins/videos/playlists/delete", { playlist_id: made.id })).status).toBe(404);
-    expect((await owner.post("/api/plugins/videos/playlists/rename", { playlist_id: made.id, title: "Renamed" })).status).toBe(200);
+    expect((await adult.client.post("/api/plugins/video/playlists/rename", { playlist_id: made.id, title: "Taken" })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/playlists/delete", { playlist_id: made.id })).status).toBe(404);
+    expect((await owner.post("/api/plugins/video/playlists/rename", { playlist_id: made.id, title: "Renamed" })).status).toBe(200);
   });
 });
 
@@ -194,18 +194,18 @@ describe("channels, suggestions, history and the saved sort", () => {
   test("Remove from history deletes only this person's own progress row for that video", async () => {
     const { owner, adult, ask, library, ownerId } = await house();
     const id = library[0]!.id as string;
-    await owner.post("/api/plugins/videos/progress", { media_id: id, position_s: 5, duration_s: 100 });
-    await adult.client.post("/api/plugins/videos/progress", { media_id: id, position_s: 9, duration_s: 100 });
+    await owner.post("/api/plugins/video/progress", { media_id: id, position_s: 5, duration_s: 100 });
+    await adult.client.post("/api/plugins/video/progress", { media_id: id, position_s: 9, duration_s: 100 });
     flushProgress();
     expect((await ask(owner, "history")).map((row) => row.id)).toContain(id);
-    const res = await owner.post("/api/plugins/videos/history/remove", { media_id: id });
+    const res = await owner.post("/api/plugins/video/history/remove", { media_id: id });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { removed: boolean }).removed).toBe(true);
     expect((await ask(owner, "history")).map((row) => row.id)).not.toContain(id);
     expect((await ask(adult.client, "history")).map((row) => row.id)).toContain(id);
     expect(db.select().from(mediaProgress).all().filter((row) => row.personId === ownerId)).toEqual([]);
-    expect(((await (await owner.post("/api/plugins/videos/history/remove", { media_id: id })).json()) as { removed: boolean }).removed).toBe(false);
-    expect((await owner.post("/api/plugins/videos/history/remove", {})).status).toBe(400);
+    expect(((await (await owner.post("/api/plugins/video/history/remove", { media_id: id })).json()) as { removed: boolean }).removed).toBe(false);
+    expect((await owner.post("/api/plugins/video/history/remove", {})).status).toBe(400);
     // The video itself is still in the library.
     expect((await ask(owner, "library")).map((row) => row.id)).toContain(id);
   });
@@ -242,7 +242,7 @@ describe("the Videos pages", () => {
       }
     }
     expect(actionsOf(shelves("history")[0]!)).toContain("Remove from history");
-    expect(shelves("history")[0]!.row_actions.at(-1).action.call.target).toBe("/api/plugins/videos/history/remove");
+    expect(shelves("history")[0]!.row_actions.at(-1).action.call.target).toBe("/api/plugins/video/history/remove");
   });
 
   test("the shelves use the soft card radius", () => {
@@ -257,7 +257,7 @@ describe("the Videos pages", () => {
     expect(manifest.contributes.sidebar.groups[0].pages).toContain("playlists");
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     const list = shelves("playlist").find((n) => n.reorder)!;
-    expect(list.reorder).toEqual({ call: { call: { target: "/api/plugins/videos/playlists/reorder", args: { playlist_id: "{playlist_id}" } } }, id_param: "ids" });
+    expect(list.reorder).toEqual({ call: { call: { target: "/api/plugins/video/playlists/reorder", args: { playlist_id: "{playlist_id}" } } }, id_param: "ids" });
     const strip = shelves("index").find((n) => n.bind.path === "channels")!;
     expect(strip).toMatchObject({ art_shape: "circle", bind: { params: { scope: "strip" } } });
     expect(shelves("index").some((n) => n.item_avatar_field === "channel_avatar")).toBe(true);

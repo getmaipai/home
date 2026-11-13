@@ -44,13 +44,13 @@ async function setup() {
   await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
   const musicSource = await owner.post("/api/media/sources", { label: "music", path: tree.music, kinds: ["track"] });
   await scanRoot(((await musicSource.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
-  const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}, headers?: Record<string, string>) => (await client.post(`/api/plugins/videos/data/${id}`, body, headers)).json() as Promise<Row[]>;
+  const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}, headers?: Record<string, string>) => (await client.post(`/api/plugins/video/data/${id}`, body, headers)).json() as Promise<Row[]>;
   const rows = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => data(client, id, body);
   const idOf = async (title: string) => (await rows(adult.client, "library")).find((row) => row.title === title)!.id;
   return { owner, adult, admin, child, data, rows, idOf };
 }
 
-const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/videos/progress", body);
+const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/video/progress", body);
 
 describe("the media-app host: data ids", () => {
   test("Music resolves a just-shown directory station as a preview item only for the eligible person", async () => {
@@ -154,11 +154,11 @@ describe("the media-app host: data ids", () => {
     if (!made.ok) throw new Error(made.error);
     if (!adultsOnly.ok) throw new Error(adultsOnly.error);
     if (!privateFile.ok) throw new Error(privateFile.error);
-    const shelf = await (await adult.client.post("/api/plugins/videos/data/made-at-home", {})).json() as Row[];
+    const shelf = await (await adult.client.post("/api/plugins/video/data/made-at-home", {})).json() as Row[];
     expect(shelf.map((item) => item.id)).toContain(made.value.id);
     expect(shelf.map((item) => item.id)).not.toContain(privateFile.value.id);
-    expect((await (await child.client.post("/api/plugins/videos/data/made-at-home", {})).json() as Row[]).map((item) => item.id)).not.toContain(adultsOnly.value.id);
-    expect(await (await adult.client.post("/api/plugins/videos/data/item", { id: made.value.id })).json()).toMatchObject({ id: made.value.id, src: `/api/files/${made.value.id}/content`, kind: "video" });
+    expect((await (await child.client.post("/api/plugins/video/data/made-at-home", {})).json() as Row[]).map((item) => item.id)).not.toContain(adultsOnly.value.id);
+    expect(await (await adult.client.post("/api/plugins/video/data/item", { id: made.value.id })).json()).toMatchObject({ id: made.value.id, src: `/api/files/${made.value.id}/content`, kind: "video" });
     expect((await adult.client.get(`/api/media/items/${made.value.id}`)).status).toBe(200);
     expect((await child.client.get(`/api/media/items/${adultsOnly.value.id}`)).status).toBe(404);
   });
@@ -191,21 +191,21 @@ describe("the media-app host: data ids", () => {
     expect(allAgeCandidates.find((candidate) => candidate.id === "household")).not.toHaveProperty("avatar_seed");
     expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].creator.avatar_seed).toBe(seedOf(ownerPerson.id));
     expect(await data(adult.client, "creation", { id: owned.value.id, scope: "people" })).toEqual([]);
-    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
     expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].visibility.mode).toBe("shared");
-    expect((await owner.post("/api/plugins/videos/actions/share-remove", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
-    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
-    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/actions/share-remove", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/video/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(200);
     const adultView = await data(adult.client, "creation", { id: owned.value.id }) as unknown as Array<Record<string, any>>;
     expect(adultView[0]?.visibility).toMatchObject({ mode: "shared", can_manage: false });
     expect(adultView[0]?.visibility.people.map((p: any) => p.id)).toEqual([adult.id]);
     expect(adultView[0]?.visibility.people[0].avatar_seed).toBe(seedOf(adult.id));
-    expect((await adult.client.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(403);
+    expect((await adult.client.post("/api/plugins/video/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(403);
     const childRow = await data(child.client, "creation", { id: owned.value.id }) as unknown as Array<Record<string, any>>;
     expect(childRow[0]?.visibility).toMatchObject({ mode: "shared", can_manage: false });
     expect(childRow[0]?.visibility.people.map((p: any) => p.id)).toEqual([child.id]);
-    expect((await child.client.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(403);
-    expect((await owner.post("/api/plugins/videos/actions/share-private", { id: owned.value.id })).status).toBe(200);
+    expect((await child.client.post("/api/plugins/video/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(403);
+    expect((await owner.post("/api/plugins/video/actions/share-private", { id: owned.value.id })).status).toBe(200);
     expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].visibility.mode).toBe("private");
     expect((await data(owner, "creation", { id: made.value.id })).length).toBe(0);
 
@@ -215,7 +215,7 @@ describe("the media-app host: data ids", () => {
     db.insert(shares).values({ id: "share-childadmin", fileId: childMade.value.id, fromPersonId: child.id, to: admin.id, provenance: "test", createdAt: now, hlc: "1:0:testtest" }).run();
     const adminRow = await data(admin.client, "creation", { id: childMade.value.id }) as unknown as Array<Record<string, any>>;
     expect(adminRow[0]?.visibility).toMatchObject({ mode: "shared", can_manage: true });
-    expect((await admin.client.post("/api/plugins/videos/actions/share-remove", { id: childMade.value.id, person_id: admin.id })).status).toBe(200);
+    expect((await admin.client.post("/api/plugins/video/actions/share-remove", { id: childMade.value.id, person_id: admin.id })).status).toBe(200);
 
     const scanItem = (await data(adult.client, "library") as unknown as Array<Record<string, any>>).find((row) => row.title === "Building a birdhouse")!;
     const scanned = await data(adult.client, "creation", { id: scanItem.id }) as unknown as Array<Record<string, any>>;
@@ -232,7 +232,7 @@ describe("the media-app host: data ids", () => {
 
     const creation = await data(owner, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>;
     expect(creation[0]?.id).toBe(made.value.id);
-    const response = await owner.post("/api/plugins/videos/actions/share-add", { id: creation[0]?.id, person_id: adult.id });
+    const response = await owner.post("/api/plugins/video/actions/share-add", { id: creation[0]?.id, person_id: adult.id });
     expect(response.status).toBe(200);
     expect((await data(owner, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>)[0]?.visibility.mode).toBe("shared");
   });
@@ -335,10 +335,10 @@ describe("the media-app host: data ids", () => {
     expect(await rows(adult.client, "continue")).toEqual([]);
     expect((await rows(adult.client, "again")).map((row) => row.id)).toEqual([id]);
     // A finished video leaves watch later.
-    await adult.client.post("/api/plugins/videos/watch-later", { media_id: id, on: true });
+    await adult.client.post("/api/plugins/video/watch-later", { media_id: id, on: true });
     await progress(adult.client, { media_id: id, position_s: "10", duration_s: "10", reason: "ended" });
     expect(await rows(adult.client, "watch-later")).toEqual([]);
-    const item = (await adult.client.post("/api/plugins/videos/data/item", { id })).json() as Promise<{ position_s?: number }>;
+    const item = (await adult.client.post("/api/plugins/video/data/item", { id })).json() as Promise<{ position_s?: number }>;
     expect((await item).position_s).toBeUndefined();
   });
 
@@ -346,25 +346,25 @@ describe("the media-app host: data ids", () => {
     const { adult, rows, idOf } = await setup();
     const a = await idOf("Building a birdhouse");
     const b = await idOf("Sprout at the beach");
-    expect((await adult.client.post("/api/plugins/videos/watch-later", { media_id: a })).status).toBe(200);
-    await adult.client.post("/api/plugins/videos/watch-later", { media_id: b, on: "true" });
+    expect((await adult.client.post("/api/plugins/video/watch-later", { media_id: a })).status).toBe(200);
+    await adult.client.post("/api/plugins/video/watch-later", { media_id: b, on: "true" });
     expect((await rows(adult.client, "watch-later")).map((row) => row.id)).toEqual([a, b]);
-    const removed = await adult.client.post("/api/plugins/videos/watch-later", { media_id: a, on: false });
+    const removed = await adult.client.post("/api/plugins/video/watch-later", { media_id: a, on: false });
     expect(await removed.json()).toMatchObject({ on: false, label: "Not saved" });
     expect((await rows(adult.client, "watch-later")).map((row) => row.id)).toEqual([b]);
     // With `on` absent a press toggles (the Home billboard's button carries only the id).
-    expect(await (await adult.client.post("/api/plugins/videos/watch-later", { media_id: b })).json()).toMatchObject({ on: false });
-    expect(await (await adult.client.post("/api/plugins/videos/watch-later", { media_id: b })).json()).toMatchObject({ on: true });
-    await adult.client.post("/api/plugins/videos/like", { media_id: a });
+    expect(await (await adult.client.post("/api/plugins/video/watch-later", { media_id: b })).json()).toMatchObject({ on: false });
+    expect(await (await adult.client.post("/api/plugins/video/watch-later", { media_id: b })).json()).toMatchObject({ on: true });
+    await adult.client.post("/api/plugins/video/like", { media_id: a });
     expect((await rows(adult.client, "liked")).map((row) => row.id)).toEqual([a]);
-    expect((await adult.client.post("/api/plugins/videos/like", { media_id: "media-nothing0001" })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/like", { media_id: "media-nothing0001" })).status).toBe(404);
   });
 
   test("library filters by channel and channels lists them for the picker", async () => {
     const { adult, rows } = await setup();
     const library = await rows(adult.client, "library", { channel: "Bramble Workshop" });
     expect(library.map((row) => row.title)).toEqual(["Building a birdhouse", "Fixing a squeaky door"]);
-    const channels = (await adult.client.post("/api/plugins/videos/data/channels", {}).then((res) => res.json())) as { rows: Array<{ id: string }> };
+    const channels = (await adult.client.post("/api/plugins/video/data/channels", {}).then((res) => res.json())) as { rows: Array<{ id: string }> };
     expect(channels.rows.map((row) => row.id)).toEqual(["Bramble Workshop", "Home videos"]);
   });
 
@@ -388,7 +388,7 @@ describe("the media-app host: a child", () => {
     expect((await rows(adult.client, "library")).map((row) => row.title)).toContain("Sprout at the beach");
     expect(await rows(child.client, "item", { id: adultOnly })).toEqual([]);
     expect((await progress(child.client, { media_id: adultOnly, position_s: "3", duration_s: "9", reason: "pause" })).status).toBe(404);
-    expect((await child.client.post("/api/plugins/videos/watch-later", { media_id: adultOnly })).status).toBe(404);
+    expect((await child.client.post("/api/plugins/video/watch-later", { media_id: adultOnly })).status).toBe(404);
   });
 
   test("a child's own watching shows in continue and a child's item has no autoplay up_next", async () => {
@@ -405,9 +405,9 @@ describe("the media-app host: a child", () => {
 describe("the media-app host: gates", () => {
   test("a person who is not signed in is refused; an app that is not installed and an unknown id fall through to the generic route", async () => {
     const { adult } = await setup();
-    expect((await new TestClient().post("/api/plugins/videos/data/recent", {})).status).toBe(401);
+    expect((await new TestClient().post("/api/plugins/video/data/recent", {})).status).toBe(401);
     expect((await adult.client.post("/api/plugins/photos/data/recent", {})).status).toBe(404);
-    expect((await adult.client.post("/api/plugins/videos/data/not_an_id", {})).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/data/not_an_id", {})).status).toBe(404);
     expect((await adult.client.post("/api/plugins/weather/data/places", {})).status).toBe(200);
   });
 
@@ -423,13 +423,13 @@ describe("the media-app host: gates", () => {
   test("the Videos package declares the Made at home shelf on Home and Library", async () => {
     const { appPackageProblems } = await import("@/lib/apps");
     const { loadManifestOnly } = await import("@/lib/plugins");
-    const loaded = loadManifestOnly("videos");
+    const loaded = loadManifestOnly("video");
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
-    expect(appPackageProblems(loaded.value, new URL("../packages/videos", import.meta.url).pathname)).toEqual([]);
+    expect(appPackageProblems(loaded.value, new URL("../packages/video", import.meta.url).pathname)).toEqual([]);
     expect(loaded.value.contributes?.data?.map((entry) => entry.id)).toContain("made-at-home");
-    const index = await Bun.file(new URL("../packages/videos/pages/index.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
-    const library = await Bun.file(new URL("../packages/videos/pages/library.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
+    const index = await Bun.file(new URL("../packages/video/pages/index.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
+    const library = await Bun.file(new URL("../packages/video/pages/library.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
     expect(index.body.some((node) => node.heading === "Made at home" && node.bind?.path === "made-at-home")).toBe(true);
     expect(library.body.some((node) => node.heading === "Made at home" && node.bind?.path === "made-at-home")).toBe(true);
   });

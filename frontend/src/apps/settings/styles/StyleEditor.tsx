@@ -94,7 +94,7 @@ export function StyleEditor({ row, person, onClose, onChanged }: { row: StyleRow
                   </Select>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/videos/create", { state: tryStyleState(row) })}>{i18n._({ id: "Try this style", message: "Try this style" })}</Button>
+                  <Button type="button" disabled={!row.usable} onClick={() => navigate("/apps/video/create", { state: tryStyleState(row) })}>{i18n._({ id: "Try this style", message: "Try this style" })}</Button>
                   <Button type="button" variant="outline" onClick={() => setAskRemove(true)}>{i18n._({ id: "Remove", message: "Remove" })}</Button>
                 </div>
               </DialogSection>

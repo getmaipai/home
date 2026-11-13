@@ -53,7 +53,7 @@ export function registerProductionSourceGate(gate: ProductionSourceGate): void {
 
 /** The apps this host serves, and the item kinds each one is about. One definition: the route mount, the shell and the packages read it. */
 export const MEDIA_APPS = {
-  videos: { kinds: ["video"] as MediaKind[], noun: "video" },
+  video: { kinds: ["video"] as MediaKind[], noun: "video" },
   shows: { kinds: ["episode", "film"] as MediaKind[], noun: "title" },
   audio: { kinds: ["track"] as MediaKind[], noun: "song" },
   podcasts: { kinds: ["podcast_episode"] as MediaKind[], noun: "episode" },
@@ -194,7 +194,7 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
 /** Generated Library files join the app shelves through the Library's own listing (and therefore its file sharing and audience gates).
  * A saved media-item wins when both records point at the same file. */
 type MadeLibraryFile = ReturnType<typeof listLibrary>["items"][number];
-export function madeFiles(person: PersonRow, appId: "audio" | "videos"): MadeLibraryFile[] {
+export function madeFiles(person: PersonRow, appId: "audio" | "video"): MadeLibraryFile[] {
   const kind = appId === "audio" ? "audio" : "video";
   const savedFileIds = new Set(queryItems(person, appId, { all: true }).map((item) => (item.location as { file_id?: string }).file_id).filter((id): id is string => !!id));
   const files: MadeLibraryFile[] = [];
@@ -217,11 +217,11 @@ export function madeVideoRow(file: MadeLibraryFile) {
   return { id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video" as const, thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", loop: `/api/files/${encodeURIComponent(file.id)}/content` };
 }
 
-export function madeFileFor(person: PersonRow, appId: "audio" | "videos", id: string): MadeLibraryFile | null {
+export function madeFileFor(person: PersonRow, appId: "audio" | "video", id: string): MadeLibraryFile | null {
   return madeFiles(person, appId).find((file) => file.id === id) ?? null;
 }
 
-export function madeFileItemView(file: MadeLibraryFile, appId: "audio" | "videos"): MediaItemView {
+export function madeFileItemView(file: MadeLibraryFile, appId: "audio" | "video"): MediaItemView {
   const kind = appId === "audio" ? "track" : "video";
   const title = file.name;
   const poster = file.thumb_url;
@@ -394,7 +394,7 @@ export function canManageMadeFile(person: PersonRow, ownerId: string): boolean {
 }
 
 function videoCreation(person: PersonRow, id: string): unknown[] {
-  const made = madeFileFor(person, "videos", id);
+  const made = madeFileFor(person, "video", id);
   if (made) {
     const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
     if (!file || file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
@@ -413,7 +413,7 @@ function videoCreation(person: PersonRow, id: string): unknown[] {
       ? { name: owner.displayName, avatar_url: null, avatar_seed: owner.avatarSeed, href: `/people/${encodeURIComponent(owner.id)}` }
       : { label: "Made at home" }, made_at: made.created_at, visibility: share.visibility }];
   }
-  const item = readableIn(person, "videos", id);
+  const item = readableIn(person, "video", id);
   if (!item) return [];
   const source = liveSourceById(item.source_id);
   if (!source) return [];
@@ -424,7 +424,7 @@ function videoCreation(person: PersonRow, id: string): unknown[] {
 }
 
 function videoCreationPeople(person: PersonRow, id: string): unknown[] {
-  const made = madeFileFor(person, "videos", id);
+  const made = madeFileFor(person, "video", id);
   if (!made) return [];
   const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!file || file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
@@ -435,7 +435,7 @@ function videoCreationPeople(person: PersonRow, id: string): unknown[] {
 export function changeVideoCreationShare(person: PersonRow, op: "add" | "remove" | "private", id: string, target?: string) {
   const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
-  if (!madeFileFor(person, "videos", id)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
+  if (!madeFileFor(person, "video", id)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
   if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this video." };
   if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
   if (op === "add") {
@@ -584,7 +584,7 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
     }
   }
   // MEDIA-HEADER-01: Audio's songs and Videos' library, asked with a `query`, are the app's search results.
-  if (params.query !== undefined && params.scope !== "top" && ((appId === "audio" && dataId === "songs") || (appId === "videos" && dataId === "library"))) {
+  if (params.query !== undefined && params.scope !== "top" && ((appId === "audio" && dataId === "songs") || (appId === "video" && dataId === "library"))) {
     const q = params.query.trim();
     return q.length < 2 ? [] : rowsOf(person, queryItems(person, appId, { where: titleMatch(q), limit }));
   }
@@ -594,11 +594,11 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
   }
   switch (dataId) {
     case "creation":
-      return appId === "videos" && params.id
+      return appId === "video" && params.id
         ? (params.scope === "people" ? videoCreationPeople(person, params.id) : videoCreation(person, params.id)) as never
         : null;
     case "made-at-home":
-      return appId === "videos" ? madeFiles(person, "videos").slice(0, params.limit ? limit : 16).map(madeVideoRow) : null;
+      return appId === "video" ? madeFiles(person, "video").slice(0, params.limit ? limit : 16).map(madeVideoRow) : null;
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
       const items = queryItems(person, appId, { limit: 12 });
@@ -670,9 +670,9 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
         const preview = previewEpisodeView(person, params.id);
         if (preview) return preview as never;
       }
-      if (params.id && (appId === "audio" || appId === "videos")) {
+      if (params.id && (appId === "audio" || appId === "video")) {
         const file = madeFileFor(person, appId, params.id);
-        if (file) { const view = madeFileItemView(file, appId); return appId === "videos" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
+        if (file) { const view = madeFileItemView(file, appId); return appId === "video" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
       }
       const item = params.id ? readableIn(person, appId, params.id) : null;
       return item ? (appId === "books" ? bookItemView(person, item) : itemView(person, appId, item)) : [];
@@ -706,12 +706,12 @@ export function safeTemplateFields<T>(value: T): T {
 
 export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): ReturnType<typeof mediaAppDataRaw> {
   // APPS-PARITY: the Videos chips (filter, type, channel) and the library sort narrow or order the rows the id already builds.
-  if (appId === "videos") {
+  if (appId === "video") {
     // MEDIA-PARITY-02: playlists, the channel strip and search suggestions answer by scope (lib/videos/playlistData.ts).
     const scoped = videoScopedData(person, dataId.replace(/_/g, "-"), params);
     if (scoped !== null) return safeTemplateFields(scoped as never);
   }
-  if (appId === "videos" && wantsVideoRules(dataId.replace(/_/g, "-"), params)) {
+  if (appId === "video" && wantsVideoRules(dataId.replace(/_/g, "-"), params)) {
     const id = dataId.replace(/_/g, "-");
     // MEDIA-PARITY-02: the Library's sort is the person's saved one unless the page names one (and a new choice is saved).
     const ruled = id === "library" && params.query === undefined ? { ...params, sort: librarySortFor(person, params.sort) } : params;
@@ -719,7 +719,7 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
     return safeTemplateFields(withChannelAvatars(person, withVideoByline(videoRules(person, id, ruled, asked, Math.min(Math.max(params.limit ?? (id === "library" ? 200 : 20), 1), 200)) as never)));
   }
   const raw = mediaAppDataRaw(person, appId, dataId, params);
-  return safeTemplateFields(appId === "videos" && dataId !== "recipes" ? withChannelAvatars(person, withVideoByline(raw)) : raw);
+  return safeTemplateFields(appId === "video" && dataId !== "recipes" ? withChannelAvatars(person, withVideoByline(raw)) : raw);
 }
 
 /** What to play after `item`: the person's watch-later queue first, then the rest of the channel in order, then the newest others. */

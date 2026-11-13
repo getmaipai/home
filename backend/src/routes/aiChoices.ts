@@ -41,7 +41,7 @@ export const aiChoicesRoutes = apiRouter();
 
 const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Videos", music: "Music", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding", faces: "Telling people apart", ingredients: "Video from pictures" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Video", music: "Music", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding", faces: "Telling people apart", ingredients: "Video from pictures" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.

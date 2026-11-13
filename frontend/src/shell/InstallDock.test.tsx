@@ -137,7 +137,7 @@ describe("InstallDock making jobs", () => {
     const model = buildDock(null, [making]);
     expect(model.primary?.label).toBe("Making a video");
     expect(model.percent).toBe(40);
-    expect(model.primary?.href).toBe("/apps/videos");
+    expect(model.primary?.href).toBe("/apps/video");
   });
   test("another person's job row and a finished job are not shown", () => {
     expect(buildDock(null, [{ id: "x", kind: "video", forPersonName: "Nova" }, { ...making, state: "done" }]).primary).toBeNull();
@@ -188,7 +188,7 @@ describe("InstallDock finish wording and stacking", () => {
 // COULD NOT FINISH card for a short time, with Open (or Try again) and Activity.
 describe("InstallDock making jobs end", () => {
   const running: HomeJobView = { id: "video:v1", kind: "video", state: "running", title: "A dog on a beach", progress: { percent: 40 } };
-  const entry = (over: Partial<ActivityItemView>): ActivityItemView => ({ id: "video:v1", source: "video", state: "done", title: "A dog on a beach", line: null, percent: null, typicalMinutes: null, href: "/apps/videos/create", at: new Date().toISOString(), ...over });
+  const entry = (over: Partial<ActivityItemView>): ActivityItemView => ({ id: "video:v1", source: "video", state: "done", title: "A dog on a beach", line: null, percent: null, typicalMinutes: null, href: "/apps/video/create", at: new Date().toISOString(), ...over });
   const mount = (rows: () => HomeJobView[], activity: () => ActivityItemView[]) => renderWithQueryClient(
     <MemoryRouter><InstallDock admin={false} read={async () => status({ state: "none", items: [] })} readJobs={async () => rows()} readActivity={async () => ({ items: activity(), seenAt: null, dot: "none" })} /></MemoryRouter>,
   );

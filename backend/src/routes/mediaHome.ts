@@ -35,7 +35,7 @@ function appForKind(kind: string | null): MediaAppId | null {
 
 const RowSchema = z.object({
   id: z.string(),
-  app: z.enum(["videos", "shows", "audio", "podcasts", "books"]),
+  app: z.enum(["video", "shows", "audio", "podcasts", "books"]),
   kind: z.string(),
   title: z.string(),
   subtitle: z.string().nullable(),
@@ -107,7 +107,7 @@ function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music
   // Made at home: Library files created in chat, kept separate from scanned media roots.
   const madeAtHome = safely("made_at_home", () => {
     const rows: Row[] = [];
-    for (const [app, kind] of [["audio", "track"], ["videos", "video"]] as const) {
+    for (const [app, kind] of [["audio", "track"], ["video", "video"]] as const) {
       for (const file of madeFiles(person, app).slice(0, 8)) {
         rows.push({
           id: file.id, app, kind, title: file.name, subtitle: null, artwork_url: file.thumb_url ?? null,

@@ -1,11 +1,11 @@
 <!-- Store card. Dad test: grade 6, one action per step, no jargon. -->
-# Videos
+# Video
 
 Watch the videos saved on your hub, in a dark look like YouTube. Nothing comes from the internet, so it plays with the internet off.
 
-## The Videos app
+## The Video app
 
-Open Videos from the app list. The tabs are Home, Library, Watch later and History.
+Open Video from the app list. The tabs are Home, Library, Watch later and History.
 
 - Home has a big picture, Continue watching, Recently added and Watch again.
 - Press a picture to play it. When you come back later, it starts where you stopped.
@@ -18,4 +18,4 @@ A video folder added by an admin (Settings, Home, Storage). Nothing else.
 
 ## What it uses
 
-Nothing leaves your home. Videos reads only the library on your hub.
+Nothing leaves your home. Video reads only the library on your hub.

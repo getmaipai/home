@@ -47,8 +47,8 @@ async function household() {
 // names the Clips page fails to load the whole Videos app. Until a spec tag adds it, the page file, the data scope and the checks below stand ready and the
 // registration tests (marked skipIf) turn on by themselves once the pinned spec allows the node. The manifest and Videos home edits are in the hand-off patch.
 const specAllowsClipFeed = PACKAGE_PAGE_NODE_TYPES.includes("clip_feed");
-const short = async (client: TestClient) => (await client.post("/api/plugins/videos/data/recipes", { scope: "short" })).json() as Promise<Row[]>;
-const action = (client: TestClient, name: string, body: Record<string, unknown>) => client.post(`/api/plugins/videos/actions/${name}`, body);
+const short = async (client: TestClient) => (await client.post("/api/plugins/video/data/recipes", { scope: "short" })).json() as Promise<Row[]>;
+const action = (client: TestClient, name: string, body: Record<string, unknown>) => client.post(`/api/plugins/video/actions/${name}`, body);
 async function makeClip(client: TestClient, actor: PersonRow, body: Record<string, unknown> = { prompt: BOAT }) {
   const made = await (await client.post("/api/videos/make", body)).json() as { id: string };
   await until(() => getVideoJobFor(actor, made.id)?.state === "done");
@@ -126,20 +126,20 @@ describe("scope short: the clips feed rows", () => {
 
   test("a child and a teen reach no other scope of recipes (feed, job, clips, showcase, studio)", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
     // The Clips shelf and page ask for the short scope: open to both.
-    for (const who of [teen, child]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope: "short" })).status).toBe(200);
+    for (const who of [teen, child]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "short" })).status).toBe(200);
   });
 
   test.skipIf(!specAllowsClipFeed)("with the Clips page registered, a child and a teen open the short scope and nothing else", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope: "short" })).status).toBe(200);
+    for (const who of [teen, child]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "short" })).status).toBe(200);
   });
 });
 
 describe("the Clips page", () => {
-  const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "videos/pages/clips-feed.json"), "utf8")) as { body: Array<Record<string, any>> };
-  const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "videos/manifest.json"), "utf8"));
+  const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "video/pages/clips-feed.json"), "utf8")) as { body: Array<Record<string, any>> };
+  const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "video/manifest.json"), "utf8"));
   const node = page.body[0]!;
 
   test("one clip_feed over the short scope, with the kit's own Close, the heart and Make another", () => {
@@ -150,10 +150,10 @@ describe("the Clips page", () => {
       item_fields: { src: "src", poster: "poster", title: "title", duration_s: "duration_s", id: "id", subtitle: "subtitle", liked: "liked" },
       autoplay: true,
       autoplay_field: "autoplay",
-      on_close: { navigate: { to: "/apps/videos" } },
+      on_close: { navigate: { to: "/apps/video" } },
     });
-    expect(node.actions.like.call).toMatchObject({ target: "/api/plugins/videos/actions/favorite", args: { id: "{id}", favorite: "{liked}" } });
-    expect(node.actions.remake).toMatchObject({ starts: "video", navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}" } } });
+    expect(node.actions.like.call).toMatchObject({ target: "/api/plugins/video/actions/favorite", args: { id: "{id}", favorite: "{liked}" } });
+    expect(node.actions.remake).toMatchObject({ starts: "video", navigate: { to: "/apps/video/create", state: { prompt: "{prompt}" } } });
     expect(node.empty_state.text).not.toContain("—");
   });
 
@@ -167,13 +167,13 @@ describe("the Clips page", () => {
   });
 
   test.skipIf(!specAllowsClipFeed)("Videos home has a Clips shelf with an Open Clips link beside its heading", () => {
-    const index = JSON.parse(readFileSync(join(PACKAGES_DIR, "videos/pages/index.json"), "utf8"));
+    const index = JSON.parse(readFileSync(join(PACKAGES_DIR, "video/pages/index.json"), "utf8"));
     const shelves: Array<Record<string, any>> = [];
     const walk = (n: unknown): void => { if (Array.isArray(n)) n.forEach(walk); else if (n && typeof n === "object") { const o = n as Record<string, any>; if (o.type === "media_shelf") shelves.push(o); Object.values(o).forEach(walk); } };
     walk(index);
     const clips = shelves.find((s) => s.bind?.params?.scope === "short");
     expect(clips).toBeDefined();
     expect(clips!.heading).toBe("Clips");
-    expect(clips!.see_all).toMatchObject({ label: "Open Clips", action: { navigate: { to: "/apps/videos/clips-feed" } } });
+    expect(clips!.see_all).toMatchObject({ label: "Open Clips", action: { navigate: { to: "/apps/video/clips-feed" } } });
   });
 });

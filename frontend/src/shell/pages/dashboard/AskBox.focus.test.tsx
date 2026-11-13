@@ -9,7 +9,7 @@ afterEach(cleanup);
 test("composer modes choose their destination and preserve the prompt", () => {
   expect(composerHref("ask", "  hello world ")).toBe("/chat?ask=hello%20world");
   expect(composerHref("picture", "a red fox")).toBe("/chat?ask=a%20red%20fox&mode=picture");
-  expect(composerHref("video", "a red fox")).toBe("/apps/videos/create?prompt=a%20red%20fox");
+  expect(composerHref("video", "a red fox")).toBe("/apps/video/create?prompt=a%20red%20fox");
   expect(composerHref("song", "a red fox")).toBe("/apps/audio/create?prompt=a%20red%20fox");
 });
 

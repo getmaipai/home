@@ -1,4 +1,4 @@
-// MEDIA-PARITY-02 (Videos): the routes the playlist and history actions call, under /api/plugins/videos. Rules live in lib/videos/playlists.ts and history.ts.
+// MEDIA-PARITY-02 (Videos): the routes the playlist and history actions call, under /api/plugins/video. Rules live in lib/videos/playlists.ts and history.ts.
 import { jsonBody } from "@/lib/validation";
 import { apiRouter, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";

@@ -22,11 +22,11 @@
       "card_radius": "soft",
       "on_select": {
         "call": {
-          "target": "/api/plugins/videos/playlists/new",
+          "target": "/api/plugins/video/playlists/new",
           "args": {},
           "then": {
             "navigate": {
-              "to": "/apps/videos/playlist",
+              "to": "/apps/video/playlist",
               "state": {
                 "id": "{id}"
               }
@@ -56,7 +56,7 @@
       "size_control": true,
       "on_select": {
         "navigate": {
-          "to": "/apps/videos/playlist",
+          "to": "/apps/video/playlist",
           "state": {
             "id": "{id}"
           }
@@ -88,7 +88,7 @@
       "layout": "grid",
       "on_select": {
         "navigate": {
-          "to": "/apps/videos/playlist",
+          "to": "/apps/video/playlist",
           "state": {
             "id": "{id}"
           }

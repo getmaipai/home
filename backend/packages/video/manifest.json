@@ -1,9 +1,9 @@
 {
-  "id": "videos",
+  "id": "video",
   "version": "0.4.0",
   "kind": "app",
   "category": "Media",
-  "display": "Videos",
+  "display": "Video",
   "description": "Watch the videos saved on your hub, pick up where you stopped and keep a list to watch later.",
   "routing": {
     "examples": [
@@ -31,7 +31,7 @@
   "permissions": [],
   "notifications": [
     {
-      "id": "videos.clip_ready",
+      "id": "video.clip_ready",
       "level": "passive",
       "audience": "person",
       "template": "Your video is ready: {title}",
@@ -48,11 +48,11 @@
       "search": {
         "type": "search",
         "state": "q",
-        "label": "Search Videos",
-        "placeholder": "Search Videos",
+        "label": "Search Video",
+        "placeholder": "Search Video",
         "submit": {
           "navigate": {
-            "to": "/apps/videos/search",
+            "to": "/apps/video/search",
             "state": {
               "q": "{q}"
             }
@@ -87,7 +87,7 @@
     "pages": [
       {
         "id": "index",
-        "label": "Videos",
+        "label": "Video",
         "icon": "film",
         "nav": true,
         "kind": "schema",
@@ -282,15 +282,15 @@
       }
     ],
     "settings_area": {
-      "id": "videos",
-      "title": "Videos",
-      "app": "/apps/videos",
+      "id": "video",
+      "title": "Video",
+      "app": "/apps/video",
       "audience": {
         "min_role": "child"
       },
       "groups": [
         {
-          "label": "Videos",
+          "label": "Video",
           "sections": [
             "speed",
             "storage"
@@ -329,7 +329,7 @@
     },
     "header": {
       "search": {
-        "label": "Search Videos"
+        "label": "Search Video"
       },
       "modes": [
         {

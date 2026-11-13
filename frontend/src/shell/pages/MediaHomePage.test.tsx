@@ -11,12 +11,12 @@ afterEach(() => { cleanup(); api.mediaHome = originals.mediaHome; api.apps = ori
 function Where() { return <p data-testid="where">{useLocation().pathname}</p>; }
 
 function row(overrides: Partial<MediaHomeRow>): MediaHomeRow {
-  return { id: "media-abc123", app: "videos", kind: "movie", title: "A Title", subtitle: "A Subtitle", artwork_url: "/art.png", href: "/media/media-abc123", percent: null, at: "2026-01-01T00:00:00Z", ...overrides };
+  return { id: "media-abc123", app: "video", kind: "movie", title: "A Title", subtitle: "A Subtitle", artwork_url: "/art.png", href: "/media/media-abc123", percent: null, at: "2026-01-01T00:00:00Z", ...overrides };
 }
 
 function open(home: () => Promise<MediaHome>) {
   api.mediaHome = home;
-  api.apps = async () => ["videos", "audio"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
+  api.apps = async () => ["video", "audio"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/media"]}><Routes><Route path="/media" element={<MediaHomePage />} /><Route path="*" element={<Where />} /></Routes></MemoryRouter></QueryClientProvider>);
 }

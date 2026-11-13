@@ -171,7 +171,12 @@ const pageOnlyTitles = (): Record<string, string> => ({
 
 function LegacyAudioRedirect() {
   const location = useLocation();
-  return <Navigate to={`${location.pathname.replace(/^\/apps\/music(?=\/|$)/, "/apps/audio")}${location.search}${location.hash}`} replace />;
+  return <Navigate to={{ pathname: location.pathname.replace(/^\/apps\/music(?=\/|$)/, "/apps/audio"), search: location.search, hash: location.hash }} replace />;
+}
+
+function LegacyVideoRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: location.pathname.replace(/^\/apps\/videos(?=\/|$)/, "/apps/video"), search: location.search, hash: location.hash }} replace />;
 }
 
 function PageHeaderLayout() {
@@ -487,6 +492,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
               MEDIA-POLISH-01 (RULES S2): an app draws its own header, so app pages sit outside PageHeaderLayout, whose
               title bar had no entry for them and drew an empty 52 px strip above every app. */}
           <Route path="apps/music/*" element={<LegacyAudioRedirect />} />
+          <Route path="apps/videos/*" element={<LegacyVideoRedirect />} />
           <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />

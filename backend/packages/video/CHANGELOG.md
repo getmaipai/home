@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Videos package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+All notable changes to the Video package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## [Unreleased]
 

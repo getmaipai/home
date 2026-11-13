@@ -11,7 +11,7 @@ export type HomeHeroChoice =
 export function chooseHomeHero(made: MediaHomeRow[] | undefined, companion: { id?: string; name: string; portrait?: string | null } | null | undefined, child = false): HomeHeroChoice {
   if (!child && made?.[0]) {
     const row = made[0];
-    return { kind: "made", id: row.id, title: row.title, art: row.artwork_url ?? undefined, mediaKind: row.app === "audio" || row.app === "podcasts" ? "music" : row.app === "videos" || row.app === "shows" ? "video" : "picture", href: row.href };
+    return { kind: "made", id: row.id, title: row.title, art: row.artwork_url ?? undefined, mediaKind: row.app === "audio" || row.app === "podcasts" ? "music" : row.app === "video" || row.app === "shows" ? "video" : "picture", href: row.href };
   }
   return companion ? { kind: "companion", title: companion.name, art: companion.portrait ? api.companionPortrait(companion.portrait) : undefined, href: companion.id ? `/companions/${encodeURIComponent(companion.id)}` : undefined } : null;
 }

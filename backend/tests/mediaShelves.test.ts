@@ -55,18 +55,18 @@ describe("every shelf data id of the media apps answers 200", () => {
       await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
     }
     // Watch progress for the owner, so the Continue, History and Again shelves have rows to build.
-    for (const app of ["videos", "audio"]) {
+    for (const app of ["video", "audio"]) {
       const library = (await (await owner.post(`/api/plugins/${app}/data/library`, {})).json()) as Array<{ id: string }>;
       for (const row of library.slice(0, 3)) await owner.post(`/api/plugins/${app}/progress`, { media_id: row.id, position_s: 3, duration_s: 20 });
     }
     const failures: string[] = [];
     let checked = 0;
-    for (const app of ["music", "videos", "podcasts"]) {
+    for (const app of ["audio", "video", "podcasts"]) {
       for (const bind of bindsOf(app)) {
         if (NEEDS_ID.has(bind.path)) continue;
         for (const [who, client] of Object.entries(clients)) {
           // The Videos Create, Studio and Clips pages are adult-only on purpose (rule 0): a teen and a child get 404 there.
-          if (app === "videos" && bind.path === "recipes" && (who === "teen" || who === "child")) continue;
+          if (app === "video" && bind.path === "recipes" && (who === "teen" || who === "child")) continue;
           const res = await client.post(`/api/plugins/${app}/data/${bind.path}`, bind.params);
           checked += 1;
           if (res.status !== 200) failures.push(`${who} ${app}/${bind.path} ${JSON.stringify(bind.params)} -> ${res.status} ${(await res.text()).slice(0, 120)}`);

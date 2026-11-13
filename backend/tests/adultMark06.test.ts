@@ -37,7 +37,7 @@ beforeEach(() => {
 afterEach(() => { __setKeyframesForTests(null); fake.restore(); __setVideoStatusForTests(undefined); });
 
 type Row = Record<string, any>;
-const data = (client: TestClient, body: Record<string, unknown>, headers?: Record<string, string>) => client.post("/api/plugins/videos/data/recipes", body, headers);
+const data = (client: TestClient, body: Record<string, unknown>, headers?: Record<string, string>) => client.post("/api/plugins/video/data/recipes", body, headers);
 const noteOf = (fileId: string) => lockItemOfProvenance("x", db.select().from(attachments).where(eq(attachments.id, fileId)).get()!.provenance);
 
 /** A clip made with the adult-only style (the way chat starts one), started for `actor`; resolves once started, with the job. */

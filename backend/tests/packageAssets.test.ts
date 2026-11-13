@@ -27,8 +27,8 @@ async function household() {
 }
 
 const LOOP = "loops/natural.mp4";
-const URL_OF = (path: string) => `/api/plugins/videos/assets/${path}`;
-const onDisk = () => Bun.file(join(PACKAGES_DIR, "videos", "assets", LOOP));
+const URL_OF = (path: string) => `/api/plugins/video/assets/${path}`;
+const onDisk = () => Bun.file(join(PACKAGES_DIR, "video", "assets", LOOP));
 
 describe("the asset route", () => {
   test("needs a signed-in person", async () => {

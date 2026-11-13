@@ -28,7 +28,7 @@ export const RAIL_GROUPS: ReadonlyArray<{ id: string; label?: string }> = [
 export function railGroupForApp(to: string): string {
   if (RAIL_GROUP_BY_APP_ID[to]) return RAIL_GROUP_BY_APP_ID[to]!;
   if (["/", "/chat", "/media", "/files", "/people"].includes(to)) return "main";
-  if (/^\/apps\/(audio|videos|pictures|voice|songs)(\/|$)/.test(to)) return "create";
+  if (/^\/apps\/(audio|video|pictures|voice|songs)(\/|$)/.test(to)) return "create";
   return "tools";
 }
 
@@ -47,7 +47,7 @@ export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly 
   return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && pinnedSet.has(app.to)).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
-export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/videos"] as const;
+export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video"] as const;
 
 export function routeAutoCollapses(pathname: string): boolean {
   return AUTO_COLLAPSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

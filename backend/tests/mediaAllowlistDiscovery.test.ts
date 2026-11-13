@@ -50,8 +50,8 @@ const allowlist = (who: PersonRow, on: boolean) => {
 
 test("control: a teen and an adult with the setting off see discovery rows in Videos and Music", () => {
   for (const who of [nova, marlow]) {
-    expect(rows(who, "videos", "featured").length).toBeGreaterThan(0);
-    expect(rows(who, "videos", "recent").length).toBeGreaterThan(0);
+    expect(rows(who, "video", "featured").length).toBeGreaterThan(0);
+    expect(rows(who, "video", "recent").length).toBeGreaterThan(0);
     expect(rows(who, "audio", "radio-seeds").length).toBeGreaterThan(0);
   }
 });
@@ -73,7 +73,7 @@ test("a child, and a guest-band child, get no discovery rows either (unchanged)"
 
 test("the item view offers no autoplay suggestion when the person's allowlist is on", () => {
   allowlist(nova, true);
-  const view = mediaAppData(nova, "videos", "item", { id: "media-disc00001" }) as Array<{ up_next?: unknown }> | { up_next?: unknown };
+  const view = mediaAppData(nova, "video", "item", { id: "media-disc00001" }) as Array<{ up_next?: unknown }> | { up_next?: unknown };
   const item = Array.isArray(view) ? view[0] : view;
   expect(item?.up_next ?? null).toBeNull();
 });
@@ -95,9 +95,9 @@ test("a child on the default allowlist and a teen whose allowlist is on never re
 
 test("noDiscovery_person_up_next_data_id_empty_in_videos_not_music", () => {
   allowlist(nova, true);
-  expect(rows(nova, "videos", "up-next", { id: "media-disc00001" })).toEqual([]);
+  expect(rows(nova, "video", "up-next", { id: "media-disc00001" })).toEqual([]);
   expect(rows(nova, "podcasts", "up-next", { id: "media-disc00007" })).toEqual([]);
-  expect(rows(marlow, "videos", "up-next", { id: "media-disc00001" }).length).toBeGreaterThan(0);
+  expect(rows(marlow, "video", "up-next", { id: "media-disc00001" }).length).toBeGreaterThan(0);
 });
 
 test("a minor never sees a shared collection whose title trips the floor; an adult does", () => {

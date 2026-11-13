@@ -1,4 +1,4 @@
-// VIDEO-STUDIO-07: what the Studio page reads and the `add` action. The page is a kit `studio` node (commons TrackStudio) fed by the Videos package's
+// VIDEO-STUDIO-07: what the Studio page reads and the `add` action. The page is a kit `studio` node (commons TrackStudio) fed by the Video package's
 // `recipes` data id (scopes `studio`, `studio-header`, `studio-picker`) and two package actions (`add`, `export`, see studioExport.ts). One definition of
 // who may open a clip: the person's own finished clip (as chat's `ownClip` says), never a locked one without the proof, never for a minor (the page is
 // adult-only: appRouteAllowed answers a child or teen 404 before any of this runs).

@@ -8,7 +8,7 @@ import { PACKAGES_DIR } from "@/lib/paths";
 import { owner } from "./support/testAuth";
 
 const pages = [
-  ["videos", "watch"], ["audio", "play"], ["podcasts", "play"], ["shows", "watch"],
+  ["video", "watch"], ["audio", "play"], ["podcasts", "play"], ["shows", "watch"],
 ] as const;
 
 describe("media detail player pages", () => {

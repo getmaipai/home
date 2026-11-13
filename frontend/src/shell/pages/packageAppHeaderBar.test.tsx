@@ -18,10 +18,10 @@ test("detail page hides the center on a phone, ordinary pages retain it", () => 
 });
 
 describe("sectionsBarEntries search", () => {
-  const app = { to: "/apps/videos", label: "Videos", icon: null, sections: [{ page: "library", label: "Library" }, { page: "search", label: "Search" }] };
+  const app = { to: "/apps/video", label: "Videos", icon: null, sections: [{ page: "library", label: "Library" }, { page: "search", label: "Search" }] };
   test("an app with a search page names it for the header and keeps it out of the bar", () => {
     const bar = sectionsBarEntries(app, "Videos", true);
-    expect(bar.searchTo).toBe("/apps/videos/search");
+    expect(bar.searchTo).toBe("/apps/video/search");
     expect(bar.entries.map((entry) => entry.label)).toEqual(["Videos", "Library"]);
     expect(sectionsBarEntries(app, "Videos", false).searchTo).toBeUndefined();
   });

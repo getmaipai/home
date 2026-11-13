@@ -49,7 +49,7 @@
       ],
       "submit": {
         "call": {
-          "target": "/api/plugins/videos/actions/make",
+          "target": "/api/plugins/video/actions/make",
           "method": "POST",
           "args": {
             "prompt": "{prompt}",
@@ -123,7 +123,7 @@
       "hide_when_empty": true,
       "on_select": {
         "navigate": {
-          "to": "/apps/videos/create",
+          "to": "/apps/video/create",
           "state": {
             "prompt": "{prompt}",
             "look": "{look}",
@@ -202,7 +202,7 @@
               "icon": "pencil",
               "action": {
                 "navigate": {
-                  "to": "/apps/videos/create",
+                  "to": "/apps/video/create",
                   "state": {
                     "prompt": "{prompt}",
                     "look": "{look}",
@@ -221,7 +221,7 @@
               "starts": "video",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/actions/max",
+                  "target": "/api/plugins/video/actions/max",
                   "method": "POST",
                   "args": {
                     "id": "{id}"
@@ -235,7 +235,7 @@
               "starts": "video",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/actions/spatial-sound",
+                  "target": "/api/plugins/video/actions/spatial-sound",
                   "method": "POST",
                   "args": {
                     "id": "{id}"
@@ -249,7 +249,7 @@
               "starts": "video",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/actions/spatial-sound",
+                  "target": "/api/plugins/video/actions/spatial-sound",
                   "method": "POST",
                   "args": {
                     "id": "{id}",
@@ -263,7 +263,7 @@
               "icon": "audio-waveform",
               "action": {
                 "navigate": {
-                  "to": "/apps/videos/studio",
+                  "to": "/apps/video/studio",
                   "state": {
                     "clip": "{id}"
                   }
@@ -276,7 +276,7 @@
               "show_when": "can_unmark",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/actions/adult-mark",
+                  "target": "/api/plugins/video/actions/adult-mark",
                   "method": "POST",
                   "args": {
                     "id": "{id}",
@@ -297,7 +297,7 @@
               "show_when": "can_mark",
               "action": {
                 "call": {
-                  "target": "/api/plugins/videos/actions/adult-mark",
+                  "target": "/api/plugins/video/actions/adult-mark",
                   "method": "POST",
                   "args": {
                     "id": "{id}",
@@ -310,7 +310,7 @@
           "handlers": {
             "stop": {
               "call": {
-                "target": "/api/plugins/videos/actions/cancel",
+                "target": "/api/plugins/video/actions/cancel",
                 "method": "POST",
                 "args": {
                   "id": "{id}"
@@ -320,7 +320,7 @@
             "retry": {
               "starts": "video",
               "call": {
-                "target": "/api/plugins/videos/actions/another",
+                "target": "/api/plugins/video/actions/another",
                 "method": "POST",
                 "args": {
                   "id": "{id}"
@@ -330,7 +330,7 @@
             "make_another": {
               "starts": "video",
               "call": {
-                "target": "/api/plugins/videos/actions/another",
+                "target": "/api/plugins/video/actions/another",
                 "method": "POST",
                 "args": {
                   "id": "{id}"
@@ -339,7 +339,7 @@
             },
             "favorite": {
               "call": {
-                "target": "/api/plugins/videos/actions/favorite",
+                "target": "/api/plugins/video/actions/favorite",
                 "method": "POST",
                 "args": {
                   "id": "{id}"

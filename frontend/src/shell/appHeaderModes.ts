@@ -26,7 +26,14 @@ export function sidebarInMode(sidebar: Sidebar | undefined, mode: string | undef
 const key = (owner: string, packageId: string): string => `maipai.mode.v1:${owner}:${packageId}`;
 export function rememberedMode(owner: string, packageId: string): string | null {
   if (!owner) return null;
-  try { return localStorage.getItem(key(owner, packageId)); } catch { return null; }
+  try {
+    const current = localStorage.getItem(key(owner, packageId));
+    if (current !== null || packageId !== "video") return current;
+    const legacyKey = key(owner, "videos");
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy !== null) { localStorage.setItem(key(owner, packageId), legacy); localStorage.removeItem(legacyKey); }
+    return legacy;
+  } catch { return null; }
 }
 export function rememberMode(owner: string, packageId: string, mode: string): void {
   if (!owner) return;

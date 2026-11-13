@@ -24,7 +24,7 @@
       "actions": {
         "like": {
           "call": {
-            "target": "/api/plugins/videos/actions/favorite",
+            "target": "/api/plugins/video/actions/favorite",
             "method": "POST",
             "args": {
               "id": "{id}",
@@ -35,7 +35,7 @@
         "remake": {
           "starts": "video",
           "navigate": {
-            "to": "/apps/videos/create",
+            "to": "/apps/video/create",
             "state": {
               "prompt": "{prompt}"
             }
@@ -48,14 +48,14 @@
         "text": "No short clips yet. Make a video and it shows up here.",
         "action": {
           "navigate": {
-            "to": "/apps/videos"
+            "to": "/apps/video"
           }
         },
-        "action_label": "Back to Videos"
+        "action_label": "Back to Video"
       },
       "on_close": {
         "navigate": {
-          "to": "/apps/videos"
+          "to": "/apps/video"
         }
       },
       "autoplay": true,

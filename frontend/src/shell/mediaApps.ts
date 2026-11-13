@@ -1,6 +1,6 @@
 // MEDIA-VIDEOS-01: which media app plays which kind of item, and where its play page is. The backend's twin is
 // backend/src/lib/media/appHost.ts (MEDIA_APPS: the data ids each app serves); this is the shell's half (a link or a `play` action
-// becomes a route). Videos is built; the other four apps use the same table when their packages land.
+// becomes a route). Video is built; the other four apps use the same table when their packages land.
 export interface MediaAppTarget {
   app: string;
   /** The app's page that plays one item, named in its manifest. */
@@ -8,7 +8,7 @@ export interface MediaAppTarget {
 }
 
 export const MEDIA_APP_FOR_KIND: Readonly<Record<string, MediaAppTarget>> = {
-  video: { app: "videos", page: "watch" },
+  video: { app: "video", page: "watch" },
   episode: { app: "shows", page: "watch" },
   film: { app: "shows", page: "watch" },
   track: { app: "audio", page: "play" },
@@ -40,13 +40,13 @@ export function playIsAlreadyOpen(heldId: string | null, pathname: string, to: s
   return heldId !== null && heldId === mediaId && to.split("?")[0] === pathname;
 }
 
-/** The media app whose area this path is in (`/apps/videos/watch` is `videos`), or null. */
+/** The media app whose area this path is in (`/apps/video/watch` is `video`), or null. */
 export function mediaAppOfPath(pathname: string): string | null {
   const match = /^\/apps\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(pathname);
   return match && isMediaApp(match[1]!) ? match[1]! : null;
 }
 
-/** MEDIA-POLISH-01: the page of `app` that plays one item (`watch` for Videos), or null for an app that is not a media app. */
+/** MEDIA-POLISH-01: the page of `app` that plays one item (`watch` for Video), or null for an app that is not a media app. */
 export function playPageOf(app: string): string | null {
   if (app === "books") return "listen";
   return Object.values(MEDIA_APP_FOR_KIND).find((target) => target.app === app)?.page ?? null;
@@ -58,7 +58,7 @@ export function isMediaPlayPage(app: string, page: string): boolean {
   return page === playPageOf(app) || (app === "books" && page === "read") || Object.values(MEDIA_APP_FOR_KIND).some((target) => target.app === app && target.page === page);
 }
 
-/** The first tab of a media app: "Home" for Videos and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading" for Books. */
+/** The first tab of a media app: "Home" for Video and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading" for Books. */
 /** The first tab of an app's own toolbar: a media app names it for what it does, News calls it Today (its index page is the day's
  * stories), and any other package app keeps the generic "Overview". */
 export function appHomeLabel(app: string, media: boolean): string {

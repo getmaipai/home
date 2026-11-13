@@ -89,20 +89,20 @@ User-facing routes registered by the Home shell and package page JSON files. Dyn
 | `/apps/shows/shows` | `shows/shows.json` (PackageAppPage) | Shows | PackagePage, Card, List | Package page: Shows. |
 | `/apps/shows/watch` | `shows/watch.json` (PackageAppPage) | Shows | PackagePage, Card, List | Package page: Watch. |
 | `/apps/shows/watchlist` | `shows/watchlist.json` (PackageAppPage) | Shows | PackagePage, Card, List | Package page: Watchlist. |
-| `/apps/videos/channel` | `videos/channel.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Channel. |
-| `/apps/videos/clips-feed` | `videos/clips-feed.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Clips Feed. |
-| `/apps/videos/clips` | `videos/clips.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Clips. |
-| `/apps/videos/create` | `videos/create.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Create. |
-| `/apps/videos/history` | `videos/history.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: History. |
-| `/apps/videos/index` | `videos/index.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Index. |
-| `/apps/videos/library` | `videos/library.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Library. |
-| `/apps/videos/liked` | `videos/liked.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Liked. |
-| `/apps/videos/playlist` | `videos/playlist.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Playlist. |
-| `/apps/videos/playlists` | `videos/playlists.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Playlists. |
-| `/apps/videos/search` | `videos/search.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Search. |
-| `/apps/videos/studio` | `videos/studio.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Studio. |
-| `/apps/videos/watch-later` | `videos/watch-later.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Watch Later. |
-| `/apps/videos/watch` | `videos/watch.json` (PackageAppPage) | Videos | PackagePage, Card, List | Package page: Watch. |
+| `/apps/video/channel` | `video/channel.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Channel. |
+| `/apps/video/clips-feed` | `video/clips-feed.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Clips Feed. |
+| `/apps/video/clips` | `video/clips.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Clips. |
+| `/apps/video/create` | `video/create.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Create. |
+| `/apps/video/history` | `video/history.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: History. |
+| `/apps/video/index` | `video/index.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Index. |
+| `/apps/video/library` | `video/library.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Library. |
+| `/apps/video/liked` | `video/liked.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Liked. |
+| `/apps/video/playlist` | `video/playlist.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Playlist. |
+| `/apps/video/playlists` | `video/playlists.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Playlists. |
+| `/apps/video/search` | `video/search.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Search. |
+| `/apps/video/studio` | `video/studio.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Studio. |
+| `/apps/video/watch-later` | `video/watch-later.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Watch Later. |
+| `/apps/video/watch` | `video/watch.json` (PackageAppPage) | Video | PackagePage, Card, List | Package page: Watch. |
 | `/apps/weather/index` | `weather/index.json` (PackageAppPage) | Weather | PackagePage, Card, List | Package page: Index. |
 | `/settings/settings` | SettingsAreaPage | Settings | SettingsShell, SettingsRenderer | Settings area: Settings. |
 
@@ -577,72 +577,72 @@ Route manifest used by the scripted capture. `auth: none` means the signed-out s
   },
   {
     "slug": "apps-videos-channel",
-    "path": "/apps/videos/channel",
+    "path": "/apps/video/channel",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-clips-feed",
-    "path": "/apps/videos/clips-feed",
+    "path": "/apps/video/clips-feed",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-clips",
-    "path": "/apps/videos/clips",
+    "path": "/apps/video/clips",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-create",
-    "path": "/apps/videos/create",
+    "path": "/apps/video/create",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-history",
-    "path": "/apps/videos/history",
+    "path": "/apps/video/history",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-index",
-    "path": "/apps/videos/index",
+    "path": "/apps/video/index",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-library",
-    "path": "/apps/videos/library",
+    "path": "/apps/video/library",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-liked",
-    "path": "/apps/videos/liked",
+    "path": "/apps/video/liked",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-playlist",
-    "path": "/apps/videos/playlist",
+    "path": "/apps/video/playlist",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-playlists",
-    "path": "/apps/videos/playlists",
+    "path": "/apps/video/playlists",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-search",
-    "path": "/apps/videos/search",
+    "path": "/apps/video/search",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-studio",
-    "path": "/apps/videos/studio",
+    "path": "/apps/video/studio",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-watch-later",
-    "path": "/apps/videos/watch-later",
+    "path": "/apps/video/watch-later",
     "auth": "sage"
   },
   {
     "slug": "apps-videos-watch",
-    "path": "/apps/videos/watch",
+    "path": "/apps/video/watch",
     "auth": "sage"
   },
   {

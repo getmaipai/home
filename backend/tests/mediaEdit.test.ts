@@ -64,7 +64,7 @@ describe("editMediaItem", () => {
 
   test("an artist on a non-track is 400", async () => {
     const { ownerPerson, video } = await setup();
-    expect(editMediaItem(ownerPerson, "videos", { id: video.id, artist: "Someone" })).toEqual({ ok: false, status: 400, error: "Only songs have an artist." });
+    expect(editMediaItem(ownerPerson, "video", { id: video.id, artist: "Someone" })).toEqual({ ok: false, status: 400, error: "Only songs have an artist." });
   });
 
   test("HTML is stripped and whitespace collapsed", async () => {

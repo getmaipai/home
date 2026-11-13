@@ -1,4 +1,4 @@
-// VIDEO-CREATE-01: "Make a video" on the Create page. One entry point for the page's action (`/api/plugins/videos/actions/make`) and the
+// VIDEO-CREATE-01: "Make a video" on the Create page. One entry point for the page's action (`/api/plugins/video/actions/make`) and the
 // plain route (`POST /api/videos/make`). It holds no generation logic of its own: after the same gate the other routes use, it calls
 // `runGenerateVideo`, the one definition the chat tool also runs, as the person's own screen with no chat behind it.
 import type { PersonRow } from "@/types";

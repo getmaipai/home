@@ -9,7 +9,7 @@ import { resolvePackageDir } from "@/lib/packageResolve";
 import { parseRange } from "@/lib/media/serve";
 
 export const ASSET_TYPES: Readonly<Record<string, string>> = { mp4: "video/mp4", webp: "image/webp", png: "image/png", jpg: "image/jpeg" };
-/** No asset is bigger than this: the loops are tens of kilobytes, and the Videos package keeps each under 300 KB. */
+/** No asset is bigger than this: the loops are tens of kilobytes, and the Video package keeps each under 300 KB. */
 export const MAX_ASSET_BYTES = 2 * 1024 * 1024;
 
 export interface PackageAsset { path: string; size: number; mediaType: string; etag: string }

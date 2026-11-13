@@ -1,11 +1,11 @@
 ---
 title: Videos
-description: Make a short video in the Videos app or in chat, change it, and choose who can make videos and which styles are on.
+description: Make a short video in the Video app or in chat, change it, and choose who can make videos and which styles are on.
 ---
 
 Home can make short videos on your own computer. Nothing is sent to anyone.
 
-Open **Videos** or its **Library** to find clips you made under **Made at home**, alongside the videos from your library folders. To watch a video, see [Watch videos](watch-videos.md). To cut and mix clips, see [Edit a video in the Studio](videos-studio.md). To make a longer story, see [Make a short film](videos-film.md). For adults-only videos, see [Adults-only videos and the lock](videos-locked.md).
+Open **Video** or its **Library** to find clips you made under **Made at home**, alongside the videos from your library folders. To watch a video, see [Watch videos](watch-videos.md). To cut and mix clips, see [Edit a video in the Studio](videos-studio.md). To make a longer story, see [Make a short film](videos-film.md). For adults-only videos, see [Adults-only videos and the lock](videos-locked.md).
 
 ## Who made a video, and who can see it
 
@@ -29,9 +29,9 @@ These times come from tests on a Mac with 128 GB. Your computer may be a little 
 
 Children and teens always get Standard. They do not choose a level, and their clips are short and have no sound.
 
-## Make a video in the Videos app
+## Make a video in the Video app
 
-Open **Videos**, then **Create**. Create is for adults. Its prompt input follows the Chat composer: a growing text field, a start-frame attachment control, compact visible choices and quality levels in one toolbar, and a round Generate button. Shape, Length, Style, Camera, Voices and the available levels stay visible with the prompt. A small **Inspiration** row with four examples sits below it, followed by **Your clips**, newest first. If video generation is unavailable, you can still type and choose settings; Generate shows why it cannot start.
+Open **Video**, then **Create**. Create is for adults. Its prompt input follows the Chat composer: a growing text field, a start-frame attachment control, compact visible choices and quality levels in one toolbar, and a round Generate button. Shape, Length, Style, Camera, Voices and the available levels stay visible with the prompt. A small **Inspiration** row with four examples sits below it, followed by **Your clips**, newest first. If video generation is unavailable, you can still type and choose settings; Generate shows why it cannot start.
 
 In the maker:
 
@@ -64,7 +64,7 @@ If Home cannot make videos right now, **Generate** and the buttons that start a 
 
 ### My clips
 
-Open **Videos**, then **My clips**. It shows every clip you can see, in groups by day. Clips other people shared with you are here too, with their names.
+Open **Video**, then **My clips**. It shows every clip you can see, in groups by day. Clips other people shared with you are here too, with their names.
 
 - **All**, **Favorites** and **Uploaded**. Uploaded shows the pictures you added. Press one to use it as a Start frame.
 - **Size.** Drag the slider to make the clips bigger or smaller.

@@ -30,7 +30,7 @@ beforeEach(() => {
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); __setAdultLockClockForTests(null); });
 
 type Row = Record<string, any>;
-const data = (client: TestClient, body: Record<string, unknown>, headers?: Record<string, string>) => client.post("/api/plugins/videos/data/recipes", body, headers);
+const data = (client: TestClient, body: Record<string, unknown>, headers?: Record<string, string>) => client.post("/api/plugins/video/data/recipes", body, headers);
 
 const MEDIA_AND_RECORD = new Set(["job preview", "job clip", "job poster", "job messages copy", "file record", "file content", "poster content", "poster thumb", "clip thumb", "file shares"]);
 
@@ -48,8 +48,8 @@ function surfaces(clip: { jobId: string; fileId: string; posterId: string }): Ar
     ["clips scope", (c, h) => data(c, { scope: "clips" }, h)],
     ["clips favorites", (c, h) => data(c, { scope: "clips", view: "favorites" }, h)],
     ["showcase scope", (c, h) => data(c, { scope: "showcase" }, h)],
-    ["made at home shelf", (c, h) => c.post("/api/plugins/videos/data/made-at-home", {}, h)],
-    ["creation header", (c, h) => c.post("/api/plugins/videos/data/creation", { id: fileId }, h)],
+    ["made at home shelf", (c, h) => c.post("/api/plugins/video/data/made-at-home", {}, h)],
+    ["creation header", (c, h) => c.post("/api/plugins/video/data/creation", { id: fileId }, h)],
     ["library list", (c, h) => c.get("/api/library", h)],
     ["library video list", (c, h) => c.get("/api/library?type=video&origin=made", h)],
     ["library search", (c, h) => c.get("/api/library?search=Zebraquill", h)],
@@ -115,9 +115,9 @@ describe("locked: no route returns a word, picture or count of the adult-only cl
     const another = await adult.client.post(`/api/videos/jobs/${locked.jobId}/another`, {});
     expect(another.status).toBe(423);
     expect(await another.json()).toMatchObject({ locked: true });
-    expect((await adult.client.post("/api/plugins/videos/actions/another", { id: locked.jobId })).status).toBe(423);
-    expect((await adult.client.post("/api/plugins/videos/actions/max", { id: locked.jobId })).status).toBe(423);
-    expect((await adult.client.post("/api/plugins/videos/actions/favorite", { id: locked.jobId })).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/video/actions/another", { id: locked.jobId })).status).toBe(423);
+    expect((await adult.client.post("/api/plugins/video/actions/max", { id: locked.jobId })).status).toBe(423);
+    expect((await adult.client.post("/api/plugins/video/actions/favorite", { id: locked.jobId })).status).toBe(404);
     expect((await adult.client.post(`/api/files/${locked.fileId}/shares`, { to: other.id })).status).toBe(404);
     // Renaming or keeping a locked file answers like a missing one.
     expect((await adult.client.request(`/api/files/${locked.fileId}`, { method: "PATCH", body: { name: "x" } })).status).toBe(404);

@@ -48,8 +48,8 @@ async function household() {
   const row = (name: string) => db.select().from(peopleTable).where(eq(peopleTable.displayName, name)).get()! as PersonRow;
   return { owner, adult, other, teen, child, row };
 }
-const data = async (client: TestClient, body: Record<string, unknown>) => (await client.post("/api/plugins/videos/data/recipes", body)).json() as Promise<Row[]>;
-const action = (client: TestClient, name: string, body: Record<string, unknown>) => client.post(`/api/plugins/videos/actions/${name}`, body);
+const data = async (client: TestClient, body: Record<string, unknown>) => (await client.post("/api/plugins/video/data/recipes", body)).json() as Promise<Row[]>;
+const action = (client: TestClient, name: string, body: Record<string, unknown>) => client.post(`/api/plugins/video/actions/${name}`, body);
 
 async function makeClip(client: TestClient, actor: PersonRow, body: Record<string, unknown> = { prompt: BOAT }) {
   const made = await (await client.post("/api/videos/make", body)).json() as { id: string };
@@ -171,7 +171,7 @@ describe("scope job: one row by id, for poll_while", () => {
 
   test("a child and a teen reach no scope", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase"]) expect((await who.client.post("/api/plugins/videos/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
   });
 });
 
@@ -357,7 +357,7 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
       expect(VIDEO_LOOKS.map((l) => l.id)).toContain(row.look);
       expect(["none", ...VIDEO_RECIPES.map((r) => r.id)]).toContain(row.camera);
       expect(row.prompt.length).toBeGreaterThan(20);
-      expect(row.thumbnail).toMatch(/^\/api\/plugins\/videos\/assets\/loops\/[a-z0-9-]+\.jpg$/);
+      expect(row.thumbnail).toMatch(/^\/api\/plugins\/video\/assets\/loops\/[a-z0-9-]+\.jpg$/);
       const res = await adult.client.get(row.thumbnail);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/jpeg");
@@ -378,7 +378,7 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("every loop has a small poster beside it, and the rows never name a resource, a model or a credit", async () => {
     const { adult } = await household();
     for (const loop of [...VIDEO_LOOKS, ...VIDEO_RECIPES].map((entry) => entry.loop)) {
-      const poster = join(PACKAGES_DIR, "videos", "assets", loop.replace(/\.mp4$/, ".jpg"));
+      const poster = join(PACKAGES_DIR, "video", "assets", loop.replace(/\.mp4$/, ".jpg"));
       expect(existsSync(poster)).toBe(true);
       expect(statSync(poster).size).toBeLessThan(300 * 1024);
     }
@@ -389,8 +389,8 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("a minor reaches the rows and the posters on no path, and nothing the rail does starts a clip", async () => {
     const { teen, child, adult } = await household();
     for (const who of [teen, child]) {
-      expect((await who.client.post("/api/plugins/videos/data/recipes", { scope: "showcase" })).status).toBe(404);
-      expect((await who.client.get("/api/plugins/videos/assets/loops/anime.jpg")).status).toBe(404);
+      expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "showcase" })).status).toBe(404);
+      expect((await who.client.get("/api/plugins/video/assets/loops/anime.jpg")).status).toBe(404);
     }
     const before = db.select().from(videoJobs).all().length;
     await data(adult.client, { scope: "showcase" });
@@ -399,12 +399,12 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
 
   test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
     const { adult } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/create")).json() as { body: Array<Row> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Row> };
     expect(page.body.map((node) => node.type)).toEqual(["prompt_bar", "media_shelf", "section"]);
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
     const shelf = page.body[1]!;
     expect(shelf).toMatchObject({ heading: "Inspiration", aspect: "wide", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 4 } } });
-    expect(shelf.on_select).toEqual({ navigate: { to: "/apps/videos/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
+    expect(shelf.on_select).toEqual({ navigate: { to: "/apps/video/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
     expect(JSON.stringify(shelf)).not.toContain("call");
     expect(page.body[2]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
   });
@@ -412,24 +412,24 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
 
 describe("the manifest of three pages", () => {
   test("Create, Studio and My clips are the whole Create group; the three old pages and their files are gone, the data list is still 16 ids", async () => {
-    const manifest = JSON.parse(await Bun.file(join(PACKAGES_DIR, "videos", "manifest.json")).text()) as { contributes: { sidebar: { groups: Array<{ id: string; pages: string[] }> }; pages: Array<{ id: string; module: string; min_role?: string }>; data: Array<{ id: string }>; header: { modes: Array<{ id: string; page: string }>; search: { label: string } } } };
+    const manifest = JSON.parse(await Bun.file(join(PACKAGES_DIR, "video", "manifest.json")).text()) as { contributes: { sidebar: { groups: Array<{ id: string; pages: string[] }> }; pages: Array<{ id: string; module: string; min_role?: string }>; data: Array<{ id: string }>; header: { modes: Array<{ id: string; page: string }>; search: { label: string } } } };
     const create = manifest.contributes.sidebar.groups.find((group) => group.id === "create")!;
     expect(create.pages).toEqual(["create", "studio", "clips"]);
     const ids = manifest.contributes.pages.map((page) => page.id);
     expect(ids).not.toContain("make-video");
     expect(ids).not.toContain("creations");
     for (const id of ["create", "studio", "clips"]) expect(manifest.contributes.pages.find((page) => page.id === id)).toMatchObject({ module: id, min_role: "adult" });
-    for (const page of manifest.contributes.pages) expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", `${page.module}.json`)).exists()).toBe(true);
-    expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", "make-video.json")).exists()).toBe(false);
-    expect(await Bun.file(join(PACKAGES_DIR, "videos", "pages", "creations.json")).exists()).toBe(false);
+    for (const page of manifest.contributes.pages) expect(await Bun.file(join(PACKAGES_DIR, "video", "pages", `${page.module}.json`)).exists()).toBe(true);
+    expect(await Bun.file(join(PACKAGES_DIR, "video", "pages", "make-video.json")).exists()).toBe(false);
+    expect(await Bun.file(join(PACKAGES_DIR, "video", "pages", "creations.json")).exists()).toBe(false);
     expect(manifest.contributes.data).toHaveLength(16);
     expect(manifest.contributes.header.modes.find((mode) => mode.id === "create")).toMatchObject({ page: "create" });
-    expect(manifest.contributes.header.search.label).toBe("Search Videos");
+    expect(manifest.contributes.header.search.label).toBe("Search Video");
   });
 
   test("the served My clips page is three tabs of day-grouped grids with a size slider; only All and Favorites carry the heart; no page links to a removed page", async () => {
     const { adult, teen } = await household();
-    const page = await (await adult.client.get("/api/plugins/videos/pages/clips")).json() as { body: Array<Row> };
+    const page = await (await adult.client.get("/api/plugins/video/pages/clips")).json() as { body: Array<Row> };
     const tabs = page.body[0]!;
     expect(tabs.type).toBe("tabs");
     expect(tabs.tabs.map((tab: Row) => tab.id)).toEqual(["all", "favorites", "uploaded"]);
@@ -440,9 +440,9 @@ describe("the manifest of three pages", () => {
       expect(shelf.bind.params.view).toBe(tab.id);
       expect(Boolean(shelf.favorite)).toBe(tab.id !== "uploaded");
     }
-    expect((await teen.client.get("/api/plugins/videos/pages/clips")).status).toBe(404);
+    expect((await teen.client.get("/api/plugins/video/pages/clips")).status).toBe(404);
     for (const file of ["index", "library", "create", "clips", "history", "watch-later", "watch", "search"]) {
-      const text = await Bun.file(join(PACKAGES_DIR, "videos", "pages", `${file}.json`)).text();
+      const text = await Bun.file(join(PACKAGES_DIR, "video", "pages", `${file}.json`)).text();
       expect(text).not.toMatch(/videos\/(make-video|creations)/);
     }
   });

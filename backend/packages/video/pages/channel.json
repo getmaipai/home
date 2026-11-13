@@ -27,7 +27,7 @@
           "label": "Watch later",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/watch-later",
+              "target": "/api/plugins/video/watch-later",
               "args": {
                 "media_id": "{id}"
               }
@@ -39,7 +39,7 @@
           "label": "Save to playlist",
           "action": {
             "call": {
-              "target": "/api/plugins/videos/playlists/save",
+              "target": "/api/plugins/video/playlists/save",
               "args": {
                 "media_id": "{id}"
               },
@@ -52,7 +52,7 @@
           "label": "Share",
           "action": {
             "share": {
-              "to": "/apps/videos/watch?id={id}",
+              "to": "/apps/video/watch?id={id}",
               "title": "{title}"
             }
           }
@@ -74,7 +74,7 @@
         "text": "No videos from this channel yet.",
         "action": {
           "navigate": {
-            "to": "/apps/videos/index"
+            "to": "/apps/video/index"
           }
         },
         "action_label": "Browse videos"

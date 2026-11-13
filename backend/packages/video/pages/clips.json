@@ -41,7 +41,7 @@
                 "field": "favorite",
                 "action": {
                   "call": {
-                    "target": "/api/plugins/videos/actions/favorite",
+                    "target": "/api/plugins/video/actions/favorite",
                     "method": "POST",
                     "args": {
                       "id": "{id}",
@@ -61,7 +61,7 @@
                 "text": "Your clips will show up here. Choose Create to make one.",
                 "action": {
                   "navigate": {
-                    "to": "/apps/videos/create"
+                    "to": "/apps/video/create"
                   }
                 },
                 "action_label": "Make a video"
@@ -72,7 +72,7 @@
                   "icon": "key-round",
                   "action": {
                     "call": {
-                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "target": "/api/plugins/video/actions/adult-mark",
                       "method": "POST",
                       "args": {
                         "id": "{id}",
@@ -93,7 +93,7 @@
                   "icon": "lock",
                   "action": {
                     "call": {
-                      "target": "/api/plugins/videos/actions/adult-mark",
+                      "target": "/api/plugins/video/actions/adult-mark",
                       "method": "POST",
                       "args": {
                         "id": "{id}",
@@ -139,7 +139,7 @@
                 "field": "favorite",
                 "action": {
                   "call": {
-                    "target": "/api/plugins/videos/actions/favorite",
+                    "target": "/api/plugins/video/actions/favorite",
                     "method": "POST",
                     "args": {
                       "id": "{id}",
@@ -190,7 +190,7 @@
               "size_control": true,
               "on_select": {
                 "navigate": {
-                  "to": "/apps/videos/create",
+                  "to": "/apps/video/create",
                   "state": {
                     "start_frame": "{id}"
                   }
@@ -202,7 +202,7 @@
                 "text": "Pictures you add to start a video from show up here.",
                 "action": {
                   "navigate": {
-                    "to": "/apps/videos/create"
+                    "to": "/apps/video/create"
                   }
                 },
                 "action_label": "Make a video"

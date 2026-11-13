@@ -6,7 +6,7 @@ import { searchMedia } from "@/lib/media/search";
 export const mediaSearchRoutes = apiRouter();
 
 const RowSchema = z.object({
-  id: z.string(), app: z.enum(["videos", "shows", "audio", "podcasts", "books"]), kind: z.string(), title: z.string(),
+  id: z.string(), app: z.enum(["video", "shows", "audio", "podcasts", "books"]), kind: z.string(), title: z.string(),
   subtitle: z.string().nullable(), artwork_url: z.string().nullable(), href: z.string(), percent: z.number().nullable(), at: z.string(),
 });
 
@@ -23,7 +23,7 @@ const route = createRoute({
         "application/json": {
           schema: z.object({
             groups: z.array(z.object({
-              app: z.enum(["videos", "shows", "audio", "podcasts", "books"]),
+              app: z.enum(["video", "shows", "audio", "podcasts", "books"]),
               heading: z.string(),
               rows: z.array(RowSchema),
             })),

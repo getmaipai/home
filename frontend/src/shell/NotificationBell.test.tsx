@@ -96,14 +96,14 @@ describe("NotificationBell", () => {
 
   // ACTIVITY-PAGE-01: the bell leads to the Activity page, and a "clip ready" row opens its result (existing notification type).
   test("links to the Activity page, and a finished-clip row opens the Videos page", async () => {
-    const restore = stubFetch({ "/api/notifications": [notification("n1", "Your video is ready.", { typeId: "videos.clip_ready" }), notification("n2", "Model download ready")] });
+    const restore = stubFetch({ "/api/notifications": [notification("n1", "Your video is ready.", { typeId: "video.clip_ready" }), notification("n2", "Model download ready")] });
     try {
       const { findByRole, getByRole, getAllByRole } = renderBell();
       fireEvent.click(await findByRole("button", { name: /Notifications \(2 pending\)/ }));
       expect(getByRole("link", { name: "Activity" }).getAttribute("href")).toBe("/activity");
       const open = getAllByRole("link", { name: "Open" });
       expect(open).toHaveLength(1);
-      expect(open[0]!.getAttribute("href")).toBe("/apps/videos/create");
+      expect(open[0]!.getAttribute("href")).toBe("/apps/video/create");
     } finally {
       restore();
     }

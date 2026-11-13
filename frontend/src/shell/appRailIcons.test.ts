@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { iconNames } from "@maipai/ui/src/icons";
 
 // The rail shows each package app's `index` page icon (backend/src/lib/apps.ts). A name the kit's
-// icon registry does not know draws no icon (Videos shipped "circle-play" and lost its rail icon).
+// icon registry does not know draws no icon (Video shipped "circle-play" and lost its rail icon).
 const PACKAGES = new URL("../../../backend/packages/", import.meta.url).pathname;
 
 describe("package app rail icons", () => {
@@ -17,7 +17,7 @@ describe("package app rail icons", () => {
   });
 
   test("finds the media apps", () => {
-    expect(apps.map(([id]) => id)).toEqual(expect.arrayContaining(["audio", "podcasts", "videos"]));
+    expect(apps.map(([id]) => id)).toEqual(expect.arrayContaining(["audio", "podcasts", "video"]));
   });
 
   test.each(apps)("%s rail icon %s is registered in the kit", (_id, icon) => {

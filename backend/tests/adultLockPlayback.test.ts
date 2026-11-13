@@ -24,7 +24,7 @@ beforeEach(() => {
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
 
 type Row = Record<string, any>;
-const data = (client: TestClient, id: string, body: Record<string, unknown>, headers?: Record<string, string>) => client.post(`/api/plugins/videos/data/${id}`, body, headers);
+const data = (client: TestClient, id: string, body: Record<string, unknown>, headers?: Record<string, string>) => client.post(`/api/plugins/video/data/${id}`, body, headers);
 
 describe("adult_only on the rows an unlocked page reads", () => {
   test("feed, My clips and the watch item mark the adult-only clip and only it", async () => {
@@ -66,7 +66,7 @@ describe("nothing about playback of an adult-only clip is kept", () => {
     const clip = await adultClip(adult.client, row("Marlow"));
     expect(fileIsAdultOnly(clip.fileId)).toBe(true);
     const h = unlockHeader(await unlock(adult.client));
-    const app = await adult.client.post("/api/plugins/videos/progress", { media_id: clip.fileId, position_s: 12, duration_s: 60, reason: "pause" }, h);
+    const app = await adult.client.post("/api/plugins/video/progress", { media_id: clip.fileId, position_s: 12, duration_s: 60, reason: "pause" }, h);
     expect([200, 404]).toContain(app.status);
     const media = await adult.client.put(`/api/media/progress/${clip.fileId}`, { position: { seconds: 12 }, duration_s: 60 }, h);
     expect(media.status).toBe(404);
@@ -77,8 +77,8 @@ describe("nothing about playback of an adult-only clip is kept", () => {
     const { adult, other, row } = await household();
     const clip = await adultClip(adult.client, row("Marlow"));
     const body = (id: string) => ({ media_id: id, position_s: 5, duration_s: 60, reason: "pause" });
-    const theirs = await other.client.post("/api/plugins/videos/progress", body(clip.fileId));
-    const missing = await other.client.post("/api/plugins/videos/progress", body("file-doesnotexist"));
+    const theirs = await other.client.post("/api/plugins/video/progress", body(clip.fileId));
+    const missing = await other.client.post("/api/plugins/video/progress", body("file-doesnotexist"));
     expect(theirs.status).toBe(missing.status);
     expect(await theirs.json()).toEqual(await missing.json());
   });

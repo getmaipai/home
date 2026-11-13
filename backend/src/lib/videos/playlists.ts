@@ -49,11 +49,11 @@ type MadeFile = ReturnType<typeof madeFiles>[number];
 interface Resolved { id: string; row: MediaRow & Record<string, unknown>; adult: boolean }
 export function resolveEntries(person: PersonRow, ids: readonly string[]): Resolved[] {
   let made: Map<string, MadeFile> | null = null;
-  const madeMap = () => (made ??= new Map(madeFiles(person, "videos").map((file) => [file.id, file])));
+  const madeMap = () => (made ??= new Map(madeFiles(person, "video").map((file) => [file.id, file])));
   const saved: Array<{ id: string; item: MediaItem }> = [];
   const slots: Array<{ id: string; item?: MediaItem }> = [];
   for (const id of ids) {
-    const item = readableIn(person, "videos", id);
+    const item = readableIn(person, "video", id);
     slots.push(item ? { id, item } : { id });
     if (item) saved.push({ id, item });
   }

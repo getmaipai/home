@@ -10,11 +10,11 @@ const originals = { mediaSearch: api.mediaSearch, apps: api.apps };
 afterEach(() => { cleanup(); api.mediaSearch = originals.mediaSearch; api.apps = originals.apps; });
 
 function Where() { const location = useLocation(); return <p data-testid="where">{location.pathname}{location.search}</p>; }
-const result: MediaSearch = { groups: [{ app: "videos", heading: "Videos", rows: [{ id: "media-one", app: "videos", kind: "video", title: "Garden Road", subtitle: "Home videos", artwork_url: null, href: "/apps/videos/watch?id=file-one", percent: null, at: "2026-10-20T00:00:00Z" }] }] };
+const result: MediaSearch = { groups: [{ app: "video", heading: "Videos", rows: [{ id: "media-one", app: "video", kind: "video", title: "Garden Road", subtitle: "Home videos", artwork_url: null, href: "/apps/video/watch?id=file-one", percent: null, at: "2026-10-20T00:00:00Z" }] }] };
 
 function open(search: () => Promise<MediaSearch>, initial = "/media/search?q=Garden%20Road") {
   api.mediaSearch = search;
-  api.apps = async () => ["videos", "shows", "audio", "podcasts", "books"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
+  api.apps = async () => ["video", "shows", "audio", "podcasts", "books"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><TooltipProvider><MemoryRouter initialEntries={[initial]}><Routes>
     <Route path="/media/search" element={<MediaSearchPage />} /><Route path="*" element={<Where />} />
@@ -28,7 +28,7 @@ test("groups render in shelves and a tile opens its href", async () => {
   expect(tile.querySelector('[data-slot="media-tile-label"]')?.textContent).toBe("Garden Road");
   expect(tile.querySelector('[data-slot="safe-image-fallback"]')?.getAttribute("data-tinted")).toBe("");
   fireEvent.click(tile);
-  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/videos/watch?id=file-one"));
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/video/watch?id=file-one"));
 });
 
 test("no matches show the query in the empty state and the search column is present", async () => {

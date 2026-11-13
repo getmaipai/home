@@ -28,7 +28,7 @@ export function askHref(text: string): string {
 
 export function composerHref(mode: string, text: string): string {
   const prompt = text.trim();
-  if (mode === "video") return `/apps/videos/create?prompt=${encodeURIComponent(prompt)}`;
+  if (mode === "video") return `/apps/video/create?prompt=${encodeURIComponent(prompt)}`;
   if (mode === "song") return `/apps/audio/create?prompt=${encodeURIComponent(prompt)}`;
   if (mode === "picture") return `/chat?ask=${encodeURIComponent(prompt)}&mode=picture`;
   return askHref(prompt);
@@ -71,7 +71,7 @@ export function AskBox({ focusOnRequest, role = "owner" }: { focusOnRequest?: nu
   const modes = [
     { id: "ask", label: i18n._({ id: "Ask", message: "Ask" }), icon: "message-circle" as const, primaryLabel: i18n._({ id: "Send", message: "Send" }) },
     ...(role === "child" ? [] : [{ id: "picture", label: i18n._({ id: "Picture", message: "Picture" }), icon: "image" as const, primaryLabel: i18n._({ id: "Make picture", message: "Make picture" }) }]),
-    ...(role === "child" || !catalog.some((app) => app.to === "/apps/videos") ? [] : [{ id: "video", label: i18n._({ id: "Video", message: "Video" }), icon: "film" as const, primaryLabel: i18n._({ id: "Make video", message: "Make video" }) }]),
+    ...(role === "child" || !catalog.some((app) => app.to === "/apps/video") ? [] : [{ id: "video", label: i18n._({ id: "Video", message: "Video" }), icon: "film" as const, primaryLabel: i18n._({ id: "Make video", message: "Make video" }) }]),
     ...(role === "child" || !catalog.some((app) => app.to === "/apps/audio") ? [] : [{ id: "song", label: i18n._({ id: "Song", message: "Song" }), icon: "music" as const, primaryLabel: i18n._({ id: "Make song", message: "Make song" }) }]),
   ];
 

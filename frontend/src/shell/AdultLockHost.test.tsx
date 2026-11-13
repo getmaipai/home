@@ -34,7 +34,7 @@ beforeEach(() => {
   calls = []; revoked = []; created = 0;
   setAdultProof(null); revokeAdultBlobs();
   // The test document starts at about:blank (origin "null"); the kit draws a blob: source only when it is of the page's own origin, as in a real page.
-  (window as unknown as { happyDOM: { setURL(url: string): void } }).happyDOM.setURL("http://localhost:3000/apps/videos/clips");
+  (window as unknown as { happyDOM: { setURL(url: string): void } }).happyDOM.setURL("http://localhost:3000/apps/video/clips");
   URL.createObjectURL = (() => `blob:${window.location.origin}/adult-test-${++created}`) as typeof URL.createObjectURL;
   URL.revokeObjectURL = ((url: string) => { revoked.push(url); }) as typeof URL.revokeObjectURL;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -48,7 +48,7 @@ beforeEach(() => {
       return Promise.resolve(body.secret === "0000" || body.secret === "pw-correct" ? Response.json({ proof: PROOF, idle_seconds: 120 }) : Response.json({ error: "Invalid PIN or password", attemptsLeft: 4 }, { status: 401 }));
     }
     if (url === "/api/adult-lock/lock") return Promise.resolve(Response.json({ locked: true }));
-    if (url.startsWith("/api/plugins/videos/data/")) {
+    if (url.startsWith("/api/plugins/video/data/")) {
       if (proof !== PROOF) return Promise.resolve(Response.json([{ locked: true, making: false }]));
       return Promise.resolve(Response.json([{ id: "c1", title: TITLE, thumbnail: "/api/files/c1/thumb", adult_only: true, created_at: new Date().toISOString() }]));
     }
@@ -86,7 +86,7 @@ function mount(who?: Pick<Roster, "pinDigits" | "hasSecret">) {
     <MemoryRouter>
       <Shell who={who}>
         <Nav />
-        <PackageScopeContext.Provider value={{ packageId: "videos" }}>
+        <PackageScopeContext.Provider value={{ packageId: "video" }}>
           <PageStateContext.Provider value={{ merge: () => {} }}>
             <NodeRenderer node={shelf} state={{}} />
           </PageStateContext.Provider>
@@ -180,7 +180,7 @@ describe("after the unlock", () => {
     const view = mount();
     await unlock(view);
     expect(getAdultProof()).toBe(PROOF);
-    expect(calls.some((c) => c.url.startsWith("/api/plugins/videos/data/") && c.proof === PROOF)).toBe(true);
+    expect(calls.some((c) => c.url.startsWith("/api/plugins/video/data/") && c.proof === PROOF)).toBe(true);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/files/c1/thumb" && c.proof === PROOF)).toBe(true));
     await waitFor(() => expect(document.querySelector("img")?.getAttribute("src") ?? "").toStartWith("blob:http://localhost:3000/adult-test-"));
     const stores = [JSON.stringify({ ...window.localStorage }), JSON.stringify({ ...window.sessionStorage }), document.cookie, window.location.href];
