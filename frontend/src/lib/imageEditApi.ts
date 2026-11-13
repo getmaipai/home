@@ -24,6 +24,8 @@ export type EditRequest =
 const json = (value: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
 
 export const imageEditApi = {
+  /** EDITOR-07: whether a picture shown in a chat is also a file in the person's own Library (so the Studio can open it). A temporary chat's picture, another person's and a locked one are not. */
+  inLibrary: (id: string) => requestJson<unknown>(`/api/media-ops/files/${encodeURIComponent(id)}/versions`).then(() => true, () => false),
   status: () => requestJson<ImageEditStatus>("/api/image-edit/status"),
   versions: (conversationId: string, id: string) => requestJson<{ versions: PictureVersion[] }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions?conversation_id=${encodeURIComponent(conversationId)}`).then((body) => body.versions),
   run(conversationId: string, id: string, request: EditRequest, signal?: AbortSignal): Promise<EditProgress> {

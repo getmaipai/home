@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { i18n } from "@lingui/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import type { ImageEditContextValue, ImageEditTarget } from "@maipai/ui/src/elements/attachment.aui";
 import type { ImageEditorOperation, ImageEditorPending, ImageEditorProps, ImageEditorVersion } from "@maipai/ui/src/elements/image-editor";
 import { imageEditApi, type EditRequest, type ImageEditStatus, type PictureVersion } from "@/lib/imageEditApi";
@@ -65,6 +66,9 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
     refetchInterval: (query) => (query.state.data?.state === "preparing" ? 4000 : false),
     staleTime: 10_000,
   });
+  // EDITOR-07: a picture that is also a Library file opens in the Studio; one that is not (a temporary chat's) gets no button.
+  const navigate = useNavigate();
+  const inLibrary = useQuery<boolean>({ queryKey: ["image-edit", "library-file", currentId], queryFn: () => imageEditApi.inLibrary(currentId!), enabled: open !== null && currentId !== null, staleTime: 30_000 });
   const versionsKey = useMemo(() => ["image-edit", "versions", open?.conversationId, open?.id] as const, [open]);
   const versionsQuery = useQuery<PictureVersion[]>({
     queryKey: versionsKey,
@@ -108,6 +112,7 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
       downloadName: `${downloadBase}-edited.png`,
       onClose: close,
       ...(canShare ? { onShare: (version: ImageEditorVersion) => onShare(version.id) } : {}),
+      ...(inLibrary.data === true ? { onOpenInStudio: (version: ImageEditorVersion) => navigate("/apps/image/studio", { state: { pageState: { file: version.id } } }) } : {}),
       onRunOperation: async (operation, ctl): Promise<ImageEditorPending> => {
         ctl.onProgress({ percent: null, label: "Starting" });
         let progress = await imageEditApi.run(open.conversationId, sourceId, toRequest(operation), ctl.signal);
@@ -153,7 +158,7 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
         throw new Error(progress.state === "failed" || progress.state === "cancelled" ? progress.error : "The change did not finish. Try again.");
       },
     };
-  }, [open, currentId, versionsQuery.data, statusQuery.data, statusQuery.isError, canShare, onShare, close, queryClient, versionsKey]);
+  }, [open, currentId, versionsQuery.data, statusQuery.data, statusQuery.isError, canShare, onShare, close, queryClient, versionsKey, inLibrary.data, navigate]);
 
   return { open, editContext, editFromSrc, close, props };
 }

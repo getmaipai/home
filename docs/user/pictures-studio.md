@@ -10,6 +10,7 @@ The Studio is where you change a picture you already have. Everything happens on
 - In the **Image** app, choose **Studio** under **Edit**, then tap one of your pictures.
 - In the **Library**, open a picture and press **Edit**.
 - In the **Image** app, tap a picture in **All images** or **Recently made**.
+- In a chat, open a picture and press **Open in Studio**. It shows only for a picture that is also in your Library. A picture from a temporary chat is not kept, so it has no button.
 - In the Studio, press **Add a picture**. Choose one from your Library, or add one from your computer. It opens in the Studio right away.
 
 You only see your own pictures. A locked picture shows a lock until you unlock it. If you have no pictures yet, the Studio offers **Add a picture** and **Make a picture**. Adding a picture follows the same rules as adding to the Library, so a profile that may not add pictures is told so.
