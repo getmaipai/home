@@ -68966,6 +68966,10 @@
                           "disabledReason": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "comingSoon": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
