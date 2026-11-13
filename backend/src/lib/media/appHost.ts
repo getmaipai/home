@@ -36,6 +36,7 @@ import { createShare, deleteShare, listSharesForFile } from "@/lib/shares";
 import { canReadFileAudience, fileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
 import { libraryProvenance } from "@/lib/libraryProvenance";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { TranscriptError, transcriptRowForItem } from "@/lib/transcripts/store";
 
 import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { songFactFor } from "./songFacts";
@@ -102,7 +103,7 @@ export interface MediaItemView extends MediaRow {
   description: string | null;
   poster: string | null;
   chapters: Array<{ start_s: number; title: string }>;
-  captions: never[];
+  captions: Array<{ src: string; srclang: string; label: string }>;
   position_s?: number;
   liked: boolean;
   watch_later: boolean;
@@ -221,17 +222,28 @@ export function madeFileFor(person: PersonRow, appId: "audio" | "video", id: str
   return madeFiles(person, appId).find((file) => file.id === id) ?? null;
 }
 
-export function madeFileItemView(file: MadeLibraryFile, appId: "audio" | "video"): MediaItemView {
+export function madeFileItemView(person: PersonRow, file: MadeLibraryFile, appId: "audio" | "video"): MediaItemView {
   const kind = appId === "audio" ? "track" : "video";
   const title = file.name;
   const poster = file.thumb_url;
   return {
     id: file.id, title, channel: file.owner.display_name || "Made at home", summary: "", kind, thumbnail: poster, backdrop: poster,
     duration_s: file.duration_seconds, copy_label: "Saved", src: `/api/files/${encodeURIComponent(file.id)}/content`,
-    subtitle: null, description: null, poster, chapters: [], captions: [], liked: false, watch_later: false,
+    subtitle: null, description: null, poster, chapters: [], captions: appId === "video" ? captionsForItem(person, file.id) : [], liked: false, watch_later: false,
     // ADULT-LOCK-05: an adult-only item plays only in its own page's player: the kit keeps it out of the host's element and the mini bar.
     ...(file.audience === "adult-only" ? { adult_only: true } : {}),
   };
+}
+
+/** Captions use the transcript route's own age and item visibility gate. */
+function captionsForItem(person: PersonRow, itemId: string): MediaItemView["captions"] {
+  try {
+    const transcript = transcriptRowForItem(person, itemId);
+    return transcript ? [{ src: `/api/transcripts/${encodeURIComponent(transcript.id)}/export?format=vtt`, srclang: transcript.language || "en", label: "Captions" }] : [];
+  } catch (error) {
+    if (error instanceof TranscriptError) return [];
+    throw error;
+  }
 }
 
 export function oneLine(text: string | null, max: number): string {
@@ -534,7 +546,7 @@ export type ItemViewHook = (person: PersonRow, item: MediaItem, view: MediaItemV
 const itemViewHooks = new Map<MediaAppId, ItemViewHook[]>();
 export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, [...(itemViewHooks.get(appId) ?? []), hook]); }
 
-function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
+export function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
   if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
@@ -672,7 +684,7 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
       }
       if (params.id && (appId === "audio" || appId === "video")) {
         const file = madeFileFor(person, appId, params.id);
-        if (file) { const view = madeFileItemView(file, appId); return appId === "video" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
+        if (file) { const view = madeFileItemView(person, file, appId); return appId === "video" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
       }
       const item = params.id ? readableIn(person, appId, params.id) : null;
       return item ? (appId === "books" ? bookItemView(person, item) : itemView(person, appId, item)) : [];
@@ -790,7 +802,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   const view: MediaItemView = {
     // A stream-only item (a podcast episode not saved yet) plays from its own address on the person's device; the hub never relays it.
     ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
-    chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: [],
+    chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: appId === "video" || appId === "shows" ? captionsForItem(person, item.id) : [],
     ...(facts ? { facts } : {}),
     ...(appId === "audio" && item.kind === "track" ? (() => { const fact = songFactFor(item, person); return fact ? { song_fact: fact } : {}; })() : {}),
     ...(seconds !== undefined && !progress?.completed ? { position_s: seconds } : {}),

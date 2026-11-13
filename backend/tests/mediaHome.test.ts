@@ -13,6 +13,8 @@ import { db } from "@/db";
 import { mediaItems, people } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { eq } from "drizzle-orm";
+import { mediaAppDataRaw } from "@/lib/media/appHost";
+import { createTranscript } from "@/lib/transcripts/store";
 
 beforeEach(() => {
   resetDb();
@@ -147,6 +149,31 @@ describe("media home", () => {
     expect(songs.map((row) => row.id)).toEqual([one, two]);
     expect(songs.every((row) => row.app === "audio")).toBe(true);
     expect(songs.every((row) => row.percent === null)).toBe(true);
+  });
+
+  test("video item captions respect transcript age and item visibility", async () => {
+    const { owner, adult, child, find } = await setup();
+    const teenMade = await owner.post("/api/people", { displayName: "River", role: "teen", birthdate: "2011-05-01", secret: "0000" });
+    const teenId = (await teenMade.json() as { id: string }).id;
+    const teen = new TestClient();
+    await teen.post("/api/auth/verify-secret", { personId: teenId, secret: "0000" });
+    const video = await find(owner, "kind=film&q=moon");
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get() as PersonRow;
+    const saved = createTranscript(person, { itemId: video, language: "fr", segments: [{ id: "line-1", start: 0, end: 1, text: "Bonjour" }], provenance: { engine: "import", model_id: "fixture", source_kind: "imported" } });
+    const expected = [{ src: `/api/transcripts/${saved.id}/export?format=vtt`, srclang: "fr", label: "Captions" }];
+    expect((mediaAppDataRaw(person, "shows", "item", { id: video }) as { captions: unknown[] }).captions).toEqual(expected);
+    const teenPerson = db.select().from(people).where(eq(people.id, teenId)).get() as PersonRow;
+    expect((mediaAppDataRaw(teenPerson, "shows", "item", { id: video }) as { captions: unknown[] }).captions).toEqual(expected);
+    const childPerson = db.select().from(people).where(eq(people.displayName, "Sprout")).get() as PersonRow;
+    expect((mediaAppDataRaw(childPerson, "shows", "item", { id: video }) as { captions: unknown[] }).captions).toEqual([]);
+    db.update(mediaItems).set({ hidden: true }).where(eq(mediaItems.id, video)).run();
+    expect(mediaAppDataRaw(person, "shows", "item", { id: video })).toEqual([]);
+    db.update(mediaItems).set({ hidden: false }).where(eq(mediaItems.id, video)).run();
+    const noTranscript = await find(owner, "kind=film&q=garden");
+    expect((mediaAppDataRaw(person, "shows", "item", { id: noTranscript }) as { captions: unknown[] }).captions).toEqual([]);
+    expect((await adult.client.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(200);
+    expect((await teen.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(200);
+    expect((await child.client.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(403);
   });
 
   test("the Pick up route still answers with its rows", async () => {
