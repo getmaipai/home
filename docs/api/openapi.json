@@ -69057,6 +69057,9 @@
                                 "icon": {
                                   "type": "string"
                                 },
+                                "iconOnly": {
+                                  "type": "boolean"
+                                },
                                 "quiet": {
                                   "anyOf": [
                                     {
@@ -69086,6 +69089,9 @@
                                         "type": "string"
                                       },
                                       "detail": {
+                                        "type": "string"
+                                      },
+                                      "icon": {
                                         "type": "string"
                                       }
                                     },
