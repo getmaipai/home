@@ -37,7 +37,9 @@ const ASK_ONLY: ComposerModesResponse = {
  * and readiness is not in it (the live health query has that), so it is never polled. */
 export function useComposerModes(): ComposerModesResponse {
   const query = useQuery({ queryKey: COMPOSER_MODES_KEY, queryFn: api.composerModes, retry: false, staleTime: Infinity, refetchOnWindowFocus: false });
-  return query.data ?? ASK_ONLY;
+  // An answer that is not a mode list (an older hub, a stubbed fetch) reads as Ask alone, never as a crash.
+  const data = query.data;
+  return data && Array.isArray(data.modes) && data.modes.length > 0 ? data : ASK_ONLY;
 }
 
 /** Words the catalogs already know (a mode's label, a chip's name): the English text is its own id in Home's catalogs, so a known

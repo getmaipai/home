@@ -38,6 +38,12 @@ describe("the Home ask box reads its modes from the hub", () => {
     expect(composerHref("/apps/image/create", "a red fox", { shape: "landscape", count: 2 })).toBe("/apps/image/create?prompt=a+red+fox&shape=landscape&count=2");
   });
 
+  test("an answer that is not a mode list reads as Ask alone, never a crash", async () => {
+    const view = setup({} as ComposerModesResponse);
+    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
+    await waitFor(() => expect(view.getAllByRole("option").map((o) => o.textContent)).toEqual(["Ask"]));
+  });
+
   test("a child's list has no Video mode in the menu", async () => {
     const view = setup(child);
     fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
