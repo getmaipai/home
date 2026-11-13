@@ -4,6 +4,7 @@
 // of probing a process.
 
 import { stackFetch } from "./stackFetch";
+import { withStackCaller } from "./caller";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { SttEndpointResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
@@ -304,7 +305,9 @@ function isLoopback(url: string): boolean {
 export function createStackClient(options: StackClientOptions = {}): StackClient {
   const baseUrl = options.baseUrl ?? defaultStackBaseUrl();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const doFetch = options.fetch ?? stackFetch;
+  const baseFetch = options.fetch ?? stackFetch;
+  // QUEUE-HOME: every Stack call says which hub it is (live, dev or test), whatever fetch carries it.
+  const doFetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) => baseFetch(input, { ...init, headers: withStackCaller(init?.headers) })) as typeof fetch;
 
   if (!isLoopback(baseUrl)) {
     throw new StackError("unexpected", `Stack baseUrl ${baseUrl} is not loopback; the Stack speaks only on this machine`);

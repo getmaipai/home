@@ -13,6 +13,7 @@ import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { lockState, type AdultProof, type LockItem } from "@/lib/adultLock";
 import { HOME_TOKEN_HEADER, PRIMING_TOKEN, VIEW_HEADER, forgetHomeViewToken, homeViewToken, reportViewKeyProblem, reportViewKeyWorks } from "@/lib/stack/homeViewToken";
+import { withStackCaller } from "@/lib/stack/caller";
 
 declare const grant: unique symbol;
 /** Proof that Home decided this one call may carry the full-view headers. Built only here. */
@@ -49,12 +50,12 @@ type Doer = (input: string | URL | Request, init?: RequestInit) => Promise<Respo
 
 /** One Stack request. With a grant it carries the two headers; a 403 `full_view_forbidden` makes Home read its key again and ask once more. */
 export async function sendWithView(doFetch: Doer, base: string, path: string, init: RequestInit, view?: FullView): Promise<Response> {
-  if (!view) return doFetch(base + path, init);
+  if (!view) return doFetch(base + path, { ...init, headers: withStackCaller(init.headers) });
   const prime = async () => { await doFetch(`${base}/stack/v1/health`, { method: "GET", headers: { [VIEW_HEADER]: "full", [HOME_TOKEN_HEADER]: PRIMING_TOKEN }, signal: AbortSignal.timeout(5_000) }).then((r) => r.arrayBuffer()).catch(() => undefined); };
   const ask = async (): Promise<Response | null> => {
     const token = await homeViewToken(prime);
     if (!token) return null;
-    const headers = new Headers(init.headers);
+    const headers = withStackCaller(init.headers);
     headers.set(VIEW_HEADER, "full"); headers.set(HOME_TOKEN_HEADER, token);
     return doFetch(base + path, { ...init, headers });
   };

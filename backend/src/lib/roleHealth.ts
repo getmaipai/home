@@ -4,6 +4,7 @@ import * as canaryResults from "@/lib/canary/results";
 import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
+import { readCapabilities } from "@/lib/memoryRoom";
 import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry } from "@/wire";
@@ -18,7 +19,7 @@ export type MakingRole = "image" | "video" | "music" | "voices";
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
 import { maintenanceActive } from "@/lib/maintenanceFlag";
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "never_fits" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); __bumpStackEpochForTests(); }
 
@@ -160,6 +161,11 @@ async function makingHealth(role: MakingRole): Promise<RoleHealth> {
     if (status === null) return { availability: "starting", reason: "stack_unreachable", cause: "restarting" };
     if (!musicStatusReady(status)) return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
   } else if (!row || row.state.state === "notInstalled") return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
+  if (role === "video") {
+    const capabilities = await readCapabilities();
+    const max = capabilities.rows.find((item) => item.category === "video")?.cells.find((cell) => cell.tier === "max");
+    if (max?.fits === false) return { availability: "unavailable", reason: "never_fits", cause: "never_fits" };
+  }
   const refusal = stackRefusal(STACK_REFUSAL_KEY[role]);
   if (refusal) return refusal.kind === "memory" ? { availability: "unavailable", reason: "stack_refused", cause: "memory" } : { availability: "starting", reason: "stack_refused", cause: "restarting" };
   const generates = role !== "voices";

@@ -324,7 +324,7 @@ const NO_ROOM_RECHECK_MS = 5_000;
 let noRoomRecheckMs = NO_ROOM_RECHECK_MS;
 let noRoomRecheck: ReturnType<typeof setTimeout> | null = null;
 export function setNoRoomRecheckForTests(ms: number | null): void { noRoomRecheckMs = ms ?? NO_ROOM_RECHECK_MS; if (noRoomRecheck) clearTimeout(noRoomRecheck); noRoomRecheck = null; }
-function scheduleNoRoomRecheck(): void {
+export function scheduleNoRoomRecheck(): void {
   if (noRoomRecheck) return;
   noRoomRecheck = setTimeout(() => { noRoomRecheck = null; void releaseHouseholdQueue(); }, noRoomRecheckMs);
   noRoomRecheck.unref?.();

@@ -15,6 +15,12 @@ import { __setRolesVisionForTests, readPictureRoles } from "@/lib/pictures/roles
 import { cancelVideoJob, getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
+import { planFirstFrameClip } from "@/lib/videos/referenceVideo";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { readCapabilities } from "@/lib/memoryRoom";
+import { setProfileSource, type ProfileSource } from "@/lib/jobs/admissionFit";
+import { setBudgetReader } from "@/lib/jobs/householdQueue";
 import { __setSheetMakerForTests, __setSheetCheckerForTests, __setParagraphWriterForTests, anotherReferenceTake, FIRST_FRAME_STEP_NAMES, getReferenceVideoRecipe, runMakeReferenceVideoTurn, NO_DIALOGUE_SENTENCE } from "@/lib/videos/referenceVideo";
 import {
   __setFirstFrameToolsForTests, buildFirstPicture, CLIP_FACE_LOW, decideReferenceRoute, FACE_GATE, FACE_MODELS_LINE, FIRST_FRAME_SENTENCE, LOOK_ALIKE_LINE, measureClipFaces, type FaceVec, type FirstFrameTools, type PicturedInput,
@@ -122,6 +128,11 @@ async function storedFirstPicture(job: VideoJob): Promise<Uint8Array> {
 
 beforeEach(() => {
   resetDb();
+  setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+  const maxRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" }, picture: { state: "max" }, voice: { state: "standard" } } } as const;
+  const boostRow = { ...maxRow, tier: "boost", cells: { ...maxRow.cells, video: { state: "boost" } } } as const;
+  setProfileSource({ table: [maxRow, boostRow], hw: { budgetGb: 120, marginGb: 2, peakGb: { video: { max: 60, boost: 45, standard: 35 } }, residentGb: { chat: { standard: 1 }, picture: { boost: 2, standard: 5 }, voice: { standard: 1 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: { video: true } } as ProfileSource);
+  setBudgetReader(async () => ({ freeMemoryBytes: 100_000_000_000, loaded: [] }));
   fake = installFakeVideoStack();
   fake.ltx25max = "ready"; fake.ltx25maxPicture = true;
   __setVideoStatusForTests(readyVideoStatusForTests({ ltx25max: "ready", ltx25maxPicture: true }));
@@ -143,12 +154,23 @@ beforeEach(() => {
   }) as unknown as typeof fetch);
 });
 afterEach(async () => {
+  setProfileSource(null); setBudgetReader(null);
   fake.restore(); __setKeyframesForTests(null); __setVideoStatusForTests(undefined); __setRolesVisionForTests(null);
   __setSheetMakerForTests(null); __setSheetCheckerForTests(null); __setParagraphWriterForTests(null); __setFirstFrameToolsForTests(null);
   await new Promise((resolve) => setTimeout(resolve, 50));
 });
 
 describe("the route is decided in code before any work", () => {
+  test("Max capability never_fits plans Boost and carries the existing explanation", async () => {
+    __setStackClientForTests({ capabilities: async () => ({ machine_class: "test", total_bytes: 0, rows: [{ category: "video", tier: "max", fits_ever: false, needs_bytes: null, cap_bytes: 0, model: null }] }) } as never);
+    try {
+      expect((await readCapabilities()).rows.find((row) => row.category === "video")?.cells.find((cell) => cell.tier === "max")?.fits).toBe(false);
+      const plan = await planFirstFrameClip(actor, readyVideoStatusForTests({ ltx25max: "ready", ltx25maxPicture: true }), 5);
+      expect(plan?.tier).toBe("boost");
+      expect(plan?.line).toBe("Max is not available on this computer yet, so this one is made at Boost.");
+    } finally { __resetStackEngineForTests(); }
+  });
+
   const pictures = async (...colors: string[]) => Promise.all(colors.map(async (c) => ({ bytes: await solid(c) })));
   test("a photographed person with a face takes the first-picture route; the readings are kept for the job", async () => {
     answersFor(READ_PERSON, READ_PLACE);

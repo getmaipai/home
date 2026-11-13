@@ -17,7 +17,7 @@ import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { laneOf } from "@/lib/pictures/lane";
 import { readAttachment, storeFile } from "@/lib/attachments";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { allowedQuality, jobTier, tierArgument, MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
+import { allowedQuality, jobTier, tierArgument, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE } from "@/lib/tiers";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
 import { householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, videoSizeFor } from "./quality";
@@ -233,7 +233,7 @@ function stackClipRun(actor: PersonRow, firstLine: string, submit: () => Promise
         const job = await getStackVideoJob(submitted.job, view);
         if (job.state === "failed" || job.state === "cancelled") {
           const known = job.code && Object.prototype.hasOwnProperty.call(INGREDIENTS_FAILURE_COPY, job.code) ? INGREDIENTS_FAILURE_COPY[job.code as keyof typeof INGREDIENTS_FAILURE_COPY] : null;
-          return { ok: false, line: failed(known ?? "It did not finish. Try again.") };
+          return { ok: false, line: failed(known ?? "It did not finish. Try again."), ...(job.code ? { refusalCode: job.code } : {}) };
         }
         if (job.state === "done") {
           const clip = job.data[0];
@@ -245,7 +245,7 @@ function stackClipRun(actor: PersonRow, firstLine: string, submit: () => Promise
         onProgress?.(job.progress);
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
-    } catch (error) { if (stackJob && signal.aborted) void cancelOrDeleteVideo(stackJob); return { ok: false, line: lineOf(error) }; }
+    } catch (error) { if (stackJob && signal.aborted) void cancelOrDeleteVideo(stackJob); return { ok: false, line: lineOf(error), ...(error instanceof StackVideoError ? { refusalCode: error.code } : {}) }; }
   };
 }
 
@@ -265,28 +265,33 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
 
 /** REFVIDEO-FIRSTFRAME-01: how a first-picture clip is made: Max with sound when this person holds it and the Stack can start a Max clip from a picture, else the best level they may use
  *  (the same choice a clip from one attached photo gets: `chooseVideoQuality` with a picture). Null only when no video level is ready. */
-export function planFirstFrameClip(actor: PersonRow, engine: Parameters<typeof chooseVideoQuality>[0]["engine"], seconds: number): { size: string; seconds: number; quality: "quick" | "detailed"; tier: "standard" | "boost" | "max"; model?: string } | null {
+export async function planFirstFrameClip(actor: PersonRow, engine: Parameters<typeof chooseVideoQuality>[0]["engine"], seconds: number): Promise<{ size: string; seconds: number; quality: "quick" | "detailed"; tier: "standard" | "boost" | "max"; model?: string; line?: string } | null> {
   if (!videoStatusReady(engine, true)) return null;
   const band = speakerAgeBand(actor, new Date());
   const maxReady = ltx25MaxReady(engine);
-  const tierAsked = tierArgument({ person: actor, category: "video", arg: "max", band, maxAvailable: maxReady });
+  const capabilities = await import("@/lib/memoryRoom").then(({ readCapabilities }) => readCapabilities());
+  const maxFits = capabilities.available ? capabilities.rows.find((row) => row.category === "video")?.cells.find((cell) => cell.tier === "max")?.fits : undefined;
+  const tierAsked = tierArgument({ person: actor, category: "video", arg: "max", band, maxAvailable: maxReady && maxFits !== false, capabilityFits: maxFits });
   const choice = chooseVideoQuality({
     requested: tierAsked.quality ? allowedQuality(actor, "video", tierAsked.quality, band) : undefined, household: allowedQuality(actor, "video", householdVideoQuality(), band), seconds, engine, hasPicture: true,
-    quickOnly: allowedQuality(actor, "video", "detailed", band) === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady,
+    quickOnly: allowedQuality(actor, "video", "detailed", band) === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady && maxFits !== false,
   });
   const model = choice.maker === "ltx25max" ? LTX25_MAX_MODEL : choice.maker === "ltx25" ? LTX25_MODEL : undefined;
-  return { size: videoSizeFor(choice.maker, choice.quality, false, engine), seconds: choice.seconds, quality: choice.quality, tier: choice.maker === "ltx25max" ? "max" : jobTier("video", tierAsked.tier, choice.quality), ...(model ? { model } : {}) };
+  const plannedTier = maxFits === false && tierAsked.tier === "max" ? "boost" : jobTier("video", tierAsked.tier, choice.quality);
+  return { size: videoSizeFor(choice.maker, choice.quality, false, engine), seconds: choice.seconds, quality: choice.quality, tier: choice.maker === "ltx25max" ? "max" : plannedTier, ...(model ? { model } : {}), ...(tierAsked.line ? { line: tierAsked.line } : {}) };
 }
 
 /** STEP 2 of the first-picture route: an image-to-video clip that starts from the saved first picture (frame 0 is the picture, so every face in it is the real one), then the face
  *  measurement of the finished clip. The measurement is told to the person on the card's notice when it is low; it never blocks the clip. */
-function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: PersonRow): EditRun {
+function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: PersonRow, maxFallbackLine: string | null = null): EditRun {
   return async (signal, onProgress, hooks) => {
     const failed = (why: string) => ({ ok: false as const, line: `${VIDEO_FAILED_PREFIX} ${why}` });
     let engine = null as Awaited<ReturnType<typeof videoEngineStatus>>;
     try { engine = await videoEngineStatus(); } catch { engine = null; }
-    const plan = planFirstFrameClip(actor, engine, recipe.seconds);
+    const plan = await planFirstFrameClip(actor, engine, recipe.seconds);
     if (!plan) return failed(videoNotReadyReason(engine));
+    const fallbackLine = maxFallbackLine ?? plan.line;
+    if (fallbackLine && plan.tier !== "max") hooks?.request({ create: { note: fallbackLine } });
     hooks?.request({ size: plan.size, seconds: plan.seconds, quality: plan.quality, ...(plan.tier === "boost" || plan.tier === "max" ? { tier: plan.tier } : {}) });
     const [width, height] = plan.size.split("x").map(Number) as [number, number];
     let image: string;
@@ -424,7 +429,7 @@ function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRe
   const source = sourceFor(actor, context, from, recipe.prompt, recipe.seconds, recipe.seed);
   const firstFrame = recipe.route === "first_frame";
   const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: firstFrame ? runFirstFrameClip(bytes[0]!, recipe, actor) : runIngredients(bytes, recipe, actor), phase: firstFrame ? FIRST_FRAME_PHASE : REFERENCE_PHASE, adultOnly, ...(adultOnly ? { adultLock: mark!.lock } : {}),
-    request: { reference: recipe, quality: "detailed", ...(firstFrame ? {} : { tier: "max" as const }), refProgress: startProgress(2, firstFrame ? "first_frame" : undefined), ...(getVideoJobFor(actor, from)?.request.subject_ids?.length ? { subject_ids: getVideoJobFor(actor, from)!.request.subject_ids } : {}) } });
+    request: { reference: recipe, quality: "detailed", tier: "max", refProgress: startProgress(2, firstFrame ? "first_frame" : undefined), ...(getVideoJobFor(actor, from)?.request.subject_ids?.length ? { subject_ids: getVideoJobFor(actor, from)!.request.subject_ids } : {}) } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
 
@@ -530,7 +535,7 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
     if (notReady) return refuse(notReady.line, notReady.why);
     const seconds = parsed.data.seconds ?? FIRST_FRAME_SECONDS;
     const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
-    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFirstFrame(actor, context, loaded, chosen.readings, request!, seconds, audience.band), phase: FIRST_FRAME_PHASE, adultOnly: castAdultOnly, request: { quality: "detailed", refProgress: startProgress(1, "first_frame"), ...castRequest } });
+    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFirstFrame(actor, context, loaded, chosen.readings, request!, seconds, audience.band), phase: FIRST_FRAME_PHASE, adultOnly: castAdultOnly, request: { quality: "detailed", tier: "max", refProgress: startProgress(1, "first_frame"), ...castRequest } });
     if (!started.ok) return refuse(started.line, "already_making");
     return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, [], "first_frame") }, data: { videoJobId: started.job.id, route: "first_frame" }, actions: [] } });
   }

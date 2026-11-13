@@ -6,6 +6,7 @@
 // sentence goes back to the caller. The key is never logged, never put in an error and never leaves for any host but the Stack.
 // These three reach "@/db" (and so the hub database); the spec client is also imported by the bench setup, which must stay clear of the
 // database until its own empty-directory check has run. They load on the first write, never on import.
+import { withStackCaller } from "@/lib/stack/caller";
 const tokenLib = () => import("@/lib/stack/homeViewToken");
 const issuesLib = () => import("@/lib/issues");
 const engineLib = () => import("@/lib/stackEngine");
@@ -47,14 +48,14 @@ const methodOf = (input: Parameters<typeof fetch>[0], init?: RequestInit): strin
 
 /** `fetch` for a Stack call: a write carries Home's token. */
 export const stackFetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
-  if (READS.has(methodOf(input, init))) return globalThis.fetch(input, init);
+  if (READS.has(methodOf(input, init))) return globalThis.fetch(input, { ...init, headers: withStackCaller(init?.headers ?? (typeof input === "object" && "headers" in input ? input.headers : undefined)) });
   const origin = new URL(urlOf(input)).origin;
   // A Stack that has not made its key file yet is asked once (a refused full-view ask is how an older Stack makes it).
   const { HOME_TOKEN_HEADER, PRIMING_TOKEN, VIEW_HEADER, forgetHomeViewToken, homeViewToken } = await tokenLib();
   const prime = async () => { await globalThis.fetch(`${origin}/stack/v1/health`, { method: "GET", headers: { [VIEW_HEADER]: "full", [HOME_TOKEN_HEADER]: PRIMING_TOKEN }, signal: AbortSignal.timeout(5_000) }).then((r) => r.arrayBuffer()).catch(() => undefined); };
   const send = async (): Promise<Response> => {
     const token = await homeViewToken(prime);
-    const headers = new Headers(init?.headers ?? (typeof input === "object" && "headers" in input ? input.headers : undefined));
+    const headers = withStackCaller(init?.headers ?? (typeof input === "object" && "headers" in input ? input.headers : undefined));
     if (token) headers.set(HOME_TOKEN_HEADER, token);
     return globalThis.fetch(input, { ...init, headers });
   };

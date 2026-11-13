@@ -265,7 +265,7 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
  * the words from the health row (`engines.image.notice`, `engines.video.notice`).
  * No figure (no sizes, no percentages) ever appears in these lines. */
 export type MakingKind = "image" | "video" | "music" | "voices";
-export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline" | "gpu";
+export type MakingCause = "restarting" | "memory" | "never_fits" | "not_installed" | "mode_change" | "offline" | "gpu";
 
 const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string }> = {
   image: { thing: "picture", Thing: "Picture", things: "Pictures" },
@@ -277,6 +277,12 @@ const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: st
 function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {
   const { Thing, things } = MAKING_NOUN[kind];
   switch (cause) {
+    case "never_fits": return {
+      adult: kind === "video" ? "This is too big for this computer even with everything else paused. Try Boost." : "This is too big for this computer even with everything else paused. Try Boost.",
+      teen: `${Thing} making isn't working right now. Try again later.`,
+      child: `${things} aren't working right now. Ask a grown-up.`,
+      repairs_link: null,
+    };
     case "memory": return {
       adult: `Waiting for its turn. ${Thing} making starts by itself in a moment.`,
       teen: `Waiting for its turn. ${Thing} making starts by itself in a moment.`,

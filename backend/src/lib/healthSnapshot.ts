@@ -38,7 +38,7 @@ async function buildHealth() {
   const chat = roleHealthEntry("chat", locals[0]!, states[0]!);
   if (chat.context_per_slot == null) chat.context_message = "I could not read how much the AI can hold, so I am using a safe small window";
   // CHAT-CALM-ERRORS-01d: the one composer line while chat cannot answer.
-  let cause: ChatPauseCause | null = chat.cause === "tier_reduced" ? null : chat.cause ?? null;
+  let cause: ChatPauseCause | null = chat.cause === "tier_reduced" || chat.cause === "never_fits" ? null : chat.cause ?? null;
   if (cause === "restarting") {
     unreachableSince ??= Date.now();
     if (Date.now() - unreachableSince > RESTART_GRACE_MS) cause = "offline";

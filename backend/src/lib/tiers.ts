@@ -136,16 +136,15 @@ export function allowedQuality(person: PersonRow, category: TierCategory, qualit
 }
 
 /** Max exists for a category only when an admin pointed its Max slot at a model of its own (the recommended Max is empty until the evaluations fill it). */
-export function maxAvailable(category: TierCategory): boolean {
+export function maxAvailable(category: TierCategory, capabilityFits?: boolean): boolean {
+  if (capabilityFits === false) return false;
   const slot = readSlot(category, "max");
   return slot.model !== "off" && slot.model !== "recommended" && slot.model !== readSlot(category, "boost").model;
 }
-
 /** Whether this person is shown a Max control on a card: they hold Max, their band reaches it, the slot is on and a Max model exists. */
 export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand, available: boolean = maxAvailable(category)): boolean {
   return available && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
 }
-
 /**
  * The tier a generating job is queued at (TIER-WIRE-01): the allowed tier `tierArgument` returned, kept only when the job really runs the better
  * maker (a Quick result is Standard) and Max only when a Max model exists here (otherwise the job runs at Boost, as the line told the person).
@@ -164,10 +163,10 @@ export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this compu
  * request was lowered. Max maps to Boost's maker until a Max slot exists on this computer (`maxAvailable`); a child or teen is lowered without
  * a line, because they are never shown a Max control (resource-tiers section 8).
  */
-export function tierArgument(input: { person: PersonRow; category: TierCategory; arg: unknown; band?: AgeBand; maxAvailable?: boolean }): { quality: "quick" | "detailed" | undefined; tier: Tier | undefined; line: string | null } {
+export function tierArgument(input: { person: PersonRow; category: TierCategory; arg: unknown; band?: AgeBand; maxAvailable?: boolean; capabilityFits?: boolean }): { quality: "quick" | "detailed" | undefined; tier: Tier | undefined; line: string | null } {
   if (!isTier(input.arg)) return { quality: undefined, tier: undefined, line: null };
   const band = input.band ?? speakerAgeBand(input.person, new Date());
-  const available = input.maxAvailable ?? maxAvailable(input.category);
+  const available = input.maxAvailable ?? maxAvailable(input.category, input.capabilityFits);
   const choice = authorizeTier({ person: input.person, category: input.category, requested: input.arg, band });
   let line: string | null = null;
   if (choice.note === "max_not_granted" && band === "adult") line = MAX_NEEDS_ADMIN_LINE;

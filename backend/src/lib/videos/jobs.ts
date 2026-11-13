@@ -12,8 +12,9 @@ import { newCreationId, newFileId, newVideoJobId } from "@/lib/id";
 import { recordClipCreation, safely } from "@/lib/creations/writers";
 import { nextHlc } from "@/lib/hlc";
 import { setShotClip } from "@/lib/mediaProductions";
-import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
+import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, scheduleNoRoomRecheck, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import { plainMakingLine } from "@/lib/pictures/plainLine";
 import type { PersonRow } from "@/types";
 import { getLoraRecord } from "@/lib/loras/store";
 import { usesAdultOnlyStyle } from "./adultStyle";
@@ -187,6 +188,7 @@ export function plainVideoFailure(error: unknown): string {
     switch (error.code) {
       case "coding_mode": return "Pictures, videos and songs will be back in a little while. Please try again later.";
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
+      case "never_fits": return plainMakingLine("video", "never_fits", error.message);
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
       case MEMORY_CANCELLED_CODE: return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "memory_stopped_failure", null, null, "adult")}`;
@@ -253,13 +255,21 @@ registerQueueProvider(() => {
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveVideoJob(job); },
       stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelVideoJob(owner as PersonRow, job.id); } : undefined,
-      release: job.state === "queued" && !job.stackJob ? () => releaseVideo(job) : undefined,
+      release: job.state === "queued" && !job.stackJob ? () => {
+        const edit = editRuns.get(job.id);
+        if (edit) {
+          // The queue pass waits for release() to return: the edit runs on its own (like a clip the Stack is making), never inside the pass.
+          void runEdit(job, edit.actor, edit.run, edit.source, edit.onSaved);
+          return Promise.resolve();
+        }
+        return releaseVideo(job);
+      } : undefined,
       save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; persistVideoJob(job); } };
   });
 });
 
 async function releaseVideo(job: VideoJob): Promise<void> {
-  if (job.state !== "queued" || job.stackJob) return;
+  if (job.state !== "queued" || job.stackJob || job.kind === "edit") return;
   try {
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     // TIER-HOME-04: the level's saved slot is read now, so the pick made in the dialog is what this job runs with.
@@ -278,7 +288,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (actor) void watch(job, actor as PersonRow, submitted.done);
   } catch (error) {
-    if (error instanceof StackVideoError && (error.code === "queue_full" || ((error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)))) { job.phase = "queued"; persistVideoJob(job); return; }
+    if (error instanceof StackVideoError && ((error.code === "queue_full") || ((error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)))) { job.state = "queued"; job.phase = "queued"; persistVideoJob(job); void releaseHouseholdQueue(); return; }
     job.state = "failed"; job.error = plainVideoFailure(error); persistVideoJob(job); refreshHouseholdQueue();
   }
 }
@@ -387,6 +397,7 @@ export function __resetVideoJobsForTests(): void {
   liveJobs.clear();
   memory.clear();
   temporaryClips.clear();
+  editRuns.clear();
 }
 /** Test-only fixture seam for an already finished source clip. */
 export function __setVideoJobForTests(job: VideoJob): void { liveJobs.set(job.id, job); }
@@ -823,7 +834,7 @@ export interface EditedClip { video: Uint8Array; seconds: number | null; width: 
   /** SPATIAL-04: the plain line kept with the clip (the Stack's lines for a spatial-sound step). */
   note?: string }
 /** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
-export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void, hooks?: EditHooks) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string }>;
+export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void, hooks?: EditHooks) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string; refusalCode?: string }>;
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
@@ -836,18 +847,25 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
   const now = new Date().toISOString();
   const from = input.source.request;
   const job: VideoJob = {
-    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "running", stackJob: null,
-    percent: 5, phase: input.phase ?? "editing", position: null, prompt: input.source.prompt,
+    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: null, kind: "edit", state: "queued", stackJob: null,
+    percent: 0, phase: "queued", position: null, prompt: input.source.prompt,
     request: { size: from.size, seconds: from.seconds, seed: from.seed, loras: [...(input.styleIds ?? [])], source_file_id: null, audience: from.audience, ...(from.quality ? { quality: from.quality } : {}), ...(from.create ? { create: from.create } : {}), edit: input.edit, ...(input.background ? { background: input.background } : {}), ...(input.adultOnly ? { adultOnly: true, adultLock: input.adultLock ?? "on" } : {}), ...(input.request ?? {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
+  // Registered before the first save: a save refreshes the queue, which may release this job at once and must find its run.
+  editRuns.set(job.id, { actor: input.actor, run: input.run, source: input.source, onSaved: input.onSaved, phase: input.phase ?? "editing" });
   saveVideoJob(job);
-  void runEdit(job, input.actor, input.run, input.source, input.onSaved);
   return { ok: true, job };
 }
 
+const editRuns = new Map<string, { actor: PersonRow; run: EditRun; source: VideoJob; onSaved?: (fileId: string) => void; phase: string }>();
+
 async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob, onSaved?: (fileId: string) => void): Promise<void> {
+  job.state = "running";
+  job.percent = Math.max(5, job.percent);
+  job.phase = editRuns.get(job.id)?.phase ?? job.phase ?? "editing";
+  saveVideoJob(job);
   const controller = new AbortController();
   watching.set(job.id, controller);
   try {
@@ -863,7 +881,27 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     };
     const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); }, hooks);
     if (controller.signal.aborted) return;
-    if (!made.ok) { job.state = "failed"; job.error = made.line; saveVideoJob(job); return; }
+    if (!made.ok) {
+      const code = made.refusalCode;
+      // A Stack refusal of an edit is the same wait a clip made from words has: back to the queue with the matching hold, never failed.
+      const neverFits = code === "never_fits";
+      const holdsSoFar = (job.request as { neverFitsHolds?: number }).neverFitsHolds ?? 0;
+      if (neverFits && (requestTier(job.request) === "max" || holdsSoFar >= 3)) { job.state = "failed"; job.error = plainMakingLine("video", "never_fits", made.line); saveVideoJob(job); return; }
+      const hold = code === "queue_full" || neverFits || ((code === "no_memory" || code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request));
+      if (hold) {
+        if (neverFits) (job.request as { neverFitsHolds?: number }).neverFitsHolds = holdsSoFar + 1;
+        job.state = "queued";
+        job.error = null;
+        job.percent = 0;
+        job.riseReason = code === "queue_full" ? "max_window" : "tier_no_room";
+        job.phase = `held:${job.riseReason}`;
+        persistVideoJob(job);
+        // Looked at again by the queue's own timer (never at once: a refusal that repeats must not spin the queue).
+        scheduleNoRoomRecheck();
+        return;
+      }
+      job.state = "failed"; job.error = made.line; saveVideoJob(job); return;
+    }
     const { clip } = made;
     const webm = job.request.edit?.change === "remove_background" && job.request?.background === "transparent";
     if (webm ? !looksLikeWebm(clip.video) : !looksLikeMp4(clip.video)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The edited video didn't come out right. Try again.`; saveVideoJob(job); return; }
@@ -873,7 +911,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     if (clip.surround && !looksLikeMp4(clip.surround)) { job.state = "failed"; job.error = `${EDIT_FAILED_PREFIX} The 5.1 file didn't come out right. Try again.`; saveVideoJob(job); return; }
     if (clip.note && job.request.edit) job.request.edit = { ...job.request.edit, note: clip.note };
     await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit", webm ? "video/webm" : "video/mp4", clip.surround ?? null);
-    if (job.state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
+    if ((job as VideoJob).state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
   } catch {
     job.state = "failed";
     job.error = `${EDIT_FAILED_PREFIX} Something went wrong while making it. Try again.`;
@@ -881,7 +919,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
   } finally {
     watching.delete(job.id);
     liveJobs.delete(job.id);
-    refreshHouseholdQueue();
+    if (job.state === "queued") persistVideoJob(job); else { editRuns.delete(job.id); refreshHouseholdQueue(); }
   }
 }
 
@@ -902,7 +940,7 @@ export async function cancelVideoJob(actor: PersonRow, id: string): Promise<Vide
 /** Called once at boot: a job a restart interrupted either finishes now or is marked failed with an honest line. */
 export function resumeVideoJobs(): void {
   const rows = db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all();
-  for (const row of rows) void resume(fromRow(row));
+  for (const row of rows) { if (editRuns.has(row.id)) continue; void resume(fromRow(row)); }
   void releaseHouseholdQueue();
 }
 

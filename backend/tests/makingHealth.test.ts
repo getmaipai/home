@@ -11,13 +11,15 @@ import { __setPicturesFetchForTests, submitGeneration, StackPicturesError } from
 import { __setVideosFetchForTests, submitVideo, StackVideoError } from "@/lib/videos/stack";
 import { plainFailure } from "@/lib/pictures/jobStore";
 import { plainVideoFailure } from "@/lib/videos/jobs";
+import { plainMakingLine, makingStateOf } from "@/lib/pictures/plainLine";
 
 type RoleRow = { id: string; state: { state: string; reason?: string | null }; reason?: string | null };
-function stack(opts: { roles?: RoleRow[]; rolesFail?: boolean; paused?: boolean; coding?: boolean }) {
+function stack(opts: { roles?: RoleRow[]; rolesFail?: boolean; paused?: boolean; coding?: boolean; videoMaxNeverFits?: boolean }) {
   __setStackClientForTests({
     roles: async () => { if (opts.rolesFail) throw new Error("offline"); return { roles: opts.roles ?? [] }; },
     memory: async () => ({ watchdog: { level: opts.paused ? "critical" : "normal", generation_paused: opts.paused === true } }),
     getCodingMode: async () => ({ mode: opts.coding ? "coding" : "normal", target: "normal", state: "stable" }),
+    capabilities: async () => ({ machine_class: "test", total_bytes: 0, rows: opts.videoMaxNeverFits ? [{ category: "video", tier: "max", fits_ever: false, needs_bytes: null, cap_bytes: 0, model: null }] : [] }),
   } as never);
 }
 const installed: RoleRow[] = [{ id: "chat", state: { state: "ready" } }, { id: "image", state: { state: "installed" } }, { id: "video", state: { state: "loaded" } }];
@@ -28,6 +30,17 @@ beforeEach(() => { resetDb(); setHouseholdSettingValue("engines.stack.url", "htt
 afterEach(() => { __resetStackEngineForTests(); __setPicturesFetchForTests(null); __setVideosFetchForTests(null); __resetMakingHealthForTests(); });
 
 describe("picture and video health rows", () => {
+  test("never_fits stays a known video state and uses the plain line instead of masking engine GB text", () => {
+    expect(makingStateOf("never_fits")).toBe("never_fits");
+    expect(plainMakingLine("video", "never_fits", "This Max job needs about 57 GB.")).toBe("This is too big for this computer even with everything else paused. Try Boost.");
+  });
+
+  test("video health row shows never_fits from the Stack capability row", async () => {
+    stack({ roles: installed, videoMaxNeverFits: true });
+    expect(await roleHealth("video")).toMatchObject({ availability: "unavailable", reason: "never_fits", cause: "never_fits" });
+    expect((await collectHealth()).engines.video?.notice?.adult).toBe("This is too big for this computer even with everything else paused. Try Boost.");
+  });
+
   test("ready when the Stack has both roles installed and memory is normal", async () => {
     stack({ roles: installed });
     expect(await roleHealth("image")).toEqual({ availability: "ready", reason: null });
