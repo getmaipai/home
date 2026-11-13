@@ -838,6 +838,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/memoryProfile.ts` | PROFILE_CARD_MAX_LINES, PROFILE_CARD_MAX_CHARS, profileCardRuleLine, isProfileCardCategory, renderProfileCardLine, renderProfileCard |
 | `backend/src/lib/memoryRoom.ts` | readReclaim, runReclaim, capabilityView, readCapabilities, cannotRunJobs, cannotRunWhy |
 | `backend/src/lib/memoryShape.ts` | toMemoryRecord |
+| `backend/src/lib/mentionedCastArgs.ts` | withMentionedCast |
 | `backend/src/lib/modelCatalog.ts` | CATALOG, kvCacheBytes, weightsBytes, usableChatBudgetBytes, fitsWithin, recommend |
 | `backend/src/lib/modelDownload.ts` | __setDownloadIdleTimeoutForTests, __setDownloadRetryDelayScaleForTests, sweepStaleDownloads, sha256OfFile, downloadUrl |
 | `backend/src/lib/modelDownloadJobs.ts` | getJob, listJobs, recoverInterruptedJobsAtBoot, extractDownloadedArchive, startSelectJob |
