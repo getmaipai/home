@@ -30,7 +30,6 @@ import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
-import { MusicLibraryColumn } from "@/shell/pages/MusicLibraryColumn";
 import { formatDate, formatTime } from "@/lib/format";
 import { navigateBack } from "@/shell/media/navigateBack";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -334,12 +333,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   );
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
-  const framed = packageId === "audio" ? (
-    <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
-      <MusicLibraryColumn pageId={pageId} />
-      {content}
-    </div>
-  ) : sidebarProps ? (
+  const framed = sidebarProps ? (
     <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
       <SectionSidebar standalone density="compact" {...sidebarProps} />
       {content}
