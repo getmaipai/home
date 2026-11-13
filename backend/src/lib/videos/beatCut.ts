@@ -25,6 +25,8 @@ export function planBeatCut(input: { beats: number[]; downbeats: number[]; beats
   let prior = 0;
   for (const end of cuts) {
     const length = end - prior;
+    // A segment shorter than one frame (a first downbeat at 0 makes one of length 0) is not cut: the Stack's trim needs out_s above in_s, so the next cut absorbs it.
+    if (length < MIN_SEGMENT_S) continue;
     // Round robin from the next clip; a clip with no footage left for this cut is skipped for the next one that has some, so footage is not shown twice
     // while another clip still has unused footage. Only when every clip is used up does the planned clip start over from its first second.
     const turn = out.length % clipSeconds.length;
@@ -45,4 +47,6 @@ export function planBeatCut(input: { beats: number[]; downbeats: number[]; beats
   }
   return { ok: true, segments: out, videoSeconds: round(prior), beatsPerCut: step };
 }
+/** One frame at 30 fps. */
+const MIN_SEGMENT_S = 1 / 30;
 const round = (n: number) => Math.round(n * 1000) / 1000;

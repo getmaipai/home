@@ -43,7 +43,13 @@ describe("beat cut planning", () => {
   test("starts at the first downbeat and cuts four beats apart on a 120 BPM grid", () => {
     const p = planBeatCut({ beats: grid(80), downbeats: [0], beatsPerCut: 4, lengthS: 8, clipSeconds: [null] });
     expect(p.ok).toBe(true);
-    if (p.ok) { expect(p.segments[0]?.length).toBe(0); expect(p.segments.slice(1).map((s) => s.length)).toEqual([2, 2, 2, 2]); }
+    if (p.ok) expect(p.segments.map((s) => s.length)).toEqual([2, 2, 2, 2]); // no zero-length first segment: the Stack trim refuses out_s equal to in_s
+  });
+  test("no segment is shorter than one frame, whatever the first downbeat", () => {
+    for (const downbeats of [[0], [0.01], [0.5]]) {
+      const p = planBeatCut({ beats: grid(80), downbeats, beatsPerCut: 4, lengthS: 8, clipSeconds: [null] });
+      expect(p.ok && p.segments.every((s) => s.length >= 1 / 30 && s.outS > s.inS)).toBe(true);
+    }
   });
   test("caps segments by increasing the beat interval", () => {
     const p = planBeatCut({ beats: grid(400), downbeats: [0], beatsPerCut: 1, lengthS: 60, clipSeconds: [null] });
@@ -52,7 +58,7 @@ describe("beat cut planning", () => {
   });
   test("wraps each clip cursor and refuses a segment longer than its clip", () => {
     const p = planBeatCut({ beats: grid(20), downbeats: [0], beatsPerCut: 4, lengthS: 8, clipSeconds: [3] });
-    expect(p.ok && p.segments[2]?.inS).toBe(0);
+    expect(p.ok && p.segments[1]?.inS).toBe(0);
     const short = planBeatCut({ beats: grid(20), downbeats: [0], beatsPerCut: 8, lengthS: 8, clipSeconds: [2] });
     expect(short.ok).toBe(false);
   });
