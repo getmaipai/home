@@ -174,7 +174,7 @@ describe("an edit by Library file id", () => {
     const upload = await libraryPicture(sageActor, "composer:upload");
     const fromUpload = await runAndApply(sage, "picture.flip", upload.id, { direction: "horizontal" });
     expect(note(fromUpload.version.id)).toMatchObject({ lock: "off" });
-    expect(note(fromUpload.version.id).audience).toBeUndefined();
+    expect(note(fromUpload.version.id).audience).toBe("all-ages");
   });
 
   test("an app cannot run an operation the list does not offer: helpers, unknown ids and bad arguments are refused", async () => {

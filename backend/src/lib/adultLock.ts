@@ -245,6 +245,11 @@ export function lockState(item: LockItem | null, actor: PersonRow, proof: AdultP
 export interface MarkSource { madeAudience: "all-ages" | "adult-only" | null; lock: "on" | "off" }
 export interface ItemMark { madeAudience: "all-ages" | "adult-only"; lock: "on" | "off" }
 
+/** An unlabeled source has no automatic Adult lock; age and surface gates still govern access. */
+export function unlabeledSourceMark(owner: PersonRow): MarkSource {
+  return { madeAudience: "all-ages", lock: "off" };
+}
+
 /**
  * ADULT-LOCK-06: the audience table of the design note (3.10), one function for every new item (job start, edit, join, mix, continue; pictures and songs
  * call it in ADULT-LOCK-07). `madeAudience` is never lower than any source's and rises when the new item adds an adult-only style. `lock` is on when a

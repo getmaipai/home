@@ -72,6 +72,7 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   expect(args.look_art).toBe("{look_art}");
   expect(args.light).toBe("{light}");
   expect(filledPage.body[1]).toMatchObject({ type: "media_shelf", bind: { source: "package", path: "recent" } });
+  expect(filledPage.body[1]).toMatchObject({ item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta" });
   const manifest = loadManifestOnly("image");
   expect(manifest.ok && (manifest.value.contributes as { data: Array<{ id: string }> }).data.some((item) => item.id === "recent")).toBe(true);
   expect(appRouteAllowed(row, "image", "data", "recent")).toBe(true);

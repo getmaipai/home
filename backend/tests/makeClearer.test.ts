@@ -162,7 +162,7 @@ describe("Quick on a picture", () => {
     expect([out.width, out.height]).toEqual([H, W]);
   });
 
-  test("over the media-ops route: Quick makes a new version; at the same size an upload's lock state carries, enlarged it does not", async () => {
+  test("over the media-ops route: Quick makes a new version; at every size an upload remains unlocked", async () => {
     const source = await libraryPicture(await softPicture(12));
     const apply = async (args: Record<string, unknown>) => {
       const res = await sage.post("/api/media-ops/picture.make_clearer", { file_id: source.id, args });
@@ -180,24 +180,24 @@ describe("Quick on a picture", () => {
     expect(same.id.label).toBe("Made clearer");
     const bigger = await apply({ level: "quick", size: "2" });
     expect([bigger.preview.width, bigger.preview.height]).toEqual([W * 2, H * 2]);
-    expect(note(bigger.id.id).lock).not.toBe("off");
+    expect(note(bigger.id.id).lock).toBe("off");
   });
 
-  test("the lock record (SIMPLE_LOCAL_OPS): only Quick at the same size keeps an uncovered source open; enlarging Quick, Better and Best lock", async () => {
+  test("Quick, enlarged Quick, Better and Best preserve an unlabeled source as unlocked", async () => {
     const original = await softPicture(0);
     const source = await libraryPicture(original);
     const bigger = new Uint8Array(await sharp(Buffer.from(original)).resize(W * 2, H * 2).png().toBuffer());
     const saved = async (png: Uint8Array, level?: "quick" | "better" | "best") => note((await saveVersion(sageActor, loadSource(sageActor, LIBRARY_SOURCE, source.id, true), png, { op: "clearer", label: "Made clearer", ...(level ? { level } : {}) })).id);
     expect((await saved(original, "quick")).lock).toBe("off");
-    expect((await saved(bigger, "quick")).lock).not.toBe("off");
-    expect((await saved(bigger, "better")).lock).not.toBe("off");
+    expect((await saved(bigger, "quick")).lock).toBe("off");
+    expect((await saved(bigger, "better")).lock).toBe("off");
     // A model level that happens to return the same size is still a model edit.
-    expect((await saved(original, "better")).lock).not.toBe("off");
-    expect((await saved(original, "best")).lock).not.toBe("off");
-    expect((await saved(original)).lock).not.toBe("off");
+    expect((await saved(original, "better")).lock).toBe("off");
+    expect((await saved(original, "best")).lock).toBe("off");
+    expect((await saved(original)).lock).toBe("off");
   });
 
-  test("Better is an ordinary upscale at the Stack and never carries the lock state", async () => {
+  test("Better is an ordinary upscale at the Stack and preserves the unlocked state", async () => {
     const source = await libraryPicture(await softPicture(0));
     const op = await import("@/lib/mediaOps/registry");
     // Better asks the Stack's `upscale` for twice the size (a Stack that cannot be reached here answers with its plain line, not a crash).
@@ -300,7 +300,7 @@ describe("Make clearer, Best level", () => {
     const done = await pollEdit(sageActor, "best-1");
     expect(done.state).toBe("done");
     expect(done).toMatchObject({ preview: { operation: "clearer", width: W, height: H } });
-    if (done.state === "done") { const saved = await applyPreview(sageActor, done.preview.token); expect(note(saved.id).lock).not.toBe("off"); }
+    if (done.state === "done") { const saved = await applyPreview(sageActor, done.preview.token); expect(note(saved.id).lock).toBe("off"); }
     expect(row()).toMatchObject({ state: "done" });
     expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
     restore(null);

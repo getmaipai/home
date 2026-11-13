@@ -155,8 +155,10 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
+      "item_subtitle_field": "{subtitle}",
+      "item_badge_field": "badge",
+      "item_meta_field": "meta",
       "aspect": "square",
       "on_select": {
         "navigate": {

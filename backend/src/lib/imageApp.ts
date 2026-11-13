@@ -4,13 +4,62 @@ import { listTemplates } from "@/lib/media/templates";
 import { registerAppData, registerAppPageFill } from "@/lib/apps";
 import { pictureFragmentChips } from "@/lib/media/pictureFragments";
 import { studioOperationRows, studioPickerRows, studioRows } from "@/lib/mediaOps/studio";
+import { attachments, pictureJobs } from "@/db/schema";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { getPictureJob } from "@/lib/pictures/jobStore";
+import { pictureJobLockState } from "@/lib/pictures/lock";
+import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
+import { jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 
 const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
   const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
   const limit = Math.min(60, Math.max(1, Number.isInteger(input.limit) ? Number(input.limit) : 20));
   const page = listLibrary(person, { type: "image", ...(madeOnly ? { origin: "made" as const } : {}), sort: "newest", limit });
-  return page.items.map((file) => ({ id: file.id, title: file.name, subtitle: file.owner.display_name, thumbnail: file.thumb_url, kind: "image", created_at: file.created_at }));
+  const finished = page.items.map((file) => ({ id: file.id, title: file.name, subtitle: file.owner.display_name, thumbnail: file.thumb_url, kind: "image", created_at: file.created_at, progress: null, badge: "", meta: "" }));
+  if (!madeOnly) return finished;
+  const jobs = db.select({ id: pictureJobs.id, state: pictureJobs.state, files: pictureJobs.files }).from(pictureJobs).where(and(eq(pictureJobs.personId, person.id), isNull(pictureJobs.purpose), isNull(pictureJobs.conversationId))).orderBy(desc(pictureJobs.updatedAt)).limit(60).all();
+  const making = jobs.flatMap((row) => {
+    const { id } = row;
+    const job = getPictureJob(person, id);
+    if (!job || job.conversationId) return [];
+    const lock = pictureJobLockState(person, job);
+    if (lock === "hidden") return [];
+    if (lock === "locked") return [{ id: `picture-job:${id}`, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: job.updatedAt, progress: null, badge: "Locked", meta: "" }];
+    if (job.state === "done" && job.files.length) return [];
+    const audience = speakerAgeBand(person, new Date()) === "child" ? "child" : "adult";
+    const line = job.state === "queued" ? jobQueueCopy("queued", "queue", job.position, null, audience)
+      : job.state === "running" ? plainStageLabel(job.phase, audience) ?? "Making your picture."
+      : job.state === "failed" ? job.error ?? "The picture did not finish. Try again."
+      : "";
+    const percent = job.state === "running" && job.percent > 0 ? Math.max(1, Math.min(99, Math.round(job.percent))) : null;
+    return [{ id: `picture-job:${id}`, title: job.prompt, subtitle: line, thumbnail: "", kind: "image", created_at: job.updatedAt, progress: null, badge: percent === null ? "" : `${percent}%`, meta: "" }];
+  });
+  making.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const lockedFinished = db.select({ id: attachments.id, owner: attachments.ownerPersonId, provenance: attachments.provenance, createdAt: attachments.createdAt }).from(attachments)
+    .where(and(eq(attachments.ownerPersonId, person.id), isNull(attachments.deletedAt))).all()
+    .filter((file) => lockState(lockItemOfProvenance(file.owner, file.provenance), person) === "locked")
+    .filter((file) => {
+      try {
+        const note = JSON.parse(file.provenance.slice(file.provenance.indexOf(":") + 1)) as { job?: string };
+        const job = jobs.find((candidate) => candidate.id === note.job);
+        return !!note.job && job?.state === "done" && getPictureJob(person, note.job)?.files.some((output) => output.id === file.id) === true;
+      } catch { return false; }
+    })
+    .map((file) => {
+      const note = JSON.parse(file.provenance.slice(file.provenance.indexOf(":") + 1)) as { job: string };
+      return { id: `picture-job:${note.job}`, fileId: file.id, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: file.createdAt, progress: null, badge: "Locked", meta: "" };
+    });
+  const lockedIds = new Set(lockedFinished.map((file) => String(file.fileId)));
+  const visibleFinished = finished.filter((file) => !lockedIds.has(String(file.id)));
+  const lockedJobIds = new Set(lockedFinished.map((file) => String(file.id)));
+  const lockRows = [...making.filter((file) => !lockedJobIds.has(String(file.id))), ...lockedFinished].map((file) => {
+    const { fileId: _fileId, ...visible } = file as typeof file & { fileId?: string };
+    return visible;
+  }).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return [...lockRows, ...visibleFinished];
 };
 
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {

@@ -1,5 +1,5 @@
 import { canReadFileAudience, fileAudience } from "@/lib/access";
-import { lockItemOfProvenance, lockState, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
+import { lockItemOfProvenance, lockState, markFields, newItemMark, unlabeledSourceMark, type MarkSource } from "@/lib/adultLock";
 // IMGTOOLS-03/04: the picture editor's server half. The person opens a
 // picture they already have (a chat attachment) in the canvas and runs a
 // tool on it: remove the background, erase an object under a painted mask,
@@ -30,7 +30,7 @@ import sharp, { type OutputInfo } from "sharp";
 import { fileTypeFromBuffer } from "file-type";
 import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversations, jobs as jobsTable } from "@/db/schema";
+import { attachments, conversations, jobs as jobsTable, people } from "@/db/schema";
 import { newCreationId, newFileId } from "@/lib/id";
 import { recordEditedPicture, safely } from "@/lib/creations/writers";
 import { createJob, updateJob } from "@/lib/jobs";
@@ -190,24 +190,6 @@ export interface SourcePicture {
   ownerPersonId?: string;
 }
 
-/**
- * Owner decision (Jesse, 2026-11-13): a feature that makes no content has no age gate, and these make none. A simple local pixel edit of a picture with no audience
- * label that the Adult lock does not cover (no lock item, for example an upload) is saved with that same state (no label, lock off), so it is visible to exactly who
- * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale), resize (it runs on the engine, not here)
- * and any operation not listed here locks as before (fail closed). Make clearer at its Quick level (a median denoise and an unsharp mask in Home) joins the list only
- * when the result has the same pixel size as the source (checked in `saveVersion`); Quick with a larger size, Better and Best are model or enlarging edits and lock as before. Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
- * otherwise it would be a way around that switch.
- */
-const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "markup", "clearer"]);
-
-/** True when the saved result has the same upright pixel size as the source picture (Make clearer, Quick, without enlarging). An unreadable source counts as a different size (fail closed). */
-async function keepsSize(sourceBytes: Uint8Array, info: { width: number; height: number }): Promise<boolean> {
-  try {
-    const was = uprightSize(await sharp(sourceBytes, { limitInputPixels: MAX_SAVED_PIXELS }).metadata());
-    return was.width === info.width && was.height === info.height;
-  } catch { return false; }
-}
-
 /** A picture addressed by its Library file id rather than by a chat: the "conversation" of a Library source (IMG-OPS-02). Such an edit is owner-only and its result is a new Library picture. */
 export const LIBRARY_SOURCE = "library";
 export const LIBRARY_PICTURE_GONE = "That picture isn't in your Library any more. Open the Library and choose it again.";
@@ -264,7 +246,9 @@ function loadLibrarySource(actor: PersonRow, id: string): SourcePicture {
   const read = readAttachment(actor, id);
   if (!read.ok) throw gone;
   const provenance = parseProvenance(row.provenance);
-  return { id, conversationId: LIBRARY_SOURCE, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: (row.name ?? row.provenance.replace(/^composer:/, "")).slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  const owner = db.select().from(people).where(eq(people.id, row.ownerPersonId)).get() as PersonRow | undefined;
+  const audience = fileAudience(row.provenance);
+  return { id, conversationId: LIBRARY_SOURCE, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: audience ?? "all-ages", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : audience ? { madeAudience: audience, lock: "on" } : owner ? unlabeledSourceMark(owner) : { madeAudience: null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: (row.name ?? row.provenance.replace(/^composer:/, "")).slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 function loadSourceChecked(actor: PersonRow, conversationId: string, id: string, write: boolean, gone: ImageEditError): SourcePicture {
@@ -284,7 +268,9 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
   }
   const provenance = parseProvenance(row.provenance);
   const item = lockItemOfProvenance(row.ownerPersonId, row.provenance);
-  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  const owner = db.select().from(people).where(eq(people.id, row.ownerPersonId)).get() as PersonRow | undefined;
+  const audience = fileAudience(row.provenance);
+  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: audience ?? "all-ages", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : audience ? { madeAudience: audience, lock: "on" } : owner ? unlabeledSourceMark(owner) : { madeAudience: null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 export interface PictureVersion { id: string; url: string; label: string; created_at: string; op: EditProvenanceOp | "original"; width: number | null; height: number | null; media_type: string; source: string | null; source_sha256: string | null }
@@ -336,7 +322,7 @@ export function readPicture(actor: PersonRow, conversationId: string, id: string
 }
 
 /** Writes a PNG as the next version of `source`'s chain. The bytes are re-encoded here (metadata dropped), never trusted as sent. */
-export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; /** Make clearer only: which level made this version. Only "quick" can carry the source's state (see SIMPLE_LOCAL_OPS); a missing level fails closed. */ level?: ClearerLevel }): Promise<PictureVersion> {
+export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; level?: ClearerLevel }): Promise<PictureVersion> {
   let clean: Buffer;
   let info: OutputInfo;
   try {
@@ -347,34 +333,29 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
   }
   const bytes = new Uint8Array(clean);
-  const stored = source.adultMark ?? { madeAudience: source.audience ?? null, lock: "on" as const };
-  // A simple local edit (no new content) of a picture with no audience label that the Adult lock does not cover (an upload, or an earlier such edit) carries the
-  // source's own state: no audience label and lock off, so exactly the people who can see the source see the result. Nothing is raised or lowered. Everything else,
-  // and any result the caller marks adult-only, goes through newItemMark as before.
-  // Make clearer ("clearer") is on the list only at its Quick level and only when the result kept the source's pixel size; any enlarging, Better and Best lock as before.
-  const sameSize = meta.op !== "clearer" || (meta.level === "quick" && await keepsSize(source.bytes, info));
-  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && sameSize && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
+  const owner = source.ownerPersonId ? db.select().from(people).where(eq(people.id, source.ownerPersonId)).get() as PersonRow | undefined : undefined;
+  const stored = source.adultMark ?? (owner ? unlabeledSourceMark(owner) : { madeAudience: source.audience ?? null, lock: "on" as const });
   const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
   const creationId = newCreationId();
-  const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, creation: creationId, ...(carries ? { lock: "off" as const } : markFields(mark)), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, creation: creationId, ...markFields(mark), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
-    storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, audience, made_audience: audience } });
+    storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, ...markFields(mark) } });
     return { id, url: pictureUrl(source.conversationId, id), label: provenance.label, created_at: new Date().toISOString(), op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (source.conversationId === LIBRARY_SOURCE) {
     // IMG-OPS-02: an edit of a Library picture is a NEW Library file (kept, with no chat), linked to its source and root by the note. The source is never written.
     const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "kept", name: null });
     if (!stored.ok) throw new ImageEditError(stored.status === 403 ? 403 : 500, stored.status === 403 ? stored.error : "The edited picture could not be saved. Try again.", stored.status === 403 ? "storage_full" : "save_failed");
-    if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
+    if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
     safely(() => recordEditedPicture(actor, { fileId: stored.value.id, sourceId: source.id, width: info.width, height: info.height, op: meta.op, label: provenance.label, model: meta.model, ms: meta.ms, creationId }));
     return { id: stored.value.id, url: pictureUrl(LIBRARY_SOURCE, stored.value.id), label: provenance.label, created_at: stored.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "conversation" });
   if (!created.ok) throw new ImageEditError(created.status === 403 ? 403 : created.status === 404 ? 404 : 500, created.status === 403 ? created.error : "The edited picture could not be saved. Try again.", created.status === 403 ? "storage_full" : "save_failed");
-  if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
+  if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
   safely(() => recordEditedPicture(actor, { fileId: created.value.id, sourceId: source.id, width: info.width, height: info.height, op: meta.op, label: provenance.label, model: meta.model, ms: meta.ms, creationId }));
   return { id: created.value.id, url: pictureUrl(source.conversationId, created.value.id), label: provenance.label, created_at: created.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
 }
@@ -594,7 +575,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
     if (!state.enabled) throw new ImageEditError(503, state.reason ?? status.note ?? "This level isn't available yet.", "unavailable");
     if (level === "quick") {
       const quick = await processClearerQuick(source.bytes, input.size ?? 1);
-      // Owner decision (Jesse, 2026-11-13): see SIMPLE_LOCAL_OPS. The level travels with the preview; saveVersion decides.
+      // The level travels with the preview for provenance; lock state follows the shared source mark.
       return { state: "done", preview: keepPreview(actor, source, "clearer", quick.png, { ...quick, level: "quick" }) };
     }
     input = { ...input, scale: level === "better" ? (input.size === 4 ? 4 : 2) : undefined };
