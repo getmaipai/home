@@ -194,5 +194,8 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
   if (pictures.some((picture) => picture.role === "actor") && !subjects.some((panel) => panel.role === "actor" && panel.single) && !(await faceModelsInstalled())) {
     notes.push("The face models are not installed, so photos of several people could not be split into one panel each and no views were drawn of people. An admin can install them in Settings, AI and models.");
   }
+  // Measured 2026-11-12 (8 clips of two real adults, face match 0.02 to 0.22 against about 0.36 for the same person): the Ingredients model follows a sheet for objects, places and
+  // invented characters but not a real face; hair, glasses and clothes carry over, the face does not. The person is told before they expect a likeness.
+  if (pictures.some((picture) => picture.role === "actor")) notes.push("This video model does not keep a real person's face exactly: the person in the clip will match the description (hair, glasses, clothes) but may not look like the photo.");
   return { png: new Uint8Array(png), description: `Reference sheet: ${described.join(" ")}`, panels, notes };
 }
