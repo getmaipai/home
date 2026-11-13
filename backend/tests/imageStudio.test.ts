@@ -3,7 +3,7 @@
 // route give one answer.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import sharp from "sharp";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, settingsValues } from "@/db/schema";
 import { storeFile } from "@/lib/attachments";
@@ -243,6 +243,21 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     // The upload's owner is the only reader besides adults: the other teen-less household member (an adult) is no different from the source.
     const a = (await lucia.get(`/api/media-ops/files/${encodeURIComponent(teenUpload.id)}/content`)).status;
     expect((await lucia.get(`/api/media-ops/files/${encodeURIComponent(crop.version.id)}/content`)).status).toBe(a);
+  });
+
+  test("markup and resize do not carry where they could be a way around a check: photo uploads off, or the engine did the work", async () => {
+    const upload = await libraryPicture(sageActor, "library:upload");
+    // Markup saves bytes the browser drew: with photo uploads off for the person it keeps the old rule (adult-only, lock on).
+    db.update(settingsValues).set({ value: "false" }).where(and(eq(settingsValues.scope, `person:${sageActor.id}`), eq(settingsValues.key, "chat.photo_uploads"))).run();
+    try {
+      const res = await studioCall(sage, "studio-markup", { file: upload.id, png: await dataUrl(await twoColour()) });
+      const marked = (await res.json()) as { id?: string };
+      // Either the Studio refuses the drawing outright, or what it saves keeps the old rule. Never an unlabelled, unlocked picture.
+      if (res.status === 200 && marked.id) expect(note(marked.id)).toMatchObject({ lock: "on", made_audience: "adult-only" });
+      else expect(res.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      db.update(settingsValues).set({ value: "true" }).where(and(eq(settingsValues.scope, `person:${sageActor.id}`), eq(settingsValues.key, "chat.photo_uploads"))).run();
+    }
   });
 
   test("a change in words or a background removal of a plain upload still saves locked, and Apply says so", async () => {

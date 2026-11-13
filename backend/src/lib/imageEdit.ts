@@ -178,10 +178,11 @@ export interface SourcePicture {
 /**
  * Owner decision (Jesse, 2026-11-13): a feature that makes no content has no age gate, and these make none. A simple local pixel edit of a picture with no audience
  * label that the Adult lock does not cover (no lock item, for example an upload) is saved with that same state (no label, lock off), so it is visible to exactly who
- * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale) and any operation not listed here
- * locks as before (fail closed).
+ * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale), resize (it runs on the engine, not here)
+ * and any operation not listed here locks as before (fail closed). Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
+ * otherwise it would be a way around that switch.
  */
-const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "resize", "markup"]);
+const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "markup"]);
 
 /** A picture addressed by its Library file id rather than by a chat: the "conversation" of a Library source (IMG-OPS-02). Such an edit is owner-only and its result is a new Library picture. */
 export const LIBRARY_SOURCE = "library";
@@ -326,7 +327,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
   // A simple local edit (no new content) of a picture with no audience label that the Adult lock does not cover (an upload, or an earlier such edit) carries the
   // source's own state: no audience label and lock off, so exactly the people who can see the source see the result. Nothing is raised or lowered. Everything else,
   // and any result the caller marks adult-only, goes through newItemMark as before.
-  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
+  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
   const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
   const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, ...(carries ? { lock: "off" as const } : markFields(mark)), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
@@ -402,7 +403,7 @@ export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; p
  * dark pictures and shifted a well exposed one.
  */
 async function autoTone(pipeline: ReturnType<typeof sharp>, bytes: Uint8Array): Promise<ReturnType<typeof sharp>> {
-  const { data } = await sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" }).rotate().resize(256, 256, { fit: "inside", withoutEnlargement: true }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { data } = await sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" }).rotate().resize(256, 256, { fit: "inside", withoutEnlargement: true }).removeAlpha().greyscale().raw().toBuffer({ resolveWithObject: true });
   const histogram = new Array<number>(256).fill(0);
   for (const value of data) histogram[value]!++;
   const percentile = (fraction: number): number => { let seen = 0; for (let v = 0; v < 256; v++) { seen += histogram[v]!; if (seen >= fraction * data.length) return v; } return 255; };
