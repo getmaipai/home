@@ -12,7 +12,7 @@ export const VOICE_TRACE_EVENTS = [
   // the hub's listening events
   "vad_on", "vad_resumed", "vad_off", "reply_pause", "reply_resume", "partial", "edge", "final", "timing", "no_speech",
   // decisions
-  "echo_partial", "echo_final", "pause", "resume", "interrupt", "reaction", "speculate", "speculate_refused", "speculate_failed", "confirm", "discard", "clip_play", "clip_end", "window_decide", "turn_send",
+  "echo_partial", "echo_final", "pause", "pause_resolved", "resume", "interrupt", "reaction", "speculate", "speculate_refused", "speculate_failed", "confirm", "discard", "clip_play", "clip_end", "window_decide", "turn_send",
   // the reply's audio
   "audio_start", "audio_stop", "audio_suspend", "audio_resume", "audio_ended",
 ] as const;

@@ -245,6 +245,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const playAckClip = (conversationId: string, text: string, end: { level: "none" | "gentle" | "natural" } | undefined) => {
     const control = talkOverRef.current; const pool = ackPoolRef.current;
     if (!control || !pool || overlapRef.current || clipPlayedThisUtteranceRef.current || !end || !control.shouldPlay(conversationId, end.level)) return;
+    // No acknowledgement while the reply is paused or was just cut in on: the person is already talking over her, not finishing a question.
+    if (overlapPausedRef.current || Date.now() - lastInterruptAtRef.current < 1000) return;
     // The edge is stable by the hub's rule (0.2 s of silence with no voice in between before it is marked), so this is the one clip.
     const clip = pool.play(performance.now());
     if (!clip) return;
@@ -319,7 +321,30 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const restoreVoice = () => {
     if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
     duckTimerRef.current = null;
+    clearPauseDeadline();
+    trace("resume", { played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
     turnSchedulerRef.current?.resume();
+  };
+  /** PAUSE-EXIT-01: the pause's one exit when no final came in time. */
+  const resolvePauseByDeadline = () => {
+    pauseDeadlineRef.current = null;
+    if (!overlapPausedRef.current) return;
+    if (overlapTranscriptRef.current) {
+      // Real words since the pause: a cut-in. The reply stops for good; the final, when it lands, is the next turn.
+      trace("pause_resolved", { reason: "deadline_interrupt", played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
+      duplexCounters.interruptions++;
+      interrupt("voice");
+    } else {
+      trace("pause_resolved", { reason: "deadline_resume" });
+      restoreVoice();
+      overlapPausedRef.current = false;
+    }
+  };
+  const pauseWithDeadline = () => {
+    turnSchedulerRef.current?.pause();
+    overlapPausedRef.current = true;
+    clearPauseDeadline();
+    pauseDeadlineRef.current = setTimeout(resolvePauseByDeadline, PAUSE_DEADLINE_MS);
   };
   const cancelReaction = () => {
     reactionEpochRef.current += 1;
@@ -344,6 +369,18 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // ECHO-GATE-01 (Jesse uses laptop speakers): while Home plays, only microphone frames clearly louder than her own echo reach the hub.
   const echoGateRef = useRef<EchoGate | null>(null);
   if (!echoGateRef.current) echoGateRef.current = createGate();
+  // A blocked frame is replaced by silence of the same length, never dropped: the hub's silence timer, edge marking and final run on
+  // the frames it receives, and a gap with no frames left an utterance open for 25 s on the live hub (2026-11-13: the reply stayed
+  // paused with no final to resolve it).
+  const silentFrames = new Map<number, Float32Array>();
+  const silentFrame = (length: number) => { let frame = silentFrames.get(length); if (!frame) { frame = new Float32Array(length); silentFrames.set(length, frame); } return frame; };
+  // PAUSE-EXIT-01: a pause always has a deadline. Within this long of the pause the final normally arrives and decides; if it has not,
+  // real words since the pause mean a cut-in (the reply stops for good, the words become the next turn when the final lands) and
+  // anything else means noise (the reply resumes from where it paused). Never a pause with no timer.
+  const PAUSE_DEADLINE_MS = 1500;
+  const pauseDeadlineRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInterruptAtRef = useRef(0);
+  const clearPauseDeadline = () => { if (pauseDeadlineRef.current) clearTimeout(pauseDeadlineRef.current); pauseDeadlineRef.current = null; };
   // ECHO-GUARD-01: Home's own reply, heard back through the microphone, must not pause or stop her, start a held run, or become a turn.
   // Seen in a traced run (2026-11-12): 372 ms into a reply the hub heard the reply itself, a two-word partial of Home's words paused her
   // (the "blip"), the echo's final cancelled the turn and went out as the next question, and the next reply did the same.
@@ -399,6 +436,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     return out;
   };
   const interrupt = (_reason: "voice" | "tap") => {
+    clearPauseDeadline();
+    lastInterruptAtRef.current = Date.now();
     if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
     if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
     overlapPauseTimerRef.current = null;
@@ -514,7 +553,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               onFrame: (frame) => {
                 if (mutedRef.current) return;
                 // ECHO-GATE-01: while she plays, her own echo is dropped here; a voice well above it passes (a cut-in).
-                if (echoGateRef.current?.pass(frame, isReplySpeaking()) !== false) socket.sendAudio(frame);
+                socket.sendAudio(echoGateRef.current?.pass(frame, isReplySpeaking()) !== false ? frame : silentFrame(frame.length));
               },
               onSource: (context, source) => {
                 levelMeter?.stop();
@@ -548,6 +587,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // The sound was not speech: carry on from the same spot.
             trace("reply_resume", { paused: overlapPausedRef.current });
             if (overlapPausedRef.current) {
+              trace("pause_resolved", { reason: "hub_resume" });
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
               overlapPauseTimerRef.current = null;
               restoreVoice();
@@ -589,9 +629,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 // Two real words are speech, not noise: pause now rather than wait out the confirm window.
                 if (heard.split(" ").length >= 2) {
                   if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
-                  trace("pause", { words: heard.split(" ").length });
-                  turnSchedulerRef.current?.pause();
-                  overlapPausedRef.current = true;
+                  if (!overlapPausedRef.current) { trace("pause", { words: heard.split(" ").length }); pauseWithDeadline(); }
                 }
               }
             }
@@ -672,6 +710,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (normalized && isOwnVoice(text)) {
               echoCounters.dropped++; echoDropsRef.current += 1;
               trace("echo_final", { words: normalized.split(" ").length });
+              if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_echo" });
               traceRef.current?.endUtterance();
               closeOverlap(null, performance.now(), null);
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
@@ -692,6 +731,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (!normalized || isReaction(normalized, text)) {
                 // Only noise or a bare reaction: carry on speaking.
                 trace("reaction", { words: normalized ? normalized.split(" ").length : 0, paused: overlapPausedRef.current });
+                if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_reaction" });
                 if (normalized) duplexCounters.reactionResumes++;
                 if (overlapPausedRef.current) restoreVoice();
                 overlapPausedRef.current = false;
@@ -699,6 +739,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               }
               overlapTranscriptRef.current = true;
               duplexCounters.interruptions++;
+              if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_interrupt" });
               trace("interrupt", { words: normalized.split(" ").length, played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
               interrupt("voice");
             } else if (voiceBargeIn && modeRef.current === "thinking" && !mutedRef.current) {
@@ -863,7 +904,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // guarantee VOICE-01's future barge-in will build on.
   useEffect(() => {
     liveVoiceActiveRef.current = open;
-    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); closeOverlap(null, performance.now(), null); ackPoolRef.current?.stopAll(); ackRenderRef.current?.abort(); traceRef.current?.close(); traceRef.current = null; }
+    if (!open) { clearPauseDeadline(); turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); closeOverlap(null, performance.now(), null); ackPoolRef.current?.stopAll(); ackRenderRef.current?.abort(); traceRef.current?.close(); traceRef.current = null; }
     return () => {
       liveVoiceActiveRef.current = false;
     };

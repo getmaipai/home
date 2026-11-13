@@ -767,16 +767,72 @@ describe("live voice session", () => {
     // She is silent: room noise passes (and measures the floor).
     for (let i = 0; i < 10; i++) onFrame!(level(0.002));
     expect(sent).toHaveLength(10);
-    // She speaks: the echo calibrates for 1.5 s (75 frames), nothing passes; then the same echo keeps being dropped.
+    // She speaks: the echo calibrates for 1.5 s (75 frames), nothing of it passes; then the same echo keeps being replaced by silence.
     act(() => view.rerender(<GateHarness isSpeaking />));
     await waitFor(() => expect(view.getByText("speaking")).toBeTruthy());
     for (let i = 0; i < 120; i++) onFrame!(level(0.05));
     await new Promise((resolve) => setTimeout(resolve, 1600));
     for (let i = 0; i < 30; i++) onFrame!(level(0.05));
-    expect(sent).toHaveLength(10);
-    // The person talks over her, clearly louder than the echo: it reaches the hub.
+    // Blocked frames reach the hub as silence of the same length, never as a gap: its silence timer keeps running.
+    expect(sent).toHaveLength(10 + 120 + 30);
+    expect(sent.slice(10).every((frame) => frame.length === 320 && frame.every((sample) => sample === 0))).toBe(true);
+    // The person talks over her, clearly louder than the echo: it reaches the hub as itself.
     for (let i = 0; i < 10; i++) onFrame!(level(0.3));
-    expect(sent.length).toBeGreaterThan(10);
+    expect(sent.slice(-5).some((frame) => frame.some((sample) => sample !== 0))).toBe(true);
+  });
+
+  test("PAUSE-EXIT-01: the live sequence of 2026-11-13 (a pause with no final for 25 s) now resolves within 1.5 s: real words cut the reply for good, the turn is cancelled once, and the final becomes the next turn", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
+    const sent: string[] = [];
+    const timings: Array<{ phase?: string }> = [];
+    const props = (isSpeaking: boolean) => <Harness open onOpenChange={() => {}} isSpeaking={isSpeaking} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} onVoiceTiming={(timing) => timings.push(timing)} />;
+    const view = render(props(false));
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(props(true)));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 450)); // past the barge-in arm delay
+    // The trace: vad_on, reply_pause, a 3-word partial (pause), partials of 7 and 8 words, vad_resumed, an edge of 8 words... and no final.
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+    act(() => socket.send({ t: "reply_pause" }));
+    act(() => socket.send({ t: "partial", v: "wait can you" }));
+    expect(pause).toHaveBeenCalledTimes(1);
+    act(() => socket.send({ t: "partial", v: "wait can you tell me how long a" }));
+    act(() => socket.send({ t: "partial", v: "wait can you tell me how long a hard" }));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 220 } as never));
+    act(() => socket.send({ t: "partial", v: "wait can you tell me how long a hard boiled", edge: true, end: { score: 0.7, level: "natural", unfinished: false } } as never));
+    expect(stop).not.toHaveBeenCalled();
+    // Within 1.5 s of the pause, with no final: the deadline decides. Real words since the pause: the reply stops for good, once.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1700)); });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(resume).not.toHaveBeenCalled();
+    expect(view.getByText("Listening")).toBeTruthy();
+    // He finishes: the final is the next turn, sent once.
+    act(() => socket.send({ t: "timing", speech_end_to_final_ms: 750, silence_wait_ms: 750 }));
+    await act(async () => { socket.send({ t: "final", v: "wait can you tell me how long a hard boiled egg takes?" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await waitFor(() => expect(sent).toEqual(["wait can you tell me how long a hard boiled egg takes?"]));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    cancel.mockRestore();
+  });
+
+  test("PAUSE-EXIT-01: a pause whose words turn out to be noise resumes the same audio at the deadline; the hub's reply_resume resumes it sooner", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock();
+    const socket = controlledSocket();
+    const props = (isSpeaking: boolean) => <Harness open onOpenChange={() => {}} isSpeaking={isSpeaking} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />;
+    const view = render(props(false));
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(props(true)));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+    act(() => socket.send({ t: "partial", v: "wait what" }));
+    expect(pause).toHaveBeenCalledTimes(1);
+    act(() => socket.send({ t: "reply_resume" })); // the hub: the sound was not speech after all
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(stop).not.toHaveBeenCalled();
+    // A second pause with no further word and no final: the deadline resumes it (the words that paused her stand, so this one interrupts; a bare noise pause has no words).
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
