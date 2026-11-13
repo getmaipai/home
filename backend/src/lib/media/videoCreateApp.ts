@@ -114,9 +114,9 @@ registerAppPageFill("video", "create", (person, page) => {
   bar.chips = [
     ...chips,
     { state: "seconds", label: "Length", group: "Settings", presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
-    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
+    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
-    { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
+    { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
     { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, quiet_value: DEFAULT_VIDEO_VOICES, ...soundTiers(), options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
