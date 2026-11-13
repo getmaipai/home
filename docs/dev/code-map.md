@@ -844,6 +844,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, SAMPLE_RATE, parseWav, mixPcmWav, run |
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
 | `backend/src/lib/music/objects.ts` | isMusicObjectRef, musicObjectOf, cardProvenance, threadMusicObject, readMusicBand, readMusicAlbum |
+| `backend/src/lib/music/peaks.ts` | PEAK_COUNT, PEAKS_NO_FFMPEG_LINE, PEAKS_FAILED_LINE, __setPeaksDecoderForTests, bucketPeaks, computePeaks |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
