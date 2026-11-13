@@ -496,6 +496,15 @@ describe("the sheet stays with the video: Another take and an edit of the words"
     expect(getReferenceVideoRecipe(actor, again.job.id)!.sheetFileIds).toEqual(getReferenceVideoRecipe(actor, first.id)!.sheetFileIds);
     expect(getVideoJobFor(actor, again.job.id)!.state).toBe("done");
   });
+  test("Another take of an adult-only clip stays adult-only with the same lock (CREATOR-PORT-2026-11-13)", async () => {
+    const first = await finished(actor, await run(await chatWithPictures(actor, 1), { request: "the girl plays" }));
+    const { videoJobs } = await import("@/db/schema");
+    db.update(videoJobs).set({ files: "[]", request: JSON.stringify({ ...first.request, adultOnly: true, adultLock: "off" }) }).where(eq(videoJobs.id, first.id)).run();
+    const again = anotherReferenceTake(actor, getVideoJobFor(actor, first.id)!);
+    if (!again.ok) throw new Error(again.line);
+    expect(getVideoJobFor(actor, again.job.id)!.request).toMatchObject({ adultOnly: true, adultLock: "off" });
+    await until(() => ["done", "failed"].includes(getVideoJobFor(actor, again.job.id)?.state ?? ""));
+  });
   test("Another take while a video is being made says so", async () => {
     const first = await finished(actor, await run(await chatWithPictures(actor, 1), { request: "the girl plays" }));
     fake.pollsToFinish = 1000;

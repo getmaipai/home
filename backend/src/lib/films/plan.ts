@@ -36,6 +36,8 @@ const filmPlanShape = {
     locked: z.string().min(1).max(400),
     /** The person wants this kept hidden until the last shot (for example writing on a product). */
     reveal_last: z.boolean().optional(),
+    /** CREATOR-05: the saved subject of a member the person cast from the `@` list. Set by Home after the plan is made (`bindCastSubjects`), never by the model (its own plan shape has no such field). */
+    subject_id: z.string().min(1).max(80).optional(),
   })).max(6),
   shots: z.array(filmPlanShotSchema).min(2).max(12),
   music: z.string().min(1).max(300),
@@ -197,6 +199,19 @@ async function planFilmUnheld(input: PlanFilmInput, complete: PlannerCompleter):
   }
 }
 
+/** CREATOR-05: a plan entry whose name is that of a cast member the person picked (already checked by `resolveCast`) carries that member's subject id, so the run
+ *  uses the member itself and never looks a name up among the viewer's saved subjects. Any `subject_id` already on an entry is dropped first. Only the picked members' names count. */
+export function bindCastSubjects(plan: FilmPlan, cast: ReadonlyArray<{ id: string; name: string }>): FilmPlan {
+  const free = [...cast];
+  const bound = plan.cast.map((entry) => {
+    const { subject_id: _dropped, ...rest } = entry;
+    const at = free.findIndex((member) => member.name.trim().toLocaleLowerCase() === entry.name.trim().toLocaleLowerCase());
+    if (at < 0) return rest;
+    const [member] = free.splice(at, 1);
+    return { ...rest, subject_id: member!.id };
+  });
+  return { ...plan, cast: bound } as FilmPlan;
+}
 /** FILM-REAL-06: every picture the person supplied must reach a shot. The planner is asked to name each picture in a shot, and a model that writes its own
  *  description of the factory floor instead leaves the photo unused (the film then shows a drawn factory, not theirs). Enforced in code for any film: a supplied
  *  picture's cast entry that no shot names is put on the unclaimed shot whose text shares the most words with its look (the earliest on a tie). A hidden

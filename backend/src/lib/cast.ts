@@ -9,7 +9,7 @@ import { attachments, people } from "@/db/schema";
 import { ensureSubject, listSynths, synthById, synthFloor, type SynthRecord } from "@/lib/synths";
 import { ensurePersonSubject, isSheetReference, listMediaSubjects, loadSubjectReferences, subjectFacts, subjectRowForPerson, subjectViewById, type MediaSubject, type SubjectWithRefs } from "@/lib/mediaSubjects";
 import { householdLikenessAllowed, LIKENESS_OFF_LINE } from "@/lib/likeness";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { readCompanionPack } from "@/lib/companionPack";
 import type { PersonRow } from "@/types";
 
@@ -37,6 +37,14 @@ export interface ResolvedCast extends CastEntry { subject_id: string; subject: M
 export interface CastResult { members: ResolvedCast[]; refused: Array<{ ref: string; line: string; ambiguous?: boolean }> }
 
 const isMinorBand = (actor: PersonRow) => speakerAgeBand(actor, new Date()) !== "adult";
+/** Who is casting: the account and the turn's own band (speaker, surface, device). The strictest of the two decides, so an adult account on a turn a child
+ *  speaks (a robot, a satellite) casts like that child. `gate` is the actor the synth gate sees: the account, or the account at the turn's lower band. */
+interface CastViewer { actor: PersonRow; minor: boolean; turnOnly: boolean; gate: PersonRow }
+function viewerOf(actor: PersonRow, band?: AgeBand | null): CastViewer {
+  const accountMinor = isMinorBand(actor), turnMinor = !!band && band !== "adult";
+  const turnOnly = turnMinor && !accountMinor;
+  return { actor, minor: accountMinor || turnMinor, turnOnly, gate: turnOnly ? { ...actor, role: band as "child" | "teen" } : actor };
+}
 export const REAL_REFUSED_LINE = "Real-person subjects are not available for this profile yet. Ask a parent or admin if you need one.";
 
 function refFiles(subject: MediaSubject | null) {
@@ -79,12 +87,15 @@ function memberEntry(person: PersonRow): CastEntry {
 function householdPeople(): PersonRow[] { return db.select().from(people).where(and(isNull(people.deletedAt), eq(people.enabled, true))).all().filter((p) => p.role !== "guest" && !p.memorializedAt); }
 
 /** What this viewer may cast: synths (the synth gate, band filtering included), saved subjects, and household members (adults only, `generation.household_likeness` alone). */
-export function listCast(actor: PersonRow): CastEntry[] {
+export function listCast(actor: PersonRow, band?: AgeBand | null): CastEntry[] {
   if (actor.role === "guest") return [];
-  const minorViewer = isMinorBand(actor);
+  const viewer = viewerOf(actor, band), minorViewer = viewer.minor;
   const entries: CastEntry[] = [];
-  for (const synth of listSynths(actor)) {
+  for (const synth of listSynths(viewer.gate)) {
+    // An adult account on a minor's turn never reaches a likeness of a real person or a household member, whatever the account's own settings say.
+    if (viewer.turnOnly && (synth.based_on.kind === "real_person" || synth.based_on.kind === "household_member")) continue;
     const entry = synthEntry(synth);
+    if (viewer.turnOnly && entry.real) continue;
     if (synth.based_on.kind === "household_member" && synth.based_on.person_id !== actor.id && !householdLikenessAllowed()) continue; // rule 0: household_likeness alone
     entries.push(entry);
   }
@@ -97,23 +108,34 @@ export function listCast(actor: PersonRow): CastEntry[] {
   return minorViewer ? entries.filter((e) => e.audience !== "adult-only") : entries; // filtered, not labelled: an adult-only entry never reaches a minor
 }
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.trim().toLocaleLowerCase();
-function refusalFor(actor: PersonRow, ref: string): string {
+function refusalFor(viewer: CastViewer, ref: string): string {
+  const { actor } = viewer;
   const person = householdPeople().find((p) => p.id === ref || same(p.displayName, ref));
-  if (person && person.id !== actor.id) { if (isMinorBand(actor)) return REAL_REFUSED_LINE; if (!householdLikenessAllowed()) return LIKENESS_OFF_LINE; }
+  if (person && person.id !== actor.id) { if (viewer.minor) return REAL_REFUSED_LINE; if (!householdLikenessAllowed()) return LIKENESS_OFF_LINE; }
   return `"${ref}" is not in your cast list. Pick someone from the list and try again.`;
 }
-/** Ids or names to cast members, every one checked against what the viewer may cast. The first cast of a synth or a household member makes its subject. */
-export async function resolveCast(actor: PersonRow, refs: string[]): Promise<CastResult> {
-  const available = listCast(actor), members: ResolvedCast[] = [], refused: CastResult["refused"] = [], seen = new Set<string>();
+export interface CastContext { band?: AgeBand | null; temporary?: boolean }
+export const TEMPORARY_CAST_LINE = "A temporary chat does not save anything, so someone new cannot be added to the cast here. Ask in a normal chat, or pick someone already saved.";
+/** Ids or names to cast members, every one checked against what the viewer may cast (the turn's band counts, see `viewerOf`). The first cast of a synth or a
+ *  household member makes its subject, but only after every ref has passed every gate: a refused call, and a temporary chat, write no row. */
+export async function resolveCast(actor: PersonRow, refs: string[], context: CastContext = {}): Promise<CastResult> {
+  const viewer = viewerOf(actor, context.band);
+  const available = listCast(actor, context.band), refused: CastResult["refused"] = [], seen = new Set<string>(), hits: CastEntry[] = [];
   for (const ref of refs) {
     const byId = available.find((e) => e.id === ref || e.subject_id === ref || e.synth_id === ref || e.person_id === ref);
     const named = byId ? [] : available.filter((e) => same(e.name, ref));
     if (named.length > 1) { refused.push({ ref, ambiguous: true, line: `More than one cast member is called "${ref}". Pick the one you mean from the cast list.` }); continue; }
     const hit = byId ?? named[0];
-    if (!hit) { refused.push({ ref, line: refusalFor(actor, ref) }); continue; }
+    if (!hit) { refused.push({ ref, line: refusalFor(viewer, ref) }); continue; }
     if (seen.has(hit.id)) continue;
-    if (members.length >= MAX_CAST) { refused.push({ ref, line: `A cast can have at most ${MAX_CAST} members. Remove one and try again.` }); continue; }
+    if (hits.length >= MAX_CAST) { refused.push({ ref, line: `A cast can have at most ${MAX_CAST} members. Remove one and try again.` }); continue; }
+    if (context.temporary === true && (hit.synth_id || hit.person_id) && !hit.subject_id) { refused.push({ ref, line: TEMPORARY_CAST_LINE }); continue; }
     seen.add(hit.id);
+    hits.push(hit);
+  }
+  if (refused.length) return { members: [], refused }; // nothing is set up for a call that is refused
+  const members: ResolvedCast[] = [];
+  for (const hit of hits) {
     try {
       let synth: SynthRecord | null = null, subjectId = hit.subject_id;
       if (hit.synth_id) { synth = synthById(hit.synth_id); if (!synth) throw new Error("gone"); subjectId = await ensureSubject(synth); synth = synthById(hit.synth_id); }
@@ -121,7 +143,7 @@ export async function resolveCast(actor: PersonRow, refs: string[]): Promise<Cas
       const subject = subjectViewById(subjectId!); if (!subject) throw new Error("gone");
       const fresh = synth ? synthEntry(synth!) : hit.person_id ? memberEntry(householdPeople().find((p) => p.id === hit.person_id)!) : subjectEntry(subject);
       members.push({ ...fresh, subject_id: subject.id, subject, synth });
-    } catch { refused.push({ ref, line: `${hit.name} could not be set up as cast. Try again in a moment.` }); }
+    } catch { refused.push({ ref: hit.id, line: `${hit.name} could not be set up as cast. Try again in a moment.` }); }
   }
   return { members, refused };
 }
@@ -136,14 +158,14 @@ export function castRefsOf(args: Record<string, unknown>): string[] | null {
   if (!Array.isArray(args.cast)) return null;
   return args.cast.map((entry) => (typeof entry === "string" ? entry.trim() : ""));
 }
-export async function castForTool(actor: PersonRow, args: Record<string, unknown>): Promise<CastForTool> {
+export async function castForTool(actor: PersonRow, args: Record<string, unknown>, context: CastContext = {}): Promise<CastForTool> {
   const refs = castRefsOf(args);
   if (refs === null) return { ok: false, line: NOT_IN_LIST("cast") };
   if (!refs.length) return { ok: true, members: [], subjects: [] };
   if (refs.length > MAX_CAST) return { ok: false, line: `A cast can have at most ${MAX_CAST} members. Remove one and try again.` };
   const bad = refs.find((ref) => !ref || ref.length > 120);
   if (bad !== undefined) return { ok: false, line: NOT_IN_LIST(bad || "that") };
-  const result = await resolveCast(actor, refs);
+  const result = await resolveCast(actor, refs, context);
   if (result.refused.length) return { ok: false, line: result.refused[0]!.line };
   // The member's locked sentence is its look wherever a saved subject's look is used today.
   const loaded = loadSubjectReferences(actor, result.members.map((member) => ({ ...member.subject, look: member.locked_description?.trim() || member.subject.look })));
@@ -155,16 +177,28 @@ export function mergeSubjects(named: SubjectWithRefs[], cast: SubjectWithRefs[])
   const seen = new Set(named.map((entry) => entry.subject.id));
   return [...named, ...cast.filter((entry) => !seen.has(entry.subject.id))];
 }
-/** The cast the composer sent as structured `@` mentions (type "cast"), kept only where the viewer may cast them (never trusted as sent). */
-export function castMentionIds(actor: PersonRow, mentions: unknown): string[] {
-  if (!Array.isArray(mentions)) return [];
-  const allowed = new Set(listCast(actor).map((entry) => entry.id));
-  const out: string[] = [];
+/** Where a turn's `@` mentions may be used: a written chat turn of the person's own, never spoken, robot, satellite or shared screens, never a temporary chat. */
+export interface MentionContext extends CastContext { surface?: string; spoken?: boolean; written?: boolean }
+export function mentionsAllowed(context: MentionContext): boolean {
+  return context.surface === "chat" && context.spoken !== true && context.temporary !== true && context.written !== false;
+}
+/** Picked cast ids kept only where mentions are allowed and the viewer (the turn's band counts) may cast them. */
+export function keepCastIds(actor: PersonRow, ids: readonly string[], context: MentionContext): string[] {
+  if (!mentionsAllowed(context)) return [];
+  const allowed = new Set(listCast(actor, context.band).map((entry) => entry.id));
+  return ids.filter((id, at) => allowed.has(id) && ids.indexOf(id) === at).slice(0, MAX_CAST);
+}
+/** The cast the composer sent as structured `@` mentions (type "cast"), kept only where the viewer may cast them (never trusted as sent) and only on a written chat turn. */
+export function castMentionIds(actor: PersonRow, mentions: unknown, context: MentionContext = { surface: "chat" }): string[] {
+  if (!Array.isArray(mentions) || !mentionsAllowed(context)) return [];
+  const ids: string[] = [];
   for (const item of mentions.slice(0, 12)) {
     const mention = item as { id?: unknown; type?: unknown } | null;
-    if (!mention || mention.type !== "cast" || typeof mention.id !== "string" || !allowed.has(mention.id) || out.includes(mention.id)) continue;
-    out.push(mention.id);
-    if (out.length >= MAX_CAST) break;
+    if (mention && mention.type === "cast" && typeof mention.id === "string") ids.push(mention.id);
   }
-  return out;
+  return keepCastIds(actor, ids, context);
+}
+/** Whether any resolved member is adult-only: by its own entry (a synth's floor, its files) or by a reference file's mark. */
+export function castIsAdultOnly(chosen: { members: ReadonlyArray<{ audience: string }>; subjects: ReadonlyArray<{ references: ReadonlyArray<{ audience: string }>; sheet?: { audience: string } | null }> }): boolean {
+  return chosen.members.some((member) => member.audience === "adult-only") || chosen.subjects.some(({ references, sheet }) => [...references, ...(sheet ? [sheet] : [])].some((file) => file.audience === "adult-only"));
 }

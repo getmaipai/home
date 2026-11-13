@@ -638,6 +638,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // reuses these exact inputs rather than re-resolving persona/signal
   // a second time.
   const surfaceClass = surfaceClassOf(surface, opts.spoken === true);
+  // CREATOR-05: `@` cast mentions count only on a written chat turn of the person's own (not spoken, robot, satellite or shared screens, not a temporary chat), at the turn's band.
+  const castMentionsKept = opts.castMentions?.length ? (await import("@/lib/cast")).keepCastIds(actor, opts.castMentions, { surface, spoken: opts.spoken === true, temporary, band, written: surfaceClass === "written" && !conversation.device_id }) : [];
   const planBasis = {
     signal,
     surface,
@@ -743,7 +745,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     engineUnavailable: false,
     context: [],
     ...pageContextForTurn(conversation, surface, opts.pageContext),
-    ...(opts.castMentions?.length && !temporary ? { castMentions: opts.castMentions } : {}),
+    ...(castMentionsKept.length ? { castMentions: castMentionsKept } : {}),
     messages: [],
     proposals: [],
     outcomes: [],

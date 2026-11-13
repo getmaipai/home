@@ -9,7 +9,7 @@ export class FilmStepError extends Error {
   get line(): string { return this.message; }
 }
 export interface FilmEngines {
-  ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string }, options: { signal: AbortSignal }): Promise<string>;
+  ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string; /** A cast member the person picked: its subject, used as it is. */ subjectId?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
   /** FILM-REAL-05: how far a finished clip drifted from its starting picture (measure only; null when it cannot be measured). */
@@ -90,7 +90,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     if (role?.subject_id) subjectIds.push(role.subject_id);
     else {
       const member = plan.cast[i]!;
-      const id = await callEngine("cast", undefined, engines, signal, () => engines.ensureSubject({ name: member.name, kind: member.kind, locked: member.locked }, { signal }));
+      const id = await callEngine("cast", undefined, engines, signal, () => engines.ensureSubject({ name: member.name, kind: member.kind, locked: member.locked, ...(member.subject_id ? { subjectId: member.subject_id } : {}) }, { signal }));
       subjectIds.push(id);
       current = storeCast(actor, productionId, plan, [...current.cast.map((entry) => entry.subject_id), id]);
       subjectIds.splice(0, subjectIds.length, ...current.cast.map((entry) => entry.subject_id));

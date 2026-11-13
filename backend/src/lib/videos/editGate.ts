@@ -56,7 +56,7 @@ export function clipFileOf(actor: PersonRow, job: VideoJob): EditFile | null {
 
 /** ADULT-LOCK-06: the flags a source clip carries right now (design 3.10): from its Library file when it has one (so a lock the creator cleared since the job
  * ran counts as cleared), else from what the job was marked at its start. A saved clip whose note does not say all-ages counts as adult-only with the lock on. */
-export async function clipMarkOf(job: VideoJob): Promise<MarkSource> {
+export function clipMarkNow(job: VideoJob): MarkSource | null {
   const file = job.files[0];
   if (file && !job.temporary) {
     const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
@@ -66,6 +66,11 @@ export async function clipMarkOf(job: VideoJob): Promise<MarkSource> {
     return { madeAudience: "all-ages", lock: "off" };
   }
   if (job.request.adultOnly === true) return { madeAudience: "adult-only", lock: job.request.adultLock ?? "on" };
+  return null;
+}
+export async function clipMarkOf(job: VideoJob): Promise<MarkSource> {
+  const now = clipMarkNow(job);
+  if (now) return now;
   if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => getLoraRecord(id)?.audience)) return { madeAudience: "adult-only", lock: "off" };
   return { madeAudience: "all-ages", lock: "off" };
 }

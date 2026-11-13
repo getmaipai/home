@@ -6,6 +6,7 @@ import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { startFilm } from "./background";
 import { checkTrack } from "@/lib/videos/editGate";
 import { prepareFilmPictures } from "./pictures";
+import { turnAgeBand } from "@/lib/turnMachine/speaker";
 
 export const MAKE_FILM_TOOL_ID = "make_film";
 export const makeFilmArgs = z.object({
@@ -27,7 +28,7 @@ export const makeFilmArgs = z.object({
   faceless: z.boolean().optional().default(false),
 });
 
-type FilmState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary"> & Partial<Pick<TurnState, "conversationId">>;
+type FilmState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary"> & Partial<Pick<TurnState, "conversationId" | "speakerEvidence" | "deviceId" | "ephemeral">>;
 type Starter = typeof startFilm;
 let starter: Starter = startFilm;
 export function __setStartFilmForTests(fn: Starter | null): void { starter = fn ?? startFilm; }
@@ -45,10 +46,11 @@ export async function runMakeFilmTurn(input: { state: FilmState & Partial<Pick<T
   // CREATOR-05: cast ids are resolved first; a refused member starts nothing. A resolved member reaches the planner as a hint in the picture-hint form, so the
   // plan names it exactly and the run finds its saved subject by that name (its look and sheet are then used, and the film's record lists it).
   const { castForTool } = await import("@/lib/cast");
-  const castChosen = await castForTool(input.state.actor as PersonRow, input.args);
+  const band = turnAgeBand(input.state.surface, input.state.actor, input.state.speakerEvidence, new Date(), input.state.deviceId);
+  const castChosen = await castForTool(input.state.actor as PersonRow, input.args, { band, temporary: input.state.temporary === true || input.state.ephemeral === true });
   if (!castChosen.ok) return refused(input.callId, input.args, castChosen.line, "cast");
   const castHints = castChosen.subjects.map(({ subject }) => `${subject.name} (cast member; ${subject.real || castChosen.members.find((m) => m.subject_id === subject.id)?.look.medium === "photo" ? "photograph" : "illustration"}): ${subject.look}`.slice(0, 700));
-  const withCast = { ...input, args: { ...input.args, cast_hints: castHints.length ? castHints : undefined } };
+  const withCast = { ...input, castSubjectIds: castChosen.subjects.map(({ subject }) => subject.id), args: { ...input.args, cast_hints: castHints.length ? castHints : undefined } };
   const images = input.state.images ?? [];
   if (!images.length) return runMakeFilm(withCast);
   // The model often fills `characters` with the pictures' file names; those say nothing, so attached pictures are always read, and only names that are
@@ -60,7 +62,7 @@ export async function runMakeFilmTurn(input: { state: FilmState & Partial<Pick<T
 }
 const FILE_NAME = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp|tiff?)$/i;
 
-export function runMakeFilm(input: { state: FilmState; args: Record<string, unknown>; callId: string; spoken: boolean }): ToolExecutionOutcome {
+export function runMakeFilm(input: { state: FilmState; args: Record<string, unknown>; callId: string; spoken: boolean; /** Home's own list of the cast members already checked; never from the model. */ castSubjectIds?: string[] }): ToolExecutionOutcome {
   const { state, args, callId } = input;
   const parsed = makeFilmArgs.safeParse(args);
   if (!parsed.success) return failed(callId, args);
@@ -76,7 +78,7 @@ export function runMakeFilm(input: { state: FilmState; args: Record<string, unkn
     if (!checked.found.fileId || state.temporary === true) return refused(callId, args, "I can't find that song. A film can only use one of your saved songs.", "no_track");
     musicFileId = checked.found.fileId;
   }
-  const result = starter({ actor: actor as PersonRow, idea, musicFileId, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castHints: [...(parsed.data.cast_hints ?? []), ...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: parsed.data.stills_first === true });
+  const result = starter({ actor: actor as PersonRow, idea, musicFileId, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castSubjectIds: input.castSubjectIds, castHints: [...(parsed.data.cast_hints ?? []), ...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: parsed.data.stills_first === true });
   if ("line" in result) return refused(callId, args, result.line, "not_started");
   const awaitingGo = parsed.data.go_ahead !== true;
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,

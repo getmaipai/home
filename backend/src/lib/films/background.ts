@@ -2,7 +2,8 @@ import type { PersonRow } from "@/types";
 import { recordFilmCreation, safely } from "@/lib/creations/writers";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { createMediaProduction } from "@/lib/mediaProductions";
-import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
+import { bindCastSubjects, planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
+import { subjectViewById } from "@/lib/mediaSubjects";
 import { changeFilmMusic, realFilmEngines, redoFilmShot, resumeFilm } from "./engines";
 import { FilmStepError, runFilm, type FilmEngines, type FilmStage } from "./run";
 import { createFilmRun, failInterruptedFilmRuns, getFilmRun, listFilmRunsInStates, updateFilmRun, type FilmRun } from "./store";
@@ -24,7 +25,7 @@ function onProgress(actor: PersonRow, id: string) { return (p: {stage:FilmStage;
 }; }
 /** MP-06: a song the person chose as the film's music (file id), by run; it becomes the production's first music line so the film does not make its own. */
 const ownMusic=new Map<string,string>();
-function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music" | "stills", shotId?: string, planInput?: PlanFilmInput): Promise<void> {
+function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music" | "stills", shotId?: string, planInput?: PlanFilmInput, castSubjectIds?: string[]): Promise<void> {
   const controller=new AbortController(); active.set(run.id,controller);
   return (async()=>{
     try {
@@ -35,6 +36,8 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
         if(controller.signal.aborted) return;
         if(!planned.ok){updateFilmRun(actor,run.id,{state:"failed",error_line:planned.line});return;}
         plan=planned.plan;
+        // CREATOR-05: the members the person cast carry their subject into the run (by the ids `resolveCast` checked, not by name).
+        if(castSubjectIds?.length) plan=bindCastSubjects(plan,castSubjectIds.flatMap(id=>{const subject=subjectViewById(id); return subject?[{id,name:subject.name}]:[];}));
         const ownSong=ownMusic.get(run.id);
         const production=createMediaProduction(actor,{title:plan.title,summary:plan.summary,...(ownSong?{music_line_ids:[ownSong]}:{})},"film");
         updateFilmRun(actor,run.id,{plan,faceless:planInput?.faceless ?? current.faceless,production_id:production.id,total_steps:total(plan,planInput?.faceless ?? current.faceless),stage:"Plan",done_steps:1});
@@ -82,14 +85,14 @@ export function startPlannedFilm(input: {actor:PersonRow;idea:string;plan:FilmPl
   return {id:run.id,done};
 }
 export type StartFilmResult = {id:string} | {line:string};
-export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean;stillsFirst?:boolean;musicFileId?:string}): StartFilmResult {
+export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];castSubjectIds?:string[];faceless?:boolean;goAhead:boolean;stillsFirst?:boolean;musicFileId?:string}): StartFilmResult {
   const {actor}=input;
   if(!allowed(actor)) return {line:"Making a film is for adults on their own written screen."};
   if(listFilmRunsInStates(["planning","running"]).some((r)=>r.person_id===actor.id)) return {line:"A film is already running. Wait for it to finish or cancel it first."};
   const run=createFilmRun(actor,{idea:input.idea,goAhead:input.goAhead,faceless:input.faceless});
   if(input.stillsFirst) previewFirst.add(run.id);
   if(input.musicFileId) ownMusic.set(run.id,input.musicFileId);
-  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,targetSeconds:input.seconds,look:input.look,castHints:input.castHints,faceless:input.faceless}); return {id:run.id};
+  launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,targetSeconds:input.seconds,look:input.look,castHints:input.castHints,faceless:input.faceless},input.castSubjectIds); return {id:run.id};
 }
 function ownedAdult(actor:PersonRow,id:string): FilmRun | null { if(!allowed(actor)) return null; return getFilmRun(actor,id); }
 export function getFilmProgress(actor:PersonRow,id:string): FilmRun | null { return ownedAdult(actor,id); }

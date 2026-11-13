@@ -142,8 +142,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
   const namedSubjects = subjectsForNames(state.actor as PersonRow, chosenSubjects);
   // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast; a refused member starts nothing and says why in one plain line.
-  const { castForTool, mergeSubjects } = await import("@/lib/cast"); // loaded here: cast.ts reaches the synth store, which must not load before the persona catalog
-  const castChosen = await castForTool(state.actor as PersonRow, args);
+  const { castForTool, mergeSubjects, castIsAdultOnly } = await import("@/lib/cast"); // loaded here: cast.ts reaches the synth store, which must not load before the persona catalog
+  const castChosen = await castForTool(state.actor as PersonRow, args, { band: audience.band, temporary: state.temporary === true || state.ephemeral === true });
   if (!castChosen.ok) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${castChosen.line}` }, data: { refused: "cast" }, actions: [] } });
   const resolvedSubjects = namedSubjects && mergeSubjects(namedSubjects, castChosen.subjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
@@ -211,7 +211,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
     .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
     .slice(0, Math.max(1, 1 + (engine.edit?.references ?? 0)));
-  const strictAudience = subjectRefs.some((ref) => ref.audience === "adult-only") ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
+  const strictAudience = subjectRefs.some((ref) => ref.audience === "adult-only") || castIsAdultOnly(castChosen) ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
   const second = refusePrompt(`${subjectPrompt} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   if (plan && !plan.ok) return refused(callId, args, { kind: "plan", why: "style_plan", line: plan.line });

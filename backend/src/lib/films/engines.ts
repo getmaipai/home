@@ -83,7 +83,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
   const state = { actor, surface: "chat", planBasis: { surfaceClass: "written" }, conversationId: null, turnId: null, temporary: false, ephemeral: false } as never;
   const engines: FilmEngines = {
     async waitForIdle() {},
-    async ensureSubject({ name, kind, locked }) {
+    async ensureSubject({ name, kind, locked, subjectId }) {
+      // CREATOR-05: a member cast from the `@` list is its own subject (already checked when it was picked): never found by name, never made blank.
+      if (subjectId) {
+        if (!subjectViewById(subjectId)) throw new Error("A cast member for this film is no longer available.");
+        return subjectId;
+      }
       const found = listMediaSubjects(actor).find((subject) => subject.name === name) ?? listMediaSubjects(actor).find((subject) => subject.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase());
       if (found) return found.id;
       const subject = createMediaSubject(actor, { name, kind, look: locked, referenceIds: [] }, "film");

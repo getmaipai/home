@@ -184,7 +184,7 @@ describe("the `@` mentions the composer sends", () => {
 
 describe("picked mentions reach a media tool call", () => {
   test("a call that names no cast gets the picked ones; a call that names cast, or another tool, is left alone", () => {
-    expect(withMentionedCast("generate_image", { prompt: "x" }, ["a", "b"])).toEqual({ prompt: "x", cast: ["a", "b"] });
+    expect(withMentionedCast<Record<string, unknown>>("generate_image", { prompt: "x" }, ["a", "b"])).toEqual({ prompt: "x", cast: ["a", "b"] });
     for (const tool of ["generate_video", "make_film", "make_reference_video"]) expect(withMentionedCast(tool, {}, ["a"])).toEqual({ cast: ["a"] });
     expect(withMentionedCast("generate_image", { cast: ["z"] }, ["a"])).toEqual({ cast: ["z"] });
     expect(withMentionedCast("generate_image", { cast: [] }, ["a"])).toEqual({ cast: [] });

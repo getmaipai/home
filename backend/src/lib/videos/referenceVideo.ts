@@ -10,6 +10,7 @@ import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
 import { loadSource } from "@/lib/imageEdit";
+import { clipMarkNow } from "./editGate";
 import { completeBackground } from "@/lib/llm";
 import { readPictureRoles, type PictureReading, type PictureRole } from "@/lib/pictures/roles";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
@@ -416,11 +417,13 @@ export function __setFirstPictureMakerForTests(fn: FirstPictureMaker | null): vo
 
 /** Starts the one clip job for a recipe. The synthetic source carries only what an edit job copies (the words, size, seed); the recipe rides on the job's request. */
 function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRecipe, from: string): { ok: true; job: VideoJob } | { ok: false; line: string } {
+  // The earlier clip's adult-only mark and lock carry over (never lowered): a new take of an adult-only clip is adult-only with the same lock.
+  const earlier = getVideoJobFor(actor, from), mark = earlier ? clipMarkNow(earlier) : null, adultOnly = mark?.madeAudience === "adult-only";
   const bytes = loadSheetFiles(actor, recipe.sheetFileIds);
   if (!bytes) return { ok: false, line: REFERENCE_NO_SHEET_LINE };
   const source = sourceFor(actor, context, from, recipe.prompt, recipe.seconds, recipe.seed);
   const firstFrame = recipe.route === "first_frame";
-  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: firstFrame ? runFirstFrameClip(bytes[0]!, recipe, actor) : runIngredients(bytes, recipe, actor), phase: firstFrame ? FIRST_FRAME_PHASE : REFERENCE_PHASE, adultOnly: false,
+  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: firstFrame ? runFirstFrameClip(bytes[0]!, recipe, actor) : runIngredients(bytes, recipe, actor), phase: firstFrame ? FIRST_FRAME_PHASE : REFERENCE_PHASE, adultOnly, ...(adultOnly ? { adultLock: mark!.lock } : {}),
     request: { reference: recipe, quality: "detailed", ...(firstFrame ? {} : { tier: "max" as const }), refProgress: startProgress(2, firstFrame ? "first_frame" : undefined), ...(getVideoJobFor(actor, from)?.request.subject_ids?.length ? { subject_ids: getVideoJobFor(actor, from)!.request.subject_ids } : {}) } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
@@ -485,12 +488,12 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   const engine = await videoEngineStatus();
   const context: Context = { conversationId: state.conversationId, turnId: state.turnId };
   // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast. Each member's picture joins the attached ones as one more reference; its id is kept on the job for the credits.
-  const { castForTool } = await import("@/lib/cast");
-  const castChosen = await castForTool(actor, args);
+  const { castForTool, castIsAdultOnly } = await import("@/lib/cast");
+  const castChosen = await castForTool(actor, args, { band: audience.band, temporary: false });
   if (!castChosen.ok) return refuse(castChosen.line, "cast");
   const castPictures: LoadedPicture[] = castChosen.subjects.flatMap(({ subject, references, sheet }) => { const picture = references[0] ?? sheet; return picture ? [{ id: picture.id, bytes: picture.bytes, mediaType: picture.mediaType }] : []; });
   const castSubjectIds = castChosen.subjects.map(({ subject }) => subject.id);
-  const castAdultOnly = castChosen.subjects.some(({ references, sheet }) => [...references, ...(sheet ? [sheet] : [])].some((file) => file.audience === "adult-only"));
+  const castAdultOnly = castIsAdultOnly(castChosen);
   const castRequest = castSubjectIds.length ? { subject_ids: castSubjectIds } : {};
 
   // Same sheet, new words (or a new take): no cut-outs, no drawn views.

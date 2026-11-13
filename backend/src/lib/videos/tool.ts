@@ -142,9 +142,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const names = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
   const namedSubjects = subjectsForNames(state.actor as PersonRow, names);
   // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast; a refused member starts nothing and says why in one plain line.
-  const { castForTool, mergeSubjects } = await import("@/lib/cast"); // loaded here: cast.ts reaches the synth store, which must not load before the persona catalog
-  const castChosen = await castForTool(state.actor as PersonRow, args);
+  const { castForTool, mergeSubjects, castIsAdultOnly } = await import("@/lib/cast");
+  const castChosen = await castForTool(state.actor as PersonRow, args, { band: audience.band, temporary: state.temporary === true || state.ephemeral === true });
   if (!castChosen.ok) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${castChosen.line}` }, data: { refused: "cast" }, actions: [] } });
+  const castAdult = castIsAdultOnly(castChosen); // the adult-only mark comes from the cast entry too, not only from its files
   const resolvedSubjects = namedSubjects && mergeSubjects(namedSubjects, castChosen.subjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
   const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), prompt].filter(Boolean).join(". ");
@@ -305,7 +306,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       ...(resolvedSubjects.length ? { subjectIds: resolvedSubjects.map(({ subject }) => subject.id) } : {}),
       ...(productionId && shotId ? { productionId, shotId } : {}),
       endFileId,
-      ...(endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
+      ...(endAudience === "adult-only" || castAdult || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),
       ...(input.adultOnly ? { adultOnly: true, ...(input.adultLock ? { adultLock: input.adultLock } : {}) } : {}),
@@ -316,7 +317,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         size,
         seconds,
         ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : {}),
-        audience: endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
+        audience: endAudience === "adult-only" || castAdult || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
         ...(endImage ? { end_image: endImage } : {}),
