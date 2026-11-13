@@ -26,6 +26,11 @@ const CLAUSE_GATE_DEFAULT = WHOLE_SENTENCE_MAX - 20; // 110
 // clause boundary at or past 32 characters once 40 are in, so "Oh no," (6) and "that's concerning!" never split but a long opening does.
 const CLAUSE_GATE_FIRST_CHUNK = 40;
 const CLAUSE_FLUSH_MIN_FIRST_CHUNK = 32;
+// FIRST-WORD-SPEECH-01 (2026-11-13): an opening sentence with no comma or full stop in its first 44 characters used to wait for its
+// whole sentence (up to 130 characters), so the voice started only after the text had finished typing. Now the opener also flushes at
+// the last whole word once 44 characters are in (never before the 28th), so the voice starts on the first few words.
+const FIRST_CHUNK_WORD_GATE = 44;
+const FIRST_CHUNK_WORD_MIN = 28;
 
 /** End offset of the next speakable chunk in `sub`, or -1 if none yet.
  * `firstChunk` lowers the clause-flush gate for the very first boundary
@@ -50,6 +55,10 @@ export function nextSentenceBoundary(sub: string, firstChunk = false): number {
       }
     }
     if (clauseEnd > 0) return clauseEnd;
+  }
+  if (firstChunk && sub.length >= FIRST_CHUNK_WORD_GATE) {
+    const space = sub.lastIndexOf(" ");
+    if (space >= FIRST_CHUNK_WORD_MIN) return space;
   }
   return termEnd;
 }

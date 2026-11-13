@@ -58,6 +58,22 @@ describe("first chunk of a reply (DUPLEX-FIRST-CLAUSE-01)", () => {
     const end = nextSentenceBoundary(text, true);
     expect(text.slice(0, end)).not.toBe("Oh no,");
   });
+  test("an opener with no comma or full stop flushes at the last whole word once 44 characters are in (FIRST-WORD-SPEECH-01)", () => {
+    const text = "Well the answer to that really depends on a bunch of different things so";
+    const end = nextSentenceBoundary(text, true);
+    expect(end).toBeGreaterThan(0);
+    expect(text.slice(0, end)).toBe("Well the answer to that really depends on a bunch of different things");
+  });
+  test("an opener shorter than 44 characters still waits, so a short phrase is never chopped", () => {
+    expect(nextSentenceBoundary("Well the answer to that really depends", true)).toBe(-1);
+  });
+  test("a clause boundary still wins over the word flush", () => {
+    const text = "Sure, here is a quick way to make it, and then you add the rest of the ingredients";
+    expect(nextSentenceBoundary(text, true)).toBe("Sure, here is a quick way to make it,".length);
+  });
+  test("later chunks never use the word flush", () => {
+    expect(nextSentenceBoundary("Well the answer to that really depends on a bunch of different things so", false)).toBe(-1);
+  });
   test("later chunks keep the old long gate", () => {
     expect(nextSentenceBoundary("Sure, here is a quick way to make it, and then you add more", false)).toBe(-1);
   });
