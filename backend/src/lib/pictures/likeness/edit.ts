@@ -20,6 +20,9 @@ export const LINES = {
   smile: "I couldn't make that change without changing who they look like.",
   assets: "I couldn't check the faces on this one, so they may look slightly different.",
   whole: "Their faces may look slightly different from the original.",
+  /** MAKE-CLEARER-2026-11-13: the Best level of Make clearer is generative and redraws faces; these two lines keep its result out (the Better level does not redraw). */
+  restoredFace: "The Best level changed how a face looks, so I kept your picture as it was. Try the Better level.",
+  restoredUnchecked: "I couldn't check the faces on this one, so I kept your picture as it was. Try the Better level.",
   clothes: (n: number) => `${n === 1 ? "One person's clothes" : `${n} people's clothes`} did not change. You can try again or name them.`,
 } as const;
 
@@ -200,6 +203,39 @@ export async function runLikenessEdit(
     }
   }
   return { ...made, note: missed ? LINES.clothes(missed) : LINES.kept };
+}
+
+/**
+ * MAKE-CLEARER-2026-11-13: the face guard for the Best level of Make clearer (SeedVR2 restores generatively and can shift a face).
+ * The same check and the same measured bar as a face edit (LIKENESS.smileCosine, the 2026-11-07 bench): every face of 60 px or more in the source
+ * must be found again in the result with a face match of at least that. No such face (or the face models absent from a picture with no face) means
+ * there is nothing to protect and nothing is said. A face that cannot be compared (the models fail on the picture) is not waved through.
+ * Returns the sentence to show when the result must be kept out, or null when it may be kept.
+ */
+/** The suite swaps in scripted face models; null puts the real ones back. */
+let depsOverride: LikenessDeps | null = null;
+export function __setLikenessDepsForTests(deps: LikenessDeps | null): void { depsOverride = deps; }
+export async function restoredFacesRefusal(source: Uint8Array, restored: Uint8Array, deps: LikenessDeps = depsOverride ?? realDeps): Promise<string | null> {
+  try { await deps.ensureAssets(); } catch { return null; } // no face models on this home: the same ordinary path as every other edit
+  const detected = await deps.detect(source);
+  if (!detected.ok) return null;
+  const faces = detected.value.filter((f) => !smallFace(f).under60);
+  if (!faces.length) return null;
+  const { width, height } = await sharp(source).metadata().then((m) => ({ width: m.width ?? 0, height: m.height ?? 0 }));
+  if (!width || !height) return LINES.restoredUnchecked;
+  const same = (await atSourceSize({ pic: { b64_json: "" } as StackPic, bytes: restored }, width, height)).bytes;
+  const found = await deps.detect(same);
+  if (!found.ok) return LINES.restoredUnchecked;
+  for (const face of faces) {
+    const match = matchFaces([face], found.value)[0];
+    if (!match || match.kind !== "matched") return LINES.restoredFace;
+    const out = found.value.find((f) => f.bbox === match.output.bbox) ?? found.value[0];
+    if (!out) return LINES.restoredFace;
+    const [a, b] = await Promise.all([deps.embed(source, face), deps.embed(same, out)]);
+    if (!a.ok || !b.ok) return LINES.restoredUnchecked;
+    if (faceCosine(a.value, b.value) < LIKENESS.smileCosine) return LINES.restoredFace;
+  }
+  return null;
 }
 
 /** Whether the picture holds a face worth protecting (60 px or more) and the face models load. Any trouble means no: today's path runs. */

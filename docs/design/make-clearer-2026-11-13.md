@@ -14,8 +14,8 @@ change `upscale` with `clarity`). Three levels, one line and one time each, neve
 | Better | Smart enlarging that rebuilds fine detail. | about a minute (clip: a few minutes) | The existing Real-ESRGAN `upscale` (pictures 2x or 4x; clips 2x). |
 | Best | The most careful repair, for old or damaged pictures and faces. | a few minutes | The AI restore (SeedVR2 and face repair, CREATOR-52). Pictures: on when the Stack's image tools list `restore`. Clips: on when `STACK_HAS_VIDEO_RESTORE` is true. |
 
-Best is always shown. While the Stack lacks the restore it is off with one line: "Best is not available on this home yet." (`BEST_NEEDS_DOWNLOAD`; it can name Settings, AI & models
-once that page actually lists the restore model). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.645). The video pages have no room: the Create feed menu is at the schema
+Best is always shown. While the Stack does not list `restore` it is off with one line: "Best can be added in Settings, AI & models." (`BEST_NEEDS_DOWNLOAD`; true since the Stack's optional component `seedvr2-3b`,
+MAKE-CLEARER-2026-11-13). For clips Best says "Best is not available for clips yet." (`BEST_VIDEO_NOT_YET`). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.645). The video pages have no room: the Create feed menu is at the schema
 cap of 8 actions and the Studio's Make more at 3 (it had one), and a menu item cannot be drawn off with a reason. So the video Studio lists Quick and Better; Best for a clip is
 reached by chat and `POST /api/plugins/video/actions/clearer` (`level: best`), which answers with the same line. A levels picker on a video page needs a kit element and is open.
 
@@ -55,3 +55,12 @@ Laplacian variance falls (1583 to 302) because grain, not edges, dominated it, s
 
 SeedVR2 and GFPGAN themselves (CREATOR-52, benched elsewhere); the video Studio timeline (a per-piece Make clearer inside an export) and a clip level chooser with a disabled Best
 (menus have no disabled item and the Create feed menu is full). CREATOR-17's `restore` operation is the Best level of this one operation, not a second operation (see Supersedes).
+
+## Best for pictures (built 2026-11-13, CREATOR-52 picture part, CREATOR-17 restore)
+
+Best calls the Stack's `restore` (SeedVR2 3B through mflux, low-RAM mode, same size as the picture, up to 2 megapixels). It always starts as a job (the Stack is asked not to wait), so it has an Activity row
+through the existing `picture_edit` row. Measured on the Studio: 512 px 5.7 s cold and 3.0 s warm, 2 megapixels 24 s, peak footprint 9.8 to 10.1 GB. The level line says "a few minutes", an honest upper bound.
+It is an engine edit for the Adult lock (it locks like Better). SeedVR2 is generative and redraws faces, so the result of a picture with a face of 60 px or more is kept only when every such face is found again with a
+face match of at least 0.80, the bar of a face edit from the 2026-11-07 likeness bench (`restoredFacesRefusal` in `lib/pictures/likeness/edit.ts`, no new rule or threshold). Otherwise the result is dropped,
+the person's picture is untouched and one line says so and offers Better; a face that cannot be compared is treated the same with its own line. No face, or no face models, leaves the ordinary path. A child's own cartoons take no
+check. Not built: Best for clips (flicker, temporal path unbenched).
