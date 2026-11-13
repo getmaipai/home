@@ -6,13 +6,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { ImageEditError, applyPreview, cancelEdit, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion } from "@/lib/imageEdit";
-import { runPictureEdit, getMediaOpJob, listMediaOps } from "@/lib/mediaOps/registry";
-import { complete } from "@/lib/llm";
-import { toToolDefinition } from "@/lib/llm";
-import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
-import { runMediaOp } from "@/lib/mediaOps/registry";
-import type { TurnState } from "@/lib/turnMachine/contract";
-import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { runPictureEdit, getMediaOpJob } from "@/lib/mediaOps/registry";
+import { runPictureWords } from "@/lib/mediaOps/words";
 
 export const imageEditRoutes = apiRouter();
 
@@ -64,15 +59,21 @@ imageEditRoutes.openapi(pictureRoute, (c) => {
 
 const editForm = z.object({
   conversation_id: z.string().min(1).max(80),
-  operation: z.enum(["remove_background", "erase", "upscale", "resize"]),
+  operation: z.enum(["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip"]),
   mask: z.any().optional(),
   scale: z.string().optional(), width: z.string().optional(), height: z.string().optional(), factor: z.string().optional(),
+  x: z.string().optional().describe("crop: left edge, 0 to 1 of the width."), y: z.string().optional().describe("crop: top edge, 0 to 1 of the height."),
+  aspect: z.enum(["1:1", "4:3", "3:2", "16:9", "9:16"]).optional().describe("crop: a centred crop of this shape (instead of x, y, width and height, which are 0 to 1 here)."),
+  brightness: z.string().optional(), contrast: z.string().optional(), saturation: z.string().optional(), warmth: z.string().optional(), auto: z.string().optional().describe("adjust: true for auto tone."),
+  radius: z.string().optional().describe("blur_background: blur strength, 1 to 40."), degrees: z.string().optional().describe("rotate: 90, 180 or 270 clockwise."), direction: z.enum(["horizontal", "vertical"]).optional().describe("flip: horizontal or vertical."),
 });
 const editRoute = createRoute({
   method: "post", path: "/pictures/{id}/edit", tags: ["Image editor"], summary: "Run an editing tool on a picture the person has", middleware: [requireAuth] as const,
   request: { params: pictureParams, body: { content: { "multipart/form-data": { schema: editForm } } } },
   responses: { 200: { content: { "application/json": { schema: ProgressSchema } }, description: "Done (a preview to apply), or running with a job to poll." }, ...refusals },
 });
+const LOCAL = ["crop", "adjust", "blur_background", "rotate", "flip"] as const;
+type LOCAL_OPERATIONS = typeof LOCAL[number];
 function wholeNumber(value: unknown, min: number, max: number): number | undefined {
   if (value === undefined || value === "") return undefined;
   const n = Number(value);
@@ -83,8 +84,16 @@ imageEditRoutes.openapi(editRoute, async (c) => {
   const actor = c.get("person");
   try {
     const form = await c.req.parseBody();
-    const operation = String(form.operation ?? "") as "remove_background" | "erase" | "upscale" | "resize";
-    if (!["remove_background", "erase", "upscale", "resize"].includes(operation)) throw new ImageEditError(400, "Pick a tool to run.", "bad_operation");
+    const operation = String(form.operation ?? "") as "remove_background" | "erase" | "upscale" | "resize" | LOCAL_OPERATIONS;
+    if (!["remove_background", "erase", "upscale", "resize", ...LOCAL].includes(operation)) throw new ImageEditError(400, "Pick a tool to run.", "bad_operation");
+    if ((LOCAL as readonly string[]).includes(operation)) {
+      // Crop, adjust, blur, rotate and flip run in Home on the registry's own argument rules (fractions, not pixels: a crop's width and height are 0 to 1).
+      const number = (name: string) => (form[name] === undefined || form[name] === "" ? {} : { [name]: Number(form[name]) });
+      const text = (name: string) => (typeof form[name] === "string" && form[name] !== "" ? { [name]: form[name] } : {});
+      const local = { ...number("x"), ...number("y"), ...number("width"), ...number("height"), ...text("aspect"), ...number("brightness"), ...number("contrast"), ...number("saturation"), ...number("warmth"), ...(form.auto === undefined ? {} : { auto: form.auto === "true" }), ...number("radius"), ...number("degrees"), ...text("direction") };
+      const started = await runPictureEdit(actor, operation, { source: { kind: "picture", via: "chat", id: c.req.valid("param").id, conversationId: String(form.conversation_id ?? "") }, args: local }, c.req.raw.signal);
+      return c.json("job" in started ? started.job : started.file, 200) as never;
+    }
     const mask = form.mask instanceof File ? new Uint8Array(await form.mask.arrayBuffer()) : undefined;
     if (mask && mask.byteLength > 20 * 1024 * 1024) throw new ImageEditError(413, "The painted area is too big. Paint a smaller area.", "too_large");
     const scale = wholeNumber(form.scale, 2, 4);
@@ -174,22 +183,8 @@ const wordsRoute = createRoute({
 });
 imageEditRoutes.openapi(wordsRoute, async (c) => {
   try {
-    const actor = c.get("person");
     const body = c.req.valid("json");
-    const sourceId = c.req.valid("param").id;
-    const operations = (await listMediaOps(actor, { input: "picture", includeHelpers: true })).filter((operation) => operation.enabled);
-    const tool = toolSpecFor("edit_picture", laneOfPerson(actor), { actor, editPictureAllowed: operations.length > 0, editPictureOps: operations, editPictureIds: [sourceId] } as TurnState);
-    if (!tool || !operations.some((operation) => operation.enabled)) throw new ImageEditError(503, "Picture edits are not available yet.", "unavailable");
-    const forced = await complete("chat", [{ role: "user", content: `Picture id: ${sourceId}. Painted area supplied: ${body.mask ? "yes" : "no"}. Other picture ids: ${(body.references ?? []).join(", ")}. Request: ${body.prompt}` }], { tools: [tool], tool_choice: "required", thinking: false, dropReasoning: true, signal: c.req.raw.signal });
-    if (!forced.ok) throw new ImageEditError(503, "The picture edit could not be chosen right now.", "model_unavailable");
-    const call = forced.value.tool_calls?.find((item) => item.tool === "edit_picture");
-    if (!call || !call.args || typeof call.args !== "object") throw new ImageEditError(503, "The picture edit could not be chosen right now.", "no_tool_call");
-    const selected = call.args as { op?: unknown; args?: Record<string, unknown> };
-    const operation = operations.find((item) => item.id === selected.op && item.enabled);
-    if (!operation) throw new ImageEditError(422, "That picture operation is not available.", "operation_unavailable");
-    const args = { ...(selected.args ?? {}) };
-    if (body.mask && operation.controls.some((control) => control.kind === "mask")) args.mask = new Uint8Array(Buffer.from(body.mask, "base64"));
-    const result = await runMediaOp(actor, operation.id, { source: { kind: "picture", via: "chat", id: sourceId, conversationId: body.conversation_id }, args }, c.req.raw.signal);
+    const result = await runPictureWords(c.get("person"), { source: { kind: "picture", via: "chat", id: c.req.valid("param").id, conversationId: body.conversation_id }, prompt: body.prompt, mask: body.mask, references: body.references }, c.req.raw.signal);
     return c.json("job" in result ? result.job : result.file, 200) as never;
   } catch (error) { return fail(c, error) as never; }
 });

@@ -30,10 +30,10 @@ function person(id: string, role: string) { const now = new Date().toISOString()
   await expect(runMediaOp(guest, "picture.locate", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 403 });
  });
  test("every op has descriptive copy and controls", () => { for (const op of registeredMediaOps()) { expect(op.label.length).toBeGreaterThan(0); expect(op.summary.length).toBeGreaterThan(0); expect(Array.isArray(op.controls)).toBe(true); } });
- test("unknown ids are refused and a Library ref has the explicit IMG-OPS-02 response", async () => {
+ test("unknown ids are refused and a Library ref that is not the actor's picture is a 404 (IMG-OPS-02)", async () => {
   resetDb(); const actor = person("op-adult", "owner");
   await expect(runMediaOp(actor, "picture.unknown", { source: { kind: "picture", via: "chat", id: "x", conversationId: "c" }, args: {} })).rejects.toMatchObject({ status: 404 });
-  await expect(runMediaOp(actor, "picture.erase", { source: { kind: "picture", via: "file", id: "x" }, args: { mask: new Uint8Array([1]) } })).rejects.toMatchObject({ status: 501 });
+  await expect(runMediaOp(actor, "picture.erase", { source: { kind: "picture", via: "file", id: "x" }, args: { mask: new Uint8Array([1]) } })).rejects.toMatchObject({ status: 404 });
  });
  test("routes and picture tools do not contain registered operation id literals", () => {
   const ids = registeredMediaOps().map(op => op.id); const root = join(import.meta.dir, "../src");

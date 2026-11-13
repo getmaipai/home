@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { startEdit, loadSource, editToolsStatus, ImageEditError } from "@/lib/imageEdit";
+import { startEdit, loadSource, editToolsStatus, ImageEditError, LIBRARY_SOURCE } from "@/lib/imageEdit";
 import { storeFile } from "@/lib/attachments";
 import { startComment } from "@/lib/imageEdit";
 import { runPictureTool } from "@/lib/pictures/people";
@@ -17,7 +17,9 @@ const resizeArgs = z.object({ width: z.number().int().min(1).max(8000), height: 
 const cropArgs = z.object({ x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(), width: z.number().min(0).max(1).optional(), height: z.number().min(0).max(1).optional(), aspect: z.enum(["1:1", "4:3", "3:2", "16:9", "9:16"]).optional() }).refine((v) => v.aspect ? v.x === undefined && v.y === undefined && v.width === undefined && v.height === undefined : v.width !== undefined && v.height !== undefined, "Choose an aspect or a fractional crop rectangle.");
 const adjustArgs = z.object({ brightness: z.number().min(-100).max(100).default(0), contrast: z.number().min(-100).max(100).default(0), saturation: z.number().min(-100).max(100).default(0), warmth: z.number().min(-100).max(100).default(0), auto: z.boolean().default(false) });
 const blurArgs = z.object({ radius: z.number().min(1).max(40).default(12) });
-const referenceSchema = z.object({ kind: z.literal("picture"), via: z.literal("chat"), id: z.string(), conversationId: z.string().optional() });
+const rotateArgs = z.object({ degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).describe("Clockwise quarter turns: 90, 180 or 270 degrees.") });
+const flipArgs = z.object({ direction: z.enum(["horizontal", "vertical"]).describe("horizontal mirrors left to right; vertical turns it upside down.") });
+const referenceSchema = z.object({ kind: z.literal("picture"), via: z.enum(["chat", "file"]), id: z.string(), conversationId: z.string().optional() });
 const changeArgs = z.object({
   prompt: z.string().min(1),
   scope: z.enum(["clothes", "background", "face", "whole"]).optional().describe("What part may change: clothes, background, face, or whole picture."),
@@ -29,12 +31,14 @@ const changeArgs = z.object({
   subjects: z.array(z.string().max(80)).max(3).optional(),
 });
 
-function chatSource(source: { conversationId?: string; id: string }) {
+/** Where a picture is read from: its chat, or the Library by file id (IMG-OPS-02). The gates for either run in lib/imageEdit.ts's loadSource. */
+function chatSource(source: { via?: "chat" | "file"; conversationId?: string; id: string }) {
+  if (source.via === "file") return { conversationId: LIBRARY_SOURCE, id: source.id };
   if (!source.conversationId) throw new Error("A chat picture needs its conversation id.");
   return { conversationId: source.conversationId, id: source.id };
 }
 
-function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background") {
+function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip") {
   registerMediaOp({
     id: `picture.${id}`,
     label,
@@ -58,6 +62,8 @@ registerEdit("upscale", "Upscale", "Make the picture larger.", upscaleArgs, [{ k
 registerEdit("resize", "Resize", "Set a new picture width and height.", resizeArgs, [{ kind: "number", name: "width", label: "Width", min: 1, max: 8000 }, { kind: "number", name: "height", label: "Height", min: 1, max: 8000 }], "resize");
 registerEdit("crop", "Crop", "Crop a picture by fractional bounds or a centred aspect ratio.", cropArgs, [{ kind: "number", name: "x", label: "Left", min: 0, max: 1 }, { kind: "number", name: "y", label: "Top", min: 0, max: 1 }, { kind: "number", name: "width", label: "Width", min: 0, max: 1 }, { kind: "number", name: "height", label: "Height", min: 0, max: 1 }, { kind: "choice", name: "aspect", label: "Aspect", options: ["1:1", "4:3", "3:2", "16:9", "9:16"] }], "crop");
 registerEdit("adjust", "Adjust", "Adjust brightness, contrast, saturation and warmth, or apply auto tone.", adjustArgs, [{ kind: "number", name: "brightness", label: "Brightness", min: -100, max: 100 }, { kind: "number", name: "contrast", label: "Contrast", min: -100, max: 100 }, { kind: "number", name: "saturation", label: "Saturation", min: -100, max: 100 }, { kind: "number", name: "warmth", label: "Warmth", min: -100, max: 100 }, { kind: "choice", name: "auto", label: "Auto tone", options: ["true", "false"] }], "adjust");
+registerEdit("rotate", "Rotate", "Turn the picture a quarter or half turn.", rotateArgs, [{ kind: "choice", name: "degrees", label: "Turn", options: ["90", "180", "270"] }], "rotate");
+registerEdit("flip", "Flip", "Mirror the picture left to right, or turn it upside down.", flipArgs, [{ kind: "choice", name: "direction", label: "Direction", options: ["horizontal", "vertical"] }], "flip");
 registerEdit("blur_background", "Blur background", "Blur the picture background while keeping the subject clear.", blurArgs, [{ kind: "number", name: "radius", label: "Blur", min: 1, max: 40 }], "blur_background");
 
 registerMediaOp({
@@ -72,8 +78,7 @@ registerMediaOp({
   minBand: "child",
   listed: false,
   run: async ({ actor }, { source, args }: any) => {
-    if (!source.conversationId) throw new Error("A chat picture needs its conversation id.");
-    const loaded = loadSource(actor, source.conversationId, source.id, false);
+    const loaded = loadSource(actor, chatSource(source).conversationId, source.id, false);
     const sourceIsGenerated = /^picture-gen:/.test(db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.id)).get()?.provenance ?? "");
     if (actor.role === "child" || actor.role === "teen") {
       if (!sourceIsGenerated) throw new ImageEditError(422, "I can't save a real photo as a subject for this profile yet.", "real_minor_subject");
@@ -138,8 +143,7 @@ registerMediaOp({
   },
 });
 
-function sourceData(source: { id: string; conversationId?: string }, actor: import("@/types").PersonRow): { bytes: Uint8Array; mediaType: string } {
-  if (!source.conversationId) throw new Error("A chat picture needs its conversation id.");
-  const loaded = loadSource(actor, source.conversationId, source.id, false);
+function sourceData(source: { id: string; via?: "chat" | "file"; conversationId?: string }, actor: import("@/types").PersonRow): { bytes: Uint8Array; mediaType: string } {
+  const loaded = loadSource(actor, chatSource(source).conversationId, source.id, false);
   return { bytes: loaded.bytes, mediaType: loaded.mediaType };
 }

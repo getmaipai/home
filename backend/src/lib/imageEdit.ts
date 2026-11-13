@@ -1,5 +1,5 @@
 import { canReadFileAudience, fileAudience } from "@/lib/access";
-import { lockItemOfProvenance, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
+import { lockItemOfProvenance, lockState, markFields, newItemMark, type MarkSource } from "@/lib/adultLock";
 // IMGTOOLS-03/04: the picture editor's server half. The person opens a
 // picture they already have (a chat attachment) in the canvas and runs a
 // tool on it: remove the background, erase an object under a painted mask,
@@ -32,7 +32,7 @@ import { and, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversations } from "@/db/schema";
 import { newFileId } from "@/lib/id";
-import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader, listTemporaryChatImageVersions, readAttachmentForConversation, storeTemporaryChatImage } from "@/lib/attachments";
+import { createAttachment, readAttachment, storeFile, getTemporaryChatImage, getTemporaryChatImageForReader, listTemporaryChatImageVersions, readAttachmentForConversation, storeTemporaryChatImage } from "@/lib/attachments";
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -51,10 +51,10 @@ import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
 
 export class ImageEditError extends Error {
-  constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
+  constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 423 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
 }
 
-export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background"] as const;
+export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip"] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
 /** The change a Comment asks for in words (the Stack's generative edit, IMGGEN-EDITOR-01). */
 export type AnyEditOp = EditOperation | "comment";
@@ -75,7 +75,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 // ---------------------------------------------------------------- tools status
 
 export interface EditToolState { enabled: boolean; reason?: string }
-export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "find_people" | "find_subjects";
+export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
   state: "ready" | "preparing" | "not_installed" | "unavailable" | "off";
   /** One plain line for the editor to show, or null when everything is ready. */
@@ -106,13 +106,13 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
-  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
+  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, rotate: { enabled: false, reason }, flip: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
   if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
   const comment: EditToolState = await commentState(actor);
-  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment }, limits: {} });
+  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment, crop: { enabled: true }, adjust: { enabled: true }, rotate: { enabled: true }, flip: { enabled: true } }, limits: {} });
   if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't set up on this computer yet. Ask an admin to set them up.", "unavailable");
   let status: StackImageToolsStatus | null;
   try {
@@ -144,6 +144,8 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     crop: { enabled: true },
     adjust: { enabled: true },
     blur_background: needs("isnet", status.vision, "The background remover"),
+    rotate: { enabled: true },
+    flip: { enabled: true },
     find_people: needs("vision", status.vision, "The people finder"),
     find_subjects: status.operations?.includes("find_subjects") ? { enabled: true } : needs("vision", status.vision, "The people finder"),
   };
@@ -171,6 +173,11 @@ export interface SourcePicture {
   ownerPersonId?: string;
 }
 
+/** A picture addressed by its Library file id rather than by a chat: the "conversation" of a Library source (IMG-OPS-02). Such an edit is owner-only and its result is a new Library picture. */
+export const LIBRARY_SOURCE = "library";
+export const LIBRARY_PICTURE_GONE = "That picture isn't in your Library any more. Open the Library and choose it again.";
+/** The fixed answer when a picture is locked (the same line Videos gives): nothing starts and nothing is named. */
+export const LIBRARY_PICTURE_LOCKED = "That is locked. Unlock it with your passcode first, then try again.";
 const EDIT_NOTE = "image-edit:";
 export interface EditProvenance { v: 1; audience?: "all-ages" | "adult-only"; op: EditProvenanceOp; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number }
 
@@ -209,7 +216,24 @@ export function loadSource(actor: PersonRow, conversationId: string, id: string,
   return loaded;
 }
 
+/** A Library picture the person owns: not in Trash, not someone else's, not locked. Every edit by file id (read or write) comes through here. */
+function loadLibrarySource(actor: PersonRow, id: string): SourcePicture {
+  const gone = new ImageEditError(404, LIBRARY_PICTURE_GONE, "not_found");
+  const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  // Only the owner edits a file (a shared picture is never changed by the person it was shared with); Trash and chat-only copies are out of the Library.
+  if (!row || row.ownerPersonId !== actor.id || row.deletedAt !== null || row.origin === "fetched" || !row.mediaType.startsWith("image/")) throw gone;
+  const item = lockItemOfProvenance(row.ownerPersonId, row.provenance);
+  const locked = lockState(item, actor);
+  if (locked === "hidden") throw gone;
+  if (locked === "locked") throw new ImageEditError(423, LIBRARY_PICTURE_LOCKED, "locked");
+  const read = readAttachment(actor, id);
+  if (!read.ok) throw gone;
+  const provenance = parseProvenance(row.provenance);
+  return { id, conversationId: LIBRARY_SOURCE, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, ownerPersonId: row.ownerPersonId, name: (row.name ?? row.provenance.replace(/^composer:/, "")).slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+}
+
 function loadSourceChecked(actor: PersonRow, conversationId: string, id: string, write: boolean, gone: ImageEditError): SourcePicture {
+  if (conversationId === LIBRARY_SOURCE) return loadLibrarySource(actor, id);
   if (isTemporaryConversation(conversationId) || getTemporaryChatImageForReader(actor, conversationId, id)) {
     const image = write ? getTemporaryChatImage(actor, conversationId, id) : getTemporaryChatImageForReader(actor, conversationId, id);
     if (!image || !image.mediaType.startsWith("image/")) throw gone;
@@ -231,12 +255,14 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
 export interface PictureVersion { id: string; url: string; label: string; created_at: string; op: EditProvenanceOp | "original"; width: number | null; height: number | null; media_type: string; source: string | null; source_sha256: string | null }
 
 export function pictureUrl(conversationId: string, id: string): string {
+  if (conversationId === LIBRARY_SOURCE) return `/api/media-ops/files/${encodeURIComponent(id)}/content`;
   return `/api/image-edit/pictures/${encodeURIComponent(id)}?conversation_id=${encodeURIComponent(conversationId)}`;
 }
 
 /** Every version of the picture's chain, oldest first, the original first. */
 export function listVersions(actor: PersonRow, conversationId: string, id: string): PictureVersion[] {
   const source = loadSource(actor, conversationId, id, false);
+  if (conversationId === LIBRARY_SOURCE) return listLibraryVersions(actor, source);
   const versions: PictureVersion[] = [];
   if (source.temporary) {
     const root = getTemporaryChatImageForReader(actor, conversationId, source.rootId);
@@ -252,6 +278,19 @@ export function listVersions(actor: PersonRow, conversationId: string, id: strin
   const chain = rows.map((row) => ({ row, p: parseProvenance(row.provenance) })).filter((entry): entry is { row: typeof entry.row; p: EditProvenance } => entry.p !== null && entry.p.root === source.rootId && canReadFileAudience(actor, entry.row));
   chain.sort((a, b) => (a.row.createdAt === b.row.createdAt ? a.row.hlc.localeCompare(b.row.hlc) : a.row.createdAt.localeCompare(b.row.createdAt)));
   for (const { row, p } of chain) versions.push({ id: row.id, url: pictureUrl(conversationId, row.id), label: p.label, created_at: row.createdAt, op: p.op, width: p.width, height: p.height, media_type: row.mediaType, source: p.source, source_sha256: p.source_sha256 });
+  return versions;
+}
+
+/** A Library picture's chain, oldest first: the original, then each edit saved from it (or from an earlier edit). "Undo" is opening the version before; nothing is removed here. */
+function listLibraryVersions(actor: PersonRow, source: SourcePicture): PictureVersion[] {
+  const open = (row: typeof attachments.$inferSelect) => row.ownerPersonId === actor.id && row.deletedAt === null && lockState(lockItemOfProvenance(row.ownerPersonId, row.provenance), actor) === "open";
+  const versions: PictureVersion[] = [];
+  const root = db.select().from(attachments).where(eq(attachments.id, source.rootId)).get();
+  if (root && open(root)) versions.push({ id: root.id, url: pictureUrl(LIBRARY_SOURCE, root.id), label: "Original", created_at: root.createdAt, op: "original", width: null, height: null, media_type: root.mediaType, source: null, source_sha256: null });
+  const rows = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), like(attachments.provenance, `${EDIT_NOTE}%`))).all();
+  const chain = rows.map((row) => ({ row, p: parseProvenance(row.provenance) })).filter((entry): entry is { row: typeof entry.row; p: EditProvenance } => entry.p !== null && entry.p.root === source.rootId && open(entry.row));
+  chain.sort((a, b) => (a.row.createdAt === b.row.createdAt ? a.row.hlc.localeCompare(b.row.hlc) : a.row.createdAt.localeCompare(b.row.createdAt)));
+  for (const { row, p } of chain) versions.push({ id: row.id, url: pictureUrl(LIBRARY_SOURCE, row.id), label: p.label, created_at: row.createdAt, op: p.op, width: p.width, height: p.height, media_type: row.mediaType, source: p.source, source_sha256: p.source_sha256 });
   return versions;
 }
 
@@ -282,6 +321,13 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     const id = newFileId();
     storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, audience, made_audience: audience } });
     return { id, url: pictureUrl(source.conversationId, id), label: provenance.label, created_at: new Date().toISOString(), op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
+  }
+  if (source.conversationId === LIBRARY_SOURCE) {
+    // IMG-OPS-02: an edit of a Library picture is a NEW Library file (kept, with no chat), linked to its source and root by the note. The source is never written.
+    const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "kept", name: null });
+    if (!stored.ok) throw new ImageEditError(stored.status === 403 ? 403 : 500, stored.status === 403 ? stored.error : "The edited picture could not be saved. Try again.", stored.status === 403 ? "storage_full" : "save_failed");
+    if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
+    return { id: stored.value.id, url: pictureUrl(LIBRARY_SOURCE, stored.value.id), label: provenance.label, created_at: stored.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "conversation" });
@@ -314,7 +360,7 @@ function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png
   for (const old of mine.slice(0, Math.max(0, mine.length - (PREVIEWS_PER_PERSON - 1)))) previews.delete(old.token);
   const token = `prev-${randomBytes(12).toString("hex")}`;
   previews.set(token, { token, personId: actor.id, png, width: item.width, height: item.height, op, audience: item.audience, engine: item.engine, model: item.model, ms: item.ms, sourceId: source.id, conversationId: source.conversationId, createdAt: Date.now(),  });
-  return { token, url: `/api/image-edit/previews/${token}`, width: item.width, height: item.height, operation: op, engine: item.engine ?? null, model: item.model ?? null, ms: item.ms ?? null, transparent: op === "remove_background" };
+  return { token, url: `/api/${source.conversationId === LIBRARY_SOURCE ? "media-ops" : "image-edit"}/previews/${token}`, width: item.width, height: item.height, operation: op, engine: item.engine ?? null, model: item.model ?? null, ms: item.ms ?? null, transparent: op === "remove_background" };
 }
 
 /** A Stack refusal or failure in the person's words: the Stack's own sentence says what happened and what to do. */
@@ -335,7 +381,7 @@ export function editErrorFrom(error: unknown): ImageEditError {
   return new ImageEditError(500, "The edit could not be finished. Try again.", "failed");
 }
 
-export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number }
+export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical" }
 
 /** Local, metadata-free pixel transforms used by picture.crop and picture.adjust. */
 export async function processLocalPicture(bytes: Uint8Array, input: StartEditInput): Promise<{ png: Uint8Array; width: number; height: number }> {
@@ -347,7 +393,17 @@ export async function processLocalPicture(bytes: Uint8Array, input: StartEditInp
   let pipeline = image;
   let width = sourceWidth;
   let height = sourceHeight;
-  if (input.operation === "crop") {
+  if (input.operation === "rotate" || input.operation === "flip") {
+    // A phone photo keeps its upright view in an EXIF tag, not in its pixels: turn the pixels upright first (a lossless PNG), so "rotate right" and "flip" mean what the person sees.
+    const upright = meta.orientation && meta.orientation > 1 ? sharp(await sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" }).rotate().png().toBuffer(), { failOn: "error" }) : image;
+    if (input.operation === "rotate") {
+      if (input.degrees !== 90 && input.degrees !== 180 && input.degrees !== 270) throw new ImageEditError(422, "Turn the picture by 90, 180 or 270 degrees.", "bad_rotation");
+      pipeline = upright.rotate(input.degrees);
+    } else {
+      if (input.direction !== "horizontal" && input.direction !== "vertical") throw new ImageEditError(422, "Flip the picture horizontal or vertical.", "bad_flip");
+      pipeline = input.direction === "horizontal" ? upright.flop() : upright.flip();
+    }
+  } else if (input.operation === "crop") {
     let left: number; let top: number; let cropWidth: number; let cropHeight: number;
     if (input.aspect) {
       const [rw = 1, rh = 1] = input.aspect.split(":").map(Number);
@@ -401,9 +457,9 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   if (input.operation === "erase" && !input.mask?.byteLength && !input.people && !input.subjects) throw new ImageEditError(422, "Paint over what you want gone, then press Erase.", "mask_empty");
   if (input.operation === "erase" && Number(Boolean(input.mask?.byteLength)) + Number(Boolean(input.people)) + Number(Boolean(input.subjects)) > 1) throw new ImageEditError(422, "Choose exactly one area to erase.", "erase_target_conflict");
   const status = await editToolsStatus(actor);
-  const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
+  const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" || input.operation === "rotate" || input.operation === "flip" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
-  if (input.operation === "crop" || input.operation === "adjust" || input.operation === "blur_background") {
+  if (input.operation === "crop" || input.operation === "adjust" || input.operation === "blur_background" || input.operation === "rotate" || input.operation === "flip") {
     if (input.operation === "blur_background") {
       const matte = await startEdit(actor, conversationId, id, { operation: "remove_background" }, signal);
       if (matte.state !== "done") throw new ImageEditError(503, status.tools.remove_background.reason ?? "The background remover isn't ready yet.", "unavailable");
@@ -441,7 +497,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   }
 }
 
-const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", comment: "Making your change" };
+const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", rotate: "Turning", flip: "Flipping", comment: "Making your change" };
 
 /** The state of a running edit; the first poll that sees it finished takes the PNG from the Stack and keeps it as a preview. */
 export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditProgress> {
@@ -496,7 +552,7 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
-  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", comment: "Changed as described" };
+  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
   const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms });
   previews.delete(token);
   return version;
@@ -533,7 +589,7 @@ export function regionForStack(region: CommentRegion | null | undefined): string
 }
 
 /** A Comment: the person describes a change, optionally pointing at an area, and the picture engine changes only that area (the rest of the picture stays as it was). The result is a preview the person applies as a new version, exactly like Erase. Gates run first: only a person who may make pictures, and the two absolute lines on the words. */
-export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat"; id: string; conversationId?: string }>; styles?: string[]; subjectIds?: string[] }): Promise<EditProgress> {
+export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat" | "file"; id: string; conversationId?: string }>; styles?: string[]; subjectIds?: string[] }): Promise<EditProgress> {
   const source = loadSource(actor, conversationId, id, true);
   const denial = pictureDenial(editorAudience(actor));
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
@@ -562,7 +618,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   // IMGEDIT-01: a second picture the change draws on.
   const referenceRefs = [
     ...(input.referenceId ? [{ id: input.referenceId, conversationId }] : []),
-    ...(input.references ?? []).map((reference) => ({ id: reference.id, conversationId: reference.conversationId ?? conversationId })),
+    ...(input.references ?? []).map((reference) => ({ id: reference.id, conversationId: reference.via === "file" ? LIBRARY_SOURCE : reference.conversationId ?? conversationId })),
   ];
   const referenceKeys = referenceRefs.map((reference) => `${reference.conversationId}:${reference.id}`);
   const uniqueReferences = new Set(referenceKeys);

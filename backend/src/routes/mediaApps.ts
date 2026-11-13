@@ -3,6 +3,8 @@
 // package, or an id it does not know, it passes on, so the generic route (and its 404) still decide. The rules live in
 // lib/media/appHost.ts; this file is the wire.
 import { jsonBody } from "@/lib/validation";
+import { ImageEditError, applyPreview, editErrorFrom } from "@/lib/imageEdit";
+import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { appRouteAllowed } from "@/lib/apps";
@@ -414,3 +416,37 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
 /** Mounted once per media app id in app.ts, before `pluginsRoutes`. */
 export const mediaAppRoutes: ReadonlyArray<{ id: MediaAppId; routes: ReturnType<typeof createMediaAppRoutes> }> = MEDIA_APP_IDS.map((id) => ({ id, routes: createMediaAppRoutes(id) }));
+
+/**
+ * IMG-OPS-02: the Image app's page actions. Image is not a media-library app (no items, progress or likes), so it does not join MEDIA_APPS; it only needs its
+ * actions served under /api/plugins/image like the media apps' are. `op` is the same start as POST /api/media-ops/{id} (startLibraryOp), so a page and the
+ * route give one answer; `op-apply` saves a previewed result as a new Library picture (the same applyPreview). Each is behind the app gate and the page floor.
+ */
+export function createImageAppRoutes() {
+  const routes = apiRouter();
+  gateMediaApp(routes, "image", ["/actions/op", "/actions/op-apply"]);
+  routes.post("/actions/op", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!appRouteAllowed(person, "image", "actions", "op")) return next();
+    const body = await jsonBody(c);
+    const op = typeof body.op === "string" ? body.op : "";
+    const read = MediaOpRequest.safeParse(body);
+    if (!op || !read.success) return c.json({ error: "Say which operation to run and on which Library picture (op and file_id), then try again.", code: "bad_arguments" }, 422);
+    const started = await startLibraryOp(person, op, read.data, c.req.raw.signal);
+    return started.ok ? c.json(started.progress as never, 200) : c.json({ error: started.error, code: started.code }, started.status as never);
+  });
+  routes.post("/actions/op-apply", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!appRouteAllowed(person, "image", "actions", "op-apply")) return next();
+    const body = await jsonBody(c);
+    try {
+      if (typeof body.token !== "string" || body.token === "") throw new ImageEditError(422, "That result expired. Run the operation again.", "expired");
+      return c.json({ version: await applyPreview(person, body.token, typeof body.label === "string" ? body.label : undefined) } as never, 200);
+    } catch (error) {
+      const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
+      return c.json({ error: mapped.message, code: mapped.code }, mapped.status as never);
+    }
+  });
+  return routes;
+}
+export const imageAppRoutes = createImageAppRoutes();

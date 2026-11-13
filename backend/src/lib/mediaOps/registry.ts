@@ -21,6 +21,12 @@ export function registerMediaOp<T extends MediaOp>(op: T): T {
  return op;
 }
 
+/** One registered operation by id (the picture operations load on first use). */
+export async function getMediaOp(id: string): Promise<MediaOp | undefined> {
+ await ensureRegistered();
+ return ops.get(id);
+}
+
 export function registeredMediaOps(): readonly MediaOp[] {
  return [...ops.values()];
 }
@@ -37,7 +43,10 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
  }
  if (op.needs === "image") {
   const health = await roleHealth("image");
-  return health.availability === "ready" ? { ready: true } : { ready: false, reason: health.detail ?? health.reason ?? "Picture creation isn't set up yet." };
+  if (health.availability !== "ready") return { ready: false, reason: health.detail ?? health.reason ?? "Picture creation isn't set up yet." };
+  // Describing a change is also refused to a profile that may not make pictures (the editor's own picture gate): say so here, so the button is off with the reason.
+  const comment = (await editToolsStatus(actor)).tools.comment;
+  return comment.enabled ? { ready: true } : { ready: false, reason: comment.reason ?? "Picture creation isn't available for this profile." };
  }
  const status = await editToolsStatus(actor);
  const key = op.id === "picture.upscale"
@@ -75,7 +84,6 @@ export async function runMediaOp(actor: PersonRow, id: string, input: { source: 
   throw error;
  }
  if (input.source.kind !== op.input) throw new ImageEditError(422, "That source is not the right media type.", "bad_source");
- if (input.source.via === "file") throw new ImageEditError(501, "Library file addressing is not available yet.", "not_implemented");
  return op.run({ actor, signal }, { source: input.source, args });
 }
 export async function getMediaOpJob(actor: PersonRow, job: string) { const { pollEdit } = await import("@/lib/imageEdit"); return pollEdit(actor, job); }
