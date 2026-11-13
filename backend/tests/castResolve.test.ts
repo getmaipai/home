@@ -297,7 +297,7 @@ describe("the migration back-fill", () => {
   test("guards bad json, links only the oldest subject per synth, and leaves everything else alone", async () => {
     const { Database } = await import("bun:sqlite");
     const { readFileSync } = await import("node:fs");
-    const sql = readFileSync(new URL("../src/db/migrations/0194_media_subject_cast.sql", import.meta.url), "utf8");
+    const sql = readFileSync(new URL("../src/db/migrations/0195_media_subject_cast.sql", import.meta.url), "utf8");
     const sqlite = new Database(":memory:");
     sqlite.exec("CREATE TABLE media_subjects (id text primary key, provenance text not null, created_at text not null, real integer not null default 0)");
     const add = (id: string, prov: string, at: string) => sqlite.query("INSERT INTO media_subjects (id, provenance, created_at) VALUES (?, ?, ?)").run(id, prov, at);
