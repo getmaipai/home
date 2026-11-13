@@ -584,7 +584,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
 | `backend/src/lib/films/run.ts` | FilmStepError, isTransientStackError, __setFilmRetryDelaysForTests, runFilm, redoShot, changeMusic |
-| `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, makeSheetFromPictures |
+| `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, cutOutPeople, makeSheetFromPictures |
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilmTurn, runMakeFilm |
@@ -1270,7 +1270,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
-| `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, phaseLabel |
+| `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, FIRST_FRAME_PHASE, phaseLabel |
 | `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
 | `backend/src/lib/videos/playlists.ts` | GONE, VIDEO_GONE, ownVideoPlaylists, memberVideoPlaylists, videoPlaylistFor, resolveEntries |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
@@ -1278,10 +1278,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
+| `backend/src/lib/videos/referenceFirstFrame.ts` | FIRST_FRAME_STEP_NAMES, FIRST_FRAME_LINES, FACE_MODELS_LINE, LOOK_ALIKE_LINE, FIRST_PICTURE_W, FACE_GATE |
 | `backend/src/lib/videos/referenceSheetCheck.ts` | REFERENCE_SHEET_W, MIN_SHEET_PANELS, SHEET_KINDS, __setSheetVisionForTests, parseSheetCheck, checkPictureIsSheet |
 | `backend/src/lib/videos/referenceSheets.ts` | REFERENCE_SHEET_NOTE, isReferenceSheetFile, sheetIdsOfRequest, sheetUsedByOtherVideo, sheetFilesOnlyUsedBy |
 | `backend/src/lib/videos/referenceToolId.ts` | MAKE_REFERENCE_VIDEO_TOOL_ID |
-| `backend/src/lib/videos/referenceVideo.ts` | REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, NO_DIALOGUE_SENTENCE, stripQuotedSpeech, FULL_FRAME_SENTENCE |
+| `backend/src/lib/videos/referenceVideo.ts` | FIRST_FRAME_SECONDS, REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, NO_DIALOGUE_SENTENCE, stripQuotedSpeech |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
