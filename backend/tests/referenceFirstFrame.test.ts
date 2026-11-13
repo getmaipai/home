@@ -278,14 +278,14 @@ describe("the face gate and its fallback", () => {
     expect(job.state).toBe("done");
     const recipe = getReferenceVideoRecipe(actor, job.id)!;
     expect(recipe.firstPicture!.how).toBe("pasted");
-    expect(recipe.firstPicture!.notes.join(" ")).toContain("changed a face");
-    expect(recipe.firstPicture!.notes.join(" ")).toContain("pasted");
+    expect(recipe.firstPicture!.notes.join(" ")).toContain("could not blend");
+    expect(recipe.firstPicture!.notes.join(" ")).toContain("own cut-out");
     // The person's own pixels stand on the place picture: the middle of the bottom is their colour, the corner is the place's.
     const still = await storedFirstPicture(job);
     // CREATOR-07: the person stands on the floor line (55 percent), cleaned and colour-matched, so their pixels are no longer the exact photo colour but are not the place's either.
     expect(await pixel(still, 512, 280)).not.toBe(PLACE);
     expect(await pixel(still, 5, 5)).toBe(PLACE);
-    expect(job.request.edit?.note).toContain("pasted");
+    expect(job.request.edit?.note).toContain("could not blend");
   });
   test("an edit that fails outright falls back the same way", async () => {
     composeResult = async () => { throw new Error("the picture editor is not ready"); };
@@ -293,7 +293,25 @@ describe("the face gate and its fallback", () => {
     expect(job.state).toBe("done");
     const recipe = getReferenceVideoRecipe(actor, job.id)!;
     expect(recipe.firstPicture!.how).toBe("pasted");
-    expect(recipe.firstPicture!.notes.join(" ")).toContain("could not place");
+    expect(recipe.firstPicture!.notes.join(" ")).toContain("could not blend");
+  });
+  test("CREATOR-07 fallback harmonizes, and keeps that picture on edit or gate failure", async () => {
+    composeResult = async () => { throw new Error("force CREATOR-07"); };
+    const vec = new Float32Array(256); vec[channelR(PERSON_A)] = 1;
+    let gateFail = false;
+    const tools = { ...firstFrameToolsForRoute(),
+      cutOutPeople: async () => ({ people: [{ name: "person", look: "person", image: Buffer.from(await solid(PERSON_A, 60, 120)), single: true }], notes: [] }),
+      faces: async () => gateFail ? [] : [{ vec, area: 100, x: 10, box: [20, 20, 20, 20] as [number, number, number, number] }],
+      cosine: () => 1,
+    };
+    let calls = 0;
+    const input = [{ bytes: await solid(PERSON_A), mediaType: "image/png", name: "person", role: "actor" as const, look: "person" }, { bytes: await solid(PLACE), mediaType: "image/png", name: "place", role: "end_shot" as const, look: "place" }];
+    const pass = await buildFirstPicture(input, { scene: "scene", tools: { ...tools, harmonize: async ({ png }) => { calls++; return png; } } });
+    expect(calls).toBe(1); expect(pass.how).toBe("composed");
+    const failedEdit = await buildFirstPicture(input, { scene: "scene", tools: { ...tools, harmonize: async () => { throw new Error("offline"); } } });
+    expect(failedEdit.how).toBe("pasted"); expect(failedEdit.notes).toContain("The picture editor could not blend the people into the scene, so each person's own cut-out is placed in it.");
+    const failedGate = await buildFirstPicture(input, { scene: "scene", tools: { ...tools, harmonize: async () => { gateFail = true; return new Uint8Array(await solid(BAD, 1024, 576)); } } });
+    expect(failedGate.how).toBe("pasted"); expect(failedGate.notes).toContain("The picture editor could not blend the people into the scene, so each person's own cut-out is placed in it.");
   });
   test("two people from one photo: both references go to the edit model, and BOTH faces must pass", async () => {
     pairNames.add("woman in a green coat");

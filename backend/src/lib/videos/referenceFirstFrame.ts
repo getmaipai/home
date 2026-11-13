@@ -37,7 +37,7 @@ export const MAX_PLACED_PEOPLE = 2;
 
 // The sheet maker's own picture shape (films/sheetMaker.ts), kept here as a plain type: importing that file, even for a type, would put the face code on the chat picture path.
 export interface SheetPicture { bytes: Uint8Array; mediaType: string; name: string; role: PictureRole; look: string }
-export interface FaceVec { vec: Float32Array; area: number; x: number }
+export interface FaceVec { vec: Float32Array; area: number; x: number; box?: [number, number, number, number] }
 export interface CutPerson { name: string; look: string; image: Buffer; single: boolean }
 export interface PicturedInput { subject: { name: string; kind: string }; picture: { bytes: Uint8Array; mediaType: string } }
 export interface FirstFrameTools {
@@ -49,6 +49,7 @@ export interface FirstFrameTools {
   cutOutPeople(picture: SheetPicture): Promise<{ people: CutPerson[]; notes: string[] }>;
   /** The Stack's picture edit (klein, up to two reference pictures): the first entry is the picture that is edited, the others ride along as references. Returns the PNG. */
   compose(input: { pictured: PicturedInput[]; scene: string; signal: AbortSignal }): Promise<Uint8Array>;
+  harmonize?(input: { png: Buffer; mask: Buffer; prompt: string; signal: AbortSignal }): Promise<Uint8Array>;
   /** SFace cosine of two vectors. */
   cosine(a: Float32Array, b: Float32Array): number;
   readPose?(image: Uint8Array): Promise<{ pose: Pose }>;
@@ -73,7 +74,7 @@ function realTools(actor: PersonRow | null): FirstFrameTools {
       const out: FaceVec[] = [];
       for (const face of [...found.value].sort((a, b) => b.bbox[2] * b.bbox[3] - a.bbox[2] * a.bbox[3]).slice(0, 8)) {
         const embedded = await faces.embedFace(png, face);
-        if (embedded.ok) out.push({ vec: embedded.value, area: face.bbox[2] * face.bbox[3], x: face.bbox[0] });
+        if (embedded.ok) out.push({ vec: embedded.value, area: face.bbox[2] * face.bbox[3], x: face.bbox[0], box: face.bbox });
       }
       return out;
     },
@@ -94,6 +95,7 @@ function realTools(actor: PersonRow | null): FirstFrameTools {
         }
       } catch (error) { void pictures.cancelOrDelete(submitted.job); throw error; }
     },
+    async harmonize({ png, mask, prompt, signal }) { return (await import("@/lib/videos/firstPictureHarmony")).realHarmonize(png, mask, prompt, signal); },
     cosine(a, b) { let dot = 0, aa = 0, bb = 0; for (let i = 0; i < a.length; i++) { dot += a[i]! * b[i]!; aa += a[i]! * a[i]!; bb += b[i]! * b[i]!; } return a.length === b.length && aa && bb ? dot / Math.sqrt(aa * bb) : 0; },
     async readPose(image) { return (await import("@/lib/pictures/pose")).readPose(image); },
     async readSeatBox(plate) { return (await import("@/lib/pictures/pose")).readSeatBox(plate); },
@@ -259,9 +261,24 @@ export async function buildFirstPicture(pictures: ReadonlyArray<FirstFramePictur
     const poseResults = await Promise.all(people.map((person) => (tools.readPose ?? (async (image: Uint8Array) => (await import("@/lib/pictures/pose")).readPose(image)))(new Uint8Array(person.image)).catch(() => ({ pose: "standing" as const }))));
     const seated = poseResults.some((result) => result.pose === "seated");
     const seat = seated ? await (tools.readSeatBox ?? (async (image: Uint8Array) => (await import("@/lib/pictures/pose")).readSeatBox(image)))(new Uint8Array(plate)).catch(() => null) : null;
-    const { composeNatural } = await import("@/lib/videos/firstPictureCompose");
-    png = await composeNatural(plate, people.map((person, index) => ({ image: person.image, pose: poseResults[index]!.pose, seat: poseResults[index]!.pose === "seated" ? seat : null })));
-    notes.push(`${reason ?? "The first picture could not be composed."} The first picture is therefore each person's own cut-out photo, cleaned and colour-matched, pasted into the place; the faces are exactly the photos'.`);
+    const [{ composeNaturalWithMasks }, harmony] = await Promise.all([import("@/lib/videos/firstPictureCompose"), import("@/lib/videos/firstPictureHarmony")]);
+    const natural = await composeNaturalWithMasks(plate, people.map((person, index) => ({ image: person.image, pose: poseResults[index]!.pose, seat: poseResults[index]!.pose === "seated" ? seat : null })));
+    png = natural.png;
+    let blended = false;
+    const harmonizeTool = tools.harmonize;
+    if (harmonizeTool) {
+      const detected = await tools.faces(new Uint8Array(natural.png)).catch(() => null);
+      const faceBoxes = (detected ?? []).flatMap((face) => face.box ? [{ box: face.box }] : []);
+      try {
+        if (faceBoxes.length) {
+          const candidate = await harmony.harmonize({ png: natural.png, people: natural.people, faceBoxes, tools: { harmonize: harmonizeTool }, signal });
+          const found = await tools.faces(new Uint8Array(candidate)).catch(() => null);
+          const scores = found ? own.map((person) => person.vec ? found.reduce((best, face) => Math.max(best, tools.cosine(person.vec!, face.vec)), -1) : -1) : [];
+          if (scores.length === own.length && scores.every((score) => score >= FACE_GATE)) { png = candidate; blended = true; how = "composed"; }
+        }
+      } catch { /* keep the clean CREATOR-07 composition */ }
+    }
+    if (!blended) notes.push("The picture editor could not blend the people into the scene, so each person's own cut-out is placed in it.");
     if (objectInputs.length) notes.push("The objects are not in the first picture; the video's words still name them.");
     scores = own.map(() => null);
   }

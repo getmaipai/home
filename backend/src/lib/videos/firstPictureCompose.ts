@@ -93,8 +93,8 @@ async function cleanAndMatch(image: Buffer, plate: { mean: Lab; sd: Lab }, stren
   return { png, width, height };
 }
 
-/** Each person's own cut-out placed on the plate by pose; returns a PNG at the plate's size. */
-export async function composeNatural(plate: Buffer, people: Person[], opts: { labStrength?: number } = {}): Promise<Buffer> {
+export interface NaturalPlacedPerson { alpha: Buffer; contact: { left: number; top: number; width: number; height: number } }
+export async function composeNaturalWithMasks(plate: Buffer, people: Person[], opts: { labStrength?: number } = {}): Promise<{ png: Buffer; people: NaturalPlacedPerson[] }> {
   const base = sharp(plate).ensureAlpha();
   const meta = await base.metadata();
   const W = meta.width!, H = meta.height!;
@@ -103,6 +103,7 @@ export async function composeNatural(plate: Buffer, people: Person[], opts: { la
   const strength = opts.labStrength ?? LAB_STRENGTH;
   const slotW = W / Math.max(people.length, 1);
   const layers: OverlayOptions[] = [];
+  const masks: NaturalPlacedPerson[] = [];
   for (const [index, person] of people.entries()) {
     const clean = await cleanAndMatch(person.image, plateStats, strength);
     let width: number, height: number, left: number, top: number;
@@ -136,6 +137,13 @@ export async function composeNatural(plate: Buffer, people: Person[], opts: { la
       ? await sharp(person_png).extract({ left: cropLeft, top: cropTop, width: Math.max(1, visibleW - cropLeft), height: Math.max(1, visibleH - cropTop) }).png().toBuffer()
       : person_png;
     layers.push({ input: shown, left: Math.max(0, left), top: Math.max(0, top) });
+    const alpha = await sharp(person_png).extract({ left: cropLeft, top: cropTop, width: Math.max(1, visibleW - cropLeft), height: Math.max(1, visibleH - cropTop) }).ensureAlpha().extractChannel(3).toColourspace("b-w").raw().toBuffer();
+    const alphaCrop = await sharp(alpha, { raw: { width: Math.max(1, visibleW - cropLeft), height: Math.max(1, visibleH - cropTop), channels: 1 } }).png().toBuffer();
+    const placedAlpha = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } }).composite([{ input: alphaCrop, left: Math.max(0, left), top: Math.max(0, top) }]).extractChannel(0).raw().toBuffer();
+    masks.push({ alpha: placedAlpha, contact: { left: Math.max(0, left), top: Math.max(0, Math.min(H - shadowH * 2, feet - shadowH)), width: Math.min(W - Math.max(0, left), width), height: Math.min(H - Math.max(0, Math.min(H - shadowH * 2, feet - shadowH)), shadowH * 2) } });
   }
-  return base.composite(layers).png().toBuffer();
+  return { png: await base.composite(layers).png().toBuffer(), people: masks };
 }
+
+/** Each person's own cut-out placed on the plate by pose; returns a PNG at the plate's size. */
+export async function composeNatural(plate: Buffer, people: Person[], opts: { labStrength?: number } = {}): Promise<Buffer> { return (await composeNaturalWithMasks(plate, people, opts)).png; }
