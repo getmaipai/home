@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
-  "description": "Make a sung song or instrumental when asked.",
+  "description": "Make a song when asked.",
   "offer": {
     "mode": "conditional",
     "gate": "musicAllowed",
@@ -38,14 +38,14 @@
       "description": {
         "type": "string",
         "grounded": false,
-        "description": "Genre, mood, instruments, voice. Never claim a song exists without calling this tool.",
+        "description": "Genre, mood, instruments, voice. Never claim a song without calling this.",
         "minLength": 3,
         "maxLength": 1200
       },
       "lyrics": {
         "type": "string",
         "grounded": false,
-        "description": "Lyrics with [Verse]/[Chorus] tags; shown by the player, not repeated in the reply.",
+        "description": "Lyrics, [Verse]/[Chorus] tags.",
         "maxLength": 4000
       },
       "bpm": {
@@ -61,7 +61,7 @@
       },
       "imitates_real_voice": {
         "type": "boolean",
-        "description": "True if asked to sound like a real person."
+        "description": "Sounds like a real person."
       },
       "instrumental": {
         "type": "boolean"
@@ -96,7 +96,7 @@
           "boost",
           "max"
         ],
-        "description": "Only if asked; max needs admin permission."
+        "description": "Only if asked; max needs admin."
       },
       "song_style": {
         "type": "string",
@@ -116,14 +116,14 @@
       "takes": {
         "type": "integer",
         "grounded": false,
-        "description": "Optional number of different takes of the song to make, from 1 to 3, made one after another and shown as one song card. Make more than one only when the person asks for options.",
+        "description": "Takes 1-3, one card; only if options asked.",
         "minimum": 1,
         "maximum": 3
       },
       "seed": {
         "type": "integer",
         "grounded": false,
-        "description": "Optional seed number. The same seed with the same words makes a very similar song; leave it out for a fresh one.",
+        "description": "Same seed, similar song.",
         "minimum": 1,
         "maximum": 2147483646
       }
