@@ -97,6 +97,7 @@ import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/
 import type { GateDecision } from "@/lib/gate/types";
 // Last on purpose: composerHint reaches the composer modes, which reach the app and page catalogs; imported earlier it reorders module loading.
 import { composerHintAllowed, resolveComposerHint } from "@/lib/composerHint";
+import { getScene } from "@/lib/scene";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -554,7 +555,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     if (surface !== "robot") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
     const answered = answerRobotOffer({
       actor, offerId: offerAnswer.offer_id, text, approved: offerAnswer.approved, turnId,
-      identified: sensitiveAllowed(surface, opts.speakerEvidence, opts.present, actor.id), // confirmed and alone, the same bar as sensitive records
+      identified: sensitiveAllowed(surface, opts.speakerEvidence, opts.present, actor.id, opts.temporary ? null : getScene(conversation.id)), // confirmed and alone, the same bar as sensitive records
     });
     if (answered.kind === "stale") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
     if (answered.kind === "accepted") offerTurn = { id: answered.offer.id, reply: answered.offer.text };
@@ -875,6 +876,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // windowRoleFromId() and nodes/answer.ts's policyRefusalLine() are
   // written this way too).
   const trace = (finalSnapshot.context as { trace: TraceRecorder }).trace;
+  const currentScene = getScene(conversationId);
+  trace.setSceneCounts("context", { people: currentScene?.people.length ?? 0, strong: currentScene?.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length ?? 0, typed: currentScene?.people.filter((p) => p.basis.includes("typed")).length ?? 0, place_known: !!currentScene?.place && currentScene.place.where !== "unknown", child_present: currentScene?.child_present ?? false, events: currentScene?.ambient?.events.length ?? 0 });
   const ranNodes = new Set(state.nodes.map((n) => n.node));
   if (!ranNodes.has("safety")) trace.skip("safety", "not reached this turn");
   if (!ranNodes.has("commands")) trace.skip("commands", "not reached this turn");

@@ -1,0 +1,30 @@
+{
+  "id": "scene-01-render",
+  "description": "Twenty-four short context render cases spanning presence, certainty, child, place, stale data and budget drop order.",
+  "cases": [
+    { "id": "empty", "people": 0, "speaker": "unknown", "expected": "unknown speaker" },
+    { "id": "actor-alone", "people": 0, "speaker": "confirmed", "expected": "With you" },
+    { "id": "actor-signed-in", "people": 0, "speaker": "signed_in", "expected": "With you" },
+    { "id": "actor-tentative", "people": 0, "speaker": "tentative", "expected": "possibly recognized" },
+    { "id": "one-unknown", "people": 1, "speaker": "confirmed", "expected": "someone the sensors do not identify" },
+    { "id": "one-confirmed", "people": 1, "speaker": "confirmed", "expected": "a confirmed person" },
+    { "id": "two-people", "people": 2, "speaker": "confirmed", "expected": "People here" },
+    { "id": "child", "people": 1, "speaker": "confirmed", "child_present": true, "expected": "A child is in the room" },
+    { "id": "teen", "people": 1, "speaker": "confirmed", "band": "teen", "expected": "People here" },
+    { "id": "typed-claim", "people": 1, "speaker": "confirmed", "typed": true, "expected": "someone the sensors do not identify" },
+    { "id": "face-fresh", "people": 1, "speaker": "confirmed", "age": "just now", "expected": "People here" },
+    { "id": "face-old", "people": 1, "speaker": "confirmed", "age": "a while ago", "expected": "People here" },
+    { "id": "look-floor", "people": 3, "speaker": "confirmed", "expected": "People here" },
+    { "id": "gps-home", "people": 0, "speaker": "confirmed", "place": "home", "expected": "at home" },
+    { "id": "gps-away", "people": 0, "speaker": "confirmed", "place": "away", "expected": "away" },
+    { "id": "place-indoor", "people": 0, "speaker": "confirmed", "place": "indoor", "expected": "indoors" },
+    { "id": "place-outdoor", "people": 0, "speaker": "confirmed", "place": "outdoor", "expected": "outdoor" },
+    { "id": "place-room", "people": 0, "speaker": "confirmed", "place": "room", "expected": "Place" },
+    { "id": "place-private", "people": 0, "speaker": "confirmed", "place": "area", "expected": "Place" },
+    { "id": "conflict", "people": 1, "speaker": "unknown", "expected": "unknown" },
+    { "id": "strong-beats-weak", "people": 1, "speaker": "confirmed", "typed": true, "expected": "People here" },
+    { "id": "child-adult-actor", "people": 1, "speaker": "confirmed", "actor": "adult", "child_present": true, "expected": "A child is in the room" },
+    { "id": "budget-drop", "people": 4, "speaker": "confirmed", "ambient": true, "place": "room", "expected": "speaker line retained" },
+    { "id": "no-visual-identity", "people": 1, "speaker": "confirmed", "expected": "never name or identify anyone from how they look" }
+  ]
+}

@@ -788,10 +788,11 @@ const TEMPORARY_SESSION_MAX = 200;
 // this chat still in use".
 const TEMPORARY_SESSION_IDLE_MS = 2 * 60 * 60 * 1000;
 const temporarySessions = new Map<string, TemporaryConversationSession>();
+function dropRuntimeScene(id: string): void { void import("@/lib/scene").then(({ dropScene }) => dropScene(id)); }
 
 function pruneTemporarySessions(now: number): void {
   for (const [id, session] of temporarySessions) {
-    if (now - session.lastActivityAt > TEMPORARY_SESSION_IDLE_MS) temporarySessions.delete(id);
+    if (now - session.lastActivityAt > TEMPORARY_SESSION_IDLE_MS) { temporarySessions.delete(id); dropRuntimeScene(id); }
   }
   pruneTemporaryChatImages(new Set(temporarySessions.keys()));
 }
@@ -808,6 +809,7 @@ function evictOldestTemporarySessionIfFull(): void {
   }
   if (oldestId) {
     temporarySessions.delete(oldestId);
+    dropRuntimeScene(oldestId);
     pruneTemporaryChatImages(new Set(temporarySessions.keys()));
   }
 }
@@ -851,6 +853,7 @@ export function discardTemporarySessions(personId: string): number {
   for (const [id, session] of temporarySessions) {
     if (session.conversation.person === personId) {
       temporarySessions.delete(id);
+      dropRuntimeScene(id);
       pruneTemporaryChatImages(new Set(temporarySessions.keys()));
       discarded++;
     }
@@ -2364,6 +2367,8 @@ export function deleteConversationById(actor: PersonRow, id: string, opts: { med
     .run(id);
   sqlite.query("DELETE FROM conversation_turns WHERE conversation_id = ?").run(id);
   forgetConversationMemory(id);
+  // Runtime-only scene state is discarded with its conversation.
+  dropRuntimeScene(id);
   return { ok: true, value: true };
 }
 

@@ -25,6 +25,7 @@ import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { LICENCE_LABELS, canonicalPageUrl } from "@/lib/retrieval/referenceSources";
 import { nextHlc } from "@/lib/hlc";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
+import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { robotCompanionBand, stricterBand } from "@/lib/robotCompanion";
@@ -59,7 +60,14 @@ export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidenc
  * empty or missing present list means the body said nothing, so nothing
  * sensitive is said; switching it off withholds sensitive records entirely
  * rather than guessing. */
-export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvidence | null | undefined, present: readonly PresentPerson[] | null | undefined, actorId: string): boolean {
+export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvidence | null | undefined, present: readonly PresentPerson[] | null | undefined, actorId: string, scene?: Scene | null): boolean {
+  const scenePeople = scene?.people ?? [];
+  const otherPresent = scenePeople.some((person) => person.person_id !== actorId);
+  if ((surface === "chat" || surface === "phone") && otherPresent) return false;
+  if (["tv", "overlay", "pod"].includes(surface)) {
+    const actorIsSpeaker = scene?.speaker?.person === actorId && scene.speaker.level === "confirmed" && ["face", "voice", "voice_and_face", "signed_in"].includes(scene.speaker.basis);
+    if (!actorIsSpeaker || !scene?.alone || scenePeople.length > 0) return false;
+  }
   if (surface !== "robot") return true;
   const confirmedSpeaker = speakerEvidence?.person === actorId && speakerEvidence.level === "confirmed";
   const signedInSpeaker = speakerEvidence?.person === actorId && speakerEvidence.basis === "signed_in";

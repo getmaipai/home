@@ -1078,6 +1078,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
+| `backend/src/lib/scene.ts` | SCENE_TTL, fuseScene, getScene, setScene, dropScene, clearScenes |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, SCHEDULE_PRUNE_DAYS |
 | `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, ONCE_GRACE_MS, pauseTask, fireHubDeviceTask |
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
@@ -1263,7 +1264,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/messages.ts` | dataContextHeaderPatternSource, contextToMessages, bareMessages, continuationMessages |
 | `backend/src/lib/turnMachine/nodes/answer.ts` | PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine, __setClaimJudgeForTests |
 | `backend/src/lib/turnMachine/nodes/commands.ts` | commandsNode |
-| `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, decideReasoning, chatModelCutoff, datesText, windowContextItems |
+| `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, renderScene, decideReasoning, chatModelCutoff, datesText |
 | `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible, retryTools |
 | `backend/src/lib/turnMachine/nodes/model.ts` | toolSpecFor, replyMaxTokensFor, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, SEARCH_ASSIST_HOLD_LIMIT_MS, SEARCH_ASSIST_RESCUE_BUDGET_MS |
 | `backend/src/lib/turnMachine/nodes/outputGate.ts` | gateGrainFor, StreamGate, outputGateNode |

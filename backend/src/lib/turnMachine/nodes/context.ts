@@ -51,7 +51,7 @@ import { picturesAttachedNote, picturesDescribedNote, picturesNotReadNote, audio
 import { chatModelReadsPictures, describePictures, loadPictureParts, picturePartsAllowed, visionPicturesAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
-import { sceneContextLine } from "@/lib/robotVision";
+import { sceneContextLine, sceneFor } from "@/lib/robotVision";
 import { dropInterruptedReply, mayCarryInterruptedReply, takeInterruptedReply } from "@/lib/interruptedReply";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { carriesCrisisSignal } from "@/lib/safety";
@@ -62,6 +62,10 @@ import { getRobotCheckin } from "@/lib/robotCheckin";
 import { getDeviceState } from "@/lib/deviceStates";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
+import { fuseScene, getScene, setScene, observationsForTurn } from "@/lib/scene";
+import { sensitiveAllowed } from "@/lib/turnContext";
+import { listActivePeople } from "@/lib/access";
+import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -72,6 +76,36 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 /** THIN-3C: the share of the history space a turn that may call a tool
  * keeps free for that round's call and results. */
 export const TOOL_ROUND_SHARE = 0.25;
+const SCENE_RENDER_TOKEN_LIMIT = 320;
+const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
+export function renderScene(scene: Scene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
+  const members = new Map(household.map((person) => [person.id, person]));
+  const age = (at: number) => {
+    const elapsed = Math.max(0, now - at);
+    return elapsed < 60_000 ? "just now" : elapsed < 5 * 60_000 ? "a few minutes ago" : "a while ago";
+  };
+  const basis = (p: Scene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
+  const lines = [SCENE_PROLOGUE];
+  if (scene.speaker?.level === "confirmed" && scene.speaker.person) lines.push(`With ${actor.displayName}:`);
+  else if (scene.speaker?.basis === "signed_in") lines.push(`With ${actor.displayName}:`);
+  else if (scene.speaker?.level === "tentative") lines.push("With you: possibly recognized.");
+  else lines.push("With you: unknown speaker.");
+  if (scene.people.length) {
+    const people = scene.people.map((p) => {
+      const member = p.person_id ? members.get(p.person_id) : null;
+      const name = member?.displayName ?? p.label ?? "someone the camera does not know";
+      const band = member ? ` (${speakerAgeBand(member, new Date(now))})` : p.band !== "unknown" ? ` (${p.band})` : "";
+      const how = p.basis.includes("typed") ? `${actor.displayName} said so` : basis(p);
+      return `${name}${band} (${how} ${age(p.last_seen_at)})`;
+    });
+    lines.push(`People here: ${people.join(", ")}.`);
+  } else lines.push("No other person is known to be here.");
+  if (scene.child_present) lines.push("A child is in the room.");
+  const place = scene.place;
+  if (place && place.where !== "unknown") lines.push(`Place: ${place.where === "home" ? "at home" : "away"}${place.setting !== "unknown" ? `, ${place.setting === "indoor" ? "indoors" : place.setting}` : ""}.`);
+  const text = lines.join(" ");
+  return text.length <= 1200 ? text : `${SCENE_PROLOGUE} People here.`;
+}
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
  * here, from the age band and the surface - "a minor's turn never
@@ -196,6 +230,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   }
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
+  const sceneNow = Date.now();
+  const lookCount = state.surface === "robot" && state.deviceId ? sceneFor(state.deviceId, sceneNow)?.people ?? null : null;
+  const speakerForScene: Scene["speaker"] = state.speakerEvidence ? { ...state.speakerEvidence } : { person: state.actor.id, basis: "signed_in", level: "confirmed" };
+  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
+  setScene(currentScene, sceneNow);
 
   const items: ContextItem[] = [];
   let disclosureWithheld = false;
@@ -317,7 +356,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // speaker_evidence does not name the signed-in person), so an
     // unidentified speaker recalls no person-scope record, and only the
     // household records a child may see.
-    const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
+    const sceneGate = sensitiveAllowed(state.surface, state.speakerEvidence, state.present, state.actor.id, currentScene);
+    const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen" || !sceneGate;
     const anonymous = speakerIsAnonymous(state);
     const embedStart = Date.now();
     const queryVector = await embedQueryForRecall(input.utterance);
@@ -508,6 +548,14 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
+  const sceneText = renderScene(currentScene, now.getTime(), state.actor, listActivePeople());
+  const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
+  const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
+  let sceneTokens = await sceneTokenCount(sceneItem.text);
+  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Ambient events:")) { sceneItem.text = sceneItem.text.replace(/ Ambient events:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
+  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Light:")) { sceneItem.text = sceneItem.text.replace(/ Light:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
+  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Temperature:")) { sceneItem.text = sceneItem.text.replace(/ Temperature:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
+  if (sceneTokens !== null && sceneTokens <= SCENE_RENDER_TOKEN_LIMIT) items.push(sceneItem);
 
   // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries
   // no task. Volatile tail only (rule 4); never in a temporary conversation, on a shared surface or for an unconfirmed speaker.

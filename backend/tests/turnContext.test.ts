@@ -44,18 +44,39 @@ describe("AGE-02: worryingConversation()", () => {
   });
 });
 
-test("sensitiveAllowed(): the robot requires a confirmed speaker who is confirmed alone", () => {
+test("sensitiveAllowed(): retains the robot floor and tightens shared surfaces", () => {
   const owner = "person-1";
   const confirmed = { person: owner, basis: "voice" as const, level: "confirmed" as const };
   const present = [{ person: owner, basis: "face" as const, level: "confirmed" as const }];
-  expect(sensitiveAllowed("chat", null, null, owner)).toBe(true);
-  expect(sensitiveAllowed("robot", confirmed, present, owner)).toBe(true);
-  expect(sensitiveAllowed("robot", { ...confirmed, basis: "signed_in" }, present, owner)).toBe(true);
-  expect(sensitiveAllowed("robot", { ...confirmed, level: "tentative" }, present, owner)).toBe(false);
-  expect(sensitiveAllowed("robot", { ...confirmed, person: "person-2" }, present, owner)).toBe(false);
-  expect(sensitiveAllowed("robot", confirmed, [...present, { person: "unknown", basis: "unknown", level: "tentative" }], owner)).toBe(false);
-  expect(sensitiveAllowed("robot", confirmed, [], owner)).toBe(false);
-  expect(sensitiveAllowed("robot", confirmed, undefined, owner)).toBe(false);
+  const scene = null;
+  expect(sensitiveAllowed("chat", null, null, owner, scene)).toBe(true);
+  expect(sensitiveAllowed("phone", null, null, owner, scene)).toBe(true);
+  expect(sensitiveAllowed("robot", confirmed, present, owner, scene)).toBe(true);
+  expect(sensitiveAllowed("robot", { ...confirmed, basis: "signed_in" }, present, owner, scene)).toBe(true);
+  expect(sensitiveAllowed("robot", { ...confirmed, level: "tentative" }, present, owner, scene)).toBe(false);
+  expect(sensitiveAllowed("robot", { ...confirmed, person: "person-2" }, present, owner, scene)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, [...present, { person: "unknown", basis: "unknown", level: "tentative" }], owner, scene)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, [], owner, scene)).toBe(false);
+  expect(sensitiveAllowed("robot", confirmed, undefined, owner, scene)).toBe(false);
+  const other = { conversation_id: "c", people: [{ person_id: null, label: null, relation: "unknown" as const, band: "unknown" as const, level: "claimed" as const, basis: ["typed" as const], last_seen_at: 0, expires_at: 1 }], speaker: null, place: null, ambient: null, weather: null, alone: false, child_present: false, updated_at: 0 };
+  for (const surface of ["chat", "phone"] as const) {
+    expect(sensitiveAllowed(surface, null, null, owner, scene)).toBe(true);
+    expect(sensitiveAllowed(surface, null, null, owner, other)).toBe(false);
+  }
+  for (const surface of ["tv", "overlay", "pod"] as const) {
+    expect(sensitiveAllowed(surface, null, null, owner, scene)).toBe(false);
+  }
+  // Exhaustive small domain: scene-aware decisions may only remove old allows.
+  for (const surface of ["chat", "phone", "robot", "tv", "overlay", "pod"] as const) {
+    for (const evidence of [null, confirmed, { ...confirmed, level: "tentative" as const }, { person: owner, basis: "signed_in" as const, level: "confirmed" as const }]) {
+      for (const list of [null, undefined, [], present, [...present, { person: "other", basis: "face" as const, level: "confirmed" as const }]]) {
+        const old = surface !== "robot" ? true : ((evidence?.person === owner && (evidence.level === "confirmed" || (evidence as { basis?: string } | null)?.basis === "signed_in")) && list?.length === 1 && list[0]?.person === owner && list[0]?.level === "confirmed");
+        const sceneExpected = surface === "robot" ? old : false;
+        expect(sensitiveAllowed(surface, evidence, list, owner, other)).toBe(sceneExpected);
+        if (sensitiveAllowed(surface, evidence, list, owner, scene)) expect(old).toBe(true);
+      }
+    }
+  }
 });
 
 test("asksHowKnown(): recognizes fixed provenance questions only", () => {

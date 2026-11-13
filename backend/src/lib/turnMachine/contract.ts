@@ -41,7 +41,7 @@ export interface ContextItem {
    * contextQuoteGrounded excludes it, and messages.ts never re-prints
    * it into the prompt's context block, since it is already the final
    * user message contextToMessages() appends). */
-  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance" | "attachment" | "project" | "camera" | "interrupted" | "page" | "opening";
+  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance" | "attachment" | "project" | "camera" | "interrupted" | "page" | "opening" | "scene";
   /** Entity ids the item mentions (household-subject rule, grounding). */
   subjects: string[];
   disclosure: "child_ok" | "teen_ok" | "adult_only";
@@ -495,6 +495,7 @@ export interface NodeExecution {
    * "so the replay bench and the weekly report can prove a minor's row
    * never carried a reasoning event." Absent on every other node. */
   reasoning?: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] };
+  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number };
 }
 
 /** A node reads TurnState and its own typed input, and returns its typed

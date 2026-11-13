@@ -40,6 +40,7 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   episode: "episode",
   profile: "profile",
   clock: "clock",
+  scene: "scene",
   roster: "household",
   subjects: "subjects",
   tool_result: "result",
@@ -84,6 +85,7 @@ function renderProfileLine(item: ContextItem): string {
 function renderContextLine(item: ContextItem): string {
   if (item.source === "memory") return renderMemoryLine(item);
   if (item.source === "profile") return renderProfileLine(item);
+  if (item.source === "scene") return `[Background data] ${item.text}`;
   const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window" | "utterance">];
   const dated = item.at ? ` (${item.at.slice(0, 10)})` : "";
   const band = item.certainty ? `, certainty: ${item.certainty}` : "";
