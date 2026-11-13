@@ -118,6 +118,9 @@ export function MusicPlayerBar() {
   const heldStarted = !!held?.started;
   useEffect(() => { if (heldStarted && !musicPlayer.get().playing) musicPlayer.stop(); }, [heldStarted]);
   useEffect(() => { if (!track) setExpanded(false); }, [track]);
+  useEffect(() => {
+    if (snap.notice) push(i18n._({ id: "This song could not be played. Check the file and try again.", message: "This song could not be played. Check the file and try again." }));
+  }, [snap.notice, push]);
 
   const askNext = () => { if (musicPlayer.canNext()) musicPlayer.next(); else push(LAST_SONG_LINE()); };
   const latest = useRef(askNext); latest.current = askNext;

@@ -6,8 +6,14 @@ import type { Track } from "./musicQueue";
 
 /** A stand-in for the audio element: the player only needs these. */
 class FakeAudio extends EventTarget {
-  src = ""; paused = true; currentTime = 0; duration = 100; volume = 1; muted = false; loop = false; preload = ""; dataset: Record<string, string> = {};
-  play() { this.paused = false; this.dispatchEvent(new Event("play")); return Promise.resolve(); }
+  private source = "";
+  loads = 0;
+  endOnPlay = false;
+  crossOrigin: string | null = null;
+  get src() { return this.source; }
+  set src(value: string) { this.source = value; if (value) { this.loads++; this.currentTime = 0; } }
+  paused = true; currentTime = 0; duration = 100; volume = 1; muted = false; loop = false; preload = ""; dataset: Record<string, string> = {};
+  play() { this.paused = false; this.dispatchEvent(new Event("play")); if (this.endOnPlay) this.dispatchEvent(new Event("ended")); return Promise.resolve(); }
   pause() { this.paused = true; this.dispatchEvent(new Event("pause")); }
   removeAttribute() { this.src = ""; }
 }
@@ -15,13 +21,19 @@ const t = (key: string): Track => ({ key, url: `/a/${key}`, title: key });
 const queue = ["a", "b", "c"].map(t);
 let fake: FakeAudio;
 const make = () => { fake = new FakeAudio(); return createMusicPlayer(() => fake as unknown as HTMLAudioElement); };
+const realNow = Date.now;
+let fakeNow = 10_000;
+const advance = (ms = 301) => { fakeNow += ms; };
 
-beforeEach(() => setPlayMode({ shuffle: false, repeat: "off" }));
+beforeEach(() => { fakeNow = 10_000; Date.now = () => fakeNow; setPlayMode({ shuffle: false, repeat: "off" }); });
+afterEach(() => { Date.now = realNow; });
 
 describe("music player", () => {
   test("pressing a song plays it with the queue; pressing it again pauses", () => {
     const player = make();
     player.toggle(t("b"), queue);
+    expect(fake.preload).toBe("metadata");
+    expect(fake.crossOrigin).toBe("anonymous");
     expect(player.get().track?.key).toBe("b");
     expect(player.get().index).toBe(1);
     expect(player.get().playing).toBe(true);
@@ -34,6 +46,7 @@ describe("music player", () => {
     player.toggle(t("a"), queue);
     player.next();
     expect(player.get().track?.key).toBe("b");
+    advance();
     player.next();
     expect(player.canNext()).toBe(false);
     player.next();
@@ -49,11 +62,14 @@ describe("music player", () => {
   test("a song that ends moves to the next; the last one stops; repeat all wraps", () => {
     const player = make();
     player.toggle(t("b"), queue);
+    fake.currentTime = 100;
     fake.dispatchEvent(new Event("ended"));
     expect(player.get().track?.key).toBe("c");
+    fake.currentTime = 100;
     fake.dispatchEvent(new Event("ended"));
     expect(player.get().playing).toBe(false);
     setPlayMode({ repeat: "all" });
+    fake.currentTime = 100;
     fake.dispatchEvent(new Event("ended"));
     expect(player.get().track?.key).toBe("a");
   });
@@ -61,6 +77,7 @@ describe("music player", () => {
     const player = make();
     setPlayMode({ repeat: "one" });
     player.toggle(t("b"), queue);
+    fake.currentTime = 100;
     fake.dispatchEvent(new Event("ended"));
     expect(player.get().track?.key).toBe("b");
     expect(player.get().playing).toBe(true);
@@ -71,6 +88,7 @@ describe("music player", () => {
     player.toggle(t("a"), queue);
     const seen = new Set(["a"]);
     player.next(); seen.add(player.get().track!.key);
+    advance();
     player.next(); seen.add(player.get().track!.key);
     expect(seen.size).toBe(3);
     expect(player.canNext()).toBe(false);
@@ -99,6 +117,59 @@ describe("music player", () => {
     expect(player.get().failed).toBe(true);
     player.next();
     expect(player.get().failed).toBe(false);
+  });
+  test("an ended event without playback does not advance", () => {
+    const player = make();
+    player.toggle(t("a"), queue);
+    fake.currentTime = 0;
+    fake.dispatchEvent(new Event("ended"));
+    expect(player.get().track?.key).toBe("a");
+    expect(fake.loads).toBe(1);
+  });
+  test.each([0, Number.NaN])("an ended event with duration %s does not advance", (duration) => {
+    const player = make();
+    player.toggle(t("a"), queue);
+    fake.duration = duration;
+    fake.currentTime = 100;
+    fake.dispatchEvent(new Event("ended"));
+    expect(player.get().track?.key).toBe("a");
+    expect(fake.loads).toBe(1);
+  });
+  test("immediate ended events stop without looping and show the notice", () => {
+    fake = new FakeAudio();
+    fake.endOnPlay = true;
+    const guarded = createMusicPlayer(() => fake as unknown as HTMLAudioElement);
+    guarded.toggle(t("a"), queue);
+    expect(fake.loads).toBeLessThanOrEqual(2);
+    expect(fake.loads).toBe(1);
+    expect(guarded.get().notice).toBe("This song could not be played. Check the file and try again.");
+  });
+  test("an error never advances", () => {
+    const player = make();
+    player.toggle(t("a"), queue);
+    fake.dispatchEvent(new Event("error"));
+    expect(player.get().track?.key).toBe("a");
+    expect(player.get().failed).toBe(true);
+    expect(fake.loads).toBe(1);
+  });
+  test("a real ended event after playback advances once", () => {
+    const player = make();
+    player.toggle(t("a"), queue);
+    fake.currentTime = 2;
+    fake.dispatchEvent(new Event("timeupdate"));
+    fake.currentTime = 100;
+    fake.dispatchEvent(new Event("ended"));
+    expect(player.get().track?.key).toBe("b");
+    expect(fake.loads).toBe(2);
+  });
+  test("two Next presses within 300 ms advance once", () => {
+    const player = make();
+    player.toggle(t("a"), queue);
+    advance();
+    player.next();
+    player.next();
+    expect(player.get().track?.key).toBe("b");
+    expect(fake.loads).toBe(2);
   });
 });
 

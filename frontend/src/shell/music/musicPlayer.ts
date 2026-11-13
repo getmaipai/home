@@ -15,10 +15,12 @@ export interface MusicSnapshot {
   playing: boolean;
   /** True when the browser could not play the file; cleared by the next song. */
   failed: boolean;
+  notice: string | null;
 }
 
 const VOLUME_KEY = "music.volume";
-const EMPTY: MusicSnapshot = { track: null, queue: [], index: -1, playing: false, failed: false };
+const EMPTY: MusicSnapshot = { track: null, queue: [], index: -1, playing: false, failed: false, notice: null };
+const UNPLAYABLE = "This song could not be played. Check the file and try again.";
 
 function readVolume(): { volume: number; muted: boolean } {
   try {
@@ -65,16 +67,31 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   let history: string[] = [];
   let vol = readVolume();
   const listeners = new Set<() => void>();
+  const reportedListenerErrors = new WeakSet<() => void>();
   const clockListeners = new Set<() => void>();
+  let silentEnds = 0;
+  let loadStartedAt = 0;
+  let lastNextAt = -Infinity;
+  let stopping = false;
+  const notify = (setOf: Set<() => void>) => {
+    setOf.forEach((listener) => {
+      try { listener(); } catch (error) {
+        if (!reportedListenerErrors.has(listener)) {
+          reportedListenerErrors.add(listener);
+          console.error("Music player listener failed", error);
+        }
+      }
+    });
+  };
   let frame = 0;
   let clockNow = { time: 0, duration: 0 };
-  const set = (patch: Partial<MusicSnapshot>) => { snap = { ...snap, ...patch }; listeners.forEach((listener) => listener()); };
+  const set = (patch: Partial<MusicSnapshot>) => { snap = { ...snap, ...patch }; notify(listeners); };
   /** Reads the element once and keeps the result until the next tick; a new object only when a number changed. */
   const readClock = () => {
     const time = el?.currentTime ?? 0, duration = el && Number.isFinite(el.duration) ? el.duration : snap.track?.duration ?? 0;
     if (time !== clockNow.time || duration !== clockNow.duration) clockNow = { time, duration };
   };
-  const clockTick = () => { readClock(); clockListeners.forEach((listener) => listener()); };
+  const clockTick = () => { readClock(); notify(clockListeners); };
   // A smooth clock for the waveform and the karaoke wipe: the element's own timeupdate is about four a second. Runs only while sound plays and someone watches.
   const startFrames = () => {
     if (frame || typeof requestAnimationFrame !== "function" || !snap.playing || clockListeners.size === 0) return;
@@ -85,18 +102,24 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   const ensure = (): HTMLAudioElement => {
     if (el) return el;
     const made = makeElement();
-    made.preload = "auto";
+    made.preload = "metadata";
+    made.crossOrigin = "anonymous";
     made.volume = vol.volume; made.muted = vol.muted;
     made.addEventListener("play", () => { set({ playing: true, failed: false }); startFrames(); });
     made.addEventListener("pause", () => { set({ playing: false }); clockTick(); });
-    made.addEventListener("ended", () => { goNext(true); });
-    made.addEventListener("error", () => set({ playing: false, failed: true }));
+    made.addEventListener("ended", () => {
+      if (stopping) return;
+      if (!reallyPlayed()) { noPlayback(); return; }
+      silentEnds = 0;
+      goNext(true);
+    });
+    made.addEventListener("error", () => { if (!stopping) noPlayback(true); });
     // The kit Player's own M key and the session's sleep fade change the element directly; follow it so the bar's volume stays true.
     made.addEventListener("volumechange", () => {
       if (vol.volume === made.volume && vol.muted === made.muted) return;
       vol = { volume: made.volume, muted: made.muted };
       try { localStorage.setItem(VOLUME_KEY, JSON.stringify(vol)); } catch { /* the level lasts until reload */ }
-      listeners.forEach((listener) => listener());
+      notify(listeners);
     });
     for (const name of ["seeked", "timeupdate", "durationchange", "loadedmetadata"] as const) made.addEventListener(name, clockTick);
     el = made;
@@ -111,17 +134,32 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     const track = queue[index];
     if (!track) return;
     const audio = ensure();
-    if (fresh) { played = new Set(); history = []; }
+    if (fresh) { played = new Set(); history = []; silentEnds = 0; }
     played.add(track.key);
     onStart?.();
     register(track);
     audio.dataset.key = track.key;
     audio.src = track.url;
+    loadStartedAt = audio.currentTime;
+    stopping = false;
     audio.loop = track.loop === true;
-    set({ track, queue, index, failed: false });
+    set({ track, queue, index, failed: false, notice: null });
     clockTick();
     handle?.requestFocus();
-    void audio.play().catch(() => set({ playing: false }));
+    void audio.play().catch(() => { if (audio.dataset.key === snap.track?.key) noPlayback(true); });
+  };
+  const reallyPlayed = (): boolean => {
+    const audio = el;
+    if (!audio || !snap.track || audio.dataset.key !== snap.track.key) return false;
+    const duration = audio.duration;
+    return Number.isFinite(duration) && duration > 0 && audio.currentTime > 0 && audio.currentTime - loadStartedAt >= Math.min(2, duration);
+  };
+  const noPlayback = (failed = false) => {
+    if (stopping) return;
+    silentEnds = Math.min(silentEnds + 1, 2);
+    stopping = true;
+    el?.pause();
+    set({ playing: false, ...(failed ? { failed: true } : {}), ...(silentEnds >= 1 ? { notice: UNPLAYABLE } : {}) });
   };
   const goNext = (ended: boolean): boolean => {
     const { queue, index, track } = snap;
@@ -144,13 +182,27 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     },
     playPause() {
       if (!el || !snap.track) return;
-      if (el.paused) { handle?.requestFocus(); void el.play().catch(() => set({ playing: false })); } else el.pause();
+      if (el.paused) {
+        stopping = false;
+        const key = snap.track.key;
+        handle?.requestFocus();
+        void el.play().catch(() => { if (el?.dataset.key === key) noPlayback(true); });
+      } else el.pause();
     },
-    next() { goNext(false); },
+    next() {
+      const now = Date.now();
+      if (now - lastNextAt < 300) return;
+      lastNextAt = now;
+      silentEnds = 0;
+      stopping = false;
+      goNext(false);
+    },
     canNext: () => !!snap.track && pickNext({ queue: snap.queue, index: snap.index, mode: getPlayMode(), played, ended: false, random: () => 0 }) !== null,
     previous() {
       const { queue, index, track } = snap;
       if (!track || !el) return;
+      silentEnds = 0;
+      stopping = false;
       const to = pickPrevious({ queue, index, mode: getPlayMode(), time: el.currentTime, history });
       if (to === "restart") { el.currentTime = 0; clockTick(); if (el.paused) store.playPause(); return; }
       if (getPlayMode().shuffle) history.pop();
@@ -167,21 +219,23 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       vol = { volume: Math.min(1, Math.max(0, volume)), muted: false };
       if (el) { el.volume = vol.volume; el.muted = false; }
       try { localStorage.setItem(VOLUME_KEY, JSON.stringify(vol)); } catch { /* the level lasts until reload */ }
-      listeners.forEach((listener) => listener());
+      notify(listeners);
     },
     toggleMute() {
       vol = { ...vol, muted: !vol.muted };
       if (el) el.muted = vol.muted;
       try { localStorage.setItem(VOLUME_KEY, JSON.stringify(vol)); } catch { /* the level lasts until reload */ }
-      listeners.forEach((listener) => listener());
+      notify(listeners);
     },
     volume: () => vol,
     stop() {
       if (el) { el.pause(); el.removeAttribute("src"); delete el.dataset.key; }
+      stopping = true;
+      silentEnds = 0;
       handle?.release(); handle = null;
       played = new Set(); history = [];
       snap = EMPTY;
-      listeners.forEach((listener) => listener());
+      notify(listeners);
       clockTick();
     },
     bind(next, start) {
