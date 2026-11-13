@@ -113625,6 +113625,32 @@
                               "position"
                             ]
                           },
+                          "seed": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                          },
+                          "takes": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "group": {
+                                "type": "string"
+                              },
+                              "index": {
+                                "type": "integer"
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "group",
+                              "index",
+                              "total"
+                            ],
+                            "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                          },
                           "cover_pending": {
                             "type": "boolean"
                           },
@@ -113713,12 +113739,18 @@
                                 },
                                 "url": {
                                   "type": "string"
+                                },
+                                "seed": {
+                                  "type": "number",
+                                  "nullable": true,
+                                  "description": "The seed this version was made with."
                                 }
                               },
                               "required": [
                                 "id",
                                 "label",
-                                "url"
+                                "url",
+                                "seed"
                               ]
                             }
                           },
@@ -113787,6 +113819,8 @@
                           "stage_index",
                           "started_at",
                           "making_version",
+                          "seed",
+                          "takes",
                           "cover_pending",
                           "cover_url",
                           "cover_versions",
@@ -114078,6 +114112,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -114166,12 +114226,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -114240,6 +114306,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -114528,6 +114596,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -114616,12 +114710,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -114690,6 +114790,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -114996,6 +115098,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -115084,12 +115212,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -115158,6 +115292,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -115472,6 +115608,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -115560,12 +115722,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -115634,6 +115802,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -115771,6 +115941,18 @@
                   "key": {
                     "type": "string",
                     "maxLength": 20
+                  },
+                  "takes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "description": "How many different takes to make, 1 to 3; they are made one after another and show as one song card."
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483646,
+                    "description": "The seed of the first take; leave out for a fresh one."
                   },
                   "song_style": {
                     "type": "string",
@@ -115977,6 +116159,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -116065,12 +116273,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -116139,6 +116353,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -116466,6 +116682,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -116554,12 +116796,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -116628,6 +116876,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -117260,6 +117510,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -117348,12 +117624,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -117422,6 +117704,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -117765,6 +118049,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -117853,12 +118163,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -117927,6 +118243,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -118236,6 +118554,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -118324,12 +118668,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -118398,6 +118748,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -118711,6 +119063,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -118799,12 +119177,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -118873,6 +119257,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -119224,6 +119610,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -119312,12 +119724,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -119386,6 +119804,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -119872,6 +120292,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -119960,12 +120406,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -120034,6 +120486,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -120350,6 +120804,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -120438,12 +120918,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -120512,6 +120998,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -120832,6 +121320,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -120920,12 +121434,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -120994,6 +121514,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
@@ -121367,6 +121889,32 @@
                             "position"
                           ]
                         },
+                        "seed": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "The seed of the take or version on show; the same seed with the same words makes a very similar song."
+                        },
+                        "takes": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "group": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "group",
+                            "index",
+                            "total"
+                          ],
+                          "description": "Set when this song was asked for as several takes: the card's versions are the takes."
+                        },
                         "cover_pending": {
                           "type": "boolean"
                         },
@@ -121455,12 +122003,18 @@
                               },
                               "url": {
                                 "type": "string"
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "The seed this version was made with."
                               }
                             },
                             "required": [
                               "id",
                               "label",
-                              "url"
+                              "url",
+                              "seed"
                             ]
                           }
                         },
@@ -121529,6 +122083,8 @@
                         "stage_index",
                         "started_at",
                         "making_version",
+                        "seed",
+                        "takes",
                         "cover_pending",
                         "cover_url",
                         "cover_versions",
