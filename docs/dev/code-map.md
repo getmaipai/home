@@ -808,7 +808,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/http.ts` | MediaOpRequest, withAttachments, startLibraryOp |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, getMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob |
-| `backend/src/lib/mediaOps/studio.ts` | STUDIO_SAVED_LOCKED_NOTE, studioRows, studioOperationRows, studioPickerRows, pngBase64, studioRun |
+| `backend/src/lib/mediaOps/studio.ts` | PICTURES_NOT_READY_LINE, STUDIO_SAVED_LOCKED_NOTE, studioRows, studioOperationRows, studioPickerRows, pngBase64 |
+| `backend/src/lib/mediaOps/studioReference.ts` | REFERENCE_UNSUPPORTED_LINE, studioReference |
 | `backend/src/lib/mediaOps/words.ts` | runPictureWords |
 | `backend/src/lib/mediaProductions.ts` | registerCastSynthGate, canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
