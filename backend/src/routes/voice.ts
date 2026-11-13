@@ -69,6 +69,7 @@ voiceRoutes.openapi(voiceTraceRoute, (c) => {
   return c.json({ kept: true, events: row.events.length }, 200);
 });
 
+const LIBRARY_SAMPLE_PATH = /^vctk\/p\d+_023(?:_enhanced)?\.wav$/;
 const voiceSampleFlights = new Map<string, ReturnType<typeof singleflight<Response>>>();
 function fetchVoiceSample(url: string): Promise<Response> {
   const host = new URL(url).host;
@@ -360,7 +361,7 @@ const voiceLibrarySampleRoute = createRoute({
 voiceRoutes.openapi(voiceLibrarySampleRoute, async (c) => {
   if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only an owner or admin can manage the household voice catalog" }, 403);
   const path = c.req.valid("query").path;
-  if (!/^vctk\/p\d+_023(?:_enhanced)?\.wav$/.test(path)) return c.text("Invalid voice sample path.", 400);
+  if (!LIBRARY_SAMPLE_PATH.test(path)) return c.text("Invalid voice sample path.", 400);
   let entries;
   try { entries = await getVoiceCatalog(); }
   catch (err) {
@@ -430,7 +431,26 @@ voiceRoutes.openapi(catalogSelectRoute, async (c) => {
   if (!isVoiceCatalogPath(entries, path)) {
     return c.json({ error: `not a real voice catalog entry: ${path}` }, 400);
   }
-  const result = setPersonTtsVoiceUnchecked(actor, `hf://kyutai/tts-voices/${path}`);
+  // WHISPER-01 (owner rule, 2026-11-13): the live engine (Chatterbox Turbo) cannot use an hf:// voice, so a library voice would speak in
+  // its default voice. A library voice is therefore saved as a home voice from its 13-second sample; that makes it sound like the voice it
+  // names and gives it a whisper sample behind the scenes (lib/whisperSample.ts), which is removed with the voice.
+  let chosen = `hf://kyutai/tts-voices/${path}`;
+  if (LIBRARY_SAMPLE_PATH.test(path)) {
+    const library = buildVoiceLibrary(entries).find((voice) => voice.id === path);
+    const label = library?.name ?? "Library voice";
+    const existing = listClonedVoices().find((voice) => voice.label === label);
+    if (existing) chosen = existing.id;
+    else {
+      try {
+        const response = await fetchVoiceSample(voiceSampleUrl(path));
+        const saved = saveClonedVoice(actor, label, new Uint8Array(await response.clone().arrayBuffer()), "audio/wav");
+        if (saved.ok) chosen = saved.value.id;
+      } catch (err) {
+        console.error("[voice] library voice sample could not be saved as a home voice", err);
+      }
+    }
+  }
+  const result = setPersonTtsVoiceUnchecked(actor, chosen);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
@@ -810,6 +830,11 @@ const clonedFileRoute = createRoute({
 voiceRoutes.openapi(clonedFileRoute, async (c) => {
   const id = c.req.valid("param").id;
   if (!isClonedVoiceTokenValid(id, c.req.query("t"))) return c.json({ error: "This voice link has expired. Open the voice again to refresh it." }, 403);
+  // WHISPER-01: the engine's built-in voice has no row; only its whisper sample is served, under the id "default".
+  if (id === "default" && c.req.query("w") === "1") {
+    const whisper = whisperSamplePath("default");
+    return existsSync(whisper) ? new Response(Bun.file(whisper), { status: 200, headers: { "content-type": "audio/wav" } }) : c.json({ error: "not found" }, 404);
+  }
   if (!clonedVoiceExists(id)) return c.json({ error: "not found" }, 404);
   const file = getClonedVoiceFile(id);
   if (!file) return c.json({ error: "not found" }, 404);

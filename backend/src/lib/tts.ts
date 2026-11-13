@@ -7,8 +7,8 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { toSpokenText } from "@/lib/spokenText";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
-import { householdVoiceSpeech, readClonedVoiceClip, whisperVoiceSpeech } from "@/lib/clonedVoices";
-import { ensureWhisperSample } from "@/lib/whisperSample";
+import { householdVoiceSpeech, readClonedVoiceClip, whisperDefaultVoiceSpeech, whisperVoiceSpeech } from "@/lib/clonedVoices";
+import { ensureDefaultWhisperSample, ensureWhisperSample } from "@/lib/whisperSample";
 import { fetchRecordedSpeech, recordedSpeechReferenceForTest, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
@@ -96,10 +96,17 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
     // A voice an admin made from a clip is not on the Stack's list: Home sends its clip address and its own settings.
     // WHISPER-01: a whispered reply is spoken from the voice's whisper sample. A voice without one yet speaks normally, and one is made in the background.
     let household = householdVoiceSpeech(voiceUrl);
-    if (opts.whisper && household) {
-      const whispered = whisperVoiceSpeech(voiceUrl);
-      if (whispered) household = whispered;
-      else { const id = /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(household.voiceUrl)?.[1]; if (id) void ensureWhisperSample(id); }
+    if (opts.whisper) {
+      if (household) {
+        const whispered = whisperVoiceSpeech(voiceUrl);
+        if (whispered) household = whispered;
+        else { const id = /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(household.voiceUrl)?.[1]; if (id) void ensureWhisperSample(id); }
+      } else {
+        // Not a home voice: the engine speaks its own default voice, so the whisper is made from that voice.
+        const whispered = whisperDefaultVoiceSpeech();
+        if (whispered) household = whispered;
+        else void ensureDefaultWhisperSample();
+      }
     }
     const result = household
       ? await synthesizeViaStack(text, household.voiceUrl, household)

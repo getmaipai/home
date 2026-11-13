@@ -285,6 +285,12 @@ export function whisperVoiceSpeech(stored: unknown): { voiceUrl: string; tempera
   return { ...speech, voiceUrl: `${speech.voiceUrl}&w=1` };
 }
 
+/** The whisper form of the engine's built-in voice (and of any voice that is not a home voice), or null while its sample is not made yet. */
+export function whisperDefaultVoiceSpeech(): { voiceUrl: string } | null {
+  if (!existsSync(whisperSamplePath("default"))) return null;
+  return { voiceUrl: `${clonedVoiceUrl("default")}&w=1` };
+}
+
 /** For routes/voice.ts's unauthenticated file-serving route only: looks
  * the id up against the real table rather than trusting anything about
  * the URL itself, so a request for an id that was never issued (or was

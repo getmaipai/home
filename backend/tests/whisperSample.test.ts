@@ -12,7 +12,7 @@ import { people } from "@/db/schema";
 import { clonedVoiceUrl, deleteClonedVoice, saveClonedVoice, whisperSamplePath, whisperVoiceSpeech } from "@/lib/clonedVoices";
 import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 import { clonedVoicesDir } from "@/lib/paths";
-import { __resetWhisperSamplesForTests, ensureWhisperSample, hasWhisperSample, makeMissingWhisperSamples, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
+import { __resetWhisperSamplesForTests, DEFAULT_VOICE_KEY, ensureDefaultWhisperSample, ensureWhisperSample, hasWhisperSample, makeMissingWhisperSamples, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
 import { hasNormalVoiceTag, hasWhisperTag, stripWhisperTags } from "@/lib/voiceCues";
 import { __resetWhisperTurnsForTests, createWhisperDeltaFilter, isWhisperMode, isWhisperTurn, markWhisperTurn, noteWhisperTag, setWhisperMode } from "@/lib/whisperTurns";
 
@@ -22,6 +22,8 @@ let ready = true;
 let available = true;
 let submitted: string[] = [];
 let spoken: FormData[] = [];
+let submittedBodies: Array<Record<string, unknown>> = [];
+let engineSpeech = new Uint8Array([9]);
 
 function owner() {
   const now = new Date().toISOString();
@@ -82,16 +84,16 @@ describe("whisper sample", () => {
   beforeEach(() => {
     resetDb(); setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8771");
     if (existsSync(clonedVoicesDir)) for (const f of readdirSync(clonedVoicesDir)) rmSync(join(clonedVoicesDir, f), { force: true });
-    ready = true; available = true; submitted = []; spoken = [];
+    ready = true; available = true; submitted = []; spoken = []; submittedBodies = []; engineSpeech = new Uint8Array([9]);
     __setTtsTagsForTests([]); __resetWhisperSamplesForTests();
     __setRecordedSpeechFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/stack/v1/speech-recorded")) return Response.json({ recorded_speech: { available, ready, installed: true } });
-      if (url.endsWith("/v1/audio/speech/recorded")) { submitted.push(JSON.parse(String(init?.body)).text); return Response.json({ job: "job-1", data: { url: "/v1/audio/speech/recorded/job-1/file", content_type: "audio/wav" } }); }
+      if (url.endsWith("/v1/audio/speech/recorded")) { const body = JSON.parse(String(init?.body)); submittedBodies.push(body); submitted.push(body.text); return Response.json({ job: "job-1", data: { url: "/v1/audio/speech/recorded/job-1/file", content_type: "audio/wav" } }); }
       if (url.endsWith("/v1/audio/speech/recorded/job-1/file")) return new Response(whisperAudio, { headers: { "content-type": "audio/wav" } });
       return new Response("no", { status: 404 });
     }) as typeof fetch);
-    __setStackClientForTests({ speak: async (form: FormData) => { spoken.push(form); return new Response(new Uint8Array([9]), { headers: { "content-type": "audio/wav" } }); } } as never);
+    __setStackClientForTests({ speak: async (form: FormData) => { spoken.push(form); return new Response(engineSpeech, { headers: { "content-type": "audio/wav" } }); } } as never);
   });
   afterEach(() => { __setRecordedSpeechFetchForTests(null); __setClonedVoiceTranscriberForTests(null); __setTtsTagsForTests(null); __resetStackEngineForTests(); });
 
@@ -113,15 +115,16 @@ describe("whisper sample", () => {
 
   test("the scheduled job makes every missing sample once the engine is installed, and is idle when none is missing", async () => {
     const first = await savedVoice();
-    owner0(); // one voice, no sample yet
+    engineSpeech = new Uint8Array(150_000);
     available = false;
-    expect(await makeMissingWhisperSamples()).toEqual({ made: 0, missing: 1 });
+    expect(await makeMissingWhisperSamples()).toEqual({ made: 0, missing: 2 }); // the voice and the engine's built-in voice
     expect(submitted).toHaveLength(0);
     available = true;
-    expect(await makeMissingWhisperSamples()).toEqual({ made: 1, missing: 0 });
+    expect(await makeMissingWhisperSamples()).toEqual({ made: 2, missing: 0 });
     expect(hasWhisperSample(first)).toBe(true);
+    expect(hasWhisperSample(DEFAULT_VOICE_KEY)).toBe(true);
     expect(await makeMissingWhisperSamples()).toEqual({ made: 0, missing: 0 });
-    expect(submitted).toHaveLength(1);
+    expect(submitted).toHaveLength(2);
   });
 
   test("a whispered reply is spoken from the sample, and a voice without one speaks normally", async () => {
@@ -136,6 +139,32 @@ describe("whisper sample", () => {
     await synthesizeSpeech("Come closer.", voice);
     expect(String(spoken[1]!.get("voice_url"))).toContain("&w=1");
     expect(String(spoken[2]!.get("voice_url"))).not.toContain("w=1");
+  });
+
+  test("the engine's own built-in voice gets a whisper too: it speaks a known passage once and that clip is the reference", async () => {
+    engineSpeech = new Uint8Array(150_000);
+    expect(await ensureDefaultWhisperSample()).toBe(true);
+    expect(hasWhisperSample(DEFAULT_VOICE_KEY)).toBe(true);
+    expect(submitted[0]).toStartWith("[whispers]");
+    expect(String(submittedBodies[0]!.reference_text)).toContain("The kettle is on the stove");
+    expect(spoken).toHaveLength(1);
+    expect(await ensureDefaultWhisperSample()).toBe(true);
+    expect(submitted).toHaveLength(1);
+  });
+
+  test("a voice that is not a home voice whispers from the default sample, and speaks normally until it exists", async () => {
+    await synthesizeSpeech("Come closer.", undefined, { whisper: true });
+    expect(String(spoken[0]!.get("voice_url") ?? "")).not.toContain("w=1");
+    engineSpeech = new Uint8Array(150_000);
+    __resetWhisperSamplesForTests();
+    expect(await ensureDefaultWhisperSample()).toBe(true);
+    await synthesizeSpeech("Come closer.", undefined, { whisper: true });
+    await synthesizeSpeech("Come closer.", "hf://kyutai/tts-voices/vctk/p1.wav", { whisper: true });
+    await synthesizeSpeech("Come closer.", undefined);
+    expect(String(spoken[spoken.length - 3]!.get("voice_url"))).toContain("/cloned/default/file");
+    expect(String(spoken[spoken.length - 3]!.get("voice_url"))).toContain("&w=1");
+    expect(String(spoken[spoken.length - 2]!.get("voice_url"))).toContain("/cloned/default/file");
+    expect(String(spoken[spoken.length - 1]!.get("voice_url") ?? "")).not.toContain("w=1");
   });
 
   test("deleting the voice removes its sample", async () => {

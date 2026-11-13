@@ -83,4 +83,23 @@ describe("voice library routes", () => {
       expect(await res.text()).toContain("/resolve/main/vctk/p225_023.wav");
     } finally { cat.stop(true); sample.stop(true); }
   });
+
+  test("choosing a library voice saves it as a home voice (the live engine cannot use an hf:// voice) and reuses it the second time", async () => {
+    const cat = catalogServer();
+    const sample = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch() { return new Response(new Uint8Array(2000), { headers: { "content-type": "audio/wav" } }); } });
+    process.env.MAIPAI_VOICE_CATALOG_URL = `http://127.0.0.1:${cat.port}/tree`;
+    process.env.MAIPAI_VOICE_SAMPLE_BASE = `http://127.0.0.1:${sample.port}/resolve/main`;
+    try {
+      const owner = new TestClient();
+      const { person } = await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json() as { person: { id: string } };
+      const path = "vctk/p225_023.wav";
+      expect((await owner.post("/api/voice/catalog/select", { path })).status).toBe(200);
+      const voices = (await (await owner.get("/api/voice/cloned")).json() as { voices: Array<{ id: string; label: string }> }).voices;
+      expect(voices).toHaveLength(1);
+      const stored = async () => ((await (await owner.get(`/api/settings?scope=person:${person.id}`)).json()) as Array<{ key: string; value: unknown }>).find((row) => row.key === "tts.voice_id")?.value;
+      expect(await stored()).toBe(voices[0]!.id);
+      expect((await owner.post("/api/voice/catalog/select", { path })).status).toBe(200);
+      expect((await (await owner.get("/api/voice/cloned")).json() as { voices: unknown[] }).voices).toHaveLength(1);
+    } finally { cat.stop(true); sample.stop(true); }
+  });
 });
