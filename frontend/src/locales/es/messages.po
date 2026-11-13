@@ -3632,6 +3632,9 @@ msgstr "Cualquiera"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:455
+msgid "setting.generation.household_likeness.help"
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
 #, needs-review
@@ -11058,6 +11061,9 @@ msgstr "Familia"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:454
+msgid "setting.generation.household_likeness.label"
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:573
 #, needs-review
@@ -13178,6 +13184,11 @@ msgstr "Home obtiene descargas, actualizaciones y búsquedas que pides como lo h
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1540
 msgid "setting.voice.talk_over.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1539
+msgid "setting.voice.talk_over.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15629,11 +15640,6 @@ msgstr ""
 #, needs-review
 msgid "setting.coding.adults_by_default.does"
 msgstr "Permite a cada persona con controles completos empezar con acceso."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1539
-msgid "setting.voice.talk_over.help"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:882
@@ -25948,6 +25954,9 @@ msgstr "Define si los colores son apagados y la animación está detenida."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:456
+msgid "setting.generation.household_likeness.does"
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:148
 #, needs-review
