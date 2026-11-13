@@ -1096,7 +1096,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/structuredPartIds.ts` | SPEC_SHEET_READY, SPEC_SHEET_BOUND |
 | `backend/src/lib/stt.ts` | transcribeUtterance, transcribeAudioClip |
 | `backend/src/lib/sttAssets.ts` | SILERO_VAD_ASSET, sileroVadPath, ensureSileroVadAsset |
-| `backend/src/lib/sttSession.ts` | getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech, SttSession, encodeWav |
+| `backend/src/lib/sttSession.ts` | RESUME_CONFIRM_S, EDGE_SILENCE_S, getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech |
 | `backend/src/lib/styleLock.ts` | pictureStyleAccess, styleOfComponent, styleAccessResolver, componentStyleAccess |
 | `backend/src/lib/subjects.ts` | findEntityByName, ensureSubjectEntity, findSubjectByName, ensurePersonEntity, RELATION_PHRASES, writeRelation |
 | `backend/src/lib/summaryRefresh.ts` | scheduleSummaryRefresh, __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests |
@@ -1117,6 +1117,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
 | `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |
+| `backend/src/lib/talkOver.ts` | TALK_OVER_KEY, TALK_OVER_WINDOW_KEY, TALK_OVER_WINDOW_DEFAULT_MS, TALK_OVER_WINDOW_MIN_MS, TALK_OVER_WINDOW_MAX_MS, talkOverLevel |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
@@ -1160,6 +1161,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
 | `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
+| `backend/src/lib/turnEnd.ts` | GENTLE_THRESHOLD, NATURAL_THRESHOLD, UNFINISHED_BELOW, predictTurnEnd, firesAt, stepDown |
 | `backend/src/lib/turnErrorDetail.ts` | canReadErrorDetail, turnOwnerId, turnErrorDetail, turnErrorDetailFrom, missingTurnErrorDetail, statsForViewer |
 | `backend/src/lib/turnMachine/backbone.ts` | BACKBONE_CHARS, EXTRA_READ_CHARS, __setBackboneWriterForTests, choosePrompt, parseChosen, overlapChoice |
 | `backend/src/lib/turnMachine/bareCompare.ts` | startBareCompare |
