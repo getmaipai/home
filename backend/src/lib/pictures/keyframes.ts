@@ -5,6 +5,7 @@
 // Stack's poster (frame 0) alone and says so. Everything is local: the clip goes to a temporary folder on this
 // computer, three JPEGs come back, the folder is removed.
 import { atBackgroundPriority } from "@/lib/backgroundPriority";
+import { findFfmpeg } from "@/lib/ffmpegPath";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -87,7 +88,7 @@ export async function extractKeyframes(mp4: Uint8Array, seconds: number | null, 
       if (await run([helper, clip, dir, String(FRAME_SIDE), String(frameCount)], HELPER_DEADLINE_MS) === 0) return readFrames(dir, frameCount);
       return null;
     }
-    const ffmpeg = Bun.which("ffmpeg");
+    const ffmpeg = findFfmpeg();
     if (!ffmpeg || !seconds || seconds <= 0) return null;
     const count = frameCount;
     const stamps = Array.from({ length: count }, (_, i) => (i === 0 ? 0 : i === count - 1 ? Math.max(0, seconds - 0.15) : (seconds * i) / (count - 1)));

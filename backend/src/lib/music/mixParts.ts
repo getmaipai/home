@@ -1,6 +1,6 @@
 import { atBackgroundPriority } from "@/lib/backgroundPriority";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { stackDataDir } from "@/lib/localStackService";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { findFfmpeg } from "@/lib/ffmpegPath";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,16 +73,6 @@ export async function run(command: string[], cwd: string): Promise<boolean> {
 }
 
 /** The decoder and encoder this host has: afconvert on a Mac, else ffmpeg; null for each that is missing. */
-/** ffmpeg on the PATH, else the one the Stack manages (its `engines/ffmpeg/<version>/ffmpeg`, newest version name last), so a hub without Homebrew still has it. */
-function findFfmpeg(): string | null {
-  const onPath = Bun.which("ffmpeg");
-  if (onPath) return onPath;
-  try {
-    const root = join(stackDataDir(), "engines", "ffmpeg");
-    for (const version of readdirSync(root).sort().reverse()) { const candidate = join(root, version, "ffmpeg"); if (existsSync(candidate)) return candidate; }
-  } catch { /* no Stack engine folder: no ffmpeg */ }
-  return null;
-}
 export function musicAudioTools(): { afconvert: string | null; ffmpeg: string | null } {
   if (toolsForTests) return toolsForTests;
   return { afconvert: existsSync("/usr/bin/afconvert") ? "/usr/bin/afconvert" : null, ffmpeg: findFfmpeg() };

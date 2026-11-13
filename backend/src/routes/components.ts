@@ -25,6 +25,7 @@ const ComponentSchema = z.object({
   size_bytes: z.number().nullable(), download_bytes: z.number(), full_bytes: z.number(), required_free_bytes: z.number(),
   plan_need: z.enum(["required", "recommended", "optional"]).nullable(), requirement: z.enum(["required", "optional", "unsupported"]), requirement_reason: z.string().nullable(),
   last_used_at: z.string().nullable(), used_by: z.array(z.string()), depends_on: z.array(z.string()),
+  licence_name: z.string().nullable().optional().describe("The licence a part ships under when it has no terms to accept (ffmpeg: GPL 3 or later); shown beside its size."),
   job: z.string().nullable(), percent: z.number().nullable(), failure: z.string().nullable(),
   licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."),
   can_install: z.boolean(), install_block: z.string().nullable(), can_uninstall: z.boolean(), uninstall_block: z.string().nullable(),

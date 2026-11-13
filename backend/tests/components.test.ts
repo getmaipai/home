@@ -57,6 +57,14 @@ describe("the list", () => {
     expect(body).toMatchObject({ stack: "ok", tier: "p128" });
     expect(body.components[0]).toMatchObject({ id: "z-image-turbo", plan_need: "optional" });
   });
+  test("MP-09: the ffmpeg tools row passes through the list route with its size, licence and need", async () => {
+    const { client } = await owner();
+    const ffmpeg = row({ id: "ffmpeg", label: "Audio and video tools (ffmpeg)", summary: "Cuts, mixes and changes sound and video", group: "tools", state: "installed", size_bytes: 114_388_848, download_bytes: 0, full_bytes: 32_902_204, plan_need: "required", requirement: "required", requirement_reason: "Home uses this to mix songs, shift voices and cut clips, so it is always installed.", licence_name: "GPL-3.0-or-later (built with --enable-gpl --enable-version3, no nonfree parts)", can_install: false, install_block: "It is already installed.", can_uninstall: false, uninstall_block: "Home needs this to run on a computer of this size. It cannot be removed." });
+    answers["GET /stack/v1/components"] = () => Response.json({ tier: "p128", free_disk_bytes: 1_500_000_000_000, disk_margin_bytes: 5e9, installed_bytes: 114_388_848, components: [ffmpeg] });
+    const body = await (await client.get("/api/components")).json() as { components: Array<Record<string, unknown>> };
+    expect(body.components[0]).toMatchObject({ id: "ffmpeg", group: "tools", label: "Audio and video tools (ffmpeg)", state: "installed", size_bytes: 114_388_848, plan_need: "required", requirement: "required", can_uninstall: false });
+    expect(String(body.components[0]!.licence_name)).toContain("GPL-3.0-or-later");
+  });
   test("with the engine down it is an empty list and a sentence, not an error page", async () => {
     const { client } = await owner();
     __setComponentsFetchForTests((async () => { throw new Error("refused"); }) as never);

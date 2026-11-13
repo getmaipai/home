@@ -7,6 +7,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { findFfmpeg } from "@/lib/ffmpegPath";
 
 export const INSPIRED_LEVELS = ["much_lower", "lower", "different", "very_different"] as const;
 export type InspiredLevel = (typeof INSPIRED_LEVELS)[number];
@@ -148,7 +149,7 @@ export const __converterForTests: { run: ((input: string, output: string) => Pro
 export async function clipToWav(bytes: Uint8Array, extension: string): Promise<Uint8Array | null> {
   if (decodeWavClip(bytes)) return bytes;
   const afconvert = existsSync("/usr/bin/afconvert") ? "/usr/bin/afconvert" : null;
-  const ffmpeg = Bun.which("ffmpeg");
+  const ffmpeg = findFfmpeg();
   if (!__converterForTests.run && !afconvert && !ffmpeg) return null;
   const dir = mkdtempSync(join(tmpdir(), "maipai-inspired-"));
   try {

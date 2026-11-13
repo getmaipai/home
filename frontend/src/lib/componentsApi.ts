@@ -9,6 +9,8 @@ export interface ComponentRow {
   plan_need: "required" | "recommended" | "optional" | null;
   requirement: "required" | "optional" | "unsupported"; requirement_reason: string | null;
   last_used_at: string | null; used_by: string[]; depends_on: string[];
+  /** MP-09: the licence a part ships under when there is nothing to accept (ffmpeg: GPL 3 or later). */
+  licence_name?: string | null;
   job: string | null; percent: number | null; failure: string | null;
   /** VIDEO-LTX-01: a licence with terms of its own, accepted once by an admin before the first install (null for every other part). */
   licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean } | null;

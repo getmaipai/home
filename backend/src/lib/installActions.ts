@@ -153,6 +153,8 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
     replaceSetupStep("plan", { status: "done", plan: { option: "recommended", tier: plan.level, roles } });
   }
   if (facesAsked) void ensureVisionAssets().catch(() => {});
+  // MP-09: ffmpeg is a required row with no model files, so the pulls never carry it; the wizard asks the Stack to install it as a component (a Stack that does not list it yet answers 404 and nothing happens).
+  if (diskPlan?.rows.some((row) => row.id === "ffmpeg") && (!selected || selected.includes("ffmpeg"))) void installStackComponent("ffmpeg").catch(() => {});
   void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}) }).catch(() => {});
   const pending = plan.models.filter((model) => !model.installed).length + (selected && plan.disk ? (plan.optional_models ?? []).filter((model) => !model.installed && plan.disk!.rows.some((row) => selected.includes(row.id) && row.model_ids.includes(model.id))).length : 0);
   return { ok: true, models: pending + startedLicensed + (facesAsked ? 1 : 0), ...(fitted.leftOut.length ? { leftOut: fitted.leftOut } : {}) };

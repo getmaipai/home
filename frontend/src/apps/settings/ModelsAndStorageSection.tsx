@@ -20,7 +20,7 @@ import { errorLine } from "@/lib/hubReachability";
 const KEY = ["components"] as const;
 const groups = (): Array<{ id: ComponentGroup; title: string }> => [
   { id: "chat", title: i18n._({ id: "Chat and thinking", message: "Chat and thinking" }) }, { id: "voice", title: i18n._({ id: "Voice", message: "Voice" }) }, { id: "pictures", title: i18n._({ id: "Pictures", message: "Pictures" }) },
-  { id: "video", title: i18n._({ id: "Video", message: "Video" }) }, { id: "music", title: i18n._({ id: "Music", message: "Music" }) }, { id: "stems", title: i18n._({ id: "Stems", message: "Stems" }) }, { id: "tools", title: i18n._({ id: "Picture tools", message: "Picture tools" }) },
+  { id: "video", title: i18n._({ id: "Video", message: "Video" }) }, { id: "music", title: i18n._({ id: "Music", message: "Music" }) }, { id: "stems", title: i18n._({ id: "Stems", message: "Stems" }) }, { id: "tools", title: i18n._({ id: "Tools", message: "Tools" }) },
 ];
 
 export const sizeWords = (n: number): string => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -72,6 +72,7 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
     installed || row.state === "installing" ? (row.size_bytes ? i18n._({ id: "Uses {size}", message: "Uses {size}", values: { size: sizeWords(row.size_bytes) } }) : null) : row.download_bytes > 0 ? i18n._({ id: "Download about {size}", message: "Download about {size}", values: { size: sizeWords(row.download_bytes) } }) : null,
     installed ? lastUsedWords(row.last_used_at) : null,
     row.used_by.length ? i18n._({ id: "Used by: {apps}", message: "Used by: {apps}", values: { apps: row.used_by.join(", ") } }) : null,
+    row.licence_name ? i18n._({ id: "Licence: {name}", message: "Licence: {name}", values: { name: row.licence_name.split(" (")[0] } }) : null,
   ].filter(Boolean).join(" · ");
   // The plain reason a button is off sits under the row, so it never hides in a tooltip.
   const reason = row.state === "failed" && row.failure ? row.failure
