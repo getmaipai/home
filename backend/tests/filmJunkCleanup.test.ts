@@ -96,7 +96,7 @@ describe("sheet maker uses it only for a split photo", () => {
     const tools: SheetTools = { ...base([{ x: 100, y: 60, w: 40, h: 50 }, { x: 400, y: 60, w: 40, h: 50 }]), junk: { editMasked: async (png, mask) => { calls++; return whiteInMask(png, mask); }, faceSimilarity: async () => 0.99 } };
     const sheet = await makeSheetFromPictures([await picture()], tools);
     expect(calls).toBe(2);
-    expect(sheet.notes).toEqual([]);
+    expect(sheet.notes.filter((note) => !note.includes("does not keep a real person's face"))).toEqual([]); // the standing face note (a separate change) is not a cleanup note
   });
   test("a failed cleanup keeps the plain cut-out and says so in plain words", async () => {
     const tools: SheetTools = { ...base([{ x: 100, y: 60, w: 40, h: 50 }, { x: 400, y: 60, w: 40, h: 50 }]), junk: { editMasked: async () => { throw new Error("busy"); }, faceSimilarity: async () => 0.99 } };
@@ -109,6 +109,6 @@ describe("sheet maker uses it only for a split photo", () => {
     const tools: SheetTools = { ...base([{ x: 100, y: 60, w: 40, h: 50 }]), junk: { editMasked: async (png) => { calls++; return new Uint8Array(png); }, faceSimilarity: async () => 1 } };
     const sheet = await makeSheetFromPictures([await picture()], tools);
     expect(calls).toBe(0);
-    expect(sheet.notes).toEqual([]);
+    expect(sheet.notes.filter((note) => !note.includes("does not keep a real person's face"))).toEqual([]); // the standing face note (a separate change) is not a cleanup note
   });
 });
