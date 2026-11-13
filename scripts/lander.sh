@@ -415,7 +415,7 @@ express_refusal() {
   fi
   [[ "$ok" == 1 ]] && return 0
   f="$(safety_surface_files "$changed" | grep -vE '^(scripts/|docs/design/RULES\.md$)' | head -n 1 || true)"
-  [[ -z "$f" ]] || echo "express refused: $f is a safety, auth or credential file; those need the owner's word in that turn (MAIPAI_RUSH_SAFETY_OK=1) or the normal landing, which runs the safety-surface tests."
+  [[ -z "$f" ]] || echo "express refused: $f is a safety, auth or credential file; those need the owner's word in that turn (MAIPAI_RUSH_SAFETY_OK=1) or land it with bash scripts/land.sh --checked (the normal lane with every check, in any mode). If you did set the variable: it must be on that land.sh call, and a later land.sh call for the branch replaces the request and drops it."
 }
 
 
@@ -755,7 +755,7 @@ outbox_summary() {
 }
 
 run_one() {
-  local request="$1" safety_ok=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
+  local request="$1" safety_ok=0 entry_checked=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -767,7 +767,7 @@ try:
     assert isinstance(v.get('done', []), list) and all(isinstance(x, str) for x in v.get('done', []))
     assert isinstance(v.get('note', ''), str) and '\n' not in v.get('note', '') and '\r' not in v.get('note', '')
     print(v['branch']); print(v['sha']); print(v.get('note', '')); print(v['requested_at'])
-    print('1' if v.get('express') is True else '0'); print('1' if v.get('safety_ok') is True else '0')
+    print('1' if v.get('express') is True else '0'); print('1' if v.get('safety_ok') is True else '0'); print('1' if v.get('checked') is True else '0')
     for item in v.get('done', []): print(item)
 except Exception:
     sys.exit(1)
@@ -781,9 +781,9 @@ PY
     return 0
   fi
   branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; landing_note="$(sed -n '3p' "$data/.request-values")"
-  entry_requested_at="$(sed -n '4p' "$data/.request-values")"; entry_express="$(sed -n '5p' "$data/.request-values")"; safety_ok="$(sed -n '6p' "$data/.request-values")"
+  entry_requested_at="$(sed -n '4p' "$data/.request-values")"; entry_express="$(sed -n '5p' "$data/.request-values")"; safety_ok="$(sed -n '6p' "$data/.request-values")"; entry_checked="$(sed -n '7p' "$data/.request-values")"
   current_branch="$branch"; entry_started="$started"; phase_times=""; phase_name=""; entry_label=""; entry_github=""; entry_generated=""; entry_check_reused=""
-  while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +7 "$data/.request-values"); rm -f "$data/.request-values"
+  while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +8 "$data/.request-values"); rm -f "$data/.request-values"
   if [[ "$entry_express" == 1 ]]; then printf '%s\t%s\n' "$branch" "$started" >"$data/current-express"; else rm -f "$data/current-express"; fi
   if [[ ! "$branch" == wt/* || ! "$sha" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
     mkdir -p "$data/queue/bad"; mv "$request" "$data/queue/bad/$(basename "$request")"
@@ -915,7 +915,7 @@ PY
   # LAND-FIRST-01 (2026-11-12, owner's word relayed by the FAST SPEECH session): in DIRECT mode nothing blocks a landing but a rebase
   # conflict. The typecheck, the boot check and the tests run after the landing (the watcher's post-landing check, section 28.2), report
   # red or green on the status rows, and a red never holds the next landing. GATED and unset modes keep every check before landing.
-  [[ "$(lander_mode)" == direct ]] && direct_landing=1
+  [[ "$(lander_mode)" == direct && "${entry_checked:-0}" != 1 ]] && direct_landing=1
   if (( direct_landing )); then
     rm -rf "$gen_scratch"
     safety_files=""; boot_note="boot check: after landing"
@@ -939,7 +939,7 @@ PY
       entry_label="starts and typechecks on top of main (express: no tests run)"
       [[ "$boot_note" != "boot check: none in this tree" ]] || entry_label="typechecks on top of main (express: no boot check in this tree, no tests run)"
     fi
-    if [[ -n "$safety_files" && "$(lander_mode)" == direct ]]; then
+    if [[ -n "$safety_files" && "$(lander_mode)" == direct && "${entry_checked:-0}" != 1 ]]; then
       # MODE-01: in DIRECT mode a safety-surface change is not held for its tests; the nightly run covers it (and a red nightly blocks `stable`).
       landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests skipped (DIRECT mode: the nightly runs them)"
       safety_files=""

@@ -210,6 +210,85 @@ describe("the express lane", () => {
   }, 60_000);
 });
 
+describe("the owner's word for a safety file (MAIPAI_RUSH_SAFETY_OK)", () => {
+  const queueSafety = (name: string, extraEnv: Record<string, string>) => {
+    const { w } = change(name, "backend/src/lib/session.ts", `export const ${name} = 1;\n`);
+    copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    const r = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach"], { cwd: w, env: { ...(env as Record<string, string>), MAIPAI_MODE: "direct", ...extraEnv }, stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode).toBe(0);
+    const f = queueFiles().find((q) => q.endsWith(`-wt-${name}.json`))!;
+    return JSON.parse(readFileSync(join(data, "queue", f), "utf8"));
+  };
+  test("MAIPAI_RUSH_SAFETY_OK=1 reaches the request and the lander lands the safety file; any other value or none bounces it", () => {
+    const yes = queueSafety("safe_yes", { MAIPAI_RUSH_SAFETY_OK: "1" });
+    expect(yes.express).toBe(true);
+    expect(yes.safety_ok).toBe(true);
+    env.MAIPAI_MODE = "direct";
+    try {
+    const out = run("lander.sh", ["run-once"]).stdout;
+    expect(out).toContain("landed: wt/safe_yes");
+    const no = queueSafety("safe_no", { MAIPAI_RUSH_SAFETY_OK: "0" });
+    expect(no.safety_ok).toBeUndefined();
+    run("lander.sh", ["run-once"]);
+    expect(note("safe_no").reason).toContain("MAIPAI_RUSH_SAFETY_OK=1");
+    } finally { delete env.MAIPAI_MODE; }
+  }, 120_000);
+});
+
+describe("land.sh --checked (CHECKED-LANE-01)", () => {
+  const checked = (name: string, file: string, mode: string, extra: string[] = []) => {
+    const { w } = change(name, file, `export const ${name} = 1;\n`);
+    copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    const r = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach", "--checked", ...extra], { cwd: w, env: { ...(env as Record<string, string>), MAIPAI_MODE: mode }, stdout: "pipe", stderr: "pipe" });
+    const f = queueFiles().find((q) => q.endsWith(`-wt-${name}.json`));
+    return { r, f, req: f ? JSON.parse(readFileSync(join(data, "queue", f), "utf8")) : undefined };
+  };
+  test("in DIRECT mode a --checked landing takes the normal lane with the full checks and the safety tests; the mode file is untouched", () => {
+    const modeFile = join(scratch, "mode-untouched");
+    const prior = { c: env.MAIPAI_LAND_CHECK_CMD, t: env.MAIPAI_LAND_T2_CMD, f: env.MAIPAI_MODE_FILE, m: env.MAIPAI_MODE };
+    env.MAIPAI_MODE_FILE = modeFile; env.MAIPAI_MODE = "direct";
+    try {
+      // A failing static check bounces it (a plain direct landing would have landed).
+      env.MAIPAI_LAND_CHECK_CMD = "echo typecheck error; exit 1";
+      const bad = checked("chk_bad", "chk_bad.txt", "direct");
+      expect(bad.r.exitCode).toBe(0);
+      expect(bad.req.checked).toBe(true);
+      expect(bad.req.express).toBeUndefined();
+      expect(bad.f).toMatch(/^\d+-wt-/);
+      run("lander.sh", ["run-once"]);
+      expect(note("chk_bad").status).toBe("bounced");
+      expect(note("chk_bad").reason).toContain("static check failed");
+      // A safety file runs the T2 tests in direct mode too: failing tests bounce it, passing tests land it.
+      env.MAIPAI_LAND_CHECK_CMD = "echo checked";
+      env.MAIPAI_LAND_T2_CMD = "echo t2 failed; exit 1";
+      const t2bad = checked("chk_t2bad", "backend/src/lib/session.ts", "direct");
+      run("lander.sh", ["run-once"]);
+      expect(note("chk_t2bad").reason).toContain("safety-surface tests failed");
+      env.MAIPAI_LAND_T2_CMD = "echo t2 ok";
+      checked("chk_t2ok", "backend/src/lib/session.ts", "direct");
+      expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/chk_t2ok");
+      expect(String((note("chk_t2ok") as Record<string, unknown>).label)).toContain("safety-surface tests");
+      expect(existsSync(modeFile)).toBe(false);
+    } finally {
+      for (const [k, v] of [["MAIPAI_LAND_CHECK_CMD", prior.c], ["MAIPAI_LAND_T2_CMD", prior.t], ["MAIPAI_MODE_FILE", prior.f], ["MAIPAI_MODE", prior.m]] as const) { if (v === undefined) delete env[k]; else env[k] = v; }
+    }
+  }, 180_000);
+
+  test("--checked works in GATED mode, and --checked with --express is refused", () => {
+    const g = checked("chk_gated", "chk_gated.txt", "gated");
+    expect(g.r.exitCode).toBe(0);
+    expect(g.req.checked).toBe(true);
+    rmSync(join(data, "queue", g.f!), { force: true });
+    const { w } = change("chk_both");
+    const both = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--checked", "--express"], { cwd: w, env: env as Record<string, string>, stdout: "pipe", stderr: "pipe" });
+    expect(both.exitCode).toBe(2);
+    expect(both.stderr.toString()).toContain("exclude each other");
+    const help = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--help"], { stdout: "pipe", stderr: "pipe" });
+    expect(help.exitCode).toBe(0);
+    expect(help.stdout.toString()).toContain("--checked");
+  }, 60_000);
+});
+
 describe("fairness between the lanes", () => {
   test("an express request never starts while another landing transaction holds the tree; it runs right after", () => {
     const n = change("fair_normal");

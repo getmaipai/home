@@ -2,12 +2,18 @@
 set -euo pipefail
 umask 077
 
-usage() { echo "usage: bash scripts/land.sh [--express] [--detach] [--queue-anyway] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
+usage() { echo "usage: bash scripts/land.sh [--express | --checked] [--detach] [--queue-anyway] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
 # --express (SINGLE-WRITER-01, 2026-11-12): what rush-ship.sh and ship-now.sh use, and only on the owner's explicit word. The lander takes the
 # entry at its next phase boundary (it waits for the current lander operation and delays other queued work, within the fairness rule in
 # lander.sh), rebases it on the landed main, typechecks the changed workspaces, boot-checks the rebased commit, runs no test suite, and
 # pushes main to GitHub before it answers. The result is labelled "starts and typechecks on top of main", never "tested". It waits for the
 # verdict (no --detach) and prints "landed-sha: <sha>", the exact rebased commit that was pushed and that ship.sh then installs.
+# --checked (CHECKED-LANE-01, 2026-11-12): this ONE landing takes the normal lane with every check (static check and, for a safety-surface
+# change such as a migration, the T2 safety-surface tests) in ANY mode, DIRECT or GATED, and never touches the mode file. Use it for what the
+# express lane refuses (a safety, auth or credential file without the owner's word) or when a change should be tested before it lands.
+# It queues like a normal entry (express entries go ahead of it; it does not hold the lander longer than its own checks, up to the T2 cap of
+# 40 minutes, so an express landing queued behind it waits that long). Nobody switches the global mode for a single landing.
+# MAIPAI_RUSH_SAFETY_OK=1 must be set on this land.sh call itself (a later land.sh call for the same branch replaces the request and drops it).
 die() { echo "land.sh: $1" >&2; exit "${2:-1}"; }
 # GITNET-01: remote git operations are bounded and retried (scripts/lib/gitnet.sh); a checkout that predates the helper runs plain git.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -23,19 +29,23 @@ done_arg=""
 landing_note=""
 queue_anyway=0
 express=0
+checked=0
 while (($#)); do
   case "$1" in
     --express) express=1; shift ;;
+    --checked) checked=1; shift ;;
     --detach) mode=detach; shift ;;
     --queue-anyway) queue_anyway=1; shift ;;
     --timeout) (($# >= 2)) || { usage; exit 2; }; timeout_seconds="$2"; shift 2 ;;
     --done) (($# >= 2)) || { usage; exit 2; }; [[ "$2" =~ ^[A-Z0-9-]+-[0-9]+$ ]] || die "invalid backlog item id '$2'; expected ^[A-Z0-9-]+-[0-9]+$" 2; done_items+=("$2"); done_arg="${done_arg:+$done_arg }$2"; shift 2 ;;
     --note) (($# >= 2)) || { usage; exit 2; }; [[ "$2" != *$'\n'* && "$2" != *$'\r'* ]] || die "--note must be one line" 2; landing_note="$2"; shift 2 ;;
     wait) mode=wait; shift ;;
+    -h|--help) sed -n '6,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
 [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || { usage; exit 2; }
+if (( checked && express )); then die "--checked and --express exclude each other: --checked is the normal lane with every check, --express is the lane without them" 2; fi
 # --express together with --detach is refused: a rush ship needs the landed commit, so it must wait for the verdict.
 if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its verdict (the ship that follows needs the landed commit); drop --detach" 2; fi
 # MODE-01: DIRECT mode lands through the express lane. DIRECT-FAST-02 (2026-11-12): that includes --detach (the request is queued express
@@ -43,7 +53,7 @@ if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its v
 if [[ -f "$here/lib/mode.sh" ]]; then
   source "$here/lib/mode.sh"
   case "$(mode_get)" in
-    direct) if (( ! express )) && [[ "$mode" != wait ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
+    direct) if (( checked )); then echo "$(mode_line): this landing is --checked, so it takes the normal lane with every check"; elif (( ! express )) && [[ "$mode" != wait ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
     gated) (( ! express )) || die "GATED: checked first, then run. The express lane is off in gated mode; use bash scripts/land.sh, or bash scripts/mode.sh direct." 2 ;;
   esac
 fi
@@ -214,13 +224,14 @@ requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 queue_file="$data/queue/$( ((express)) && printf '0-')$(python3 -c 'import time; print(int(time.time() * 1000))')-$slug.json"
 tmp="$(mktemp "$data/queue/.request.XXXXXX")"
 if [[ -n "$done_arg" ]]; then echo "done: ${done_items[*]}"; fi
-python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" "$landing_note" "$done_arg" "$express" "${MAIPAI_RUSH_SAFETY_OK:-0}" <<'PY'
+python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" "$landing_note" "$done_arg" "$express" "${MAIPAI_RUSH_SAFETY_OK:-0}" "$checked" <<'PY'
 import json, sys
 with open(sys.argv[1], 'w') as f:
     req = dict(branch=sys.argv[2], sha=sys.argv[3], worktree=sys.argv[4], session=sys.argv[5], requested_at=sys.argv[6], note=sys.argv[7], done=sys.argv[8].split())
     if sys.argv[9] == '1':
         req['express'] = True
         if sys.argv[10] == '1': req['safety_ok'] = True
+    if sys.argv[11] == '1': req['checked'] = True
     json.dump(req, f)
     f.write('\n')
 PY
