@@ -26,7 +26,7 @@ import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, mus
 import { authorizeTier, maxOffered } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
-import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
+import { refuseMusicPrompt, MUSIC_REFUSAL_LINE, householdSongLength } from "@/lib/music/policy";
 import { likenessRefusal } from "@/lib/likeness";
 import { runSongEdit } from "@/lib/music/songEdit";
 import { StackMusicError } from "@/lib/music/stack";
@@ -45,6 +45,7 @@ import { promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
+import { writeSongLyrics } from "@/lib/music/lyricsWriter";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -279,6 +280,7 @@ const makeSongBody = z.object({
   idea: z.string().trim().min(3).max(1200).describe("What the song is about and how it should sound."),
   lyrics: z.string().max(4000).optional().describe("The words to sing. Leave out for Home to write them."),
   instrumental: z.boolean().optional(), title: z.string().trim().min(1).max(200).optional(), length: z.enum(["quick", "full"]).optional(),
+  language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(),
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).optional(),
   song_style: z.string().optional().describe("A saved song style's id (starter or the person's own)."), band: z.string().optional().describe("A made band's id: make the song in that band's sound."),
 });
@@ -290,11 +292,15 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
   const engine = await musicEngineStatus();
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const args: Record<string, unknown> = { description: body.idea, ...(body.lyrics?.trim() ? { lyrics: body.lyrics } : {}), ...(body.instrumental ? { instrumental: true } : {}),
-    ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
+    ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.language ? { language: body.language } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
     ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
+  if (!body.instrumental && !body.lyrics?.trim()) {
+    const lyrics = await writeSongLyrics({ description: body.idea, seconds: (body.length ?? householdSongLength()) === "quick" ? 45 : 180, language: body.language, title: body.title });
+    if (lyrics) args.lyrics = lyrics;
+  }
   const sound = resolveSound(actor, { song_style: body.song_style, band: body.band });
   if (!sound.ok) return c.json({ error: sound.line }, 422) as never;
   const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
