@@ -1298,7 +1298,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/frameCheck.ts` | CLIP_RULES, evaluateClipSeries, clipWeight, keepBetter, shouldRetake, sharpness |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
 | `backend/src/lib/videos/ingredientsAdapter.ts` | INGREDIENTS_NAME, INGREDIENTS_LIBRARY_NAME, INGREDIENTS_FILE, INGREDIENTS_BYTES, INGREDIENTS_REPO, INGREDIENTS_URL |
-| `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, markAnotherTake, getVideoJobFor |
+| `backend/src/lib/videos/jobs.ts` | referencePercent, __setClipCheckForTests, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, markAnotherTake |
 | `backend/src/lib/videos/librarySort.ts` | LIBRARY_SORT_KEY, savedLibrarySort, librarySortFor |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MAX_TAKE_SECONDS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE |

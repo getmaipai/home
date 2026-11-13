@@ -76446,7 +76446,10 @@
                             "enum": [
                               "black",
                               "frozen",
-                              "soft"
+                              "soft",
+                              "jump",
+                              "camera_not_seen",
+                              "loop_seam"
                             ]
                           },
                           "level": {
