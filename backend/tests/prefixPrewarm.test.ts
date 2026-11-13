@@ -109,6 +109,40 @@ describe("prefix prewarm", () => {
     complete.mockRestore();
   });
 
+  // CONVO-PREWARM-04: every warm leaves a kept state in the engine, so the household keeps few conversations warm and stops
+  // warming a conversation again once it has been quiet for a while.
+  test("the household keeps at most eight conversations warm; a fold of a dropped one sends nothing", async () => {
+    const complete = spyOn(llm, "complete").mockResolvedValue({ ok: true, value: { text: "", model: "model-a" } });
+    const system = { role: "system" as const, content: "system" };
+    notePrefix("person-a", "spoken", [system], [], "model-a");
+    for (let i = 1; i <= 9; i++) {
+      let window = [{ role: "user" as const, content: `words ${i}` }];
+      await prewarmConversation("person-a", "spoken", async () => window, `conv-${i}`);
+      window = [{ role: "user" as const, content: `folded ${i}` }];
+    }
+    expect(complete).toHaveBeenCalledTimes(9);
+    expect(prewarmPrefixHit("conv-1", [system], []).warmed).toBe(false);
+    expect(prewarmPrefixHit("conv-2", [system], []).warmed).toBe(true);
+    expect(await rewarmConversation("conv-1", () => false)).toBe(false);
+    expect(complete).toHaveBeenCalledTimes(9);
+    expect(await rewarmConversation("conv-9", () => false)).toBe(true);
+    expect(complete).toHaveBeenCalledTimes(10);
+    complete.mockRestore();
+  });
+
+  test("a conversation quiet for more than 30 minutes is not warmed again after a fold", async () => {
+    const complete = spyOn(llm, "complete").mockResolvedValue({ ok: true, value: { text: "", model: "model-a" } });
+    const system = { role: "system" as const, content: "system" };
+    notePrefix("person-a", "spoken", [system], [], "model-a");
+    let window = [{ role: "user" as const, content: "words" }];
+    await prewarmConversation("person-a", "spoken", async () => window, "conv-old");
+    window = [{ role: "user" as const, content: "folded" }];
+    expect(await rewarmConversation("conv-old", () => false, Date.now() + 31 * 60_000)).toBe(false);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(prewarmPrefixHit("conv-old", [system], []).warmed).toBe(false);
+    complete.mockRestore();
+  });
+
   test("written turns never send a conversation warm", async () => {
     const complete = spyOn(llm, "complete");
     notePrefix("person-a", "written", [{ role: "system", content: "system" }], []);

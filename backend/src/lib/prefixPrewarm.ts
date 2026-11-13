@@ -61,7 +61,13 @@ export async function prewarmPrefix(actorId: string, surfaceClass: string, now =
 // session-open warm (cache_n stuck at 2,048 while the window read cold). The warm now keeps its builder, runs again when the
 // conversation folds, and the turn reports whether its prompt extended the last warm (`prewarm` on the generation record).
 interface ConversationWarm { actorId: string; surfaceClass: string; build: () => Promise<readonly LlmMessage[]>; parts: string[]; at: number }
-const MAX_WARMS = 64;
+// CONVO-PREWARM-04 (2026-11-12): every warm leaves one more kept state in the engine (about a third of a gigabyte per 2,600-token
+// prompt on Splash 1.6.1, never evicted by time), and the fold warm ran again for every conversation warmed since the hub
+// started. So the household keeps at most MAX_WARMS conversations warm (the oldest dropped when a newer one is warmed), and a
+// conversation is warmed again after a fold only within WARM_TTL_MS of its last warm; an older one is dropped and left to its next
+// turn. The engine's own budget (Stack SPLASH-MEM-01) bounds what Home cannot see.
+const MAX_WARMS = 8;
+const WARM_TTL_MS = 30 * 60_000;
 const conversationWarmed = new Map<string, ConversationWarm>();
 
 /** The request's parts in the order the engine lays them out: the tools block, then each message (one JSON string each). No text leaves this process. */
@@ -104,9 +110,10 @@ export async function prewarmConversation(actorId: string, surfaceClass: string,
 /** The conversation's window changed after its warm (a fold stored a new summary and moved the anchor): warm it again from the
  * kept builder, so the next turn still extends a whole earlier request. Skipped while a turn runs (the turn aborts warms anyway)
  * and when the window did not change. Best effort, never throws. */
-export async function rewarmConversation(conversationId: string, turnActive: () => boolean = () => activeTurnCount() > 0): Promise<boolean> {
+export async function rewarmConversation(conversationId: string, turnActive: () => boolean = () => activeTurnCount() > 0, now = Date.now()): Promise<boolean> {
   const warm = conversationWarmed.get(conversationId);
   if (!warm || turnActive()) return false;
+  if (now - warm.at > WARM_TTL_MS) { conversationWarmed.delete(conversationId); return false; }
   const prefix = recorded.get(keyFor(warm.actorId, warm.surfaceClass));
   if (!prefix) return false;
   try {
