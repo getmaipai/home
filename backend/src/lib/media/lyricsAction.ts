@@ -40,7 +40,7 @@ export async function lookupLyricsFor(
   deps?: { fetch?: typeof fetch; nowMs?: () => number },
 ): Promise<LookupResult> {
   const now = deps?.nowMs?.() ?? Date.now();
-  const item = typeof mediaId === "string" ? readableIn(person, "music", mediaId) : null;
+  const item = typeof mediaId === "string" ? readableIn(person, "audio", mediaId) : null;
   if (!item) return { ok: false, status: 404, error: "That song is not in the library." };
 
   const currentLyrics = bandAllows(person, item) ? item.lyrics : null;

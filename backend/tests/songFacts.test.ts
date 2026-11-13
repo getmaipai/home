@@ -64,7 +64,7 @@ import { mediaAppData } from "@/lib/media/appHost";
 function storeFact(status: string, summary: string | null) {
   db.insert(musicSongFacts).values({ musicbrainzRecordingId: REC, status, summary, pageUrl: summary ? EN_WIKI : null, fetchedAt: stamp.createdAt, hlc: stamp.hlc }).onConflictDoUpdate({ target: musicSongFacts.musicbrainzRecordingId, set: { status, summary, pageUrl: summary ? EN_WIKI : null } }).run();
 }
-const factRows = (person: ReturnType<typeof insertPerson>) => mediaAppData(person, "music", "up-next", { id: "media-song000001", scope: "fact" }) as unknown as Array<Record<string, unknown>>;
+const factRows = (person: ReturnType<typeof insertPerson>) => mediaAppData(person, "audio", "up-next", { id: "media-song000001", scope: "fact" }) as unknown as Array<Record<string, unknown>>;
 function insertPerson() { return db.select().from(people).get()!; }
 
 test("the song fact data path (up-next, scope fact) returns one text row for a stored fact and nothing otherwise", () => {
@@ -73,7 +73,7 @@ test("the song fact data path (up-next, scope fact) returns one text row for a s
   expect(factRows(person)).toEqual([]);
   storeFact("found", "Paper Boats is a song by Rivet Row.");
   expect(factRows(person)).toMatchObject([{ id: "media-song000001", title: "Did you know?", channel: "Paper Boats is a song by Rivet Row. (Wikipedia)", source_url: EN_WIKI }]);
-  expect(mediaAppData(person, "music", "up-next", { scope: "fact" })).toEqual([]);
+  expect(mediaAppData(person, "audio", "up-next", { scope: "fact" })).toEqual([]);
   storeFact("none", null);
   expect(factRows(person)).toEqual([]);
   storeFact("withheld", null);

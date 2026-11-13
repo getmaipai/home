@@ -41,22 +41,22 @@ const indexPage = {
 };
 const weekPage = { type: "page", id: "week", title: "Week", body: [{ type: "empty_state", icon: "calendar", text: "The week ahead is quiet." }] };
 const musicRow: AppRow = {
-  package: "music",
+  package: "audio",
   page: "index",
-  label: "Music",
+  label: "Audio",
   icon: "music",
   description: "A fixture music app.",
   category: "Media",
   keywords: [],
   sections: [],
-  to: "/apps/music",
+  to: "/apps/audio",
   incognito: "unaffected",
 };
-const musicIndexPage = { type: "page", id: "index", title: "Music", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
+const musicIndexPage = { type: "page", id: "index", title: "Audio", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
 const musicStationPage = { type: "page", id: "station", title: "Station", body: [{ type: "empty_state", icon: "radio", text: "Live radio station." }] };
 const musicAlbumPage = { type: "page", id: "album", title: "Album", body: [{ type: "empty_state", icon: "disc", text: "Album details." }] };
 const videoWatchPage = { type: "page", id: "watch", title: "Watch", body: [{ type: "empty_state", icon: "play", text: "Video details." }] };
-const mediaPageFiles = ["videos", "music", "shows", "podcasts", "books"] as const;
+const mediaPageFiles = ["videos", "audio", "shows", "podcasts", "books"] as const;
 const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
   packageId,
   JSON.parse(readFileSync(resolve(import.meta.dir, `../../../../backend/packages/${packageId}/pages/index.json`), "utf8")),
@@ -81,9 +81,9 @@ beforeEach(() => {
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
     if (url.startsWith("/api/plugins/demo/pages/index")) return Promise.resolve(rows.length ? Response.json(indexPage) : Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/week")) return Promise.resolve(Response.json(weekPage));
-    if (url.startsWith("/api/plugins/music/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
-    if (url.startsWith("/api/plugins/music/pages/station")) return Promise.resolve(Response.json(musicStationPage));
-    if (url.startsWith("/api/plugins/music/pages/album")) return Promise.resolve(Response.json(musicAlbumPage));
+    if (url.startsWith("/api/plugins/audio/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
+    if (url.startsWith("/api/plugins/audio/pages/station")) return Promise.resolve(Response.json(musicStationPage));
+    if (url.startsWith("/api/plugins/audio/pages/album")) return Promise.resolve(Response.json(musicAlbumPage));
     if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videoWatchPage));
     if (url.startsWith("/api/plugins/news/pages/story")) return Promise.resolve(Response.json(newsStoryPage));
     if (url.startsWith("/api/plugins/news/data/story")) { calls.push(String(init?.body)); return Promise.resolve(Response.json({ as_of: "x", blocks: [] })); }
@@ -144,7 +144,7 @@ describe("an app that declares a settings area", () => {
 describe("a package app at /apps/<id>", () => {
   test("a music station keeps the phone section navigation", async () => {
     rows = [{ ...musicRow, sections: [{ page: "station", label: "Radio", icon: null }] }];
-    const view = open("/apps/music/station", 402);
+    const view = open("/apps/audio/station", 402);
     await view.findByText("Live radio station.");
     const nav = view.container.querySelector('[data-slot="phone-nav"]')!;
     expect(nav.hasAttribute("data-floating")).toBe(true);
@@ -156,11 +156,11 @@ describe("a package app at /apps/<id>", () => {
 
   test("detail pages put Back in the shell header (no empty row); only video watch keeps a controls row with Minimize", async () => {
     rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }, { page: "albums", label: "Albums", icon: null }] }];
-    let view = open("/apps/music/station", 402);
+    let view = open("/apps/audio/station", 402);
     await view.findByText("Live radio station.");
     expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
-    view = open("/apps/music/album", 402);
+    view = open("/apps/audio/album", 402);
     await view.findByText("Album details.");
     expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
@@ -183,7 +183,7 @@ describe("a package app at /apps/<id>", () => {
 
   test("index and news story pages have no generic controls row", async () => {
     rows = [musicRow];
-    let view = open("/apps/music", 402);
+    let view = open("/apps/audio", 402);
     await view.findByText("No music yet.");
     expect(view.queryByTestId("page-controls")).toBeNull();
     cleanup();
@@ -197,14 +197,14 @@ describe("a package app at /apps/<id>", () => {
     rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }] }];
     const originalState = window.history.state;
     Object.defineProperty(window.history, "state", { configurable: true, value: { idx: 0 } });
-    const view = open("/apps/music/station", 402);
+    const view = open("/apps/audio/station", 402);
     fireEvent.click(await view.findByRole("button", { name: "Back" }));
-    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/music"));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/audio"));
     cleanup();
     Object.defineProperty(window.history, "state", { configurable: true, value: { idx: 2 } });
-    const second = open("/apps/music/station", 402);
+    const second = open("/apps/audio/station", 402);
     fireEvent.click(await second.findByRole("button", { name: "Back" }));
-    await waitFor(() => expect(second.getByTestId("where").textContent).toBe("/apps/music/station"));
+    await waitFor(() => expect(second.getByTestId("where").textContent).toBe("/apps/audio/station"));
     Object.defineProperty(window.history, "state", { configurable: true, value: originalState });
   });
 
@@ -309,20 +309,20 @@ describe("a media app is drawn inside the Media hub", () => {
     sessionStorage.clear();
   });
 
-  test("a media app at /apps/music has the media hub frame and its column lists Music when the person came in through Media", async () => {
+  test("a media app at /apps/audio has the media hub frame and its column lists Audio when the person came in through Media", async () => {
     sessionStorage.setItem("maipai.media-hub", "1");
     rows = [musicRow];
-    const view = open("/apps/music");
+    const view = open("/apps/audio");
     const frame = await view.findByTestId("media-hub-frame");
     await waitFor(() => {
       const links = frame.querySelectorAll('[data-slot="section-sidebar"] a[href^="/apps/"]');
-      expect([...links].some((link) => link.textContent === "Music")).toBe(true);
+      expect([...links].some((link) => link.textContent === "Audio")).toBe(true);
     });
   });
 
-  test("a media app at /apps/music is standalone, with no media hub frame, when the person did not come in through Media", async () => {
+  test("a media app at /apps/audio is standalone, with no media hub frame, when the person did not come in through Media", async () => {
     rows = [musicRow];
-    const view = open("/apps/music");
+    const view = open("/apps/audio");
     await view.findByText("No music yet.");
     expect(view.queryByTestId("media-hub-frame")).toBeNull();
   });
@@ -335,7 +335,7 @@ describe("a media app is drawn inside the Media hub", () => {
   });
 
   test("standalone media app headings and tabs have the shared shell inset", async () => {
-    const view = open("/apps/music");
+    const view = open("/apps/audio");
     await view.findByText("No music yet.");
     expect(view.getByTestId("package-app").className).toContain("p-4");
   });
@@ -370,7 +370,7 @@ describe("media index empty states", () => {
       };
       findLast(page.body);
       const visiblePath = [...paths][0]!;
-      // A Response body reads once, and two bound nodes may ask for the same path (Music binds History twice), so each
+      // A Response body reads once, and two bound nodes may ask for the same path (Audio binds History twice), so each
       // request gets its own Response built from the one pending payload.
       let releaseData!: (payload: unknown) => void;
       const pendingPayload = new Promise<unknown>((resolveData) => { releaseData = resolveData; });
@@ -391,7 +391,7 @@ describe("media index empty states", () => {
       // it is the only shelf allowed an empty line.
       expect(lastShelfEmptyText.reduce((text, line) => text.replace(line, ""), document.body.textContent ?? "")).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
       await act(async () => { releaseData([{ id: `${packageId}-item`, title: "Visible item", kind: "video", thumbnail: null }]); });
-      // Music shows the same item in its quick tiles and its History shelf, so more than one button is right.
+      // Audio shows the same item in its quick tiles and its History shelf, so more than one button is right.
       expect((await populated.findAllByRole("button", { name: /Visible item/ })).length).toBeGreaterThan(0);
       // An app's last shelf (the whole library) carries the app's one empty state, since every other shelf is hidden when empty;
       // it is the only shelf allowed an empty line.

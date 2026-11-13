@@ -1,4 +1,4 @@
-// MEDIA-VIZ-02: the Music page's visualizer draws only while the media host holds that song.
+// MEDIA-VIZ-02: the Audio page's visualizer draws only while the media host holds that song.
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, render } from "@testing-library/react";
 import { MusicVisualizerSection } from "@/shell/media/MusicVisualizerSection";

@@ -10,9 +10,9 @@ import { registerAppPageFill } from "@/lib/apps";
 import { fillLibraryPage } from "./musicLibrary";
 
 // PARITY-02: the Library opens on the order this person chose last time.
-registerAppPageFill("music", "library", fillLibraryPage);
+registerAppPageFill("audio", "library", fillLibraryPage);
 
-registerItemView("music", (person, item, view) => {
+registerItemView("audio", (person, item, view) => {
   const allowed = bandAllows(person, item);
   const lyrics = allowed ? item.lyrics : null;
   // MUSIC-GEN-20c: a track whose lyrics have line timing but no words is lined up in the background, once per version of its lyrics.

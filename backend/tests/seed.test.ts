@@ -88,7 +88,7 @@ describe("seedDemoHousehold", () => {
     const collections = await get("/api/media/collections") as { kind: string; title: string; items: unknown[] }[];
     expect(collections.find((entry) => entry.kind === "playlist")?.items.length).toBe(6);
     expect(collections.find((entry) => entry.kind === "liked")?.items.length).toBe(5);
-    const stations = await get("/api/plugins/music/radio/stations") as unknown;
+    const stations = await get("/api/plugins/audio/radio/stations") as unknown;
     expect(JSON.stringify(stations)).toContain("Porchlight FM");
     const settings = await get("/api/settings?scope=household") as { key: string; value: unknown }[];
     for (const key of ["music.lyrics_online", "music.musicbrainz_match", "music.artist_wikimedia", "music.album_art_online"]) expect(settings.find((setting) => setting.key === key)?.value).toBe(false);

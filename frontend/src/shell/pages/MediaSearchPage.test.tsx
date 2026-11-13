@@ -14,7 +14,7 @@ const result: MediaSearch = { groups: [{ app: "videos", heading: "Videos", rows:
 
 function open(search: () => Promise<MediaSearch>, initial = "/media/search?q=Garden%20Road") {
   api.mediaSearch = search;
-  api.apps = async () => ["videos", "shows", "music", "podcasts", "books"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
+  api.apps = async () => ["videos", "shows", "audio", "podcasts", "books"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><TooltipProvider><MemoryRouter initialEntries={[initial]}><Routes>
     <Route path="/media/search" element={<MediaSearchPage />} /><Route path="*" element={<Where />} />

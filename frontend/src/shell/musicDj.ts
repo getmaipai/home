@@ -8,7 +8,7 @@ type Item = { id: string; up_next?: { id: string } };
 
 /** The same first queue lookup used by mediaHost's Next action. */
 export async function nextMusicQueueId(after: string): Promise<string | null> {
-  const item = await api.appData<Item | []>("music", "item", { id: after });
+  const item = await api.appData<Item | []>("audio", "item", { id: after });
   return Array.isArray(item) ? null : item.up_next?.id ?? null;
 }
 
@@ -33,7 +33,7 @@ export function useMusicDj(current: MusicDjCurrent | null): MusicDjVoice | undef
   const lineRef = useRef<{ id: string; src: string } | undefined>(undefined);
   lineRef.current = line;
   const previousMusicId = useRef<string | null>(null);
-  const track = current?.appId === "music" && !current.live ? current : null;
+  const track = current?.appId === "audio" && !current.live ? current : null;
   const id = track?.id ?? null;
 
   useEffect(() => {

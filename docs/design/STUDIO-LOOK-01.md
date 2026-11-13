@@ -333,7 +333,7 @@ No. Runway leads with a composer because generation is its only product; Home's 
 | 7 | Family and companions | `Avatar` row, `CharacterTile` | `/api/people`, companions |
 | 8 | Hub care, Getting started | `StatusCard` | repairs, updates, setup |
 
-Above the fold at 1440: sections 1 to 3; phone: a shorter hero, the pill, the Make shelf peeking. The composer is one pill, not a 180 px box. A Make tile opens its studio with the mode preselected and starters shown (`/pictures/create`, `/apps/videos/create`, `/apps/music/create`); "Ask or plan" opens Chat with starter text filled, never blank. A mode chip sends the prompt to that studio.
+Above the fold at 1440: sections 1 to 3; phone: a shorter hero, the pill, the Make shelf peeking. The composer is one pill, not a 180 px box. A Make tile opens its studio with the mode preselected and starters shown (`/pictures/create`, `/apps/videos/create`, `/apps/audio/create`); "Ask or plan" opens Chat with starter text filled, never blank. A mode chip sends the prompt to that studio.
 
 ### D. Pictures
 Real first: made pictures and clips (`artwork_url`), companion portraits, avatars, podcast and book covers, news images, the weather scene. Floor: the seeded gradient cover with the name on it (KIT-ART-FALLBACK), never the gray box. Missing: covers for songs and chats; ART-FALLBACK-01 item 2 (one low-priority picture job per made item) fills it. Seed the demo with CC0 art.

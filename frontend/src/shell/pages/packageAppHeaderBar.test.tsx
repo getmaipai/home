@@ -8,11 +8,11 @@ import { PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } fro
 afterEach(() => { cleanup(); publishPackageAppHeader(null); });
 
 test("detail page hides the center on a phone, ordinary pages retain it", () => {
-  publishPackageAppHeader({ to: "/apps/music", label: "Music", detail: true });
+  publishPackageAppHeader({ to: "/apps/audio", label: "Audio", detail: true });
   const detail = render(<QueryClientProvider client={createQueryClient()}><MemoryRouter><PackageAppHeaderLeft /></MemoryRouter></QueryClientProvider>);
   expect(detail.getByTestId("app-header-center").className).toContain("max-sm:hidden");
   cleanup();
-  publishPackageAppHeader({ to: "/apps/music", label: "Music" });
+  publishPackageAppHeader({ to: "/apps/audio", label: "Audio" });
   const ordinary = render(<QueryClientProvider client={createQueryClient()}><MemoryRouter><PackageAppHeaderLeft /></MemoryRouter></QueryClientProvider>);
   expect(ordinary.getByTestId("app-header-center").className).not.toContain("max-sm:hidden");
 });

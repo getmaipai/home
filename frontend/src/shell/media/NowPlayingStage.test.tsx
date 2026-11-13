@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 
-const media = (): HoistedMedia => ({ id: "s1", src: "/a.mp3", kind: "audio", title: "First song", subtitle: "Marsh", appId: "music", el: document.createElement("audio"), started: true });
+const media = (): HoistedMedia => ({ id: "s1", src: "/a.mp3", kind: "audio", title: "First song", subtitle: "Marsh", appId: "audio", el: document.createElement("audio"), started: true });
 
 function mount(dock: Partial<MediaDock> = {}, initialView?: "scene" | "lyrics" | "queue") {
   const full: MediaDock = { current: null, clear: () => {}, next: async () => {}, previous: async () => {}, play: async () => {}, ...dock };
@@ -61,7 +61,7 @@ describe("stage transport", () => {
     const view = mount();
     await waitFor(() => expect(calls.some((c) => c.url.includes("item"))).toBe(true));
     await act(async () => { fireEvent.click(view.getByRole("button", { name: "Like" })); });
-    const post = calls.find((c) => c.url.endsWith("/api/plugins/music/like"));
+    const post = calls.find((c) => c.url.endsWith("/api/plugins/audio/like"));
     expect(JSON.parse(post!.body)).toEqual({ media_id: "s1", on: true });
     expect(view.getByRole("button", { name: "Unlike" })).toHaveAttribute("aria-pressed", "true");
   });

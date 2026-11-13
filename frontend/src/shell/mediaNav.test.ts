@@ -21,16 +21,16 @@ test("apps come back in MEDIA_APP_ORDER even when the rows arrive reversed", () 
   const rows = [
     row({ package: "books", label: "Books" }),
     row({ package: "podcasts", label: "Podcasts" }),
-    row({ package: "music", label: "Music" }),
+    row({ package: "audio", label: "Audio" }),
     row({ package: "shows", label: "Shows" }),
     row({ package: "videos", label: "Videos" }),
   ];
-  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "shows", "music", "podcasts", "books"]);
+  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "shows", "audio", "podcasts", "books"]);
 });
 
 test("an app that is missing from the rows is simply absent, and the rest keep their place", () => {
-  const rows = [row({ package: "videos", label: "Videos" }), row({ package: "music", label: "Music" })];
-  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "music"]);
+  const rows = [row({ package: "videos", label: "Videos" }), row({ package: "audio", label: "Audio" })];
+  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "audio"]);
 });
 
 test("undefined and an empty array both give no apps", () => {
@@ -39,23 +39,23 @@ test("undefined and an empty array both give no apps", () => {
 });
 
 test("a non-media package is dropped entirely", () => {
-  const rows = [row({ package: "weather", label: "Weather" }), row({ package: "music", label: "Music" })];
+  const rows = [row({ package: "weather", label: "Weather" }), row({ package: "audio", label: "Audio" })];
   const result = mediaNav(rows);
   expect(result).toHaveLength(1);
-  expect(result[0]?.id).toBe("music");
+  expect(result[0]?.id).toBe("audio");
 });
 
 test("the app route is the row's own to", () => {
-  const rows = [row({ package: "music", label: "Music", to: "/apps/music" })];
+  const rows = [row({ package: "audio", label: "Audio", to: "/apps/audio" })];
   const [app] = mediaNav(rows);
-  expect(app?.to).toBe("/apps/music");
+  expect(app?.to).toBe("/apps/audio");
 });
 
 test("the input rows and their sections are not mutated", () => {
   const section = { page: "albums", label: "Albums", icon: "disc" };
-  const rows = [row({ package: "music", sections: [section] })];
+  const rows = [row({ package: "audio", sections: [section] })];
   mediaNav(rows);
   expect(section).toEqual({ page: "albums", label: "Albums", icon: "disc" });
   expect(rows).toHaveLength(1);
-  expect(rows[0]?.to).toBe("/media/music");
+  expect(rows[0]?.to).toBe("/media/audio");
 });

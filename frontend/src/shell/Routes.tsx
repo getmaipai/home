@@ -169,6 +169,11 @@ const pageOnlyTitles = (): Record<string, string> => ({
   "/dev/ui": i18n._({ id: "Chat showcase", message: "Chat showcase" }),
 });
 
+function LegacyAudioRedirect() {
+  const location = useLocation();
+  return <Navigate to={`${location.pathname.replace(/^\/apps\/music(?=\/|$)/, "/apps/audio")}${location.search}${location.hash}`} replace />;
+}
+
 function PageHeaderLayout() {
   const { pathname } = useLocation();
   useHeaderExtra(PageHeaderTitle, PageHeaderActions);
@@ -481,7 +486,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           {/* APP-KIND-04: every installed package app, with no rebuild. Static routes win over this splat.
               MEDIA-POLISH-01 (RULES S2): an app draws its own header, so app pages sit outside PageHeaderLayout, whose
               title bar had no entry for them and drew an empty 52 px strip above every app. */}
-          <Route path="apps/music/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
+          <Route path="apps/music/*" element={<LegacyAudioRedirect />} />
+          <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>

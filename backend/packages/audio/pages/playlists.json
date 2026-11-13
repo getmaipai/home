@@ -1,0 +1,72 @@
+{
+  "type": "page",
+  "id": "playlists",
+  "title": "Playlists",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Start a playlist",
+      "bind": {
+        "source": "package",
+        "path": "playlists",
+        "params": {
+          "scope": "new"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "density": "compact",
+      "on_select": {
+        "call": {
+          "target": "/api/plugins/audio/playlist",
+          "args": {
+            "op": "new"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No playlists yet. Add songs to one from Now playing.",
+        "action": {
+          "call": {
+            "target": "/api/plugins/audio/playlist",
+            "args": {
+              "op": "new"
+            }
+          }
+        },
+        "action_label": "New playlist"
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your playlists",
+      "bind": {
+        "source": "package",
+        "path": "playlists"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "size_control": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/playlist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}

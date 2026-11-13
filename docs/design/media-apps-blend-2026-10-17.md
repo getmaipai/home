@@ -172,7 +172,7 @@ wide screens and in the phone drawer (rules S1, S2).
   History, Settings gear (sources, quality, SponsorBlock, auto-save). Watch page at `/apps/videos/watch?item=`.
 - **Shows and Films** (`/apps/shows`): Home (billboard, Continue, Recently added, by genre when tags exist), Shows, Films, Watchlist.
   Detail page: hero, seasons, episode list with progress. Netflix's layout is this app's native app (rule S2 "and so on").
-- **Music** (`/apps/music`): Listen now (recently played, radio seeds, liked), Albums, Artists, Songs, Playlists; Now playing is the
+- **Music** (`/apps/audio`): Listen now (recently played, radio seeds, liked), Albums, Artists, Songs, Playlists; Now playing is the
   shell's audio session surface, full screen on a phone. Spotify's layout is the native app.
 - **Podcasts** (`/apps/podcasts`): Listen now (continue, newest from subscriptions), Shows, Episodes, Queue, Saved. Apple Podcasts'
   layout is the native app.

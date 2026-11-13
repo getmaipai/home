@@ -26,7 +26,7 @@ function renderAt(pathname: string, extra: ReactNode = null) {
 }
 
 test("a media app page shows no flag unless the person came in through Media", () => {
-  const view = renderAt("/apps/music");
+  const view = renderAt("/apps/audio");
   expect(view.getByTestId("flag").textContent).toBe("false");
 });
 
@@ -43,7 +43,7 @@ test("Media search is active and records the flag", async () => {
 });
 
 test("after the Media home, a media app page still shows the flag", async () => {
-  const view = renderAt("/media", <GoTo to="/apps/music" />);
+  const view = renderAt("/media", <GoTo to="/apps/audio" />);
   await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));
   fireEvent.click(view.getByTestId("go"));
   await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));

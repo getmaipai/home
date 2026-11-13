@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 type Row = Record<string, unknown> & { id: string; title: string };
-const lib = (person: PersonRow, params: { sort?: string; kind?: string } = {}) => mediaAppData(person, "music", "songs", { scope: "library", ...params }) as unknown as Row[];
+const lib = (person: PersonRow, params: { sort?: string; kind?: string } = {}) => mediaAppData(person, "audio", "songs", { scope: "library", ...params }) as unknown as Row[];
 
 test("the Library lists songs, albums, artists and playlists in one list and the chips narrow it", () => {
   musicPlaylistAction(atlas, { op: "new" });
@@ -45,7 +45,7 @@ test("the Library lists songs, albums, artists and playlists in one list and the
 test("sort A to Z orders by title, Creator by creator then title, Recents by what was played last", () => {
   expect(lib(atlas, { kind: "songs", sort: "a-z" }).map((row) => row.title)).toEqual(["Beta", "Delta", "Gamma", "Zeta"]);
   expect(lib(atlas, { kind: "songs", sort: "creator" }).map((row) => row.title)).toEqual(["Delta", "Beta", "Gamma", "Zeta"]);
-  saveProgress(atlas, "music", { media_id: id(1), position_s: 10, duration_s: 10, reason: "ended" });
+  saveProgress(atlas, "audio", { media_id: id(1), position_s: 10, duration_s: 10, reason: "ended" });
   expect(lib(atlas, { kind: "songs", sort: "recents" })[0]!.id).toBe(id(1));
   // With no play history the newest addition comes first.
   expect(lib(sprout, { kind: "songs", sort: "recents" }).map((row) => row.id)).toEqual([id(4), id(3), id(2), id(1)]);
@@ -97,7 +97,7 @@ test("recent searches keep the newest ten once each, are per person, and clear",
   for (let n = 0; n < 12; n += 1) recordMusicSearch(atlas, { q: `query ${n}` });
   recordMusicSearch(atlas, { q: "query 5" });
   recordMusicSearch(atlas, { q: " " });
-  const read = (person: PersonRow) => (mediaAppData(person, "music", "songs", { scope: "recent-searches" }) as unknown as { rows: Array<{ key: string; label: string }> }).rows.map((row) => row.label);
+  const read = (person: PersonRow) => (mediaAppData(person, "audio", "songs", { scope: "recent-searches" }) as unknown as { rows: Array<{ key: string; label: string }> }).rows.map((row) => row.label);
   const got = read(atlas);
   expect(got).toHaveLength(10);
   expect(got[0]).toBe("query 5");
@@ -108,9 +108,9 @@ test("recent searches keep the newest ten once each, are per person, and clear",
 });
 
 test("album and playlist headers carry a share link id and the playlist header says how to play it", () => {
-  const album = (mediaAppData(atlas, "music", "header", { id: lib(atlas, { kind: "albums" })[0]!.id, scope: "album" }) as unknown as Row[])[0]!;
+  const album = (mediaAppData(atlas, "audio", "header", { id: lib(atlas, { kind: "albums" })[0]!.id, scope: "album" }) as unknown as Row[])[0]!;
   expect(album.share_id).toBe(encodeURIComponent(album.id as string));
   const made = musicPlaylistAction(atlas, { op: "new" });
-  const playlist = (mediaAppData(atlas, "music", "header", { id: made.ok ? made.value.id : "", scope: "playlist" }) as unknown as Row[])[0]!;
+  const playlist = (mediaAppData(atlas, "audio", "header", { id: made.ok ? made.value.id : "", scope: "playlist" }) as unknown as Row[])[0]!;
   expect(playlist.share_id).toBe(playlist.id);
 });

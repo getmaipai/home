@@ -1,4 +1,4 @@
-// MUSIC-LIKE-01: what the band card's buttons (and the Music app's band page) do. Every action works on a band the person may
+// MUSIC-LIKE-01: what the band card's buttons (and the Audio app's band page) do. Every action works on a band the person may
 // change; the band record is the only state. Rule 6a: nothing here logs a name, a story, a title or an id.
 import { eq } from "drizzle-orm";
 import { db } from "@/db";

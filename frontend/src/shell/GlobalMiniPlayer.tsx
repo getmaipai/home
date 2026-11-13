@@ -31,7 +31,7 @@ export function onPlayPageOf(held: HoistedMedia, pathname: string, search: strin
   if (app !== held.appId) return false;
   const page = pathname.split("/")[3] || "index";
   // A station's page has no player of its own (it is a billboard and shelves), so the bar stays up while its sound plays.
-  if (app === "music" && page === "station") return false;
+  if (app === "audio" && page === "station") return false;
   if (!isMediaPlayPage(app, page)) return false;
   const id = new URLSearchParams(search).get("id") ?? stateId;
   return id === held.id || (app === "books" && page === "listen");
@@ -99,11 +99,11 @@ export function GlobalMiniPlayer() {
           title={held.title}
           subtitle={held.subtitle}
           poster={held.poster}
-          voiceover={held.appId === "music" ? dock.voiceover : undefined}
+          voiceover={held.appId === "audio" ? dock.voiceover : undefined}
           live={live}
           mediaSession={false}
           onExpand={openPlayPage}
-          {...(held.appId === "music" && !live ? { swipeToSkip: true, onNext: () => { void dock.next(); }, ...(dock.previous ? { onPrevious: () => { void dock.previous?.(); } } : {}) } : {})}
+          {...(held.appId === "audio" && !live ? { swipeToSkip: true, onNext: () => { void dock.next(); }, ...(dock.previous ? { onPrevious: () => { void dock.previous?.(); } } : {}) } : {})}
           onProgress={listening || live ? undefined : (p) => {
             api.mediaProgress(held.appId, { media_id: held.id, position_s: p.position_s, duration_s: p.duration_s, reason: p.reason }, p.reason === "unload").catch(() => {});
           }}

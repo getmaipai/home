@@ -52,7 +52,7 @@ test("control: a teen and an adult with the setting off see discovery rows in Vi
   for (const who of [nova, marlow]) {
     expect(rows(who, "videos", "featured").length).toBeGreaterThan(0);
     expect(rows(who, "videos", "recent").length).toBeGreaterThan(0);
-    expect(rows(who, "music", "radio-seeds").length).toBeGreaterThan(0);
+    expect(rows(who, "audio", "radio-seeds").length).toBeGreaterThan(0);
   }
 });
 
@@ -62,13 +62,13 @@ test("a teen or an adult whose own media.allowlist_only is on gets no discovery 
     for (const app of apps) {
       for (const id of DISCOVERY_IDS) expect(rows(who, app, id, { id: "media-disc00001" })).toEqual([]);
     }
-    expect(rows(who, "music", "radio-seeds")).toEqual([]);
+    expect(rows(who, "audio", "radio-seeds")).toEqual([]);
   }
 });
 
 test("a child, and a guest-band child, get no discovery rows either (unchanged)", () => {
   for (const app of apps) for (const id of DISCOVERY_IDS) expect(rows(sprout, app, id, { id: "media-disc00001" })).toEqual([]);
-  expect(rows(sprout, "music", "radio-seeds")).toEqual([]);
+  expect(rows(sprout, "audio", "radio-seeds")).toEqual([]);
 });
 
 test("the item view offers no autoplay suggestion when the person's allowlist is on", () => {

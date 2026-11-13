@@ -23,10 +23,10 @@ export type ItemReader = (person: PersonRow, id: string) => Promise<ItemText | n
 export const ITEM_READERS: Record<string, ItemReader> = {
   "news/story": readNewsStory,
   "reference/article": readReferenceArticle,
-  "music/track": readMusicTrack,
-  "music/band": readMusicBand,
-  "music/album": readMusicAlbum,
-  "music/style": readMusicStyle,
+  "audio/track": readMusicTrack,
+  "audio/band": readMusicBand,
+  "audio/album": readMusicAlbum,
+  "audio/style": readMusicStyle,
 };
 
 /** Every reference in a piece of text, in order, once each. */

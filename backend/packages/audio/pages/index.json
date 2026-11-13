@@ -1,0 +1,541 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Listen now",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "greeting"
+        }
+      },
+      "label": "Greeting",
+      "size": "banner",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{channel}",
+      "primary": {
+        "label": "Browse songs",
+        "icon": "music",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/songs"
+          }
+        }
+      },
+      "secondary": []
+    },
+    {
+      "type": "quick_tiles",
+      "label": "Pick up where you left off",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "quick"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "max": 6,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently played",
+      "bind": {
+        "source": "package",
+        "path": "history"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "density": "compact",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{album_id}"
+          }
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Jump back in",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "jump-back"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Made for you",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "made"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your most played",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "most-played"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}",
+      "density": "compact",
+      "orientation": "vertical",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Saved to the playlist"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Daylist",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "daylist"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Saved to the playlist"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your Replay",
+      "bind": {
+        "source": "package",
+        "path": "history",
+        "params": {
+          "scope": "replay"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Saved to the playlist"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your artists",
+      "bind": {
+        "source": "package",
+        "path": "artists",
+        "params": {
+          "scope": "recent"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "art_shape": "circle",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/artist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Made here",
+      "bind": {
+        "source": "package",
+        "path": "songs",
+        "params": {
+          "scope": "made"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "horizontal",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "albums",
+        "params": {
+          "scope": "recent"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true,
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Radio from your music",
+      "bind": {
+        "source": "package",
+        "path": "radio-seeds"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "art_shape": "circle",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true,
+      "card_radius": "tight",
+      "press_scale": true
+    },
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "popular",
+          "limit": "6"
+        }
+      },
+      "label": "Featured stations",
+      "size": "banner",
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_art_field": "thumbnail",
+      "primary": {
+        "label": "Open station",
+        "icon": "play",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/station",
+            "state": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "secondary": [],
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Liked songs",
+      "bind": {
+        "source": "package",
+        "path": "liked"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true,
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Saved to the playlist"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your stations",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "saved"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/station",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "card_radius": "tight",
+      "press_scale": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Popular radio",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "popular"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/station",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "card_radius": "tight",
+      "press_scale": true
+    }
+  ]
+}

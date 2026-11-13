@@ -55,7 +55,7 @@ describe("every shelf data id of the media apps answers 200", () => {
       await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
     }
     // Watch progress for the owner, so the Continue, History and Again shelves have rows to build.
-    for (const app of ["videos", "music"]) {
+    for (const app of ["videos", "audio"]) {
       const library = (await (await owner.post(`/api/plugins/${app}/data/library`, {})).json()) as Array<{ id: string }>;
       for (const row of library.slice(0, 3)) await owner.post(`/api/plugins/${app}/progress`, { media_id: row.id, position_s: 3, duration_s: 20 });
     }

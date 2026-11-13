@@ -16,7 +16,7 @@ function row(overrides: Partial<MediaHomeRow>): MediaHomeRow {
 
 function open(home: () => Promise<MediaHome>) {
   api.mediaHome = home;
-  api.apps = async () => ["videos", "music"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
+  api.apps = async () => ["videos", "audio"].map((id) => ({ package: id, page: "index" as const, label: id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/media"]}><Routes><Route path="/media" element={<MediaHomePage />} /><Route path="*" element={<Where />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
@@ -25,7 +25,7 @@ test("the shelves draw with their headings and row titles", async () => {
   const view = open(async () => ({
     continue: [row({ percent: 42 })],
     new: [row({ id: "new-1", title: "Fresh" })],
-    recent_music: [row({ id: "music-1", app: "music", title: "Played" })],
+    recent_music: [row({ id: "music-1", app: "audio", title: "Played" })],
     made_at_home: [],
   }));
   await waitFor(() => expect(view.getByText("Pick up where you left off")).toBeTruthy());
@@ -50,11 +50,11 @@ test("with nothing in the library the empty state shows instead of the shelves",
 });
 
 test("made at home rows show their shelf and navigate to the app href", async () => {
-  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [row({ id: "made-1", app: "music", title: "Made Song", href: "/apps/music/play?id=made-1" })] }));
+  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [row({ id: "made-1", app: "audio", title: "Made Song", href: "/apps/audio/play?id=made-1" })] }));
   expect(await view.findByText("Made at home")).toBeTruthy();
   expect(view.queryByText("Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.")).toBeNull();
   fireEvent.click(await view.findByRole("button", { name: "Made Song" }));
-  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/music/play"));
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/audio/play"));
 });
 
 test("the hero uses the newest made item and its Play action opens it", async () => {

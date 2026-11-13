@@ -68,7 +68,7 @@ Three records, one editor each, shared by chat and the Music app.
 
 - **Records:** `made-artist` (`mband-`), `made-album` (`malbum-`), `song-style` (`sstyle-`), and `mrev-` revisions that keep every earlier version with its provenance
   (`make_band|make_album|make_song_style:<id>:<conversation|->:<turn|->`). Code: `backend/src/lib/music/*`, routes in `backend/src/routes/musicMade.ts`.
-- **Tools:** `make_album`, `make_song_style` and the edit tools `edit_band`, `edit_album`, `edit_song_style`. Offered by object context (a `maipai://music/<band|album|style|track>/<id>`
+- **Tools:** `make_album`, `make_song_style` and the edit tools `edit_band`, `edit_album`, `edit_song_style`. Offered by object context (a `maipai://audio/<band|album|style|track>/<id>`
   link), never by wording; adults only, like `make_band`. `generate_music` accepts a `song_style` and a `band` or `album`.
 - **Routes:** `/api/music/{bands,albums,styles}` list, create, get, patch, delete; `/:id/revisions` and `/:id/revisions/:revision/restore`; `/:id/card` returns the answer block;
   `/:id/action` takes `{action, patch, conversation_id, turn_id}`.

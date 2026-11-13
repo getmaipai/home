@@ -74,7 +74,7 @@ export function changePlaylistMembers(person: PersonRow, op: "add" | "remove" | 
 /** Puts the songs this person can see in the order given, leaving songs they cannot see where they are. */
 function visibleReorder(person: PersonRow, collection: MediaCollection, named: readonly string[]): string[] {
   const current = collection.items.map((entry) => entry.media_id);
-  const seen = new Set(current.filter((mediaId) => readableIn(person, "music", mediaId)));
+  const seen = new Set(current.filter((mediaId) => readableIn(person, "audio", mediaId)));
   const asked = [...new Set(named)].filter((mediaId) => seen.has(mediaId));
   const order = [...asked, ...current.filter((mediaId) => seen.has(mediaId) && !asked.includes(mediaId))];
   let next = 0;
@@ -111,7 +111,7 @@ export function musicPlaylistOps(person: PersonRow, args: Record<string, unknown
     const found = playlistFor(person, playlistId);
     if (!found) return GONE;
     const mediaId = typeof args.media_id === "string" ? args.media_id : "";
-    const item = readableIn(person, "music", mediaId);
+    const item = readableIn(person, "audio", mediaId);
     if (!item) return { ok: false, status: 404, error: "That song is not available. Go back to the library and choose another." };
     if (args.op === "remove") removeItemFrom(found.collection, item.id);
     else if (!found.collection.items.some((entry) => entry.media_id === item.id)) addItem(found.collection, item.id);

@@ -50,7 +50,7 @@ describe("voice chat tools", () => {
   });
   test("TOOL-OFFER-VOICEOVER-01: an adult written turn is offered voiceover whatever it says or attaches", async () => {
     const adult = person("owner", 40);
-    for (const text of ["hello", "Read this out loud as a narrator", "make a voice-over for my clip maipai://music/track/abc123", "what is the weather"]) {
+    for (const text of ["hello", "Read this out loud as a narrator", "make a voice-over for my clip maipai://audio/track/abc123", "what is the weather"]) {
       expect((await budgetWithTurnToolGates(input(adult, { text }))).budget.tools_offered).toContain(VOICEOVER_TOOL_ID);
     }
   });

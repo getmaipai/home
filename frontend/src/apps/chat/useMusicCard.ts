@@ -36,7 +36,7 @@ export function cardPath(kind: MusicCardKind, id: string, conversationId: string
 /** The chat ask a "make something from this" button opens: the words, then the object link the turn reads (one object per turn). */
 export function studioAsk(action: "make_album" | "make_song", kind: MusicCardKind, id: string): string {
   const object = kind === "song_style" ? "style" : kind;
-  return `${action === "make_album" ? "Make an album in this sound." : "Make me a new song in this sound."}\n\nmaipai://music/${object}/${id}`;
+  return `${action === "make_album" ? "Make an album in this sound." : "Make me a new song in this sound."}\n\nmaipai://audio/${object}/${id}`;
 }
 
 /** The kit's edit action for a card kind, as the action route names it. */
@@ -107,7 +107,7 @@ export function useMusicCard(block: Block): { props: Record<string, unknown> | n
   const onAction = useCallback((_blockId: string, action: string, detail?: Record<string, unknown>) => {
     if (!id || busy) return;
     if (action === "play_track") { if (typeof detail?.media_id === "string") play(detail.media_id); return; }
-    if (action === "open_app") { navigate("/apps/music"); return; }
+    if (action === "open_app") { navigate("/apps/audio"); return; }
     if (action === "make_song" || action === "make_album") { navigate(`/chat?ask=${encodeURIComponent(studioAsk(action, kind, id))}`); return; }
     const isEdit = action === EDIT_ACTION[kind];
     const send = isEdit ? { action: "edit", patch: detail ?? {} } : { action };

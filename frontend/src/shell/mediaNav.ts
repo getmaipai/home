@@ -1,7 +1,7 @@
 import type { AppRow } from "@/lib/api";
 
 export interface MediaNavApp { id: string; label: string; icon: string; to: string }
-export const MEDIA_APP_ORDER: readonly string[] = ["videos", "shows", "music", "podcasts", "books"];
+export const MEDIA_APP_ORDER: readonly string[] = ["videos", "shows", "audio", "podcasts", "books"];
 
 /** The media apps as `GET /api/apps` lists them, in MEDIA_APP_ORDER. An app the hub does not list is absent;
  * every route is the row's own `to`. */

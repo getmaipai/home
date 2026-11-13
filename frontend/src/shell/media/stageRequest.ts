@@ -1,5 +1,5 @@
 // NOW-PLAYING-01: the kit's Now Playing asks its host to open the Up next list (`MediaHost.openQueue`). The host lives above the page and
-// the full-screen stage lives in the Music page's player section, so the ask crosses through this one small store: the host calls
+// the full-screen stage lives in the Audio page's player section, so the ask crosses through this one small store: the host calls
 // `requestStage("queue")`, the section sees the new number and opens the stage on that view. Nothing is kept between page visits.
 import { useSyncExternalStore } from "react";
 

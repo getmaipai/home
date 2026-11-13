@@ -1,0 +1,220 @@
+{
+  "type": "page",
+  "id": "album",
+  "title": "Album",
+  "body": [
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "backdrop": "art_gradient",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "album"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{id}"
+          }
+        }
+      },
+      "shuffle": {
+        "label": "Shuffle",
+        "icon": "shuffle",
+        "labeled": true,
+        "action": {
+          "play": {
+            "media_id": "{shuffle_id}"
+          }
+        }
+      },
+      "more": [
+        {
+          "label": "Share",
+          "icon": "share",
+          "action": {
+            "share": {
+              "to": "/apps/audio/album?id={share_id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "track_rows",
+      "label": "Tracks",
+      "bind": {
+        "source": "package",
+        "path": "album",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_number_field": "track_number",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "hide_when_empty": true,
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "item_group_field": "disc_label",
+      "row_actions": [
+        {
+          "icon": "list-plus",
+          "label": "Play next",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/queue",
+              "args": {
+                "op": "play_next",
+                "media_id": "{id}"
+              },
+              "success_label": "Playing next"
+            }
+          }
+        },
+        {
+          "icon": "list-music",
+          "label": "Add to queue",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/queue",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Added to the queue"
+            }
+          }
+        },
+        {
+          "icon": "user",
+          "label": "Go to artist",
+          "action": {
+            "navigate": {
+              "to": "/apps/audio/artist",
+              "state": {
+                "id": "{channel}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "album"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "part": "footer"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "More by this artist",
+      "bind": {
+        "source": "package",
+        "path": "album-more",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "play_label": "Play {title}"
+    }
+  ]
+}

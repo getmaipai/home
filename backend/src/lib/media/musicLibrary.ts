@@ -39,7 +39,7 @@ function pinTargetExists(person: PersonRow, key: string): boolean {
   const split = key.indexOf(":");
   const kind = key.slice(0, split), ref = key.slice(split + 1);
   if (split < 1 || !ref) return false;
-  if (kind === "track") return readableIn(person, "music", ref)?.kind === "track";
+  if (kind === "track") return readableIn(person, "audio", ref)?.kind === "track";
   if (kind === "album" || kind === "artist") return groupTracks(musicLibrary(person), kind).has(ref);
   if (kind === "playlist") return visiblePlaylists(person).some((collection) => collection.id === ref);
   return false;
@@ -69,7 +69,7 @@ export function pinMusicItem(person: PersonRow, args: Record<string, unknown>): 
 export function musicQueueAction(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string; label: string }> {
   if (args.op === "reorder") return reorderMusicQueue(person, args);
   if (args.op !== "play_next" && args.op !== "add") return { ok: false, status: 400, error: "Choose Play next or Add to queue." };
-  const item = typeof args.media_id === "string" ? readableIn(person, "music", args.media_id) : null;
+  const item = typeof args.media_id === "string" ? readableIn(person, "audio", args.media_id) : null;
   if (!item || item.kind !== "track") return { ok: false, status: 404, error: "That song is not available. Go back to the library and choose another." };
   const queue = resolveCollection(person.id, "queue")!;
   const playing = queue.pointer !== null ? queue.items[queue.pointer]?.media_id : undefined;
@@ -123,7 +123,7 @@ function recentSearchRows(person: PersonRow): { as_of: string; rows: Array<{ key
 /** The device told us which songs it keeps for offline play (only songs this person may read, at most 500). The list replaces the device's last one. */
 export function reportKeptSongs(person: PersonRow, device: string, args: Record<string, unknown>): ActionResult<{ count: number }> {
   if (!Array.isArray(args.ids) || args.ids.some((id) => typeof id !== "string")) return { ok: false, status: 400, error: "Say which songs this device keeps, then try again." };
-  const ids = [...new Set(args.ids as string[])].slice(0, MUSIC_KEPT_MAX).filter((id) => readableIn(person, "music", id)?.kind === "track");
+  const ids = [...new Set(args.ids as string[])].slice(0, MUSIC_KEPT_MAX).filter((id) => readableIn(person, "audio", id)?.kind === "track");
   saveKeys(person, `${KEPT_TITLE_PREFIX}${device}`, ids);
   return { ok: true, value: { count: ids.length } };
 }

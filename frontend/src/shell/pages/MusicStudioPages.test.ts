@@ -2,17 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { makeSongBody, songAddress } from "./MakeSongPage";
 import { createBody, editPath, isStudioPage } from "./MusicStudioPages";
 import { stemsAddress, studioAddress } from "./MusicWorkspacePage";
-import manifest from "../../../../backend/packages/music/manifest.json";
+import manifest from "../../../../backend/packages/audio/manifest.json";
 
 describe("music studio pages", () => {
   test("only the music app's studio pages are ours", () => {
-    expect(isStudioPage("music", "make-album")).toBe(true);
-    expect(isStudioPage("music", "make-song")).toBe(true);
-    expect(isStudioPage("music", "browse")).toBe(false);
+    expect(isStudioPage("audio", "make-album")).toBe(true);
+    expect(isStudioPage("audio", "make-song")).toBe(true);
+    expect(isStudioPage("audio", "browse")).toBe(false);
     expect(isStudioPage("books", "create")).toBe(false);
   });
   test("edit address names the kind and the id", () => {
-    expect(editPath("album", "malbum-abc")).toBe("/apps/music/edit?kind=album&id=malbum-abc");
+    expect(editPath("album", "malbum-abc")).toBe("/apps/audio/edit?kind=album&id=malbum-abc");
   });
   test("a made album starts empty with its sound as the style", () => {
     const body = createBody("album", { title: " Porch Light ", sound: "dreamy synth pop" });
@@ -35,7 +35,7 @@ describe("music studio pages", () => {
     expect(body).toEqual({ idea: "calm piano", instrumental: true });
   });
   test("a made song has its own address", () => {
-    expect(songAddress("a b")).toBe("/apps/music/create?song=a%20b");
+    expect(songAddress("a b")).toBe("/apps/audio/create?song=a%20b");
   });
   test("stems opens the studio and asks for the split", () => {
     expect(stemsAddress("a b")).toContain("split=1");

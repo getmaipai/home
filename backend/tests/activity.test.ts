@@ -38,7 +38,7 @@ describe("ACTIVITY-PAGE-01: the list", () => {
     expect(byId.get("video:v1")).toMatchObject({ state: "waiting", percent: null });
     expect(byId.get("video:v1")?.line).toBeTruthy();
     expect(byId.get("video:v2")).toMatchObject({ state: "failed", line: "I couldn't make that video. Try again, or ask for something simpler.", href: "/apps/videos/create" });
-    expect(byId.get("song:s1")).toMatchObject({ state: "making", title: "Rainy porch song", percent: 30, href: "/apps/music/create?song=s1" });
+    expect(byId.get("song:s1")).toMatchObject({ state: "making", title: "Rainy porch song", percent: 30, href: "/apps/audio/create?song=s1" });
   });
 
   test("never lists another person's job, an admin's included", async () => {

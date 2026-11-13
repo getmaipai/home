@@ -210,7 +210,7 @@ describe("Lyrics look off", () => {
   test("the player action reaches the same function", async () => {
     const client = new TestClient();
     await client.post("/api/auth/verify-secret", { personId: adult.id, secret: "correcthorse" });
-    const res = await client.post("/api/plugins/music/actions/lyrics-realign", { media_id: trackId });
+    const res = await client.post("/api/plugins/audio/actions/lyrics-realign", { media_id: trackId });
     expect([202, 404]).toContain(res.status);
     if (res.status === 404) throw new Error("the music package does not serve lyrics-realign: the play page must name it");
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -229,12 +229,12 @@ describe("when it starts", () => {
     expect(stored().filter((row) => row.words?.length).length).toBe(2);
   });
   test("opening a track whose lyrics have timing but no words starts it once", async () => {
-    expect(itemViewFor(adult, "music", trackId)).toBeTruthy();
-    expect(itemViewFor(adult, "music", trackId)).toBeTruthy();   // the second open finds it running or done
+    expect(itemViewFor(adult, "audio", trackId)).toBeTruthy();
+    expect(itemViewFor(adult, "audio", trackId)).toBeTruthy();   // the second open finds it running or done
     await new Promise((resolve) => setTimeout(resolve, 80));
     expect(sent).toHaveLength(2);
     expect(stored().filter((row) => row.words?.length)).toHaveLength(5);
-    const view = itemViewFor(adult, "music", trackId) as { timed_lyrics?: { words?: unknown[] }[] };
+    const view = itemViewFor(adult, "audio", trackId) as { timed_lyrics?: { words?: unknown[] }[] };
     expect(view.timed_lyrics?.[0]?.words?.length).toBe(2);
   });
 });

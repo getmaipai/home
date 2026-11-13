@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "music-creations",
+  "title": "My creations",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "library",
+      "text": "Your songs and bands will show up here.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/create"
+        }
+      },
+      "action_label": "Make a song"
+    }
+  ]
+}

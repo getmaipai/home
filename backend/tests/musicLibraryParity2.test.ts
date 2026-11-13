@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 type Row = Record<string, unknown> & { id: string; title: string };
-const lib = (person: PersonRow, params: { sort?: string; kind?: string } = {}) => mediaAppData(person, "music", "songs", { scope: "library", ...params }) as unknown as Row[];
+const lib = (person: PersonRow, params: { sort?: string; kind?: string } = {}) => mediaAppData(person, "audio", "songs", { scope: "library", ...params }) as unknown as Row[];
 const queueIds = (person: PersonRow) => resolveCollection(person.id, "queue")!.items.map((entry) => entry.media_id);
 const newPlaylist = (owner: PersonRow, songs: number[]) => {
   const made = musicPlaylistAction(owner, { op: "new" });
@@ -44,7 +44,7 @@ const newPlaylist = (owner: PersonRow, songs: number[]) => {
   for (const n of songs) musicPlaylistOps(owner, { op: "add", playlist_id: made.value.id, media_id: id(n) });
   return made.value.id;
 };
-const playlistIds = (person: PersonRow, playlist: string) => (mediaAppData(person, "music", "playlist", { id: playlist }) as unknown as Row[]).map((row) => row.id);
+const playlistIds = (person: PersonRow, playlist: string) => (mediaAppData(person, "audio", "playlist", { id: playlist }) as unknown as Row[]).map((row) => row.id);
 
 test("the Library sort the person chose is saved, read back and opens first on the page", () => {
   expect(savedLibrarySort(atlas)).toBe("recents");
@@ -57,11 +57,11 @@ test("the Library sort the person chose is saved, read back and opens first on t
   expect(savedLibrarySort(atlas)).toBe("creator");
   lib(atlas, { sort: "nonsense" });
   expect(savedLibrarySort(atlas)).toBe("creator");
-  const page = getAppPage(atlas, "music", "library");
+  const page = getAppPage(atlas, "audio", "library");
   if (!page.ok) throw new Error("no page");
   const shelf = (page.value as { body: Array<{ sort: { options: Array<{ value: string }> } }> }).body[0]!;
   expect(shelf.sort.options.map((option) => option.value)).toEqual(["creator", "recents", "az"]);
-  const other = getAppPage(sprout, "music", "library");
+  const other = getAppPage(sprout, "audio", "library");
   expect((other.ok ? (other.value as typeof page.value as { body: Array<{ sort: { options: Array<{ value: string }> } }> }) : null)!.body[0]!.sort.options[0]!.value).toBe("recents");
 });
 
@@ -85,7 +85,7 @@ test("reordering Up next moves only the songs after the playing one and keeps th
 test("reordering a playlist uses the keys the page sends and keeps the rest", () => {
   const playlist = newPlaylist(atlas, [1, 2, 3]);
   expect(playlistIds(atlas, playlist)).toEqual([id(1), id(2), id(3)]);
-  const keys = (mediaAppData(atlas, "music", "playlist", { id: playlist }) as unknown as Row[]).map((row) => row.reorder_key as string);
+  const keys = (mediaAppData(atlas, "audio", "playlist", { id: playlist }) as unknown as Row[]).map((row) => row.reorder_key as string);
   expect(keys[0]).toBe(`${playlist}:${id(1)}`);
   expect(musicPlaylistOps(atlas, { op: "reorder", ids: [keys[2]!, keys[0]!, keys[1]!] })?.ok).toBe(true);
   expect(playlistIds(atlas, playlist)).toEqual([id(3), id(1), id(2)]);
@@ -103,7 +103,7 @@ test("a member can add and remove songs; only the owner changes who the members 
   expect(changePlaylistMembers(atlas, "add", playlist, nova.id).ok).toBe(true);
   expect(changePlaylistMembers(atlas, "add", playlist, atlas.id).ok).toBe(false);
   expect(playlistIds(nova, playlist)).toEqual([id(1)]);
-  expect((mediaAppData(nova, "music", "playlists", {}) as unknown as Row[]).map((row) => row.id)).toContain(playlist);
+  expect((mediaAppData(nova, "audio", "playlists", {}) as unknown as Row[]).map((row) => row.id)).toContain(playlist);
   expect(musicPlaylistOps(nova, { op: "add", playlist_id: playlist, media_id: id(2) })?.ok).toBe(true);
   expect(playlistIds(atlas, playlist)).toEqual([id(1), id(2)]);
   expect(musicPlaylistOps(nova, { op: "reorder", playlist_id: playlist, ids: [id(2), id(1)] })?.ok).toBe(true);
@@ -131,7 +131,7 @@ test("a child member is added only by an adult and never adds or sees a song it 
   const kids = newPlaylist(sprout, [1]);
   expect(changePlaylistMembers(sprout, "add", kids, nova.id).ok).toBe(false);
   // The share panel: the owner manages, a member only sees the list.
-  const header = (person: PersonRow) => (mediaAppData(person, "music", "header", { id: playlist, scope: "playlist" }) as unknown as Array<{ visibility: { can_manage: boolean; people: unknown[] }; candidates: Array<{ id: string }> }>)[0]!;
+  const header = (person: PersonRow) => (mediaAppData(person, "audio", "header", { id: playlist, scope: "playlist" }) as unknown as Array<{ visibility: { can_manage: boolean; people: unknown[] }; candidates: Array<{ id: string }> }>)[0]!;
   expect(header(atlas).visibility.can_manage).toBe(true);
   expect(header(atlas).visibility.people).toHaveLength(1);
   expect(header(atlas).candidates.map((entry) => entry.id)).toEqual([nova.id]);
@@ -141,7 +141,7 @@ test("a child member is added only by an adult and never adds or sees a song it 
   expect(playlistIds(sprout, playlist)).toEqual([]);
 });
 
-const libFor = (person: PersonRow, params: { kind?: string; device?: string }) => mediaAppData(person, "music", "songs", { scope: "library", ...params }) as unknown as Row[];
+const libFor = (person: PersonRow, params: { kind?: string; device?: string }) => mediaAppData(person, "audio", "songs", { scope: "library", ...params }) as unknown as Row[];
 
 test("the Library's one Pin button pins what is not pinned and unpins what is, and says which", () => {
   expect(pinMusicItem(atlas, { op: "toggle", key: `track:${id(1)}` }).ok).toBe(true);

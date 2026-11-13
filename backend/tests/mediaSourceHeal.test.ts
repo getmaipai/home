@@ -40,7 +40,7 @@ describe("the early 'Created by you' source", () => {
     expect(() => sourceFromRow(legacyRow)).toThrow();
     expect(sourcesFromRows([legacyRow])).toEqual([]);
     expect((await client.get("/api/media/sources")).status).toBe(200);
-    expect((await client.post("/api/plugins/music/data/songs", {})).status).toBe(200);
+    expect((await client.post("/api/plugins/audio/data/songs", {})).status).toBe(200);
     expect((await client.post("/api/plugins/videos/data/recent", {})).status).toBe(200);
     expect((await client.get("/api/media/home")).status).toBe(200);
   });
@@ -60,7 +60,7 @@ describe("the early 'Created by you' source", () => {
     expect(healed.root).toEqual({ mount_id: null, path: "made-at-home", kinds: ["track"] });
     expect(healed.paused).toBe(true);
     expect(db.select().from(mediaItems).where(eq(mediaItems.id, song.id)).get()!.sourceId).toBe(newId);
-    const songs = (await (await client.post("/api/plugins/music/data/songs", {})).json()) as Array<{ id: string }>;
+    const songs = (await (await client.post("/api/plugins/audio/data/songs", {})).json()) as Array<{ id: string }>;
     expect(songs.map((row) => row.id)).toContain(song.id);
     expect(healMadeSources()).toBe(0);
   });

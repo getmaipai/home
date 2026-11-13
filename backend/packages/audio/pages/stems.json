@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-stems",
+  "title": "Stems",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "Stems need the Home app. Open a song in Audio, then choose Extract stems."
+    }
+  ]
+}

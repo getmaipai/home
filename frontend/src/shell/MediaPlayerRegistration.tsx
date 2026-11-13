@@ -29,7 +29,7 @@ export function chaptersWithEnds(chapters: PlayedItem["chapters"], durationS: nu
 /** The audio session's kind for what an app plays: it decides the person's speed (`audio.speed.<kind>`) and the sleep timer's reach. */
 export function audioKindOfApp(appId: string): AudioKind {
   if (appId === "podcasts") return "podcast";
-  if (appId === "music") return "music";
+  if (appId === "audio") return "music";
   if (appId === "books") return "audiobook";
   if (appId === "news") return "spoken_reply";
   return "video";
@@ -59,7 +59,7 @@ function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<
   const played = item.data ?? null;
   const audioItem = useMemo<AudioItem>(
     () => ({
-      title: played?.title ?? (appId === "podcasts" ? "Episode" : appId === "music" ? "Song" : "Video"),
+      title: played?.title ?? (appId === "podcasts" ? "Episode" : appId === "audio" ? "Song" : "Video"),
       // A live station: the Media Session shows the station as the title and what is on now as the artist line.
       ...(liveSubtitle !== undefined ? (liveSubtitle ? { artist: liveSubtitle } : {}) : played?.channel ? { artist: played.channel } : {}),
       ...(played?.poster ? { artworkUrl: played.poster } : {}),

@@ -31,7 +31,7 @@ export function clock(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** What the stage reads about a song from the Music app's item data. */
+/** What the stage reads about a song from the Audio app's item data. */
 export interface StageSong { liked?: boolean; lyrics?: string; timed_lyrics?: Array<{ t: number; line: string; section?: string | null }> }
 type QueueRow = { id: string; title: string; channel?: string | null };
 
@@ -55,7 +55,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
   const [duration, setDuration] = useState(Number.isFinite(el.duration) ? el.duration : 0);
   const dock = useMediaDock();
   const mode = usePlayMode();
-  const isSong = media.appId === "music" && liveStationIdOf(media.src) === null;
+  const isSong = media.appId === "audio" && liveStationIdOf(media.src) === null;
   const [song, setSong] = useState<StageSong | null>(null);
   const [liked, setLiked] = useState(false);
   const [view, setView] = useState<"scene" | "lyrics" | "queue">(initialView);
@@ -66,7 +66,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
     setSong(null); setLiked(false); setView((old) => (old === "lyrics" ? "scene" : old));
     if (!isSong) return;
     let alive = true;
-    api.appData<StageSong | []>("music", "item", { id: media.id }).then((item) => {
+    api.appData<StageSong | []>("audio", "item", { id: media.id }).then((item) => {
       if (!alive || Array.isArray(item)) return;
       setSong(item); setLiked(item.liked === true);
     }).catch(() => undefined);
@@ -76,13 +76,13 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
   useEffect(() => {
     if (view !== "queue" || !isSong) return;
     let alive = true;
-    api.appData<QueueRow[]>("music", "up-next", { id: media.id }).then((rows) => { if (alive) setQueue(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setQueue([]); });
+    api.appData<QueueRow[]>("audio", "up-next", { id: media.id }).then((rows) => { if (alive) setQueue(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setQueue([]); });
     return () => { alive = false; };
   }, [view, isSong, media.id]);
   const toggleLike = () => {
     const on = !liked;
     setLiked(on);
-    request("/api/plugins/music/like", { method: "POST", body: JSON.stringify({ media_id: media.id, on }) }).catch(() => setLiked(!on));
+    request("/api/plugins/audio/like", { method: "POST", body: JSON.stringify({ media_id: media.id, on }) }).catch(() => setLiked(!on));
   };
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export function NowPlayingStage({ media, onClose, initialView = "scene" }: { med
     try { localStorage.setItem(SCENE_KEY, scene === "art" ? "art" : "scene"); } catch { /* the choice lasts until reload */ }
   };
 
-  const CloseIcon = getIcon("x"), PlayIcon = getIcon("play"), PauseIcon = getIcon("pause"), MusicIcon = getIcon("music");
+  const CloseIcon = getIcon("x"), PlayIcon = getIcon("play"), PauseIcon = getIcon("pause"), MusicIcon = getIcon("audio");
   const HeartIcon = getIcon("heart"), ShuffleIcon = getIcon("shuffle"), RepeatIcon = getIcon("refresh-cw"), PrevIcon = getIcon("skip-back"), NextIcon = getIcon("skip-forward");
   const LyricsIcon = getIcon("mic-vocal"), QueueIcon = getIcon("list-music"), Back10Icon = getIcon("rotate-ccw"), Fwd30Icon = getIcon("rotate-cw");
   const pick = (next: "lyrics" | "queue") => setView((old) => (old === next ? "scene" : next));

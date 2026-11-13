@@ -43,7 +43,7 @@ const watchPage = {
   body: [{ type: "player", bind: { source: "package", path: "item", params: { id: "$state.id" } }, kind: "video", empty_state: { type: "empty_state", icon: "film", text: "Not on the hub." } }],
 };
 const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/videos/pages/watch.json"), "utf8")) as unknown;
-const musicPlayPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/music/pages/play.json"), "utf8")) as unknown;
+const musicPlayPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/audio/pages/play.json"), "utf8")) as unknown;
 const weatherIndexPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/weather/pages/index.json"), "utf8")) as unknown;
 
 let home: HomeFixture;
@@ -100,7 +100,7 @@ function open(path: string, extra: ReactNode = null) {
 describe("a media app's first tab", () => {
   test("is Home for the video apps, Listen now for the audio apps and Reading for Books", async () => {
     const { homeLabelOf, playRoute } = await import("@/shell/mediaApps");
-    expect(["videos", "shows", "podcasts", "music", "books"].map(homeLabelOf)).toEqual(["Home", "Home", "Listen now", "Listen now", "Reading"]);
+    expect(["videos", "shows", "podcasts", "audio", "books"].map(homeLabelOf)).toEqual(["Home", "Home", "Listen now", "Listen now", "Reading"]);
     expect(playRoute("podcast_episode", "media-aaaaaa")).toBe("/apps/podcasts/play?id=media-aaaaaa");
   });
 });
@@ -164,26 +164,26 @@ describe("a media app in the shell", () => {
   });
 
   test("the shipped Music play schema renders song details and shares with the creation row file id", async () => {
-    const musicApp = { ...row, package: "music", page: "index", label: "Music", description: "Music.", to: "/apps/music", sections: [{ page: "index", label: "Listen now", icon: null }, { page: "play", label: "Now playing", icon: null }] } as AppRow;
+    const musicApp = { ...row, package: "audio", page: "index", label: "Audio", description: "Audio.", to: "/apps/audio", sections: [{ page: "index", label: "Listen now", icon: null }, { page: "play", label: "Now playing", icon: null }] } as AppRow;
     const recipients = ["Aster", "Basil"].map((name, index) => ({ id: `person-${index}`, name, avatar_url: null }));
     const candidate = { id: "person-2", name: "Clover", avatar_url: null };
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([musicApp]));
-      if (url.startsWith("/api/plugins/music/pages/play")) return Promise.resolve(Response.json(musicPlayPage));
-      if (url.startsWith("/api/plugins/music/data/header")) {
+      if (url.startsWith("/api/plugins/audio/pages/play")) return Promise.resolve(Response.json(musicPlayPage));
+      if (url.startsWith("/api/plugins/audio/data/header")) {
         if (JSON.parse(String(init?.body ?? "{}")).scope === "creation-people") return Promise.resolve(Response.json([candidate]));
         return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", creator: { name: "Jesse Torres", href: "/people/person-jesse", avatar_url: null }, made_at: "2026-10-21T12:00:00Z", description: "[Verse] Morning light by the river. The water moves beneath the willow trees.", visibility: { mode: "shared", people: recipients, can_manage: true } }]));
       }
-      if (url.startsWith("/api/plugins/music/data/item")) return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", src: "/api/files/file-song-123/content", duration_s: 20, lyrics: "[Verse] Morning light", chapters: [] }]));
-      if (url.startsWith("/api/plugins/music/data/up-next")) return Promise.resolve(Response.json([]));
-      if (url.startsWith("/api/plugins/music/actions/")) {
+      if (url.startsWith("/api/plugins/audio/data/item")) return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", src: "/api/files/file-song-123/content", duration_s: 20, lyrics: "[Verse] Morning light", chapters: [] }]));
+      if (url.startsWith("/api/plugins/audio/data/up-next")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/audio/actions/")) {
         shareBodies.push(JSON.stringify({ url, body: init?.body }));
         return Promise.resolve(Response.json({ ok: true }));
       }
       return baseFetch(input, init);
     }) as typeof fetch;
-    const view = open("/apps/music/play?id=file-song-123");
+    const view = open("/apps/audio/play?id=file-song-123");
     expect(await view.findByText("River song")).toBeTruthy();
     expect(view.getByRole("link", { name: "Jesse Torres, open profile" }).getAttribute("href")).toBe("/people/person-jesse");
     expect(view.container.querySelector("time")?.textContent).toMatch(/^Made /);
@@ -195,7 +195,7 @@ describe("a media app in the shell", () => {
     expect(await view.findByRole("dialog")).toBeTruthy();
     fireEvent.click(view.getByRole("switch", { name: "Clover" }));
     await waitFor(() => expect(shareBodies).toHaveLength(1));
-    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/music/actions/share-add", body: JSON.stringify({ id: "file-song-123", person_id: "person-2" }) });
+    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/audio/actions/share-add", body: JSON.stringify({ id: "file-song-123", person_id: "person-2" }) });
     expect(document.body.textContent).not.toMatch(/\{[^{}]+\}/);
   });
 
@@ -313,7 +313,7 @@ describe("media app helpers", () => {
   test("playRoute names the owning app's play page, and a kind no app plays has none", () => {
     expect(playRoute("video", "media-a b")).toBe("/apps/videos/watch?id=media-a%20b");
     expect(playRoute("episode", "media-x")).toBe("/apps/shows/watch?id=media-x");
-    expect(playRoute("track", "media-x")).toBe("/apps/music/play?id=media-x");
+    expect(playRoute("track", "media-x")).toBe("/apps/audio/play?id=media-x");
     expect(playRoute("mystery", "media-x")).toBeNull();
     expect(playPageOf("videos")).toBe("watch");
     expect(playPageOf("weather")).toBeNull();
@@ -339,13 +339,13 @@ describe("an app's first tab for the apps that are not media apps", () => {
     const { appHomeLabel } = await import("@/shell/mediaApps");
     expect(appHomeLabel("news", false)).toBe("Today");
     expect(appHomeLabel("weather", false)).toBe("Overview");
-    expect(appHomeLabel("music", true)).toBe("Listen now");
+    expect(appHomeLabel("audio", true)).toBe("Listen now");
   });
 });
 
 describe("family app headers", () => {
   test("usesFamilyHeader is the media apps, News and Weather; isMediaApp stays the media apps", () => {
-    expect(["videos", "shows", "music", "podcasts", "books", "news", "weather"].every(usesFamilyHeader)).toBe(true);
+    expect(["videos", "shows", "audio", "podcasts", "books", "news", "weather"].every(usesFamilyHeader)).toBe(true);
     expect(isMediaApp("news")).toBe(false);
     expect(isMediaApp("weather")).toBe(false);
   });

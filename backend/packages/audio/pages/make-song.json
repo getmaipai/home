@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-song",
+  "title": "Make a song",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "Making a song needs the Home app. Open Audio in the app, pick Make a song, describe it and press Make."
+    }
+  ]
+}

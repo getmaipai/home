@@ -38,7 +38,7 @@ async function setup() {
   const adult = await signIn("Marlow", "adult");
   const child = await signIn("Sprout", "child");
   const tree = buildMediaTree();
-  for (const [label, path, kinds] of [["films", tree.films, ["film"]], ["music", tree.music, ["track"]], ["reading", tree.reading, ["book", "audiobook"]]] as const) {
+  for (const [label, path, kinds] of [["films", tree.films, ["film"]], ["audio", tree.music, ["track"]], ["reading", tree.reading, ["book", "audiobook"]]] as const) {
     const added = await owner.post("/api/media/sources", { label, path, kinds });
     await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
   }
@@ -101,7 +101,7 @@ describe("media home", () => {
     const made = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([1, 2, 3]), provenance: 'music-gen:{"title":"Made at home","duration_seconds":31}', deduplicate: false });
     if (!made.ok) throw new Error(made.error);
     const rows = (await home(adult.client)).made_at_home;
-    expect(rows).toContainEqual(expect.objectContaining({ id: made.value.id, app: "music", href: expect.stringMatching(/^\/apps\/music\/play\?id=/) }));
+    expect(rows).toContainEqual(expect.objectContaining({ id: made.value.id, app: "audio", href: expect.stringMatching(/^\/apps\/music\/play\?id=/) }));
     expect((await home(child.client)).made_at_home).toEqual([]);
   });
 
@@ -145,7 +145,7 @@ describe("media home", () => {
     flushProgress();
     const songs = (await home(adult.client)).recent_music;
     expect(songs.map((row) => row.id)).toEqual([one, two]);
-    expect(songs.every((row) => row.app === "music")).toBe(true);
+    expect(songs.every((row) => row.app === "audio")).toBe(true);
     expect(songs.every((row) => row.percent === null)).toBe(true);
   });
 

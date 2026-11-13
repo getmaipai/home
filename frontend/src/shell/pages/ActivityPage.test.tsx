@@ -39,7 +39,7 @@ describe("ActivityPage", () => {
   test("shows each state with its state word, title, one line and one action, grouped by day, newest first", async () => {
     const api = mockActivity({ seenAt: null, dot: "attention", items: [
       item({ id: "video:1", source: "video", state: "making", title: "A paper lantern", line: "Drawing the frames", percent: 42, href: "/apps/videos/create", at: at(0, 11) }),
-      item({ id: "song:1", source: "song", state: "waiting", title: "Rainy porch song", line: "You are next.", href: "/apps/music/create?song=1", at: at(0, 10) }),
+      item({ id: "song:1", source: "song", state: "waiting", title: "Rainy porch song", line: "You are next.", href: "/apps/audio/create?song=1", at: at(0, 10) }),
       item({ id: "picture:2", state: "done", title: "A red fox", at: at(0, 9) }),
       item({ id: "video:2", source: "video", state: "failed", title: "Rain on a tin roof", line: "I couldn't make that video. Try again, or ask for something simpler.", href: "/apps/videos/create", at: at(1) }),
       item({ id: "job:1", source: "job", state: "attention", title: "Asked to unlock a clip", line: "This is waiting for your answer.", href: "/chat", at: at(3) }),

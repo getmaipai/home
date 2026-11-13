@@ -1,4 +1,4 @@
-// RADIO-02 / RADIO-04: the Radio routes under /api/plugins/music/radio. The directory (search) is a network lookup that only
+// RADIO-02 / RADIO-04: the Radio routes under /api/plugins/audio/radio. The directory (search) is a network lookup that only
 // an adult, or a teen, may start, and only while the household switch is on; a child plays what a parent saved and nothing else.
 // A minor's search words pass the household-name check before they leave the home (PRIVACY.md); a teen is never shown a station
 // tagged as adult content. Saved stations are `media-source` records of kind station (lib/media/radio.ts).
@@ -42,7 +42,7 @@ const subtitleOf = (station: { country_code: string | null; tags: string[] }): s
 
 export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; language: string; homepage: string; action_label: string; recording?: string; idle?: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
-  id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}&n=${encodeURIComponent(station.name)}` : `/api/plugins/music/radio/card?n=${encodeURIComponent(station.name)}`, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
+  id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/audio/radio/art?u=${encodeURIComponent(station.favicon)}&n=${encodeURIComponent(station.name)}` : `/api/plugins/audio/radio/card?n=${encodeURIComponent(station.name)}`, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
   country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), language: "language" in station && station.language ? station.language : "", homepage: "homepage" in station && station.homepage ? station.homepage : "", action_label: label,
 });
 
@@ -84,7 +84,7 @@ export async function radioDirectoryRows(person: PersonRow, query: { q: string; 
   const result = scopeQuery ? await findStations(scopeQuery) : name === "" && country === "" && tag === "" ? await findStations({ kind: "popular" }) : await findStations({ kind: "search", name, country, tag });
   if (!result.ok) return [];
   rememberPreviewStations("household", result.stations);
-  return directoryRowsFor(person, result.stations).map((station) => ({ ...rowOf(station, station.added ? "Added" : "Add"), preview_url: `/api/plugins/music/radio/preview/${encodeURIComponent(station.id)}` }));
+  return directoryRowsFor(person, result.stations).map((station) => ({ ...rowOf(station, station.added ? "Added" : "Add"), preview_url: `/api/plugins/audio/radio/preview/${encodeURIComponent(station.id)}` }));
 }
 
 let streamDeps: StreamDeps = {};
@@ -94,7 +94,7 @@ export function radioAddressDeps(): StreamDeps { return streamDeps; }
 
 export function radioRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "music", ["/search", "/stations", "/stations/*", "/recordings/*", "/stream/*", "/preview", "/preview/*", "/hls/*", "/now/*"]);
+  gateMediaApp(routes, "audio", ["/search", "/stations", "/stations/*", "/recordings/*", "/stream/*", "/preview", "/preview/*", "/hls/*", "/now/*"]);
 
   const gate = (c: Context) => {
     const person = c.get("person");

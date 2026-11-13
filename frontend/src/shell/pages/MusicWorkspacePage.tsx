@@ -1,4 +1,4 @@
-// MUSIC-WORKSPACE-03: the Music app's Create home, in the look of a modern creator app. A black page with a lime accent (kit tokens only): a hero
+// MUSIC-WORKSPACE-03: the Audio app's Create home, in the look of a modern creator app. A black page with a lime accent (kit tokens only): a hero
 // panel of covers with a headline and a floating glass prompt bar (mode, style, engine, lyrics, length and instrumental chips, and one big Generate
 // button), then carousels of your songs, starter sounds and the tools, every tile with a cover (a real one, or one drawn from the song's id).
 // Picking a song opens it above the rows with every action as a visible button; one the engine cannot do is turned off with its plain reason.
@@ -43,11 +43,11 @@ const text = (error: unknown, fallback: string): string => (error instanceof Err
 
 export const STEMS_LINE = () => i18n._({ id: "Splitting a song into stems is not available on this Home yet.", message: "Splitting a song into stems is not available on this Home yet." });
 export const COVER_SONG_LINE = () => i18n._({ id: "Bring a song to change its style, remove vocals, split stems, or sing it in another household voice.", message: "Bring a song to change its style, remove vocals, split stems, or sing it in another household voice." });
-export const songAddress = (id: string | null): string => (id ? `/apps/music/create?song=${encodeURIComponent(id)}` : "/apps/music/create");
-export const studioAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}`;
-export const stemsAddress = (id: string): string => `/apps/music/studio?song=${encodeURIComponent(id)}&split=1`;
+export const songAddress = (id: string | null): string => (id ? `/apps/audio/create?song=${encodeURIComponent(id)}` : "/apps/audio/create");
+export const studioAddress = (id: string): string => `/apps/audio/studio?song=${encodeURIComponent(id)}`;
+export const stemsAddress = (id: string): string => `/apps/audio/studio?song=${encodeURIComponent(id)}&split=1`;
 /** Opens the song with the Remix panel showing. Nothing is made until the panel's confirm button is pressed. */
-export const remixAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}&remix=1`;
+export const remixAddress = (id: string): string => `/apps/audio/create?song=${encodeURIComponent(id)}&remix=1`;
 export function makeSoundBody(form: { description: string; seconds: string; loop: boolean; stick: "words" | "surprise"; takes?: number }) {
   const seconds = Number(form.seconds);
   return { description: form.description.trim(), ...(form.seconds.trim() && Number.isFinite(seconds) && seconds > 0 ? { seconds } : {}), loop: form.loop, stick_to_words: form.stick === "words", ...(form.takes && form.takes > 1 ? { takes: form.takes } : {}) };
@@ -160,11 +160,11 @@ export function SongGallery({ selected, onOpen, actionsFor = TILE_ACTIONS, empty
 }
 
 const TOOLS = () => ([
-  { label: i18n._({ id: "Studio", message: "Studio" }), line: i18n._({ id: "Tracks, waveforms, mute and solo for any song.", message: "Tracks, waveforms, mute and solo for any song." }), to: "/apps/music/studio" },
-  { label: i18n._({ id: "Stems", message: "Stems" }), line: i18n._({ id: "Split a song into vocals, drums, bass and the rest.", message: "Split a song into vocals, drums, bass and the rest." }), to: "/apps/music/stems" },
-  { label: i18n._({ id: "Remix", message: "Remix" }), line: i18n._({ id: "Say what to change, review it, then Home makes it.", message: "Say what to change, review it, then Home makes it." }), to: "/apps/music/remix" },
-  { label: i18n._({ id: "Extend", message: "Extend" }), line: i18n._({ id: "Turn a quick song into a full one, or back.", message: "Turn a quick song into a full one, or back." }), to: "/apps/music/remix" },
-  { label: i18n._({ id: "Cover art", message: "Cover art" }), line: i18n._({ id: "Make a new picture for any song.", message: "Make a new picture for any song." }), to: "/apps/music/remix" },
+  { label: i18n._({ id: "Studio", message: "Studio" }), line: i18n._({ id: "Tracks, waveforms, mute and solo for any song.", message: "Tracks, waveforms, mute and solo for any song." }), to: "/apps/audio/studio" },
+  { label: i18n._({ id: "Stems", message: "Stems" }), line: i18n._({ id: "Split a song into vocals, drums, bass and the rest.", message: "Split a song into vocals, drums, bass and the rest." }), to: "/apps/audio/stems" },
+  { label: i18n._({ id: "Remix", message: "Remix" }), line: i18n._({ id: "Say what to change, review it, then Home makes it.", message: "Say what to change, review it, then Home makes it." }), to: "/apps/audio/remix" },
+  { label: i18n._({ id: "Extend", message: "Extend" }), line: i18n._({ id: "Turn a quick song into a full one, or back.", message: "Turn a quick song into a full one, or back." }), to: "/apps/audio/remix" },
+  { label: i18n._({ id: "Cover art", message: "Cover art" }), line: i18n._({ id: "Make a new picture for any song.", message: "Make a new picture for any song." }), to: "/apps/audio/remix" },
 ]);
 
 /** The song opened above the rows: its cover blurred into the background, the kit player, and every action as a button, each off with its reason. */

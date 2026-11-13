@@ -24,7 +24,7 @@ describe("settings and rules", () => {
   test("seconds are whole numbers from 0 to 12", () => {
     expect([crossfadeSeconds(5), crossfadeSeconds(99), crossfadeSeconds(-3), crossfadeSeconds("x"), crossfadeSeconds(null), crossfadeSeconds(2.6)]).toEqual([5, 12, 0, 0, 0, 3]);
   });
-  const song = { appId: "music", kind: "audio", live: false, loop: false, duration: 200 };
+  const song = { appId: "audio", kind: "audio", live: false, loop: false, duration: 200 };
   test("only a song crossfades: not a podcast, audiobook, station, repeat-one song, video or very short song", () => {
     expect(mayCrossfade(song, 6)).toBe(true);
     expect(mayCrossfade(song, 0)).toBe(false);
@@ -92,7 +92,7 @@ describe("attachCrossfade", () => {
       afterHandOff: ({ next: n }) => { hand.push(n.id); },
       ...over,
     };
-    const heldItem: CrossfadeHeld = { id: "media-a", appId: "music", kind: "audio", src: "/a.mp3", el: asEl(el), live: false, ...held };
+    const heldItem: CrossfadeHeld = { id: "media-a", appId: "audio", kind: "audio", src: "/a.mp3", el: asEl(el), live: false, ...held };
     const detach = attachCrossfade(heldItem, deps);
     return { el, incoming, time, primed, hand, elementFor, detach };
   }

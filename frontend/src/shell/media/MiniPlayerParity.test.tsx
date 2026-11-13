@@ -1,4 +1,4 @@
-// MEDIA-VIZ-03: the pieces added to bring the mini player and the Music page up to the pre-rebuild hub's.
+// MEDIA-VIZ-03: the pieces added to bring the mini player and the Audio page up to the pre-rebuild hub's.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -21,7 +21,7 @@ describe("visualizer on/off", () => {
 
 describe("MinimizeButton", () => {
   test("is a labelled button on a play page", () => {
-    const view = render(<MemoryRouter><MinimizeButton appHome="/apps/music" /></MemoryRouter>);
+    const view = render(<MemoryRouter><MinimizeButton appHome="/apps/audio" /></MemoryRouter>);
     const button = view.getByRole("button", { name: "Minimize to the mini player" });
     expect(button.parentElement).toHaveAttribute("data-slot", "media-minimize");
     expect(button.querySelector(".max-sm\\:sr-only")?.textContent).toBe("Minimize");

@@ -363,13 +363,13 @@ with `item_meta_field` running time, `item_highlight_field: playing` (the track 
 playlist pages, `item_index_field: track_number` (a playlist numbers by its own order). Album, Artist and Playlist pages open with
 a `billboard` bound to the one `header` data id (`scope` = album, artist or playlist). The package declares 16 data ids, the cap.
 
-`POST /api/plugins/music/queue` accepts `{ id, mode, shuffle?, seed_kind? }`. Modes are track, album, artist, playlist and radio.
+`POST /api/plugins/audio/queue` accepts `{ id, mode, shuffle?, seed_kind? }`. Modes are track, album, artist, playlist and radio.
 A button that carries only an id may say more in it: `shuffle:<id>` shuffles, `radio:<artist|album|genre|track>:<seed>` starts
 radio. Radio candidates come only from readable library tracks and rank by same artist, album artist, genre, then decade.
 Queue changes use the person's standing collection; finishing a song advances its pointer. The shell requests audio autoplay and
 registers Music with the audio session's music kind.
 
-`POST /api/plugins/music/playlist` takes `{ op: "new" }`, `{ op: "add", media_id }` (onto the newest playlist) or
+`POST /api/plugins/audio/playlist` takes `{ op: "new" }`, `{ op: "add", media_id }` (onto the newest playlist) or
 `{ op: "remove", media_id, playlist_id }` (the person's own playlist only). A package page may not use the schema `form` node, so
 rename and reorder stay on `/api/media/collections`. A minor never sees a track whose artist, album, album artist or genre trips
 the minor floor (`bandAllows` reads them at every read), and a playlist or its header is another person's secret.
@@ -397,7 +397,7 @@ title, play and pause); tapping the title opens the play page.
   through a suspended context), so playback is never affected. Colors come from the cover art (`lib/media/artPalette.ts`) or, with no art, the dark theme's tokens.
 - Ported from the pre-rebuild hub's `AudioVisualizer`, `artPalette` and `mediaAudioGraph`, without its EQ chain, DJ and radio parts.
 - Open: an Up next and a queue sheet on the stage, lyrics on the stage, and a Cast button; the host has no queue to show yet outside Music's own page.
-- The Music play page (`apps/music`, `play`) keeps the kit `Player` in its audio layout untouched and adds `shell/media/MusicVisualizerSection.tsx` beside it: a scene
+- The Music play page (`apps/audio`, `play`) keeps the kit `Player` in its audio layout untouched and adds `shell/media/MusicVisualizerSection.tsx` beside it: a scene
   picker (hide or show, the seven scenes), a Full screen button that opens the same stage, and an ambient strip along the bottom of the page, as the pre-rebuild hub's
   Now Playing overlay had. It draws only while the host holds that song. Mini player and page hand off with no restart: the bar opens the page, the page hides the bar.
 

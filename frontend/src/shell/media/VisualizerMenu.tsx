@@ -1,5 +1,5 @@
 import { i18n } from "@lingui/core";
-// MEDIA-VIZ-03: the scene menu on the mini bar and the Music page: None, then each scene. One app-wide choice (AudioVisualizer's prefs),
+// MEDIA-VIZ-03: the scene menu on the mini bar and the Audio page: None, then each scene. One app-wide choice (AudioVisualizer's prefs),
 // the pre-rebuild hub's visualizer menu. Its icon is the equalizer bars: the waveform is the voice icon in chat.
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";

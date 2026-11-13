@@ -1,5 +1,5 @@
 // MUSIC-STUDIO-EDIT: the made-music object a chat turn follows (a song, a band, an album or a song style). A turn follows an object
-// when the message carries its reference (`maipai://music/band/<id>`, as the Music app's Edit buttons send) or when the newest card
+// when the message carries its reference (`maipai://audio/band/<id>`, as the Audio app's Edit buttons send) or when the newest card
 // in the thread is one. The object, never the wording of the message, decides which creation and edit tools are offered (rule 8).
 // Rule 6a: nothing here logs a title, a name or an id.
 import { desc, eq } from "drizzle-orm";
@@ -13,7 +13,7 @@ export interface MusicObjectRef { kind: MusicObjectKind; id: string }
 
 const KINDS: ReadonlySet<string> = new Set<MusicObjectKind>(["track", "band", "album", "style"]);
 /** A reference's kind is a music object when its app is music and the kind is one of the four. */
-export const isMusicObjectRef = (ref: { app: string; kind: string }): boolean => ref.app === "music" && KINDS.has(ref.kind);
+export const isMusicObjectRef = (ref: { app: string; kind: string }): boolean => ref.app === "audio" && KINDS.has(ref.kind);
 export const musicObjectOf = (ref: { app: string; kind: string; id: string }): MusicObjectRef | null => isMusicObjectRef(ref) ? { kind: ref.kind as MusicObjectKind, id: ref.id } : null;
 
 /** The block kind a card has, and the provenance prefix its id rides under. */
@@ -51,7 +51,7 @@ export function threadMusicObject(actor: PersonRow, conversationId: string): Mus
 type ItemText = { title: string; text: string };
 const lines = (...parts: Array<string | number | null | undefined | false>): string => parts.filter(Boolean).join("\n");
 
-/** The item readers for the three made objects, so a reference to one reads under the same access as the Music app. */
+/** The item readers for the three made objects, so a reference to one reads under the same access as the Audio app. */
 export async function readMusicBand(person: PersonRow, id: string): Promise<ItemText | null> {
   const found = getMade("made_artist", person, id); if (!found.ok) return null;
   const b = found.value as unknown as { name: string; backstory?: string | null; genres?: string[]; style?: { description?: string } };

@@ -5,7 +5,7 @@
 import { request } from "@/lib/api";
 
 // A saved station plays from /stream/, a station just shown on the Radio page (not saved yet) from /preview/; both are live and get the same handling.
-const STREAM_PREFIXES = ["/api/plugins/music/radio/stream/", "/api/plugins/music/radio/preview/"] as const;
+const STREAM_PREFIXES = ["/api/plugins/audio/radio/stream/", "/api/plugins/audio/radio/preview/"] as const;
 export const NOW_POLL_MS = 15_000;
 /** The first look comes a few seconds after sound starts, once the station has sent its first metadata block. */
 export const NOW_FIRST_MS = 4_000;
@@ -22,7 +22,7 @@ export function liveStationIdOf(src: string): string | null {
 /** What the station says is on now, or null (none sent, the station left the list, or the hub did not answer). */
 export async function fetchNowPlaying(stationId: string): Promise<string | null> {
   try {
-    const found = await request<{ title: string | null }>(`/api/plugins/music/radio/now/${encodeURIComponent(stationId)}`);
+    const found = await request<{ title: string | null }>(`/api/plugins/audio/radio/now/${encodeURIComponent(stationId)}`);
     return typeof found.title === "string" && found.title !== "" ? found.title : null;
   } catch {
     return null;

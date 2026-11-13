@@ -57,13 +57,13 @@ describe("the media-app host: data ids", () => {
     const { adult, child } = await setup();
     const person = db.select().from(people).where(eq(people.id, adult.id)).get()!;
     rememberPreviewStations("household", [{ id: "preview-1", name: "Cabin FM", url: "https://radio.example/live", favicon: null, tags: ["jazz"], country_code: "US", codec: "mp3", bitrate_kbps: 128, hls: false }]);
-    const view = await (await adult.client.post("/api/plugins/music/data/item", { id: "preview-1" })).json() as Record<string, unknown>;
-    expect(view).toMatchObject({ id: "preview-1", title: "Cabin FM", kind: "station", live: true, src: "/api/plugins/music/radio/preview/preview-1" });
+    const view = await (await adult.client.post("/api/plugins/audio/data/item", { id: "preview-1" })).json() as Record<string, unknown>;
+    expect(view).toMatchObject({ id: "preview-1", title: "Cabin FM", kind: "station", live: true, src: "/api/plugins/audio/radio/preview/preview-1" });
     // An HLS station's preview item is marked so the shell attaches hls.js (a plain audio element cannot play a playlist).
     rememberPreviewStations("household", [{ id: "preview-hls", name: "Hill HLS", url: "https://radio.example/hill.m3u8", favicon: null, tags: [], country_code: "US", codec: "aac", bitrate_kbps: 64, hls: true }]);
-    expect(await (await adult.client.post("/api/plugins/music/data/item", { id: "preview-hls" })).json()).toMatchObject({ src: "/api/plugins/music/radio/preview/preview-hls?hls=1" });
-    expect(await (await adult.client.post("/api/plugins/music/data/item", { id: "stranger" })).json()).toEqual([]);
-    expect(await (await child.client.post("/api/plugins/music/data/item", { id: "preview-1" })).json()).toEqual([]);
+    expect(await (await adult.client.post("/api/plugins/audio/data/item", { id: "preview-hls" })).json()).toMatchObject({ src: "/api/plugins/audio/radio/preview/preview-hls?hls=1" });
+    expect(await (await adult.client.post("/api/plugins/audio/data/item", { id: "stranger" })).json()).toEqual([]);
+    expect(await (await child.client.post("/api/plugins/audio/data/item", { id: "preview-1" })).json()).toEqual([]);
   });
 
   test("Music item views gate lyrics and expose lookup eligibility", async () => {
@@ -72,7 +72,7 @@ describe("the media-app host: data ids", () => {
     expect(getHouseholdSettingValue("music.lyrics_online")).toBe(true);
     const row = db.select().from(mediaItems).all().find((item) => item.title === "Morning Light")!;
     db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "file", text: "First line", timed: [{ t: 1, line: "First line", section: "Verse" }] }) }).where(eq(mediaItems.id, row.id)).run();
-    const url = `/api/plugins/music/data/item`;
+    const url = `/api/plugins/audio/data/item`;
     const lyrics = await (await adult.client.post(url, { id: row.id })).json() as Record<string, unknown>;
     expect(lyrics).toMatchObject({ lyrics: "First line", timed_lyrics: [{ t: 1, line: "First line", section: "Verse" }], lyrics_lookup: "none" });
     expect(lyrics.facts).toBe("Tempo · 2023 · Indie");
@@ -98,10 +98,10 @@ describe("the media-app host: data ids", () => {
     const made = storeFile(person, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([2, 4, 6]), provenance: 'music-gen:{"job_id":"lyrics-made-test","title":"At Home"}', deduplicate: false });
     if (!made.ok) throw new Error(made.error);
     db.insert(musicJobs).values({ id: "lyrics-made-test", personId: adult.id, task: "text2music", state: "done", request: JSON.stringify({ title: "At Home", lyrics: "[Verse]\nWords from home" }), fileId: made.value.id, durationS: 40, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: "1:0:lyrics-made" }).run();
-    await adult.client.post("/api/plugins/music/queue", { id: made.value.id });
+    await adult.client.post("/api/plugins/audio/queue", { id: made.value.id });
     const item = db.select().from(mediaItems).where(eq(mediaItems.locFileId, made.value.id)).get()!;
     expect(JSON.parse(item.lyrics!)).toEqual({ source: "made", text: "[Verse]\nWords from home" });
-    const view = await (await adult.client.post("/api/plugins/music/data/item", { id: item.id })).json() as Record<string, unknown>;
+    const view = await (await adult.client.post("/api/plugins/audio/data/item", { id: item.id })).json() as Record<string, unknown>;
     expect(view.lyrics_lookup).toBe("none");
   });
   test("a band's single is saved under the band: artist and made_artist_id are set, and a discarded band's single is not credited", async () => {
@@ -116,12 +116,12 @@ describe("the media-app host: data ids", () => {
       return file.value.id;
     };
     const kept = single("band-single-kept", band.value.id, [1, 2, 3]);
-    await adult.client.post("/api/plugins/music/queue", { id: kept });
+    await adult.client.post("/api/plugins/audio/queue", { id: kept });
     const item = db.select().from(mediaItems).where(eq(mediaItems.locFileId, kept)).get()!;
     expect(item.artist).toBe("Clover Lane");
     expect(item.madeArtistId).toBe(band.value.id);
     const stray = single("band-single-stray", "mband-nothere00000", [4, 5, 6]);
-    await adult.client.post("/api/plugins/music/queue", { id: stray });
+    await adult.client.post("/api/plugins/audio/queue", { id: stray });
     const other = db.select().from(mediaItems).where(eq(mediaItems.locFileId, stray)).get()!;
     expect(other.madeArtistId).toBeNull();
     expect(other.artist).not.toBe("Clover Lane");
@@ -244,47 +244,47 @@ describe("the media-app host: data ids", () => {
     const song = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([4, 5, 6]), provenance: 'music-gen:{"job_id":"music-header","audience":"all-ages"}', deduplicate: false });
     if (!song.ok) throw new Error(song.error);
     db.insert(musicJobs).values({ id: "music-header", personId: ownerPerson.id, task: "text2music", state: "done", request: JSON.stringify({ title: "River song", lyrics: "[Verse] Morning light\nA river runs." }), fileId: song.value.id, createdAt: now, updatedAt: now, hlc: "1:0:music" }).run();
-    const data = async (client: TestClient, scope = "creation") => (await client.post("/api/plugins/music/data/header", { id: song.value.id, scope })).json() as Promise<any[]>;
+    const data = async (client: TestClient, scope = "creation") => (await client.post("/api/plugins/audio/data/header", { id: song.value.id, scope })).json() as Promise<any[]>;
     const creation = await data(owner);
     expect(creation[0]).toMatchObject({ id: song.value.id, title: "River song", description: "[Verse] Morning light\nA river runs.", creator: { name: "Sage", href: `/people/${ownerPerson.id}`, avatar_url: null }, made_at: expect.any(String), visibility: { mode: "private", can_manage: true } });
     expect((await data(owner, "creation-people")).map((candidate) => candidate.id).sort()).toEqual(["household", adult.id, admin.id, child.id].sort());
     expect(await data(adult.client, "creation-people")).toEqual([]);
-    expect((await adult.client.post("/api/plugins/music/actions/share-add", { id: song.value.id, person_id: child.id })).status).toBe(403);
+    expect((await adult.client.post("/api/plugins/audio/actions/share-add", { id: song.value.id, person_id: child.id })).status).toBe(403);
     const childPerson = db.select().from(people).where(eq(people.id, child.id)).get()!;
     const childSong = storeFile(childPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([7, 8, 9]), provenance: 'music-gen:{"audience":"all-ages"}', deduplicate: false });
     if (!childSong.ok) throw new Error(childSong.error);
-    expect((await child.client.post("/api/plugins/music/actions/share-add", { id: childSong.value.id, person_id: adult.id })).status).toBe(403);
-    const share = await owner.post("/api/plugins/music/actions/share-add", { id: creation[0].id, person_id: adult.id });
+    expect((await child.client.post("/api/plugins/audio/actions/share-add", { id: childSong.value.id, person_id: adult.id })).status).toBe(403);
+    const share = await owner.post("/api/plugins/audio/actions/share-add", { id: creation[0].id, person_id: adult.id });
     expect(share.status).toBe(200);
     expect((await data(owner))[0].visibility.mode).toBe("shared");
 
-    const scanned = (await (await adult.client.post("/api/plugins/music/data/songs", {})).json() as any[]).find((row) => row.title === "Morning Light");
+    const scanned = (await (await adult.client.post("/api/plugins/audio/data/songs", {})).json() as any[]).find((row) => row.title === "Morning Light");
     expect(scanned).toBeTruthy();
-    const scannedHeader = await (await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation" })).json() as any[];
+    const scannedHeader = await (await adult.client.post("/api/plugins/audio/data/header", { id: scanned.id, scope: "creation" })).json() as any[];
     expect(scannedHeader[0]).toMatchObject({ id: scanned.id, creator: { name: "The Marlows" }, visibility: { can_manage: false } });
-    expect(await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation-people" }).then((response) => response.json())).toEqual([]);
+    expect(await adult.client.post("/api/plugins/audio/data/header", { id: scanned.id, scope: "creation-people" }).then((response) => response.json())).toEqual([]);
   });
 
   test("Music collection headers include safe Apple Music metadata and readable child details", async () => {
     const { owner, adult, child } = await setup();
-    const songs = await (await adult.client.post("/api/plugins/music/data/songs", {})).json() as any[];
+    const songs = await (await adult.client.post("/api/plugins/audio/data/songs", {})).json() as any[];
     const morning = songs.find((row) => row.title === "Morning Light")!;
     const albumId = JSON.stringify(["The Marlows", "Tempo"]);
-    const getHeader = async (client: TestClient, id: string, scope: string) => (await client.post("/api/plugins/music/data/header", { id, scope })).json() as Promise<any[]>;
+    const getHeader = async (client: TestClient, id: string, scope: string) => (await client.post("/api/plugins/audio/data/header", { id, scope })).json() as Promise<any[]>;
     const album = (await getHeader(adult.client, albumId, "album"))[0];
     expect(album).toMatchObject({
-      title: "Tempo", creator: { name: "The Marlows", href: "/apps/music/artist?id=The%20Marlows" },
+      title: "Tempo", creator: { name: "The Marlows", href: "/apps/audio/artist?id=The%20Marlows" },
       art: expect.stringContaining(morning.id), meta: expect.stringContaining("Album"),
       footer_lines: expect.arrayContaining([expect.stringMatching(/\d+ songs?, \d+ minutes?/)]),
       visibility: { mode: "shared" }, made_at: expect.any(String),
     });
     const explicit = songs.find((row) => row.title === "Loud Song")!;
-    const childSongs = await (await child.client.post("/api/plugins/music/data/songs", {})).json() as any[];
+    const childSongs = await (await child.client.post("/api/plugins/audio/data/songs", {})).json() as any[];
     const childAlbumId = JSON.stringify(["The Marlows", "Tempo"]);
     const childAlbum = await getHeader(child.client, childAlbumId, "album");
     expect(childAlbum[0]?.title).toBe("Tempo");
     expect(JSON.stringify(childAlbum)).not.toContain(explicit.title);
-    const madePlaylist = await adult.client.post("/api/plugins/music/playlist", { op: "new" });
+    const madePlaylist = await adult.client.post("/api/plugins/audio/playlist", { op: "new" });
     const playlistId = ((await madePlaylist.json()) as { id: string }).id;
     const playlist = (await getHeader(adult.client, playlistId, "playlist"))[0];
     expect(playlist).toMatchObject({ creator: { name: "Marlow" }, meta: expect.stringContaining("Playlist"), footer_lines: expect.arrayContaining([expect.stringMatching(/\d+ songs?, \d+ minutes?/)]) });
@@ -293,8 +293,8 @@ describe("the media-app host: data ids", () => {
     expect(artist).not.toHaveProperty("creator");
     expect(childSongs.map((row) => row.title)).not.toContain(explicit.title);
     expect(JSON.stringify(await getHeader(child.client, "Clover", "artist"))).not.toContain(explicit.title);
-    expect(JSON.stringify(await (await child.client.post("/api/plugins/music/data/album-more", { id: albumId })).json())).not.toContain(explicit.title);
-    const ownerAlbum = await (await owner.post("/api/plugins/music/data/header", { id: albumId, scope: "album" })).json() as any[];
+    expect(JSON.stringify(await (await child.client.post("/api/plugins/audio/data/album-more", { id: albumId })).json())).not.toContain(explicit.title);
+    const ownerAlbum = await (await owner.post("/api/plugins/audio/data/header", { id: albumId, scope: "album" })).json() as any[];
     expect(ownerAlbum[0]?.title).toBe("Tempo");
   });
 

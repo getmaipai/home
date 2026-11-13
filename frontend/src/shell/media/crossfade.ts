@@ -12,9 +12,9 @@ export function crossfadeSeconds(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(CROSSFADE_MAX_S, Math.max(0, Math.round(value))) : 0;
 }
 
-/** Whether the held item may crossfade at all: a song of the Music app, not a live station, not looping, and long enough for the fade. */
+/** Whether the held item may crossfade at all: a song of the Audio app, not a live station, not looping, and long enough for the fade. */
 export function mayCrossfade(held: { appId: string; kind: string; live: boolean; loop: boolean; duration: number }, seconds: number, ios = false): boolean {
-  if (ios || seconds <= 0 || held.appId !== "music" || held.kind !== "audio" || held.live || held.loop) return false;
+  if (ios || seconds <= 0 || held.appId !== "audio" || held.kind !== "audio" || held.live || held.loop) return false;
   return Number.isFinite(held.duration) && held.duration >= seconds * 2;
 }
 

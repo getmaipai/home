@@ -178,11 +178,11 @@ describe("Deno is optional", () => {
   afterEach(() => setDenoLookupForTest(null));
   test("deno missing: a deno_test package is skipped (off, no issue, no throw)", async () => {
     setDenoLookupForTest(() => null);
-    const r = await runSmoke("music");
+    const r = await runSmoke("audio");
     expect(r.ok).toBe(true);
     expect(r.message).toContain("Deno is not installed");
-    expect(getPackageStatus("music").status).toBe("disabled");
-    expect(listIssues().some((i) => i.key === "music")).toBe(false);
+    expect(getPackageStatus("audio").status).toBe("disabled");
+    expect(listIssues().some((i) => i.key === "audio")).toBe(false);
     await expect(runAllSmokeTests()).resolves.toBeDefined();
   });
 });

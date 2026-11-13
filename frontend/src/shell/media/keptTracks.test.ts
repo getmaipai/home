@@ -29,7 +29,7 @@ test("only an offline: id is a Save for offline ask", () => {
 test("saving keeps the copy, tells the hub, and the next press removes it", async () => {
   expect(await toggleKeptSong("media-a", deps)).toMatch(/Saved on this device/);
   expect(keepCalls).toEqual([{ kind: "media", id: "media-a" }]);
-  expect(posted.at(-1)).toEqual({ url: "/api/plugins/music/offline", body: { ids: ["media-a"] } });
+  expect(posted.at(-1)).toEqual({ url: "/api/plugins/audio/offline", body: { ids: ["media-a"] } });
   expect(await toggleKeptSong("media-a", deps)).toMatch(/Removed from this device/);
   expect(posted.at(-1)!.body).toEqual({ ids: [] });
 });

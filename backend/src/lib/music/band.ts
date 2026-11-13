@@ -205,7 +205,7 @@ export async function makeBand(input: { state: BandState; mediaId: string; callI
 /** The turn's runner for `make_band`: the policy node has already checked the offer and that the reference is the one the person sent. */
 export async function runMakeBand(input: { state: BandState; args: Record<string, unknown>; callId: string; spoken: boolean }): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
-  const ref = itemRefsIn(typeof args.ref === "string" ? args.ref : "")[0] ?? itemRefsIn(state.utterance ?? "").find((r) => r.app === "music" && r.kind === "track");
+  const ref = itemRefsIn(typeof args.ref === "string" ? args.ref : "")[0] ?? itemRefsIn(state.utterance ?? "").find((r) => r.app === "audio" && r.kind === "track");
   if (!ref) return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: "bad_arguments", failureKind: "bad_arguments", durationMs: 0 });
   const made = await makeBand({ state, mediaId: ref.id, callId, spoken: input.spoken });
   if (!made.ok) return outcomeOf({ callId, packageId: MAKE_BAND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: made.line }, actions: [] } });

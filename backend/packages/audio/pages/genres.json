@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "music-genres",
+  "title": "Genres and moods",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "compass",
+      "text": "Browse music by genre and mood. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/search"
+        }
+      },
+      "action_label": "Find songs"
+    }
+  ]
+}

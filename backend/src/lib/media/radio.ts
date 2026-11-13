@@ -79,7 +79,7 @@ export function stationItemView(actor: PersonRow, id: string, nowPlaying: string
   if (!station) return null;
   const detail = [station.country_code, station.tags.slice(0, 2).join(", "), station.language, station.codec?.toUpperCase(), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : null].filter(Boolean).join(" · ");
   return {
-    id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/stream/${encodeURIComponent(station.id)}${station.hls ? "?hls=1" : ""}`,
+    id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/audio/radio/stream/${encodeURIComponent(station.id)}${station.hls ? "?hls=1" : ""}`,
     live: true, poster: null, description: "", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [],
   };
 }
@@ -87,7 +87,7 @@ export function stationItemView(actor: PersonRow, id: string, nowPlaying: string
 /** A directory station may become an item only while the household's recent-result grant is live. */
 export function previewStationItemView(actor: PersonRow, station: DirectoryStation, nowPlaying: string | null): Record<string, unknown> {
   const detail = [station.country_code, station.tags.join(", "), station.language, station.codec?.toUpperCase(), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : null].filter(Boolean).join(" · ");
-  return { id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/preview/${encodeURIComponent(station.id)}${hlsAddress(station.url) ? "?hls=1" : ""}`, live: true, poster: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}&n=${encodeURIComponent(station.name)}` : `/api/plugins/music/radio/card?n=${encodeURIComponent(station.name)}`, description: detail || "Live radio station.", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [] };
+  return { id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/audio/radio/preview/${encodeURIComponent(station.id)}${hlsAddress(station.url) ? "?hls=1" : ""}`, live: true, poster: station.favicon ? `/api/plugins/audio/radio/art?u=${encodeURIComponent(station.favicon)}&n=${encodeURIComponent(station.name)}` : `/api/plugins/audio/radio/card?n=${encodeURIComponent(station.name)}`, description: detail || "Live radio station.", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [] };
 }
 
 /** The addresses a person already has, for the `added` flag on directory rows. */

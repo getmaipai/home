@@ -1,4 +1,4 @@
-// MUSIC-STUDIO-VIEW-01: the Music app's Studio (DAW) view of one song. A track row per audio part: the full song, and the stems (vocals, drums,
+// MUSIC-STUDIO-VIEW-01: the Audio app's Studio (DAW) view of one song. A track row per audio part: the full song, and the stems (vocals, drums,
 // bass, other) once Home has split it. Every row has its own waveform from the real file, mute, solo and volume; the timeline has a ruler, the
 // song's sections as flags (from its timed words) and one playhead; the transport plays every row together. A split is the existing stems
 // action (the same one the chat card uses), so nothing here is a second path. The side panel is a live listening EQ (six bands) and compressor
@@ -153,14 +153,14 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
     if (!autoSplit || asked.current || !songId) return;
     asked.current = true;
     setSplitting(true);
-    musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
+    musicApi.stems(songId).then((card) => navigate(`/apps/audio/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
       .catch((error: unknown) => setStemsProblem(errorLine(error, STEMS_UNAVAILABLE_LINE())))
       .finally(() => setSplitting(false));
   }, [autoSplit, songId, navigate]);
 
   if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
-  if (!songId) return <EmptyState icon="music" text={i18n._({ id: "Open a song from your list, then choose Studio.", message: "Open a song from your list, then choose Studio." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/music/create")} />;
-  if (song.isError) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/music/create")} />;
+  if (!songId) return <EmptyState icon="music" text={i18n._({ id: "Open a song from your list, then choose Studio.", message: "Open a song from your list, then choose Studio." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/audio/create")} />;
+  if (song.isError) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/audio/create")} />;
 
   const everyAudio = () => tracks.map((track) => audios.current.get(track.id)).filter((el): el is HTMLAudioElement => !!el);
   /** Routes every row through the EQ and compressor. An element can be wired once, so rows that arrive later (the stems) are added as they appear. */
@@ -179,7 +179,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const flip = (set: Set<string>, id: string) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next; };
   const split = () => {
     setSplitting(true); setStemsProblem("");
-    musicApi.stems(songId).then((card) => navigate(`/apps/music/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
+    musicApi.stems(songId).then((card) => navigate(`/apps/audio/studio?song=${encodeURIComponent(songId)}&stems=${encodeURIComponent(card.id)}`, { replace: true }))
       .catch((error: unknown) => setStemsProblem(errorLine(error, STEMS_UNAVAILABLE_LINE())))
       .finally(() => setSplitting(false));
   };
@@ -197,7 +197,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
       <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Studio", message: "Studio" })}</p>
         <h2 className="min-w-0 truncate text-title">{song.data?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-        <Button asChild variant="secondary"><Link to={`/apps/music/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
+        <Button asChild variant="secondary"><Link to={`/apps/audio/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
         <Button type="button" disabled={splitting || !!stemsBusy || tracks.length > 1 || tracks.length === 0} onClick={split}>{stemsBusy || splitting ? i18n._({ id: "Splitting into stems", message: "Splitting into stems" }) : tracks.length > 1 ? i18n._({ id: "Split into stems (done)", message: "Split into stems (done)" }) : i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
       </div>
     </div>

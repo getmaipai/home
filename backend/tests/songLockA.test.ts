@@ -28,12 +28,12 @@ test("a music-gen file lock hides Library, file music metadata, and promoted Mus
   expect(listLibrary(sage, {}).items.map((f) => f.id)).not.toContain(fileId);
   const fileBody = await (await client.get(`/api/files/${fileId}`)).text();
   expect(fileBody).not.toContain("Hidden Moon Song"); expect(fileBody).not.toContain("silver lantern");
-  expect(mediaAppData(sage, "music", "songs", {}) as unknown[]).toHaveLength(0);
-  expect(mediaAppData(sage, "music", "songs", { scope: "item", id: mediaId }) as unknown[]).toHaveLength(0);
+  expect(mediaAppData(sage, "audio", "songs", {}) as unknown[]).toHaveLength(0);
+  expect(mediaAppData(sage, "audio", "songs", { scope: "item", id: mediaId }) as unknown[]).toHaveLength(0);
   expect(__unlockedForTests(sage.id, () => listLibrary(sage, {}).items.some((f) => f.id === fileId))).toBe(true);
-  expect(__unlockedForTests(sage.id, () => mediaAppData(sage, "music", "songs", {}) as unknown[])).toHaveLength(1);
+  expect(__unlockedForTests(sage.id, () => mediaAppData(sage, "audio", "songs", {}) as unknown[])).toHaveLength(1);
   const madeChild = await client.post("/api/people", { displayName: "Nova", role: "child", secret: "0000", birthdate: "2018-01-01" });
   const childResult = await madeChild.json() as { id: string };
   const child = db.select().from(people).where(eq(people.id, childResult.id)).get() as PersonRow;
-  expect(mediaAppData(child, "music", "songs", {}) as unknown[]).toHaveLength(0);
+  expect(mediaAppData(child, "audio", "songs", {}) as unknown[]).toHaveLength(0);
 });

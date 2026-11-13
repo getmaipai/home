@@ -1,7 +1,7 @@
 {
   "description": "Recipe fallback; the native tool and its gates are covered in backend/tests/makeBand.test.ts.",
   "inputs": {
-    "ref": "maipai://music/track/media-a1b2c3d4e5"
+    "ref": "maipai://audio/track/media-a1b2c3d4e5"
   },
   "host_setup": {},
   "expected": {

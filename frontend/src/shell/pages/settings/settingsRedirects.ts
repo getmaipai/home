@@ -71,8 +71,8 @@ export function aliasTarget(path: string, viewer: { canManageHousehold: boolean 
     "/settings/devices": settingsPath("profile", "profile"),
     "/settings/repairs": settingsPath("advanced"),
     "/settings/updates": "/updates",
-    // AUDIT-UI-01: radio is a page of the Music app (its Radio tab), not an app of its own.
-    "/apps/radio": "/apps/music/radio",
+    // AUDIT-UI-01: radio is a page of the Audio app (its Radio tab), not an app of its own.
+    "/apps/radio": "/apps/audio/radio",
   };
   return fixed[path]
     ?? (path === "/settings/models" ? retiredManagePageTarget("/models", viewer) : undefined)

@@ -27,7 +27,7 @@ beforeEach(() => {
     db.insert(mediaItems).values({ id: id(n), sourceId: n === 6 ? "msrc-private0001" : "msrc-music000001", kind: "track", locRootId: n === 6 ? "msrc-private0001" : "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist, album: "Garden", discNo: disc, trackNo: track, genre: "Folk", year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   }
 });
-const data = (person: PersonRow, name: string, key?: string) => mediaAppData(person, "music", name, { id: key }) as Array<{id: string; title: string}>;
+const data = (person: PersonRow, name: string, key?: string) => mediaAppData(person, "audio", name, { id: key }) as Array<{id: string; title: string}>;
 const album = () => albumKey(itemFromRow(db.select().from(mediaItems).where(eq(mediaItems.id,id(1))).get()!));
 test("albums group by album artist and album; artists group by track artist", () => {
   expect(data(atlas,"albums")).toHaveLength(2);
@@ -38,7 +38,7 @@ test("album playback writes ordered own queue and progress advances its pointer"
   expect(startMusicQueue(atlas,{mode:"album",id:album()}).ok).toBe(true);
   expect(resolveCollection(atlas.id,"queue")!.items[0]!.media_id).toBe(id(3));
   expect(resolveCollection(sprout.id,"queue")!.items).toEqual([]);
-  saveProgress(atlas,"music",{media_id:id(3),position_s:10,duration_s:10,reason:"ended"});
+  saveProgress(atlas,"audio",{media_id:id(3),position_s:10,duration_s:10,reason:"ended"});
   expect(resolveCollection(atlas.id,"queue")!.pointer).toBe(1);
   expect(data(atlas,"up-next",id(3))[0]!.id).toBe(id(6));
 });
@@ -78,10 +78,10 @@ test("radio orders by similarity: the seed first, then the same artist, then the
 test("the Music package passes the hub's own package-page check", async () => {
   const { appPackageProblems } = await import("@/lib/apps");
   const { loadManifestOnly } = await import("@/lib/plugins");
-  const loaded = loadManifestOnly("music");
+  const loaded = loadManifestOnly("audio");
   expect(loaded.ok).toBe(true);
   if (loaded.ok) {
-    expect(appPackageProblems(loaded.value, new URL("../packages/music", import.meta.url).pathname)).toEqual([]);
+    expect(appPackageProblems(loaded.value, new URL("../packages/audio", import.meta.url).pathname)).toEqual([]);
     expect(loaded.value.contributes?.data?.length).toBeLessThanOrEqual(16);
   }
 });
@@ -98,14 +98,14 @@ test("a playlist is made empty, then a song is added once and a child cannot add
   expect(data(sprout, "playlists")).toEqual([]);
 });
 
-const rows = (person: PersonRow, name: string, key?: string, scope?: string) => mediaAppData(person, "music", name, { id: key, scope }) as unknown as Array<Record<string, unknown>>;
+const rows = (person: PersonRow, name: string, key?: string, scope?: string) => mediaAppData(person, "audio", name, { id: key, scope }) as unknown as Array<Record<string, unknown>>;
 test("the album page header, track rows and Like label carry the fields the kit nodes bind", () => {
   const [header] = rows(atlas, "header", album(), "album");
   expect(header).toMatchObject({ id: album(), title: "Garden", channel: "atlas · 2021 · 5 songs", queue_mode: "album", shuffle_id: `shuffle:${album()}` });
   const tracks = rows(atlas, "album", album());
   expect(tracks.map((row) => row.track_number)).toEqual([1, 1, 2, 3, 1]);
   expect(tracks.every((row) => row.like_label === "Like" && row.playing === false)).toBe(true);
-  setListed(atlas, "music", "liked", id(3), true);
+  setListed(atlas, "audio", "liked", id(3), true);
   startMusicQueue(atlas, { mode: "album", id: album() });
   const after = rows(atlas, "album", album());
   expect(after.find((row) => row.id === id(3))).toMatchObject({ like_label: "Liked", playing: true });
@@ -133,7 +133,7 @@ test("Created by you lists visible made tracks newest first, excludes another pe
   db.update(attachments).set({ createdAt: "2026-10-18T12:00:00.000Z" }).where(eq(attachments.id, old.value.id)).run();
   db.update(attachments).set({ createdAt: "2026-10-19T12:00:00.000Z" }).where(eq(attachments.id, recent.value.id)).run();
   expect(rows(atlas, "songs", undefined, "made").map((row) => row.id)).toEqual([recent.value.id, old.value.id]);
-  expect(mediaAppData(atlas, "music", "item", { id: recent.value.id })).toMatchObject({ id: recent.value.id, src: `/api/files/${recent.value.id}/content`, poster: `/api/files/${recent.value.id}/thumb?w=320` });
+  expect(mediaAppData(atlas, "audio", "item", { id: recent.value.id })).toMatchObject({ id: recent.value.id, src: `/api/files/${recent.value.id}/content`, poster: `/api/files/${recent.value.id}/thumb?w=320` });
   db.update(mediaItems).set({ locFileId: recent.value.id }).where(eq(mediaItems.id, id(1))).run();
   expect(rows(atlas, "songs", undefined, "made").map((row) => row.id)).toEqual([old.value.id]);
 });
@@ -153,7 +153,7 @@ test("playing a visible made Library song promotes it into the shared media queu
   // The private root that holds the saved song is a valid source (a folderless or hyphenated one broke every shelf of every media app).
   for (const row of db.select().from(mediaSources).all()) expect(() => sourceFromRow(row)).not.toThrow();
   for (const row of db.select().from(mediaItems).all()) expect(() => itemFromRow(row)).not.toThrow();
-  expect(mediaAppData(atlas, "music", "item", { id: queue.items[0]!.media_id })).toMatchObject({ src: `/api/media/items/${queue.items[0]!.media_id}/content` });
+  expect(mediaAppData(atlas, "audio", "item", { id: queue.items[0]!.media_id })).toMatchObject({ src: `/api/media/items/${queue.items[0]!.media_id}/content` });
   expect(startMusicQueue(atlas, { mode: "track", id: made.value.id }).ok).toBe(true);
   expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, made.value.id)).all()).toHaveLength(1);
 });
@@ -206,7 +206,7 @@ test("a guest reads Music like a child: no explicit song, no radio, no private s
   expect(resolveCollection(guest.id, "queue")!.items.map((entry) => entry.media_id).every((value) => [id(1), id(2), id(3), id(5)].includes(value))).toBe(true);
 });
 // MEDIA-HEADER-01: the title-bar search asks `songs` with a `query`; it matches the title, needs two letters, and stays inside what the person may open.
-const found = (person: PersonRow, query: string) => (mediaAppData(person, "music", "songs", { query }) as Array<{ id: string }>).map((row) => row.id);
+const found = (person: PersonRow, query: string) => (mediaAppData(person, "audio", "songs", { query }) as Array<{ id: string }>).map((row) => row.id);
 test("a songs query finds matching titles, needs two letters and keeps a child's limits", () => {
   expect(found(atlas, "Song 3")).toEqual([id(3)]);
   expect(found(atlas, "S")).toEqual([]);
@@ -214,7 +214,7 @@ test("a songs query finds matching titles, needs two letters and keeps a child's
   expect(found(sprout, "Song 4")).toEqual([]);
   expect(found(sprout, "Song 6")).toEqual([]);
 });
-const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "music", name, params) as unknown as Array<Record<string, unknown>>;
+const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "audio", name, params) as unknown as Array<Record<string, unknown>>;
 test("Search finds a top result and grouped rows, and a child never gets popular songs", () => {
   const top = call(atlas, "songs", { scope: "top", query: "nova" });
   expect(top).toHaveLength(1);
@@ -222,13 +222,13 @@ test("Search finds a top result and grouped rows, and a child never gets popular
   expect(call(atlas, "artists", { query: "pip" }).map((row) => row.title)).toEqual(["pippa"]);
   expect(call(atlas, "albums", { query: "gard" }).length).toBeGreaterThan(0);
   expect(call(atlas, "songs", { query: "Song 2" }).map((row) => row.id)).toEqual([id(2)]);
-  saveProgress(atlas, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
-  saveProgress(sprout, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  saveProgress(atlas, "audio", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  saveProgress(sprout, "audio", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
   expect(call(atlas, "artist", { scope: "popular", id: "nova" }).map((row) => row.id)).toEqual([id(3)]);
   expect(call(sprout, "artist", { scope: "popular", id: "nova" })).toEqual([]);
 });
 test("Listen now data is per person: another person's play never shows in my recent list", () => {
-  saveProgress(atlas, "music", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
+  saveProgress(atlas, "audio", { media_id: id(3), position_s: 10, duration_s: 10, reason: "ended" });
   expect(call(atlas, "history", { scope: "quick" }).length).toBeGreaterThan(0);
   expect(call(sprout, "history", { scope: "quick" }).map((row) => row.id)).not.toContain(id(3));
 });

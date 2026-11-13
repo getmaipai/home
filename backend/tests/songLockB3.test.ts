@@ -47,9 +47,9 @@ test("locked music creations and sharing are missing until unlocked", () => {
   const fileId = "file-song-lock-b3";
   db.insert(attachments).values({ id: fileId, ownerPersonId: sage.id, conversationId: null, turnId: null, mediaType: "audio/mpeg", size: 4, sha256: createHash("sha256").update("song").digest("hex"), storagePath: `people/${sage.id}/attachments/${fileId}`, provenance: 'music-gen:{"made_audience":"adult-only","lock":"on","job_id":"locked-create-song"}', createdAt: now, hlc: "1" }).run();
   db.insert(musicJobs).values({ id: "locked-create-song", personId: sage.id, conversationId: null, turnId: null, task: "text2music", request: JSON.stringify({ title: "Private song", adultOnly: true }), state: "done", progress: 1, fileId, createdAt: now, updatedAt: now, hlc: "1" }).run();
-  expect(mediaAppData(sage, "music", "header", { scope: "creation", id: fileId })).toEqual([]);
+  expect(mediaAppData(sage, "audio", "header", { scope: "creation", id: fileId })).toEqual([]);
   expect(changeMusicCreationShare(sage, "private", fileId).status).toBe(404);
-  expect(__unlockedForTests(sage.id, () => (mediaAppData(sage, "music", "header", { scope: "creation", id: fileId }) as unknown[]).length)).toBe(1);
+  expect(__unlockedForTests(sage.id, () => (mediaAppData(sage, "audio", "header", { scope: "creation", id: fileId }) as unknown[]).length)).toBe(1);
 });
 
 test("a locked running song cannot start a waiting music bed mix", async () => {

@@ -2979,7 +2979,7 @@ describe("turnNext.ts: COMMAND-FAIL-01, a failed pattern outcome continues the t
 
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
       const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[]) : [];
-      const musicOutcome = outcomes.find((o) => o.packageId === "music");
+      const musicOutcome = outcomes.find((o) => o.packageId === "audio");
       expect(musicOutcome?.status).toBe("failed");
       expect(musicOutcome?.errorCode).toBe("not_found");
       expect(musicOutcome?.userMessage).toContain("MCP error");

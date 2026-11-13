@@ -17,7 +17,7 @@ describe("package app rail icons", () => {
   });
 
   test("finds the media apps", () => {
-    expect(apps.map(([id]) => id)).toEqual(expect.arrayContaining(["music", "podcasts", "videos"]));
+    expect(apps.map(([id]) => id)).toEqual(expect.arrayContaining(["audio", "podcasts", "videos"]));
   });
 
   test.each(apps)("%s rail icon %s is registered in the kit", (_id, icon) => {

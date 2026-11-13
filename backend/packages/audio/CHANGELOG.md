@@ -1,0 +1,163 @@
+# Changelog
+
+All notable changes to the Audio package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+
+## [0.3.15] - 2026-11-09
+
+### Added
+
+- Your Library is one list of songs, albums, artists and playlists. Sort it by Recents, A to Z or Creator, narrow it with the All, Songs, Albums, Artists and Playlists chips, and pin up to 6 items to the top (Pin and Unpin on each row; Open goes to the page).
+- Search remembers your last 10 searches as chips (Clear removes them) and has Songs, Artists, Albums and Playlists chips that narrow the results.
+- Songs on album, artist and playlist pages have Play next, Add to queue and Go to artist. Album and playlist pages have Share, which copies a link to the page on this hub.
+- Album, artist and playlist headers sit on a soft gradient taken from the cover.
+
+### Changed
+
+- Now playing uses the new layout with shuffle, repeat and the Up next button. The row under the player no longer repeats the Repeat button.
+- Radio: Your stations is one list with Record, Stop recording and Remove station; the separate Manage stations list is gone.
+
+## [0.3.14] - 2026-11-02
+
+### Added
+
+- Make a song page: describe a song, add your own words or make it instrumental, pick a saved style or a band's sound, then Make. The song card has Play, Keep in my Library and Edit. Edit now has a Details tab (title, words, style) that makes a new version and keeps the old one. In chat, edit_music also takes a new title.
+- The Create page lists Song first. Placeholder texts no longer say "comes here soon".
+
+## [0.3.13] - 2026-11-02
+
+### Added
+
+- Create pages for Make a band, Make an album and Make a song style, and My creations: a shelf of the bands, albums and styles you made. A tile opens the same editor card the chat shows, and every change keeps the earlier version. Pictures and new songs are still made in chat, and the pages link there.
+
+## [0.3.12] - 2026-11-01
+
+### Added
+
+- Listen now has quick tiles, per-person shelves (recently played, your artists, recently added) and radio from your music. Artist and Album pages show popular songs, discography tabs, similar artists and disc groups. Search shows a Top result and grouped Songs, Artists, Albums, Playlists and saved Stations; children see no play counts or popular lists.
+
+## [0.3.11] - 2026-11-01
+
+### Added
+
+- A new `cover-art-archive` data source, on by default: for an album that has no art in its files or folder and that MusicBrainz matched, Home keeps the front cover from the Cover Art Archive on your computer and shows it as the album art. Only the album's public MusicBrainz id is sent. Art in your files or folders, or set by you, is never replaced. An owner turns it off with "Fetch album covers from the Cover Art Archive" under Music settings; without it albums show the generated cover.
+
+## [0.3.10] - 2026-11-01
+
+### Added
+
+- A new `wikimedia-artists` data source, on by default: for each artist MusicBrainz matched, Home keeps one Wikimedia photo (with its licence line) and a two-sentence Wikipedia bio on your computer and shows them on the Artist page. Only public ids and page titles are sent, and nothing for an artist under 18. An owner turns it off with "Show artist photos and short bios from Wikimedia" under Music settings; without it the Artist page shows the generated cover.
+
+## [0.3.9] - 2026-11-01
+
+### Changed
+
+- The `musicbrainz` data source is on by default and now also covers the background match of library songs to MusicBrainz ids (title, artist, album and track number as text, about one song a second). An owner turns it off with "Match my songs to MusicBrainz" under Music settings.
+
+## [0.3.7] - 2026-10-28
+
+### Added
+
+- Open radio station details from every station shelf, play recent directory stations as previews, and surface saved and popular stations on Listen now.
+- Preview HLS directory stations through the same guarded playlist and segment proxy as saved stations.
+
+## [0.3.6] - 2026-10-28
+
+### Added
+
+- Record saved radio stations to the Audio library through Stack media.fetch jobs, with timed stop and playback.
+
+## [0.3.5] - 2026-10-28
+
+### Added
+
+- Add public HTTPS radio streams by address and preview directory stations before saving.
+- Keep preview access short-lived and apply the radio age, privacy and stream limits.
+
+## [0.3.4] - 2026-10-28
+
+### Changed
+
+- Turn Radio into one searchable dashboard with saved stations, popular and genre shelves, and country shelves. Station artwork uses a same-origin, allowlisted image route.
+- Remove the separate Find stations page.
+
+## [0.3.2] - 2026-10-28
+
+### Added
+
+- Play HLS stations through the shell's one audio element. Playlists and segments use the guarded same-origin proxy; browsers with native HLS use the playlist directly, and other browsers attach hls.js. The Live badge and pause-to-live-edge behavior apply as for other stations.
+
+## [0.3.1] - 2026-10-28
+
+### Added
+
+- Play a saved station from Radio. It plays in the one mini player with a Live badge and no seek, shows the song the station is
+  sending when it sends one, and starts at the live edge again after Pause.
+
+## [0.3.0] - 2026-10-28
+
+### Added
+
+- Radio and Find stations pages. Radio lists the stations saved for you (a child sees what a parent saved) with Remove. Find stations
+  (teens and adults, only while the household switch for outside radio is on) searches by name, country and genre, with Add on each
+  result. Playing a station comes later.
+
+## [0.2.0] - 2026-10-17
+
+### Added
+
+- The Audio app: Listen now, Albums, Artists, Songs, Playlists and Liked pages over the household's saved songs, with album and
+  artist pages, local radio, Play, Shuffle and Start radio. The pages use the kit's media grid, round artist art and compact
+  track rows. The artist lookup below is unchanged.
+
+## [0.1.1] - 2026-10-14
+
+### Changed
+
+- Use Home's shared User-Agent for external music lookups.
+
+### Added
+
+- Looks up a music artist (session-d-packages-and-store.md step 7), via
+  MusicBrainz's own public search API - no API key. Reports what kind of
+  act it is (band, solo artist, orchestra, choir), where they're from,
+  and when they formed or were born (and disbanded or passed away, when
+  known). Sends a real identifying User-Agent per MusicBrainz's own
+  etiquette (`host.fetch`'s `opts.headers`), the first bundled package to
+  override the default.
+
+### Fixed
+
+- A real, documented collision, the same class the math package hit
+  (step 7): `routing.patterns` originally included "tell me about the
+  band *", but `knowledge` (step 7's own general lookup) already owns
+  the literal "tell me about *" pattern, and `knowledge` sorts before
+  `music` by id - so that pattern could never actually fire, dead behind
+  knowledge's own match. Dropped from both `routing.patterns` and
+  `routing.examples`.
+- A second, different-shaped instance of math's own routing-collision
+  class, found by code review: "who is the artist *" is generic enough
+  on its own (painters, other visual artists) that a literal pattern
+  match (which wins immediately over the model, no fallback) could
+  confidently route a completely unrelated question into a MusicBrainz
+  lookup that finds nothing, or - worse - a wrong same-sounding band via
+  MusicBrainz's own fuzzy relevance scoring. Dropped; "who is the singer
+  *" is kept (much more narrowly musical) alongside the already-safe
+  "look up the artist *".
+
+### Known gap
+
+- The plan's fuller "music and media lookup" also names movie/TV
+  metadata via a TMDB-style API "with the user's own key where
+  required." That needs a household-supplied secret a Tier 1 package's
+  sandboxed process can actually read, which no package has a way to do
+  yet - deferred to docs/BACKLOG.md rather than built on settings
+  infrastructure that doesn't exist. Songs and albums (not just artists)
+  are the same "not yet, scoped down honestly" call.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.
+
+## [0.3.3] - 2026-10-28
+
+- The Radio pages say where to turn on Find radio stations online when no stations show.

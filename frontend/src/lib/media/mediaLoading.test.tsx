@@ -6,7 +6,7 @@ afterEach(cleanup);
 
 function audio(over: Partial<{ paused: boolean; readyState: number; networkState: number; autoplay: boolean }> = {}) {
   const el = document.createElement("audio");
-  el.setAttribute("src", "/api/plugins/music/radio/stream/source-abc123");
+  el.setAttribute("src", "/api/plugins/audio/radio/stream/source-abc123");
   const values = { paused: true, readyState: 0, networkState: 2, autoplay: true, ...over };
   for (const key of ["paused", "readyState", "networkState"] as const) Object.defineProperty(el, key, { configurable: true, get: () => values[key] });
   el.autoplay = values.autoplay;

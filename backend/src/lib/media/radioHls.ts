@@ -29,7 +29,7 @@ function proxyUrl(stationId: string, resource: URL, basePath: string): string {
 }
 
 /** Rewrites media/variant playlist references and serves binary segments through guarded requests. */
-export async function openHlsResource(personId: string, station: SavedStation, resourceUrl: string, deps: HlsDeps = {}, clientSignal?: AbortSignal, basePath = "/api/plugins/music/radio/hls"): Promise<HlsOpen | HlsFailure> {
+export async function openHlsResource(personId: string, station: SavedStation, resourceUrl: string, deps: HlsDeps = {}, clientSignal?: AbortSignal, basePath = "/api/plugins/audio/radio/hls"): Promise<HlsOpen | HlsFailure> {
   let parsed: URL;
   try { parsed = new URL(resourceUrl); } catch { return failure(404, "That playlist resource is not available."); }
   if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return failure(422, "That station address is not available.");

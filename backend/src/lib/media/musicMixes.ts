@@ -35,7 +35,7 @@ function ownPlays(person: PersonRow): Map<string, number> {
 function jumpBackIn(person: PersonRow) {
   const groups = groupTracks(musicLibrary(person), "album");
   const keys: string[] = [];
-  for (const item of itemsInOrder(person, "music", recentProgress(person.id, 120).map((progress) => progress.media_id), 60)) {
+  for (const item of itemsInOrder(person, "audio", recentProgress(person.id, 120).map((progress) => progress.media_id), 60)) {
     const key = albumKey(item);
     if (!keys.includes(key) && groups.has(key)) keys.push(key);
   }

@@ -23,7 +23,7 @@ export interface MediaSearchGroup {
 const HEADINGS: Record<MediaAppId, string> = {
   videos: "Videos",
   shows: "Shows and Films",
-  music: "Music",
+  audio: "Audio",
   podcasts: "Podcasts",
   books: "Books",
 };
@@ -47,17 +47,17 @@ export function searchMedia(person: PersonRow, query: string, perApp = 8): Media
       at: item.added_at,
     }));
     const rows: MediaSearchRow[] = [];
-    if (app === "music" || app === "videos") {
+    if (app === "audio" || app === "videos") {
       for (const file of madeFiles(person, app)) {
         if (!file.name.toLowerCase().includes(normalized.toLowerCase())) continue;
         rows.push({
           id: file.id,
           app,
-          kind: app === "music" ? "track" : "video",
+          kind: app === "audio" ? "track" : "video",
           title: file.name,
           subtitle: null,
           artwork_url: file.thumb_url,
-          href: `/apps/${app}/${app === "music" ? "play" : "watch"}?id=${encodeURIComponent(file.id)}`,
+          href: `/apps/${app}/${app === "audio" ? "play" : "watch"}?id=${encodeURIComponent(file.id)}`,
           percent: null,
           at: file.created_at,
         });

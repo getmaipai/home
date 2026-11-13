@@ -34,7 +34,7 @@ async function setup() {
   };
   await add("films", tree.films, ["film"]);
   await add("videos", tree.videos, ["video"]);
-  await add("music", tree.music, ["track"]);
+  await add("audio", tree.music, ["track"]);
   await add("reading", tree.reading, ["book", "audiobook"]);
   return { owner, adult, child };
 }
@@ -74,7 +74,7 @@ describe("media search", () => {
     const stored = storeFile(person, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([4, 5, 6]), provenance: 'music-gen:{"title":"Searchable Home Song","duration_seconds":31}', deduplicate: false });
     if (!stored.ok) throw new Error(stored.error);
     const rows = (await search(adult.client, "Searchable Home")).groups.flatMap((group) => group.rows);
-    expect(rows).toContainEqual(expect.objectContaining({ id: stored.value.id, app: "music", kind: "track", href: `/apps/music/play?id=${stored.value.id}` }));
+    expect(rows).toContainEqual(expect.objectContaining({ id: stored.value.id, app: "audio", kind: "track", href: `/apps/audio/play?id=${stored.value.id}` }));
   });
 
   test("skips an item that no longer parses", async () => {

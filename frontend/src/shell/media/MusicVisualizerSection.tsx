@@ -34,7 +34,7 @@ function useMediaFlags(el: HTMLMediaElement | null): { loop: boolean; volume: nu
 
 export function MusicVisualizerSection({ id }: { id: string }) {
   const held = useMediaDock().current;
-  const mine = held !== null && held.appId === "music" && held.id === id && held.kind === "audio" ? held : null;
+  const mine = held !== null && held.appId === "audio" && held.id === id && held.kind === "audio" ? held : null;
   const [stage, setStage] = useState(false);
   const [stageView, setStageView] = useState<StageView>("scene");
   // NOW-PLAYING-01: the kit's Up next button asks the host, and the host asks here; only an ask made while this section is on screen opens the stage.
@@ -62,7 +62,7 @@ export function MusicVisualizerSection({ id }: { id: string }) {
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.25} className="absolute inset-0 size-full grayscale" /> : null}
       </div>
       <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full shrink-0 items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&>*]:shrink-0">
-        <MinimizeButton appHome="/apps/music" />
+        <MinimizeButton appHome="/apps/audio" />
         <VisualizerMenu withLabel />
         <SleepMenu withLabel />
         <EqualizerMenu withLabel />

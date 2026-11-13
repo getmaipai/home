@@ -11,7 +11,7 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboar
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type MediaHome, type MediaHomeRow, type PersonRosterEntry, type Roster } from "@/lib/api";
 
-const FALLBACK: Record<MediaHomeRow["app"], ImageFallbackKind> = { videos: "video", shows: "video", music: "music", podcasts: "music", books: "file" };
+const FALLBACK: Record<MediaHomeRow["app"], ImageFallbackKind> = { videos: "video", shows: "video", audio: "music", podcasts: "music", books: "file" };
 const ChatIcon = getIcon("message-circle");
 
 /** AUDIT-UI-01: a tile with no picture shows an icon for what it is: a chat bubble for a conversation (it rides the shelf under the videos app,
@@ -26,7 +26,7 @@ export function tilePicture(row: MediaHomeRow, small = false) {
 export const CONTINUE_SHORTCUTS = 6;
 
 /** The app a /api/continue row's media kind belongs to, for the picture it shows while it has no artwork. */
-const continueApp = (mediaKind: string | null): MediaHomeRow["app"] => /song|track|music|album/.test(mediaKind ?? "") ? "music" : /podcast|episode/.test(mediaKind ?? "") ? "podcasts" : /book/.test(mediaKind ?? "") ? "books" : "videos";
+const continueApp = (mediaKind: string | null): MediaHomeRow["app"] => /song|track|music|album/.test(mediaKind ?? "") ? "audio" : /podcast|episode/.test(mediaKind ?? "") ? "podcasts" : /book/.test(mediaKind ?? "") ? "books" : "videos";
 
 /** Continue: compact shortcuts (a small picture or icon, one line of title), two columns on a phone and one row on a wide screen. */
 function ContinueGrid({ rows }: { rows: MediaHomeRow[] }) {

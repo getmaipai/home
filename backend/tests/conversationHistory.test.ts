@@ -1651,7 +1651,7 @@ describe("buildConversationWindow() (step 3)", () => {
     logTurn(actor, "chat", "play some jazz", {
       reply: { text: "Playing jazz now." },
       source: "plugin",
-      plugin_id: "music",
+      plugin_id: "audio",
       safety: SAFE,
       conversation_id: conv.value.id,
       turn_id: "turn-b3-plugin",
@@ -1661,7 +1661,7 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Playing jazz now.")).toBe(false);
     const note = window.messages.find((m) => m.role === "user" && m.content.includes("Playing jazz now."));
     expect(note).toBeDefined();
-    expect(note!.content).toContain("Music"); // music/manifest.json's own `display`, not the bare id "music"
+    expect(note!.content).toContain("Music"); // music/manifest.json's own `display`, not the bare id "audio"
   });
 
   // A code review (2026-09-07) found this uncovered: attemptTier2Tools()
@@ -1756,7 +1756,7 @@ describe("buildConversationWindow() (step 3)", () => {
     logTurn(actor, "chat", "play some jazz", {
       reply: { text: "Sorry, I couldn't do that." },
       source: "plugin_error",
-      plugin_id: "music",
+      plugin_id: "audio",
       safety: SAFE,
       conversation_id: conv.value.id,
       turn_id: "turn-b3-plugin-error",

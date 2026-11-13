@@ -1,5 +1,5 @@
 import { i18n } from "@lingui/core";
-// MEDIA-VIZ-03: the sleep timer on the mini bar and the Music page, through the shell's one audio session (its timer already pauses
+// MEDIA-VIZ-03: the sleep timer on the mini bar and the Audio page, through the shell's one audio session (its timer already pauses
 // the host's element and reaches "end of song").
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";

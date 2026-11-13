@@ -35,7 +35,7 @@ function appForKind(kind: string | null): MediaAppId | null {
 
 const RowSchema = z.object({
   id: z.string(),
-  app: z.enum(["videos", "shows", "music", "podcasts", "books"]),
+  app: z.enum(["videos", "shows", "audio", "podcasts", "books"]),
   kind: z.string(),
   title: z.string(),
   subtitle: z.string().nullable(),
@@ -95,7 +95,7 @@ function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music
       if (!item || item.kind !== "track" || seen.has(item.id)) continue;
       seen.add(item.id);
       rows.push({
-        id: item.id, app: "music", kind: "track", title: item.title, subtitle: item.subtitle ?? null,
+        id: item.id, app: "audio", kind: "track", title: item.title, subtitle: item.subtitle ?? null,
         artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, href: `/media/${encodeURIComponent(item.id)}`,
         percent: null, at: progress.updated_at,
       });
@@ -107,11 +107,11 @@ function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music
   // Made at home: Library files created in chat, kept separate from scanned media roots.
   const madeAtHome = safely("made_at_home", () => {
     const rows: Row[] = [];
-    for (const [app, kind] of [["music", "track"], ["videos", "video"]] as const) {
+    for (const [app, kind] of [["audio", "track"], ["videos", "video"]] as const) {
       for (const file of madeFiles(person, app).slice(0, 8)) {
         rows.push({
           id: file.id, app, kind, title: file.name, subtitle: null, artwork_url: file.thumb_url ?? null,
-          href: `/apps/${app}/${app === "music" ? "play" : "watch"}?id=${encodeURIComponent(file.id)}`,
+          href: `/apps/${app}/${app === "audio" ? "play" : "watch"}?id=${encodeURIComponent(file.id)}`,
           percent: null, at: file.created_at,
         });
       }

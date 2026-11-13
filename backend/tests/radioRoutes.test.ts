@@ -36,7 +36,7 @@ afterEach(() => { globalThis.fetch = realFetch; setHouseholdSettingValue("radio.
 const on = () => setHouseholdSettingValue("radio.directory.enabled", true);
 type Row = { id: string; name: string; added?: boolean; hls: boolean; tags: string[] };
 const names = async (response: Response) => ((await response.json()) as { stations: Row[] }).stations.map((station) => station.name);
-const BASE = "/api/plugins/music/radio";
+const BASE = "/api/plugins/audio/radio";
 
 describe("the radio directory routes", () => {
   test("switch off: every band is refused and nothing leaves the home", async () => {
@@ -174,14 +174,14 @@ describe("radio dashboard scopes", () => {
     const { client } = await owner();
     const scopes = ["popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"];
     const rows: Array<{ scope: string; resultRows: Array<{ thumbnail: string | null; summary: string }> }> = [];
-    for (const scope of scopes) rows.push({ scope, resultRows: await (await client.post("/api/plugins/music/data/radio", { scope })).json() as Array<{ thumbnail: string | null; summary: string }> });
+    for (const scope of scopes) rows.push({ scope, resultRows: await (await client.post("/api/plugins/audio/data/radio", { scope })).json() as Array<{ thumbnail: string | null; summary: string }> });
     expect(urls.length).toBeLessThanOrEqual(8);
     for (const { scope, resultRows } of rows) {
       expect(resultRows, scope).toBeArray();
       expect(resultRows.every((row) => row.summary.length > 0), scope).toBe(true);
     }
     const opened = urls.length;
-    for (const scope of scopes) await client.post("/api/plugins/music/data/radio", { scope });
+    for (const scope of scopes) await client.post("/api/plugins/audio/data/radio", { scope });
     expect(urls.length).toBe(opened);
   });
 
@@ -190,7 +190,7 @@ describe("radio dashboard scopes", () => {
     const { client } = await owner();
     const { client: childClient } = await child(client);
     for (const scope of ["popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"]) {
-      expect(await (await childClient.post("/api/plugins/music/data/radio", { scope })).json()).toEqual([]);
+      expect(await (await childClient.post("/api/plugins/audio/data/radio", { scope })).json()).toEqual([]);
     }
     expect(urls).toEqual([]);
   });
@@ -199,32 +199,32 @@ describe("radio dashboard scopes", () => {
     const { client } = await owner();
     const teenClient = await teen(client);
     const { client: childClient } = await child(client);
-    expect(((await (await client.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()) as Array<{ title: string }>)[0]?.title).toBe("Add this address");
-    expect(await (await teenClient.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()).toEqual([]);
-    expect(await childClient.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" }).then((r) => r.json())).toEqual([]);
+    expect(((await (await client.post("/api/plugins/audio/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()) as Array<{ title: string }>)[0]?.title).toBe("Add this address");
+    expect(await (await teenClient.post("/api/plugins/audio/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()).toEqual([]);
+    expect(await childClient.post("/api/plugins/audio/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" }).then((r) => r.json())).toEqual([]);
   });
 
   test("blank directory shelf is empty without a lookup; typed directory search still works", async () => {
     on();
     const { client } = await owner();
-    expect(await (await client.post("/api/plugins/music/data/radio", { scope: "directory" })).json()).toEqual([]);
+    expect(await (await client.post("/api/plugins/audio/data/radio", { scope: "directory" })).json()).toEqual([]);
     expect(urls).toEqual([]);
-    expect(((await (await client.post("/api/plugins/music/data/radio", { scope: "directory", q: "cabin" })).json()) as Array<{ title: string }>).map((row) => row.title)).toContain("Cabin FM");
+    expect(((await (await client.post("/api/plugins/audio/data/radio", { scope: "directory", q: "cabin" })).json()) as Array<{ title: string }>).map((row) => row.title)).toContain("Cabin FM");
     expect(urls.length).toBe(1);
   });
 
   test("station scope returns saved and recently shown directory details, never an unknown id", async () => {
     on();
     const { client } = await owner();
-    const directory = await client.post("/api/plugins/music/data/radio", { scope: "popular" });
+    const directory = await client.post("/api/plugins/audio/data/radio", { scope: "popular" });
     const rows = await directory.json() as Array<{ id: string }>;
     expect(rows.map((row) => row.id)).toContain("s-1");
-    const shown = await client.post("/api/plugins/music/data/radio", { scope: "station", id: "s-1" });
+    const shown = await client.post("/api/plugins/audio/data/radio", { scope: "station", id: "s-1" });
     expect(await shown.json()).toMatchObject([{ id: "s-1", title: "Cabin FM", saved: false, play_label: "Preview" }]);
-    expect(await (await client.post("/api/plugins/music/data/radio", { scope: "station", id: "stranger" })).json()).toEqual([]);
+    expect(await (await client.post("/api/plugins/audio/data/radio", { scope: "station", id: "stranger" })).json()).toEqual([]);
     const saved = await client.post(`${BASE}/stations`, { from: "directory", name: "Cabin FM", url: ROWS[0]!.url_resolved, tags: ["jazz"] });
     const savedId = ((await saved.json()) as { station: { id: string } }).station.id;
-    expect(await (await client.post("/api/plugins/music/data/radio", { scope: "station", id: savedId })).json()).toMatchObject([{ id: savedId, title: "Cabin FM", saved: true, play_label: "Play" }]);
+    expect(await (await client.post("/api/plugins/audio/data/radio", { scope: "station", id: savedId })).json()).toMatchObject([{ id: savedId, title: "Cabin FM", saved: true, play_label: "Play" }]);
   });
 
   test("a child gets station details only for a parent-saved station", async () => {
@@ -233,8 +233,8 @@ describe("radio dashboard scopes", () => {
     const { client: childClient, row } = await child(client);
     const created = await client.post(`${BASE}/stations`, { name: "Kids Tunes", url: "https://stream.example.com/kids.mp3", for_person_id: row.id });
     const id = ((await created.json()) as { station: { id: string } }).station.id;
-    expect(await (await childClient.post("/api/plugins/music/data/radio", { scope: "station", id })).json()).toMatchObject([{ id, saved: true }]);
-    expect(await (await childClient.post("/api/plugins/music/data/radio", { scope: "station", id: "s-1" })).json()).toEqual([]);
+    expect(await (await childClient.post("/api/plugins/audio/data/radio", { scope: "station", id })).json()).toMatchObject([{ id, saved: true }]);
+    expect(await (await childClient.post("/api/plugins/audio/data/radio", { scope: "station", id: "s-1" })).json()).toEqual([]);
   });
 });
 
@@ -250,7 +250,7 @@ describe("radio station art", () => {
     }) as typeof fetch;
     __setRadioArtDepsForTests({ fetch: globalThis.fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
     try {
-      await client.post("/api/plugins/music/data/radio", { scope: "popular" });
+      await client.post("/api/plugins/audio/data/radio", { scope: "popular" });
       const address = encodeURIComponent("https://icons.example.com/cabin.png");
       __rememberRadioFaviconForTests("https://icons.example.com/cabin.png");
       const image = await client.get(`${BASE}/art?u=${address}`);
@@ -283,7 +283,7 @@ describe("radio station art", () => {
     }) as typeof fetch;
     __setRadioArtDepsForTests({ fetch: globalThis.fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
     try {
-      await client.post("/api/plugins/music/data/radio", { scope: "popular" });
+      await client.post("/api/plugins/audio/data/radio", { scope: "popular" });
       const address = encodeURIComponent("https://icons.example.com/cabin.png");
       __rememberRadioFaviconForTests("https://icons.example.com/cabin.png");
       // Upstream bytes that are not an image, or too big, are never passed on: the station gets its generated picture instead.
@@ -310,8 +310,8 @@ describe("radio station art", () => {
       return url.includes("radio-browser.info") ? new Response(JSON.stringify(ROWS), { status: 200 }) : new Response("{}", { status: 404 });
     }) as typeof fetch;
     try {
-      const all = await client.post("/api/plugins/music/data/radio", { scope: "popular" });
-      const few = await client.post("/api/plugins/music/data/radio", { scope: "popular", limit: "1" });
+      const all = await client.post("/api/plugins/audio/data/radio", { scope: "popular" });
+      const few = await client.post("/api/plugins/audio/data/radio", { scope: "popular", limit: "1" });
       expect(((await few.json()) as unknown[]).length).toBe(1);
       expect(((await all.json()) as unknown[]).length).toBeGreaterThanOrEqual(1);
     } finally { globalThis.fetch = realFetch; }

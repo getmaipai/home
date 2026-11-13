@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "music-drafts",
+  "title": "Drafts",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "bookmark",
+      "text": "Songs you started and have not finished will show up here.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/create"
+        }
+      },
+      "action_label": "Make a song"
+    }
+  ]
+}

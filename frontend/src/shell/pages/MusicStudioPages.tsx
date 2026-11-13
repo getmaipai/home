@@ -1,4 +1,4 @@
-// MUSIC-STUDIO-HOME: the Music app's Create pages (Make a band, Make an album, Make a song style), the "My creations" library of what the
+// MUSIC-STUDIO-HOME: the Audio app's Create pages (Make a band, Make an album, Make a song style), the "My creations" library of what the
 // household made (bands, albums and styles) and the editor a library tile opens. Every page draws the kit's own Band, Album and
 // SongStyleCard (rule 9: as shipped, restyled by tokens only, no wrapper component); the cards are the same ones the chat shows, and
 // they save through the same routes as the edit tools, so a change made here or in chat is one change to one record.
@@ -26,7 +26,7 @@ import { musicRefOf, type MusicCardKind } from "@/apps/chat/useMusicCard";
 import { useMusicBlock } from "@/apps/chat/useMusicBlock";
 
 export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit", "studio", "stems", "remix"] as const;
-export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "music" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
+export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "audio" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
 
 type Kind = MusicCardKind;
 const COLLECTION: Record<Kind, string> = { band: "bands", album: "albums", song_style: "styles" };
@@ -57,7 +57,7 @@ export function createBody(kind: Kind, patch: BandPatch & AlbumPatch & SongStyle
   };
 }
 
-/** The address of a made thing's editor. */ export const editPath = (kind: Kind, id: string): string => `/apps/music/edit?kind=${kind}&id=${encodeURIComponent(id)}`; function Heading({ title, line }: { title: string; line?: string }) { return <header className="flex flex-col gap-1 px-4 lg:px-0"> <h2 className="text-section">{title}</h2> {line ? <p className="text-supporting text-muted-foreground max-w-xl">{line}</p> : null} </header>; } /** The page's frame: heading, the card passed in as children, and a line under it. The kit card itself is rendered by the caller. */
+/** The address of a made thing's editor. */ export const editPath = (kind: Kind, id: string): string => `/apps/audio/edit?kind=${kind}&id=${encodeURIComponent(id)}`; function Heading({ title, line }: { title: string; line?: string }) { return <header className="flex flex-col gap-1 px-4 lg:px-0"> <h2 className="text-section">{title}</h2> {line ? <p className="text-supporting text-muted-foreground max-w-xl">{line}</p> : null} </header>; } /** The page's frame: heading, the card passed in as children, and a line under it. The kit card itself is rendered by the caller. */
 function Frame({ testId, title, line, children, footer }: { testId: string; title: string; line?: string; children: ReactNode; footer: ReactNode }) {
   return <section className="flex flex-col gap-4" data-testid={testId}>
     <Heading title={title} line={line} />
@@ -139,10 +139,10 @@ function CreationsPage({ adult }: { adult: boolean }) {
   const navigate = useNavigate();
   return <section className="flex flex-col gap-6" data-testid="music-creations">
     <Heading title={i18n._({ id: "Library", message: "Library" })} line={i18n._({ id: "Your songs, bands, albums and song styles. Open one to play it or change it.", message: "Your songs, bands, albums and song styles. Open one to play it or change it." })} />
-    {adult ? <div className="flex flex-col gap-3 px-4 lg:px-0"><h2 className="text-body font-semibold">{i18n._({ id: "Songs", message: "Songs" })}</h2><SongGallery selected={null} onOpen={(card) => navigate(`/apps/music/create?song=${encodeURIComponent(card.id)}`)} /></div> : null}
-    <Shelf kind="band" title={i18n._({ id: "Bands", message: "Bands" })} makeTo="/apps/music/create" adult={adult} />
-    <Shelf kind="album" title={i18n._({ id: "Albums", message: "Albums" })} makeTo="/apps/music/create" adult={adult} />
-    <Shelf kind="song_style" title={i18n._({ id: "Styles", message: "Styles" })} makeTo="/apps/music/create" adult={adult} />
+    {adult ? <div className="flex flex-col gap-3 px-4 lg:px-0"><h2 className="text-body font-semibold">{i18n._({ id: "Songs", message: "Songs" })}</h2><SongGallery selected={null} onOpen={(card) => navigate(`/apps/audio/create?song=${encodeURIComponent(card.id)}`)} /></div> : null}
+    <Shelf kind="band" title={i18n._({ id: "Bands", message: "Bands" })} makeTo="/apps/audio/create" adult={adult} />
+    <Shelf kind="album" title={i18n._({ id: "Albums", message: "Albums" })} makeTo="/apps/audio/create" adult={adult} />
+    <Shelf kind="song_style" title={i18n._({ id: "Styles", message: "Styles" })} makeTo="/apps/audio/create" adult={adult} />
   </section>;
 }
 
@@ -166,8 +166,8 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const music = useMusicBlock(block);
   const onAction = music.onAction ?? (() => undefined);
   const gone = music.gone;
-  if (gone) return <EmptyState icon="music" text={i18n._({ id: "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}", message: "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}", values: { kind } })} actionLabel={i18n._({ id: "My creations", message: "My creations" })} onAction={() => navigate("/apps/music/creations")} />;
-  if (card.isError) return <EmptyState icon="music" text={i18n._({ id: "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}", message: "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}", values: { kind } })} actionLabel={i18n._({ id: "My creations", message: "My creations" })} onAction={() => navigate("/apps/music/creations")} />;
+  if (gone) return <EmptyState icon="music" text={i18n._({ id: "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}", message: "{kind, select, band {That band is gone. Your songs are still in your library.} album {That album is gone. Your songs are still in your library.} other {That style is gone. Your songs are still in your library.}}", values: { kind } })} actionLabel={i18n._({ id: "My creations", message: "My creations" })} onAction={() => navigate("/apps/audio/creations")} />;
+  if (card.isError) return <EmptyState icon="music" text={i18n._({ id: "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}", message: "{kind, select, band {That band is not here. It may have been discarded.} album {That album is not here. It may have been discarded.} other {That style is not here. It may have been discarded.}}", values: { kind } })} actionLabel={i18n._({ id: "My creations", message: "My creations" })} onAction={() => navigate("/apps/audio/creations")} />;
   if (!card.data) return <p role="status" className="text-muted-foreground px-4 text-sm lg:px-0">{i18n._({ id: "{kind, select, band {Opening your band} album {Opening your album} other {Opening your style}}", message: "{kind, select, band {Opening your band} album {Opening your album} other {Opening your style}}", values: { kind } })}</p>;
   const props = { ...(music.props ?? card.data.block.props) };
   // A new picture or cover is made by a chat turn, so these buttons open chat with the ask and the object link (one object per turn).
@@ -175,12 +175,12 @@ function EditPage({ kind, id }: { kind: Kind; id: string }) {
   const act = (action: string, detail?: Record<string, unknown>) => {
     const ask = PICTURE_ASK[action];
     if (action === "discard" && !detail) { setConfirmingDiscard(true); return; }
-    if (ask) navigate(`/chat?ask=${encodeURIComponent(`${ask}\n\nmaipai://music/${kind === "song_style" ? "style" : kind}/${id}`)}`);
+    if (ask) navigate(`/chat?ask=${encodeURIComponent(`${ask}\n\nmaipai://audio/${kind === "song_style" ? "style" : kind}/${id}`)}`);
     else { onAction("", action, detail); void queryClient.invalidateQueries({ queryKey: ["music-made"] }); }
   };
   const actions = kind === "band" ? ["make_album", "discard"] : kind === "album" ? ["play_all", "remake_cover", "discard"] : ["make_song", "discard"];
   const shared = { editable: props.editable !== false, defaultEditing: props.editable !== false };
-  const footer = <p className="text-muted-foreground px-4 text-sm lg:px-0">{i18n._({ id: "Pictures are made in chat; songs are made on", message: "Pictures are made in chat; songs are made on" })} <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/create">{i18n._({ id: "Create", message: "Create" })}</Link>. <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/music/creations">{i18n._({ id: "Back to My creations", message: "Back to My creations" })}</Link></p>;
+  const footer = <p className="text-muted-foreground px-4 text-sm lg:px-0">{i18n._({ id: "Pictures are made in chat; songs are made on", message: "Pictures are made in chat; songs are made on" })} <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/audio/create">{i18n._({ id: "Create", message: "Create" })}</Link>. <Link className="text-foreground font-medium underline underline-offset-4" to="/apps/audio/creations">{i18n._({ id: "Back to My creations", message: "Back to My creations" })}</Link></p>;
   const discard = () => { setConfirmingDiscard(false); act("discard", {}); };
   return <Frame testId="music-edit" title={i18n._({ id: "{kind, select, band {Edit your band} album {Edit your album} other {Edit your style}}", message: "{kind, select, band {Edit your band} album {Edit your album} other {Edit your style}}", values: { kind } })} line={i18n._({ id: "Every change keeps the earlier version, so nothing is lost.", message: "Every change keeps the earlier version, so nothing is lost." })} footer={footer}>
     {kind === "band" ? <Band {...(props as unknown as ComponentProps<typeof Band>)} actions={actions as never} {...shared} resolveImageSrc={bandImageSrc} onAction={(action) => act(action)} onEdit={(patch) => act("edit_band", { ...patch })} />
@@ -196,10 +196,10 @@ function songStyleProps(props: Record<string, unknown>) {
   return { ...(rest as unknown as ComponentProps<typeof SongStyleCard>), musicKey: key as string | undefined };
 }
 
-/** The Music app's Create and library pages. `search` is the address's query string. */
+/** The Audio app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
   if (pageId === "create") return <MusicWorkspace adult={adult} search={search} />;
-  if (pageId === "make-song" || pageId === "make-band" || pageId === "make-album" || pageId === "make-style") return <Navigate to={`/apps/music/create${search}`} replace />;
+  if (pageId === "make-song" || pageId === "make-band" || pageId === "make-album" || pageId === "make-style") return <Navigate to={`/apps/audio/create${search}`} replace />;
   if (pageId === "studio") return new URLSearchParams(search).get("song") ? <MusicStudioView adult={adult} search={search} /> : <PickSong adult={adult} title={i18n._({ id: "Studio", message: "Studio" })} line={i18n._({ id: "Pick a song to open its tracks.", message: "Pick a song to open its tracks." })} go={(card) => studioAddress(card.id)} />;
   if (pageId === "stems") return <PickSong adult={adult} title={i18n._({ id: "Stems", message: "Stems" })} line={i18n._({ id: "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio.", message: "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio." })} go={(card) => stemsAddress(card.id)} />;
   if (pageId === "remix") return <PickSong adult={adult} title={i18n._({ id: "Remix and edit", message: "Remix and edit" })} line={i18n._({ id: "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made.", message: "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made." })} go={(card) => remixAddress(card.id)} />;

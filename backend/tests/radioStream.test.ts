@@ -10,7 +10,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
-const BASE = "/api/plugins/music/radio";
+const BASE = "/api/plugins/audio/radio";
 const enc = new TextEncoder();
 const audio = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (i * 7 + seed) & 0xff);
 const A1 = audio(8192, 1), A2 = audio(8192, 2);

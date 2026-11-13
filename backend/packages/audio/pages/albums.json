@@ -1,0 +1,42 @@
+{
+  "type": "page",
+  "id": "albums",
+  "title": "Albums",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Albums",
+      "bind": {
+        "source": "package",
+        "path": "albums"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "size_control": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/audio/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No albums yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/create"
+          }
+        },
+        "action_label": "Make a song"
+      }
+    }
+  ]
+}

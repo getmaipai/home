@@ -138,7 +138,7 @@ describe("stored pictures obey the Adult lock", () => {
     const sourceId = ((await source.json()) as { source: { id: string } }).source.id;
     await scanRoot(sourceId, { prober: null, pruneGraceMs: 0 });
     const track = db.select().from(mediaItems).where(eq(mediaItems.kind, "track")).get()!;
-    const refusedEdit = await h.owner.post("/api/plugins/music/actions/edit", { id: track.id, artwork: adultPicture.id });
+    const refusedEdit = await h.owner.post("/api/plugins/audio/actions/edit", { id: track.id, artwork: adultPicture.id });
     expect(refusedEdit.status).toBe(400);
     const refusedText = await refusedEdit.text();
     expect(refusedText).not.toContain(adultPicture.id);
@@ -180,7 +180,7 @@ describe("stored pictures obey the Adult lock", () => {
     }
     expect((await h.adult.client.get(`/api/attachments/${adultPicture.id}?v=full&conversation_id=${adultPicture.conversationId}`, proof)).status).toBe(200);
     const ownerProof = unlockHeader(await unlock(h.owner, "correcthorse"));
-    expect((await h.owner.post("/api/plugins/music/actions/edit", { id: track.id, artwork: adultPicture.id }, ownerProof)).status).toBe(200);
+    expect((await h.owner.post("/api/plugins/audio/actions/edit", { id: track.id, artwork: adultPicture.id }, ownerProof)).status).toBe(200);
     expect((await h.adult.client.get(`/api/files/${plain.id}/content`)).status).toBe(200);
     expect((await h.adult.client.get(`/api/files/${plain.id}/thumb?w=320`)).status).toBe(200);
   });

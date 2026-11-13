@@ -28,8 +28,8 @@ describe("cardPath", () => {
 
 describe("studioAsk", () => {
   test("carries one object link for the turn", () => {
-    expect(studioAsk("make_album", "band", "mband-abc123")).toContain("maipai://music/band/mband-abc123");
-    expect(studioAsk("make_song", "song_style", "sstyle-abc123")).toContain("maipai://music/style/sstyle-abc123");
+    expect(studioAsk("make_album", "band", "mband-abc123")).toContain("maipai://audio/band/mband-abc123");
+    expect(studioAsk("make_song", "song_style", "sstyle-abc123")).toContain("maipai://audio/style/sstyle-abc123");
   });
 });
 

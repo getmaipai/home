@@ -8,11 +8,11 @@ const song = (id: string) => ({ id, src: `/${id}.mp3`, kind: "audio" as const, t
 
 test("elementFor takes the primed element for that song and drops the old one", () => {
   const store = createMediaStore();
-  const old = store.elementFor(song("a"), "music");
+  const old = store.elementFor(song("a"), "audio");
   const second = document.createElement("audio");
   second.setAttribute("src", "/b.mp3");
   store.prime({ id: "b", src: "/b.mp3" }, second);
-  const taken = store.elementFor(song("b"), "music");
+  const taken = store.elementFor(song("b"), "audio");
   expect(taken).toBe(second);
   expect(store.get()?.el).toBe(second);
   expect(old.hasAttribute("src")).toBe(false);
@@ -21,11 +21,11 @@ test("elementFor takes the primed element for that song and drops the old one", 
 
 test("a primed element for another song is dropped, and an unprimed one is released", () => {
   const store = createMediaStore();
-  store.elementFor(song("a"), "music");
+  store.elementFor(song("a"), "audio");
   const second = document.createElement("audio");
   second.setAttribute("src", "/b.mp3");
   store.prime({ id: "b", src: "/b.mp3" }, second);
-  const other = store.elementFor(song("c"), "music");
+  const other = store.elementFor(song("c"), "audio");
   expect(other).not.toBe(second);
   expect(second.hasAttribute("src")).toBe(false);
   const third = document.createElement("audio");

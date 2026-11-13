@@ -9,12 +9,12 @@ const held = (appId: string, id: string) => ({ appId, id, src: "/s", kind: "audi
 
 describe("onPlayPageOf", () => {
   test("is true only on the held item's own play page", () => {
-    expect(onPlayPageOf(held("music", "m1"), "/apps/music/play", "?id=m1", undefined)).toBe(true);
-    expect(onPlayPageOf(held("music", "m1"), "/apps/music/play", "", "m1")).toBe(true);
-    expect(onPlayPageOf(held("music", "m1"), "/apps/music/play", "?id=m2", undefined)).toBe(false);
-    expect(onPlayPageOf(held("music", "m1"), "/apps/music", "?id=m1", undefined)).toBe(false);
-    expect(onPlayPageOf(held("music", "m1"), "/apps/news", "?id=m1", undefined)).toBe(false);
-    expect(onPlayPageOf(held("music", "m1"), "/chat", "", undefined)).toBe(false);
+    expect(onPlayPageOf(held("audio", "m1"), "/apps/audio/play", "?id=m1", undefined)).toBe(true);
+    expect(onPlayPageOf(held("audio", "m1"), "/apps/audio/play", "", "m1")).toBe(true);
+    expect(onPlayPageOf(held("audio", "m1"), "/apps/audio/play", "?id=m2", undefined)).toBe(false);
+    expect(onPlayPageOf(held("audio", "m1"), "/apps/audio", "?id=m1", undefined)).toBe(false);
+    expect(onPlayPageOf(held("audio", "m1"), "/apps/news", "?id=m1", undefined)).toBe(false);
+    expect(onPlayPageOf(held("audio", "m1"), "/chat", "", undefined)).toBe(false);
     expect(onPlayPageOf(held("books", "b1"), "/apps/books/listen", "", undefined)).toBe(true);
   });
 });

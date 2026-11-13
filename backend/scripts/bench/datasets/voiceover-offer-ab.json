@@ -8,7 +8,7 @@
   {
    "id": "vo2-clip",
    "category": "knowledge",
-   "prompt": "Make a voice-over for my clip maipai://music/track/clip0001 that says: Welcome to Nova's birthday, everyone."
+   "prompt": "Make a voice-over for my clip maipai://audio/track/clip0001 that says: Welcome to Nova's birthday, everyone."
   },
   {
    "id": "vo3-announce",

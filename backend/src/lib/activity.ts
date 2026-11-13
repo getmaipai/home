@@ -144,7 +144,7 @@ function songItems(actor: PersonRow): ActivityItem[] {
     let request: { title?: string; description?: string } = {};
     try { request = JSON.parse(row.request) as typeof request; } catch { request = {}; }
     const title = titleFor(actor, "song", request.title ?? request.description ?? "", "A song");
-    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/music/create?song=${encodeURIComponent(row.id)}` };
+    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/audio/create?song=${encodeURIComponent(row.id)}` };
     if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
     else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? "Making your song.", percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
     else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? "The song did not finish. Open it to try again.", percent: null, typicalMinutes: null });

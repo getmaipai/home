@@ -86,7 +86,7 @@ describe("holes a locked clip must not have", () => {
     const me = db.select().from(people).where(eq(people.role, "owner")).get() as unknown as PersonRow;
     const track = db.select().from(mediaItems).where(eq(mediaItems.kind, "track")).all()[0]!;
     const locked = await adultClip(owner, me);
-    expect(editMediaItem(me, "music", { id: track.id, artwork: locked.posterId })).toEqual({ ok: false, status: 400, error: "That picture is not available." });
+    expect(editMediaItem(me, "audio", { id: track.id, artwork: locked.posterId })).toEqual({ ok: false, status: 400, error: "That picture is not available." });
   });
 
   test("a style the adapter list does not know is treated as adult-only at job start (the lock fails closed)", async () => {

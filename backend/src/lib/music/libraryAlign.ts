@@ -133,7 +133,7 @@ export type AlignOutcome = "done" | "partial" | "too_long" | "paused" | "no_word
 async function run(person: PersonRow, itemId: string, opts: { lrclibDurationS?: number | null }): Promise<AlignOutcome> {
   const started = Date.now();
   try {
-    const item = readableIn(person, "music", itemId);
+    const item = readableIn(person, "audio", itemId);
     const lyrics = item?.lyrics as Lyrics | null | undefined;
     if (!item || !lyrics?.timed?.length || !bandAllows(person, item)) return "skipped";
     if (alignPaused() || !musicStackConfigured()) return "paused";
@@ -192,7 +192,7 @@ export type RealignResult = { ok: true; status: 202 } | { ok: false; status: 404
 
 /** "Lyrics look off": ignore the stored words and run the quick then the full pass again. At most one request a minute per track. */
 export function requestRealign(person: PersonRow, itemId: string, deps: { nowMs?: () => number } = {}): { result: RealignResult; done: Promise<AlignOutcome> | null } {
-  const item = readableIn(person, "music", itemId);
+  const item = readableIn(person, "audio", itemId);
   if (!item || item.kind !== "track" || !bandAllows(person, item)) return { result: { ok: false, status: 404, error: "That song is not in the library." }, done: null };
   if (!(item.lyrics as Lyrics | null)?.timed?.some((row) => row.line.trim() !== "")) return { result: { ok: false, status: 422, error: "These lyrics have no timing to line up. Open the song's lyrics first." }, done: null };
   if (!tryConsume(`lyrics-realign:${item.id}`, REALIGN_BUCKET, deps.nowMs?.())) return { result: { ok: false, status: 429, error: "Lyrics were just lined up again. Try again in a minute." }, done: null };

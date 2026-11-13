@@ -14,19 +14,19 @@ import { isMediaPlayPage, playRoute } from "@/shell/mediaApps";
 
 afterEach(cleanup);
 
-const STREAM = "/api/plugins/music/radio/stream/source-abc123";
+const STREAM = "/api/plugins/audio/radio/stream/source-abc123";
 
 function held(src: string, subtitle: string): HoistedMedia {
   const el = document.createElement("audio");
   el.setAttribute("src", src);
-  return { id: "source-abc123", src, kind: "audio", title: "Cabin FM", subtitle, appId: "music", el, started: true };
+  return { id: "source-abc123", src, kind: "audio", title: "Cabin FM", subtitle, appId: "audio", el, started: true };
 }
 function mount(current: HoistedMedia) {
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <TooltipProvider>
         <ToastProvider>
-          <MemoryRouter initialEntries={["/apps/music/radio"]}>
+          <MemoryRouter initialEntries={["/apps/audio/radio"]}>
             <MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => {} }}>
               <GlobalMiniPlayer />
             </MediaDockContext.Provider>
@@ -62,33 +62,33 @@ describe("a live station in the mini player", () => {
 
 describe("station helpers", () => {
   test("selects native HLS or hls.js for an m3u8 source", () => {
-    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1.m3u8", true)).toBe("native");
-    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1.m3u8", false)).toBe("hls");
-    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1", false)).toBe("direct");
+    expect(hlsPathFor("/api/plugins/audio/radio/stream/station-1.m3u8", true)).toBe("native");
+    expect(hlsPathFor("/api/plugins/audio/radio/stream/station-1.m3u8", false)).toBe("hls");
+    expect(hlsPathFor("/api/plugins/audio/radio/stream/station-1", false)).toBe("direct");
   });
   test("liveStationIdOf reads only the hub's own stream route", () => {
     expect(liveStationIdOf(STREAM)).toBe("source-abc123");
-    expect(liveStationIdOf("/api/plugins/music/radio/stream/a%20b?x=1")).toBe("a b");
+    expect(liveStationIdOf("/api/plugins/audio/radio/stream/a%20b?x=1")).toBe("a b");
     expect(liveStationIdOf("/api/media/items/x/content")).toBeNull();
     // A station from the Radio page that is not saved yet plays from the preview route and is just as live (a dropped stream retries, the song shows).
-    expect(liveStationIdOf("/api/plugins/music/radio/preview/d1a54d2e-623e?hls=1")).toBe("d1a54d2e-623e");
-    expect(liveStationIdOf("https://other.example.com/api/plugins/music/radio/stream/x")).toBeNull();
-    expect(liveStationIdOf("/api/plugins/music/radio/stream/")).toBeNull();
+    expect(liveStationIdOf("/api/plugins/audio/radio/preview/d1a54d2e-623e?hls=1")).toBe("d1a54d2e-623e");
+    expect(liveStationIdOf("https://other.example.com/api/plugins/audio/radio/stream/x")).toBeNull();
+    expect(liveStationIdOf("/api/plugins/audio/radio/stream/")).toBeNull();
   });
 
   test("a station plays on its own page, and the bar stays up there because the page has no player", () => {
-    expect(playRoute("station", "source-abc123")).toBe("/apps/music/station?id=source-abc123");
-    expect(isMediaPlayPage("music", "station")).toBe(false);
-    expect(isMediaPlayPage("music", "radio")).toBe(false);
-    expect(onPlayPageOf(held(STREAM, ""), "/apps/music/station", "?id=source-abc123", undefined)).toBe(false);
+    expect(playRoute("station", "source-abc123")).toBe("/apps/audio/station?id=source-abc123");
+    expect(isMediaPlayPage("audio", "station")).toBe(false);
+    expect(isMediaPlayPage("audio", "radio")).toBe(false);
+    expect(onPlayPageOf(held(STREAM, ""), "/apps/audio/station", "?id=source-abc123", undefined)).toBe(false);
   });
 
   test("the song the station reports stays when the page asks for the same item again", () => {
     const store = createMediaStore();
     const ref = { id: "source-abc123", src: STREAM, kind: "audio" as const, title: "Cabin FM", subtitle: "US · jazz" };
-    const el = store.elementFor(ref, "music");
+    const el = store.elementFor(ref, "audio");
     store.setSubtitle(el, "Blue Hour");
-    store.elementFor(ref, "music");
+    store.elementFor(ref, "audio");
     expect(store.get()?.subtitle).toBe("Blue Hour");
     store.clear();
   });
@@ -123,7 +123,7 @@ describe("a live station that is connecting", () => {
       <QueryClientProvider client={createQueryClient()}>
         <TooltipProvider>
           <ToastProvider>
-            <MemoryRouter initialEntries={["/apps/music/radio"]}>
+            <MemoryRouter initialEntries={["/apps/audio/radio"]}>
               <MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => {}, retry: () => { retried += 1; } }}>
                 <GlobalMiniPlayer />
               </MediaDockContext.Provider>

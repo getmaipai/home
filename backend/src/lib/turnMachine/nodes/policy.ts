@@ -524,7 +524,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (call.tool === MAKE_BAND_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const bandProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
-      const typed = itemRefsIn(state.utterance).filter((item) => item.app === "music" && item.kind === "track");
+      const typed = itemRefsIn(state.utterance).filter((item) => item.app === "audio" && item.kind === "track");
       const given = typeof callArgs.ref === "string" ? callArgs.ref.trim() : "";
       const asked = given ? (typed.find((item) => item.ref === (itemRefsIn(given)[0]?.ref ?? given)) ?? typed.find((item) => item.id === trimItemQuoting(given))) : typed[0];
       if (asked) callArgs.ref = asked.ref;

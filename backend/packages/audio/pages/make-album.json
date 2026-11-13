@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-album",
+  "title": "Make an album",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "disc-3",
+      "text": "Making an album needs the Home app. Open Audio in the app and pick Make an album."
+    }
+  ]
+}

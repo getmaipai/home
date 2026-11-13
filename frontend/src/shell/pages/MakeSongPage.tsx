@@ -1,4 +1,4 @@
-// MUSIC-STUDIO-SONG: the Music app's "Make a song" page. A prompt, optional words, an instrumental switch, an optional saved style and an
+// MUSIC-STUDIO-SONG: the Audio app's "Make a song" page. A prompt, optional words, an instrumental switch, an optional saved style and an
 // optional made band's sound, then Make. Make runs the same path as the generate_music tool (POST /api/music/songs), the page shows the
 // song card the chat shows (the kit's MusicTrack, with Details to change the title, words or style and make a new version that keeps the
 // old one), and Keep pins the song in the Library. Kit parts only, restyled by tokens (rule 9). Adults only, like the other studio pages.
@@ -46,7 +46,7 @@ export function makeSongBody(form: { idea: string; lyrics: string; instrumental:
   };
 }
 
-export const songAddress = (id: string): string => `/apps/music/create?song=${encodeURIComponent(id)}`;
+export const songAddress = (id: string): string => `/apps/audio/create?song=${encodeURIComponent(id)}`;
 
 const text = (error: unknown, fallback: string): string => (error instanceof Error && error.message ? error.message : fallback);
 
@@ -86,7 +86,7 @@ export function SongResult({ id, onAnother, inWorkspace = false }: { id: string;
     onRefresh: () => { void card.refetch(); void queryClient.invalidateQueries({ queryKey: ["library"] }); },
     onStop: () => { void musicApi.stop(id).then(() => card.refetch()).catch((error: unknown) => push(text(error, i18n._({ id: "The song could not be stopped. Try again.", message: "The song could not be stopped. Try again." })))); },
   });
-  if (card.isError && !card.data) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Make a song", message: "Make a song" })} onAction={() => (onAnother ?? (() => navigate("/apps/music/create")))()} />;
+  if (card.isError && !card.data) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Make a song", message: "Make a song" })} onAction={() => (onAnother ?? (() => navigate("/apps/audio/create")))()} />;
   const ready = shown.state === "done" && shown.versions.length > 0;
   const fileId = shown.current_id ?? shown.versions.at(-1)?.id ?? null;
   const keep = () => { if (!fileId) return; api.updateLibraryFile(fileId, { keep: true }).then(() => { setKept(true); push(i18n._({ id: "Kept. This song stays in your Library until you delete it.", message: "Kept. This song stays in your Library until you delete it." })); }).catch((error: unknown) => push(text(error, i18n._({ id: "The song could not be kept. Try again.", message: "The song could not be kept. Try again." })))); };
@@ -94,12 +94,12 @@ export function SongResult({ id, onAnother, inWorkspace = false }: { id: string;
     <MusicTrack {...props} />
     {ready ? <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant={kept ? "secondary" : "default"} disabled={kept} onClick={keep}>{kept ? i18n._({ id: "Kept in your Library", message: "Kept in your Library" }) : i18n._({ id: "Keep in my Library", message: "Keep in my Library" })}</Button>
-      {inWorkspace ? null : <Button asChild variant="outline"><Link to={`/apps/music/studio?song=${encodeURIComponent(id)}`}>{i18n._({ id: "Open in Studio", message: "Open in Studio" })}</Link></Button>}
+      {inWorkspace ? null : <Button asChild variant="outline"><Link to={`/apps/audio/studio?song=${encodeURIComponent(id)}`}>{i18n._({ id: "Open in Studio", message: "Open in Studio" })}</Link></Button>}
       {fileId ? <Button asChild variant="outline"><Link to={`/files?file=${encodeURIComponent(fileId)}`}>{i18n._({ id: "Open in Library", message: "Open in Library" })}</Link></Button> : null}
-      {inWorkspace ? null : <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>{i18n._({ id: "Make another", message: "Make another" })}</Button>}
+      {inWorkspace ? null : <Button type="button" variant="ghost" onClick={onAnother ?? (() => navigate("/apps/audio/create"))}>{i18n._({ id: "Make another", message: "Make another" })}</Button>}
     </div> : null}
     {ready ? <p className="text-muted-foreground text-sm">{i18n._({ id: "Every song you make lands in your Library. Keep pins it so storage clean-up never removes it. Open Edit above to change the title, words or style; your earlier version stays.", message: "Every song you make lands in your Library. Keep pins it so storage clean-up never removes it. Open Edit above to change the title, words or style; your earlier version stays." })}</p> : null}
-    {shown.state === "failed" || shown.state === "cancelled" ? <Button type="button" variant="outline" onClick={onAnother ?? (() => navigate("/apps/music/create"))}>{i18n._({ id: "Start over", message: "Start over" })}</Button> : null}
+    {shown.state === "failed" || shown.state === "cancelled" ? <Button type="button" variant="outline" onClick={onAnother ?? (() => navigate("/apps/audio/create"))}>{i18n._({ id: "Start over", message: "Start over" })}</Button> : null}
   </>;
 }
 
@@ -156,9 +156,9 @@ export function Maker({ search, simple = false, onMade }: { search: string; simp
         <Textarea id="song-lyrics" rows={6} maxLength={4000} value={lyrics} onChange={(event) => setLyrics(event.currentTarget.value)} />
       </Field>}
       <Shelf label={i18n._({ id: "Song style (optional)", message: "Song style (optional)" })} hint={i18n._({ id: "A saved sound to start from. Pick it again to clear it.", message: "A saved sound to start from. Pick it again to clear it." })} picks={stylePicks} value={styleId} onChange={setStyleId}
-        empty={<AsyncState data={styles.data} error={styles.isError} isFetching={styles.isFetching} onRetry={() => void styles.refetch()} errorMessage={i18n._({ id: "Styles could not be loaded. Open this page again.", message: "Styles could not be loaded. Open this page again." })} loadingLabel={i18n._({ id: "Loading styles", message: "Loading styles" })}>{() => <>{i18n._({ id: "No styles yet.", message: "No styles yet." })} <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-style">{i18n._({ id: "Make a song style", message: "Make a song style" })}</Link></>}</AsyncState>} />
+        empty={<AsyncState data={styles.data} error={styles.isError} isFetching={styles.isFetching} onRetry={() => void styles.refetch()} errorMessage={i18n._({ id: "Styles could not be loaded. Open this page again.", message: "Styles could not be loaded. Open this page again." })} loadingLabel={i18n._({ id: "Loading styles", message: "Loading styles" })}>{() => <>{i18n._({ id: "No styles yet.", message: "No styles yet." })} <Link className="text-foreground underline underline-offset-4" to="/apps/audio/make-style">{i18n._({ id: "Make a song style", message: "Make a song style" })}</Link></>}</AsyncState>} />
       <Shelf label={i18n._({ id: "In a band's sound (optional)", message: "In a band's sound (optional)" })} hint={i18n._({ id: "Makes the song sound like one of the bands you made.", message: "Makes the song sound like one of the bands you made." })} picks={bandPicks} value={bandId} onChange={setBandId}
-        empty={<AsyncState data={bands.data} error={bands.isError} isFetching={bands.isFetching} onRetry={() => void bands.refetch()} errorMessage={i18n._({ id: "Bands could not be loaded. Open this page again.", message: "Bands could not be loaded. Open this page again." })} loadingLabel={i18n._({ id: "Loading bands", message: "Loading bands" })}>{() => <>{i18n._({ id: "No bands yet.", message: "No bands yet." })} <Link className="text-foreground underline underline-offset-4" to="/apps/music/make-band">{i18n._({ id: "Make a band", message: "Make a band" })}</Link></>}</AsyncState>} />
+        empty={<AsyncState data={bands.data} error={bands.isError} isFetching={bands.isFetching} onRetry={() => void bands.refetch()} errorMessage={i18n._({ id: "Bands could not be loaded. Open this page again.", message: "Bands could not be loaded. Open this page again." })} loadingLabel={i18n._({ id: "Loading bands", message: "Loading bands" })}>{() => <>{i18n._({ id: "No bands yet.", message: "No bands yet." })} <Link className="text-foreground underline underline-offset-4" to="/apps/audio/make-band">{i18n._({ id: "Make a band", message: "Make a band" })}</Link></>}</AsyncState>} />
       <Field id="song-title" label={i18n._({ id: "Title (optional)", message: "Title (optional)" })}><Input id="song-title" maxLength={200} value={title} onChange={(event) => setTitle(event.currentTarget.value)} placeholder={i18n._({ id: "Home picks one if you leave this empty", message: "Home picks one if you leave this empty" })} /></Field>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label={i18n._({ id: "Length", message: "Length" })} hint={limits ? i18n._({ id: "Up to {minutes, plural, one {# minute} other {# minutes}} on this computer.", message: "Up to {minutes, plural, one {# minute} other {# minutes}} on this computer.", values: { minutes: Math.floor(limits.max_seconds / 60) } }) : undefined}>

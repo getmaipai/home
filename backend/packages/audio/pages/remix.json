@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-remix",
+  "title": "Remix and edit",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "music",
+      "text": "Remix and edit need the Home app. Open a song in Audio, then choose Remix."
+    }
+  ]
+}

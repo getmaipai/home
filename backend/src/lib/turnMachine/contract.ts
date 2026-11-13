@@ -277,7 +277,7 @@ export interface TurnState {
   /** AGENT-SVC-01: an adult speaker and at least one enabled Uptime Kuma instance. */
   uptimeAllowed?: boolean;
   houseContext?: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] };
-  /** MUSIC-LIKE-01: the message holds a maipai://music/track reference on a turn that may make music; `make_band` is offered only then. */
+  /** MUSIC-LIKE-01: the message holds a maipai://audio/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;
   /** MUSIC-STUDIO-EDIT: the made-music object the turn follows ("none": the turn may make a song style but names no object). Decides the make/edit tools. */
   musicObject?: { kind: "track" | "band" | "album" | "style" | "none"; id?: string };

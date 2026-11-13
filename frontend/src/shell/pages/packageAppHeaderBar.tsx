@@ -121,7 +121,7 @@ export function PackageAppHeaderActions() {
 // to one of the kit's own.
 const SECTION_ICONS: Record<string, string> = { mix: "sparkles", following: "heart", saved: "bookmark", library: "folder", history: "history", "watch-later": "clock", search: "search", channel: "layout-grid", albums: "disc-3", artists: "mic-vocal", songs: "music", playlists: "list-music" };
 // An app whose own icon is also a section's icon (Music: the note is Songs) names its index tab differently.
-const HOME_ICONS: Record<string, string> = { "/apps/music": "headphones" };
+const HOME_ICONS: Record<string, string> = { "/apps/audio": "headphones" };
 const iconOrNull = (name: string | null | undefined): string | null => (name && (iconNames as string[]).includes(name) ? name : null);
 export interface SectionsBarEntries {
   entries: Array<{ to: string; icon: string; label: string; exact?: boolean }>;

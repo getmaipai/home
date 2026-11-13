@@ -13,8 +13,8 @@ afterEach(() => { cleanup(); api.apps = originals; });
 
 function Where() { const location = useLocation(); return <p data-testid="where">{location.pathname}{location.search}</p>; }
 
-const labels: Record<string, string> = { videos: "Videos", shows: "Shows", music: "Music", podcasts: "Podcasts", books: "Books" };
-const ids = ["videos", "shows", "music", "podcasts", "books"];
+const labels: Record<string, string> = { videos: "Videos", shows: "Shows", audio: "Audio", podcasts: "Podcasts", books: "Books" };
+const ids = ["videos", "shows", "audio", "podcasts", "books"];
 
 function open(packageId: string) {
   api.apps = async () => ids.map((id) => ({ package: id, page: "index" as const, label: labels[id] ?? id, icon: "film", description: "Media", category: "Media", keywords: [], sections: [], to: `/apps/${id}`, incognito: "unaffected" as const }));
@@ -44,14 +44,14 @@ test("the column lists Home first, then the media apps in the hub's order", asyn
   // The column carries no title of its own: the header row says Media (owner, 2026-10-29).
   expect(view.container.querySelector('[data-slot="section-sidebar"] h2')).toBeNull();
   const rows = await links(view);
-  expect(rows.map((row) => row.textContent)).toEqual(["Home", "Videos", "Shows", "Music", "Podcasts", "Books"]);
+  expect(rows.map((row) => row.textContent)).toEqual(["Home", "Videos", "Shows", "Audio", "Podcasts", "Books"]);
 });
 
 test("the app the page shows is marked active and the others are not", async () => {
-  const view = open("music");
+  const view = open("audio");
   const rows = await links(view);
   const byLabel = (label: string) => rows.find((row) => row.textContent === label) as HTMLElement;
-  expect(byLabel("Music").getAttribute("aria-current")).toBe("page");
+  expect(byLabel("Audio").getAttribute("aria-current")).toBe("page");
   for (const label of ["Home", "Videos", "Shows", "Podcasts", "Books"]) expect(byLabel(label).getAttribute("aria-current")).toBeNull();
 });
 
@@ -60,11 +60,11 @@ test("when the page is Home, the Home row is the active one and no app row is", 
   const rows = await links(view);
   const byLabel = (label: string) => rows.find((row) => row.textContent === label) as HTMLElement;
   expect(byLabel("Home").getAttribute("aria-current")).toBe("page");
-  for (const label of ["Videos", "Shows", "Music", "Podcasts", "Books"]) expect(byLabel(label).getAttribute("aria-current")).toBeNull();
+  for (const label of ["Videos", "Shows", "Audio", "Podcasts", "Books"]) expect(byLabel(label).getAttribute("aria-current")).toBeNull();
 });
 
 test("clicking a row navigates to that app's own route", async () => {
-  const view = open("music");
+  const view = open("audio");
   const podcasts = (await links(view)).find((row) => row.textContent === "Podcasts") as HTMLElement;
   fireEvent.click(podcasts);
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/podcasts"));

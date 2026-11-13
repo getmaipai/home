@@ -89,9 +89,9 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
   // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
-  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "music" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "videos" ? ["/playlists/*", "/history/*"] : [])]);
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "audio" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "videos" ? ["/playlists/*", "/history/*"] : [])]);
 
-  if (appId === "music") {
+  if (appId === "audio") {
     const radio = radioRoutes();
     radio.get("/art", requireAuth, async (c, next) => {
     const person = c.get("person");
@@ -115,7 +115,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   routes.post("/data/:dataId", requireAuth, async (c, next) => {
     const person = c.get("person");
     // NEWS-00 review: a data id a raised page binds needs that page's floor; ids the media host serves that no page binds stay under the host's own rules.
-    const isRadioDirectoryScope = appId === "music" && c.req.param("dataId") === "radio";
+    const isRadioDirectoryScope = appId === "audio" && c.req.param("dataId") === "radio";
     if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
@@ -133,7 +133,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined)) as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
-    if (appId === "music") {
+    if (appId === "audio") {
       if (c.req.param("dataId") === "radio") {
         const body = await jsonBody(c);
         const field = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
@@ -157,7 +157,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     // CLIPS-FEED-01: the Clips page is open to every role and binds `recipes`; a null from the hook would fall through to the package runner (a 502), so a person below
     // the Create floor asking for any scope but `short` is answered 404 here.
     if (appId === "videos" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && (await jsonBody(c)).scope !== "short") return c.json({ error: "no such data" }, 404);
-    const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "music" ? { device: deviceKeyOf(c) } : {}) });
+    const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "audio" ? { device: deviceKeyOf(c) } : {}) });
     if (value === null) return next();
     return c.json(value as never, 200);
   });
@@ -165,7 +165,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   for (const [path, op] of [["share-add", "add"], ["share-remove", "remove"], ["share-private", "private"]] as const) {
     routes.post(`/actions/${path}`, requireAuth, async (c, next) => {
       const person = c.get("person");
-      if (appId !== "videos" && appId !== "music") return next();
+      if (appId !== "videos" && appId !== "audio") return next();
       if (!appRouteAllowed(person, appId, "actions", path)) return next();
       const body = await jsonBody(c);
       const id = typeof body.id === "string" ? body.id : "";
@@ -296,7 +296,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music") return next();
+    if (appId !== "audio") return next();
     if (!appRouteAllowed(person, appId, "actions", "lyrics")) return next();
     const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
@@ -307,7 +307,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   // MUSIC-GEN-20c: the player's "Lyrics look off" action; the same function as POST /api/music/library/:id/lyrics-realign.
   routes.post("/actions/lyrics-realign", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music") return next();
+    if (appId !== "audio") return next();
     if (!appRouteAllowed(person, appId, "actions", "lyrics-realign")) return next();
     const body = await jsonBody(c);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
@@ -348,7 +348,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/playlist", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music") return next();
+    if (appId !== "audio") return next();
     const body = await jsonBody(c);
     const result = musicPlaylistOps(person, body) ?? musicPlaylistAction(person, body);
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : refuseWith(c, result);
@@ -356,14 +356,14 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   routes.post("/queue", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (appId !== "music") return next();
+    if (appId !== "audio") return next();
     const body = await jsonBody(c);
     // PARITY-01: an `op` (play_next or add) edits the queue the stage's Up next list reads; without one the queue is started as before.
     const result = body.op !== undefined ? musicQueueAction(person, body) : startMusicQueue(person, body);
     return respond(c, result);
   });
 
-  if (appId === "music") {
+  if (appId === "audio") {
     routes.post("/offline", requireAuth, async (c) => respond(c, reportKeptSongs(c.get("person"), deviceKeyOf(c), await jsonBody(c))));
     routes.post("/pin", requireAuth, async (c) => respond(c, pinMusicItem(c.get("person"), await jsonBody(c))));
     routes.post("/recent-searches", requireAuth, async (c) => {

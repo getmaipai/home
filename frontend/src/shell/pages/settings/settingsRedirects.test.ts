@@ -77,7 +77,7 @@ describe("aliasTarget (AUDIT-UI-01)", () => {
     expect(aliasTarget("/settings/updates", admin)).toBe("/updates");
   });
   test("/apps/radio lands on the Radio page of Music", () => {
-    expect(aliasTarget("/apps/radio", member)).toBe("/apps/music/radio");
+    expect(aliasTarget("/apps/radio", member)).toBe("/apps/audio/radio");
   });
   test("the older aliases keep their destinations and an unknown path lands on itself", () => {
     expect(aliasTarget("/conversations", admin)).toBe("/chat");

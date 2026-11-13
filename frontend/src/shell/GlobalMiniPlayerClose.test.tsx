@@ -14,14 +14,14 @@ import { liveStationIdOf } from "@/shell/radioLive";
 const held = (appId: string, id: string) => ({ appId, id, src: "/s", kind: "audio", title: "T", el: document.createElement("audio"), started: true }) as HoistedMedia;
 
 test("mini player keeps its clearance slot", () => {
-  const current = held("music", "m1");
+  const current = held("audio", "m1");
   const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => {} }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);
   expect(view.container.querySelector('[data-slot="global-mini-player"]')).not.toBeNull();
   cleanup();
 });
 
 test("the mini player shows one visible close button and clears held media", () => {
-  const current = held("music", "m1");
+  const current = held("audio", "m1");
   const clear = () => {};
   const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current, clear, next: async () => {} }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);
   const buttons = view.getAllByRole("button", { name: /^Close player/i });
@@ -33,7 +33,7 @@ test("the mini player shows one visible close button and clears held media", () 
 
 test("live station and video mini players each show one close button", () => {
   for (const item of [
-    { ...held("music", "station"), src: "/api/plugins/music/radio/stream/station" },
+    { ...held("audio", "station"), src: "/api/plugins/audio/radio/stream/station" },
     { ...held("videos", "v1"), kind: "video" },
   ] as HoistedMedia[]) {
     if (item.id === "station") expect(liveStationIdOf(item.src)).not.toBeNull();
@@ -46,7 +46,7 @@ test("live station and video mini players each show one close button", () => {
 
 test("the music mini player turns on swipe to skip, wired to the host's next and previous, and draws the hairline", () => {
   let nexts = 0, previouses = 0;
-  const current = held("music", "m1");
+  const current = held("audio", "m1");
   const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current, clear: () => {}, next: async () => { nexts++; }, previous: async () => { previouses++; } }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);
   const bar = view.container.querySelector("[data-slot=player]")!;
   expect(bar.getAttribute("data-swipe-skip")).toBe("true");

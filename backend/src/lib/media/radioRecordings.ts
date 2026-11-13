@@ -137,11 +137,11 @@ export function radioRecordingItem(person: PersonRow, id: string): boolean {
   return Boolean(item?.provenance.startsWith("radio:recording:"));
 }
 
-registerMediaAppData("music", (person, dataId, params) => {
+registerMediaAppData("audio", (person, dataId, params) => {
   if (dataId !== "radio-recordings" && (dataId !== "radio" || params.scope !== "recordings")) return null;
   return radioRecordingRows(person);
 });
 
-registerItemView("music", (person, item, view) => radioRecordingItem(person, item.id) ? { ...view, channel: item.subtitle, subtitle: item.subtitle, src: `/api/media/items/${encodeURIComponent(item.id)}/content` } : view);
+registerItemView("audio", (person, item, view) => radioRecordingItem(person, item.id) ? { ...view, channel: item.subtitle, subtitle: item.subtitle, src: `/api/media/items/${encodeURIComponent(item.id)}/content` } : view);
 
 export function __resetRadioRecordingsForTests(): void { for (const e of active.values()) if (e.timer) clearTimeout(e.timer); active.clear(); }

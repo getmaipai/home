@@ -101,7 +101,7 @@ export function StudioPickerBody({ kind, start, personId, onDone }: { kind: Stud
       ) : (
         <>
           <AsyncState data={library.data} error={library.isError} isFetching={library.isFetching} onRetry={() => void library.refetch()} errorMessage={i18n._({ id: "Your {noun} did not load. Close this and try again.", message: "Your {noun} did not load. Close this and try again.", values: { noun } })} loadingLabel={i18n._({ id: "Loading your {noun}", message: "Loading your {noun}", values: { noun } })}>
-            {() => items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? i18n._({ id: "You have no clips yet. Make one on the Create page.", message: "You have no clips yet. Make one on the Create page." }) : i18n._({ id: "You have no songs in your Library yet. Make one in Music.", message: "You have no songs in your Library yet. Make one in Music." })}</p> : (
+            {() => items.length === 0 ? <p className="text-sm text-muted-foreground">{kind === "video" ? i18n._({ id: "You have no clips yet. Make one on the Create page.", message: "You have no clips yet. Make one on the Create page." }) : i18n._({ id: "You have no songs in your Library yet. Make one in Audio.", message: "You have no songs in your Library yet. Make one in Audio." })}</p> : (
               <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={i18n._({ id: "Your {noun}", message: "Your {noun}", values: { noun } })}>
                 {items.map((item) => (
                   <li key={item.id}>

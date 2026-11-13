@@ -715,7 +715,7 @@ body {
   min-height: 0;
 }
 
-/* MUSIC-SURFACE-01: the one near-black surface of the Music app. The kit's dark theme is navy; Music sits next to a black title bar and side nav,
+/* MUSIC-SURFACE-01: the one near-black surface of the Audio app. The kit's dark theme is navy; Music sits next to a black title bar and side nav,
    so its panels, cards and borders are neutral near-black steps instead. Set as custom properties on the Music section, so every kit part inside
    (cards, chips, sliders, buttons) picks them up through its own tokens and nothing carries a color of its own. The accent stays the kit's yellow hue. */
 @utility music-surface {

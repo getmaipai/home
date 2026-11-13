@@ -948,7 +948,7 @@ export type AppRow = AppRowWire;
 /** GET /api/media/home: one row of the Media home's shelves (backend/src/routes/mediaHome.ts). */
 export interface MediaHomeRow {
   id: string;
-  app: "videos" | "shows" | "music" | "podcasts" | "books";
+  app: "videos" | "shows" | "audio" | "podcasts" | "books";
   kind: string;
   title: string;
   subtitle: string | null;

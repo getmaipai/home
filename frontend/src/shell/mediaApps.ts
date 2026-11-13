@@ -11,8 +11,8 @@ export const MEDIA_APP_FOR_KIND: Readonly<Record<string, MediaAppTarget>> = {
   video: { app: "videos", page: "watch" },
   episode: { app: "shows", page: "watch" },
   film: { app: "shows", page: "watch" },
-  track: { app: "music", page: "play" },
-  station: { app: "music", page: "station" },
+  track: { app: "audio", page: "play" },
+  station: { app: "audio", page: "station" },
   podcast_episode: { app: "podcasts", page: "play" },
   book: { app: "books", page: "read" },
   audiobook: { app: "books", page: "listen" },
@@ -54,7 +54,7 @@ export function playPageOf(app: string): string | null {
 
 export function isMediaPlayPage(app: string, page: string): boolean {
   // Radio's station page hosts playback in the shell's global mini player, not in the page itself.
-  if (app === "music" && page === "station") return false;
+  if (app === "audio" && page === "station") return false;
   return page === playPageOf(app) || (app === "books" && page === "read") || Object.values(MEDIA_APP_FOR_KIND).some((target) => target.app === app && target.page === page);
 }
 
@@ -67,7 +67,7 @@ export function appHomeLabel(app: string, media: boolean): string {
 }
 
 export function homeLabelOf(app: string): string {
-  if (app === "podcasts" || app === "music") return "Listen now";
+  if (app === "podcasts" || app === "audio") return "Listen now";
   if (app === "books") return "Reading";
   return "Home";
 }

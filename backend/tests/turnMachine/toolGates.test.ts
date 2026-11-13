@@ -183,7 +183,7 @@ describe("conversation tool gate latch", () => {
 });
 
 describe("MUSIC-LIKE-01: make_band follows a song reference, never the wording", () => {
-  const track = "maipai://music/track/media-a1b2c3d4e5";
+  const track = "maipai://audio/track/media-a1b2c3d4e5";
   test("a song reference on a music turn offers make_band and not read_item; wording alone offers neither", async () => {
     const adult = makePerson("owner");
     setReady(true);

@@ -1,6 +1,6 @@
 // MUSIC-STUDIO-STYLE: `make_song_style`, a saved song style made in chat, and the actions of its card (save, discard, edit). A song
 // style is words only (never lyrics): a sound a person can make songs in. The model writes the fields; this saves them as the
-// person's own style, which the Music app lists under Styles. Rule 6a: nothing here logs a title or the style words.
+// person's own style, which the Audio app lists under Styles. Rule 6a: nothing here logs a title or the style words.
 import { outcomeOf } from "@/lib/turnContext";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";

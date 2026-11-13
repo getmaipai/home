@@ -24,8 +24,8 @@ beforeEach(() => {
     db.insert(mediaItems).values({ id: id(n), sourceId: "msrc-music000001", kind: "track", locRootId: "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist: artist, album, discNo: 1, trackNo: n, genre, year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   }
 });
-const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "music", name, params) as unknown as Array<Record<string, any>>;
-const play = (person: PersonRow, n: number, times = 1) => { for (let i = 0; i < times; i++) saveProgress(person, "music", { media_id: id(n), position_s: 10, duration_s: 10, reason: "ended" }); };
+const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "audio", name, params) as unknown as Array<Record<string, any>>;
+const play = (person: PersonRow, n: number, times = 1) => { for (let i = 0; i < times; i++) saveProgress(person, "audio", { media_id: id(n), position_s: 10, duration_s: 10, reason: "ended" }); };
 
 test("the greeting follows the hour in the given zone, with the person's name", () => {
   const noon = new Date("2026-11-09T12:00:00Z");

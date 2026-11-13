@@ -14,7 +14,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 const FALLBACK_KIND: Record<MediaHomeRow["app"], ImageFallbackKind> = {
   videos: "video",
   shows: "video",
-  music: "music",
+  audio: "music",
   podcasts: "music",
   books: "file",
 };

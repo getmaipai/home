@@ -147,7 +147,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const filmOk = !input.bare && input.actor.role !== "guest" && input.band === "adult" && input.surfaceClass === "written" && input.surface === "chat" && videosOk;
 
   const itemRefPermission = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written";
-  // MUSIC-LIKE-01: a song reference (maipai://music/track/...) offers `make_band` and nothing else; every other reference offers
+  // MUSIC-LIKE-01: a song reference (maipai://audio/track/...) offers `make_band` and nothing else; every other reference offers
   // `read_item`. The two never share a turn, so the sixteen-tool worst case holds (a message with both kinds offers read_item only).
   const refsInMessage = itemRefPermission ? (() => { try { return itemRefsIn(input.text); } catch { return []; } })() : [];
   // MUSIC-STUDIO-EDIT: a reference to a made band, album or song style is a music object like a song. The newest object wins: the

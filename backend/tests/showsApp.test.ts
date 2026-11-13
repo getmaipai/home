@@ -148,11 +148,11 @@ test("a guest gets nothing from Shows or Music: every data id and action answers
   const { id } = await made.json() as { id: string };
   const guest = new TestClient();
   expect((await guest.post("/api/auth/select", { personId: id })).status).toBe(200);
-  for (const [app, dataId] of [["shows", "shows"], ["shows", "featured"], ["shows", "watchlist"], ["shows", "episodes"], ["music", "songs"], ["music", "albums"], ["music", "radio-seeds"]] as const) {
+  for (const [app, dataId] of [["shows", "shows"], ["shows", "featured"], ["shows", "watchlist"], ["shows", "episodes"], ["audio", "songs"], ["audio", "albums"], ["audio", "radio-seeds"]] as const) {
     expect({ app, dataId, status: (await guest.post(`/api/plugins/${app}/data/${dataId}`, { id: show.id })).status }).toEqual({ app, dataId, status: 404 });
   }
   expect((await guest.post("/api/plugins/shows/watchlist", { media_id: show.id, status: "want" })).status).toBe(404);
-  expect((await guest.post("/api/plugins/music/queue", { id: show.id })).status).toBe(404);
+  expect((await guest.post("/api/plugins/audio/queue", { id: show.id })).status).toBe(404);
 });
 
 test("the person's allowlist setting empties discovery for an adult who turned it on, and never opens it for a child", async () => {

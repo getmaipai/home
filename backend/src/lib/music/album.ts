@@ -217,7 +217,7 @@ export async function runMakeAlbum(input: { state: BandState; args: Record<strin
   return outcomeOf({ callId, packageId: MAKE_ALBUM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: made.line }, data: { albumId: made.albumId, ...(made.musicJobId ? { musicJobId: made.musicJobId } : {}) }, blocks: [made.block], actions: [] } as NonNullable<ToolExecutionOutcome["result"]> });
 }
 
-// ---- Actions: the card's buttons, the Music app's album page and the edit_album tool all go through here.
+// ---- Actions: the card's buttons, the Audio app's album page and the edit_album tool all go through here.
 
 export const ALBUM_ACTION_NAMES = ["keep", "remake_cover", "discard", "edit", "play_all"] as const;
 export type AlbumActionName = (typeof ALBUM_ACTION_NAMES)[number];

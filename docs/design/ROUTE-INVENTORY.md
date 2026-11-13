@@ -39,30 +39,30 @@ User-facing routes registered by the Home shell and package page JSON files. Dyn
 | `/apps/books/read` | `books/read.json` (PackageAppPage) | Books | PackagePage, Card, List | Package page: Read. |
 | `/apps/books/series-detail` | `books/series-detail.json` (PackageAppPage) | Books | PackagePage, Card, List | Package page: Series Detail. |
 | `/apps/books/series` | `books/series.json` (PackageAppPage) | Books | PackagePage, Card, List | Package page: Series. |
-| `/apps/music/album` | `music/album.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Album. |
-| `/apps/music/albums` | `music/albums.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Albums. |
-| `/apps/music/artist` | `music/artist.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Artist. |
-| `/apps/music/artists` | `music/artists.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Artists. |
-| `/apps/music/create` | `music/create.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Create. |
-| `/apps/music/creations` | `music/creations.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Creations. |
-| `/apps/music/edit` | `music/edit.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Edit. |
-| `/apps/music/index` | `music/index.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Index. |
-| `/apps/music/library` | `music/library.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Library. |
-| `/apps/music/liked` | `music/liked.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Liked. |
-| `/apps/music/make-album` | `music/make-album.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Album. |
-| `/apps/music/make-band` | `music/make-band.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Band. |
-| `/apps/music/make-song` | `music/make-song.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Song. |
-| `/apps/music/make-style` | `music/make-style.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Style. |
-| `/apps/music/play` | `music/play.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Play. |
-| `/apps/music/playlist` | `music/playlist.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Playlist. |
-| `/apps/music/playlists` | `music/playlists.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Playlists. |
-| `/apps/music/radio` | `music/radio.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Radio. |
-| `/apps/music/remix` | `music/remix.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Remix. |
-| `/apps/music/search` | `music/search.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Search. |
-| `/apps/music/songs` | `music/songs.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Songs. |
-| `/apps/music/station` | `music/station.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Station. |
-| `/apps/music/stems` | `music/stems.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Stems. |
-| `/apps/music/studio` | `music/studio.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Studio. |
+| `/apps/audio/album` | `music/album.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Album. |
+| `/apps/audio/albums` | `music/albums.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Albums. |
+| `/apps/audio/artist` | `music/artist.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Artist. |
+| `/apps/audio/artists` | `music/artists.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Artists. |
+| `/apps/audio/create` | `music/create.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Create. |
+| `/apps/audio/creations` | `music/creations.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Creations. |
+| `/apps/audio/edit` | `music/edit.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Edit. |
+| `/apps/audio/index` | `music/index.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Index. |
+| `/apps/audio/library` | `music/library.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Library. |
+| `/apps/audio/liked` | `music/liked.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Liked. |
+| `/apps/audio/make-album` | `music/make-album.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Album. |
+| `/apps/audio/make-band` | `music/make-band.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Band. |
+| `/apps/audio/make-song` | `music/make-song.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Song. |
+| `/apps/audio/make-style` | `music/make-style.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Make Style. |
+| `/apps/audio/play` | `music/play.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Play. |
+| `/apps/audio/playlist` | `music/playlist.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Playlist. |
+| `/apps/audio/playlists` | `music/playlists.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Playlists. |
+| `/apps/audio/radio` | `music/radio.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Radio. |
+| `/apps/audio/remix` | `music/remix.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Remix. |
+| `/apps/audio/search` | `music/search.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Search. |
+| `/apps/audio/songs` | `music/songs.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Songs. |
+| `/apps/audio/station` | `music/station.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Station. |
+| `/apps/audio/stems` | `music/stems.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Stems. |
+| `/apps/audio/studio` | `music/studio.json` (PackageAppPage) | Music | PackagePage, Card, List | Package page: Studio. |
 | `/apps/news/channel` | `news/channel.json` (PackageAppPage) | News | PackagePage, Card, List | Package page: Channel. |
 | `/apps/news/following` | `news/following.json` (PackageAppPage) | News | PackagePage, Card, List | Package page: Following. |
 | `/apps/news/index` | `news/index.json` (PackageAppPage) | News | PackagePage, Card, List | Package page: Index. |
@@ -113,7 +113,7 @@ User-facing routes registered by the Home shell and package page JSON files. Dyn
 | `/settings/home` | LegacySettingsRedirect | Settings | Card, List, Button | Shell route. |
 | `/settings/account` | LegacySettingsRedirect | Settings | Card, List, Button | Shell route. |
 | `/customize` | CustomizeRedirect | Settings | Card, List, Button | Shell route. |
-| `/apps/music/like-this` | MusicLikeThisPage | Music | Card, List, Button | Shell route. |
+| `/apps/audio/like-this` | MusicLikeThisPage | Music | Card, List, Button | Shell route. |
 | `/apps/news/discuss` | NewsDiscussPage | News | Card, List, Button | Shell route. |
 | `/companions` | CompanionsPage | Companions | Card, List, Button | Shell route. |
 | `/companions/create` | CompanionFlowPage | Companions | Card, List, Button | Shell route. |
@@ -327,122 +327,122 @@ Route manifest used by the scripted capture. `auth: none` means the signed-out s
   },
   {
     "slug": "apps-music-album",
-    "path": "/apps/music/album",
+    "path": "/apps/audio/album",
     "auth": "sage"
   },
   {
     "slug": "apps-music-albums",
-    "path": "/apps/music/albums",
+    "path": "/apps/audio/albums",
     "auth": "sage"
   },
   {
     "slug": "apps-music-artist",
-    "path": "/apps/music/artist",
+    "path": "/apps/audio/artist",
     "auth": "sage"
   },
   {
     "slug": "apps-music-artists",
-    "path": "/apps/music/artists",
+    "path": "/apps/audio/artists",
     "auth": "sage"
   },
   {
     "slug": "apps-music-create",
-    "path": "/apps/music/create",
+    "path": "/apps/audio/create",
     "auth": "sage"
   },
   {
     "slug": "apps-music-creations",
-    "path": "/apps/music/creations",
+    "path": "/apps/audio/creations",
     "auth": "sage"
   },
   {
     "slug": "apps-music-edit",
-    "path": "/apps/music/edit",
+    "path": "/apps/audio/edit",
     "auth": "sage"
   },
   {
     "slug": "apps-music-index",
-    "path": "/apps/music/index",
+    "path": "/apps/audio/index",
     "auth": "sage"
   },
   {
     "slug": "apps-music-library",
-    "path": "/apps/music/library",
+    "path": "/apps/audio/library",
     "auth": "sage"
   },
   {
     "slug": "apps-music-liked",
-    "path": "/apps/music/liked",
+    "path": "/apps/audio/liked",
     "auth": "sage"
   },
   {
     "slug": "apps-music-make-album",
-    "path": "/apps/music/make-album",
+    "path": "/apps/audio/make-album",
     "auth": "sage"
   },
   {
     "slug": "apps-music-make-band",
-    "path": "/apps/music/make-band",
+    "path": "/apps/audio/make-band",
     "auth": "sage"
   },
   {
     "slug": "apps-music-make-song",
-    "path": "/apps/music/make-song",
+    "path": "/apps/audio/make-song",
     "auth": "sage"
   },
   {
     "slug": "apps-music-make-style",
-    "path": "/apps/music/make-style",
+    "path": "/apps/audio/make-style",
     "auth": "sage"
   },
   {
     "slug": "apps-music-play",
-    "path": "/apps/music/play",
+    "path": "/apps/audio/play",
     "auth": "sage"
   },
   {
     "slug": "apps-music-playlist",
-    "path": "/apps/music/playlist",
+    "path": "/apps/audio/playlist",
     "auth": "sage"
   },
   {
     "slug": "apps-music-playlists",
-    "path": "/apps/music/playlists",
+    "path": "/apps/audio/playlists",
     "auth": "sage"
   },
   {
     "slug": "apps-music-radio",
-    "path": "/apps/music/radio",
+    "path": "/apps/audio/radio",
     "auth": "sage"
   },
   {
     "slug": "apps-music-remix",
-    "path": "/apps/music/remix",
+    "path": "/apps/audio/remix",
     "auth": "sage"
   },
   {
     "slug": "apps-music-search",
-    "path": "/apps/music/search",
+    "path": "/apps/audio/search",
     "auth": "sage"
   },
   {
     "slug": "apps-music-songs",
-    "path": "/apps/music/songs",
+    "path": "/apps/audio/songs",
     "auth": "sage"
   },
   {
     "slug": "apps-music-station",
-    "path": "/apps/music/station",
+    "path": "/apps/audio/station",
     "auth": "sage"
   },
   {
     "slug": "apps-music-stems",
-    "path": "/apps/music/stems",
+    "path": "/apps/audio/stems",
     "auth": "sage"
   },
   {
     "slug": "apps-music-studio",
-    "path": "/apps/music/studio",
+    "path": "/apps/audio/studio",
     "auth": "sage"
   },
   {
@@ -692,7 +692,7 @@ Route manifest used by the scripted capture. `auth: none` means the signed-out s
   },
   {
     "slug": "apps-music-like-this",
-    "path": "/apps/music/like-this",
+    "path": "/apps/audio/like-this",
     "auth": "sage"
   },
   {

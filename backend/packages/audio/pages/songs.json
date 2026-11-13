@@ -1,0 +1,57 @@
+{
+  "type": "page",
+  "id": "songs",
+  "title": "Songs",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Songs",
+      "bind": {
+        "source": "package",
+        "path": "songs"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No songs yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/create"
+          }
+        },
+        "action_label": "Make a song"
+      },
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add to playlist",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Saved to the playlist"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

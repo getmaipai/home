@@ -118,7 +118,7 @@ export function createMediaStore() {
       if (!taken) {
         if (wasClosed) el.preload = "none";
         el.setAttribute("src", ref.src);
-        el.autoplay = appId === "music" && !wasClosed;
+        el.autoplay = appId === "audio" && !wasClosed;
       }
       // The Player that asked for it adopts it in the same commit, and parks it in the kit's hidden spot when it goes. This file does
       // not import the Player (it stays out of the shell's main chunk; PackageAppPage loads it on demand).
@@ -245,7 +245,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
         if (kind === "track") {
-          const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: mediaId, mode: item.queue_mode ?? "track", shuffle: item.shuffle, seed_kind: item.seed_kind }) });
+          const queued = await request<{ id: string }>("/api/plugins/audio/queue", { method: "POST", body: JSON.stringify({ id: mediaId, mode: item.queue_mode ?? "track", shuffle: item.shuffle, seed_kind: item.seed_kind }) });
           mediaId = queued.id;
         }
         const to = playRoute(kind, mediaId);
@@ -269,10 +269,10 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   const djFor = useMusicDj(current ? { id: current.id, appId: current.appId, live: liveStationIdOf(current.src) !== null } : null);
   const voiceoverFor = useCallback((ref: MediaItemRef) => ref.id === djFor?.id ? djFor?.voiceover : undefined, [djFor]);
-  // NOW-PLAYING-01: on the Music app's pages the kit's Now Playing draws shuffle, repeat and the Up next button from the same play mode the
+  // NOW-PLAYING-01: on the Audio app's pages the kit's Now Playing draws shuffle, repeat and the Up next button from the same play mode the
   // stage uses (media/playMode.ts, kept on this device) and opens the same Up next view the stage has. Other apps' players get neither.
   const playMode = usePlayMode();
-  const inMusic = mediaAppOfPath(location.pathname) === "music";
+  const inMusic = mediaAppOfPath(location.pathname) === "audio";
   const hostWithDj = useMemo<MediaHost>(() => ({
     ...host,
     voiceoverFor,
@@ -286,13 +286,13 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   // MUSIC-STAGE-01: songs played this session, newest last, so Previous can go back.
   const history = useRef<string[]>([]);
   const playQueued = useCallback(async (wanted: string, held: HoistedMedia, remember: boolean) => {
-    const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: wanted }) });
+    const queued = await request<{ id: string }>("/api/plugins/audio/queue", { method: "POST", body: JSON.stringify({ id: wanted }) });
     type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string };
-    const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
+    const next = await api.appData<NextItem | []>("audio", "item", { id: queued.id });
     if (Array.isArray(next) || store.get()?.id !== held.id) return;
     if (remember) history.current.push(held.id);
     const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
-    const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
+    const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "audio");
     parkMedia(el);
     await el.play();
   }, [store]);
@@ -300,12 +300,12 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   const nextAfter = useCallback(async (heldId: string): Promise<string | null> => {
     const mode = getPlayMode();
     const nextId = await nextMusicQueueId(heldId);
-    const ahead = mode.shuffle ? (await api.appData<Array<{ id: string }>>("music", "up-next", { id: heldId })).map((row) => row.id) : [];
+    const ahead = mode.shuffle ? (await api.appData<Array<{ id: string }>>("audio", "up-next", { id: heldId })).map((row) => row.id) : [];
     return chooseNext({ nextId, ahead, currentId: heldId, first: history.current[0], mode });
   }, []);
   const advance = useCallback(async () => {
     const held = store.get();
-    if (!held || held.appId !== "music") return;
+    if (!held || held.appId !== "audio") return;
     try {
       const queuedId = await nextAfter(held.id);
       if (!queuedId || store.get()?.id !== held.id) return;
@@ -316,7 +316,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   }, [store, playQueued, nextAfter]);
   const previous = useCallback(async () => {
     const held = store.get();
-    if (!held || held.appId !== "music") return;
+    if (!held || held.appId !== "audio") return;
     const before = history.current[history.current.length - 1];
     if (!before || held.el.currentTime > 3) { held.el.currentTime = 0; return; }
     try {
@@ -326,18 +326,18 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   }, [store, playQueued]);
   const playId = useCallback(async (id: string) => {
     const held = store.get();
-    if (!held || held.appId !== "music" || held.id === id) return;
+    if (!held || held.appId !== "audio" || held.id === id) return;
     try { await playQueued(id, held, true); } catch { /* the song stays as it was */ }
   }, [store, playQueued]);
   // Repeat "one" loops the held song, whichever page is open.
   useEffect(() => {
-    if (!current || current.appId !== "music") return;
+    if (!current || current.appId !== "audio") return;
     current.el.loop = playMode.repeat === "one" && liveStationIdOf(current.src) === null;
   }, [current, playMode.repeat]);
   // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
   useEffect(() => {
-    if (!current || current.appId !== "music") return;
-    const ended = () => { if (handedOff.has(current.el)) return; if (pathRef.current !== "/apps/music/play") void advance(); };
+    if (!current || current.appId !== "audio") return;
+    const ended = () => { if (handedOff.has(current.el)) return; if (pathRef.current !== "/apps/audio/play") void advance(); };
     current.el.addEventListener("ended", ended);
     return () => current.el.removeEventListener("ended", ended);
   }, [current, advance]);
@@ -366,7 +366,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   }, [soundScope, queryClient]);
   const eq = useEqPreset();
   const heldEl = current?.el ?? null;
-  const heldMusic = current?.appId === "music" && current.kind === "audio" && current.src ? current : null;
+  const heldMusic = current?.appId === "audio" && current.kind === "audio" && current.src ? current : null;
   const heldLive = heldMusic ? liveStationIdOf(heldMusic.src) !== null : false;
   // A tone preset needs the element routed through Web Audio (tapped once, when it plays). Not on iOS, where that would end background playback.
   useEffect(() => {
@@ -381,7 +381,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   useEffect(() => {
     if (!heldMusic || heldLive || crossfadeS <= 0) return;
     const readNext = async (id: string) => {
-      const item = await api.appData<{ id: string; src: string; title: string; subtitle?: string; poster?: string } | []>("music", "item", { id });
+      const item = await api.appData<{ id: string; src: string; title: string; subtitle?: string; poster?: string } | []>("audio", "item", { id });
       return Array.isArray(item) ? null : item;
     };
     return attachCrossfade({ id: heldMusic.id, appId: heldMusic.appId, kind: heldMusic.kind, src: heldMusic.src, el: heldMusic.el, live: false }, {
@@ -392,8 +392,8 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       afterHandOff: ({ from, next, el }) => {
         history.current.push(from.id);
         void import("@maipai/ui/src/primitives/Player").then(({ parkMedia }) => parkMedia(el));
-        void request("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: next.id }) }).catch(() => undefined);
-        const to = pathRef.current === "/apps/music/play" ? playRoute("track", next.id) : null;
+        void request("/api/plugins/audio/queue", { method: "POST", body: JSON.stringify({ id: next.id }) }).catch(() => undefined);
+        const to = pathRef.current === "/apps/audio/play" ? playRoute("track", next.id) : null;
         if (to) navigate(to, { state: { pageState: { id: next.id } } });
       },
     });
@@ -469,7 +469,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     <MediaHostContext.Provider value={hostWithDj}>
       <MediaDockContext.Provider value={dock}>
        <ListenStatusContext.Provider value={speech}>
-        {current ? <MediaPlayerRegistration adultOnly={refuseAdultOnly(current)} appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
+        {current ? <MediaPlayerRegistration adultOnly={refuseAdultOnly(current)} appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "audio" ? () => { void advance(); } : undefined} /> : null}
         {children}
         {pick ? (
           <Dialog open onOpenChange={(open) => { if (!open) { pick.resolve(null); setPick(null); } }}>

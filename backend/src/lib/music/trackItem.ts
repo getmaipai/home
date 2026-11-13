@@ -1,6 +1,6 @@
-// MUSIC-LIKE-01: a library song as an item reference, `maipai://music/track/<media id>`. The Player's like-this buttons open a chat
+// MUSIC-LIKE-01: a library song as an item reference, `maipai://audio/track/<media id>`. The Player's like-this buttons open a chat
 // with this token, so the turn follows the object the person is playing (`make_band` is offered for it). The reader gives the
-// song's own labels only, under the same library access as the Music app.
+// song's own labels only, under the same library access as the Audio app.
 import { readableItem } from "@/lib/media/access";
 import type { PersonRow } from "@/types";
 

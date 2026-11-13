@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "music-make-style",
+  "title": "Make a song style",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "Making a song style needs the Home app. Open Audio in the app and pick Make a song style."
+    }
+  ]
+}

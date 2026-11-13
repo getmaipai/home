@@ -8,7 +8,7 @@ import { PACKAGES_DIR } from "@/lib/paths";
 import { owner } from "./support/testAuth";
 
 const pages = [
-  ["videos", "watch"], ["music", "play"], ["podcasts", "play"], ["shows", "watch"],
+  ["videos", "watch"], ["audio", "play"], ["podcasts", "play"], ["shows", "watch"],
 ] as const;
 
 describe("media detail player pages", () => {
@@ -27,14 +27,14 @@ describe("media detail player pages", () => {
   test("Music collection detail pages start with a collection creation header", () => {
     const ajv = new Ajv2020({ strict: false });
     for (const pageId of ["album", "playlist", "artist"]) {
-      const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "music", "pages", `${pageId}.json`), "utf8")) as { body: Array<Record<string, unknown>> };
+      const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "audio", "pages", `${pageId}.json`), "utf8")) as { body: Array<Record<string, unknown>> };
       expect(ajv.validate(UI_SCHEMA as object, page), `${pageId}: ${JSON.stringify(ajv.errors)}`).toBe(true);
       expect(page.body[0]).toMatchObject({ type: "creation_header", variant: "collection" });
     }
   });
 
   test("Music play page uses a byline creation header", () => {
-    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "music", "pages", "play.json"), "utf8")) as { body: Array<{ main: Array<Record<string, unknown>> }> };
+    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "audio", "pages", "play.json"), "utf8")) as { body: Array<{ main: Array<Record<string, unknown>> }> };
     const creationHeader = page.body[0]?.main.find((node) => node.type === "creation_header");
     expect(creationHeader).toMatchObject({ type: "creation_header", variant: "byline" });
   });

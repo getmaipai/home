@@ -10,7 +10,7 @@ const revokeUrl = URL.revokeObjectURL;
 afterEach(() => { globalThis.fetch = realFetch; URL.createObjectURL = createUrl; URL.revokeObjectURL = revokeUrl; });
 
 let voiceover: PlayerVoiceover | undefined;
-function Probe({ id }: { id: string }) { voiceover = useMusicDj({ id, appId: "music" })?.voiceover; return null; }
+function Probe({ id }: { id: string }) { voiceover = useMusicDj({ id, appId: "audio" })?.voiceover; return null; }
 function mount() { return render(<Probe id="song-1" />); }
 
 describe("useMusicDj", () => {

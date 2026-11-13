@@ -1,0 +1,225 @@
+{
+  "type": "page",
+  "id": "playlist",
+  "title": "Playlist",
+  "body": [
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "backdrop": "art_gradient",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist"
+        }
+      },
+      "candidates_bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-people"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{id}"
+          }
+        }
+      },
+      "shuffle": {
+        "label": "Shuffle",
+        "icon": "shuffle",
+        "labeled": true,
+        "action": {
+          "play": {
+            "media_id": "{shuffle_id}"
+          }
+        }
+      },
+      "more": [
+        {
+          "label": "Share",
+          "icon": "share",
+          "action": {
+            "share": {
+              "to": "/apps/audio/playlist?id={share_id}",
+              "title": "{title}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "track_rows",
+      "label": "Songs",
+      "bind": {
+        "source": "package",
+        "path": "playlist",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "reorder_key",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_number_field": "track_number",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "play_label": "Play {title}",
+      "on_play": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "list-plus",
+          "label": "Play next",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/queue",
+              "args": {
+                "op": "play_next",
+                "media_id": "{id}"
+              },
+              "success_label": "Playing next"
+            }
+          }
+        },
+        {
+          "icon": "list-music",
+          "label": "Add to queue",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/queue",
+              "args": {
+                "op": "add",
+                "media_id": "{id}"
+              },
+              "success_label": "Added to the queue"
+            }
+          }
+        },
+        {
+          "icon": "x",
+          "label": "Remove",
+          "action": {
+            "call": {
+              "target": "/api/plugins/audio/playlist",
+              "args": {
+                "op": "remove",
+                "media_id": "{id}",
+                "playlist_id": "{playlist_id}"
+              }
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "This playlist is empty. Press Add to playlist on Now playing.",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/search"
+          }
+        },
+        "action_label": "Find songs"
+      },
+      "reorder": {
+        "call": {
+          "call": {
+            "target": "/api/plugins/audio/playlist",
+            "args": {
+              "op": "reorder"
+            }
+          }
+        },
+        "id_param": "ids"
+      }
+    },
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "part": "footer",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist"
+        }
+      },
+      "candidates_bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist-people"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/audio/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

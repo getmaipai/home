@@ -61,7 +61,7 @@ describe("video playlists", () => {
     expect((await ask(owner, "library", { scope: "playlist", id: made.id })).length).toBe(2);
     // The Music playlists page and the generic list keep the two kinds apart.
     expect(await ask(owner, "library", { scope: "playlists" })).toHaveLength(1);
-    const musicPlaylists = (await (await owner.post("/api/plugins/music/data/playlists", {})).json()) as Row[];
+    const musicPlaylists = (await (await owner.post("/api/plugins/audio/data/playlists", {})).json()) as Row[];
     expect(musicPlaylists.map((t) => t.title)).not.toContain("Rainy day");
     const stored = (await (await owner.get("/api/media/collections?kind=playlist")).json()) as Row[];
     expect(stored.find((c) => c.id === made.id)?.media_kind).toBe("video");

@@ -19,7 +19,7 @@ describe("a Home shelf tile with no picture (AUDIT-UI-01)", () => {
   test("a clip shows a film and a song shows a note", () => {
     expect(iconOf(tilePicture(row({ kind: "video", app: "videos" })))).toContain("film");
     cleanup();
-    expect(iconOf(tilePicture(row({ kind: "song", app: "music" })))).toContain("music");
+    expect(iconOf(tilePicture(row({ kind: "song", app: "audio" })))).toContain("audio");
   });
   test("the missing art is seeded and leaves the shelf overlay to draw the title", () => {
     const view = render(tilePicture(row({ title: "Lantern Road" })));

@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "music-downloads",
+  "title": "Downloads",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "download",
+      "text": "Songs saved for offline play will show up here.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/search"
+        }
+      },
+      "action_label": "Find songs"
+    }
+  ]
+}
