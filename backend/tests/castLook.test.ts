@@ -10,7 +10,6 @@ import { storeFile } from "@/lib/attachments";
 import { listCast, resolveCast } from "@/lib/cast";
 import { captureLook, type LookSheetMaker, type LookPortraitMaker } from "@/lib/castLook";
 import { sheetNote } from "@/lib/castLookKey";
-import { LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { makeSheetFromPictures, cutOutPause, type SheetTools } from "@/lib/films/sheetMaker";
 import { resetDb } from "./reset-db";
@@ -169,11 +168,11 @@ describe("gates per band, exactly as the cast resolver applies them", () => {
     expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.personId, kid.id)).get()?.referenceIds ?? "[]").toBe("[]"); // the child's photos were never stored on the subject
   });
 
-  test("household_likeness off refuses capturing another member with the existing line; capturing yourself still works", async () => {
+  test("a legacy household likeness value does not block an adult capturing another member", async () => {
     const { sage, adult2 } = await world();
     if (!adult2) return;
-    setHouseholdSettingValue("generation.household_likeness", false);
-    expect(await captureLook(sage, adult2.id, { sheetMaker: maker, photoFileIds: [await photo(sage, 40)] })).toMatchObject({ ok: false, line: LIKENESS_OFF_LINE });
+    setHouseholdSettingValue("generation.household_likeness", false as never);
+    expect((await captureLook(sage, adult2.id, { sheetMaker: maker, photoFileIds: [await photo(sage, 40)] })).ok).toBe(true);
     expect((await captureLook(sage, sage.id, { sheetMaker: maker, photoFileIds: [await photo(sage, 41)] })).ok).toBe(true);
   });
 

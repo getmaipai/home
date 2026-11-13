@@ -116,19 +116,6 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.media_kids",
     honoured_by: ["home"],
   }),
-  // LIKENESS-01 (rule 0): anyone in the household may make things with or of any household member; on by default. Read by lib/likeness.ts.
-  SettingsKey.parse({
-    key: "generation.household_likeness",
-    scope: "household",
-    selector: "boolean",
-    default: true,
-    label: "Family can make pictures, videos and songs of each other",
-    help: "Anyone in the home may make things with or of any household member. Turn it off to stop that.",
-    copy: { does: "Sets whether household members may include one another in things made here." },
-    level: "basic",
-    lives_in: "household.media_kids",
-    honoured_by: ["home"],
-  }),
   SettingsKey.parse({
     key: "generation.styles.civitai",
     scope: "household",

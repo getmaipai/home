@@ -1,7 +1,7 @@
 // KIDS-CREATE-01 / PEOPLE-PROMPTS-01 (owner rulings 2026-10-17: "Teens can edit and create picture and video without annoying messages"):
 // a teen makes pictures and videos and edits pictures, with teen-appropriate hard gates only: nothing adult or sexual (the prompt gate and the
-// finished-picture check, in ONE short plain line), adult-only styles never, another person's likeness never (the household option is for
-// other adults), their own photo for a non-sexual edit, and never any hedging or extra questions whatever the household setting says.
+// finished-picture check, in ONE short plain line), adult-only styles never, another person's likeness is not available to teen viewers,
+// their own photo for a non-sexual edit, and never any hedging or extra questions.
 // A child is still refused here (the child lane is its own change).
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";

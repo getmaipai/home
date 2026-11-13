@@ -46,7 +46,7 @@ captured by [cap.sh](assets/settings-media-2026-11-02/cap.sh). Today's screens: 
 | same, section 5.1 "'Adult' never as a badge" | After unlock an "Adults only" chip is drawn on an open adult-only row and the editor's switch shows it; locked, nothing is drawn. |
 | [settings-ia-2026-10-18.md](settings-ia-2026-10-18.md) row P6 (Account, Pictures and videos) | Removed with the Yours page (section 8). |
 | [ai-models-glance-2026-10-26.md](ai-models-glance-2026-10-26.md), the Quick, Detailed and music.make rows | The Quick or Detailed radio leaves the AI card; `music.make` becomes a state line plus a link to the Music tab. |
-| [content-policy-2026-10-18.md](content-policy-2026-10-18.md) key table, [image-editing-2026-10-17.md](image-editing-2026-10-17.md) section 7, backlog row PEOPLE-PROMPTS-01 | `generation.people_prompts` is retired; `generation.household_likeness` stays. |
+| [content-policy-2026-10-18.md](content-policy-2026-10-18.md) key table, [image-editing-2026-10-17.md](image-editing-2026-10-17.md) section 7, backlog row PEOPLE-PROMPTS-01 | `generation.people_prompts` is retired; the household likeness option was later added and removed by owner decision (2026-11-13). |
 | open row SETTINGS-IA-04 | Amended: the tabs of this page come from VIDEO-SETTINGS-03 and 05; that row does not redo them. |
 | IMGGEN-SET-01 and VIDEO-GEN-04 (the two views `PicturesLibrary` and `VideoLibrary`) | Both views are deleted and replaced by the tab views of section 7. Their style lists move into the Styles tab (VIDEO-LORA-08). |
 | `docs/user/pictures.md`, `settings.md`, `people.md` and `videos.md` wording about "Install the picture model", "Quick and Detailed" and the style library | Rewritten in the slice that changes the screen (same commit as the behavior). |
@@ -95,7 +95,7 @@ then Online radio and podcasts (3 rows). About 4,700 px tall at 1440 wide; the s
 - **The picture and video help lines** "Children and teens cannot, whatever this says" (`generation.adults`, `generation.video.enabled`) are wrong for teens and for cartoon-lane children. The same line on `generation.music.enabled` is correct (`musicViewDenial` makes songs adults only) and stays.
 - **"Teens ... only get all-ages styles"** (picture band note) contradicts D3 of the LoRA note: a minor never sees any style.
 - **Old install model for styles**: "Hugging Face link", "A file from this computer (up to 120 MB)", "A file already on this computer (for big files)" as three radio buttons, a typed licence string, "Not sure" as an age answer. The browser, the confirm panel and the Adults only question replace them.
-- **Keys that nothing reads** (searched `backend/src`, `frontend/src`, `shared`; only the spec and tests mention them): `generation.people_prompts` ("Ask me before making pictures and videos of people": `image-editing-2026-10-17.md` section 7 says it is no longer read for an adult, and rule 10 says Home asks nothing about people), `generation.household_likeness` ("Family can make pictures and videos of each other": its help says an admin can turn it off, and nothing checks it), `engines.video.choice` and `engines.music.choice` (absorbed by the tier slots; no reader). `generation.picture_quick_model` and `generation.picture_detailed.enabled` are still written by the AI card, copied into the slots by `lib/tierSlotMigration.ts` and read by `lib/aiChoicesState.ts` and `shared/aiChoices.ts`.
+- **Keys that nothing reads** (searched `backend/src`, `frontend/src`, `shared`; only the spec and tests mention them): `generation.people_prompts` ("Ask me before making pictures and videos of people": `image-editing-2026-10-17.md` section 7 says it is no longer read for an adult, and rule 10 says Home asks nothing about people), `engines.video.choice` and `engines.music.choice` (absorbed by the tier slots; no reader). `generation.picture_quick_model` and `generation.picture_detailed.enabled` are still written by the AI card, copied into the slots by `lib/tierSlotMigration.ts` and read by `lib/aiChoicesState.ts` and `shared/aiChoices.ts`.
 - **Wrong person-area page**: Settings, Yours, **Pictures and videos** ("Pictures and videos that look like you") holds one row, `generation.kid_enabled`, whose label reads "This child can make cartoon pictures and videos". An owner sees it about herself. A parent sets it for a child on the child's Family page already (`personLimits.ts`).
 - **A denial line that sends a child to settings**: `VIDEO_DENIAL_LINE.minor` tells the child "A parent can turn it on in Settings, Pictures, videos and music" (`lib/videos/policy.ts`). The switch is not there for videos.
 
@@ -129,7 +129,6 @@ then Online radio and podcasts (3 rows). About 4,700 px tall at 1440 wide; the s
 | `generation.picture_quick_model` | Quick picture model | spec | nowhere (read and copied by the card code) | retire after the card writes the slot directly (VIDEO-SETTINGS-04, -09) |
 | `generation.picture_detailed.enabled` | Detailed pictures | spec | AI card switch | retire after the switch writes `engines.image.tier.boost` (VIDEO-SETTINGS-04, -09) |
 | `engines.video.choice`, `engines.music.choice` | Video model choice, Music model choice | spec | nowhere | retire (no reader) |
-| `generation.household_likeness` | Family can make pictures and videos of each other | spec only | keys card | rule 0 names this option, so it stays on the Pictures tab; it has no reader today, and VIDEO-SETTINGS-04 adds the reader and its test |
 | `generation.people_prompts` | Ask me before making pictures and videos of people | spec only | keys card | retire |
 | `generation.kids` | Let kids make cartoon pictures and videos | `pictureKeys.ts` | keys card | keep; Children card |
 | `generation.kids_daily_pictures`, `generation.kids_daily_videos` | Cartoon pictures/videos a child can make each day | `pictureKeys.ts` | keys card | keep; Children card |
@@ -165,7 +164,6 @@ Where each old thing went:
 | Media library tab | deleted | |
 | `generation.kids`, caps | Pictures tab, card Children and teens | covers pictures and videos |
 | `generation.people_prompts` | retired (nothing reads it) | see section 8 |
-| `generation.household_likeness` | Pictures tab, card Children and teens, row "Family can make pictures, videos and songs of each other" | stays; its reader is added (section 8) |
 | Yours, Pictures and videos page | removed (section 8) | |
 
 Counts: Pictures 7 rows, Videos 4 rows, Music 3 rows plus 3 radio and podcast rows plus 4 folded, Styles 4 groups. Each tab is far under the "about fifteen keys per screen" cap of SETTINGS.md rule 6, and the page is no longer 4,700 px.
@@ -189,7 +187,6 @@ Plain words, grade 6, no resource words on any row an admin could read aloud to 
 | `generation.kids` | Let children make cartoon pictures and videos | Children get cartoons with no sound, up to the limits below. Photos, real people and anything scary or grown-up are never made for them. |
 | `generation.kids_daily_pictures` | Cartoon pictures a child can make each day | 0 means none. |
 | `generation.kids_daily_videos` | Cartoon videos a child can make each day | 0 means none. |
-| `generation.household_likeness` | Family can make pictures, videos and songs of each other | Anyone in the home may make things with or of any household member. Turn it off to stop that. |
 
 ### 4.2 Videos tab
 
@@ -354,7 +351,7 @@ tap (behind the lock for an adult-only style). After 30 days the Stack deletes t
 
 ## 8. Key migration and spec flow (migrations are rules)
 
-`lives_in` groups (S4, each group in exactly one card): `household.media_pictures` (`generation.adults`, `generation.picture_tier`), `household.media_kids` (Children and teens: `generation.kids`, the two limits, `generation.household_likeness`), `household.media_videos` (`generation.video.enabled`, `generation.video_tier`), `household.media_music` (`generation.music.enabled`, `generation.music.length`), `household.media_lookups` (the four folded `music.*` keys), `household.media_online` (unchanged), `household.media_styles` (`generation.styles.adult_only`, `generation.styles.civitai`, `generation.styles.civitai_key`), and `household.media_retired` (`generation.people_prompts` alone, listed under `not_placed`). The person group `person.likeness` (`generation.kid_enabled`, drawn on the Family page by `personLimits.ts`) is listed under `not_placed` with that reason when the Yours page goes. `household.pictures` ends up empty. Each of the Pictures, Videos and Music cards (and the Styles card) is drawn by a named view id added to `ALLOWED_VIEW_IDS` in VIDEO-SETTINGS-03, because the spec check refuses a card description with no view; the link-row text sits in that card's `copy` map. `not_placed` works per group, so no group mixes a retired key with a drawn one.
+`lives_in` groups (S4, each group in exactly one card): `household.media_pictures` (`generation.adults`, `generation.picture_tier`), `household.media_kids` (Children and teens: `generation.kids`, the two limits), `household.media_videos` (`generation.video.enabled`, `generation.video_tier`), `household.media_music` (`generation.music.enabled`, `generation.music.length`), `household.media_lookups` (the four folded `music.*` keys), `household.media_online` (unchanged), `household.media_styles` (`generation.styles.adult_only`, `generation.styles.civitai`, `generation.styles.civitai_key`), and `household.media_retired` (`generation.people_prompts` alone, listed under `not_placed`). The person group `person.likeness` (`generation.kid_enabled`, drawn on the Family page by `personLimits.ts`) is listed under `not_placed` with that reason when the Yours page goes. `household.pictures` ends up empty. Each of the Pictures, Videos and Music cards (and the Styles card) is drawn by a named view id added to `ALLOWED_VIEW_IDS` in VIDEO-SETTINGS-03, because the spec check refuses a card description with no view; the link-row text sits in that card's `copy` map. `not_placed` works per group, so no group mixes a retired key with a drawn one.
 
 Order is fixed: spec first (commons `spec`), tag, Home pin bump, then Home declarations, readers and migration, then screens. `gen:settings`
 is **never hand-run**: it writes the registry into whatever `MAIPAI_COMMONS_DIR` names. The slices use only the repo's flow: Home declares keys
@@ -368,7 +365,7 @@ its own commons worktree (`MAIPAI_COMMONS_DIR` set to that worktree by the slice
 | `generation.picture_quality`, `generation.video_quality` (`quick`, `detailed`) | `generation.picture_tier`, `generation.video_tier` (`standard`, `boost`) | `quick` becomes `standard`, `detailed` becomes `boost`, one to one (resource-tiers section 11). An unreadable value reads as `standard`. Readers (`policy.ts` x2, `quality.ts`, `aiChoicesState.ts`, `aiCopy.ts`) change in the same slice. If the saved level's slot is `off`, the select shows Standard and the reader falls back one tier with the note (section 3a, rule 7 of the tiers note). |
 | `generation.picture_quick_model`, `generation.picture_detailed.enabled`, `engines.video.choice`, `engines.music.choice` | none | Not yet absorbed in code: the Detailed switch on the AI card writes `generation.picture_detailed.enabled` (`routes/aiChoices.ts` `SETTING_ONLY_SWITCHES`), `tierSlotMigration` copies every write of the old keys into the slots, and `aiChoicesState.ts` and `shared/aiChoices.ts` read them. VIDEO-SETTINGS-04 makes the card write `engines.image.tier.boost` and the Standard slot directly, removes the copy-on-write step and switches the readers; a test shows every stored old value is already in its slot; then the keys leave the spec (VIDEO-SETTINGS-09). |
 | `generation.people_prompts` | none | Retired: nothing reads it and rule 10 says Home asks nothing about people. Its own group `household.media_retired` is listed under `not_placed` with that reason; stored values are dropped. |
-| `generation.household_likeness` | same key | **Stays** (rule 0 names it: anyone in the household may make things with or of any household member, as an option that is on by default). Drawn on the Pictures tab now. VIDEO-SETTINGS-04 adds its missing reader (off stops a person being used in another's picture, video or song) with a test for on and off, ahead of anything else in that row. Retiring or hiding it would need Jesse's rule change; this note does neither. |
+Amended (owner 2026-11-13): the household likeness option is removed. Adult household members may cast one another without an option; child and teen limits remain.
 | `generation.music.enabled` | same key, new card `household.media_music` | `lives_in` change only. |
 | `generation.music.length` option labels | same ids | copy only. |
 | `generation.video.lora_sources` (planned in the LoRA note) | `generation.styles.civitai`, `generation.styles.civitai_key` | never shipped; nothing to move. |
@@ -460,6 +457,6 @@ Order: VIDEO-SETTINGS-02 now; 03; 04; 05, 06 and 07 in parallel; 08; then VIDEO-
 
 ## 13. Open items that are measurements, not owner questions
 
-- Where the household-likeness gate should read `generation.household_likeness` (VIDEO-SETTINGS-04 finds the one place subjects are resolved and wires it).
+- Household likeness is not governed by a setting (owner decision, 2026-11-13).
 - A real Stack's component list (the audit used a scripted one); VIDEO-SETTINGS-05 re-captures the screens against the live component list before landing.
 - Civitai's terms and whether a download works without a key (the LoRA note already carries both).

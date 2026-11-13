@@ -1,14 +1,13 @@
 // CREATOR-04 (docs/design/creatoros-port-2026-11-13.md section 6): the one cast resolver. A cast member is a synth or a saved subject seen
 // through this one function: `listCast` is what the viewer may cast (GET /api/cast), `resolveCast` turns ids or names into everything a feature needs.
-// Rulings applied as written, nothing new: a synth is governed by `maySeeSynth` (companion use, `synths.of_me`, `synths.real_people`); a household
-// member is governed by `generation.household_likeness` alone (rule 0), never `synths.of_me`, and casting one creates no synth; a child or teen is
+// Rulings applied as written, nothing new: a synth is governed by `maySeeSynth` (companion use, `synths.of_me`, `synths.real_people`); adults may cast
+// any household member, and casting one creates no synth; a child or teen is
 // refused a real subject; `real` and the minor fact are derived at read time (`subjectFacts`).
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { ensureSubject, listSynths, synthById, synthFloor, type SynthRecord } from "@/lib/synths";
 import { ensurePersonSubject, isSheetReference, listMediaSubjects, loadSubjectReferences, subjectFacts, subjectRowForPerson, subjectViewById, type MediaSubject, type SubjectWithRefs } from "@/lib/mediaSubjects";
-import { householdLikenessAllowed, LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { readCompanionPack } from "@/lib/companionPack";
 import { lookSheetState } from "@/lib/castLookKey";
@@ -88,7 +87,7 @@ function memberEntry(person: PersonRow): CastEntry {
 }
 function householdPeople(): PersonRow[] { return db.select().from(people).where(and(isNull(people.deletedAt), eq(people.enabled, true))).all().filter((p) => p.role !== "guest" && !p.memorializedAt); }
 
-/** What this viewer may cast: synths (the synth gate, band filtering included), saved subjects, and household members (adults only, `generation.household_likeness` alone). */
+/** What this viewer may cast: synths (the synth gate, band filtering included), saved subjects, and household members (adults only). */
 export function listCast(actor: PersonRow, band?: AgeBand | null): CastEntry[] {
   if (actor.role === "guest") return [];
   const viewer = viewerOf(actor, band), minorViewer = viewer.minor;
@@ -98,7 +97,6 @@ export function listCast(actor: PersonRow, band?: AgeBand | null): CastEntry[] {
     if (viewer.turnOnly && (synth.based_on.kind === "real_person" || synth.based_on.kind === "household_member")) continue;
     const entry = synthEntry(synth);
     if (viewer.turnOnly && entry.real) continue;
-    if (synth.based_on.kind === "household_member" && synth.based_on.person_id !== actor.id && !householdLikenessAllowed()) continue; // rule 0: household_likeness alone
     entries.push(entry);
   }
   for (const subject of listMediaSubjects(actor)) {
@@ -106,14 +104,14 @@ export function listCast(actor: PersonRow, band?: AgeBand | null): CastEntry[] {
     if (subject.real && minorViewer) continue;
     entries.push(subjectEntry(subject));
   }
-  if (!minorViewer) for (const person of householdPeople()) if (person.id === actor.id || householdLikenessAllowed()) entries.push(memberEntry(person));
+  if (!minorViewer) for (const person of householdPeople()) entries.push(memberEntry(person));
   return minorViewer ? entries.filter((e) => e.audience !== "adult-only") : entries; // filtered, not labelled: an adult-only entry never reaches a minor
 }
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 function refusalFor(viewer: CastViewer, ref: string): string {
   const { actor } = viewer;
   const person = householdPeople().find((p) => p.id === ref || same(p.displayName, ref));
-  if (person && person.id !== actor.id) { if (viewer.minor) return REAL_REFUSED_LINE; if (!householdLikenessAllowed()) return LIKENESS_OFF_LINE; }
+  if (person && person.id !== actor.id && viewer.minor) return REAL_REFUSED_LINE;
   return `"${ref}" is not in your cast list. Pick someone from the list and try again.`;
 }
 export interface CastContext { band?: AgeBand | null; temporary?: boolean }

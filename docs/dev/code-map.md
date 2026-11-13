@@ -724,7 +724,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
-| `backend/src/lib/likeness.ts` | HOUSEHOLD_LIKENESS_KEY, LIKENESS_OFF_LINE, householdLikenessAllowed, otherMembersNamed, likenessRefusal, likenessCallRefusal |
 | `backend/src/lib/listActionNames.ts` | LIST_ACTIONS |
 | `backend/src/lib/listActions.ts` | PARENT_CAN_DO_THAT, runListAction |
 | `backend/src/lib/listContext.ts` | lastListContextFor |

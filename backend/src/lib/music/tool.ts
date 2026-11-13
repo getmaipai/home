@@ -15,7 +15,6 @@ import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { resolveSound } from "./sound";
 import { EFFECT_CHANGES, EQ_PRESETS, EFFECT_UNAVAILABLE_LINE, checkEffect, isEffectChange, startMusicEffectJob } from "./effects";
-import { likenessCallRefusal } from "@/lib/likeness";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
@@ -245,7 +244,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const failed = (code: string, kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `${REFUSED_PREFIX}${line}` }, data: { refused: why }, actions: [] } });
   const musicAudience = musicAudienceOf(state, input.spoken);
-  const refusal = musicRefusalFor(musicAudience, args) ?? likenessCallRefusal(musicAudience.actor, args);
+  const refusal = musicRefusalFor(musicAudience, args);
   if (refusal) return refused(refusal.line, refusal.why);
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;

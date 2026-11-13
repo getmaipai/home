@@ -3147,10 +3147,6 @@ msgid "Any"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:455
-msgid "setting.generation.household_likeness.help"
-msgstr ""
-
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
 msgid "Anyone with this key can use Coding as you. If an admin turns Coding off, this key stops working."
@@ -9590,10 +9586,6 @@ msgid "area.Family"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:454
-msgid "setting.generation.household_likeness.label"
-msgstr ""
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:573
 msgid "setting.household.family_name.label"
@@ -22526,10 +22518,6 @@ msgid "setting.ease.motion.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:456
-msgid "setting.generation.household_likeness.does"
-msgstr ""
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:148
 msgid "setting.coding.person.network_hosts.does"

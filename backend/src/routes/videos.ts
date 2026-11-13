@@ -50,7 +50,6 @@ import { db } from "@/db";
 import { conversationTurns, videoJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
-import { likenessRefusal } from "@/lib/likeness";
 import { serveBytes } from "@/lib/media/serve";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { refusalLineOf, runEditVideo } from "@/lib/videos/editTool";
@@ -398,7 +397,6 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
   const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
-  { const likeness = likenessRefusal(actor, prompt); if (likeness) return { status: 422, body: { error: likeness, code: "household_likeness_off" } }; }
   if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
   { const engine = await videoEngineStatus(); if (!videoStatusReady(engine, laneOf(audience) === "adult")) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
   return null;

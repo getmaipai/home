@@ -49,7 +49,7 @@ function linkRows(rows: LinkSpec[], navigate: (to: string) => void) {
 
 const CHOOSE_MODELS = settingsPath("ai", "overview");
 
-/** Children and teens: the kids switch, the two daily limits and the household likeness option. Admin only (the area is). */
+/** Children and teens: the kids switch and the two daily limits. Admin only (the area is). */
 export function MediaKidsView(props: SettingsViewProps) { return <MediaKeysList person={props.person} card={props.card} />; }
 
 export function MediaPicturesView(props: SettingsViewProps) {

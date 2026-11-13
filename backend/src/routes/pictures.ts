@@ -21,7 +21,6 @@ import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPicture
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 import { JOB_QUEUE_COPY, jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
-import { likenessRefusal } from "@/lib/likeness";
 import { lockedView, requestProof, unlockedFor } from "@/lib/adultLock";
 import { isAdultPictureStyle, pictureJobGroupLockState, pictureJobLockState } from "@/lib/pictures/lock";
 import { adultStateOf, setItemLock, NOT_READY_LINE, TEMPORARY_LINE } from "@/lib/adultMarks";
@@ -251,7 +250,6 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const kid = lane === "child";
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
   if (refused) return c.json({ error: promptRefusalLineFor(refused, "picture", actor, routeAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), code: refused }, 422) as never;
-  { const likeness = likenessRefusal(actor, prompt); if (likeness) return c.json({ error: likeness, code: "household_likeness_off" }, 422) as never; }
   // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;

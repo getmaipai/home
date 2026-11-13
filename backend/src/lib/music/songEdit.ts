@@ -1,12 +1,11 @@
 // AUDIT-DUP-ROUTES-01: the one path every "make this song again with a change" route walks (revise, details, length, quality).
-// Find the song's latest finished version, check the maker is ready, plan the edit, refuse unsuitable words and likenesses,
+// Find the song's latest finished version, check the maker is ready, plan the edit, refuse unsuitable words,
 // clamp the length to what the maker can do, start the job. The routes supply only their plan input and their own tier checks.
 import type { PersonRow } from "@/types";
 import { getMusicJobFor, musicVersions, plainMusicFailure, startMusicJob, type MusicJob } from "@/lib/music/jobs";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { prepareMusicEdit } from "@/lib/music/tool";
 import { MUSIC_REFUSAL_LINE, refuseMusicPrompt } from "@/lib/music/policy";
-import { likenessRefusal } from "@/lib/likeness";
 import { StackMusicError } from "@/lib/music/stack";
 import { musicJobLockState } from "@/lib/music/lock";
 
@@ -56,8 +55,6 @@ export async function runSongEdit(options: SongEditOptions): Promise<SongEditRes
   const words = [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" ");
   const refusal = refuseMusicPrompt(words);
   if (refusal) return refuse({ status: 403, error: MUSIC_REFUSAL_LINE[refusal] });
-  const likeness = likenessRefusal(actor, [plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title].filter(Boolean).join(" "));
-  if (likeness) return refuse({ status: 403, error: likeness });
   const late = options.extraChecks?.(plan, ready);
   if (late) return refuse(late);
   plan.request.seconds = Math.min(plan.request.seconds, ready.limits.max_seconds);

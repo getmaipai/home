@@ -4,7 +4,6 @@ import { mediaProductions, mediaSubjects, mediaSources, people, productionDocume
 import { canUseSubject, getMediaSubject } from "@/lib/mediaSubjects";
 import { randomSuffix } from "@/lib/id";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { householdLikenessAllowed } from "@/lib/likeness";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import type { MediaProduction } from "@maipai/spec/gen/ts/media-production.js";
@@ -50,8 +49,8 @@ function validSubjectIds(actor: PersonRow, ids: string[]) {
   return ids.every((id) => {
     const row = db.select().from(mediaSubjects).where(eq(mediaSubjects.id, id)).get();
     if (row && canUseSubject(actor, row)) return true;
-    // CREATOR-05: a household member picked from the cast list (an adult, by `generation.household_likeness` alone, or the person themself) is a subject of the production.
-    if (row?.personId && speakerAgeBand(actor, new Date()) === "adult" && (row.personId === actor.id || householdLikenessAllowed())) return true;
+    // CREATOR-05: an adult household member picked from the cast list is a subject of the production.
+    if (row?.personId && speakerAgeBand(actor, new Date()) === "adult") return true;
     return db.select().from(mediaProductions).all().some((production) => (JSON.parse(production.cast) as CastRole[]).some((entry) => entry.subject_id === id && castBySynth(actor, entry)));
   });
 }

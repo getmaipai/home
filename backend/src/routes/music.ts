@@ -31,7 +31,6 @@ import { authorizeTier, maxOffered } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
 import { resolveSound } from "@/lib/music/sound";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE, householdSongLength } from "@/lib/music/policy";
-import { likenessRefusal } from "@/lib/likeness";
 import { runSongEdit } from "@/lib/music/songEdit";
 import { StackMusicError } from "@/lib/music/stack";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -463,8 +462,6 @@ musicRoutes.openapi(fromFileEditRoute, async c => {
   const prompt = args.style ?? "";
   const refusal = refuseMusicPrompt(prompt);
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
-  const likeness = likenessRefusal(actor, prompt);
-  if (likeness) return c.json({ error: likeness }, 403) as never;
   const sharedPlan = prepareOwnedMusicEdit(source, { change: args.change, ...(args.style ? { style: args.style } : {}), ...(args.parts ? { parts: args.parts } : {}) }, engine!.limits);
   const plan = sharedPlan;
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;

@@ -3632,10 +3632,6 @@ msgstr "Cualquiera"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:455
-#, needs-review
-msgid "setting.generation.household_likeness.help"
-msgstr "Cualquiera en el hogar puede crear cosas con o de cualquier miembro del hogar. Desactívalo para evitarlo."
-
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
 #, needs-review
@@ -11062,10 +11058,6 @@ msgstr "Familia"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:454
-#, needs-review
-msgid "setting.generation.household_likeness.label"
-msgstr "La familia puede hacer imágenes, videos y canciones entre sí"
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:573
 #, needs-review
@@ -25956,10 +25948,6 @@ msgstr "Define si los colores son apagados y la animación está detenida."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:456
-#, needs-review
-msgid "setting.generation.household_likeness.does"
-msgstr "Define si los miembros del hogar pueden incluirse entre sí en lo creado aquí."
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:148
 #, needs-review

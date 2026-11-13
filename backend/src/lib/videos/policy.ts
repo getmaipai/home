@@ -1,6 +1,6 @@
 // VIDEO-GEN-04: who may make a video, on which surface, with which LoRAs, and the minor line checked before
 // any job starts. Rule 0 of docs/design/RULES.md: age and surface gates outrank every other rule. The age and
-// surface half is the picture policy's (pictures/policy.ts: one definition), minus the picture household switch;
+// surface half is the picture policy's (pictures/policy.ts: one definition);
 // the video household switch (`generation.video.enabled`) is this file's. Nothing in a household setting reaches
 // the minor line.
 //

@@ -135,12 +135,12 @@ CSAM line that nothing lifts.
 ## 8. Safety and privacy
 
 Unchanged: adults on their own screen; a minor is never a maker (Create is `min_role: "adult"`). Family subjects follow rule 0's
-household option (on by default): anyone in the household may make videos with or of a household member, and an ordinary mention or a
+Adults may make videos with or of any household member; an ordinary mention or a
 nonsexual depiction of a minor is not blocked for an adult (rules 0 and 10). A possible minor in nude or sexual output is a CSAM
 candidate and is withheld (rule 10). Reference pictures of real people follow rules 0 and 10 and
 [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md): no adult-side likeness restriction, consent
 proof or consent prompt, except as part of CSAM prevention. This note adds no gate. A Character made from a household member is the
-household option's family subject; it points at the source pictures of the existing likeness saved style (LIKENESS-01; the style itself is an image adapter and does not work on Wan or LTX) and does not define a
+family subject; it points at the source pictures of the existing likeness saved style (LIKENESS-01; the style itself is an image adapter and does not work on Wan or LTX) and does not define a
 person's likeness a second time. All work is local: zero outbound connections, asserted for every new worker.
 
 Status surfaces (S6): Create's controls follow the existing "Pictures and video are not ready" row (`useMakingAvailability` on the

@@ -2,7 +2,7 @@
 // sheet builder (films/sheetMaker.ts, 768x448, the "Reference sheet:" text; never a second builder) from the member's own pictures, storing it as the subject's sheet
 // reference, and writing the locked sentence. Every feature then reads that sheet through `resolveCast` (`look.sheet_file_id`); a sheet whose source pictures changed is
 // rebuilt on the next capture (`look.sheet_stale`). Retires `mediaSubjectSheet.ts` `makeSubjectSheet` and PRODUCTION-VIDEO-02's separate turnaround sheet.
-// Gates, exactly as `cast.ts` applies them: the cast resolver decides who may be cast at all (guests, minors and real people, `synths.real_people`, `generation.household_likeness`);
+// Adults may cast any household member. Minor viewers keep their existing limits, and synths keep their `synths.real_people` gates.
 // a household member who is under 18 (or a real person's synth who is) is never turned into a sheet; a child's photos never widen access (`canUseSubject` still refuses
 // person-linked rows). A household member's look is built only from pictures the person doing the capture supplies; nothing is generated for a real person.
 import { readFileSync } from "node:fs";

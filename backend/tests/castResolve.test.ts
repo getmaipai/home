@@ -7,8 +7,8 @@ import { createSynth, linkSynthSubject, synthById, ensureSubject, ownerActor, li
 import { createMediaSubject, shareMediaSubject, updateMediaSubject, subjectFacts } from "@/lib/mediaSubjects";
 import { storeFile } from "@/lib/attachments";
 import { listCast, resolveCast, type CastEntry } from "@/lib/cast";
-import { LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { getRegistry, isRetiredKey } from "@/lib/settingsRegistry";
 import { createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
 import { runFilm, type FilmEngines } from "@/lib/films/run";
 import type { FilmPlan } from "@/lib/films/plan";
@@ -42,6 +42,13 @@ const names = (rows: CastEntry[]) => mine(rows).map((r) => r.name).sort();
 beforeEach(() => { resetDb(); created.clear(); });
 
 describe("GET /api/cast lists what the viewer may cast", () => {
+  test("the retired setting is absent from the registry and a stale false value does not hide adult household cast", async () => {
+    const { sage } = await world();
+    setHouseholdSettingValue("generation.household_likeness", false as never);
+    expect(isRetiredKey(getRegistry().find((key) => key.key === "generation.household_likeness")!)).toBe(true);
+    expect(names(listCast(sage))).toContain("Poppy");
+    expect((await resolveCast(sage, ["Poppy"])).members).toHaveLength(1);
+  });
   test("an adult sees synths, saved subjects and household members with real and minor derived", async () => {
     const { sage, kid } = await world();
     await makeSynth(sage, "Marlow Fox");
@@ -89,19 +96,16 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     expect(ada.id).toBeTruthy();
   });
 
-  test("a synth based on a household member needs household_likeness on (or the viewer is that member); a minor follows the existing synth gate", async () => {
+  test("a synth based on a household member is available to adults; a minor follows the existing synth gate", async () => {
     const { sage, kid, teenRow } = await world();
     const synth = await makeSynth(sage, "Poppy Fox", { kind: "household_member", person_id: kid.id, name: null, refresh: "7d", minor: true });
     const other = db.select().from(people).where(eq(people.displayName, "Sage")).get()! as PersonRow;
     expect(names(listCast(other))).toContain("Poppy Fox");
-    setHouseholdSettingValue("generation.household_likeness", false);
-    expect(names(listCast(sage))).not.toContain("Poppy Fox");
-    expect((await resolveCast(sage, [synth.id])).members).toEqual([]);
-    expect(names(listCast(teenRow))).not.toContain("Poppy Fox");
-    expect((await resolveCast(teenRow, [synth.id, "Poppy Fox"])).members).toEqual([]);
+    setHouseholdSettingValue("generation.household_likeness", false as never); // legacy stored value is ignored
+    expect(names(listCast(sage))).toContain("Poppy Fox");
+    expect((await resolveCast(sage, [synth.id])).members).toHaveLength(1);
     expect(names(listCast(kid))).toContain("Poppy Fox"); // the viewer is that member
-    setHouseholdSettingValue("generation.household_likeness", true);
-    expect(names(listCast(teenRow))).toContain("Poppy Fox"); // on: the existing synth gate alone decides for a minor
+    expect(names(listCast(teenRow))).toContain("Poppy Fox"); // the existing synth gate alone decides for a minor
   });
 
   test("adult-only subjects are filtered out for a minor, not just labelled", async () => {
@@ -141,15 +145,14 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     expect((await resolveCast(sage, [one.id, two.id])).members).toHaveLength(2);
   });
 
-  test("the household option off hides other members from adults, keeps their own entry, and the line names the setting", async () => {
+  test("a legacy household option value does not hide adult household members from cast", async () => {
     const { sage, kid } = await world();
-    setHouseholdSettingValue("generation.household_likeness", false);
-    expect(names(listCast(sage))).toEqual(["Sage"]);
+    setHouseholdSettingValue("generation.household_likeness", false as never);
+    expect(names(listCast(sage))).toEqual(expect.arrayContaining(["Poppy", "Sage"]));
     const refused = await resolveCast(sage, ["Poppy"]);
-    expect(refused.members).toEqual([]);
-    expect(refused.refused[0]!.line).toBe(LIKENESS_OFF_LINE);
+    expect(refused.members).toHaveLength(1);
+    expect(refused.refused).toEqual([]);
     expect((await resolveCast(sage, ["Sage"])).members).toHaveLength(1);
-    setHouseholdSettingValue("generation.household_likeness", true);
     expect((await resolveCast(sage, ["Poppy"])).members[0]).toMatchObject({ person_id: kid.id, minor: true });
   });
 

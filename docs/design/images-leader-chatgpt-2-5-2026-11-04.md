@@ -17,7 +17,7 @@ claims we cannot measure.
 
 | # | Their feature | Ours today | Plan | Slice |
 |---|---|---|---|---|
-| 1 | Reference photos keep the subject recognisable (2.5) | `picture.change` takes up to 2 references (IMG-OPS-05, landed); the household likeness option and the minor line apply | Bench fidelity on 10 household-style cases (face and pet kept, lighting natural) before claiming it; no new code | IMG-BENCH-01 |
+| 1 | Reference photos keep the subject recognisable (2.5) | `picture.change` takes up to 2 references (IMG-OPS-05, landed); the minor line applies | Bench fidelity on 10 household-style cases (face and pet kept, lighting natural) before claiming it; no new code | IMG-BENCH-01 |
 | 2 | Edit only what was asked, rest unchanged (2.5) | Comment brush, `picture.change` with region/mask, erase by person (landed) | Add a measurable check: pixel difference outside the edited area, run in the bench | IMG-BENCH-01 |
 | 3 | Many edits in a row stay consistent, no quality loss (2.5) | Every edit is a new Library version; chat edits via `edit_picture` (IMG-CHAT-03, not built) | Edit always starts from the latest lossless version (PNG, no re-compress); bench a 6-edit chain for drift | IMG-BENCH-01, IMG-CHAT-03 |
 | 4 | Sketch: draw as a guide for the final picture (2.5) | kit `ImageEditor` has brush and Markup; Create has reference slots | A "Sketch" reference in Create: open the kit canvas, the drawing goes in as a reference with "follow this layout". Needs a Stack measure first (does the engine follow a rough drawing?) | IMG-SKETCH-01 |

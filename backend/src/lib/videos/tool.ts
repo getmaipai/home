@@ -28,7 +28,6 @@ import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
 import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
 import { StackVideoError } from "./stack";
-import { likenessCallRefusal } from "@/lib/likeness";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 import { subjectsForNames } from "@/lib/mediaSubjects";
 import { getMediaProduction } from "@/lib/mediaProductions";
@@ -48,7 +47,7 @@ export function videoAudienceOf(state: Pick<TurnState, "actor" | "surface" | "sp
   };
 }
 
-export type VideoCallRefusal = { kind: "denied"; why: VideoDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | NonNullable<ReturnType<typeof likenessCallRefusal>> | { kind: "child"; why: "photos" | "daily_limit"; line: string };
+export type VideoCallRefusal = { kind: "denied"; why: VideoDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "child"; why: "photos" | "daily_limit"; line: string };
 
 /** The `from_picture` word for a photo the person attached to this message. */
 export const ATTACHED_PHOTO = "attached";
@@ -123,7 +122,7 @@ const SEVERAL_PHOTOS_LINE = "A single clip starts from one photo. With several p
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
   const audience = input.audience ?? videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  const refusal = videoRefusalFor(audience, args) ?? likenessCallRefusal(audience.actor, args);
+  const refusal = videoRefusalFor(audience, args);
   if (refusal) return refused(callId, args, refusal);
 
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";

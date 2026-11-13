@@ -1,7 +1,7 @@
 # Pictures, videos and styles that look like a household member (2026-10-17)
 
 Owner's ruling, 2026-10-17 (Jesse, in the session that closed VIDEO-GEN-12's open question): an adult may make a video, a picture
-or a likeness style (LoRA) of a household member. The household option, the absence of a per-person agreement and the
+or a likeness style (LoRA) of a household member. Adults may use any household member without an option. The absence of a per-person agreement and the
 model-decides rule for adults are in [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) and
 [RULES.md](RULES.md) rule 0. This note keeps what still holds.
 

@@ -13,7 +13,7 @@ Web claims below come from vendor pages, model cards and community posts found 2
 
 ## Owner decisions (Jesse, 2026-11-04)
 
-1. Per-subject training is allowed for invented characters, pets, mascots and products; real adults go through the household likeness option like any likeness LoRA (no extra consent prompt, rule 0).
+1. Per-subject training is allowed for invented characters, pets, mascots and products; adults may use household members as subjects (rule 0).
 2. Real children: the architect ruled (2026-11-05) this is allowed as an added child protection with these conditions: applies to every minor; off by default; per child; only a parent or admin can switch it on, never the child or teen; revoking it deletes the trained LoRA; every output counts as a known minor for the CSAM check (rule 10); children never get it in their own lane. Jesse chose "parent opt-in only".
 3. An opt-in slow "Careful" re-render (about 6 minutes, 39 GB) is allowed. Training and Careful progress show on the job's own card (S6), never a raw error.
 4. Saved subjects are private to their creator; sharing is an explicit per-item Share. The container for shows, movies and YouTube is a Production.
@@ -36,9 +36,7 @@ Web claims below come from vendor pages, model cards and community posts found 2
   There is no per-subject LoRA trainer anywhere in Stack or Home.
 - **Video:** LTX-2.3 22B distilled on MLX (LTX-2.x Community Licence, 2026-08-11). VIDEO-INPUTS-01 adds a start picture and optional end frame;
   VIDEO-INPUTS-03 the slots; End frame needs a bench. Not built yet.
-- **Likeness rules:** an adult may make pictures, videos and a likeness style of a household member; the household option replaced per-person
-  agreements (LIKENESS-SIMPLIFY-01). Lines that stay: nothing sexual involving a minor or minor-looking person; child and teen lanes keep their
-  filters and the no-real-people rule; the Stack checks an Ed25519 proof bound to the picture hash.
+- **Likeness rules:** an adult may make pictures, videos and a likeness style of a household member; per-person agreements were retired in LIKENESS-SIMPLIFY-01 and the household option was removed by owner decision (2026-11-13). Child and teen lanes keep their age and surface limits; the Stack checks an Ed25519 proof bound to the picture hash.
 
 ## 2. What the field offers (late 2026)
 
@@ -70,7 +68,7 @@ Papers report repeated edits lose high-frequency detail, brighten the picture an
 
 ## 4. Safety and rules notes
 
-- **Real people:** a likeness LoRA is a model of a person's face kept on the Studio. Under the household likeness option (SAFETY.md); stored in the household LoRA
+- **Real people:** a likeness LoRA is a model of a person's face kept on the Studio. Adults may use any household member without a Home option; stored in the household LoRA
   library; the Stack proof still binds each use. Nothing here changes the minor line: any possible-minor output
   in sexual media is withheld.
 - **Children:** a child's face must never train a LoRA by default (no-real-people rule for child and teen lanes; a parent-owned decision at most).
@@ -137,7 +135,7 @@ Jesse's addition (2026-11-04): a shot must keep its character, its objects and i
 One definition (principle 4), used by Create (images), the Studio, templates, chat tools and video shots. V4's "Characters and Places" becomes this, with Props added.
 - **A saved subject** has: a name; a kind (character, prop, place); who owns it; **private to its creator, never listed for the household** (owner ruling 2026-11-04: custom video characters are not a family library); sharing is an explicit per-item Share to named people, off by default; a one-line look
   description (words the tools start from); approved reference pictures; for a character a voice (optional); a "real" flag when it is a real person or
-  animal (a label only; the household likeness option and the minor line decide what is allowed, no consent prompt blocks an adult request); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
+  animal (a label only; the minor line and age gates remain); the pictures' provenance and clock stamp like every record; optionally a trained style (LoRA) from step 4 of the ladder.
 - **References by kind:** character = front, two three-quarters, back, one close face (section 5, step 2). Prop = front, side, top, one in-use picture, on plain background.
   Place = one wide establishing plate, plus 3 to 4 angles of the same room or spot (made by editing the plate), no people in them, plus a time-of-day variant if needed.
 - **Where it lives:** a spec record in `commons/spec` (additive, spec first, like `media_template`); the files in the Library; companions are characters
@@ -228,7 +226,7 @@ Run V0 and V1 first (one LTX clip is about 15 s at 43 GB peak, so only one at a 
 
 ### 8.7 Rules for the video part
 
-Local only, nothing fetched at run time (the IC-LoRA needs a one-time licence accept, a Jesse step). Real adults: household option and the Stack proof as today. Real
+Local only, nothing fetched at run time (the IC-LoRA needs a one-time licence accept, a Jesse step). Real adults: the Stack proof as today. Real
 children: the owner chose a real child's photos only with parent opt-in, and the architect rules on that first, so the library blocks a "real" child subject until it does;
 invented characters are fine. The adult/teen/child gates stay in front of every shot. A prop or place with a real person visible counts as a real-person subject.
 

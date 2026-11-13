@@ -20,7 +20,6 @@ import { pictureEngineStatus } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
 import { StackPicturesError } from "./stack";
-import { likenessCallRefusal } from "@/lib/likeness";
 import { getTemplate } from "@/lib/media/templates";
 import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
 import { runMediaOp } from "@/lib/mediaOps/registry";
@@ -59,7 +58,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "plan"; why: "style_plan"; line: string } | NonNullable<ReturnType<typeof likenessCallRefusal>>;
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "plan"; why: "style_plan"; line: string };
 
 /** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -139,7 +138,6 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     presetAspect = composed.aspect;
   }
   delete normalized.presets;
-  // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
   if (Array.isArray(args.references)) {
     const refs = (args.references as unknown[]).flatMap((entry) => {
       const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
@@ -148,7 +146,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     if (refs.length) normalized.reference = refs[0];
   }
   delete normalized.template;
-  const refusal = refusalFor(audience, normalized) ?? likenessCallRefusal(audience.actor, normalized);
+  const refusal = refusalFor(audience, normalized);
   if (refusal) return refused(callId, args, refusal);
   const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
   const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];

@@ -631,8 +631,7 @@ fixed, and no setting reaches them.
   teens and children as today. Everything else in 18.7 (the seam, the rewriter, the as-sung transcription, cartoon covers) is built behind
   the closed lane, and the lane opens in one commit when the seam calls the shared check on the rewritten words and on the as-sung
   transcript.
-- **Family.** Anyone in the household may make songs with or about household members, as rule 0's household option (on by default) allows
-  for pictures and videos. No real person outside the household and no public figure (rule 0's absolute line; the existing
+- **Family.** Adults may make songs with or about any household member under rule 0. No real person outside the household and no public figure (rule 0's absolute line; the existing
   `imitates_real_voice` flag and the picture real-person rule).
 - **Who and where.** The lane is the picture lane (`laneOf`, the stricter of the turn's band and the person's own). A teen or child may make
   songs exactly when they may make pictures (`pictureDenial` for their audience): the home's switch and each child's own switch (`kidLaneOn`),

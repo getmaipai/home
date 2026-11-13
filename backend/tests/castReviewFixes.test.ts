@@ -1,8 +1,9 @@
 // CREATOR-05 review fixes (CREATOR-PORT-2026-11-13): the turn's band, mentions only on written chat, adult-only from the cast entry, film cast by id, no rows for a refused or temporary call.
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 import { db } from "@/db";
-import { conversationTurns, creationCast, mediaSubjects, people, videoJobs } from "@/db/schema";
+import { conversationTurns, creationCast, mediaSubjects, people, videoJobs, settingsValues } from "@/db/schema";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { createSynth, ensureSubject, type SynthRecord } from "@/lib/synths";
@@ -13,16 +14,15 @@ import { realFilmEngines } from "@/lib/films/engines";
 import { ensurePersonSubject, listMediaSubjects } from "@/lib/mediaSubjects";
 import { createMediaProduction, updateMediaProduction } from "@/lib/mediaProductions";
 import { storeFile } from "@/lib/attachments";
-import sharp from "sharp";
 import { withMentionedCast } from "@/lib/mentionedCastArgs";
 import { listSynthCreditItems } from "@/lib/creations/credits";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { runGenerateVideo } from "@/lib/videos/tool";
+import { runGenerateMusic } from "@/lib/music/tool";
 import { runMakeReferenceVideoTurn } from "@/lib/videos/referenceVideo";
 import { __setStartFilmForTests, runMakeFilmTurn } from "@/lib/films/tool";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
-import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "./reset-db";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
@@ -78,9 +78,12 @@ async function makeSynthWith(actor: PersonRow, name: string, based_on: unknown, 
 }
 const subjectRows = () => db.select().from(mediaSubjects).all().length;
 
+function storeLegacyHouseholdLikenessFalse() {
+  db.insert(settingsValues).values({ scope: "household", key: "generation.household_likeness", value: "false", hlc: "1:0:test", source: "user", setBy: sage.id, updatedAt: new Date().toISOString() }).run();
+}
+
 describe("1. the turn's band counts, not only the account's", () => {
   test("an adult account on a child's turn cannot cast household members, real-person synths or adult-only entries", async () => {
-    setHouseholdSettingValue("generation.household_likeness", true as never);
     const ada = await makeSynthWith(sage, "Ada Lovelace", real);
     const night = await makeSynthWith(sage, "Night Fox", none, "adult");
     const plain = await makeSynth(sage, "Marlow Fox");
@@ -103,6 +106,25 @@ describe("1. the turn's band counts, not only the account's", () => {
     }
     expect((await castForTool(sage, { cast: [plain.id] }, { band: "child" })).ok).toBe(true);
     expect(listCast(sage, "adult").map((e) => e.name)).toContain("Ada Lovelace");
+  });
+});
+
+describe("household likeness option removal", () => {
+  test("an old false value does not refuse adult picture, video, song requests or casting", async () => {
+    storeLegacyHouseholdLikenessFalse();
+    const castMember = listCast(sage).find((entry) => entry.person_id === kid.id);
+    expect(castMember).toBeDefined();
+    expect((await resolveCast(sage, [kid.displayName])).members).toHaveLength(1);
+
+
+    const picture = await pic(sage, { prompt: `A portrait of ${kid.displayName} on a bicycle` });
+    expect(text(picture)).not.toMatch(/household likeness|switched off/i);
+
+    const videoResult = await vid(sage, { prompt: `A short video starring ${kid.displayName} at the beach` });
+    expect(text(videoResult)).not.toMatch(/household likeness|switched off/i);
+
+    const musicResult = await runGenerateMusic({ state: stateOf(sage), args: { description: `A song about ${kid.displayName}` }, callId: "c3", spoken: false });
+    expect(text(musicResult)).not.toMatch(/household likeness|switched off/i);
   });
 });
 
@@ -149,7 +171,6 @@ describe("5. film cast is found by id, never by name", () => {
     expect(bound.cast[1]!.subject_id).toBeUndefined();
   });
   test("a household member cast reaches the run with its own subject, not a blank one or a same-named stranger", async () => {
-    setHouseholdSettingValue("generation.household_likeness", true as never);
     const seen: Array<{ castSubjectIds?: string[] }> = [];
     __setStartFilmForTests(((input: { castSubjectIds?: string[] }) => { seen.push(input); return { id: "run-1" }; }) as never);
     const stranger = createMediaSubject(sage, { name: teenRow.displayName, kind: "character", look: "an unrelated stranger" });

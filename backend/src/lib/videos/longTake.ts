@@ -14,7 +14,6 @@ import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { backgroundTurn } from "@/lib/films/engines";
-import { likenessRefusal } from "@/lib/likeness";
 import { runGenerateVideo } from "./tool";
 import { makeAudienceOf, MINOR_MAKE_LINE } from "./make";
 import { getVideoJobFor, type VideoJob } from "./jobs";
@@ -103,7 +102,6 @@ export function startLongTake(actor: PersonRow, input: { prompt: string; seconds
   if (prompt.length < 3) return { ok: false, status: 422, line: "Describe the video in 3 to 1200 characters, then try again." };
   for (const text of [prompt, ...beats]) {
     const refused = refuseVideoPrompt(text, { lane: "adult" }); if (refused) return { ok: false, status: 422, line: VIDEO_REFUSAL_LINE[refused] };
-    const likeness = likenessRefusal(actor, text); if (likeness) return { ok: false, status: 422, line: likeness };
   }
   const tier = input.tier ?? "standard";
   const plan = planParts(input.seconds, tier); if (!plan.ok) return { ok: false, status: 422, line: plan.line };

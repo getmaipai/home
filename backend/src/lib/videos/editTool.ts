@@ -7,7 +7,6 @@
 // start (VIDEO-INPUTS-01); `retake` is not here. The model decides when a person wants one of these (rule 1); nothing here reads wording. The result is
 // `data: { videoJobId }` like `generate_video`, so the same card follows the job. A failed tool tells the model only the failure kind
 // (rule 6); a refusal keeps its own plain line.
-import { likenessRefusal } from "@/lib/likeness";
 import { z } from "zod";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
@@ -241,7 +240,6 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   const typed = value.change === "remix" || value.change === "continue" || value.change === "retake" ? value.prompt ?? "" : value.change === "mix" && value.sound === "voice" ? value.line ?? "" : value.change === "restyle" ? value.words ?? "" : "";
   const refusal = videoRefusalFor(audience, { prompt: typed });
   if (refusal) return refused(callId, args, refusal.line, refusal.why);
-  { const likeness = likenessRefusal(actor, typed); if (likeness) return refused(callId, args, likeness, "household_likeness_off"); }
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");

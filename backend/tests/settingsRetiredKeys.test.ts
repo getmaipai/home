@@ -1,4 +1,5 @@
-// AUDIT-DEAD-01: keys nothing reads (the four engines.stack.use_* switches, generation.people_prompts) stay registered and
+// AUDIT-DEAD-01: keys nothing reads (the four engines.stack.use_* switches, generation.people_prompts, the retired
+// household likeness key) stay registered and
 // writable, so a stored value reads and a PUT answers 200, but the settings list does not show them.
 import { beforeEach, expect, test } from "bun:test";
 import { TestClient } from "./client";
@@ -7,7 +8,7 @@ import { getRegistry, getRegistryKey, isRetiredKey } from "@/lib/settingsRegistr
 
 beforeEach(() => resetDb());
 
-const RETIRED = ["engines.stack.use_chat", "engines.stack.use_embeddings", "engines.stack.use_stt", "engines.stack.use_tts", "generation.people_prompts"];
+const RETIRED = ["engines.stack.use_chat", "engines.stack.use_embeddings", "engines.stack.use_stt", "engines.stack.use_tts", "generation.people_prompts", "generation.household_likeness"];
 
 test("retired keys are registered, flagged retired, and left out of the household list, but a PUT still answers 200", async () => {
   const owner = new TestClient();

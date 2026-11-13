@@ -3151,10 +3151,6 @@ msgid "Any"
 msgstr "Any"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:455
-msgid "setting.generation.household_likeness.help"
-msgstr "Anyone in the home may make things with or of any household member. Turn it off to stop that."
-
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:232
 msgid "Anyone with this key can use Coding as you. If an admin turns Coding off, this key stops working."
@@ -9593,10 +9589,6 @@ msgid "area.Family"
 msgstr "Family"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:454
-msgid "setting.generation.household_likeness.label"
-msgstr "Family can make pictures, videos and songs of each other"
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:573
 msgid "setting.household.family_name.label"
@@ -22539,10 +22531,6 @@ msgid "setting.ease.motion.does"
 msgstr "Sets whether colors are muted and animation is stopped."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:456
-msgid "setting.generation.household_likeness.does"
-msgstr "Sets whether household members may include one another in things made here."
-
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:148
 msgid "setting.coding.person.network_hosts.does"

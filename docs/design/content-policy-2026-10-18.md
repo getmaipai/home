@@ -16,8 +16,8 @@ signature in [music section 18.7](music-generation-2026-10-17.md#187-teens-and-c
 with the interface below. It preserves section 18's finished-song checks and closed lanes until their dependencies ship.
 
 The sibling `.github/docs/SAFETY.md` was read from its checkout. Its older household likeness agreement and adult-only
-subject limits conflict with the newer Home rule 0. Home's rule wins here; LIKENESS-SIMPLIFY-01 needs a coordinated
-standards update before release, without changing that file in this docs task. No other safety invariant is relaxed.
+subject limits conflict with Home rule 0 and were removed by the owner decision of 2026-11-13. Child and teen protections
+remain in force. The shared standards copy still needs its owner-approved update.
 
 ## Today: evidence inventory
 
@@ -105,8 +105,8 @@ Proposed keys, all **ahead-of-spec**, require commons schema, registry, copy, ar
 | Proposed key | Scope and write authority | Meaning |
 |---|---|---|
 | `content.filters` | Person; adult self, minor self may only add, assigned guardian may tighten their minor; admin may tighten minors | Added kinds, default empty; union with immutable band defaults |
-| `generation.household_likeness` | Household; owner/admin | On by default; enables permitted household subjects |
 | `content.policy.chat_output`, `.search`, `.pictures`, `.videos`, `.songs` | Household rollout flags; owner/admin | Consumer migration only, never disable a floor |
+
 
 No adult, guardian or admin can remove a minor's band minimum. A guardian can remove a prior added restriction only down to
 that minimum. An admin cannot set another adult's own filters. Server validation enforces writes and resets, imports and old
@@ -137,12 +137,12 @@ No word rule decides whether a tool or search is needed. The helper runs only af
 | A gun fight, with no injury detail or instructions | A friendly pretend adventure with no weapons, injury or fighting |
 | `[ADULT_STYLE_REQUEST]` | Fixed child-safe redirect, no generation; this stands for the brief's adult-style example |
 | A graphic attack or self-harm request | Fixed child-safe redirect; keep crisis support when applicable |
-| A real person's name | Resolve household identity; household cartoon/song subject may pass when option is on; outside household, public figure or unresolved identity redirects |
+| A real person's name | Resolve household identity; household subjects are available to adults; outside household, public figure or unresolved identity redirects |
 
 Hard lines are never laundered through a rewrite: adult-content requests, the absolute minor line, graphic violence, harmful
 self-harm content, real people outside the rules, prohibited instructions and other existing child floors keep their safe redirect.
 Distinguish a non-graphic pretend fight from graphic harm. A health or crisis question still gets care and help, not a generated
-item or a refusal of support. A household subject is drawn as a child-safe cartoon for a child: the family exception never
+item or a refusal of support. A household subject is drawn as a child-safe cartoon for a child: this never
 allows photos/references in that lane or adult content involving a minor, whoever requested it.
 
 The rewrite preserves safe topic and intent, uses fixed bounded instructions and a schema response, and treats supplied text
@@ -158,6 +158,7 @@ A text matcher cannot inspect pixels. Minor songs remain off until transcription
 checks from music section 18 are complete. An adult with a chosen text filter also needs the as-sung check to uphold that filter;
 this extends section 18.7's no-adult-transcription default only for filtered adults.
 
+
 ## LIKENESS-SIMPLIFY-01: remove the per-person agreement
 
 This is its own migration slice, not an implication of adding the module. Current storage is in
@@ -165,11 +166,11 @@ This is its own migration slice, not an implication of adding the module. Curren
 
 | Remove or neutralize | Exact scope |
 |---|---|
-| Keys and setting side effects | Retire `likeness.adults`, `likeness.adult_content` in commons and `backend/src/settings/likenessKeys.ts`; remove write/reset hooks in `backend/src/lib/settings.ts:648`, `:751`, `:985`. Old writes return retired-key errors; old values cannot grant or deny access |
+| Keys and setting side effects | Retire the old `likeness.*` keys; the household likeness option was removed by owner decision on 2026-11-13, and old stored values are ignored |
 | Agreement records and revocation | Stop `LikenessConsent` writes/reads; remove `backend/src/lib/likeness/consent.ts`, `history.ts`, agreement-only `revoke.ts` behavior. Add a forward migration deleting settings values and dropping `likeness_consent_events` and `likeness_uses`; do not edit migration 0106 or retain hidden history |
 | Notices and activity log | Remove `backend/src/lib/likeness/uses.ts` use recording, `likeness.used` in `backend/src/lib/notificationTypes.ts:69` and pending notices; remove consent/use payloads in `backend/src/routes/likeness.ts:32` |
 | UI and API | Remove agreement switches, history, use log and polling in `frontend/src/apps/settings/LikenessSettings.tsx:12`, its tests, and obsolete calls/types in `frontend/src/lib/likenessApi.ts`; update `frontend/src/shell/pages/settings/settingsViews.tsx:92`. Keep family subject picker in `LooksLikePicker.tsx`, expand eligible household subjects; move the child limits group out of `person.likeness` (`personLimits.ts:4`) before retiring the group |
-| Decision and queued work | Replace adult-requester, adult-subject and consent branches in `backend/src/lib/likeness/decide.ts:53`, `apply.ts`, `guard.ts`, `resolve.ts`, `importStyle.ts`; remove agreement wording and consent-dependent negative prompt logic. Jobs recheck household membership, option, requester policy and subject age at run/release; household option off withholds waiting jobs |
+| Decision and queued work | Replace adult-requester, adult-subject and consent branches in the old likeness subsystem; remove agreement wording and consent-dependent negative prompt logic. Child and teen policy continues to govern age-specific access |
 | Saved styles | Keep `likeness_adapters` subject binding as safety metadata, not agreement history. Remove agreement-only revocation state and deletion triggers in `adapters.ts`/`revoke.ts`; do not revive already deleted assets. Revalidate remaining styles against household identity and policy |
 
 Keep `inspector.ts`, the minor line, surface limits, finished-item checks, and subject identity binding. A minor is never a
@@ -236,7 +237,7 @@ The injected reader validates and copies the added filters before any check runs
 The current picture audience has no present-person list or resolved subject context. The module accepts that audience with
 an optional `present` list for union resolution. Its optional trusted subject-context reader captures a resolved household,
 outside, public or unresolved subject decision; outside, public and unresolved subjects block before optional filters.
-This reader must receive the existing identity decision and household option when consumers are wired. Text alone does not
+This reader receives trusted subject context when consumers are wired. Text alone does not
 identify real people, and the default reader makes no identity claim. No likeness code changed.
 
 Offline tests cover every field and band, defaults, added filters, failure paths, runtime mutation, repeated calls, boundaries,

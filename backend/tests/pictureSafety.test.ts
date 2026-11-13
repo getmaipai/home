@@ -171,7 +171,7 @@ describe("the two absolute lines", () => {
     setHouseholdSettingValue("generation.styles.adult_only", "allowed");
     expect(refusePrompt("naked child")).toBe("minor_sexual");
     // PEOPLE-PROMPTS-01: every generation key, the new one included, flipped both ways: the two absolute lines hold either way.
-    for (const [key, values] of [["generation.adults", [true, false]], ["generation.styles.adult_only", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_tier", ["standard", "boost"]], ["generation.household_likeness", [true, false]], ["generation.kids", [true, false]], ["generation.kids_daily_pictures", [0, 20]], ["generation.kids_daily_videos", [0, 5]]] as const) {
+    for (const [key, values] of [["generation.adults", [true, false]], ["generation.styles.adult_only", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_tier", ["standard", "boost"]], ["generation.kids", [true, false]], ["generation.kids_daily_pictures", [0, 20]], ["generation.kids_daily_videos", [0, 5]]] as const) {
       for (const value of values) {
         setHouseholdSettingValue(key, value);
         expect(refusePrompt("naked child")).toBe("minor_sexual");

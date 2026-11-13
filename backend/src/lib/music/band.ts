@@ -1,7 +1,7 @@
 // MUSIC-LIKE-01: `make_band`, a made band "like" a song the person holds. The song only supplies a short brief (its genre, year and
 // mood words, plus its artist's public genre tags when MusicBrainz knows it); the band is a new fictional act. Its name, members,
 // back story, single title and words are never a copy of the song's (a "like this" is an instruction, not a copy), and nothing
-// here refuses an adult's brief over a name or a likeness. The portrait, the logo and the first single go through the existing
+// here refuses an adult's brief over a name or likeness. The portrait, the logo and the first single go through the existing
 // picture and song jobs; each is optional, so a failed one never fails the band or the answer.
 // Rule 6a: a title, a band name, a back story and the style words are a person's words. Nothing here logs any of them or an id.
 import { and, eq } from "drizzle-orm";
