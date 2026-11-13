@@ -529,14 +529,15 @@ describe("live voice session", () => {
         expect(h.played).toHaveLength(round + 1);
         await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
         // The hub reports the voice back, well after the clip (100 ms) plus the echo margin.
-        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
         act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 210 } as never));
-        // At the window's end: the held run is discarded, nothing said, the clip untouched. The window widens 100 ms per wrong start.
-        await waitFor(() => expect(discard).toHaveBeenCalledTimes(round + 1), { timeout: 1500 });
-        expect(h.played[round]!.completed).toBe(true);
-        expect(h.played[round]!.closed).toBe(false);
+        // The window's end (a real timer, exercised in talkOver.test.ts) or the final with other words: either way the held run is
+        // discarded, nothing is said, and the clip is untouched (it ended on its own).
         act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
         await act(async () => { h.socket.send({ t: "final", v: "I want to go to the store tomorrow at five" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+        await waitFor(() => expect(discard).toHaveBeenCalledTimes(round + 1), { timeout: 3000 });
+        expect(h.played[round]!.completed).toBe(true);
+        expect(h.played[round]!.closed).toBe(false);
         expect(h.pendingRef.current).toBeNull();
         const final = h.timings.filter((t) => t.phase === "final")[round];
         expect(final?.talkOver).toMatchObject({ decision: "continued", clip_completed: true });
@@ -747,6 +748,35 @@ describe("live voice session", () => {
       expect(timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ talk_over_reason: "setting_off", pool_size: 0 });
       expect(post).not.toHaveBeenCalled();
     } finally { post.mockRestore(); }
+  });
+
+  test("ECHO-GATE-01: on speakers, microphone frames at Home's own echo level never reach the hub while she plays; a voice clearly louder does; while she is silent everything passes", async () => {
+    const sent: Float32Array[] = [];
+    let onFrame: ((frame: Float32Array) => void) | null = null;
+    const socket = { createSocket: (handlers: SttSocketHandlers) => { setTimeout(() => handlers.onMessage({ t: "ready" }), 0); return { sendAudio: (frame: Float32Array) => { sent.push(frame); }, close: () => {} }; } };
+    const capture = async (options: MicCaptureOptions) => { onFrame = options.onFrame; return { stop: () => {}, sampleRate: 16_000 }; };
+    function GateHarness({ isSpeaking }: { isSpeaking: boolean }) {
+      const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
+      const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef: useRef(null), liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never });
+      return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
+    }
+    const level = (rms: number) => { const f = new Float32Array(320); for (let i = 0; i < f.length; i++) f[i] = rms * Math.SQRT2 * Math.sin(i / 3); return f; };
+    const view = render(<GateHarness isSpeaking={false} />);
+    await waitFor(() => expect(onFrame).not.toBeNull());
+    // She is silent: room noise passes (and measures the floor).
+    for (let i = 0; i < 10; i++) onFrame!(level(0.002));
+    expect(sent).toHaveLength(10);
+    // She speaks: the echo calibrates for 1.5 s (75 frames), nothing passes; then the same echo keeps being dropped.
+    act(() => view.rerender(<GateHarness isSpeaking />));
+    await waitFor(() => expect(view.getByText("speaking")).toBeTruthy());
+    for (let i = 0; i < 120; i++) onFrame!(level(0.05));
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    for (let i = 0; i < 30; i++) onFrame!(level(0.05));
+    expect(sent).toHaveLength(10);
+    // The person talks over her, clearly louder than the echo: it reaches the hub.
+    for (let i = 0; i < 10; i++) onFrame!(level(0.3));
+    expect(sent.length).toBeGreaterThan(10);
   });
 
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {

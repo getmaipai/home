@@ -8,7 +8,7 @@ import { z } from "zod";
 import { dataDir } from "./paths";
 
 export const VOICE_TRACE_EVENTS = [
-  "session_open", "mic_settings", "output", "ready", "grant", "pool", "mode",
+  "session_open", "mic_settings", "mic_echo", "mic_gate", "output", "ready", "grant", "pool", "mode",
   "vad_on", "vad_resumed", "vad_off", "reply_pause", "reply_resume", "partial", "edge", "final", "timing", "no_speech",
   "echo_partial", "echo_final", "pause", "resume", "interrupt", "reaction", "speculate", "speculate_refused", "speculate_failed", "confirm", "discard", "clip_play", "clip_end", "window_decide", "turn_send",
   "audio_start", "audio_stop", "audio_suspend", "audio_resume", "audio_ended",

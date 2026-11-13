@@ -39,6 +39,7 @@ import type { SpeculativeOutcome, SttTimingExtras } from "@/lib/voice/sttContrac
 import { TalkOverController, type Overlap } from "@/lib/voice/talkOver";
 import { renderAckClips, type AckClipHandle, type AckClipPool } from "@/lib/voice/ackClip";
 import { createVoiceTrace, type VoiceTrace } from "@/lib/voice/voiceTrace";
+import { browserFamily, createEchoGate, type EchoGate } from "@/lib/voice/echoGate";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -95,6 +96,8 @@ export interface LiveVoiceSessionProps {
   voiceTimingSocketRef?: { current: SttSocket | null };
   /** VOICE-TRACE-01: an owner's live trace for the next N utterances of this call (event names and numbers only; off when 0). */
   traceUtterances?: number;
+  /** ECHO-GATE-01: test seam for the microphone gate (on speakers, Home's own reply never reaches the hub while she plays). */
+  createGate?: typeof createEchoGate;
 }
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
@@ -170,7 +173,7 @@ function normalizedTranscript(text: string): string {
   return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 }
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, speculation, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture, onVoiceTiming, voiceTimingSocketRef, traceUtterances = 0 }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, speculation, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture, onVoiceTiming, voiceTimingSocketRef, traceUtterances = 0, createGate = createEchoGate }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -338,6 +341,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // The grant's reason and the pool size, reported on the next timing message so the record itself says why no clip could play.
   const talkOverReasonRef = useRef<SttTimingExtras["talk_over_reason"]>("unknown");
   const poolSizeRef = useRef(0);
+  // ECHO-GATE-01 (Jesse uses laptop speakers): while Home plays, only microphone frames clearly louder than her own echo reach the hub.
+  const echoGateRef = useRef<EchoGate | null>(null);
+  if (!echoGateRef.current) echoGateRef.current = createGate();
   // ECHO-GUARD-01: Home's own reply, heard back through the microphone, must not pause or stop her, start a held run, or become a turn.
   // Seen in a traced run (2026-11-12): 372 ms into a reply the hub heard the reply itself, a two-word partial of Home's words paused her
   // (the "blip"), the echo's final cancelled the turn and went out as the next question, and the next reply did the same.
@@ -358,7 +364,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   };
   const isOwnVoice = (text: string) => { const spoken = homeVoiceWords(); return spoken.length > 0 && isOwnEcho(text, spoken); };
   const traceSessionStart = (handle: MicCaptureHandle | null) => {
-    trace("session_open", { bargein: voiceBargeIn, trace_left: traceRef.current?.utterancesLeft ?? 0 });
+    // Playback goes through the page's one shared AudioContext (playbackContext.ts), the same page as the capture, so Chrome's echo
+    // cancellation has its reference; `same_page` records that fact beside the browser family.
+    trace("session_open", { bargein: voiceBargeIn, trace_left: traceRef.current?.utterancesLeft ?? 0, browser: typeof navigator === "undefined" ? "other" : browserFamily(navigator.userAgent), same_page: true });
     const s = handle?.settings;
     if (s) trace("mic_settings", { aec: s.echoCancellation ?? "unknown", ns: s.noiseSuppression ?? "unknown", agc: s.autoGainControl ?? "unknown", rate: s.sampleRate ?? 0, channels: s.channelCount ?? 0 });
     try {
@@ -504,7 +512,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("listening");
             if (voiceBargeIn || (!isSpeakingRef.current && modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
               onFrame: (frame) => {
-                if (!mutedRef.current) socket.sendAudio(frame);
+                if (mutedRef.current) return;
+                // ECHO-GATE-01: while she plays, her own echo is dropped here; a voice well above it passes (a cut-in).
+                if (echoGateRef.current?.pass(frame, isReplySpeaking()) !== false) socket.sendAudio(frame);
               },
               onSource: (context, source) => {
                 levelMeter?.stop();
@@ -818,6 +828,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     trace("mode", { mode: isSpeaking ? "speaking" : modeRef.current, speaking: isSpeaking });
     if (isSpeaking) {
       const wasSpeaking = modeRef.current === "speaking";
+      if (!wasSpeaking) echoGateRef.current?.replyStarted();
       modeRef.current = "speaking";
       if (!wasSpeaking) speakingStartedAtRef.current = Date.now();
       setMode("speaking");
@@ -825,6 +836,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       return () => clearInterval(timer);
     }
     lastSpeakingEndedAtRef.current = Date.now();
+    // The reply ended: what the microphone heard of it, as numbers (the echo's level over the room's silence, frames dropped and passed).
+    if (echoGateRef.current && traceRef.current) { const report = echoGateRef.current.report(); trace("mic_echo", { ratio_db: report.ratio_db ?? -1, echo_rms: report.echo_rms ?? 0, silence_rms: report.silence_rms ?? 0 }); trace("mic_gate", { blocked: report.blocked, passed: report.passed }); }
     setMode((current) => {
       if (current !== "speaking" && current !== "thinking") return current;
       setAmplitude(0);

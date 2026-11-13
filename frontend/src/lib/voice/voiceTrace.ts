@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 /** The whole vocabulary. A name outside this list is dropped before it is recorded. */
 export const VOICE_TRACE_EVENTS = [
   // session
-  "session_open", "mic_settings", "output", "ready", "grant", "pool", "mode",
+  "session_open", "mic_settings", "mic_echo", "mic_gate", "output", "ready", "grant", "pool", "mode",
   // the hub's listening events
   "vad_on", "vad_resumed", "vad_off", "reply_pause", "reply_resume", "partial", "edge", "final", "timing", "no_speech",
   // decisions
