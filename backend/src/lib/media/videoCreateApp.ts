@@ -112,13 +112,22 @@ registerAppPageFill("video", "create", (person, page) => {
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   const lengths = lengthOptions();
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
+  // Owner rule (2026-11-13): every chip is icon-only (the dropdown names the choices, the tooltip says "Label: value"). Orientation comes from the page JSON, so it gets its icons here.
+  for (const item of chips) {
+    const chip = item as Record<string, unknown>;
+    if (chip?.state !== "orientation") continue;
+    chip.icon = "rectangle-horizontal";
+    chip.icon_only = true;
+    const icons: Record<string, string> = { landscape: "rectangle-horizontal", portrait: "rectangle-vertical" };
+    if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
+  }
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", group: "Settings", presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
-    { state: "look", label: "Look", variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
+    { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "look", label: "Look", icon: "palette", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
-    { state: "camera", label: "Camera", variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
-    { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, quiet_value: DEFAULT_VIDEO_VOICES, ...soundTiers(), options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
+    { state: "camera", label: "Camera", icon: "clapperboard", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
+    { state: "voices", label: "Sound", align: "end", icon: "volume-2", icon_only: true, default: DEFAULT_VIDEO_VOICES, quiet_value: DEFAULT_VIDEO_VOICES, ...soundTiers(), options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
     ...shotCardChips(person),
@@ -142,7 +151,7 @@ function shotCardChips(person: PersonRow): Array<Record<string, unknown>> {
   const groups = [["framing", "Framing"], ["camera", "Camera"], ["light", "Light"], ["look", "Look"], ["grade", "Grade"]] as const;
   return groups.flatMap(([group, label]) => {
     const rows = listFragments({ actor: person, group });
-    return rows.length ? [{ state: `card_${group}`, label, group: "Shot", icon: "camera", presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "None" }, ...rows.map((row) => ({ value: row.id, label: row.title }))] }] : [];
+    return rows.length ? [{ state: `card_${group}`, label, group: "Shot", icon: "camera", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "None" }, ...rows.map((row) => ({ value: row.id, label: row.title }))] }] : [];
   });
 }
 

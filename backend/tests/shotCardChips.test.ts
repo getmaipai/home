@@ -29,6 +29,25 @@ describe("Video shot card chips", () => {
     expect(bar.chips!.length).toBeLessThanOrEqual(10); // the kit page schema's limit: more and the page does not open
   });
 
+  test("every Video Create chip is icon-only with a registered icon, and orientation options carry icons", async () => {
+    const { row } = await owner();
+    const page = getAppPage(row, "video", "create");
+    expect(page.ok).toBe(true);
+    if (!page.ok) return;
+    const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; icon?: string; icon_only?: boolean; options: Array<{ value: string; icon?: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
+    const { iconNames } = await import("../../frontend/node_modules/@maipai/ui/src/icons");
+    const registry = new Set<string>(iconNames);
+    expect(bar.chips!.length).toBeLessThanOrEqual(10);
+    for (const chip of bar.chips!) {
+      expect(chip.icon_only, chip.state).toBe(true);
+      expect(registry.has(chip.icon ?? ""), `${chip.state} icon ${chip.icon}`).toBe(true);
+      for (const option of chip.options) if (option.icon) expect(registry.has(option.icon), `${chip.state}/${option.value}`).toBe(true);
+    }
+    const orientation = bar.chips!.find((chip) => chip.state === "orientation")!;
+    expect(orientation.options.find((o) => o.value === "landscape")!.icon).toBe("rectangle-horizontal");
+    expect(orientation.options.find((o) => o.value === "portrait")!.icon).toBe("rectangle-vertical");
+  });
+
   test("Video hint displays settings and fills generate_video prompt in shot-card order", async () => {
     const { row } = await owner();
     const framing = "mtpl-shotframingclose";

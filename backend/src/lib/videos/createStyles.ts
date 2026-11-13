@@ -60,10 +60,10 @@ export function styleChips({ person, engine, offered }: StyleChipsInput): Array<
   const group = { variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", private: true, ...gate };
   const option = (lora: Lora) => ({ value: lora.id, label: cut(lora.name, 40), note: styleNote(lora) });
   const chips: Array<Record<string, unknown>> = [];
-  if (styles.length > 0 || locked) chips.push({ state: "style", label: "Styles", ...group, ...(locked ? { locked: true } : {}), options: [{ value: "none", label: "No style" }, ...styles.slice(0, 23).map(option)] });
-  if (characters.length > 0) chips.push({ state: "character", label: "Characters", ...group, options: [{ value: "none", label: "No character" }, ...characters.slice(0, 23).map(option)] });
+  if (styles.length > 0 || locked) chips.push({ state: "style", label: "Styles", icon: "sparkles", icon_only: true, ...group, ...(locked ? { locked: true } : {}), options: [{ value: "none", label: "No style" }, ...styles.slice(0, 23).map(option)] });
+  if (characters.length > 0) chips.push({ state: "character", label: "Characters", icon: "user", icon_only: true, ...group, options: [{ value: "none", label: "No character" }, ...characters.slice(0, 23).map(option)] });
   if (styles.length > 0 || characters.length > 0) {
-    chips.push({ state: "strength", label: "Strength", presentation: "popover", group: "Style", default: "normal", quiet_value: "normal", ...gate, options: [{ value: "less", label: "Less" }, { value: "normal", label: "Normal" }, { value: "more", label: "More" }] });
+    chips.push({ state: "strength", label: "Strength", icon: "gauge", icon_only: true, presentation: "popover", group: "Style", default: "normal", quiet_value: "normal", ...gate, options: [{ value: "less", label: "Less" }, { value: "normal", label: "Normal" }, { value: "more", label: "More" }] });
   }
   return chips;
 }
