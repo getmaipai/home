@@ -2445,6 +2445,13 @@ export const mediaSubjects = sqliteTable(
     look: text("look").notNull(),
     referenceIds: text("reference_ids").notNull().default("[]"),
     real: integer("real", { mode: "boolean" }).notNull().default(false),
+    // CREATOR-04: the cast record's links. `synthId` mirrors synth.subject_id (written in the same transaction); `personId` is the
+    // household member a subject was made from (real and the minor fact are derived from it at read time, never stored here).
+    synthId: text("synth_id"),
+    personId: text("person_id"),
+    voice: text("voice"),
+    trainedStyleId: text("trained_style_id"),
+    lockedDescription: text("locked_description"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     hlc: text("hlc").notNull(),

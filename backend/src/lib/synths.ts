@@ -14,7 +14,8 @@ import { canManage } from "@/lib/personLifecycle";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
 import { registerCastSynthGate } from "@/lib/mediaProductions";
-import { createMediaSubject } from "@/lib/mediaSubjects";
+import { createMediaSubject, registerSynthFactDeriver, subjectRowById } from "@/lib/mediaSubjects";
+import { mediaSubjects } from "@/db/schema";
 import { readLook, versionPath } from "@/lib/companionLook";
 import { readFileSync } from "node:fs";
 import { storeFile } from "@/lib/attachments";
@@ -137,7 +138,21 @@ export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<Sy
   return result.ok && result.value.companion ? { ok: true, value: { id, manifest: result.value, companion: result.value.companion, synth: next } } : { ok: false, status: 400, error: result.ok ? "The synth could not be saved. Check its fields and try again." : result.error };
 }
 
-/** Reuse the synth's one saved media subject across every production. */
+/**
+ * CREATOR-04: the two-link write. `synth.subject_id` is the source of truth; the subject's `synth_id` is written in the same transaction, so no reader
+ * sees one without the other. The synth file is written last: when it fails the subject row rolls back with it.
+ */
+export function linkSynthSubject(actor: PersonRow, synthId: string, subjectId: string): void {
+  db.transaction(() => {
+    const row = subjectRowById(subjectId);
+    if (!row) throw new Error("That subject could not be found. Choose another and try again.");
+    if (row.synthId && row.synthId !== synthId) throw new Error("That subject already belongs to another synth. Choose a different subject.");
+    db.update(mediaSubjects).set({ synthId, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, subjectId)).run();
+    const saved = updateSynth(actor, synthId, { subject_id: subjectId });
+    if (!saved.ok) throw new Error(`The synth's subject could not be saved. ${saved.error}`);
+  });
+}
+/** Reuse the synth's one saved media subject across every production; made the first time the synth is cast anywhere. `real` is derived from `based_on`, never stored by hand. */
 export async function ensureSubject(synth: SynthRecord): Promise<string> {
   if (synth.subject_id) return synth.subject_id;
   const actor = ownerActor(synth);
@@ -151,11 +166,17 @@ export async function ensureSubject(synth: SynthRecord): Promise<string> {
       if (stored.ok) referenceIds = [stored.value.id];
     } catch { /* A missing portrait does not prevent a text-only subject. */ }
   }
-  const subject = createMediaSubject(actor, { name: synth.persona.display_name, kind: "character", look: synth.persona.look_prompt ?? synth.persona.display_name, referenceIds, real: synth.based_on.kind !== "none" }, `talent:synth:${synth.id}`);
-  const saved = updateSynth(actor, synth.id, { subject_id: subject.id });
-  if (!saved.ok) throw new Error("The synth's subject could not be saved. Try creating the show again.");
-  return subject.id;
+  let subjectId = "";
+  try {
+    db.transaction(() => {
+      const subject = createMediaSubject(actor, { name: synth.persona.display_name, kind: "character", look: synth.persona.look_prompt ?? synth.persona.display_name, referenceIds }, `talent:synth:${synth.id}`);
+      subjectId = subject.id;
+      linkSynthSubject(actor, synth.id, subject.id);
+    });
+  } catch { throw new Error("The synth's subject could not be saved. Try again."); }
+  return subjectId;
 }
+registerSynthFactDeriver((id) => { const synth = synthById(id); return synth ? { real: synth.based_on.kind !== "none", minor: synth.based_on.minor === true, personId: synth.based_on.kind === "household_member" ? synth.based_on.person_id ?? null : null } : null; });
 export function forkSynth(actor: PersonRow, baseId: string): SynthWriteResult {
   const base = synthById(baseId);
   if (!base || !maySeeSynth(actor, base)) return { ok: false, status: 404, error: base ? deniedUse(actor, base) : "That synth could not be found. Check its ID and try again." };

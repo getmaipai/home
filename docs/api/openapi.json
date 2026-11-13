@@ -68452,6 +68452,163 @@
         }
       }
     },
+    "/api/cast": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "List what this person may cast in a picture, video or film",
+        "responses": {
+          "200": {
+            "description": "Synths, saved subjects and household members this person may cast",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "synth",
+                              "member",
+                              "subject"
+                            ]
+                          },
+                          "subject_kind": {
+                            "type": "string",
+                            "enum": [
+                              "character",
+                              "prop",
+                              "place"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "subject_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "synth_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "person_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "look": {
+                            "type": "object",
+                            "properties": {
+                              "description": {
+                                "type": "string"
+                              },
+                              "sheet_file_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "medium": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "photo",
+                                  "stylised",
+                                  null
+                                ]
+                              }
+                            },
+                            "required": [
+                              "description",
+                              "sheet_file_id",
+                              "medium"
+                            ]
+                          },
+                          "locked_description": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "voice": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "avatar": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "seed"
+                            ]
+                          },
+                          "real": {
+                            "type": "boolean"
+                          },
+                          "minor": {
+                            "type": "boolean"
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all-ages",
+                              "adult-only"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "subject_kind",
+                          "name",
+                          "subject_id",
+                          "synth_id",
+                          "person_id",
+                          "look",
+                          "locked_description",
+                          "voice",
+                          "avatar",
+                          "real",
+                          "minor",
+                          "audience"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "cast"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media-productions": {
       "get": {
         "tags": [

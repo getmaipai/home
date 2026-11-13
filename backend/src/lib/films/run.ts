@@ -1,4 +1,5 @@
 import { getMediaProduction, setShotClip, setShotPicture, setShotVoiceLine, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
+import { synthIdOfSubject } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
 import type { FilmPlan } from "@/lib/films/plan";
 
@@ -30,7 +31,7 @@ function lockedForShot(plan: FilmPlan, shot: FilmPlan["shots"][number]): string[
 }
 function storeCast(actor: PersonRow, productionId: string, plan: FilmPlan, ids: string[]): Production {
   const current = getMediaProduction(actor, productionId)!;
-  const cast = plan.cast.slice(0, ids.length).map((member, i) => ({ subject_id: ids[i]!, role: member.name, wardrobe_variant_ids: [], voice_choice: null, notes: member.locked }));
+  const cast = plan.cast.slice(0, ids.length).map((member, i) => ({ subject_id: ids[i]!, role: member.name, wardrobe_variant_ids: [], voice_choice: null, notes: member.locked, synth_id: synthIdOfSubject(ids[i]!) }));
   return updateMediaProduction(actor, productionId, { cast }) ?? current;
 }
 

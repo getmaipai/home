@@ -7,15 +7,49 @@ import { attachmentFilePath } from "@/lib/attachments";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { canReadFileAudience } from "@/lib/access";
+import { householdLikenessAllowed } from "@/lib/likeness";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 
 export type SubjectKind = "character" | "prop" | "place";
 export interface SubjectInput { name: string; kind: SubjectKind; look: string; referenceIds?: string[]; real?: boolean }
-export interface MediaSubject { id: string; name: string; kind: SubjectKind; owner_person_id: string; shared_with: string[]; look: string; reference_ids: string[]; real: boolean; created_at: string; updated_at: string; hlc: string; provenance: string }
-function view(row: typeof mediaSubjects.$inferSelect): MediaSubject { return { id: row.id, name: row.name, kind: row.kind as SubjectKind, owner_person_id: row.ownerPersonId, shared_with: JSON.parse(row.sharedWith), look: row.look, reference_ids: JSON.parse(row.referenceIds), real: row.real, created_at: row.createdAt, updated_at: row.updatedAt, hlc: row.hlc, provenance: row.provenance }; }
+/** CREATOR-04: `real` and `minor` of a linked subject are derived at read time, never read from the stored column (talent architect condition 13). */
+export interface MediaSubject { id: string; name: string; kind: SubjectKind; owner_person_id: string; shared_with: string[]; look: string; reference_ids: string[]; real: boolean; minor: boolean; synth_id: string | null; person_id: string | null; voice: string | null; trained_style_id: string | null; locked_description: string | null; created_at: string; updated_at: string; hlc: string; provenance: string }
+/** `lib/synths.ts` registers how a synth-linked subject's real-person and minor facts are read (it imports this module, so this one cannot import it). */
+export type SynthFactDeriver = (synthId: string) => { real: boolean; minor: boolean; personId: string | null } | null;
+let synthFacts: SynthFactDeriver = () => null;
+export function registerSynthFactDeriver(fn: SynthFactDeriver): void { synthFacts = fn; }
+function personBand(personId: string): "child" | "teen" | "adult" | null {
+  const person = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+  return person ? speakerAgeBand(person, new Date()) : null;
+}
+/** The one place the real-person and minor facts of a subject are worked out. A household member's subject is real and minor when the person is under 18 now. */
+export function subjectFacts(row: Pick<typeof mediaSubjects.$inferSelect, "real" | "synthId" | "personId">): { real: boolean; minor: boolean } {
+  let real = row.real, minor = false;
+  if (row.synthId) { const facts = synthFacts(row.synthId); if (facts) { real = facts.real; minor = facts.minor; if (facts.personId) { const band = personBand(facts.personId); if (band && band !== "adult") minor = true; } } }
+  if (row.personId) { const band = personBand(row.personId); real = true; minor = minor || (band !== null && band !== "adult"); }
+  return { real, minor };
+}
+function view(row: typeof mediaSubjects.$inferSelect): MediaSubject { const facts = subjectFacts(row); return { id: row.id, name: row.name, kind: row.kind as SubjectKind, owner_person_id: row.ownerPersonId, shared_with: JSON.parse(row.sharedWith), look: row.look, reference_ids: JSON.parse(row.referenceIds), real: facts.real, minor: facts.minor, synth_id: row.synthId, person_id: row.personId, voice: row.voice, trained_style_id: row.trainedStyleId, locked_description: row.lockedDescription, created_at: row.createdAt, updated_at: row.updatedAt, hlc: row.hlc, provenance: row.provenance }; }
 export function isSheetReference(fileProvenance: string): boolean { if (!fileProvenance.startsWith("media-subject-reference:")) return false; try { return (JSON.parse(fileProvenance.slice("media-subject-reference:".length)) as { role?: string }).role === "sheet"; } catch { return false; } }
 function rowById(id: string) { return db.select().from(mediaSubjects).where(eq(mediaSubjects.id, id)).get(); }
-export function canUseSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return actor.role !== "guest" && (row.ownerPersonId === actor.id || (JSON.parse(row.sharedWith) as string[]).includes(actor.id)); }
+/** A household member's subject (`person_id`) is open to adults by `generation.household_likeness` alone (rule 0), never `synths.of_me`; a child or teen never uses a real subject. */
+function canUsePersonSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return !!row.personId && speakerAgeBand(actor, new Date()) === "adult" && actor.role !== "guest" && (row.personId === actor.id || householdLikenessAllowed()); }
+export function canUseSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return actor.role !== "guest" && (row.ownerPersonId === actor.id || (JSON.parse(row.sharedWith) as string[]).includes(actor.id) || canUsePersonSubject(actor, row)); }
+/** The synth a subject is linked to, or null (the link `synth.subject_id` points back through). */
+export function synthIdOfSubject(subjectId: string): string | null { return rowById(subjectId)?.synthId ?? null; }
+/** The subject made from a household member's own photos, or null; no reader access check (callers apply `canUseSubject`). */
+export function subjectRowForPerson(personId: string) { return db.select().from(mediaSubjects).where(eq(mediaSubjects.personId, personId)).get(); }
+export function subjectRowById(id: string) { return rowById(id); }
+/** One subject by id with no access check: the cast resolver checks access first. */
+export function subjectViewById(id: string): MediaSubject | null { const row = rowById(id); return row ? view(row) : null; }
+/** The first time a household member is cast: a subject owned by the member, carrying the person link, no persona and no synth. `real` and `minor` are derived, so none is stored. */
+export function ensurePersonSubject(person: PersonRow): MediaSubject {
+  const existing = subjectRowForPerson(person.id); if (existing) return view(existing);
+  const now = new Date().toISOString(), id = `msub-${randomSuffix(10)}`;
+  db.insert(mediaSubjects).values({ id, ownerPersonId: person.id, name: person.displayName.trim().slice(0, 80), kind: "character", sharedWith: "[]", look: person.displayName.trim().slice(0, 1000), referenceIds: "[]", real: false, personId: person.id, createdAt: now, updatedAt: now, hlc: nextHlc(), provenance: `media-subject:${JSON.stringify({ v: 1, source: "cast:household-member" })}` }).run();
+  return view(rowById(id)!);
+}
 export function listMediaSubjects(actor: PersonRow): MediaSubject[] { if (actor.role === "guest") return []; return db.select().from(mediaSubjects).all().filter((r) => canUseSubject(actor, r)).map(view); }
 export function getMediaSubject(actor: PersonRow, id: string): MediaSubject | null { const row = rowById(id); return row && canUseSubject(actor, row) ? view(row) : null; }
 function validateReferences(actor: PersonRow, ids: string[]) {
@@ -34,6 +68,7 @@ export function createMediaSubject(actor: PersonRow, input: SubjectInput, source
 export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<SubjectInput>): MediaSubject | null {
   const existing = rowById(id); if (!existing || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
   const updated: SubjectInput = { name: patch.name ?? existing.name, kind: patch.kind ?? existing.kind as SubjectKind, look: patch.look ?? existing.look, referenceIds: patch.referenceIds ?? JSON.parse(existing.referenceIds), real: patch.real ?? existing.real };
+  if (existing.synthId || existing.personId) updated.real = existing.real; // a linked subject's `real` is derived, never set by hand
   if (updated.real && (actor.role === "child" || actor.role === "teen")) throw new Error("Real-person subjects are not available for this profile yet.");
   const name = updated.name.trim().slice(0, 80), look = updated.look.trim().slice(0, 1000), ids = [...new Set(updated.referenceIds ?? [])];
   if (!name || !look || !validateReferences(actor, ids)) throw new Error("Choose a name, look, and pictures from your Library.");
