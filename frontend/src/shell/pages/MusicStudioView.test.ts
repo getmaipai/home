@@ -13,6 +13,13 @@ describe("studioLanes", () => {
     expect(lanes.map((l) => l.id)).toEqual(["music"]);
     expect(lanes[0]!.pieces[0]).toMatchObject({ ref: "a", src: "/a.m4a", in_s: 0, out_s: 90 });
   });
+  test("a hub file gets its peaks route, so the browser never decodes it; a stem too", () => {
+    const hub = (id: string) => `/api/music/jobs/j1/files/${id}`;
+    const lanes = studioLanes(card({ versions: [{ id: "a", label: "Version 1", url: hub("a") }] }), card({ versions: [{ id: "v", label: "Vocals", url: hub("v") }] }), 60) as { pieces: { peaks_url?: string }[] }[];
+    expect(lanes[0]!.pieces[0]!.peaks_url).toBe("/api/music/jobs/j1/files/a/peaks");
+    expect(lanes[1]!.pieces[0]!.peaks_url).toBe("/api/music/jobs/j1/files/v/peaks");
+    expect((studioLanes(card({}), undefined, 90) as { pieces: { peaks_url?: string }[] }[])[0]!.pieces[0]!.peaks_url).toBeUndefined();
+  });
   test("the version on show is the card's current one", () => {
     const song = card({ current_id: "b", versions: [{ id: "a", label: "Version 1", url: "/a" }, { id: "b", label: "Version 2", url: "/b" }] });
     expect((studioLanes(song, undefined, 30) as Lane[])[0]!.pieces[0]!.src).toBe("/b");

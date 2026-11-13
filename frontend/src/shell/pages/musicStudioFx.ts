@@ -3,6 +3,7 @@ import { i18n } from "@lingui/core";
 import type { EffectBody, MusicCard } from "@/lib/musicApi";
 import type { StudioEffects, StudioSelection } from "@maipai/ui/src/elements/track-studio";
 
+const HUB_FILE = /^\/api\/music\/jobs\/[^/]+\/files\/[^/]+$/;
 const STEM_NAMES = ["vocals", "drums", "bass", "other"] as const;
 
 /** The song version on show: the one the card calls current, else the newest. */
@@ -14,7 +15,8 @@ export function currentVersion(song: MusicCard | undefined) {
 export function studioLanes(song: MusicCard | undefined, stems: MusicCard | undefined, durationS: number): unknown[] {
   const full = currentVersion(song);
   if (!song || !full || !(durationS > 0)) return [];
-  const piece = (id: string, url: string, label: string) => ({ id: `piece-${id}`, ref: id, src: url, label, in_s: 0, out_s: durationS, source_s: durationS });
+  // MP-10: the hub makes the waveform (`<file url>/peaks`), so the browser never decodes a long song; the kit decodes only when that request fails.
+  const piece = (id: string, url: string, label: string) => ({ id: `piece-${id}`, ref: id, src: url, label, in_s: 0, out_s: durationS, source_s: durationS, ...(HUB_FILE.test(url) ? { peaks_url: `${url}/peaks` } : {}) });
   const lanes: unknown[] = [{ id: "music", label: i18n._({ id: "Full song", message: "Full song" }), pieces: [piece(full.id, full.url, song.title ?? i18n._({ id: "Full song", message: "Full song" }))] }];
   if (stems?.state === "done") {
     for (const version of stems.versions) {

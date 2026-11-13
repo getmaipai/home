@@ -1,4 +1,5 @@
 import { serveBytes } from "@/lib/media/serve";
+import { musicPeaksRoutes } from "./musicPeaks";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { pictureEngineReady } from "@/lib/pictures/ready";
@@ -630,6 +631,7 @@ musicRoutes.openapi(fileRoute, (c) => {
   if (!file) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   return audioResponse(file, c.req.header("Range"), () => !lockedJob(actor, root!)) as never;
 });
+musicRoutes.route("/", musicPeaksRoutes); // MP-10: GET /jobs/{id}/files/{fileId}/peaks
 const exportRoute = createRoute({ method: "get", path: "/files/{fileId}", tags: ["Music"], summary: "Download a song, checking its chain for commercial export", middleware: viewMiddleware,
   request: { params: z.object({ fileId: z.string().min(1).max(80) }), query: z.object({ purpose: z.enum(["commercial", "personal"]).optional() }) },
   responses: { 200: { content: { "audio/mp4": { schema: z.string() } }, description: "Audio bytes." }, 206: { description: "A Range slice." }, ...refusals } });
