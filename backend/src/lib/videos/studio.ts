@@ -8,13 +8,16 @@ import { attachments } from "@/db/schema";
 import { libraryProvenanceSql } from "@/lib/libraryProvenance";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { makeAudienceOf } from "./make";
-import { clipUrl, getVideoJobByFileFor, getVideoJobFor, posterUrl, type VideoJob } from "./jobs";
-import { editableClip, editRefusal, ownTrackFile, speakLine, voiceChoice } from "./editGate";
+import { activeVideoJobsFor, clipUrl, getVideoJobByFileFor, getVideoJobFor, posterUrl, type VideoJob } from "./jobs";
+import { EDIT_MINOR_LINE, editableClip, editRefusal, ownTrackFile, speakLine, voiceChoice } from "./editGate";
 import { lockedJobView, videoJobLockItem, videoJobLockState } from "./lock";
 import { audioSeconds } from "./audioLength";
 import { putStudioVoice, studioVoiceRef, studioVoiceUrl, VOICE_REF_PREFIX } from "./studioVoices";
 import { STUDIO_AUDIO_PIECES, STUDIO_FILM_S, STUDIO_VIDEO_PIECES } from "./studioPlan";
 import { MIX_LEVELS } from "./editPlan";
+import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "./stackEdit";
+import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
+import { laneOf } from "@/lib/pictures/lane";
 import type { PersonRow } from "@/types";
 
 type Row = Record<string, unknown>;
@@ -87,6 +90,25 @@ export function studioHeaderRows(person: PersonRow, id: string | undefined): Row
 /** The numbers the page draws (its `limits`), from the constants the export enforces. */
 export const studioLimits = { video_pieces: STUDIO_VIDEO_PIECES, audio_pieces: STUDIO_AUDIO_PIECES, film_s: STUDIO_FILM_S };
 export const studioLevelSteps = MIX_LEVELS.map((step) => ({ id: step.id, label: step.id === "very_loud" ? "Very loud" : step.id[0]!.toUpperCase() + step.id.slice(1), gain_db: step.gain_db, clip_gain_db: step.clip_gain_db }));
+
+const plainEngineReason = (line: string): string => line.replace("I couldn't change that video. ", "");
+export const STUDIO_BUSY_LINE = "You already have a video being made. Wait for it to finish, or stop it first.";
+
+/**
+ * The reasons the page draws beside a disabled tool or Export (the kit's `tool_reasons` and `export_disabled_reason`), from the same facts the gates use:
+ * the age lane (the page is adult-only; a lane below it gets the edit gate's own line), the engine (the Stack must be set up and run on this computer, which
+ * Export and a typed voice line both need), and a clip already being made (Export refuses a second job). Each is one plain line; nothing here removes a
+ * gate, the actions still refuse on their own. Add a clip and Add music read only the person's own files, so no engine fact disables them.
+ */
+export function studioReadiness(person: PersonRow): { tool_reasons: Partial<Record<"add_clip" | "add_voice" | "add_music", string>>; export_disabled_reason?: string } {
+  if (laneOf(makeAudienceOf(person)) !== "adult") {
+    return { tool_reasons: { add_clip: EDIT_MINOR_LINE, add_voice: EDIT_MINOR_LINE, add_music: EDIT_MINOR_LINE }, export_disabled_reason: EDIT_MINOR_LINE };
+  }
+  const engine = !isStackConfigured() ? plainEngineReason(EDIT_UNAVAILABLE_LINE) : isRemoteStackSelected() ? plainEngineReason(EDIT_REMOTE_LINE) : undefined;
+  const busy = activeVideoJobsFor(person) > 0 ? STUDIO_BUSY_LINE : undefined;
+  const exportReason = engine ?? busy;
+  return { tool_reasons: engine ? { add_voice: engine } : {}, ...(exportReason ? { export_disabled_reason: exportReason } : {}) };
+}
 
 /** The length of a Library audio file (a made song's job, else its note), or null. */
 export function songSeconds(person: PersonRow, fileId: string, bytes?: Uint8Array): number | null {

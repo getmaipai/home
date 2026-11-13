@@ -7,7 +7,12 @@ import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { storeFile } from "@/lib/attachments";
 import { __resetAdultLockForTests, __unlockedForTests, __unlockRestOfTest, withMark } from "@/lib/adultLock";
-import { appRouteAllowed } from "@/lib/apps";
+import { appRouteAllowed, getAppPage } from "@/lib/apps";
+import "@/lib/media/videoCreateApp"; // registers the Studio page fill
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { EDIT_MINOR_LINE } from "@/lib/videos/editGate";
+import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "@/lib/videos/stackEdit";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { newConversationTurnId } from "@/lib/id";
@@ -19,7 +24,7 @@ import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { compileStudioPlan, studioPlanSchema, STUDIO_FILM_S, type StudioPlan, type StudioSources } from "@/lib/videos/studioPlan";
 import { startStudioExport, STUDIO_VOICE_GONE_LINE } from "@/lib/videos/studioExport";
-import { studioAdd, studioHeaderRows, studioRows, STUDIO_LOCKED_LINE, STUDIO_NO_CLIP_LINE } from "@/lib/videos/studio";
+import { studioAdd, studioHeaderRows, studioReadiness, studioRows, STUDIO_BUSY_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_CLIP_LINE } from "@/lib/videos/studio";
 import { __resetStudioVoicesForTests, getStudioVoice, wavSeconds } from "@/lib/videos/studioVoices";
 import { feedRowById, feedRows } from "@/lib/videos/feed";
 import { CROSSFADE_IN_STACK, gainOps, fadeOps } from "@/lib/videos/editPlan";
@@ -468,5 +473,65 @@ describe("the page's rows", () => {
     expect(piece).toMatchObject({ ref: refOf(clip), in_s: 0, out_s: seconds(clip), source_s: seconds(clip) });
     expect(studioHeaderRows(owner, clip.id)[0]).toMatchObject({ locked: false });
     expect(String(studioHeaderRows(owner, clip.id)[0]!.title).toLowerCase()).toContain("paper boat");
+  });
+});
+
+describe("the reasons the page draws (tool_reasons, export_disabled_reason)", () => {
+  const studioNode = (owner: PersonRow) => {
+    const got = getAppPage(owner, "video", "studio");
+    if (!got.ok) throw new Error("no page");
+    return ((got.value as { body: Array<Record<string, unknown>> }).body).find((n) => n.type === "studio")!;
+  };
+  const plain = (line: string) => line.replace("I couldn't change that video. ", "");
+
+  test("a ready engine and nothing being made: nothing is disabled and no reason is sent", () => {
+    const node = studioNode(person("owner"));
+    expect(node.tool_reasons).toBeUndefined();
+    expect(node.export_disabled_reason).toBeUndefined();
+    expect(node.limits).toBeDefined();
+  });
+
+  test("no engine set up: the typed voice line and Export are each disabled with the existing engine line; the file-only tools stay on", () => {
+    const owner = person("owner");
+    __setStackClientForTests(null);
+    const r = studioReadiness(owner);
+    expect(r.tool_reasons).toEqual({ add_voice: plain(EDIT_UNAVAILABLE_LINE) });
+    expect(r.export_disabled_reason).toBe(plain(EDIT_UNAVAILABLE_LINE));
+    const node = studioNode(owner);
+    expect(node.tool_reasons).toEqual({ add_voice: plain(EDIT_UNAVAILABLE_LINE) });
+    expect(node.export_disabled_reason).toBe(plain(EDIT_UNAVAILABLE_LINE));
+  });
+
+  test("the engine on another computer: the same tools say editing needs this computer", () => {
+    const owner = person("owner");
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    try {
+      const r = studioReadiness(owner);
+      expect(r.tool_reasons).toEqual({ add_voice: plain(EDIT_REMOTE_LINE) });
+      expect(r.export_disabled_reason).toBe(plain(EDIT_REMOTE_LINE));
+    } finally { setHouseholdSettingValue("engines.stack.where", "this_computer"); }
+  });
+
+  test("a clip already being made: only Export says so, in the existing busy wording", async () => {
+    const owner = person("owner");
+    const a = await makeClip(owner);
+    expect(studioReadiness(owner).export_disabled_reason).toBeUndefined();
+    stack.pollsToFinish = 40;
+    const first = await startStudioExport(owner, { plan: planOf([vp(refOf(a), { in_s: 1, out_s: 4 })]) });
+    expect(first.ok).toBe(true);
+    const r = studioReadiness(owner);
+    expect(r.export_disabled_reason).toBe(STUDIO_BUSY_LINE);
+    expect(r.tool_reasons).toEqual({});
+    if (first.ok) await finished(owner, first.job.id);
+  });
+
+  test("a child or a teen lane gets the edit gate's own line on every tool and on Export; the gates themselves still refuse", async () => {
+    for (const role of ["child", "teen"]) {
+      const minor = person(role, `${role}y`);
+      const r = studioReadiness(minor);
+      expect(r.tool_reasons).toEqual({ add_clip: EDIT_MINOR_LINE, add_voice: EDIT_MINOR_LINE, add_music: EDIT_MINOR_LINE });
+      expect(r.export_disabled_reason).toBe(EDIT_MINOR_LINE);
+      expect((await studioAdd(minor, { kind: "voice", ref: "say:hello there" })).ok).toBe(false);
+    }
   });
 });

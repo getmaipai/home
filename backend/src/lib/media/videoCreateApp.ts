@@ -7,9 +7,7 @@ import { doneVideoJobsFor } from "@/lib/videos/jobs";
 import { lockedVideoTile } from "@/lib/videos/lock";
 import { feedRowById, feedRowOf, feedRows, levelOfJob } from "@/lib/videos/feed";
 import { favoriteFileIds } from "@/lib/videos/favorites";
-import { studioHeaderRows, studioLevelSteps, studioLimits, studioRows } from "@/lib/videos/studio";
-import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
-import { EDIT_REMOTE_LINE, EDIT_UNAVAILABLE_LINE } from "@/lib/videos/stackEdit";
+import { studioHeaderRows, studioLevelSteps, studioLimits, studioReadiness, studioRows } from "@/lib/videos/studio";
 import { listLibrary } from "@/lib/library";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { requestProof } from "@/lib/adultLock";
@@ -146,13 +144,14 @@ registerAppPageFill("video", "clips-feed", (person, page) => {
 
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
  * where the person acts (the page shows it beside the button), never a raw error after a press. */
-registerAppPageFill("video", "studio", (_person, page) => {
+registerAppPageFill("video", "studio", (person, page) => {
   const studio = findNode(page.body, "studio");
   if (!studio) return;
   studio.limits = studioLimits;
   studio.level_steps = studioLevelSteps;
-  if (!isStackConfigured()) studio.export_disabled_reason = EDIT_UNAVAILABLE_LINE.replace("I couldn't change that video. ", "");
-  else if (isRemoteStackSelected()) studio.export_disabled_reason = EDIT_REMOTE_LINE.replace("I couldn't change that video. ", "");
+  const { tool_reasons, export_disabled_reason } = studioReadiness(person);
+  if (Object.keys(tool_reasons).length > 0) studio.tool_reasons = tool_reasons;
+  if (export_disabled_reason) studio.export_disabled_reason = export_disabled_reason;
 });
 
 /** The My clips rows: Library clips made at home (the person's own and the ones shared with them, as the Library lists them), or the pictures the

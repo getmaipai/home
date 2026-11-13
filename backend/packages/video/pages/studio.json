@@ -56,6 +56,49 @@
       }
     },
     {
+      "type": "media_shelf",
+      "heading": "Pick a clip to edit",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "studio-picker",
+          "id": "$state.clip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "locked_field": "locked",
+      "making_field": "making",
+      "aspect": "wide",
+      "variant": "plain",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/studio",
+          "state": {
+            "clip": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "You have no clips yet. Make one with Create.",
+        "action": {
+          "navigate": {
+            "to": "/apps/video/create"
+          }
+        },
+        "action_label": "Make a video"
+      }
+    },
+    {
       "type": "studio",
       "kind": "video",
       "bind": {
@@ -201,49 +244,6 @@
             }
           }
         }
-      }
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Pick a clip to open",
-      "heading_style": "eyebrow",
-      "bind": {
-        "source": "package",
-        "path": "recipes",
-        "params": {
-          "scope": "studio-picker",
-          "id": "$state.clip"
-        }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{subtitle}",
-      "item_media_field": "thumbnail",
-      "item_meta_field": "duration_s",
-      "locked_field": "locked",
-      "making_field": "making",
-      "aspect": "wide",
-      "variant": "plain",
-      "layout": "grid",
-      "hide_when_empty": true,
-      "on_select": {
-        "navigate": {
-          "to": "/apps/video/studio",
-          "state": {
-            "clip": "{id}"
-          }
-        }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Your clips will show up here. Choose Create to make one.",
-        "action": {
-          "navigate": {
-            "to": "/apps/video/create"
-          }
-        },
-        "action_label": "Make a video"
       }
     }
   ]
