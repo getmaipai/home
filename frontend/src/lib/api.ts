@@ -408,6 +408,8 @@ export type CompanionPackJob = {
 export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states" | "synth">>;
 export type CompanionUpdateFields = CompanionFields & { pins?: { dials: string[]; examples: string[] } };
 export type CompanionCreateFields = CompanionFields & { status?: CompanionStatus; based_on?: { kind: "none" | "household_member" | "real_person"; person_id?: string | null; name?: string | null }; life?: { enabled: boolean; seed: string } };
+/** CREATOR-05: one line of GET /api/cast (the fields the `@` list needs). */
+export interface CastListEntry { id: string; kind: "synth" | "member" | "subject"; subject_kind: "character" | "prop" | "place"; name: string; real: boolean; minor: boolean; audience: "all-ages" | "adult-only" }
 export interface CompanionList {
   allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
@@ -1633,6 +1635,8 @@ export const api = {
   mediaHome: () => request<MediaHome>("/api/media/home"),
   continueRows: () => request<{ rows: Array<{ source: string; kind: "chat" | "media"; id: string; title: string; subtitle: string | null; href: string; at: string; percent: number | null; media_kind: string | null; artwork_url: string | null }> }>("/api/continue"),
   companions: () => request<CompanionList>("/api/companions"),
+  /** CREATOR-05: what this person may cast in a picture, video or film (the `@` list's cast items). */
+  cast: () => request<{ cast: CastListEntry[] }>("/api/cast"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   companionActivity: (id: string) => request<CompanionActivity>(`/api/companions/${encodeURIComponent(id)}/activity`),
   synthCredits: (id: string) => request<SynthCredits>(`/api/talent/synths/${encodeURIComponent(id)}/credits`),
@@ -1968,7 +1972,7 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; max?: boolean; model?: string; conversationId?: string; mentionCompanionId?: string; tryCompanionId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; sttMs?: number; confirm?: boolean; currentLocation?: { lat: number; lon: number }; pageContext?: import("@maipai/spec/gen/ts/page-context.js").PageContext; askAnswer?: { turnId: string; approved: boolean } | { turnId: string; values: Record<string, string | number | boolean | null> }; documentAttachments?: { name: string; mediaType: string; data: string }[]; images?: { id: string; name: string; width: number; height: number; media_type: string }[]; audio?: { id: string; name: string; media_type: string; duration_ms?: number }[]; assistantStream?: boolean } = {},
+    opts: { thinking?: boolean; max?: boolean; model?: string; conversationId?: string; mentionCompanionId?: string; castMentions?: string[]; tryCompanionId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; sttMs?: number; confirm?: boolean; currentLocation?: { lat: number; lon: number }; pageContext?: import("@maipai/spec/gen/ts/page-context.js").PageContext; askAnswer?: { turnId: string; approved: boolean } | { turnId: string; values: Record<string, string | number | boolean | null> }; documentAttachments?: { name: string; mediaType: string; data: string }[]; images?: { id: string; name: string; width: number; height: number; media_type: string }[]; audio?: { id: string; name: string; media_type: string; duration_ms?: number }[]; assistantStream?: boolean } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
@@ -1989,7 +1993,7 @@ export const api = {
       // (routes/turn.ts's own `askAnswer` zod schema), matched against
       // the conversation's live pending ask by `turn_id`
       // (turnMachine/turnNext.ts's `resumesAsk()`).
-      { surface: "chat", text, thinking: opts.thinking, max: opts.max, model: opts.model, conversation_id: opts.conversationId, mention_companion_id: opts.mentionCompanionId, try_companion_id: opts.tryCompanionId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken, stt_ms: opts.sttMs, confirm: opts.confirm, current_location: opts.currentLocation, page_context: opts.pageContext, ask_answer: opts.askAnswer ? "values" in opts.askAnswer ? { turn_id: opts.askAnswer.turnId, values: opts.askAnswer.values } : { turn_id: opts.askAnswer.turnId, approved: opts.askAnswer.approved } : undefined, document_attachments: opts.documentAttachments?.map(({ name, mediaType, data }) => ({ name, media_type: mediaType, data })), images: opts.images, audio: opts.audio },
+      { surface: "chat", text, thinking: opts.thinking, max: opts.max, model: opts.model, conversation_id: opts.conversationId, mention_companion_id: opts.mentionCompanionId, mentions: opts.castMentions?.length ? opts.castMentions.map((id) => ({ id, type: "cast" as const })) : undefined, try_companion_id: opts.tryCompanionId, supersedes: opts.supersedes, ephemeral: opts.ephemeral, continuation_text: opts.continuation?.assistantText, continuation_of: opts.continuation?.fromTurnId, resume_token: opts.resumeToken, turn_id: opts.turnId, resume_from: opts.resumeFrom, bare: opts.bare, package_scope: opts.packageScope, temporary: opts.temporary, spoken: opts.spoken, stt_ms: opts.sttMs, confirm: opts.confirm, current_location: opts.currentLocation, page_context: opts.pageContext, ask_answer: opts.askAnswer ? "values" in opts.askAnswer ? { turn_id: opts.askAnswer.turnId, values: opts.askAnswer.values } : { turn_id: opts.askAnswer.turnId, approved: opts.askAnswer.approved } : undefined, document_attachments: opts.documentAttachments?.map(({ name, mediaType, data }) => ({ name, media_type: mediaType, data })), images: opts.images, audio: opts.audio },
       0,
       undefined,
       signal,

@@ -103,6 +103,8 @@ export interface RunTurnNextOpts {
   conversationId?: string;
   pageContext?: unknown;
   mentionCompanionId?: string;
+  /** CREATOR-05: cast ids from the composer's structured `@` mentions, checked by the route against the viewer's cast list. */
+  castMentions?: string[];
   tryCompanionId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
@@ -741,6 +743,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     engineUnavailable: false,
     context: [],
     ...pageContextForTurn(conversation, surface, opts.pageContext),
+    ...(opts.castMentions?.length && !temporary ? { castMentions: opts.castMentions } : {}),
     messages: [],
     proposals: [],
     outcomes: [],

@@ -59,14 +59,13 @@
         "grounded": false,
         "description": "Saved style name, only if named."
       },
-      "subjects": {
+      "cast": {
         "type": "array",
         "items": {
-          "type": "string",
-          "maxLength": 80
+          "type": "string"
         },
-        "maxItems": 3,
-        "description": "Saved subject names, only if chosen."
+        "grounded": false,
+        "description": "Cast ids from @ mentions."
       },
       "quality": {
         "type": "string",

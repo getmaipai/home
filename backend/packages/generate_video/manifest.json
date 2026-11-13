@@ -109,17 +109,15 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 60
-        },
-        "description": "Saved styles."
-      },
-      "subjects": {
-        "type": "array",
-        "maxItems": 3,
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 80
         }
+      },
+      "cast": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "grounded": false,
+        "description": "Cast ids from @ mentions."
       },
       "production": {
         "type": "string",

@@ -84,7 +84,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
   const engines: FilmEngines = {
     async waitForIdle() {},
     async ensureSubject({ name, kind, locked }) {
-      const found = listMediaSubjects(actor).find((subject) => subject.name === name);
+      const found = listMediaSubjects(actor).find((subject) => subject.name === name) ?? listMediaSubjects(actor).find((subject) => subject.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase());
       if (found) return found.id;
       const subject = createMediaSubject(actor, { name, kind, look: locked, referenceIds: [] }, "film");
       try { const { makeSubjectSheet } = await import("@/lib/mediaSubjectSheet"); await makeSubjectSheet(actor, subject.id); } catch { /* Model sheets are optional; the saved subject remains usable. */ }

@@ -189,6 +189,21 @@ describe("companion mention request", () => {
     expect(await bodyFor("Please email @Rivet")).not.toHaveProperty("mention_companion_id");
   });
 
+  // CREATOR-05: a cast chip is its own mention type; a companion chip still means a one-turn guest and a cast chip never makes a persona answer.
+  test("a cast chip sends structured mentions and no companion; a companion chip still sends only the guest", async () => {
+    const cast = await bodyFor("A picture of :cast[Marlow Fox]{name=cast:msub-abc123def} at the beach");
+    expect(cast).toHaveProperty("mentions", [{ id: "msub-abc123def", type: "cast" }]);
+    expect(cast).not.toHaveProperty("mention_companion_id");
+    expect(cast.text).toBe("A picture of @Marlow Fox at the beach");
+    const guest = await bodyFor("Please ask :person[Rivet]{name=guest-rivet}");
+    expect(guest).toHaveProperty("mention_companion_id", "guest-rivet");
+    expect(guest).not.toHaveProperty("mentions");
+    const both = await bodyFor(":person[Rivet]{name=guest-rivet} draw :cast[Marlow Fox]{name=cast:msub-abc123def} and :cast[Marlow Fox]{name=cast:msub-abc123def}");
+    expect(both).toMatchObject({ mention_companion_id: "guest-rivet", mentions: [{ id: "msub-abc123def", type: "cast" }] });
+    expect(await bodyFor("Please email @Marlow")).not.toHaveProperty("mentions");
+    expect(await bodyFor("a cast chip without the prefix :cast[X]{name=msub-1}")).not.toHaveProperty("mentions");
+  });
+
   async function retryBody(answeredBy: { companion_id: string } | null, current: boolean) {
     const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-retry-speaker", reply: { text: "Again" }, source: "model", safety: SAFETY } }]));
     try {

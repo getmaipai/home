@@ -95,13 +95,19 @@ export function shareMediaSubject(actor: PersonRow, id: string, personId: string
   db.update(mediaSubjects).set({ sharedWith: JSON.stringify([...ids]), updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();
   return getMediaSubject(actor, id);
 }
-export function subjectsForNames(actor: PersonRow, names: string[]): Array<{ subject: MediaSubject; references: Array<{ id: string; bytes: Uint8Array; mediaType: string; audience: string }>; sheet?: { id: string; bytes: Uint8Array; mediaType: string; audience: string } }> | null {
+export type SubjectWithRefs = { subject: MediaSubject; references: Array<{ id: string; bytes: Uint8Array; mediaType: string; audience: string }>; sheet?: { id: string; bytes: Uint8Array; mediaType: string; audience: string } };
+export function subjectsForNames(actor: PersonRow, names: string[]): SubjectWithRefs[] | null {
   if (names.length > 3 || new Set(names).size !== names.length) return null;
   const all = listMediaSubjects(actor); const selected: MediaSubject[] = [];
   for (const name of names) { const row = all.find((s) => s.name.toLocaleLowerCase() === name.toLocaleLowerCase()); if (!row) return null; if (row.real && (actor.role === "child" || actor.role === "teen")) return null; selected.push(row); }
+  return loadSubjectReferences(actor, selected);
+}
+/** CREATOR-05: the picture files (references and the sheet) of subjects already chosen and checked (`resolveCast` or a name match); null when a file is missing or altered. */
+export function loadSubjectReferences(actor: PersonRow, chosen: MediaSubject[]): SubjectWithRefs[] | null {
+  const selected = [...chosen];
   const rank = { place: 0, character: 1, prop: 2 };
   selected.sort((a, b) => rank[a.kind] - rank[b.kind]);
-  const result: Array<{ subject: MediaSubject; references: Array<{ id: string; bytes: Uint8Array; mediaType: string; audience: string }>; sheet?: { id: string; bytes: Uint8Array; mediaType: string; audience: string } }> = [];
+  const result: SubjectWithRefs[] = [];
   for (const subject of selected) {
     const files = subject.reference_ids.map((id) => {
       const file = db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, subject.owner_person_id), isNull(attachments.deletedAt))).get();

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- CREATOR-05: `cast` (ids from the cast list or an `@` mention, up to six). Each resolved member reaches the planner as a cast hint and the run uses its saved subject, so the film's record lists it. `characters` stays as the text alias.
+
 ### Added
 
 - Pictures you attach now work with real uploads (the saved copy no longer collapses into the upload). A product kept hidden until the end stays out of every earlier shot, its title and summary; a spoiled or empty plan from the model is asked for again.

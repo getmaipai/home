@@ -7,7 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { ensureSubject, listSynths, synthById, synthFloor, type SynthRecord } from "@/lib/synths";
-import { ensurePersonSubject, isSheetReference, listMediaSubjects, subjectFacts, subjectRowForPerson, subjectViewById, type MediaSubject } from "@/lib/mediaSubjects";
+import { ensurePersonSubject, isSheetReference, listMediaSubjects, loadSubjectReferences, subjectFacts, subjectRowForPerson, subjectViewById, type MediaSubject, type SubjectWithRefs } from "@/lib/mediaSubjects";
 import { householdLikenessAllowed, LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { readCompanionPack } from "@/lib/companionPack";
@@ -124,4 +124,47 @@ export async function resolveCast(actor: PersonRow, refs: string[]): Promise<Cas
     } catch { refused.push({ ref, line: `${hit.name} could not be set up as cast. Try again in a moment.` }); }
   }
   return { members, refused };
+}
+
+// CREATOR-05: what a media tool does with its `cast` argument. The ids come from GET /api/cast (the model copies them from the structured `@` mentions or the
+// list); every one goes through `resolveCast`, so a crafted id, an ambiguous name, someone the viewer may not cast, or more than six is refused with one plain line.
+export type CastForTool = { ok: true; members: ResolvedCast[]; subjects: SubjectWithRefs[] } | { ok: false; line: string };
+const NOT_IN_LIST = (ref: string) => `"${ref.slice(0, 80)}" is not in your cast list. Pick someone from the list and try again.`;
+/** The `cast` argument as text refs. A non-text entry is kept as an empty ref so it is refused, never skipped. */
+export function castRefsOf(args: Record<string, unknown>): string[] | null {
+  if (args.cast === undefined || args.cast === null) return [];
+  if (!Array.isArray(args.cast)) return null;
+  return args.cast.map((entry) => (typeof entry === "string" ? entry.trim() : ""));
+}
+export async function castForTool(actor: PersonRow, args: Record<string, unknown>): Promise<CastForTool> {
+  const refs = castRefsOf(args);
+  if (refs === null) return { ok: false, line: NOT_IN_LIST("cast") };
+  if (!refs.length) return { ok: true, members: [], subjects: [] };
+  if (refs.length > MAX_CAST) return { ok: false, line: `A cast can have at most ${MAX_CAST} members. Remove one and try again.` };
+  const bad = refs.find((ref) => !ref || ref.length > 120);
+  if (bad !== undefined) return { ok: false, line: NOT_IN_LIST(bad || "that") };
+  const result = await resolveCast(actor, refs);
+  if (result.refused.length) return { ok: false, line: result.refused[0]!.line };
+  // The member's locked sentence is its look wherever a saved subject's look is used today.
+  const loaded = loadSubjectReferences(actor, result.members.map((member) => ({ ...member.subject, look: member.locked_description?.trim() || member.subject.look })));
+  if (!loaded) return { ok: false, line: `${result.members[0]?.name ?? "That cast member"}'s pictures could not be read. Try again in a moment.` };
+  return { ok: true, members: result.members, subjects: loaded };
+}
+/** Saved-subject matches and cast matches as one list, each subject once. */
+export function mergeSubjects(named: SubjectWithRefs[], cast: SubjectWithRefs[]): SubjectWithRefs[] {
+  const seen = new Set(named.map((entry) => entry.subject.id));
+  return [...named, ...cast.filter((entry) => !seen.has(entry.subject.id))];
+}
+/** The cast the composer sent as structured `@` mentions (type "cast"), kept only where the viewer may cast them (never trusted as sent). */
+export function castMentionIds(actor: PersonRow, mentions: unknown): string[] {
+  if (!Array.isArray(mentions)) return [];
+  const allowed = new Set(listCast(actor).map((entry) => entry.id));
+  const out: string[] = [];
+  for (const item of mentions.slice(0, 12)) {
+    const mention = item as { id?: unknown; type?: unknown } | null;
+    if (!mention || mention.type !== "cast" || typeof mention.id !== "string" || !allowed.has(mention.id) || out.includes(mention.id)) continue;
+    out.push(mention.id);
+    if (out.length >= MAX_CAST) break;
+  }
+  return out;
 }

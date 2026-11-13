@@ -48,6 +48,14 @@
         "maxLength": 120,
         "grounded": false,
         "description": "The id of an earlier video made from pictures in this chat, to make a new video from the SAME reference sheet without new pictures (for example 'same sheet, but make her walk away'). Use with request. Use 'latest' for the newest one."
+      },
+      "cast": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "grounded": false,
+        "description": "Cast ids from @ mentions."
       }
     }
   },

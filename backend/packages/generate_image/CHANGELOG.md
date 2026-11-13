@@ -6,6 +6,7 @@ All notable changes to the Make a Picture package, in [Keep a Changelog](https:/
 
 ### Changed
 
+- CREATOR-05: `cast` (ids from the cast list or an `@` mention, up to six) replaces `subjects` in the schema the model sees; `subjects` (saved names) still works. Every id goes through `resolveCast`: a made-up id, an ambiguous name or someone the person may not cast starts nothing and gets one plain line. The picture's record lists its cast.
 - RECENCY-02: the description says the tool is never used to show something real that already exists (a poster, photo, film, person); that is `show_images`.
 
 ## [0.2.0] - 2026-10-17

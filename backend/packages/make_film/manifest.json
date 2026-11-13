@@ -70,7 +70,15 @@
           "maxLength": 80
         },
         "grounded": false,
-        "description": "Optional names of saved characters or of the person's own synths to use, only when the person names them. Never list attached pictures or their file names here: Home reads each attached picture itself."
+        "description": "Names of saved characters or synths, only when named. Never attached pictures or file names: Home reads those."
+      },
+      "cast": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "grounded": false,
+        "description": "Cast ids from @ mentions."
       },
       "go_ahead": {
         "type": "boolean",

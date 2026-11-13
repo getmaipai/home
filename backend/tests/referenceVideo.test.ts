@@ -140,7 +140,7 @@ describe("the package and its arguments", () => {
   test("the manifest declares an adult conditional tool with its own gate", () => {
     const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages/make_reference_video/manifest.json"), "utf8"));
     expect(manifest).toMatchObject({ id: MAKE_REFERENCE_VIDEO_TOOL_ID, kind: "plugin", min_role: "adult", offer: { mode: "conditional", gate: "referenceVideoAllowed", bench_row: "make-reference-video-tool" } });
-    expect(Object.keys(manifest.args.properties)).toEqual(["request", "seconds", "reuse_video"]);
+    expect(Object.keys(manifest.args.properties)).toEqual(["request", "seconds", "reuse_video", "cast"]);
     expect(manifest.routing.examples.length).toBeGreaterThanOrEqual(4);
   });
   test("arguments: seconds 4 to 8, words up to 2000 characters", () => {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- CREATOR-05: `cast`. A cast member's picture joins the attached pictures as one more reference, and the video's record lists the cast. A made-up id starts nothing.
+
 ### Added
 
 - Attach pictures and ask for a short video: Home builds a reference sheet, shows it in the chat, and makes an 8 second video from it (Max, LTX 2.5 Ingredients adapter).

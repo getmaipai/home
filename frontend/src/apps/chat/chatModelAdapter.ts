@@ -26,6 +26,7 @@ import { randomUuid } from "@/lib/randomUuid";
 import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
 import type { PageContext as SpecPageContext } from "@maipai/spec/gen/ts/page-context.js";
 import { errorLine } from "@/lib/hubReachability";
+import { CAST_MENTION_PREFIX } from "@/apps/chat/castMentions";
 
 // The backend already emits the song job id; the pinned spec has not added it yet.
 const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
@@ -268,6 +269,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const audioAttachments = lastMessage?.role === "user" ? lastMessage.attachments.map((attachment) => ({ attachment, file: stagedAudioFile(attachment.id) })).filter((item): item is { attachment: (typeof lastMessage.attachments)[number]; file: File } => Boolean(item.file)) : [];
       const typedText = lastUserText(messages, !quoteSpoken);
       const mentionCompanionId = lastMessage?.role === "user" ? unstable_defaultDirectiveFormatter.parse(messageText(lastMessage)).find((segment): segment is Extract<ReturnType<typeof unstable_defaultDirectiveFormatter.parse>[number], { kind: "mention" }> => segment.kind === "mention" && segment.type === "person")?.id : undefined;
+      // CREATOR-05: cast chips are structured mentions (type "cast", id prefixed `cast:`), read from the directive the popover wrote, never from the words. A companion chip stays a one-turn guest.
+      const castMentions = lastMessage?.role === "user" ? unstable_defaultDirectiveFormatter.parse(messageText(lastMessage)).flatMap((segment) => (segment.kind === "mention" && segment.type === "cast" && segment.id.startsWith(CAST_MENTION_PREFIX) ? [segment.id.slice(CAST_MENTION_PREFIX.length)] : [])).filter((id, index, all) => id && all.indexOf(id) === index).slice(0, 6) : [];
       const retryWithCurrent = deps.consumeRetryWithCurrentCompanion?.() ?? false;
       const retrySpeakerId = !retryWithCurrent && unstable_parentId && unstable_assistantMessageId
         ? deps.findReplacedSpeaker?.({ parentId: unstable_parentId, newMessageId: unstable_assistantMessageId })
@@ -488,6 +491,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             assistantStream: true,
             conversationId,
             tryCompanionId: deps.getTryCompanionId?.(),
+            ...(reconnectAttempts === 0 && castMentions.length ? { castMentions } : {}),
             mentionCompanionId: reconnectAttempts === 0 ? (!temporary && !retryWithCurrent && retrySpeakerId ? retrySpeakerId : mentionCompanionId) : undefined,
             supersedes,
             continuation,

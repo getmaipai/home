@@ -117,6 +117,8 @@ export interface VideoRequest {
   end_file_id?: string | null;
   production_id?: string;
   shot_id?: string;
+  /** CREATOR-05: the saved subjects (cast) the clip shows. */
+  subject_ids?: string[];
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
@@ -496,6 +498,8 @@ export interface StartVideoInput {
   endFileId?: string | null;
   productionId?: string;
   shotId?: string;
+  /** CREATOR-05: the saved subjects (cast) this clip shows; kept on the request so the clip's creation record lists its cast. */
+  subjectIds?: string[];
   /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
   tier?: "standard" | "boost" | "max";
   /** VIDEO-CREATE-01 (V1b): kept on the request for Another take. */
@@ -526,7 +530,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

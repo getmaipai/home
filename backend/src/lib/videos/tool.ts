@@ -140,7 +140,12 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     shotPictureId = shot.picture_file_id ?? null;
   }
   const names = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
-  const resolvedSubjects = subjectsForNames(state.actor as PersonRow, names);
+  const namedSubjects = subjectsForNames(state.actor as PersonRow, names);
+  // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast; a refused member starts nothing and says why in one plain line.
+  const { castForTool, mergeSubjects } = await import("@/lib/cast"); // loaded here: cast.ts reaches the synth store, which must not load before the persona catalog
+  const castChosen = await castForTool(state.actor as PersonRow, args);
+  if (!castChosen.ok) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${castChosen.line}` }, data: { refused: "cast" }, actions: [] } });
+  const resolvedSubjects = namedSubjects && mergeSubjects(namedSubjects, castChosen.subjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
   const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), prompt].filter(Boolean).join(". ");
   const engine = await videoEngineStatus();
@@ -297,6 +302,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       kind: image ? "animate" : "generate",
       prompt: subjectPrompt,
       sourceFileId,
+      ...(resolvedSubjects.length ? { subjectIds: resolvedSubjects.map(({ subject }) => subject.id) } : {}),
       ...(productionId && shotId ? { productionId, shotId } : {}),
       endFileId,
       ...(endAudience === "adult-only" || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),

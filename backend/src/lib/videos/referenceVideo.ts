@@ -421,7 +421,7 @@ function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRe
   const source = sourceFor(actor, context, from, recipe.prompt, recipe.seconds, recipe.seed);
   const firstFrame = recipe.route === "first_frame";
   const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: firstFrame ? runFirstFrameClip(bytes[0]!, recipe, actor) : runIngredients(bytes, recipe, actor), phase: firstFrame ? FIRST_FRAME_PHASE : REFERENCE_PHASE, adultOnly: false,
-    request: { reference: recipe, quality: "detailed", ...(firstFrame ? {} : { tier: "max" as const }), refProgress: startProgress(2, firstFrame ? "first_frame" : undefined) } });
+    request: { reference: recipe, quality: "detailed", ...(firstFrame ? {} : { tier: "max" as const }), refProgress: startProgress(2, firstFrame ? "first_frame" : undefined), ...(getVideoJobFor(actor, from)?.request.subject_ids?.length ? { subject_ids: getVideoJobFor(actor, from)!.request.subject_ids } : {}) } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
 
@@ -472,7 +472,8 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   const reuse = parsed.data.reuse_video;
   const images = state.images ?? [];
   const request = parsed.data.request;
-  if (!reuse && images.length === 0) return refuse(REFERENCE_NO_PICTURES_LINE, "no_pictures");
+  const castGiven = Array.isArray(args.cast) && args.cast.length > 0;
+  if (!reuse && images.length === 0 && !castGiven) return refuse(REFERENCE_NO_PICTURES_LINE, "no_pictures");
   if (!reuse && !request) return refuse(REFERENCE_WORDS_LINE, "no_words");
   // Who may make it: an adult on their own written chat screen (the same floor as a film).
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
@@ -483,6 +484,14 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   if (activeVideoJobsFor(actor) > 0) return refuse(REFERENCE_BUSY_LINE, "already_making");
   const engine = await videoEngineStatus();
   const context: Context = { conversationId: state.conversationId, turnId: state.turnId };
+  // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast. Each member's picture joins the attached ones as one more reference; its id is kept on the job for the credits.
+  const { castForTool } = await import("@/lib/cast");
+  const castChosen = await castForTool(actor, args);
+  if (!castChosen.ok) return refuse(castChosen.line, "cast");
+  const castPictures: LoadedPicture[] = castChosen.subjects.flatMap(({ subject, references, sheet }) => { const picture = references[0] ?? sheet; return picture ? [{ id: picture.id, bytes: picture.bytes, mediaType: picture.mediaType }] : []; });
+  const castSubjectIds = castChosen.subjects.map(({ subject }) => subject.id);
+  const castAdultOnly = castChosen.subjects.some(({ references, sheet }) => [...references, ...(sheet ? [sheet] : [])].some((file) => file.audience === "adult-only"));
+  const castRequest = castSubjectIds.length ? { subject_ids: castSubjectIds } : {};
 
   // Same sheet, new words (or a new take): no cut-outs, no drawn views.
   if (reuse) {
@@ -505,9 +514,11 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   // Fresh pictures: the same ownership checks a film gives its pictures.
   const loaded: LoadedPicture[] = [];
   try {
-    for (const image of images.slice(0, MAX_REFERENCE_PICTURES)) { const picture = loadSource(actor, state.conversationId, image.id, false); loaded.push({ id: image.id, bytes: picture.bytes, mediaType: picture.mediaType }); }
+    for (const image of images.slice(0, Math.max(0, MAX_REFERENCE_PICTURES - castPictures.length))) { const picture = loadSource(actor, state.conversationId, image.id, false); loaded.push({ id: image.id, bytes: picture.bytes, mediaType: picture.mediaType }); }
+    loaded.push(...castPictures);
   } catch (error) { return refuse(error instanceof Error && error.message ? error.message : "I couldn't open your pictures. Attach them again.", "pictures"); }
 
+  if (loaded.length === 0) return refuse(REFERENCE_NO_PICTURES_LINE, "no_pictures");
   // The route is decided in code before any work: a real person's face takes the first-picture route (the Ingredients adapter does not keep a real face from a sheet).
   const chosen = await decideReferenceRoute(loaded, readPictureRoles, firstFrameTools(actor));
   if (chosen.route === "refuse") return refuse(chosen.line, "face_models_missing");
@@ -516,7 +527,7 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
     if (notReady) return refuse(notReady.line, notReady.why);
     const seconds = parsed.data.seconds ?? FIRST_FRAME_SECONDS;
     const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
-    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFirstFrame(actor, context, loaded, chosen.readings, request!, seconds, audience.band), phase: FIRST_FRAME_PHASE, adultOnly: false, request: { quality: "detailed", refProgress: startProgress(1, "first_frame") } });
+    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFirstFrame(actor, context, loaded, chosen.readings, request!, seconds, audience.band), phase: FIRST_FRAME_PHASE, adultOnly: castAdultOnly, request: { quality: "detailed", refProgress: startProgress(1, "first_frame"), ...castRequest } });
     if (!started.ok) return refuse(started.line, "already_making");
     return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, [], "first_frame") }, data: { videoJobId: started.job.id, route: "first_frame" }, actions: [] } });
   }
@@ -527,7 +538,7 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   const seconds = parsed.data.seconds ?? REFERENCE_VIDEO_SECONDS;
   // The sheet is built by the job itself (its step 1), so the call returns now and the card shows each step.
   const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFresh(actor, context, loaded, request!, seconds, audience.band), phase: REFERENCE_PHASE, adultOnly: false, request: { quality: "detailed", tier: "max", refProgress: startProgress(1) } });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFresh(actor, context, loaded, request!, seconds, audience.band), phase: REFERENCE_PHASE, adultOnly: castAdultOnly, request: { quality: "detailed", tier: "max", refProgress: startProgress(1), ...castRequest } });
   if (!started.ok) return refuse(started.line, "already_making");
   return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, []) }, data: { videoJobId: started.job.id }, actions: [] } });
 }

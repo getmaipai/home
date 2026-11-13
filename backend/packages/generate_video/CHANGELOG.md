@@ -4,6 +4,10 @@ All notable changes to the Make a Video package, in [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Changed
+
+- CREATOR-05: `cast` (ids from the cast list or an `@` mention, up to six) replaces `subjects` in the schema the model sees; `subjects` (saved names) still works. Every id goes through `resolveCast`, and the clip's record lists its cast.
+
 ### Added
 
 - PRODUCTION-VIDEO-01 B: `production` and `shot` (set together) make the video for one shot of the person's own film; the shot's saved picture is the start picture and the finished clip is kept on the shot.

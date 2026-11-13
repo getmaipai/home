@@ -4,6 +4,9 @@
 import { creationIdOfFile, creationIdOfJob, FILE_ID, recordCreation, type Creation, type CreationInput } from "./store";
 import type { PictureJob } from "@/lib/pictures/jobStore";
 import type { VideoJob, VideoFile } from "@/lib/videos/jobs";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { mediaSubjects } from "@/db/schema";
 import type { PersonRow } from "@/types";
 
 let fault: (() => void) | null = null;
@@ -35,6 +38,12 @@ export function generationBlock(input: { kind: "picture" | "video" | "film"; job
   };
 }
 
+const synthOfSubject = (subjectId: string): string | null => db.select({ synthId: mediaSubjects.synthId }).from(mediaSubjects).where(eq(mediaSubjects.id, subjectId)).get()?.synthId ?? null;
+/** CREATOR-05: the cast a job asked for, as the record stores it (the synth link comes from the subject, so a synth's credits find it by either id). */
+function castOfSubjects(subjectIds: readonly string[] | undefined, role: string): NonNullable<CreationInput["cast"]> {
+  return (subjectIds ?? []).map((subject_id) => ({ subject_id, synth_id: synthOfSubject(subject_id), role }));
+}
+
 const sizeOf = (size: string): { width?: number; height?: number } => {
   const match = /^(\d+)x(\d+)$/.exec(size);
   return match ? { width: Number(match[1]), height: Number(match[2]) } : {};
@@ -49,7 +58,7 @@ export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: {
     kind: "picture", fileIds: [file.id], jobIds: [job.id],
     recipe: { tool: "pictures", route: source ? "picture" : "text" },
     words: words(job.prompt, job.prompt),
-    cast: (job.request.subject_ids ?? []).map((subject_id) => ({ subject_id, synth_id: null, role: "subject" })),
+    cast: castOfSubjects(job.request.subject_ids, "subject"),
     sources: source && FILE_ID.test(source) ? [{ file_id: source, role: "reference" }] : [],
     generation: generationBlock({ kind: "picture", jobId: job.stackJob ?? job.id, task: "generate", model: file.model, seed: file.seed, seconds: null, tier: job.request.tier, madeAt: job.updatedAt }),
     settings: { width: file.width, height: file.height, ...(job.request.quality ? { quality: job.request.quality } : {}), styles: job.request.loras.map((style_id) => ({ style_id })), takes: job.request.n },
@@ -106,6 +115,7 @@ export function recordClipCreation(actor: PersonRow, job: VideoJob, files: Video
     // The reference recipe's own words (the person's request rewritten around the panels, and the whole prompt the Stack received).
     words: words(recipe ? recipe.request : job.prompt, recipe ? recipe.prompt : job.prompt),
     sources: sourcesOfVideo(job),
+    ...(job.request.subject_ids?.length ? { cast: castOfSubjects(job.request.subject_ids, "subject") } : {}),
     generation: generationBlock({ kind: "video", jobId: job.stackJob ?? job.id, task: job.request.edit ? "edit" : "generate", model: clip.model, seed: clip.seed ?? job.request.seed, seconds: clip.seconds, tier: job.request.tier, madeAt: job.updatedAt }),
     settings: { width: clip.width, height: clip.height, ...(clip.seconds !== null ? { seconds: clip.seconds } : {}), ...(clip.quality ? { quality: clip.quality } : {}), styles: job.request.loras.map((style_id) => ({ style_id })), ...(recipe ? { route: recipe.route ?? "sheet" } : {}) },
     checks: Object.keys(checks).length ? checks : null,
@@ -122,7 +132,7 @@ export function recordFilmCreation(actor: PersonRow, input: { cutFileId: string;
     productionId: input.productionId,
     recipe: { tool: input.faceless ? "make_film_faceless" : "make_film", route: "film" },
     plan: input.plan.shots.length <= 12 ? { shots: input.plan.shots } : { film_run_id: input.runId },
-    cast: input.castSubjects.map((member) => ({ subject_id: member.subject_id, synth_id: null, role: member.role })),
+    cast: input.castSubjects.map((member) => ({ subject_id: member.subject_id, synth_id: synthOfSubject(member.subject_id), role: member.role })),
     sources: input.clipFileIds.filter((id) => FILE_ID.test(id)).map((file_id) => ({ file_id, role: "clip" as const })),
     settings: { takes: 1 },
   });

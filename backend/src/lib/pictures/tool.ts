@@ -125,7 +125,12 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (refusal) return refused(callId, args, refusal);
   const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
   const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
-  const resolvedSubjects = subjectsForNames(state.actor as PersonRow, chosenSubjects);
+  const namedSubjects = subjectsForNames(state.actor as PersonRow, chosenSubjects);
+  // CREATOR-05: `cast` (ids from GET /api/cast) goes through resolveCast; a refused member starts nothing and says why in one plain line.
+  const { castForTool, mergeSubjects } = await import("@/lib/cast"); // loaded here: cast.ts reaches the synth store, which must not load before the persona catalog
+  const castChosen = await castForTool(state.actor as PersonRow, args);
+  if (!castChosen.ok) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${castChosen.line}` }, data: { refused: "cast" }, actions: [] } });
+  const resolvedSubjects = namedSubjects && mergeSubjects(namedSubjects, castChosen.subjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
 
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
