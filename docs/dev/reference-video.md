@@ -1,6 +1,28 @@
-# Videos from the person's pictures (REFVIDEO-01)
+# Videos from the person's pictures (REFVIDEO-01, REFVIDEO-FIRSTFRAME-01)
 
 The `make_reference_video` tool (package `backend/packages/make_reference_video`) makes a short video from pictures a person attached in chat: people, objects and places. A film or commercial of 10 seconds or more stays `make_film`.
+
+## Two routes, chosen in code before any work (REFVIDEO-FIRSTFRAME-01)
+
+Measured 2026-11-12 (8 clips of two real adults, SFace cosine to the photo 0.02 to 0.22 against about 0.36 for the same person): the LTX 2.5 Ingredients adapter keeps hair, glasses and clothes from a reference sheet but not a real person's face. It works for objects, places and invented or cartoon characters. A face in the clip's FIRST FRAME does stay (image-to-video conditions frame 0 at full strength). So `videos/referenceFirstFrame.ts` `decideReferenceRoute` runs at the tool call, before the job starts:
+
+- The face finder finds a face in a picture the vision model reads as a photographed person (`role actor`, `medium photograph`): **first-picture route**. Pictures with no face anywhere skip the vision read and take the **sheet route** (everything below this section). A face in a cartoon or an object picture is the sheet route too.
+- People in the pictures and the face models not installed: a refusal sentence (`face_models_missing`, `FACE_MODELS_LINE`: an admin installs "Telling people apart" in Settings, AI and models). Never a silent downgrade to the sheet route.
+- A picture that already is a reference sheet and also holds a real face is not handled specially; it is read like any other picture.
+
+### First-picture route
+
+The card's steps are "Creating the first picture" and "Creating the video" (`FIRST_FRAME_STEP_NAMES`, chosen by `ReferenceProgress.route`); the job phase is `making from the first picture`. Same job machinery as the sheet route: one `edit` job, one at a time, Stop in both steps, the "waiting for free room" line, restart ends the job with the first picture kept, the recipe on `VideoRequest.reference` (`route: "first_frame"`, `sheetFileIds[0]` is the first picture, `prompt` is the paragraph alone, `firstPicture`, `faceMatch`).
+
+1. **Step 1, `buildFirstPicture(pictures, { scene, actor, onStep, signal })`** returns `{ png, how, notes, people, description }`. One actor picture and nothing else: the photo itself fitted to 1024x576 on a soft copy of itself (`how: "photo"`, nothing redrawn). Otherwise each person is cut out alone with `films/sheetMaker.ts` `cutOutPeople` (the sheet's own face split and junk-only cleanup; no close-ups, no drawn views), at most two people. The place picture (set, building) is the plate the edit model works on; the people (their cut-outs on white) and the objects are its reference pictures (the edit takes two). With no place, the first person's own photo is the picture that is edited. The edit is `films/engines.ts` `submitComposition` (Stack `/v1/images/edits`), whose instruction says to keep references exactly as they look and never asks for a redrawn face.
+2. **Face gate, per person:** the best SFace cosine between their own photo's face (from their cut-out) and any face in the composed still must be at least `FACE_GATE` 0.5. If the edit fails or any person fails the gate, the first picture is a plain Sharp paste of each person's own cut-out over the plate (`how: "pasted"`) and a note says so; objects are then left to the video's words. The scores and the people's face vectors are saved in `recipe.firstPicture`.
+3. **Step 2, `runFirstFrameClip`:** an ordinary image-to-video submit (`submitVideo`, picture start, `image_source: "uploaded"`) from the saved first picture. `planFirstFrameClip` picks the level the same way a clip from one attached photo does: Max with sound when the person holds it and the Stack reports `ltx25max.image_to_video`, else the best allowed level. Length is 6 s by default (4 to 8 asked, the level's ceiling lowers it). The prompt is the person's request rewritten as one paragraph about what happens, ending with `FIRST_FRAME_SENTENCE` (photorealistic, one continuous scene) and the no-dialogue sentence. The job's request takes the real size, level and tier (`EditHooks.request`).
+4. **After the clip,** `measureClipFaces` samples six frames (`extractKeyframes` with a count), takes each person's nearest face in each frame (SFace cosine to their photo) and stores `recipe.faceMatch`. A median under `CLIP_FACE_LOW` 0.35 adds `LOOK_ALIKE_LINE` to the card's notice (`clip.note`), with any step 1 notes. It never blocks the clip.
+5. **Another take and new words:** `anotherReferenceTake` and `reuse_video` re-run step 2 only from the saved first picture (new seed, or new paragraph). No cut-outs, no edit, no gate. The route needs a ready video level, not Max or the adapter.
+
+Face code, the sheet maker and the Stack picture edit are dynamic imports (VISION-02c: `tests/turnMachine/pictureParts.test.ts` fails if the chat picture path reaches them). `referenceFirstFrame.ts` therefore defines its own `SheetPicture` type instead of importing the sheet maker's.
+
+**Real run:** `buildFirstPicture` is the entry for step 1 against the live Stack's image edit with a temporary data dir (`MAIPAI_DATA_DIR`; the face models must be in its `models/robot-assets`); the test seam `__setFirstFrameToolsForTests` replaces the face finder, cut-out tool and edit. Tests: `tests/referenceFirstFrame.test.ts` (fake faces by colour, fake edit and Stack).
 
 ## Flow
 
@@ -24,5 +46,8 @@ Settings, AI and models and the setup wizard list both parts like every other mo
 - **Cleanup.** A sheet is a companion of its video's clip (`libraryTrash.companionsOf`): Trash and purge take it along only when no other video that is still being made or still has its clip uses it (`videos/referenceSheets.ts`). A kept sheet never protects its clip from the storage rules. A sheet of a video that failed or was stopped stays in the Library until the person deletes it.
 
 ## Not done
+
+The first-picture route has been tested only against fakes; no real run has been made (the owner of REFVIDEO-FIRSTFRAME-01 runs it by hand).
+
 
 The Stack lane (`/v1/videos/ingredients`) was built in parallel and was not deployed when this landed: everything above is tested against a fake Stack, and no real run has been made. The adapter check before work needs the Stack to report `qualities.ltx25max.ingredients`; until it does, a missing adapter shows as the plain sentence on the card after the sheet is made.

@@ -60,7 +60,7 @@ async function compileHelper(): Promise<string | null> {
 }
 
 /** Test seam: replaces the whole extraction. */
-let forTests: ((mp4: Uint8Array, seconds: number | null) => Promise<Uint8Array[] | null>) | null = null;
+let forTests: ((mp4: Uint8Array, seconds: number | null, count?: number) => Promise<Uint8Array[] | null>) | null = null;
 export function __setKeyframesForTests(fn: typeof forTests): void { forTests = fn; }
 
 async function run(cmd: string[], deadlineMs: number): Promise<number> {
@@ -75,20 +75,21 @@ async function run(cmd: string[], deadlineMs: number): Promise<number> {
 export const keyframeCount = (seconds: number | null): number => (seconds !== null && seconds > 6 ? 5 : 3);
 
 /** First, middle and last frames (five for a clip over 6 seconds) as JPEG bytes (at most 768 px a side), or null when this Mac cannot decode a clip. */
-export async function extractKeyframes(mp4: Uint8Array, seconds: number | null): Promise<Uint8Array[] | null> {
-  if (forTests) return forTests(mp4, seconds);
+export async function extractKeyframes(mp4: Uint8Array, seconds: number | null, wanted?: number): Promise<Uint8Array[] | null> {
+  if (forTests) return forTests(mp4, seconds, wanted);
+  const frameCount = wanted ?? keyframeCount(seconds);
   const dir = mkdtempSync(join(workRoot(), "clip-"));
   try {
     const clip = join(dir, "clip.mp4");
     writeFileSync(clip, mp4, { mode: 0o600 });
     const helper = await ensureKeyframeHelper();
     if (helper) {
-      if (await run([helper, clip, dir, String(FRAME_SIDE), String(keyframeCount(seconds))], HELPER_DEADLINE_MS) === 0) return readFrames(dir, keyframeCount(seconds));
+      if (await run([helper, clip, dir, String(FRAME_SIDE), String(frameCount)], HELPER_DEADLINE_MS) === 0) return readFrames(dir, frameCount);
       return null;
     }
     const ffmpeg = Bun.which("ffmpeg");
     if (!ffmpeg || !seconds || seconds <= 0) return null;
-    const count = keyframeCount(seconds);
+    const count = frameCount;
     const stamps = Array.from({ length: count }, (_, i) => (i === 0 ? 0 : i === count - 1 ? Math.max(0, seconds - 0.15) : (seconds * i) / (count - 1)));
     for (let i = 0; i < stamps.length; i += 1) {
       const code = await run([ffmpeg, "-loglevel", "error", "-y", "-ss", String(stamps[i]), "-i", clip, "-frames:v", "1", "-vf", `scale='min(${FRAME_SIDE},iw)':-2`, "-map_metadata", "-1", join(dir, `${i}.jpg`)], HELPER_DEADLINE_MS);

@@ -14,6 +14,7 @@ import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory"
 import { companionsOf } from "@/lib/libraryTrash";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { __setRolesVisionForTests } from "@/lib/pictures/roles";
+import { __setFirstFrameToolsForTests } from "@/lib/videos/referenceFirstFrame";
 import { cancelVideoJob, getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
 import { activeGenerationRows } from "@/lib/activity";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
@@ -100,6 +101,8 @@ beforeEach(() => {
   actor = person("owner");
   fakeMaker();
   __setSheetCheckerForTests(notSheet);
+  // The face models are installed and no picture holds a face: every test here is the sheet route (the first-picture route has its own file, referenceFirstFrame.test.ts).
+  __setFirstFrameToolsForTests({ installed: async () => true, faces: async () => [] });
   __setParagraphWriterForTests(async (request) => `The woman from the Top Left panel does this: ${request}`);
   let n = 0; __setRolesVisionForTests(async () => JSON.stringify(ROLE_ANSWERS[n++ % ROLE_ANSWERS.length]));
   const base = fake.handler;
@@ -129,7 +132,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   fake.restore(); __setKeyframesForTests(null); __setVideoStatusForTests(undefined); __setRolesVisionForTests(null); __setSheetVisionForTests(null);
-  __setSheetMakerForTests(null); __setSheetCheckerForTests(null); __setParagraphWriterForTests(null);
+  __setSheetMakerForTests(null); __setSheetCheckerForTests(null); __setParagraphWriterForTests(null); __setFirstFrameToolsForTests(null);
   await new Promise((resolve) => setTimeout(resolve, 50));
 });
 

@@ -122,6 +122,16 @@ After chat has made you a picture, say "animate this picture" or open the **More
 
 Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
 
+## Make a video from your pictures
+
+Attach pictures of people, objects or places to a chat message and say what should happen, for example "she walks up to this building holding these cards". The card shows two steps.
+
+**Pictures with a real person in them.** Step 1 is **Creating the first picture**. Home cuts each person out of their photo and puts them into the scene, using your building or room photo as the place. It then checks that each face still matches the face in your photo. If a face does not match, Home pastes the person's own photo into the scene instead, which can look less natural but keeps the face exactly yours, and tells you so. The first picture shows on the card as soon as it is ready. Step 2 is **Creating the video**: the video starts from that first picture, so the person's real face is in it. It is 5 to 8 seconds long, and it has natural sound and no talking. At the end Home compares the faces in six moments of the video with your photo. If the person in the later part may not look like the photo, it says so under the video. This needs **Telling people apart** to be installed. If it is not, Home tells you and an admin can add it in **Settings**, **AI and models**.
+
+**Pictures of objects, places or made-up characters.** Step 1 is **Creating the reference sheet**: Home puts your pictures on one sheet. Step 2 is **Creating the video**, made from the sheet. This needs Max.
+
+In both cases you can press **Another take** for a new try from the same first picture or sheet, or ask for the same pictures with new words.
+
 ## Who can make videos
 
 Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. An owner or admin can turn this off. Teens and children get Standard only, as short clips with no sound. They never see a half-drawn frame. Spoken answers, the TV and other shared screens never make videos. A guest cannot.

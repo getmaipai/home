@@ -33,7 +33,7 @@ import { recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
-import { anotherReferenceTake, REFERENCE_STEP_NAMES } from "@/lib/videos/referenceVideo";
+import { anotherReferenceTake, FIRST_FRAME_STEP_NAMES, REFERENCE_STEP_NAMES } from "@/lib/videos/referenceVideo";
 import type { ReferenceProgress } from "@/lib/videos/jobs";
 import { getStudioVoice } from "@/lib/videos/studioVoices";
 import { appRouteAllowed } from "@/lib/apps";
@@ -122,9 +122,10 @@ function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean
 /** REFVIDEO-STEPS-01: the two steps of a video made from pictures, as the chat card draws them. */
 export function referenceSteps(progress: ReferenceProgress) {
   const sheetPercent = progress.step === 2 ? 100 : Math.round(100 * Math.max(0, Math.min(1, progress.sheet.done / Math.max(1, progress.sheet.total))));
+  const names = progress.route === "first_frame" ? FIRST_FRAME_STEP_NAMES : REFERENCE_STEP_NAMES;
   return [
-    { id: "sheet" as const, name: REFERENCE_STEP_NAMES[0], state: progress.step === 2 ? "done" as const : "running" as const, percent: sheetPercent, line: progress.step === 2 ? null : `${progress.sheet.line}.`, waiting: false },
-    { id: "clip" as const, name: REFERENCE_STEP_NAMES[1], state: progress.step === 1 ? "waiting" as const : "running" as const, percent: progress.step === 1 ? 0 : Math.round(progress.clip.percent), line: progress.step === 1 ? null : progress.clip.line.replace(/[.\s]*$/, "."), waiting: progress.step === 2 && progress.clip.waiting },
+    { id: "sheet" as const, name: names[0], state: progress.step === 2 ? "done" as const : "running" as const, percent: sheetPercent, line: progress.step === 2 ? null : `${progress.sheet.line}.`, waiting: false },
+    { id: "clip" as const, name: names[1], state: progress.step === 1 ? "waiting" as const : "running" as const, percent: progress.step === 1 ? 0 : Math.round(progress.clip.percent), line: progress.step === 1 ? null : progress.clip.line.replace(/[.\s]*$/, "."), waiting: progress.step === 2 && progress.clip.waiting },
   ];
 }
 
@@ -388,7 +389,9 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     const audience = videoRouteAudience(actor);
     if (laneOf(audience) !== "adult") return c.json({ error: "Videos from pictures are for adults on their own screen. Ask an adult in your home to help.", code: "minor" }, 403) as never;
     const engine = await videoEngineStatus();
-    if (!ltx25MaxReady(engine)) return c.json({ error: videoMaxNotReadyReason(engine), code: "max_not_ready" }, 503) as never;
+    // The first-picture route (a real person's face) is an ordinary picture-to-video clip: any ready video level will do; the sheet route needs Max.
+    if (source.request.reference.route === "first_frame") { if (!videoStatusReady(engine, true)) return c.json({ error: videoNotReadyReason(engine), code: "not_installed" }, 503) as never; }
+    else if (!ltx25MaxReady(engine)) return c.json({ error: videoMaxNotReadyReason(engine), code: "max_not_ready" }, 503) as never;
     const again = anotherReferenceTake(actor, source);
     if (!again.ok) return c.json({ error: again.line, code: again.status === 409 ? "already_making" : "gone" }, again.status) as never;
     return c.json(videoCardOrLocked(actor, again.job, true, await readyFlags(actor)), 200);

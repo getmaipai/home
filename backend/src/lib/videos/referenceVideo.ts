@@ -15,23 +15,27 @@ import { readPictureRoles, type PictureReading, type PictureRole } from "@/lib/p
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { laneOf } from "@/lib/pictures/lane";
 import { readAttachment, storeFile } from "@/lib/attachments";
-import { tierArgument, MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { allowedQuality, jobTier, tierArgument, MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
-import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
-import { ltx25MaxReady } from "./quality";
-import { videoEngineStatus, videoMaxNotReadyReason } from "./ready";
+import { householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
+import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, videoSizeFor } from "./quality";
+import { videoEngineStatus, videoMaxNotReadyReason, videoNotReadyReason, videoStatusReady } from "./ready";
 import { videoAudienceOf, type GenerateVideoState } from "./tool";
 import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, type EditRun, type ReferenceProgress, type ReferenceRecipe, type VideoJob } from "./jobs";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { videoWaitLine } from "./waitLine";
 import { fullViewForJob } from "@/lib/stack/fullView";
-import { cancelOrDeleteVideo, fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideoIngredients } from "./stack";
+import { cancelOrDeleteVideo, fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoIngredients, type StackClip } from "./stack";
 import { checkPictureIsSheet, describeProvidedSheet, fitToSheetSize, type SheetCheck } from "./referenceSheetCheck";
-import { REFERENCE_PHASE } from "./phaseLabel";
+import { FIRST_FRAME_PHASE, REFERENCE_PHASE } from "./phaseLabel";
 import { REFERENCE_SHEET_NOTE } from "./referenceSheets";
+import { FIRST_FRAME_LINES, FIRST_FRAME_SENTENCE, FIRST_FRAME_STEP_NAMES, buildFirstPicture, decideReferenceRoute, firstFrameTools, measureClipFaces, LOOK_ALIKE_LINE, type FirstFramePicture, type FirstPictureResult } from "./referenceFirstFrame";
 
 import { MAKE_REFERENCE_VIDEO_TOOL_ID } from "./referenceToolId";
-export { MAKE_REFERENCE_VIDEO_TOOL_ID };
+export { MAKE_REFERENCE_VIDEO_TOOL_ID, FIRST_FRAME_STEP_NAMES };
+/** The first-picture route's default length (REFVIDEO-FIRSTFRAME-01): 5 to 8 seconds; the level's own ceiling lowers it. */
+export const FIRST_FRAME_SECONDS = 6;
 export const REFERENCE_VIDEO_SECONDS = 8;
 export const MAX_REFERENCE_PICTURES = 6;
 /** The Stack takes at most this many characters of prompt. */
@@ -78,7 +82,7 @@ export function __setSheetMakerForTests(fn: SheetMaker | null): void { sheetMake
 type SheetChecker = (bytes: Uint8Array) => Promise<SheetCheck>;
 let sheetChecker: SheetChecker = checkPictureIsSheet;
 export function __setSheetCheckerForTests(fn: SheetChecker | null): void { sheetChecker = fn ?? checkPictureIsSheet; }
-type ParagraphWriter = (request: string, description: string) => Promise<string | null>;
+type ParagraphWriter = (request: string, description: string, route?: "sheet" | "first_frame") => Promise<string | null>;
 let paragraphWriter: ParagraphWriter = writeParagraph;
 export function __setParagraphWriterForTests(fn: ParagraphWriter | null): void { paragraphWriter = fn ?? writeParagraph; }
 
@@ -92,10 +96,19 @@ const WRITER_SYSTEM = [
   "Reply with the paragraph only, with no heading and no quotes.",
 ].join("\n");
 
-async function writeParagraph(request: string, description: string): Promise<string | null> {
+const FIRST_FRAME_WRITER_SYSTEM = [
+  "You write the video part of a prompt for a video model that starts from one given first picture.",
+  "You are given what that first picture shows and the person's request. Rewrite the request as ONE paragraph, at most 600 characters, that says what happens from the first picture on: who or what does what and where, and how the camera moves.",
+  "Refer to each person the way the picture list names them (for example \"the woman in the red jacket\") so the model knows who is meant. Do not describe anyone's face, age or identity: the people stay as the first picture shows them.",
+  "Keep the person's meaning and details; add no new people, events or places. Describe positive facts only. Never write names of real people. Never write anything a person says: no quoted lines, no dialogue, no speech. Never read out or repeat writing, logos or numbers that appear on the pictures.",
+  "Reply with the paragraph only, with no heading and no quotes.",
+].join("\n");
+
+async function writeParagraph(request: string, description: string, route: "sheet" | "first_frame" = "sheet"): Promise<string | null> {
+  const first = route === "first_frame";
   const result = await completeBackground([
-    { role: "system", content: WRITER_SYSTEM },
-    { role: "user", content: `<sheet>\n${description}\n</sheet>\n\n<request>\n${request}\n</request>` },
+    { role: "system", content: first ? FIRST_FRAME_WRITER_SYSTEM : WRITER_SYSTEM },
+    { role: "user", content: `<${first ? "first_picture" : "sheet"}>\n${description}\n</${first ? "first_picture" : "sheet"}>\n\n<request>\n${request}\n</request>` },
   ], { temperature: 0.2, max_tokens: 260 });
   return result.ok ? result.text : null;
 }
@@ -103,13 +116,14 @@ async function writeParagraph(request: string, description: string): Promise<str
 const oneParagraph = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** The "Generated video" paragraph: the model's rewrite around the sheet panels, or the person's own words when it cannot be written; always ending with the full-frame sentence. */
-export async function generatedParagraph(request: string, description: string): Promise<string> {
+export async function generatedParagraph(request: string, description: string, route: "sheet" | "first_frame" = "sheet"): Promise<string> {
   let written: string | null = null;
-  try { written = await paragraphWriter(request, description); } catch { written = null; }
+  try { written = await paragraphWriter(request, description, route); } catch { written = null; }
   let paragraph = stripQuotedSpeech(oneParagraph(written ?? ""));
   if (!paragraph || paragraph.length > 900) paragraph = stripQuotedSpeech(oneParagraph(request)).slice(0, 900);
   paragraph = paragraph.replace(/[.\s]*$/, "") + ".";
-  if (!paragraph.includes(FULL_FRAME_SENTENCE)) paragraph = `${paragraph} ${FULL_FRAME_SENTENCE}`;
+  const framing = route === "first_frame" ? FIRST_FRAME_SENTENCE : FULL_FRAME_SENTENCE;
+  if (!paragraph.includes(framing)) paragraph = `${paragraph} ${framing}`;
   return paragraph.includes(NO_DIALOGUE_SENTENCE) ? paragraph : `${paragraph} ${NO_DIALOGUE_SENTENCE}`;
 }
 
@@ -197,8 +211,8 @@ function loadSheetFiles(actor: PersonRow, ids: readonly string[]): Uint8Array[] 
   return files;
 }
 
-/** The Stack work of one video from sheets. It never throws: a failure is one plain line. */
-function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: PersonRow): EditRun {
+/** The Stack work of one clip, whichever route made its input: submit it, watch it (the card's step 2) and read the clip back. It never throws: a failure is one plain line. */
+function stackClipRun(actor: PersonRow, firstLine: string, submit: () => Promise<{ job: string; done: StackClip[] | null }>): EditRun {
   // The job is sent as adult (this tool is adult-only), and the Stack answers an adult job's status and clip only with the full-view grant: without it the finished job read back as empty.
   const view = fullViewForJob("adult", actor);
   const failed = (why: string) => `${VIDEO_FAILED_PREFIX} ${why}`;
@@ -208,15 +222,8 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
     // Step 2 of the card: the Stack's own state, in plain words.
     const clipStep = (percent: number, waiting: boolean, line: string) => hooks?.steps((progress) => { progress.step = 2; progress.sheet.done = progress.sheet.total; progress.clip = { percent, waiting, line }; });
     try {
-      clipStep(0, false, "Sending the sheet to the video model");
-      const form = new FormData();
-      for (const [index, bytes] of sheets.entries()) form.append("sheet", new Blob([bytes as unknown as ArrayBuffer], { type: "image/png" }), `sheet-${index + 1}.png`);
-      form.set("prompt", recipe.prompt);
-      form.set("seconds", String(recipe.seconds));
-      if (recipe.seed !== null) form.set("seed", String(recipe.seed));
-      form.set("audience", "adult");
-      form.set("timeout_ms", "1");
-      const submitted = await submitVideoIngredients(form);
+      clipStep(0, false, firstLine);
+      const submitted = await submit();
       stackJob = submitted.job;
       const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job, view), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0 } });
       if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
@@ -241,6 +248,63 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
   };
 }
 
+/** The Stack work of one video from sheets (the sheet route): `POST /v1/videos/ingredients`. */
+function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: PersonRow): EditRun {
+  return stackClipRun(actor, "Sending the sheet to the video model", () => {
+    const form = new FormData();
+    for (const [index, bytes] of sheets.entries()) form.append("sheet", new Blob([bytes as unknown as ArrayBuffer], { type: "image/png" }), `sheet-${index + 1}.png`);
+    form.set("prompt", recipe.prompt);
+    form.set("seconds", String(recipe.seconds));
+    if (recipe.seed !== null) form.set("seed", String(recipe.seed));
+    form.set("audience", "adult");
+    form.set("timeout_ms", "1");
+    return submitVideoIngredients(form);
+  });
+}
+
+/** REFVIDEO-FIRSTFRAME-01: how a first-picture clip is made: Max with sound when this person holds it and the Stack can start a Max clip from a picture, else the best level they may use
+ *  (the same choice a clip from one attached photo gets: `chooseVideoQuality` with a picture). Null only when no video level is ready. */
+export function planFirstFrameClip(actor: PersonRow, engine: Parameters<typeof chooseVideoQuality>[0]["engine"], seconds: number): { size: string; seconds: number; quality: "quick" | "detailed"; tier: "standard" | "boost" | "max"; model?: string } | null {
+  if (!videoStatusReady(engine, true)) return null;
+  const band = speakerAgeBand(actor, new Date());
+  const maxReady = ltx25MaxReady(engine);
+  const tierAsked = tierArgument({ person: actor, category: "video", arg: "max", band, maxAvailable: maxReady });
+  const choice = chooseVideoQuality({
+    requested: tierAsked.quality ? allowedQuality(actor, "video", tierAsked.quality, band) : undefined, household: allowedQuality(actor, "video", householdVideoQuality(), band), seconds, engine, hasPicture: true,
+    quickOnly: allowedQuality(actor, "video", "detailed", band) === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady,
+  });
+  const model = choice.maker === "ltx25max" ? LTX25_MAX_MODEL : choice.maker === "ltx25" ? LTX25_MODEL : undefined;
+  return { size: videoSizeFor(choice.maker, choice.quality, false, engine), seconds: choice.seconds, quality: choice.quality, tier: choice.maker === "ltx25max" ? "max" : jobTier("video", tierAsked.tier, choice.quality), ...(model ? { model } : {}) };
+}
+
+/** STEP 2 of the first-picture route: an image-to-video clip that starts from the saved first picture (frame 0 is the picture, so every face in it is the real one), then the face
+ *  measurement of the finished clip. The measurement is told to the person on the card's notice when it is low; it never blocks the clip. */
+function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: PersonRow): EditRun {
+  return async (signal, onProgress, hooks) => {
+    const failed = (why: string) => ({ ok: false as const, line: `${VIDEO_FAILED_PREFIX} ${why}` });
+    let engine = null as Awaited<ReturnType<typeof videoEngineStatus>>;
+    try { engine = await videoEngineStatus(); } catch { engine = null; }
+    const plan = planFirstFrameClip(actor, engine, recipe.seconds);
+    if (!plan) return failed(videoNotReadyReason(engine));
+    hooks?.request({ size: plan.size, seconds: plan.seconds, quality: plan.quality, ...(plan.tier === "boost" || plan.tier === "max" ? { tier: plan.tier } : {}) });
+    const [width, height] = plan.size.split("x").map(Number) as [number, number];
+    let image: string;
+    try { image = Buffer.from(await sharp(Buffer.from(picture)).resize(width, height, { fit: "cover" }).png().toBuffer()).toString("base64"); } catch { return failed("The first picture could not be read. Try again."); }
+    const made = await stackClipRun(actor, "Sending the first picture to the video model", () => submitVideo({
+      prompt: recipe.prompt, size: plan.size, seconds: plan.seconds, ...(recipe.seed !== null ? { seed: recipe.seed } : {}), image, image_source: "uploaded", audience: "adult",
+      ...(plan.model ? { model: plan.model } : {}), ...(plan.tier === "boost" || plan.tier === "max" ? { tier: plan.tier } : {}), timeout_ms: 1,
+    }))(signal, onProgress, hooks);
+    if (!made.ok) return made;
+    // Measured, then told: six frames, each person's nearest face against their own photo.
+    const known = recipe.firstPicture;
+    const match = known ? await measureClipFaces(made.clip.video, made.clip.seconds, known.people).catch(() => null) : null;
+    const sentences = [...(known?.notes ?? []), ...(match?.low ? [LOOK_ALIKE_LINE] : [])];
+    const { faceMatch: _earlier, ...kept } = recipe;
+    hooks?.recipe({ ...kept, seconds: plan.seconds, ...(match ? { faceMatch: match } : {}) });
+    return { ok: true, clip: { ...made.clip, ...(sentences.length ? { note: sentences.join(" ") } : {}) } };
+  };
+}
+
 /** Step 2 while the Stack holds the clip: the Stack's phase (or its place in line) in the card's words. */
 function stackWaitLine(phase: string | null, position: number | null): string {
   const hold = videoWaitLine(phase, "adult");
@@ -255,7 +319,7 @@ function runningLine(phase: string | null, progress: number): string {
   return "Drawing the frames";
 }
 
-const startProgress = (step: 1 | 2): ReferenceProgress => ({ step, sheet: { done: step === 2 ? 1 : 0, total: 1, line: SHEET_LINES.read }, clip: { percent: 0, waiting: false, line: "Waiting for the sheet" } });
+const startProgress = (step: 1 | 2, route?: "first_frame"): ReferenceProgress => ({ step, ...(route ? { route } : {}), sheet: { done: step === 2 ? 1 : 0, total: 1, line: route ? FIRST_FRAME_LINES.read : SHEET_LINES.read }, clip: { percent: 0, waiting: false, line: route ? "Waiting for the first picture" : "Waiting for the sheet" } });
 
 /** The synthetic source an edit job copies from: the words, size and seed only. */
 function sourceFor(actor: PersonRow, context: Context, id: string, prompt: string, seconds: number, seed: number | null): VideoJob {
@@ -305,12 +369,59 @@ function runFresh(actor: PersonRow, context: Context, loaded: LoadedPicture[], r
   };
 }
 
+export const REFERENCE_FIRST_PICTURE_FAILED_LINE = "I couldn't make the first picture from those pictures. Try again, or attach clearer pictures with one person in each.";
+
+/** The prompt the Stack gets: the sheet route's sheet text and paragraph, or (first-picture route) the paragraph alone, which already carries the fixed parts. */
+const promptOf = (route: "sheet" | "first_frame", description: string, paragraph: string): string => route === "first_frame" ? paragraph : composePrompt(description, paragraph);
+
+/** REFVIDEO-FIRSTFRAME-01: the whole job for pictures with a real person's face. Step 1 makes the first picture (cut-outs, the edit model's composition, the face check, or a plain paste of the
+ *  people's own pixels), shows it on the card as soon as it is kept, and step 2 starts the clip from it. The tool call returned at once; a refusal or failure after that ends the job with one plain line. */
+function runFirstFrame(actor: PersonRow, context: Context, loaded: LoadedPicture[], readings: PictureReading[], request: string, seconds: number, audienceBand: Parameters<typeof viewerOf>[1]): EditRun {
+  return async (signal, onProgress, hooks) => {
+    const failed = (line: string) => ({ ok: false as const, line });
+    const stepOne = (done: number, total: number, line: string) => hooks?.steps((progress) => { progress.step = 1; progress.route = "first_frame"; progress.sheet = { done, total, line }; });
+    try {
+      const pictures: FirstFramePicture[] = loaded.map((picture, index) => { const reading = readings[index]!; return { id: picture.id, bytes: picture.bytes, mediaType: picture.mediaType, name: reading.name, role: reading.role, look: reading.look }; });
+      let first: FirstPictureResult;
+      try { first = await firstPictureMaker(pictures, { scene: stripQuotedSpeech(oneParagraph(request)).slice(0, 300), signal, actor, onStep: stepOne }); }
+      catch (error) { if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`); console.error("[reference-video] first picture failed:", error instanceof Error ? error.message : error); return failed(REFERENCE_FIRST_PICTURE_FAILED_LINE); }
+      if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
+      const paragraph = await generatedParagraph(request, first.description, "first_frame");
+      const promptRefusal = refuseVideoPrompt(paragraph, { lane: "adult" });
+      if (promptRefusal) return failed(VIDEO_REFUSAL_LINE[promptRefusal]);
+      // The same input-side floor a photo gets, on the picture that actually goes to the video model.
+      const jpeg = new Uint8Array(await sharp(Buffer.from(first.png)).jpeg({ quality: 90 }).toBuffer());
+      const screened = await screenInputImage(jpeg, request, viewerOf(actor, audienceBand));
+      if (!screened.ok) return failed(screened.line);
+      if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
+      const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: first.png, provenance: `${REFERENCE_SHEET_NOTE}${JSON.stringify({ v: 1, provided: false, index: 0, route: "first_frame" })}`, deduplicate: false, retention: "kept", name: "First picture.png" });
+      if (!stored.ok) return failed(REFERENCE_SHEET_SAVE_LINE);
+      const recipe: ReferenceRecipe = {
+        v: 1, route: "first_frame", sheetFileIds: [stored.value.id], description: first.description, request: paragraph, prompt: promptOf("first_frame", first.description, paragraph), seed: newSeed(), seconds, pictureFileIds: loaded.map((picture) => picture.id), providedAsIs: [false],
+        panels: first.people.map((person, index) => ({ name: person.name, view: "First picture", slot: "First picture", sheet: 0, pictures: first.pictureIds[index] ?? [] })),
+        firstPicture: { how: first.how, notes: first.notes, people: first.people.map((person) => ({ name: person.name, score: person.score, face: person.face })) },
+      };
+      hooks?.recipe(recipe);
+      const bytes = loadSheetFiles(actor, recipe.sheetFileIds);
+      if (!bytes) return failed(REFERENCE_NO_SHEET_LINE);
+      return await runFirstFrameClip(bytes[0]!, recipe, actor)(signal, onProgress, hooks);
+    } catch { return failed(REFERENCE_FIRST_PICTURE_FAILED_LINE); }
+  };
+}
+
+type FirstPictureMaker = typeof buildFirstPicture;
+let firstPictureMaker: FirstPictureMaker = buildFirstPicture;
+/** Test seam: replaces the first picture maker (the real one needs the face models and the Stack's picture edit). */
+export function __setFirstPictureMakerForTests(fn: FirstPictureMaker | null): void { firstPictureMaker = fn ?? buildFirstPicture; }
+
 /** Starts the one clip job for a recipe. The synthetic source carries only what an edit job copies (the words, size, seed); the recipe rides on the job's request. */
 function startFromRecipe(actor: PersonRow, context: Context, recipe: ReferenceRecipe, from: string): { ok: true; job: VideoJob } | { ok: false; line: string } {
   const bytes = loadSheetFiles(actor, recipe.sheetFileIds);
   if (!bytes) return { ok: false, line: REFERENCE_NO_SHEET_LINE };
   const source = sourceFor(actor, context, from, recipe.prompt, recipe.seconds, recipe.seed);
-  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: runIngredients(bytes, recipe, actor), phase: REFERENCE_PHASE, adultOnly: false, request: { reference: recipe, quality: "detailed", tier: "max", refProgress: startProgress(2) } });
+  const firstFrame = recipe.route === "first_frame";
+  const started = startVideoEditJob({ actor, conversationId: context.conversationId, turnId: context.turnId, temporary: false, source, edit: { from, change: "ingredients" }, run: firstFrame ? runFirstFrameClip(bytes[0]!, recipe, actor) : runIngredients(bytes, recipe, actor), phase: firstFrame ? FIRST_FRAME_PHASE : REFERENCE_PHASE, adultOnly: false,
+    request: { reference: recipe, quality: "detailed", ...(firstFrame ? {} : { tier: "max" as const }), refProgress: startProgress(2, firstFrame ? "first_frame" : undefined) } });
   return started.ok ? { ok: true, job: started.job } : { ok: false, line: started.line };
 }
 
@@ -368,27 +479,26 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   if (audience.spoken || audience.surface !== "chat" || state.temporary || !state.conversationId) return refuse(REFERENCE_SCREEN_LINE, "screen");
   const wordsRefusal = request ? refuseVideoPrompt(request, { lane: "adult" }) : null;
   if (wordsRefusal) return refuse(VIDEO_REFUSAL_LINE[wordsRefusal], wordsRefusal);
-  // Max: every refusal here is one plain line before a picture is cut out or a sheet drawn.
-  if (tierArgument({ person: actor, category: "video", arg: "max", band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) return refuse(MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
-  const engine = await videoEngineStatus();
-  if (!ltx25MaxReady(engine)) return refuse(videoMaxNotReadyReason(engine), "max_not_ready");
-  if (engine?.qualities?.ltx25max?.ingredients === false) return refuse(REFERENCE_ADAPTER_LINE, "adapter_missing");
   if (activeVideoJobsFor(actor) > 0) return refuse(REFERENCE_BUSY_LINE, "already_making");
+  const engine = await videoEngineStatus();
   const context: Context = { conversationId: state.conversationId, turnId: state.turnId };
-  const seconds = parsed.data.seconds ?? REFERENCE_VIDEO_SECONDS;
 
   // Same sheet, new words (or a new take): no cut-outs, no drawn views.
   if (reuse) {
     const source = /^(latest|last|this|that)$/i.test(reuse) ? newestReferenceVideo(actor, state.conversationId) : getVideoJobFor(actor, reuse);
     const recipe = source ? getReferenceVideoRecipe(actor, source.id) : null;
+    const route = recipe?.route === "first_frame" ? "first_frame" as const : "sheet" as const;
+    const notReady = route === "first_frame" ? firstFrameNotReady(engine) : sheetRouteNotReady(actor, audience.band, engine);
+    if (notReady) return refuse(notReady.line, notReady.why);
     if (!source || !recipe || (source.conversationId !== state.conversationId)) return refuse(REFERENCE_NO_SHEET_LINE, "no_sheet");
-    const paragraph = request ? await generatedParagraph(request, recipe.description) : recipe.request;
-    const prompt = composePrompt(recipe.description, paragraph);
+    const seconds = parsed.data.seconds ?? (route === "first_frame" ? FIRST_FRAME_SECONDS : REFERENCE_VIDEO_SECONDS);
+    const paragraph = request ? await generatedParagraph(request, recipe.description, route) : recipe.request;
+    const prompt = promptOf(route, recipe.description, paragraph);
     const promptRefusal = refuseVideoPrompt(prompt, { lane: "adult" });
     if (promptRefusal) return refuse(VIDEO_REFUSAL_LINE[promptRefusal], promptRefusal);
     const started = startFromRecipe(actor, context, { ...recipe, request: paragraph, prompt, seconds, seed: newSeed() }, source.id);
     if (!started.ok) return refuse(started.line, started.line === REFERENCE_NO_SHEET_LINE ? "no_sheet" : "already_making");
-    return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(recipe.sheetFileIds.length, ["The same reference sheet is used again; the sheet is shown with the video."]) }, data: { videoJobId: started.job.id, sheetFileIds: recipe.sheetFileIds }, actions: [] } });
+    return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(recipe.sheetFileIds.length, [route === "first_frame" ? "The same first picture is used again; it is shown with the video." : "The same reference sheet is used again; the sheet is shown with the video."], route) }, data: { videoJobId: started.job.id, sheetFileIds: recipe.sheetFileIds }, actions: [] } });
   }
 
   // Fresh pictures: the same ownership checks a film gives its pictures.
@@ -396,6 +506,24 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   try {
     for (const image of images.slice(0, MAX_REFERENCE_PICTURES)) { const picture = loadSource(actor, state.conversationId, image.id, false); loaded.push({ id: image.id, bytes: picture.bytes, mediaType: picture.mediaType }); }
   } catch (error) { return refuse(error instanceof Error && error.message ? error.message : "I couldn't open your pictures. Attach them again.", "pictures"); }
+
+  // The route is decided in code before any work: a real person's face takes the first-picture route (the Ingredients adapter does not keep a real face from a sheet).
+  const chosen = await decideReferenceRoute(loaded, readPictureRoles, firstFrameTools(actor));
+  if (chosen.route === "refuse") return refuse(chosen.line, "face_models_missing");
+  if (chosen.route === "first_frame") {
+    const notReady = firstFrameNotReady(engine);
+    if (notReady) return refuse(notReady.line, notReady.why);
+    const seconds = parsed.data.seconds ?? FIRST_FRAME_SECONDS;
+    const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
+    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFirstFrame(actor, context, loaded, chosen.readings, request!, seconds, audience.band), phase: FIRST_FRAME_PHASE, adultOnly: false, request: { quality: "detailed", refProgress: startProgress(1, "first_frame") } });
+    if (!started.ok) return refuse(started.line, "already_making");
+    return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, [], "first_frame") }, data: { videoJobId: started.job.id, route: "first_frame" }, actions: [] } });
+  }
+
+  // Objects, places and invented characters: the sheet route (Max and the adapter), unchanged.
+  const notReady = sheetRouteNotReady(actor, audience.band, engine);
+  if (notReady) return refuse(notReady.line, notReady.why);
+  const seconds = parsed.data.seconds ?? REFERENCE_VIDEO_SECONDS;
   // The sheet is built by the job itself (its step 1), so the call returns now and the card shows each step.
   const source = sourceFor(actor, context, "reference:new", request!, seconds, null);
   const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit: { from: "reference:new", change: "ingredients" }, run: runFresh(actor, context, loaded, request!, seconds, audience.band), phase: REFERENCE_PHASE, adultOnly: false, request: { quality: "detailed", tier: "max", refProgress: startProgress(1) } });
@@ -403,9 +531,24 @@ export async function runMakeReferenceVideoTurn(input: RunReferenceVideoInput): 
   return outcomeOf({ callId, packageId: MAKE_REFERENCE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: replyText(null, []) }, data: { videoJobId: started.job.id }, actions: [] } });
 }
 
-function replyText(sheets: number | null, notes: readonly string[]): string {
+/** The sheet route needs Max and the Ingredients adapter: every refusal here is one plain line before a picture is cut out or a sheet drawn. */
+function sheetRouteNotReady(actor: PersonRow, band: Parameters<typeof tierArgument>[0]["band"], engine: Awaited<ReturnType<typeof videoEngineStatus>>): { line: string; why: string } | null {
+  if (tierArgument({ person: actor, category: "video", arg: "max", ...(band ? { band } : {}) }).line === MAX_NEEDS_ADMIN_LINE) return { line: MAX_NEEDS_ADMIN_LINE, why: "max_needs_admin" };
+  if (!ltx25MaxReady(engine)) return { line: videoMaxNotReadyReason(engine), why: "max_not_ready" };
+  if (engine?.qualities?.ltx25max?.ingredients === false) return { line: REFERENCE_ADAPTER_LINE, why: "adapter_missing" };
+  return null;
+}
+/** The first-picture route is an ordinary picture-to-video clip: it needs some ready video level, not Max or the adapter. */
+function firstFrameNotReady(engine: Awaited<ReturnType<typeof videoEngineStatus>>): { line: string; why: string } | null {
+  return videoStatusReady(engine, true) ? null : { line: videoNotReadyReason(engine), why: "no_engine" };
+}
+
+function replyText(sheets: number | null, notes: readonly string[], route: "sheet" | "first_frame" = "sheet"): string {
+  const first = route === "first_frame";
   const lead = sheets === null
-    ? "The video is being made in two steps that the video card below your reply shows with their own progress: first a reference sheet from the pictures, then the video. It takes about three minutes and appears there when it is ready."
-    : `${sheets > 1 ? "The reference sheets are" : "The reference sheet is"} shown on the video card below your reply, and the video is being made from ${sheets > 1 ? "them" : "it"}. It takes about three minutes and appears there when it is ready.`;
+    ? (first
+      ? "The video is being made in two steps that the video card below your reply shows with their own progress: first a first picture that puts the people from the pictures into the scene, then the video from it. It takes about four minutes and appears there when it is ready."
+      : "The video is being made in two steps that the video card below your reply shows with their own progress: first a reference sheet from the pictures, then the video. It takes about three minutes and appears there when it is ready.")
+    : `${first ? "The first picture is" : sheets > 1 ? "The reference sheets are" : "The reference sheet is"} shown on the video card below your reply, and the video is being made from ${first || sheets <= 1 ? "it" : "them"}. It takes about three minutes and appears there when it is ready.`;
   return [lead, "You have not seen the video: do not describe how it looks. Tell the person in one or two short sentences that the video is on its way.", ...notes].join(" ");
 }

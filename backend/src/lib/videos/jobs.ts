@@ -55,8 +55,10 @@ export interface VideoFile {
 
 /** REFVIDEO-STEPS-01: where a video made from pictures is, in its two steps. Kept on the job's request so the card and a restart read the same state. */
 export interface ReferenceProgress {
-  /** 1: the reference sheet, 2: the video. */
+  /** 1: the reference sheet (or, on the first-picture route, the first picture), 2: the video. */
   step: 1 | 2;
+  /** REFVIDEO-FIRSTFRAME-01: absent on the sheet route; "first_frame" when step 1 makes the clip's first picture (a real person's face). The card's step names follow it. */
+  route?: "first_frame";
   /** Step 1: sub-steps done of total, and the plain sentence for the one in hand. */
   sheet: { done: number; total: number; line: string };
   /** Step 2: the clip's percent; `waiting` while the Stack holds the job without a worker running; `line` is the plain sentence. */
@@ -73,6 +75,8 @@ export interface EditHooks {
   steps(change: (progress: ReferenceProgress) => void): void;
   /** The sheet is made and kept: the job now carries its recipe (the sheet picture shows on the card from here). */
   recipe(recipe: ReferenceRecipe): void;
+  /** REFVIDEO-FIRSTFRAME-01: the run learned what the clip really is (its size, length, kind and level); the job's request takes it. */
+  request(patch: Partial<VideoRequest>): void;
 }
 
 /** What the person asked for, kept on their own job record (never in a log). */
@@ -94,6 +98,12 @@ export interface ReferenceRecipe {
   pictureFileIds: string[];
   /** Per sheet: the person's own picture was already a sheet and was used as provided. */
   providedAsIs: boolean[];
+  /** REFVIDEO-FIRSTFRAME-01: absent (or "sheet") for the sheet route; "first_frame" when `sheetFileIds[0]` is the clip's FIRST PICTURE (a real person's face is in frame 0, image-to-video) and `prompt` is just the paragraph. */
+  route?: "sheet" | "first_frame";
+  /** First-picture route: how the first picture was made ("composed": the edit model placed the people and every face passed the check; "pasted": the people's own cut-outs pasted over the place; "photo": the attached photo itself), the plain notes about what could not be done exactly, and each person: their face against their own photo in the first picture, and their own photo's face (SFace vector) that the finished clip is measured against. */
+  firstPicture?: { how: "composed" | "pasted" | "photo"; notes: string[]; people: Array<{ name: string; score: number | null; face: number[] | null }> };
+  /** First-picture route: the face check of the finished clip (6 frames, SFace cosine against each person's photo). Measured only; it never blocks the clip. */
+  faceMatch?: { frames: number; people: Array<{ name: string; scores: number[]; median: number | null }>; threshold: number; low: boolean };
 }
 
 export interface VideoRequest {
@@ -778,6 +788,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
         source.request.seed = recipe.seed; source.prompt = recipe.prompt;
         saveVideoJob(job);
       },
+      request: (patch) => { Object.assign(job.request, patch); saveVideoJob(job); },
     };
     const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); }, hooks);
     if (controller.signal.aborted) return;
@@ -830,7 +841,7 @@ async function resume(job: VideoJob): Promise<void> {
   if (job.kind === "edit") {
     job.state = "failed";
     // REFVIDEO-STEPS-01: a video from pictures keeps its sheet once step 1 is done; Try again makes the video from it without new cut-outs.
-    job.error = job.request.reference ? `${EDIT_RESTART_LINE.replace(/ Ask again\.$/, "")} Your reference sheet is kept: choose Try again to make the video from it.` : EDIT_RESTART_LINE;
+    job.error = job.request.reference ? `${EDIT_RESTART_LINE.replace(/ Ask again\.$/, "")} Your ${job.request.reference.route === "first_frame" ? "first picture" : "reference sheet"} is kept: choose Try again to make the video from it.` : EDIT_RESTART_LINE;
     saveVideoJob(job); return;
   }
   liveJobs.set(job.id, job);

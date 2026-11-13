@@ -131,7 +131,7 @@ export async function splitCutOutByMask(cut: Buffer): Promise<Buffer[] | null> {
   return halves;
 }
 
-async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Panel[]> {
+async function panelsFor(picture: SheetPicture, tools: SheetTools, closeUps = true): Promise<Panel[]> {
   const base = { name: picture.name, role: picture.role, look: picture.look };
   if (picture.role === "set" || picture.role === "end_shot" || picture.role === "other") return [{ ...base, kind: "place", view: "Setting", image: Buffer.from(picture.bytes), onWhite: false }];
   if (picture.role === "actor") {
@@ -158,7 +158,7 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
       const own = faces.length > 1 ? await tools.describe?.(new Uint8Array(image), "image/png").catch(() => null) ?? null : null;
       panels.push({ ...base, name: own?.name ? `${own.name}` : name, look: own?.look ?? base.look, kind: "subject", single: true, view: "Front View", image, onWhite: true });
       // A face that already fills the picture needs no close-up; a smaller one gets its own, cut from the original with room for the whole head.
-      if (face.w / box.w < 0.3) {
+      if (closeUps && face.w / box.w < 0.3) {
         const fx = Math.max(0, Math.round(face.x - face.w * 0.7)), fy = Math.max(0, Math.round(face.y - face.h * 0.8));
         const faceBox = { x: fx, y: fy, w: Math.min(width - fx, Math.round(face.w * 2.4)), h: Math.min(height - fy, Math.round(face.h * 2.3)) };
         panels.push({ ...base, name: panels[panels.length - 1]!.name, look: panels[panels.length - 1]!.look, kind: "subject", single: true, view: "Face Close-up", image: await cutOut(picture, tools, faceBox), onWhite: true });
@@ -167,6 +167,22 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
     return panels;
   }
   return [{ ...base, kind: "subject", view: "Front View", image: await cutOut(picture, tools), onWhite: true }];
+}
+
+/** REFVIDEO-FIRSTFRAME-01: the people of one actor picture, each cut out alone (a photo of several people gives one cut-out per person, left to right; the neighbour's slivers are removed
+ *  by the same junk-only cleanup the sheet uses). Pixels are the person's own. A cut-out that the background remover refused is the plain crop (a note says so). No close-ups, no drawn views. */
+export async function cutOutPeople(picture: SheetPicture, tools: SheetTools = realTools): Promise<{ people: Array<{ name: string; look: string; image: Buffer; /** Known to hold exactly one person (found by the face finder). */ single: boolean }>; notes: string[] }> {
+  const fallbacks: string[] = [];
+  fellBack = fallbacks;
+  const cleanupNotes: string[] = [];
+  junkNotes = cleanupNotes;
+  try {
+    const panels = await panelsFor(picture, tools, false);
+    const people = panels.filter((panel) => panel.kind === "subject" && panel.view === "Front View").map((panel) => ({ name: panel.name, look: panel.look, image: panel.image, single: panel.single === true }));
+    const notes = [...cleanupNotes];
+    if (fallbacks.length) notes.push(`The background could not be removed from ${[...new Set(fallbacks)].join(", ")}, so it was used as sent.`);
+    return { people, notes };
+  } finally { fellBack = null; junkNotes = null; }
 }
 
 const ROW = ["Top", "Middle", "Bottom"], COL = ["Left", "Middle", "Right"];
