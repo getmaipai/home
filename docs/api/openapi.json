@@ -18273,6 +18273,7 @@
                             "echo_partial",
                             "echo_final",
                             "pause",
+                            "pause_resolved",
                             "resume",
                             "interrupt",
                             "reaction",
