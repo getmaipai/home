@@ -234,8 +234,19 @@ export class SentenceSpeechScheduler implements SpeechSource {
    * parallel with any other in-flight sentence), then schedules it right
    * after whatever's already queued - strictly in enqueue order, even if
    * a later sentence's fetch finishes first, via `dispatchTail`. */
+  // ECHO-GUARD-01 (DUPLEX-02's text echo guard, client side; docs/design/full-duplex-voice-2026-10-24.md): the normalized words of every
+  // sentence this reply speaks, with when they were given, so the voice session can tell Home's own voice coming back through the
+  // microphone from the person. Memory only, this reply only, never stored.
+  private readonly spoken: Array<{ at: number; words: string[] }> = [];
+  /** The words spoken (or about to be) in the last `windowMs`, oldest first. */
+  recentlySpokenWords(windowMs = 15_000, now = Date.now()): string[] {
+    return this.spoken.filter((entry) => now - entry.at <= windowMs).flatMap((entry) => entry.words);
+  }
+
   enqueueSentence(text: string, meta?: SpeechSentenceMeta): void {
     if (this.stopped) return;
+    const words = text.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ").split(/\s+/).filter(Boolean);
+    if (words.length > 0) { this.spoken.push({ at: Date.now(), words }); if (this.spoken.length > 200) this.spoken.shift(); }
     const predecessorDone = this.dispatchTail;
     let resolveThis!: () => void;
     this.dispatchTail = new Promise<void>((resolve) => {

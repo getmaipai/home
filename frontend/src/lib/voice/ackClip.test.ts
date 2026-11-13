@@ -19,8 +19,12 @@ class FakeContext {
     this.sources.push(source);
     return source as unknown as AudioBufferSourceNode;
   }
-  async decodeAudioData() { this.decoded += 1; return { duration: 0.45 } as AudioBuffer; }
+  createBuffer(_channels: number, length: number, sampleRate: number) { const data = new Float32Array(length); return { duration: length / sampleRate, sampleRate, length, getChannelData: () => data } as unknown as AudioBuffer; }
+  // A decoded clip with sound all the way through (nothing to trim), 0.45 s unless a test overrides it.
+  async decodeAudioData() { this.decoded += 1; return sound(0.45); }
 }
+
+function sound(seconds: number): AudioBuffer { const rate = 16_000; const data = new Float32Array(Math.round(rate * seconds)); for (let i = 0; i < data.length; i++) data[i] = 0.3 * Math.sin(i / 9); return { duration: seconds, sampleRate: rate, length: data.length, getChannelData: () => data } as unknown as AudioBuffer; }
 
 function wav(): Response {
   const bytes = new Uint8Array(44 + 100);
@@ -30,6 +34,18 @@ function wav(): Response {
 }
 
 describe("TALK-OVER-01: acknowledgement clips", () => {
+  test("the engine's silence padding is trimmed before the length check, so a padded 'Mm-hm.' is kept", async () => {
+    const { trimSilence, MAX_ACK_CLIP_MS } = await import("@/lib/voice/ackClip");
+    const rate = 16_000; const padded = new Float32Array(rate * 1.2); // 1.2 s with 0.4 s of sound in the middle
+    for (let i = Math.round(rate * 0.5); i < Math.round(rate * 0.9); i++) padded[i] = 0.3 * Math.sin(i / 9);
+    const context = { createBuffer: (_c: number, length: number, sampleRate: number) => { const data = new Float32Array(length); return { duration: length / sampleRate, sampleRate, length, getChannelData: () => data } as unknown as AudioBuffer; } };
+    const buffer = { duration: 1.2, sampleRate: rate, length: padded.length, getChannelData: () => padded } as unknown as AudioBuffer;
+    const trimmed = trimSilence(buffer, context);
+    expect(trimmed.duration * 1000).toBeLessThanOrEqual(MAX_ACK_CLIP_MS);
+    expect(Math.round(trimmed.duration * 1000)).toBeGreaterThanOrEqual(400);
+    expect(Math.round(trimmed.duration * 1000)).toBeLessThanOrEqual(450);
+  });
+
   test("the pool renders each clip once in the given voice and plays them without repeating the same clip twice in a row", async () => {
     const speech = spyOn(api, "streamSpeech").mockImplementation(async () => wav());
     try {
@@ -52,7 +68,7 @@ describe("TALK-OVER-01: acknowledgement clips", () => {
     try {
       const context = new FakeContext();
       // A long render is dropped from the pool.
-      context.decodeAudioData = async () => ({ duration: context.decoded++ === 0 ? 0.45 : 1.2 } as AudioBuffer);
+      context.decodeAudioData = async () => sound(context.decoded++ === 0 ? 0.45 : 1.2);
       const pool = await renderAckClips(["Mm-hm.", "Okay.", "Right."], undefined, { context: context as unknown as AudioContext, now: () => 100 });
       expect(pool.size).toBe(1);
       const played = pool.play(50)!;

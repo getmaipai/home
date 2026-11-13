@@ -14,7 +14,7 @@ import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
 import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
+import { isOwnEcho, useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createMockSttSocket, type SttFixtureStep, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import type { SttServerMessage } from "@/lib/voice/sttContract";
 import type { MicCaptureHandle, MicCaptureOptions } from "@/lib/voice/mic-capture";
@@ -458,6 +458,7 @@ describe("live voice session", () => {
   }
   function talkOverHarness(options: { grant?: { level: "gentle" | "natural"; window_ms: number; clips: string[] } | null; speculate?: ReturnType<typeof spyOn>; discard?: ReturnType<typeof spyOn>; durationMs?: number } = {}) {
     const played: Array<{ ended: boolean; completed: boolean; closed: boolean; endedAt: number | null }> = [];
+    const sentTexts: string[] = [];
     const rendered: string[][] = [];
     const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
     const ackClipPlayedRef = { current: false };
@@ -472,13 +473,13 @@ describe("live voice session", () => {
     };
     const renderClips = async (clips: readonly string[]) => { rendered.push([...clips]); return fakeClipPool(played, options.durationMs) as never; };
     let ended = 0;
-    const element = (speakingEndedAt: number) => <Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={speakingEndedAt} fixture={[]} sentTexts={[]} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />;
+    const element = (speakingEndedAt: number) => <Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={speakingEndedAt} fixture={[]} sentTexts={sentTexts} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />;
     const view = render(element(0));
     // The reply finished speaking (chatModelAdapter's onSpeakingChange, relayed as state): the session goes back to listening.
     const endReply = () => { ended += 1; view.rerender(element(ended)); };
     // The call closes (open goes false): the one thing that stops a clip early.
     const close = () => view.rerender(<Harness open={false} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={ended} fixture={[]} sentTexts={[]} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />);
-    return { view, played, rendered, pendingRef, ackClipPlayedRef, timings, socket, endReply, close };
+    return { view, played, rendered, pendingRef, ackClipPlayedRef, timings, socket, endReply, close, sentTexts };
   }
 
   test("TALK-OVER-01: a granted session renders the hub's clips once; the edge partial that starts a held run plays one when the score fires at the level, and the matching final confirms it, skips the run's cue and reports the timing", async () => {
@@ -529,9 +530,8 @@ describe("live voice session", () => {
         // The hub reports the voice back, well after the clip (100 ms) plus the echo margin.
         await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
         act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 210 } as never));
-        // At the window's end: the held run is discarded, nothing said, the clip untouched. The window widens 100 ms per wrong start, so wait past the widest.
-        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
-        expect(discard).toHaveBeenCalledTimes(round + 1);
+        // At the window's end: the held run is discarded, nothing said, the clip untouched. The window widens 100 ms per wrong start.
+        await waitFor(() => expect(discard).toHaveBeenCalledTimes(round + 1), { timeout: 1500 });
         expect(h.played[round]!.completed).toBe(true);
         expect(h.played[round]!.closed).toBe(false);
         act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
@@ -634,6 +634,73 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); discard.mockRestore(); }
   });
 
+  test("ECHO-GUARD-01: Home's own words coming back through the microphone are an echo; the person's words are not", () => {
+    const spoken = "a soft boiled egg takes about six minutes in boiling water".split(" ");
+    expect(isOwnEcho("takes about six minutes", spoken)).toBe(true); // in order, every word
+    expect(isOwnEcho("Boiled egg takes about six", spoken)).toBe(true);
+    expect(isOwnEcho("about six", spoken)).toBe(true); // two words as one exact run
+    expect(isOwnEcho("six about", spoken)).toBe(false); // two words out of order are not a run
+    expect(isOwnEcho("how long for a hard boiled one", spoken)).toBe(false); // the person's own question shares words but not enough in order
+    expect(isOwnEcho("boiled", spoken)).toBe(true); // one of her own words, heard back as a fragment
+    expect(isOwnEcho("no", [...spoken, "no"])).toBe(false); // a stop word is always the person, even right after she said it
+    expect(isOwnEcho("stop", spoken)).toBe(false);
+    expect(isOwnEcho("stop that", spoken)).toBe(false);
+    expect(isOwnEcho("please", spoken)).toBe(false); // a word she did not say
+    expect(isOwnEcho("takes about six minutes", [])).toBe(false);
+  });
+
+  test("ECHO-GUARD-01: Home's own reply heard back while she speaks neither pauses nor stops her nor becomes a turn; a real interruption still does", async () => {
+    const socket = controlledSocket();
+    const stops: number[] = []; const pauses: number[] = []; const cancels: number[] = [];
+    const sentTexts: string[] = [];
+    const timings: Array<{ phase?: string; speculative?: string; talkOver?: Record<string, unknown> }> = [];
+    const schedulerWords = "a soft boiled egg takes about six minutes in boiling water and a hard one about ten".split(" ");
+    function EchoHarness({ isSpeaking }: { isSpeaking: boolean }) {
+      const adapter: ChatModelAdapter = { async *run({ messages }) { const last = messages[messages.length - 1]; const part = last?.content[0]; sentTexts.push(part && part.type === "text" ? part.text : ""); yield { content: [{ type: "text", text: "ok" }] }; } };
+      const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
+      const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+      turnSchedulerRef.current = { stop: () => { stops.push(1); }, pause: () => { pauses.push(1); }, resume: () => {}, duck: () => {}, unduck: () => {}, readLevel: () => 0, playedMs: () => 500, recentlySpokenWords: () => schedulerWords } as unknown as SentenceSpeechScheduler;
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef({ turnId: "turn-reply", heardVisibleEnd: () => 8 }), cancelRun: () => { cancels.push(1); }, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: fakeStartCapture(), onVoiceTiming: (timing) => timings.push(timing as never), speculation: { getConversationId: () => "conv-1", pendingRef: { current: null } } });
+      return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
+    }
+    const cancelTurn = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "t", conversation_id: "conv-1" });
+    try {
+      const view = render(<EchoHarness isSpeaking={false} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      view.rerender(<EchoHarness isSpeaking />); // the reply is speaking
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); }); // past the 400 ms barge-in arm delay
+      // The microphone hears the reply itself: an onset, a two-word partial, an edge partial that even reads as a finished sentence, a final.
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.2 }));
+      act(() => socket.send({ t: "partial", v: "takes about" }));
+      act(() => socket.send({ t: "partial", v: "takes about six minutes", edge: true, end: { score: 0.7, level: "natural", unfinished: false } } as never));
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+      await act(async () => { socket.send({ t: "final", v: "takes about six minutes in boiling water" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      // A one-word fragment of her reply, and a long sound with no words at all (the echo of a long sentence): neither pauses nor stops her.
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.2 }));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1000)); });
+      act(() => socket.send({ t: "partial", v: "boiled" }));
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+      await act(async () => { socket.send({ t: "final", v: "boiled" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(pauses).toHaveLength(0);
+      expect(stops).toHaveLength(0);
+      expect(cancels).toHaveLength(0);
+      expect(cancelTurn).not.toHaveBeenCalled();
+      expect(speculate).not.toHaveBeenCalled();
+      expect(sentTexts).toEqual([]);
+      expect(view.getByText("speaking")).toBeTruthy();
+      // The person really cuts in with their own words: the reply stops, the turn is cancelled once, the words become the next turn.
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "wait what about" }));
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+      await act(async () => { socket.send({ t: "final", v: "wait what about poached eggs?" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(stops).toHaveLength(1);
+      expect(cancelTurn).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(sentTexts).toEqual(["wait what about poached eggs?"]));
+      expect(timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ echo_drops: 2 });
+    } finally { cancelTurn.mockRestore(); speculate.mockRestore(); }
+  });
+
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
     const random = spyOn(Math, "random").mockReturnValue(0);
     const react = spyOn(api, "reactTurn").mockResolvedValue({ text: null });
@@ -656,7 +723,29 @@ describe("live voice session", () => {
     } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
   });
 
-  test("sound that lasts past the confirm window pauses the voice; before that she plays on at full volume", async () => {
+  test("ECHO-GUARD-01: the acknowledgement clip's own echo at the end of the person's words does not break the held run's match, and the clip's words are not sent", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const h = talkOverHarness({ grant: { level: "gentle", window_ms: 800, clips: ["Mm-hm.", "Okay."] }, durationMs: 250 });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => h.socket.send({ t: "partial", v: "How long should I boil an egg?", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(h.played).toHaveLength(1);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      // The speakers play the clip, the microphone hears it: the hub appends it to the utterance.
+      act(() => h.socket.send({ t: "vad", speaking: true, rms: 0.3, resumed: true, voiced_ms: 230 } as never));
+      act(() => h.socket.send({ t: "partial", v: "How long should I boil an egg? Mm-hm.", edge: true, end: { score: 0.3, level: "none", unfinished: false } } as never));
+      act(() => h.socket.send({ t: "timing", speech_end_to_final_ms: 750, silence_wait_ms: 750 }));
+      await act(async () => { h.socket.send({ t: "final", v: "How long should I boil an egg? Mm-hm." }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(discard).not.toHaveBeenCalled();
+      expect(h.pendingRef.current?.turnId).toBe("turn-held");
+      await waitFor(() => expect(h.sentTexts).toEqual(["How long should I boil an egg?"]));
+      expect(h.timings.find((t) => t.phase === "final")?.speculative).toBe("confirmed");
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("a sound with no words never pauses the voice, however long it lasts; two real words do", async () => {
     const pause = mock();
     const socket = controlledSocket();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
@@ -665,9 +754,9 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 1300)); // longer than the old 850 ms confirm window: still no pause without words
     expect(pause).not.toHaveBeenCalled();
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    act(() => socket.send({ t: "partial", v: "wait what" })); // two real words that are not Home's own
     expect(pause).toHaveBeenCalledTimes(1);
     cleanup();
   });
@@ -775,7 +864,7 @@ describe("live voice session", () => {
     expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
     cancel.mockRestore();
   });
-  test("the reaction mm-hm over the reply pauses it and then resumes without cancelling or sending", async () => {
+  test("the reaction mm-hm over the reply neither pauses nor cancels nor sends; she plays on", async () => {
     const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const socket = controlledSocket();
     const sent: string[] = [];
@@ -788,11 +877,11 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "mm-hm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
-  test("the reaction oh wow over the reply pauses it and then resumes without cancelling or sending", async () => {
+  test("the reaction oh wow over the reply neither pauses nor cancels nor sends; she plays on", async () => {
     const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const socket = controlledSocket();
     const sent: string[] = [];
@@ -805,11 +894,11 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh wow" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
-  test("the reaction oh my god over the reply pauses it and then resumes without cancelling or sending", async () => {
+  test("the reaction oh my god over the reply neither pauses nor cancels nor sends; she plays on", async () => {
     const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const socket = controlledSocket();
     const sent: string[] = [];
@@ -822,7 +911,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh my god" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -839,7 +928,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "no way" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -856,7 +945,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh yeah" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -873,7 +962,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "uh nice" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -890,7 +979,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "yeah right" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -907,7 +996,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "mmm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -924,7 +1013,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "hmmm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -941,7 +1030,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "wooow" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -958,7 +1047,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "yeahhh" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled(); // ECHO-GUARD-01: a sound with no words never pauses her, so there is nothing to resume
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -1113,7 +1202,7 @@ describe("live voice session", () => {
     cancel.mockRestore();
   });
 
-  test("a false interruption resumes after the transcript window", async () => {
+  test("a sound that stops without words was never an interruption: nothing paused, nothing to resume", async () => {
     const pause = mock(); const resume = mock();
     const socket = controlledSocket();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} resumeScheduler={resume} socketFactory={socket.createSocket} />);
@@ -1124,8 +1213,8 @@ describe("live voice session", () => {
     act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
     await new Promise((resolve) => setTimeout(resolve, 550));
     act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
-    await new Promise((resolve) => setTimeout(resolve, 3200));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(pause).not.toHaveBeenCalled(); expect(resume).not.toHaveBeenCalled();
   });
 
   test("a partial never cancels the reply, only the final transcript does", async () => {

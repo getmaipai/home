@@ -90,7 +90,7 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
-  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; talkOver?: Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "edge_partials" | "clip_started_ms" | "clip_ended_ms" | "clip_completed"> }) => void;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; talkOver?: Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "edge_partials" | "clip_started_ms" | "clip_ended_ms" | "clip_completed" | "echo_drops"> }) => void;
   voiceTimingSocketRef?: { current: SttSocket | null };
 }
 
@@ -141,6 +141,29 @@ function isReaction(normalized: string, rawText: string): boolean {
   const words = collapsed.split(" ").filter(Boolean);
   return words.length > 0 && words.length <= 4 && words.every((word) => POSITIVE_REACTION_WORDS.has(word));
 }
+
+/** ECHO-GUARD-01: the transcript is Home's own voice coming back through the microphone when its words are the words Home just said:
+ * two or more words as one exact run of what was spoken, or three or more words of which at least 60 percent appear in order in what
+ * was spoken (DUPLEX-02's numbers). A one-word transcript is never judged here ("no", "stop" after Home said them still stop her). */
+/** Words that always count as the person, however recently Home said them: a child's "no" or "stop" after Home said "no" must still stop her. */
+const STOP_WORDS: ReadonlySet<string> = new Set(["no", "stop", "wait", "hey", "hold", "pause", "quiet", "enough", "shush", "shh"]);
+export function isOwnEcho(transcript: string, spoken: readonly string[]): boolean {
+  const words = normalizedTranscript(transcript).split(" ").filter(Boolean);
+  if (words.length === 0 || spoken.length === 0) return false;
+  // One word: an echo only when Home just said that very word and it is not a stop word (the microphone hears fragments of her reply:
+  // "boiled", "minutes").
+  if (words.length === 1) return !STOP_WORDS.has(words[0]!) && spoken.includes(words[0]!);
+  if (words.some((word) => STOP_WORDS.has(word)) && words.length < 3) return false;
+  if (words.length < 3) {
+    for (let i = 0; i + words.length <= spoken.length; i++) if (words.every((word, k) => spoken[i + k] === word)) return true;
+    return false;
+  }
+  let matched = 0; let cursor = 0;
+  for (const word of words) { const at = spoken.indexOf(word, cursor); if (at >= 0) { matched += 1; cursor = at + 1; } }
+  return matched / words.length >= 0.6;
+}
+/** Counts only (rule 6a): echoes of Home's own voice that were dropped. */
+export const echoCounters = { dropped: 0 };
 
 function normalizedTranscript(text: string): string {
   return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
@@ -221,6 +244,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     const clip = pool.play(performance.now());
     if (!clip) return;
     clipPlayedThisUtteranceRef.current = true;
+    clipPlayedAtRef.current = Date.now();
     const overlap = control.open(conversationId, clip.startedAt, clip.durationMs);
     overlapRef.current = { ...overlap, conversationId, text, clip, level: control.state(conversationId).level as "gentle" | "natural" };
     clearOverlapTimer();
@@ -284,13 +308,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       speculativeOutcomeRef.current = status === 400 ? "refused" : "request_failed";
     });
   };
-  const yieldVoice = () => {
-    const scheduler = turnSchedulerRef.current;
-    if (!scheduler) return;
-    overlapPausedRef.current = true;
-    if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
-    duckTimerRef.current = setTimeout(() => { duckTimerRef.current = null; turnSchedulerRef.current?.pause(); }, DUPLEX_CONFIRM_MS);
-  };
   const restoreVoice = () => {
     if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
     duckTimerRef.current = null;
@@ -310,6 +327,40 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   isSpeakingRef.current = isSpeaking;
   const setCurrentMode = (next: VoiceMode) => { modeRef.current = next; setMode(next); };
   const isReplySpeaking = () => modeRef.current === "speaking" || isSpeakingRef.current;
+  // ECHO-GUARD-01: Home's own reply, heard back through the microphone, must not pause or stop her, start a held run, or become a turn.
+  // Seen in a traced run (2026-11-12): 372 ms into a reply the hub heard the reply itself, a two-word partial of Home's words paused her
+  // (the "blip"), the echo's final cancelled the turn and went out as the next question, and the next reply did the same.
+  const lastSpeakingEndedAtRef = useRef(0);
+  const echoDropsRef = useRef(0);
+  const ECHO_TAIL_MS = 1500;
+  // The acknowledgement clip's own words, heard back: part of Home's voice for a few seconds after it played.
+  const clipWordsRef = useRef<string[]>([]);
+  // The clips as whole normalized phrases ("mm hm", "okay"), for the trailing-echo strip below.
+  const clipPhrasesRef = useRef<string[]>([]);
+  const clipPlayedAtRef = useRef(0);
+  const CLIP_ECHO_MS = 4000;
+  const homeVoiceWords = () => {
+    const scheduler = turnSchedulerRef.current;
+    const replyWords = scheduler && typeof scheduler.recentlySpokenWords === "function" && (isReplySpeaking() || Date.now() - lastSpeakingEndedAtRef.current <= ECHO_TAIL_MS) ? scheduler.recentlySpokenWords() : [];
+    const clipWords = Date.now() - clipPlayedAtRef.current <= CLIP_ECHO_MS ? clipWordsRef.current : [];
+    return [...replyWords, ...clipWords];
+  };
+  const isOwnVoice = (text: string) => { const spoken = homeVoiceWords(); return spoken.length > 0 && isOwnEcho(text, spoken); };
+  /** The clip's echo can land inside the person's own utterance (speakers, no headset): the final then ends with the clip's words. Those
+   * trailing words are Home's, not the person's: dropped before the held run is matched and before the words are sent. */
+  const withoutTrailingClipEcho = (text: string) => {
+    if (Date.now() - clipPlayedAtRef.current > CLIP_ECHO_MS || clipPhrasesRef.current.length === 0) return text;
+    let out = text.trim();
+    for (let round = 0; round < 3; round++) {
+      const tokens = out.split(/\s+/);
+      // A phrase may span one token ("Okay.") or more ("Mm-hm." is "mm hm" once normalized, but "mm hm" could also arrive as two tokens).
+      const phrase = clipPhrasesRef.current.find((candidate) => { const n = candidate.split(" ").length; for (let k = 1; k <= Math.min(n, tokens.length - 1); k++) { if (normalizedTranscript(tokens.slice(-k).join(" ")) === candidate) return true; } return false; });
+      if (!phrase) break;
+      let k = 1; while (k < tokens.length && normalizedTranscript(tokens.slice(-k).join(" ")) !== phrase) k++;
+      out = tokens.slice(0, -k).join(" ").replace(/[,;:]+$/, "").trim();
+    }
+    return out;
+  };
   const interrupt = (_reason: "voice" | "tap") => {
     if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
     if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
@@ -407,6 +458,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               talkOverRef.current = new TalkOverController(grant);
               ackRenderRef.current?.abort();
               const render = new AbortController(); ackRenderRef.current = render;
+              clipWordsRef.current = grant.clips.flatMap((clip) => normalizedTranscript(clip).split(" ").filter(Boolean));
+              clipPhrasesRef.current = grant.clips.map((clip) => normalizedTranscript(clip)).filter(Boolean);
               void (speculation.renderClips ?? renderAckClips)(grant.clips, speculation.getVoice?.(), { signal: render.signal }).then((pool) => { if (!render.signal.aborted) ackPoolRef.current = pool; }).catch(() => undefined);
             } else { talkOverRef.current = null; ackPoolRef.current = null; }
             if (voiceBargeIn && !playedTimer) {
@@ -464,7 +517,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // that follows a vad-false from an older hub.
             if ("edge" in message && message.edge === true) { edgeSeenRef.current = true; edgeCountRef.current += 1; }
             if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) {
-              if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim(), "end" in message && message.end?.unfinished === true, "end" in message ? message.end : undefined);
+              // The clip's own echo at the end of the words is Home's, not the person's (see withoutTrailingClipEcho): the held run keeps matching.
+              const edgeText = withoutTrailingClipEcho(message.v.trim());
+              if (isOwnVoice(edgeText)) { if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
+              else if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, "end" in message ? message.end : undefined);
               // The session was not listening (the last reply still thinking or speaking, or the mic muted): labelled, so a live record names it.
               else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
             }
@@ -478,7 +534,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // from background TV or a cough left Home silent). The reply stays paused; the final transcript decides. Real-looking
               // words just stop the pause from timing out into a resume.
               const heard = normalizedTranscript(message.v);
-              if (heard && !isReaction(heard, message.v)) {
+              if (heard && !isReaction(heard, message.v) && !isOwnVoice(message.v)) {
                 overlapTranscriptRef.current = true;
                 // Two real words are speech, not noise: pause now rather than wait out the confirm window.
                 if (heard.split(" ").length >= 2) {
@@ -507,16 +563,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               discardSpeculation(); // STT-SMARTTURN-01: a new utterance means the held run's words were not the final ones
               activeSpeechRef.current = true;
               setIdleActivity((value) => value + 1);
-              const elapsed = Date.now() - speakingStartedAtRef.current;
-              if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && !overlapPauseTimerRef.current && !overlapPausedRef.current) {
-                overlapTranscriptRef.current = false;
-                overlapPauseTimerRef.current = setTimeout(() => {
-                  overlapPauseTimerRef.current = null;
-                  if (isReplySpeaking() && activeSpeechRef.current) {
-                    yieldVoice();
-                  }
-                }, Math.max(0, BARGE_IN_ARM_DELAY_MS - elapsed) + DUPLEX_PAUSE_AFTER_MS);
-              }
+              // ECHO-GUARD-01 (2026-11-12): a sound with no words never pauses her any more. The pause that fired 850 ms into any sound while
+              // she spoke was the "blip" the owner heard: the microphone hears her own reply, that sound lasts as long as the reply, and
+              // the pause came before any transcript could say whose voice it was. Her words in a partial (two real words that are not
+              // her own) pause her; the final decides the rest (Jesse, 2026-10-30: she pauses only once the sound is clearly speech).
+              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) overlapTranscriptRef.current = false;
             } else {
               activeSpeechRef.current = false;
               edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
@@ -557,11 +608,25 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             lastPartialRef.current = "";
             activeSpeechRef.current = false;
             setIdleActivity((value) => value + 1);
-            const text = message.v.trim();
+            const text = withoutTrailingClipEcho(message.v.trim());
             const normalized = normalizedTranscript(text);
             // VOICE-QUICK-02: the microphone can hear Home's own reaction. A transcript that is just that reaction, right after it played, is her voice, not the person's.
             if (normalized && lastReactionTextRef.current && Date.now() - lastReactionAtRef.current < 4000 && normalized === normalizedTranscript(lastReactionTextRef.current)) {
               lastReactionTextRef.current = "";
+              break;
+            }
+            // ECHO-GUARD-01: a final that is Home's own voice, while she speaks or just after, is dropped: she carries on, nothing is sent.
+            if (normalized && isOwnVoice(text)) {
+              echoCounters.dropped++; echoDropsRef.current += 1;
+              closeOverlap(null, performance.now(), null);
+              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+              overlapPauseTimerRef.current = null;
+              if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
+              falseInterruptionTimerRef.current = null;
+              if (overlapPausedRef.current) restoreVoice();
+              overlapPausedRef.current = false;
+              discardSpeculation();
+              if (speculativeOutcomeRef.current === "armed" || speculativeOutcomeRef.current === "echo") speculativeOutcomeRef.current = "armed";
               break;
             }
             if (voiceBargeIn && isReplySpeaking() && !mutedRef.current) {
@@ -618,7 +683,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             latestEdgeTextRef.current = null;
             refusedThisUtteranceRef.current = false;
             const edgePartials = edgeCountRef.current; edgeCountRef.current = 0;
-            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), talkOver: { ...lastTalkOverRef.current, edge_partials: edgePartials } });
+            const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), talkOver: { ...lastTalkOverRef.current, edge_partials: edgePartials, ...(echoDrops > 0 ? { echo_drops: echoDrops } : {}) } });
             lastTalkOverRef.current = undefined;
             pendingSpeechRef.current = true;
             composer.setText(text);
@@ -703,6 +769,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       const timer = setInterval(() => setAmplitude(turnSchedulerRef.current?.readLevel() ?? 0), 60);
       return () => clearInterval(timer);
     }
+    lastSpeakingEndedAtRef.current = Date.now();
     setMode((current) => {
       if (current !== "speaking" && current !== "thinking") return current;
       setAmplitude(0);

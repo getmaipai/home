@@ -42,7 +42,22 @@ async function renderOne(text: string, voice: string | undefined, context: Audio
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (view.getUint32(0, false) === 0x52494646 && view.getUint32(8, false) === 0x57415645) { view.setUint32(4, bytes.length - 8, true); view.setUint32(40, bytes.length - 44, true); }
   }
-  return context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  return trimSilence(await context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), context);
+}
+
+/** The voice engine pads a clip with silence at both ends (a rendered "Mm-hm." came back over 700 ms, all four clips were dropped as
+ * too long on the first live day): keep the audible part only, with 20 ms of room on each side. */
+export const SILENCE_FLOOR = 0.01;
+export function trimSilence(buffer: AudioBuffer, context: Pick<AudioContext, "createBuffer">): AudioBuffer {
+  const data = buffer.getChannelData(0);
+  let start = 0; while (start < data.length && Math.abs(data[start]!) < SILENCE_FLOOR) start++;
+  let end = data.length - 1; while (end > start && Math.abs(data[end]!) < SILENCE_FLOOR) end--;
+  if (start === 0 && end === data.length - 1) return buffer;
+  const room = Math.round(buffer.sampleRate * 0.02);
+  start = Math.max(0, start - room); end = Math.min(data.length - 1, end + room);
+  const out = context.createBuffer(1, Math.max(1, end - start + 1), buffer.sampleRate);
+  out.getChannelData(0).set(data.subarray(start, end + 1));
+  return out;
 }
 
 /** Render the pool in the given voice. Resolves when every clip that could be rendered is ready; a clip that fails is left out

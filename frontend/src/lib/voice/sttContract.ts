@@ -44,7 +44,7 @@ import { z } from "zod";
 export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
 /** `unfinished`: every edge partial read as a mid-sentence fragment, so no run was started; `late_start`: the start request was still in
  * flight when the final came (the hub answered after the silence timer). */
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "echo", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
 /** `busy_*`: the edge partial came while the session was not listening (the last reply still thinking or speaking); `muted`: the mic was muted. */
 export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** The optional labels and counts a client adds to its timing report, beside the speech-path stamps. */
@@ -55,6 +55,8 @@ export interface SttTimingExtras {
   /** How many edge partials the hub marked in the utterance; the clip's start and end against the end of speech (negative is
    * before the person finished: a wrong start in a pause), and whether it played to its natural end (false only when the call closed). */
   edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean;
+  /** ECHO-GUARD-01: final transcripts that were Home's own voice and were dropped before this turn. */
+  echo_drops?: number;
 }
 
 /** Additive client timing report; all playback fields remain optional for older clients. */
@@ -67,5 +69,5 @@ export const SttTimingReportSchema = z.object({
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(),
   talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().optional(), overlap_ms: z.number().finite().nonnegative().optional(),
   decision: z.enum(["none", "confirmed", "continued"]).optional(), yield_ms: z.number().finite().nonnegative().optional(),
-  edge_partials: z.number().int().nonnegative().optional(), clip_started_ms: z.number().finite().optional(), clip_ended_ms: z.number().finite().optional(), clip_completed: z.boolean().optional(),
+  edge_partials: z.number().int().nonnegative().optional(), clip_started_ms: z.number().finite().optional(), clip_ended_ms: z.number().finite().optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().optional(),
 }).strict();
