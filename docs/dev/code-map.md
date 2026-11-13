@@ -1331,7 +1331,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, __setWebSearchToolDeadlineForTests, webSearchToolDeadlineMs |
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
-| `backend/src/lib/whisperSample.ts` | WHISPER_SAMPLE_TEXT, hasWhisperSample, ensureWhisperSample, makeMissingWhisperSamples, __resetWhisperSamplesForTests |
+| `backend/src/lib/whisperSample.ts` | WHISPER_SAMPLE_TEXT, hasWhisperSample, ensureWhisperSample, DEFAULT_VOICE_KEY, withRealWavSizes, ensureDefaultWhisperSample |
 | `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests, setWhisperMode, isWhisperMode, noteWhisperTag |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, arrangeHomeSections |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
