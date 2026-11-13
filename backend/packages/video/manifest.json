@@ -137,7 +137,7 @@
       },
       {
         "id": "library",
-        "label": "Library",
+        "label": "All videos",
         "icon": "library",
         "nav": true,
         "kind": "schema",
