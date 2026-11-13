@@ -13,15 +13,15 @@ const clip = { id: "clip-1", src: "/api/files/clip-1/content", kind: "video" as 
 describe("createMediaStore refuses an adult-only item", () => {
   test("elementFor throws the plain line, creates no element and holds nothing", () => {
     const store = createMediaStore();
-    expect(() => store.elementFor({ ...clip, adultOnly: true }, "videos")).toThrow(ADULT_ONLY_PAGE_ONLY);
+    expect(() => store.elementFor({ ...clip, adultOnly: true }, "video")).toThrow(ADULT_ONLY_PAGE_ONLY);
     expect(store.get()).toBeNull();
     expect(document.querySelectorAll("video").length).toBe(0);
   });
 
   test("an adult-only item asked for while another plays does not replace it, and the other keeps playing", () => {
     const store = createMediaStore();
-    const open = store.elementFor({ ...clip, id: "open-1" }, "videos");
-    expect(() => store.elementFor({ ...clip, adultOnly: true }, "videos")).toThrow();
+    const open = store.elementFor({ ...clip, id: "open-1" }, "video");
+    expect(() => store.elementFor({ ...clip, adultOnly: true }, "video")).toThrow();
     expect(store.get()?.id).toBe("open-1");
     expect(store.get()?.el).toBe(open);
     store.clear();
@@ -29,7 +29,7 @@ describe("createMediaStore refuses an adult-only item", () => {
 
   test("an item with adultOnly false or absent is held as before", () => {
     const store = createMediaStore();
-    store.elementFor({ ...clip, adultOnly: false }, "videos");
+    store.elementFor({ ...clip, adultOnly: false }, "video");
     expect(store.get()?.id).toBe("clip-1");
     store.clear();
   });

@@ -34,7 +34,7 @@ test("the mini player shows one visible close button and clears held media", () 
 test("live station and video mini players each show one close button", () => {
   for (const item of [
     { ...held("audio", "station"), src: "/api/plugins/audio/radio/stream/station" },
-    { ...held("videos", "v1"), kind: "video" },
+    { ...held("video", "v1"), kind: "video" },
   ] as HoistedMedia[]) {
     if (item.id === "station") expect(liveStationIdOf(item.src)).not.toBeNull();
     const view = render(<QueryClientProvider client={createQueryClient()}><TooltipProvider><ToastProvider><MemoryRouter><MediaDockContext.Provider value={{ current: item, clear: () => {}, next: async () => {} }}><GlobalMiniPlayer /></MediaDockContext.Provider></MemoryRouter></ToastProvider></TooltipProvider></QueryClientProvider>);

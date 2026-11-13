@@ -5,7 +5,7 @@ describe("isMediaPlayPage", () => {
   test("only pages with their own player are media play pages", () => {
     expect(isMediaPlayPage("audio", "station")).toBe(false);
     expect(isMediaPlayPage("audio", "play")).toBe(true);
-    expect(isMediaPlayPage("videos", "watch")).toBe(true);
+    expect(isMediaPlayPage("video", "watch")).toBe(true);
   });
 });
 
