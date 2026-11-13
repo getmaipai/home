@@ -8,7 +8,7 @@ describe("rail group mapping", () => {
     expect(RAIL_GROUPS[0]).toEqual({ id: "main" });
   });
 
-  test("the media group is headed Media, holds Audio, Video and Image, and Audio and Video are there even when nothing is pinned", () => {
+  test("the media group is headed Media, holds Audio, Video and Image, and Audio, Video and Image are there even when nothing is pinned", () => {
     expect(RAIL_GROUPS.find((group) => group.id === "create")?.label).toBe("Media");
     for (const to of ["/apps/audio", "/apps/video", "/apps/image"]) expect(railGroupForApp(to)).toBe("create");
     const apps = [
@@ -19,13 +19,12 @@ describe("rail group mapping", () => {
     const none = railItemsForCatalog(apps, []).map((item) => item.href);
     expect(none).toContain("/apps/audio");
     expect(none).toContain("/apps/video");
-    expect(none).not.toContain("/apps/image");
-    expect(railItemsForCatalog(apps, ["/apps/image"]).map((item) => item.href)).toContain("/apps/image");
+    expect(none).toContain("/apps/image");
   });
 
   test("routes owning a side column auto-collapse, with siblings staying open", () => {
-    expect(AUTO_COLLAPSE_PREFIXES).toEqual(["/chat", "/settings", "/files", "/apps/audio", "/apps/video"]);
-    for (const path of ["/chat", "/chat/projects", "/settings/profile", "/files", "/apps/audio", "/apps/audio/play", "/apps/video/edit"]) {
+    expect(AUTO_COLLAPSE_PREFIXES).toEqual(["/chat", "/settings", "/files", "/apps/audio", "/apps/video", "/apps/podcasts", "/apps/image"]);
+    for (const path of ["/chat", "/chat/projects", "/settings/profile", "/files", "/apps/audio", "/apps/audio/play", "/apps/video/edit", "/apps/podcasts", "/apps/podcasts/episodes", "/apps/image/templates"]) {
       expect(routeAutoCollapses(path)).toBe(true);
     }
     for (const path of ["/", "/media", "/apps/weather", "/apps/news"]) expect(routeAutoCollapses(path)).toBe(false);

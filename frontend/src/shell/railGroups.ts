@@ -32,8 +32,8 @@ export function railGroupForApp(to: string): string {
   return "tools";
 }
 
-/** Audio and Video are always in the menu: nobody has to pin them, and unpinning them changes nothing. */
-export const ALWAYS_IN_RAIL: ReadonlySet<string> = new Set(["/apps/audio", "/apps/video"]);
+/** Audio, Video and Image are always in the menu: nobody has to pin them, and unpinning them changes nothing. */
+export const ALWAYS_IN_RAIL: ReadonlySet<string> = new Set(["/apps/audio", "/apps/video", "/apps/image"]);
 
 export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly string[] = []) {
   const core = [
@@ -46,12 +46,12 @@ export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly 
   const pinnedSet = new Set(pinned);
   // Fixed shell destinations stay in the grouped list. Pinnable apps only
   // appear there when selected; defaults are supplied by usePinnedApps and
-  // an explicitly saved empty list therefore remains empty. Audio and Video
+  // an explicitly saved empty list therefore remains empty. Audio, Video and Image
   // (ALWAYS_IN_RAIL) appear whatever the person pinned.
   return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && (ALWAYS_IN_RAIL.has(app.to) || pinnedSet.has(app.to))).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
-export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video"] as const;
+export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video", "/apps/podcasts", "/apps/image"] as const;
 
 export function routeAutoCollapses(pathname: string): boolean {
   return AUTO_COLLAPSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
