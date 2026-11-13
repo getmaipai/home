@@ -6,6 +6,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 
 const ROOT = join(import.meta.dir, "../../../packages/generate_image/images/templates");
+const VIDEO_ROOT = join(import.meta.dir, "../../../packages/generate_video/video/templates");
 /** CREATOR-13: the preset records (looks, lights, angles, formats) live beside the templates, one array file per family. */
 const FRAGMENTS = join(ROOT, "fragments");
 /** A template a person can start from. CREATOR-01: records of kind "fragment" (shot-card vocabulary, picture presets) are not templates, so every template reader skips them. */
@@ -15,7 +16,7 @@ let cache: { stamp: number; templates: PickableTemplate[]; fragments: FragmentRe
 function jsonFiles(dir: string): string[] { return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith(".json")).sort().map((name) => join(dir, name)) : []; }
 /** The one reader: every bundled record is parsed against the spec once per change, then split into templates and fragments. */
 function all(): { templates: PickableTemplate[]; fragments: FragmentRecord[] } {
-  const files = [...jsonFiles(ROOT), ...jsonFiles(FRAGMENTS)];
+  const files = [...jsonFiles(ROOT), ...jsonFiles(FRAGMENTS), ...jsonFiles(VIDEO_ROOT), ...jsonFiles(join(VIDEO_ROOT, "fragments"))];
   const stamp = files.reduce((n, file) => Math.max(n, statSync(file).mtimeMs), 0) + files.length;
   if (cache?.stamp === stamp) return cache;
   const parsed = files.flatMap((file) => {

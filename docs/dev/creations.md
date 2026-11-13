@@ -3,6 +3,10 @@
 One record per made item says what it was made from. The shape is the spec `creation-record` (commons `spec`, pinned `spec-v0.1.378`); the design is
 [creatoros-port-2026-11-13.md](../design/creatoros-port-2026-11-13.md) section 7.
 
+### Shot-card presets (CREATOR-20a)
+
+The video shot-card vocabulary lives in `backend/packages/generate_video/video/templates/fragments/`, with one validated fragment array per group; six starter shots are video templates in `shot-starters.json`. `backend/src/lib/media/shotCard.ts` composes a card from those records and provides the same-shot, four-lights variants. Both picture and video presets use the shared reader in `backend/src/lib/media/templates.ts`.
+
 - **Tables.** `creations` (one row per item, the record as JSON in `body`, plus `person_id`, `kind`, `parent_id`, `review`, `made_audience`, `lock`,
   `file_ids`, `job_ids`) and `creation_cast` (the derived index of who is cast; written in the same transaction; `rebuildCreationCast()` rebuilds it).
   Migration `0194_creations`, schema version 145.
