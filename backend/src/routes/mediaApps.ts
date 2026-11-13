@@ -30,6 +30,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
+import { isReshape, startReshape, startSharpen } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
@@ -275,6 +276,29 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "spatial-sound")) return next();
     const body = await jsonBody(c);
     const started = await startSpatialSound(person, typeof body.id === "string" ? body.id : "", { surround: body.surround === true || body.surround === "true", side: body.side });
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  // PHOSPHENE-PARITY-01: "Make it vertical / portrait / square / widescreen" and "Sharpen 2x" on a finished Create clip. The same start as the chat tool's reframe and
+  // upscale (clipEditStart): the edit gate (adults only), the person's own open clip and the finished-clip check are written once, there. The original is kept.
+  routes.post("/actions/reshape", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "reshape")) return next();
+    const body = await jsonBody(c);
+    if (!isReshape(body.shape)) return c.json({ error: "Choose vertical, portrait, square or wide.", code: "bad_shape" }, 400);
+    const started = await startReshape(person, typeof body.id === "string" ? body.id : "", body.shape);
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  routes.post("/actions/sharpen", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "sharpen")) return next();
+    const body = await jsonBody(c);
+    const started = await startSharpen(person, typeof body.id === "string" ? body.id : "");
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });

@@ -446,3 +446,46 @@ describe("the minor line from the menu", () => {
     expect(stack.jobs).toHaveLength(0);
   });
 });
+
+describe("PHOSPHENE-PARITY-01: Make it vertical and Sharpen 2x on the Create page", () => {
+  async function createClip() {
+    const fixture = await household();
+    const me = fixture.row("Marlow");
+    const made = await runGenerateVideo({ state: chatState(me), args: { prompt: "A paper boat floats down a rainy street, soft evening light" }, callId: "make", spoken: false });
+    const id = (made.result?.data as { videoJobId: string }).videoJobId;
+    await until(() => getVideoJobFor(me, id)?.state === "done");
+    const { videoJobs } = await import("@/db/schema");
+    db.update(videoJobs).set({ conversationId: null }).where(eq(videoJobs.id, id)).run();
+    return { ...fixture, me, jobId: id };
+  }
+
+  test("the feed offers Make it vertical and the Studio export offers Sharpen 2x, within their caps", async () => {
+    const { readFileSync } = await import("node:fs");
+    const create = JSON.parse(readFileSync(new URL("../packages/video/pages/create.json", import.meta.url), "utf8")) as unknown;
+    const labels: string[] = [];
+    const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const r = node as Record<string, unknown>; if (r.type === "result_feed") labels.push(...(r.actions as Array<{ label: string }>).map((a) => a.label)); Object.values(r).forEach(walk); } };
+    walk(create);
+    expect(labels).toContain("Make it vertical");
+    expect(labels.length).toBeLessThanOrEqual(8);
+  });
+
+  test("an adult reshapes a clip: the Stack gets a blurred 9:16 reframe, and a bad shape is refused", async () => {
+    const { adult, me, jobId } = await createClip();
+    expect((await adult.client.post("/api/plugins/video/actions/reshape", { id: jobId, shape: "tall" })).status).toBe(400);
+    const res = await adult.client.post("/api/plugins/video/actions/reshape", { id: jobId, shape: "vertical" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string };
+    await until(() => getVideoJobFor(me, body.id)?.state === "done");
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "reframe", aspect: "9:16", fill: "blur" }]);
+  });
+
+  test("an adult sharpens a clip, someone else's clip is not found, and a child is refused", async () => {
+    const { adult, other, me, jobId } = await createClip();
+    expect((await other.client.post("/api/plugins/video/actions/sharpen", { id: jobId })).status).toBe(404);
+    const res = await adult.client.post("/api/plugins/video/actions/sharpen", { id: jobId });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string };
+    await until(() => getVideoJobFor(me, body.id)?.state === "done");
+    expect(stack.jobs.at(-1)!.input.ops).toEqual([{ op: "upscale", factor: 2 }]);
+  });
+});

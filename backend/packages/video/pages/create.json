@@ -230,6 +230,21 @@
               }
             },
             {
+              "label": "Make it vertical",
+              "icon": "smartphone",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshape",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "shape": "vertical"
+                  }
+                }
+              }
+            },
+            {
               "label": "Spatial sound",
               "icon": "headphones",
               "starts": "video",
