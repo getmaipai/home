@@ -1297,7 +1297,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/estimate.ts` | ESTIMATE_MIN_SAMPLES, medianMinutes, estimateVideoMinutes |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
-| `backend/src/lib/videos/firstPictureCompose.ts` | LAB_STRENGTH, FLOOR_LINE, MAX_PERSON_HEIGHT, CROP_FRACTION, labStats, composeNatural |
+| `backend/src/lib/videos/firstPictureCompose.ts` | LAB_STRENGTH, FLOOR_LINE, MAX_PERSON_HEIGHT, CROP_FRACTION, labStats, composeNaturalWithMasks |
+| `backend/src/lib/videos/firstPictureHarmony.ts` | HARMONY_PROMPT, ringMask, harmonize, realHarmonize |
 | `backend/src/lib/videos/frameCheck.ts` | CLIP_RULES, evaluateClipSeries, clipWeight, keepBetter, shouldRetake, sharpness |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
 | `backend/src/lib/videos/ingredientsAdapter.ts` | INGREDIENTS_NAME, INGREDIENTS_LIBRARY_NAME, INGREDIENTS_FILE, INGREDIENTS_BYTES, INGREDIENTS_REPO, INGREDIENTS_URL |
