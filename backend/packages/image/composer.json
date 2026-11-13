@@ -9,8 +9,20 @@
       "engine": "image",
       "gate": "pictures",
       "tier_category": "image",
-      "tools": ["clear"],
-      "presets": { "label": "Presets", "source": "templates", "kind": "picture" }
+      "tools": [
+        "clear"
+      ],
+      "presets": {
+        "label": "Presets",
+        "source": "templates",
+        "kind": "picture"
+      },
+      "chat_tool": "generate_image",
+      "chat_args": {
+        "shape": "size",
+        "count": "count",
+        "quality": "tier"
+      }
     }
   ]
 }

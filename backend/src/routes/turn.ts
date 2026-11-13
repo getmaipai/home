@@ -464,6 +464,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     spoken?: boolean;
     ask_answer?: unknown;
     page_context?: unknown;
+    composer?: unknown;
   };
   // A robot that cannot tell who is speaking sends speaker_evidence: null (the hosted StackChan always did); that means "no evidence", the same as leaving it out.
   const parsedEvidence = z.object({ speaker_evidence: evidence.nullish(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
@@ -495,7 +496,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, false);
   // runTurnNext() always resolves "immediate" (its own header note); the
   // explicit kind check is TypeScript's, not a real branch.
-  const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, pageContext: body.page_context, mentionCompanionId: typeof body.mention_companion_id === "string" ? body.mention_companion_id : undefined,
+  const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, pageContext: body.page_context, composer: body.composer, mentionCompanionId: typeof body.mention_companion_id === "string" ? body.mention_companion_id : undefined,
       castMentions: (await import("@/lib/cast")).castMentionIds(actor, body.mentions, { surface, spoken: body.spoken === true, temporary: body.temporary === true }), tryCompanionId: typeof body.try_companion_id === "string" ? body.try_companion_id : undefined, temporary: body.temporary, supersedes: body.supersedes, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(robotName ? { robotName } : {}), ...(surface === "robot" && deviceId ? { deviceId } : {}), ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) }); // Evidence is only honored on the robot surface.
   const result: TurnOpResult = next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the turn machine returned a stream result unexpectedly" } : next;
   if (!result.ok) {
@@ -1083,6 +1084,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     confirm?: boolean;
     ask_answer?: unknown;
     page_context?: unknown;
+    composer?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
     images?: { id: string; name: string; width: number; height: number; media_type: string }[];
     audio?: ChatAudioPart[];
@@ -1229,6 +1231,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     result = await runTurnNextStream(actor, bare ? "chat" : surface, body.text ?? "", {
       conversationId: body.conversation_id,
       pageContext: body.page_context,
+      composer: body.composer,
       mentionCompanionId: typeof body.mention_companion_id === "string" ? body.mention_companion_id : undefined,
       castMentions: (await import("@/lib/cast")).castMentionIds(actor, body.mentions, { surface: bare ? "chat" : surface, spoken: body.spoken === true, temporary: body.temporary === true }),
       tryCompanionId: typeof body.try_companion_id === "string" ? body.try_companion_id : undefined,

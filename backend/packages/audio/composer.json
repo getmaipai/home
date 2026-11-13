@@ -10,10 +10,16 @@
       "engine": "music",
       "gate": "music",
       "tier_category": "music",
-      "tools": ["clear"],
+      "tools": [
+        "clear"
+      ],
       "fallback": {
         "placeholder": "Describe the song you want. Add details like instruments or the kind of voice.",
         "primary": "Make song"
+      },
+      "chat_tool": "generate_music",
+      "chat_args": {
+        "quality": "tier"
       }
     }
   ]

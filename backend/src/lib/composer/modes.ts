@@ -57,6 +57,9 @@ interface Descriptor {
   fallback?: { placeholder?: string; primary?: string };
   /** The plain line that replaces the primary button's action while no backend route exists for this mode (never a dead control, never hidden). */
   coming_soon?: string;
+  /** COMPOSER-04: the one tool a chat hint for this mode may fill, and which chip (or `quality`) fills which of its arguments. Chat only; never an offer. */
+  chat_tool?: string;
+  chat_args?: Record<string, string>;
 }
 
 /** The Chat mode: the person's own chat, today's behaviour, always first. It belongs to no package. */
@@ -124,8 +127,9 @@ function presetsOf(person: PersonRow, d: Descriptor): ComposerModeRecord["preset
 
 const PACKAGES = ["image", "video", "audio"] as const;
 
-/** The modes this person is offered, in the order Ask, Picture, Video, Song. */
-export async function composerModesFor(person: PersonRow): Promise<ComposerModesResponse> {
+type EngineHealth = Awaited<ReturnType<typeof collectHealth>>["engines"];
+
+function buildModes(person: PersonRow, health: EngineHealth | null): { band: AgeBand; modes: ComposerModeRecord[]; descriptors: Map<string, Descriptor> } {
   const band = speakerAgeBand(person, new Date());
   const audience = routeAudience(person);
   const allowed: Record<Descriptor["gate"], boolean> = {
@@ -133,8 +137,8 @@ export async function composerModesFor(person: PersonRow): Promise<ComposerModes
     videos: videosAllowed(audience),
     music: musicsAllowed(audience),
   };
-  const health = await collectHealth().then((snapshot) => snapshot.engines, () => null);
   const modes: ComposerModeRecord[] = [CHAT_MODE];
+  const descriptors = new Map<string, Descriptor>();
   for (const packageId of PACKAGES) {
     for (const d of readDescriptors(packageId)) {
       if (!allowed[d.gate]) continue;
@@ -144,6 +148,7 @@ export async function composerModesFor(person: PersonRow): Promise<ComposerModes
       const row = health?.[d.engine];
       const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture" }] : []);
       const notice = row?.notice;
+      descriptors.set(d.id, d);
       modes.push({
         id: d.id, label: d.label, icon: d.icon, route: d.route, engine: d.engine,
         placeholder: text(bar.placeholder) ?? d.fallback?.placeholder ?? "",
@@ -156,5 +161,21 @@ export async function composerModesFor(person: PersonRow): Promise<ComposerModes
       });
     }
   }
+  return { band, modes, descriptors };
+}
+
+/** The modes this person is offered, in the order Ask, Picture, Video, Song. */
+export async function composerModesFor(person: PersonRow): Promise<ComposerModesResponse> {
+  const health = await collectHealth().then((snapshot) => snapshot.engines, () => null);
+  const { band, modes } = buildModes(person, health);
   return { band, modes };
+}
+
+/** COMPOSER-04: what a chat hint for `modeId` may do for this person, from the SAME band filter as the modes list (no health read, nothing awaited).
+ * null when the mode is unknown, plain chat, not allowed for this person, or has no chat tool. */
+export function composerHintSpec(person: PersonRow, modeId: string): { mode: ComposerModeRecord; tool: string; fill: Record<string, string> } | null {
+  const { modes, descriptors } = buildModes(person, null);
+  const mode = modes.find((m) => m.id === modeId), d = descriptors.get(modeId);
+  if (!mode || !d?.chat_tool) return null;
+  return { mode, tool: d.chat_tool, fill: d.chat_args ?? {} };
 }

@@ -61,6 +61,7 @@ import { getDeviceById } from "@/lib/devices";
 import { getRobotCheckin } from "@/lib/robotCheckin";
 import { getDeviceState } from "@/lib/deviceStates";
 import { getRobotSoftware } from "@/lib/robotSoftware";
+import { composerHintItem } from "@/lib/composerHint";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -209,6 +210,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
   const pageContext = resolvePageContext(state.actor, state.pageContextRaw);
   if (pageContext) items.push(pageContext);
+  if (state.composerHint) items.push(composerHintItem(state.composerHint));
   if (state.surface === "chat" && state.deviceId) {
     const device = getDeviceById(state.deviceId);
     if (device?.kind === "robot") {

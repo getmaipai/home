@@ -95,6 +95,8 @@ import { readLook } from "@/lib/companionLook";
 import { trimClosers } from "@/lib/guards";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
+// Last on purpose: composerHint reaches the composer modes, which reach the app and page catalogs; imported earlier it reorders module loading.
+import { composerHintAllowed, resolveComposerHint } from "@/lib/composerHint";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -102,6 +104,8 @@ export interface RunTurnNextOpts {
   replyVoiceId?: string;
   conversationId?: string;
   pageContext?: unknown;
+  /** COMPOSER-04: the chat composer's mode hint (spec TurnComposer), read on a written chat turn only. */
+  composer?: unknown;
   mentionCompanionId?: string;
   /** CREATOR-05: cast ids from the composer's structured `@` mentions, checked by the route against the viewer's cast list. */
   castMentions?: string[];
@@ -690,6 +694,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     referenceVideoAvailable: () => !temporary && opts.ephemeral !== true && conversationHasReferenceVideo(actor, conversation.id),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
+  // COMPOSER-04: a hint rides only a written chat turn, is read only when its mode's tool is already offered, and changes no offer.
+  const composerHint = opts.composer !== undefined && composerHintAllowed({ surface, spoken: opts.spoken === true, deviceId: opts.deviceId, anonymous: speakerIsAnonymous(speaker), bare }) ? await resolveComposerHint(actor, opts.composer, gated.budget.tools_offered) : null;
   const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk } = gated;
 
   const state: TurnState = {
@@ -746,6 +752,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     context: [],
     ...pageContextForTurn(conversation, surface, opts.pageContext),
     ...(castMentionsKept.length ? { castMentions: castMentionsKept } : {}),
+    ...(composerHint ? { composerHint } : {}),
     messages: [],
     proposals: [],
     outcomes: [],

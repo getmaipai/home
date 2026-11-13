@@ -195,6 +195,7 @@ async function retryEmptySearches(
 }
 
 import { speculationConfirmed } from "@/lib/speculation";
+import { fillComposerDefaults } from "@/lib/composerHint";
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
@@ -302,6 +303,10 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     let args = modelFacingArgs(tool, proposal.request.args);
     // CREATOR-05: people picked from the `@` list reach a media tool as structured data (never found in the words); see lib/mentionedCastArgs.ts.
     args = withMentionedCast(tool, args as Record<string, unknown>, state.castMentions) as typeof args;
+    // COMPOSER-04: after the model itself called the hinted tool, the person's chip values fill only the arguments it left unset. The runner
+    // checks the filled set like any other; the stored call keeps the model's own arguments (no chip value is kept beyond the run).
+    const chosenArgs = (a: Record<string, unknown>) => fillComposerDefaults(state.composerHint, tool, a);
+    const keepModelArgs = (o: ToolExecutionOutcome): ToolExecutionOutcome => (state.composerHint?.tool === tool && o.args !== undefined ? { ...o, args: args as Record<string, unknown> } : o);
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
@@ -460,7 +465,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     // MUSIC-GEN-03: both music tools start a Stack job and return its card id at once.
     if (tool === GENERATE_MUSIC_TOOL_ID || tool === EDIT_MUSIC_TOOL_ID || tool === MAKE_SOUND_TOOL_ID) {
-      const outcome = redactLockedMusicOutcome(state.actor, await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : tool === MAKE_SOUND_TOOL_ID ? runMakeSound : runGenerateMusic)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" }));
+      const outcome = keepModelArgs(redactLockedMusicOutcome(state.actor, await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : tool === MAKE_SOUND_TOOL_ID ? runMakeSound : runGenerateMusic)({ state, args: chosenArgs(args as Record<string, unknown>), callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" })));
       outcomes.push(outcome);
       const data = outcome.result?.data as { musicJobId?: string } | undefined;
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text ?? LOCKED_MUSIC_RESULT_TEXT, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
@@ -471,7 +476,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // VIDEO-GEN-05: the card follows the job after this call returns.
     if (tool === GENERATE_VIDEO_TOOL_ID || tool === EDIT_VIDEO_TOOL_ID) {
       // ADULT-LOCK-02: a locked item's outcome is stored as a placeholder (no prompt, styles or file ids), and so is what the wire carries.
-      const outcome = redactLockedVideoOutcome(state.actor, await (tool === EDIT_VIDEO_TOOL_ID ? runEditVideo : runGenerateVideo)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" }));
+      const outcome = keepModelArgs(redactLockedVideoOutcome(state.actor, await (tool === EDIT_VIDEO_TOOL_ID ? runEditVideo : runGenerateVideo)({ state, args: chosenArgs(args as Record<string, unknown>), callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" })));
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
@@ -499,7 +504,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // IMGGEN-HOME-01: the picture tool starts a Stack job and answers at once; the card on the thread follows the job.
     // It never goes through runPlugin() (the package holds its description and arguments; this is its one runner).
     if (tool === GENERATE_IMAGE_TOOL_ID) {
-      const outcome = await runGenerateImage({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", signal });
+      const outcome = keepModelArgs(await runGenerateImage({ state, args: chosenArgs(args as Record<string, unknown>), callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", signal }));
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

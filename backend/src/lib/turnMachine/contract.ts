@@ -320,6 +320,8 @@ export interface TurnState {
   pageContextRaw?: unknown;
   /** CREATOR-05: ids the composer sent as structured `@` mentions, already checked against what the viewer may pick (never read from the words). */
   castMentions?: string[];
+  /** COMPOSER-04: the composer hint already checked against this person's band and this turn's offered tools (lib/composerHint.ts). Never logged or traced. */
+  composerHint?: import("@/lib/composerHint").ComposerHint;
   /** Set by the `context` node (ContextOutput.temporary). Not in the
    * design record's own TurnState listing, which otherwise fixes this
    * contract exactly; added because `policy`'s own "temporary mode (no

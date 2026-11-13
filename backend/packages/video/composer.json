@@ -11,7 +11,12 @@
       "tier_category": "video",
       "tools": [
         "clear"
-      ]
+      ],
+      "chat_tool": "generate_video",
+      "chat_args": {
+        "orientation": "orientation",
+        "seconds": "seconds"
+      }
     },
     {
       "id": "from-picture",
