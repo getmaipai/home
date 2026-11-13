@@ -59,6 +59,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [robot-vision-2026-10-21.md](robot-vision-2026-10-21.md) | owner ruling (RULES.md) | ROBOT-VISION-01, -02 |
 | [robots-switch-and-install-2026-10-20.md](robots-switch-and-install-2026-10-20.md) | design note; hub side | robot switch/install slices |
 | [safety-factual-references-2026-10-19.md](safety-factual-references-2026-10-19.md) | investigation only; no rule change | n/a |
+| [scene-awareness-2026-11-13.md](scene-awareness-2026-11-13.md) | current; architect APPROVED 2026-11-13; SCENE-02 build waits on SCENE-02a (RULES.md A1 to A4) | SCENE-01a to h, SCENE-02a to g, MOVE-SCENE-01 to 06, SELF-SCENE-01 to 04, DISMISS-01 to 04, VOICE-MATCH-01, CLIPS-SCENE-01, SCENE-SOUND-BENCH-01 |
 | [settings-layout-revamp-2026-10-22.md](settings-layout-revamp-2026-10-22.md) | partly superseded by RULES.md S1 and S4 (2026-10-23) | settings layout slices |
 | [splash-chat-01-2026-10-28.md](splash-chat-01-2026-10-28.md) | opt-in chat engine design | SPLASH-CHAT-01 |
 | [tier-evaluations-2026-10-30.md](tier-evaluations-2026-10-30.md) | evaluation results; see resource tiers | TIER-EVAL-01 to -08 |
