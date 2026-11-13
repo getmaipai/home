@@ -68631,6 +68631,9 @@
                                 "type": "string",
                                 "nullable": true
                               },
+                              "sheet_stale": {
+                                "type": "boolean"
+                              },
                               "medium": {
                                 "type": "string",
                                 "nullable": true,
@@ -68644,6 +68647,7 @@
                             "required": [
                               "description",
                               "sheet_file_id",
+                              "sheet_stale",
                               "medium"
                             ]
                           },
@@ -68708,6 +68712,231 @@
                   "required": [
                     "cast"
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cast/{id}/look": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Capture the look of a cast member (one reference sheet, reused until its pictures change)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo_file_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 7
+                  },
+                  "force": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sheet_file_id": {
+                      "type": "string"
+                    },
+                    "reused": {
+                      "type": "boolean"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "locked_description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "cast": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "synth",
+                            "member",
+                            "subject"
+                          ]
+                        },
+                        "subject_kind": {
+                          "type": "string",
+                          "enum": [
+                            "character",
+                            "prop",
+                            "place"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "subject_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "synth_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "person_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "look": {
+                          "type": "object",
+                          "properties": {
+                            "description": {
+                              "type": "string"
+                            },
+                            "sheet_file_id": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "sheet_stale": {
+                              "type": "boolean"
+                            },
+                            "medium": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "photo",
+                                "stylised",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "description",
+                            "sheet_file_id",
+                            "sheet_stale",
+                            "medium"
+                          ]
+                        },
+                        "locked_description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "voice": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "avatar": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "seed": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "seed"
+                          ]
+                        },
+                        "real": {
+                          "type": "boolean"
+                        },
+                        "minor": {
+                          "type": "boolean"
+                        },
+                        "audience": {
+                          "type": "string",
+                          "enum": [
+                            "all-ages",
+                            "adult-only"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "subject_kind",
+                        "name",
+                        "subject_id",
+                        "synth_id",
+                        "person_id",
+                        "look",
+                        "locked_description",
+                        "voice",
+                        "avatar",
+                        "real",
+                        "minor",
+                        "audience"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sheet_file_id",
+                    "reused",
+                    "description",
+                    "locked_description",
+                    "notes",
+                    "cast"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The look could not be captured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
