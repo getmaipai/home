@@ -2,7 +2,7 @@
 // the stored file is usually ready as it is; a clip stored before that has no sound track and is converted by the Stack
 // (POST /v1/videos/messages, nothing kept there) and kept here in memory for a few minutes. The name comes from the
 // prompt ("a paper boat in the rain" becomes paper-boat-in-the-rain.mp4), never "video.mp4".
-import { convertForMessages } from "@/lib/videos/stack";
+import { convertAnimated, convertForMessages } from "@/lib/videos/stack";
 
 const FILLER = new Set(["a", "an", "the", "of", "and", "to", "in", "on", "with", "for", "please", "make", "me", "video", "clip", "movie"]);
 
@@ -15,6 +15,11 @@ export function videoFileName(prompt: string): string {
   let name = chosen.join("-").slice(0, 48).replace(/-+$/, "");
   if (name === "") name = "video";
   return `${name}.mp4`;
+}
+
+/** The animation download name follows the same prompt words as the mp4 copy. */
+export function animatedFileName(prompt: string, format: "gif" | "webp"): string {
+  return videoFileName(prompt).replace(/\.mp4$/, `.${format}`);
 }
 
 /** The title written into the file: the prompt's first 80 characters, one line. */
@@ -53,3 +58,20 @@ export async function messagesCopyOf(fileId: string, bytes: Uint8Array, title: s
 }
 
 export function __resetMessagesCopiesForTests(): void { kept.clear(); }
+
+const animatedKept = new Map<string, { bytes: Uint8Array; at: number }>();
+
+/** Convert once per source file and format, keeping only a small in-memory copy. */
+export async function animatedCopyOf(fileId: string, format: "gif" | "webp", bytes: Uint8Array): Promise<Uint8Array> {
+  const now = Date.now();
+  for (const [key, value] of animatedKept) if (now - value.at > KEEP_MS) animatedKept.delete(key);
+  const key = `${fileId}:${format}`;
+  const hit = animatedKept.get(key);
+  if (hit) return hit.bytes;
+  const out = await convertAnimated(bytes, format);
+  animatedKept.set(key, { bytes: out, at: now });
+  while (animatedKept.size > KEEP_MAX) animatedKept.delete(animatedKept.keys().next().value as string);
+  return out;
+}
+
+export function __resetAnimatedCopiesForTests(): void { animatedKept.clear(); }

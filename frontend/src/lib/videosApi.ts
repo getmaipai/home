@@ -53,6 +53,8 @@ export const videosApi = {
   status: () => requestJson<VideoStatus>("/api/videos/status"),
   /** The clip prepared for texting (a sound track, a name from the prompt). */
   messagesUrl: (id: string) => `/api/videos/jobs/${encodeURIComponent(id)}/messages.mp4`,
+  /** The finished clip as an animated GIF or WebP download. */
+  animatedUrl: (id: string, format: "gif" | "webp" = "gif") => `/api/videos/jobs/${encodeURIComponent(id)}/animated?format=${encodeURIComponent(format)}`,
   card: (id: string, signal?: AbortSignal) => requestJson<VideoCard | LockedVideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => requestJson<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),

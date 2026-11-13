@@ -267,6 +267,26 @@ export async function convertForMessages(bytes: Uint8Array, title: string): Prom
   return new Uint8Array(await res.arrayBuffer());
 }
 
+/** Asks the Stack for a short animated GIF or WebP copy. Nothing is kept on the Stack. */
+export async function convertAnimated(bytes: Uint8Array, format: "gif" | "webp", opts: { width?: number; fps?: number; seconds?: number } = {}): Promise<Uint8Array> {
+  const query = new URLSearchParams({ format });
+  if (opts.width !== undefined) query.set("width", String(opts.width));
+  if (opts.fps !== undefined) query.set("fps", String(opts.fps));
+  if (opts.seconds !== undefined) query.set("seconds", String(opts.seconds));
+  const res = await request(`/v1/videos/animated?${query.toString()}`, { method: "POST", headers: { "content-type": "video/mp4" }, body: new Blob([bytes as unknown as ArrayBuffer], { type: "video/mp4" }), timeoutMs: 180_000 });
+  if (!res.ok) {
+    try {
+      const payload = await res.json() as { code?: unknown; error?: unknown };
+      if (payload.code === "format_unavailable") throw new StackVideoError(res.status, "format_unavailable", format === "webp" ? "Animated WebP is unavailable on this computer. Save as GIF or MP4 instead." : "Animated GIF is unavailable on this computer. Save as WebP or MP4 instead.");
+      throw new StackVideoError(res.status, typeof payload.code === "string" ? payload.code : `http_${res.status}`, typeof payload.error === "string" ? payload.error : "The clip could not be saved as an animation. Try again.");
+    } catch (error) {
+      if (error instanceof StackVideoError) throw error;
+      throw new StackVideoError(res.status, `http_${res.status}`, "The clip could not be saved as an animation. Try again.");
+    }
+  }
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export async function getVideoJob(job: string, view?: FullView): Promise<StackVideoJob> {
   const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}`, { method: "GET" }, view);
   if (!res.ok) return failure(res);

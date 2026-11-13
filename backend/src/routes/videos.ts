@@ -24,7 +24,7 @@ import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial,
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason, videoMaxNotReadyReason } from "@/lib/videos/ready";
-import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
+import { animatedCopyOf, animatedFileName, hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, StackVideoError } from "@/lib/videos/stack";
 import { loraAccess, readLora, readLoras } from "@/lib/loras/access";
 import { confirmLora, markAdultOnly, markAllAges, patchLora, removeLora } from "@/lib/loras/admin";
@@ -305,6 +305,29 @@ videosRoutes.openapi(messagesRoute, async (c) => {
   }
   const name = generic ? "video.mp4" : videoFileName(job.prompt);
   return new Response(bytes, { status: 200, headers: { "content-type": "video/mp4", "content-length": String(bytes.byteLength), "content-disposition": `attachment; filename="${name}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
+});
+
+const animatedRoute = createRoute({
+  method: "get", path: "/jobs/{id}/animated", tags: ["Videos"], summary: "Save a finished clip as a GIF or animated WebP", middleware: [requireAuth] as const,
+  request: { params: idParams, query: z.object({ format: z.enum(["gif", "webp"]).default("gif") }) },
+  responses: { 200: { content: { "image/gif": { schema: z.string() }, "image/webp": { schema: z.string() } }, description: "The converted animation, downloaded with a prompt based filename." }, ...errorResponses({ 400: "Choose GIF or WebP", 401: "Not signed in", 404: "No such video", 422: "The animation could not be made", 503: "Video conversion is unavailable" }) },
+});
+videosRoutes.openapi(animatedRoute, async (c) => {
+  const actor = c.get("person");
+  const { format } = c.req.valid("query");
+  const job = getVideoJobFor(actor, c.req.valid("param").id);
+  const first = job?.state === "done" ? job.files[0] : undefined;
+  const file = job && first && videoJobLockState(actor, job) === "open" ? readVideoFile(actor, job, first.id) : null;
+  if (!job || !first || !file) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404, NO_STORE) as never;
+  let bytes: Uint8Array;
+  try { bytes = await animatedCopyOf(first.id, format, file.bytes); } catch (error) {
+    if (error instanceof StackVideoError) return c.json({ error: `I couldn't save this clip as ${format === "gif" ? "a GIF" : "an animated WebP"}. ${error.message}`, code: error.code }, error.status >= 500 ? 503 : 422) as never;
+    throw error;
+  }
+  // ADULT-LOCK-02: never derive a download name from adult-only prompt words.
+  const generic = videoJobLockItem(job)?.madeAudience === "adult-only";
+  const name = generic ? `video.${format}` : animatedFileName(job.prompt, format);
+  return new Response(bytes, { status: 200, headers: { "content-type": format === "gif" ? "image/gif" : "image/webp", "content-length": String(bytes.byteLength), "content-disposition": `attachment; filename="${name}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 // IVY-QC-01: what a quick measured look at the finished clip's frames found (black, nothing moves, a much softer stretch). Local only; says nothing about the words.

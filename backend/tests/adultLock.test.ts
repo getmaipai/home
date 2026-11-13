@@ -32,7 +32,7 @@ afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); __setAdul
 type Row = Record<string, any>;
 const data = (client: TestClient, body: Record<string, unknown>, headers?: Record<string, string>) => client.post("/api/plugins/video/data/recipes", body, headers);
 
-const MEDIA_AND_RECORD = new Set(["job preview", "job clip", "job poster", "job messages copy", "file record", "file content", "poster content", "poster thumb", "clip thumb", "file shares"]);
+const MEDIA_AND_RECORD = new Set(["job preview", "job clip", "job poster", "job messages copy", "job animated copy", "file record", "file content", "poster content", "poster thumb", "clip thumb", "file shares"]);
 
 /** Every route that can return the adult-only clip to its owner, as [label, request]. */
 function surfaces(clip: { jobId: string; fileId: string; posterId: string }): Array<[string, (c: TestClient, h?: Record<string, string>) => Promise<Response>]> {
@@ -43,6 +43,7 @@ function surfaces(clip: { jobId: string; fileId: string; posterId: string }): Ar
     ["job clip", (c, h) => c.get(`/api/videos/jobs/${jobId}/files/${fileId}`, h)],
     ["job poster", (c, h) => c.get(`/api/videos/jobs/${jobId}/files/${posterId}`, h)],
     ["job messages copy", (c, h) => c.get(`/api/videos/jobs/${jobId}/messages.mp4`, h)],
+    ["job animated copy", (c, h) => c.get(`/api/videos/jobs/${jobId}/animated?format=gif`, h)],
     ["feed scope", (c, h) => data(c, { scope: "feed" }, h)],
     ["job scope", (c, h) => data(c, { scope: "job", id: jobId }, h)],
     ["clips scope", (c, h) => data(c, { scope: "clips" }, h)],
