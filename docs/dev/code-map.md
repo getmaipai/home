@@ -500,7 +500,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/canary/wav.ts` | decodeWav |
 | `backend/src/lib/capabilities.ts` | unavailableCapabilities, missingRequired, missingOptional, capabilityWords, installRefusal |
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
-| `backend/src/lib/cast.ts` | MAX_CAST, REAL_REFUSED_LINE, listCast, resolveCast, castRefsOf, castForTool |
+| `backend/src/lib/cast.ts` | MAX_CAST, REAL_REFUSED_LINE, listCast, TEMPORARY_CAST_LINE, resolveCast, castRefsOf |
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/changeVoice.ts` | changeVoice |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
@@ -1287,7 +1287,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen |
 | `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
-| `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkOf, ownTrackFile |
+| `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkNow, clipMarkOf |
 | `backend/src/lib/videos/editPlan.ts` | VIDEO_RESTYLES, restyleBody, MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_STYLE_LINE, NO_PICTURE_LINE |
 | `backend/src/lib/videos/estimate.ts` | ESTIMATE_MIN_SAMPLES, medianMinutes, estimateVideoMinutes |
