@@ -22,6 +22,11 @@ export type RobotCheckin = {
   crash_resets: number | null;
   battery_level: number | null;
   charging: boolean | null;
+  /** Bot 0.2.65: timers the unit is holding, how often it restarted itself, whether its restart guard is holding, and the microphone level. */
+  timers_active?: number | null;
+  self_restarts?: number | null;
+  heal_hold?: boolean | null;
+  mic_level?: number | null;
 };
 
 const latest = new Map<string, { value: RobotCheckin; receivedAt: number }>();

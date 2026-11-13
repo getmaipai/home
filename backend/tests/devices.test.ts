@@ -5,7 +5,7 @@ import { startFakeSshd, generateFakeSshHostKey } from "./fixtures/fakeSshd";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
-import { people, memoryRecords, memoryEmbeddings } from "@/db/schema";
+import { people, memoryRecords, memoryEmbeddings, deviceCommands } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { privacyConnections } from "@/lib/privacy";
@@ -401,6 +401,31 @@ describe("GET /api/devices/robots", () => {
     const guest = await make("Guest", "guest");
     expect((await guest.post(`/api/devices/${robot}/commands`, { kind: "find_me" })).status).toBe(403);
     expect((await child.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(404);
+  });
+
+  test("STACKCHAN-HOME-01: dance, music_test and announce queue typed commands with the right payload and gates", async () => {
+    const { client: ownerClient, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "Rover").deviceId;
+    const make = async (name: string, role: string) => {
+      const created = await ownerClient.post("/api/people", { displayName: name, role, secret: "0000" }).then((r) => r.json()) as { id: string };
+      const client = new TestClient(); await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" }); return client;
+    };
+    expect((await ownerClient.post(`/api/devices/${robot}/commands`, { kind: "dance" })).status).toBe(202);
+    expect((await ownerClient.post(`/api/devices/${robot}/commands`, { kind: "music_test", fast: true })).status).toBe(202);
+    expect((await ownerClient.post(`/api/devices/${robot}/commands`, { kind: "announce", text: "Dinner is ready.", urgent: true })).status).toBe(202);
+    expect((await ownerClient.post(`/api/devices/${robot}/commands`, { kind: "announce", text: "   " })).status).toBe(400);
+    const rows = db.select().from(deviceCommands).where(eq(deviceCommands.deviceId, robot)).all().map((row) => [row.kind, JSON.parse(row.payload)]);
+    expect(rows).toContainEqual(["dance", {}]);
+    expect(rows).toContainEqual(["music_test", { fast: true }]);
+    expect(rows).toContainEqual(["announce", { text: "Dinner is ready.", urgent: true }]);
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.controls", "adult");
+    setValue(db.select().from(people).where(eq(people.id, personId)).get()!, `device:${robot}`, "robot.companion.id", "rivet");
+    const child = await make("Nova", "child");
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "dance" })).status).toBe(202);
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "announce", text: "Hi" })).status).toBe(404);
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "music_test" })).status).toBe(404);
+    const guest = await make("Guest", "guest");
+    expect((await guest.post(`/api/devices/${robot}/commands`, { kind: "dance" })).status).toBe(403);
   });
 
   test("lists a robot household-wide, even for an admin who didn't pair it", async () => {

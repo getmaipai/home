@@ -19,6 +19,7 @@ import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { api, type DeviceInfo } from "@/lib/api";
 import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
+import { RobotActions } from "@/apps/settings/RobotActions";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -31,6 +32,17 @@ function statusText(device: DeviceInfo): string {
   if (device.lastSeenAt === null && device.state == null) return i18n._({ id: "Waiting for first report", message: "Waiting for first report" });
   if (device.state && !device.state.reachable) return i18n._({ id: "Not responding", message: "Not responding" });
   return i18n._({ id: "Paired", message: "Paired" });
+}
+
+/** STACKCHAN-HOME-01: the bot 0.2.65 check-in extras as small plain facts; a field the robot did not send shows nothing. */
+export function checkinFacts(checkin: { timers_active?: number | null; self_restarts?: number | null; heal_hold?: boolean | null; mic_level?: number | null } | null): string[] {
+  if (!checkin) return [];
+  const facts: string[] = [];
+  if (typeof checkin.timers_active === "number") facts.push(i18n._({ id: "Timers: {count}", message: "Timers: {count}", values: { count: checkin.timers_active } }));
+  if (typeof checkin.self_restarts === "number") facts.push(i18n._({ id: "Restarted itself {count, plural, one {# time} other {# times}}", message: "Restarted itself {count, plural, one {# time} other {# times}}", values: { count: checkin.self_restarts } }));
+  if (checkin.heal_hold === true) facts.push(i18n._({ id: "Restart guard is holding", message: "Restart guard is holding" }));
+  if (typeof checkin.mic_level === "number") facts.push(i18n._({ id: "Microphone level {level}", message: "Microphone level {level}", values: { level: checkin.mic_level } }));
+  return facts;
 }
 
 function robotOnline(device: DeviceInfo): boolean {
@@ -150,6 +162,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
         {activeTab === "overview" ? <>
         <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(device.lastSeenAt, { dateStyle: "medium", timeStyle: "short" }) } })}</> : null}</p>
         <RobotSelfTests device={device} />
+        <RobotActions device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading={i18n._({ id: "Software", message: "Software" })}>
           <ItemGroup variant="card" aria-label={i18n._({ id: "Robot software", message: "Robot software" })}>
             <Item size="setting">
@@ -157,7 +170,8 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
                 ? [softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: formatTime(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!) } }),
                   softwareQuery.data.checkin?.signal ? i18n._({ id: "Wi-Fi {signal}", message: "Wi-Fi {signal}", values: { signal: softwareQuery.data.checkin.signal } }) : null,
                   softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? (softwareQuery.data.checkin.battery.charging ? i18n._({ id: "Battery {level}%, charging", message: "Battery {level}%, charging", values: { level: softwareQuery.data.checkin.battery.level } }) : i18n._({ id: "Battery {level}%", message: "Battery {level}%", values: { level: softwareQuery.data.checkin.battery.level } })) : null,
-                  softwareQuery.data.checkin?.ip ? i18n._({ id: "IP address {ip}", message: "IP address {ip}", values: { ip: softwareQuery.data.checkin.ip } }) : null].filter(Boolean).join(" · ") || i18n._({ id: "No connection details reported.", message: "No connection details reported." })
+                  softwareQuery.data.checkin?.ip ? i18n._({ id: "IP address {ip}", message: "IP address {ip}", values: { ip: softwareQuery.data.checkin.ip } }) : null,
+                  ...checkinFacts(softwareQuery.data.checkin)].filter(Boolean).join(" · ") || i18n._({ id: "No connection details reported.", message: "No connection details reported." })
                 : i18n._({ id: "Waiting for the robot to check in.", message: "Waiting for the robot to check in." })}</ItemDescription></ItemContent>
               <Badge variant="secondary">{softwareQuery.data.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : i18n._({ id: "Offline", message: "Offline" })}</Badge>
             </Item>

@@ -178,6 +178,7 @@ const robotCheckinSchema = z.object({
   last_seen: z.string().datetime({ offset: true }), connected_since: loose(z.string().datetime({ offset: true })),
   ip: loose(z.string().max(64)), firmware_version: loose(z.string().max(64)), bot_version: loose(z.string().max(64)),
   rssi: loose(z.number().int()), signal: z.enum(["strong", "medium", "weak"]).nullable().catch(null),
+  timers_active: loose(z.number().int().nonnegative()), self_restarts: loose(z.number().int().nonnegative()), heal_hold: loose(z.boolean()), mic_level: loose(z.number().int()),
   free_heap_internal: loose(z.number().int().nonnegative()), free_heap_min: loose(z.number().int().nonnegative()), psram_free: loose(z.number().int().nonnegative()),
   boot_reason: loose(z.number().int()), crash_resets: loose(z.number().int().nonnegative()),
   battery_level: loose(z.number().int().min(0).max(100)), charging: loose(z.boolean()),
@@ -428,11 +429,17 @@ const sendCommandRoute = createRoute({
   method: "post",
   path: "/{id}/commands",
   tags: ["Devices"],
-  summary: "Ask a paired robot to mute or unmute its microphone",
+  summary: "Ask a paired robot to mute, unmute, chirp, dance, run its music test or read out an announcement",
   middleware: [requireAuth] as const,
   request: {
     params: idParamSchema("id", "device-a1b2c3"),
-    body: { content: { "application/json": { schema: z.object({ kind: z.enum(["mute", "unmute", "find_me"]), seconds: z.number().int().min(1).max(30).optional() }) } } },
+    body: { content: { "application/json": { schema: z.object({
+      kind: z.enum(["mute", "unmute", "find_me", "dance", "music_test", "announce"]),
+      seconds: z.number().int().min(1).max(30).optional(),
+      fast: z.boolean().optional().openapi({ description: "music_test only: a shorter run, about 40 seconds." }),
+      text: z.string().trim().min(1).max(400).optional().openapi({ description: "announce only: what the robot says." }),
+      urgent: z.boolean().optional().openapi({ description: "announce only: the robot says it even when it would hold a normal one back." }),
+    }) } } },
   },
   responses: {
     202: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Persisted for delivery to the robot." },
@@ -443,18 +450,24 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  const { kind, seconds = 5 } = c.req.valid("json");
+  const { kind, seconds = 5, fast, text, urgent } = c.req.valid("json");
   // ROBOT-ADMIN-PLACE-01: a robot is the household's. Anyone but a child or guest may ask it to mute (the privacy-safe
   // direction); unmuting stays with the person who paired it and admins.
   const mayMuteAnyRobot = kind === "mute" && actor.role !== "child" && actor.role !== "guest";
   const companion = device?.kind === "robot" ? robotCompanionOf(device.id) : null;
-  const mayFind = kind === "find_me" && actor.role !== "guest" && !!companion && mayUseCompanion(actor, resolvePersona(companion.id));
-  if (kind === "find_me" && device?.kind === "robot" && !mayFind && device.personId !== actor.id && !isOwnerOrAdmin(actor)) return c.json({ error: "You cannot use this robot." }, 403);
+  const mayFind = (kind === "find_me" || kind === "dance") && actor.role !== "guest" && !!companion && mayUseCompanion(actor, resolvePersona(companion.id));
+  if ((kind === "find_me" || kind === "dance") && device?.kind === "robot" && !mayFind && device.personId !== actor.id && !isOwnerOrAdmin(actor)) return c.json({ error: "You cannot use this robot." }, 403);
   if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor) && !(mayMuteAnyRobot && device.kind === "robot") && !mayFind)) {
     return c.json({ error: "No such device" }, 404);
   }
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
-  const command = issueDeviceCommand(device.id, kind, kind === "find_me" ? { seconds } : {});
+  // STACKCHAN-HOME-01: dance is open to whoever may use the robot's companion (like find_me, checked above); the music test and announcements are
+  // for the robot's owner and admins, and a child or guest never speaks through a robot.
+  const adultOwnerOrAdmin = actor.role !== "child" && actor.role !== "guest" && (device.personId === actor.id || isOwnerOrAdmin(actor));
+  if ((kind === "music_test" || kind === "announce") && !adultOwnerOrAdmin) return c.json({ error: "Only an adult who owns this robot, or an admin, can do that." }, 403);
+  if (kind === "announce" && !text) return c.json({ error: "Type what the robot should say, then send it." }, 400);
+  const payload = kind === "find_me" ? { seconds } : kind === "music_test" ? (fast === undefined ? {} : { fast }) : kind === "announce" ? { text: text!, ...(urgent === undefined ? {} : { urgent }) } : {};
+  const command = issueDeviceCommand(device.id, kind, payload, kind === "announce" ? 60_000 : kind === "dance" || kind === "music_test" ? 120_000 : undefined);
   return c.json({ id: command.id }, 202);
 });
 

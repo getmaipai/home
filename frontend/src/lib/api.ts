@@ -1195,7 +1195,7 @@ export const api = {
   robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
   robotCompanion: (id: string) => request<RobotCompanionInfo>(`/api/devices/${encodeURIComponent(id)}/companion`),
   robotInstallStatus: (deviceId: string) => request<{ hosted: true; enrollment_pending: boolean }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/install-status`),
-  robotSoftware: (deviceId: string) => request<{ firmware: { installed: { version: string; at: string } | null; available: string; status: "up_to_date" | "update_available" | "unknown" }; bot: { running: string | null; available: string; status: "up_to_date" | "restart_needed" | "unknown" }; checkin: { online: boolean; lastSeen: string; ip: string | null; rssi: number | null; signal: "strong" | "medium" | "weak" | null; battery: { level: number | null; charging: boolean | null }; boot_reason: number | null; crash_resets: number | null; heap: { internal: number | null; minimum: number | null; psram: number | null } } | null; lastSeenAt: string | null }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/software`),
+  robotSoftware: (deviceId: string) => request<{ firmware: { installed: { version: string; at: string } | null; available: string; status: "up_to_date" | "update_available" | "unknown" }; bot: { running: string | null; available: string; status: "up_to_date" | "restart_needed" | "unknown" }; checkin: { online: boolean; lastSeen: string; ip: string | null; rssi: number | null; signal: "strong" | "medium" | "weak" | null; battery: { level: number | null; charging: boolean | null }; boot_reason: number | null; crash_resets: number | null; timers_active?: number | null; self_restarts?: number | null; heal_hold?: boolean | null; mic_level?: number | null; heap: { internal: number | null; minimum: number | null; psram: number | null } } | null; lastSeenAt: string | null }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/software`),
   recordRobotFirmwareInstalled: async (deviceId: string) => {
     const software = await api.robotSoftware(deviceId);
     return request<{ recorded: true }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/firmware-installed`, { method: "POST", body: JSON.stringify({ version: software.firmware.available }) });
@@ -1207,6 +1207,9 @@ export const api = {
       body: JSON.stringify({ kind: muted ? "mute" : "unmute" }),
     }),
   findRobot: (deviceId: string, seconds?: number) => request<{ id: string }>(`/api/devices/${encodeURIComponent(deviceId)}/commands`, { method: "POST", body: JSON.stringify({ kind: "find_me", ...(seconds === undefined ? {} : { seconds }) }) }),
+  // STACKCHAN-HOME-01: the robot page's Dance and Test music detection buttons, and the Announce form.
+  robotCommand: (deviceId: string, kind: "dance" | "music_test") => request<{ id: string }>(`/api/devices/${encodeURIComponent(deviceId)}/commands`, { method: "POST", body: JSON.stringify({ kind }) }),
+  robotAnnounce: (deviceId: string, text: string, urgent: boolean) => request<{ id: string }>(`/api/devices/${encodeURIComponent(deviceId)}/commands`, { method: "POST", body: JSON.stringify({ kind: "announce", text, ...(urgent ? { urgent: true } : {}) }) }),
   // MOTOR-REBOOT-CARD: an adult's answer to the robot's offer to restart a latched motor. Only "yes" sends a command.
   answerMotorReboot: (id: string, answer: "yes" | "no") =>
     request<unknown>(`/api/devices/${encodeURIComponent(id)}/motor-reboot`, { method: "POST", body: JSON.stringify({ answer }) }),

@@ -512,5 +512,148 @@
     "honoured_by": [
       "home"
     ]
+  },
+  {
+    "key": "robot.dance.enabled",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Dance when asked",
+    "help": "Lets this robot do its little dance when someone asks it to, or when you press Dance on this page.",
+    "copy": {
+      "does": "Lets this robot do its little routine on request."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.dance.show_ring",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Light show during the dance",
+    "help": "Colored lights on the ring while this robot dances. Off keeps the dance and turns the lights down.",
+    "copy": {
+      "does": "Colored lights glow on the ring."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.dance.auto",
+    "scope": "device",
+    "selector": "boolean",
+    "default": false,
+    "label": "Dance to music",
+    "help": "Off by default. When on, this robot may hear music playing nearby and dance along on its own.",
+    "copy": {
+      "does": "Lets this robot move along when it hears a tune."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.dance.auto_sensitivity",
+    "scope": "device",
+    "selector": "select",
+    "range": {
+      "options": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "default": "medium",
+    "label": "Music dance sensitivity",
+    "help": "How easily this robot decides music is playing. Low wants a clear beat; high picks up a softer one.",
+    "copy": {
+      "does": "Sets how easily it decides a tune is playing.",
+      "options": {
+        "low": "Needs a clear, strong beat.",
+        "medium": "Balanced for most rooms.",
+        "high": "Picks up softer music."
+      },
+      "option_labels": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      }
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.timers.enabled",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Timers and alarms on this robot",
+    "help": "Lets this robot set and ring timers and alarms itself, even when Home is off.",
+    "copy": {
+      "does": "Lets the unit itself ring your countdowns and wake-ups."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.announce.enabled",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Announcements from Home",
+    "help": "Lets Home say things like \"dinner is ready\" through this robot.",
+    "copy": {
+      "does": "Lets the house speak a message through this robot."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.repeat.enabled",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Say that again and what I missed",
+    "help": "Lets this robot repeat its last answer and tell you what it was not able to say while you were away.",
+    "copy": {
+      "does": "Lets this robot replay its last answer and recap notices it could not give."
+    },
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
   }
 ]

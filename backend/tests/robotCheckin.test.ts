@@ -61,4 +61,14 @@ describe("robot check-in", () => {
     expect((await robot.put("/api/devices/me/checkin", odd)).status).toBe(204);
     expect(getRobotCheckin(deviceId)).toMatchObject({ online: false, signal: null, rssi: null, battery_level: null });
   });
+
+  test("STACKCHAN-HOME-01: timers_active, self_restarts, heal_hold and mic_level are kept and shown, and an odd value becomes null", async () => {
+    expect((await robot.put("/api/devices/me/checkin", payload({ timers_active: 2, self_restarts: 3, heal_hold: true, mic_level: 41 }))).status).toBe(204);
+    const software = await owner.get(`/api/robots/hosts/${deviceId}/software`);
+    expect(await software.json()).toMatchObject({ checkin: { timers_active: 2, self_restarts: 3, heal_hold: true, mic_level: 41 } });
+    expect((await robot.put("/api/devices/me/checkin", payload({ timers_active: -1, self_restarts: "many", heal_hold: "yes" }))).status).toBe(204);
+    expect(getRobotCheckin(deviceId)).toMatchObject({ timers_active: null, self_restarts: null, heal_hold: null });
+    expect((await robot.put("/api/devices/me/checkin", payload())).status).toBe(204);
+    expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { timers_active: null, mic_level: null } });
+  });
 });
