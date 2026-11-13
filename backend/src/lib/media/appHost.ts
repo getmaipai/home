@@ -1476,6 +1476,6 @@ export function startMusicQueue(person: PersonRow, args: Record<string, unknown>
   if (shuffle) tracks = shuffled(tracks);
   if (!tracks.length) return { ok: false, status: 404, error: "No songs are available for this queue. Choose another song or album." };
   const now = new Date().toISOString();
-  setItems(resolveCollection(person.id, "queue")!, tracks.map((item, position) => ({ media_id: item.id, position, added_at: now, status: null })), 0);
+  setItems(resolveCollection(person.id, "queue")!, tracks.map((item, position) => ({ media_id: item.id, position, added_at: now, status: null, votes: [] })), 0);
   return { ok: true, value: { id: tracks[0]!.id } };
 }

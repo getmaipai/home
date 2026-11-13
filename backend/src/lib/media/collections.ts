@@ -12,7 +12,7 @@ import { mediaBandOf, trips } from "./band";
 import { collectionFromRow, type MediaCollection } from "./model";
 
 export const SINGLETON_KINDS = ["liked", "watch_later", "queue"] as const;
-export const MADE_KINDS = ["playlist", "watchlist", "pins"] as const;
+export const MADE_KINDS = ["playlist", "watchlist", "pins", "family_picks"] as const;
 export type CollectionKind = MediaCollection["kind"];
 type Entry = MediaCollection["items"][number];
 
@@ -81,7 +81,7 @@ export function addItem(collection: MediaCollection, mediaId: string, options: {
     items[existing] = { ...items[existing]!, status: options.status ?? items[existing]!.status };
     return setItems(collection, items);
   }
-  const entry: Entry = { media_id: mediaId, added_at: new Date().toISOString(), position: 0, status };
+  const entry: Entry = { media_id: mediaId, added_at: new Date().toISOString(), position: 0, status, votes: [] };
   items.splice(Math.min(Math.max(options.at ?? items.length, 0), items.length), 0, entry);
   // The queue's pointer keeps pointing at the same title when something is inserted before it.
   const pointer = collection.pointer !== null && options.at !== undefined && options.at <= collection.pointer ? collection.pointer + 1 : collection.pointer;
