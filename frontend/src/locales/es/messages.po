@@ -60,7 +60,7 @@ msgid " You can also turn off an extra above."
 msgstr " También puedes apagar un extra arriba."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:208
+#: src/apps/settings/ModelsAndStorageSection.tsx:209
 #: src/apps/settings/ReferenceLibrarySettings.tsx:195
 #, needs-review
 msgid ", {size} free"
@@ -606,7 +606,7 @@ msgid "{item} access for {person}"
 msgstr "Acceso a {item} para {person}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:186
+#: src/apps/settings/ModelsAndStorageSection.tsx:187
 #, needs-review
 msgid "{join}. The licences are accepted. Progress shows on the install strip."
 msgstr "{join}. Las licencias están aceptadas. El progreso aparece en la barra de instalación."
@@ -1385,7 +1385,7 @@ msgid "{sizeGb} will be freed. {value} You can download them again later."
 msgstr "Se liberarán {sizeGb}. {value} Puedes volver a descargarlos más tarde."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:208
+#: src/apps/settings/ModelsAndStorageSection.tsx:209
 #, needs-review
 msgid "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer."
 msgstr "{sizeWords} de IA en este ordenador{value}. Añade o quita piezas aquí. Todo se queda en este ordenador."
@@ -2276,19 +2276,19 @@ msgid "Accent color"
 msgstr "Color de acento"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:174
+#: src/apps/settings/ModelsAndStorageSection.tsx:175
 #, needs-review
 msgid "Accept"
 msgstr "Aceptar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:154
+#: src/apps/settings/ModelsAndStorageSection.tsx:155
 #, needs-review
 msgid "Accept once, and Home installs any of them without asking again."
 msgstr "Acepta una vez y Home instala cualquiera de ellas sin preguntar de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:152
+#: src/apps/settings/ModelsAndStorageSection.tsx:153
 #, needs-review
 msgid "Accept the licences for the AI models Home installs"
 msgstr "Acepta las licencias de los modelos de IA que instala Home"
@@ -4377,7 +4377,7 @@ msgid "Before this synth is for everyone, check each one."
 msgstr "Antes de que este sintetizador sea para todos, revisa cada uno."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:102
+#: src/apps/settings/ModelsAndStorageSection.tsx:103
 #, needs-review
 msgid "Before you get {label}"
 msgstr "Antes de obtener {label}"
@@ -5727,7 +5727,7 @@ msgstr "Asegúrate de que Home esté funcionando y luego abre Liberar espacio de
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:139
-#: src/apps/settings/ModelsAndStorageSection.tsx:211
+#: src/apps/settings/ModelsAndStorageSection.tsx:212
 #, needs-review
 msgid "Check that Home is running, then reload this page."
 msgstr "Comprueba que Home está en ejecución y recarga esta página."
@@ -9874,7 +9874,7 @@ msgstr "Descargando y verificando el archivo"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:72
-#: src/apps/settings/ModelsAndStorageSection.tsx:86
+#: src/apps/settings/ModelsAndStorageSection.tsx:87
 #, needs-review
 msgid "Downloading and installing"
 msgstr "Descargando e instalando"
@@ -12901,7 +12901,7 @@ msgid "Home couldn't save this step. Try again."
 msgstr "Home no pudo guardar este paso. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:143
+#: src/apps/settings/ModelsAndStorageSection.tsx:144
 #, needs-review
 msgid "Home couldn't save your accept. Check that the engine is running, then press Accept again."
 msgstr "Home no pudo guardar tu aceptación. Comprueba que el motor está activo y pulsa Aceptar de nuevo."
@@ -12937,7 +12937,7 @@ msgid "Home couldn't start the download. Press Install again."
 msgstr "Home no pudo iniciar la descarga. Pulsa Instalar otra vez."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:147
+#: src/apps/settings/ModelsAndStorageSection.tsx:148
 #, needs-review
 msgid "Home couldn't start the extras. Check that the engine is running, then try again."
 msgstr "Home no pudo iniciar los extras. Comprueba que el motor está activo e inténtalo de nuevo."
@@ -13731,7 +13731,7 @@ msgid "Humor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:111
+#: src/apps/settings/ModelsAndStorageSection.tsx:112
 #, needs-review
 msgid "I accept, get it"
 msgstr "Acepto, consíguelo"
@@ -14154,14 +14154,14 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/settings/CodingSettings.tsx:165
-#: src/apps/settings/ModelsAndStorageSection.tsx:91
+#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/shell/pages/EnginesPage.tsx:242
 #, needs-review
 msgid "Install"
 msgstr "Instalar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:91
+#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #, needs-review
 msgid "Install {label}"
 msgstr "Instalar {label}"
@@ -14221,7 +14221,7 @@ msgid "Install Tailscale on your phone, sign in to the same account, then scan t
 msgstr "Instala Tailscale en tu teléfono, inicia sesión con la misma cuenta y luego escanea este código."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:187
+#: src/apps/settings/ModelsAndStorageSection.tsx:188
 #, needs-review
 msgid "Install the recommended extras ({size})"
 msgstr "Instalar los extras recomendados ({size})"
@@ -14431,7 +14431,7 @@ msgid "It appears on this song when it is done. The earlier version stays."
 msgstr "Aparece en esta canción cuando termina. La versión anterior se queda."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:103
+#: src/apps/settings/ModelsAndStorageSection.tsx:104
 #, needs-review
 msgid "It comes with its maker's licence ({name}). Read these points, then accept to start the {sizeWords} download. You only need to accept once for this computer."
 msgstr "Viene con la licencia de su creador ({name}). Lee estos puntos y acepta para iniciar la descarga de {sizeWords}. Solo necesitas aceptar una vez para este ordenador."
@@ -14650,7 +14650,7 @@ msgstr ""
 #: src/apps/settings/DevicesSection.tsx:141
 #: src/apps/settings/DevicesSection.tsx:222
 #: src/apps/settings/HouseholdRobotsSection.tsx:190
-#: src/apps/settings/ModelsAndStorageSection.tsx:123
+#: src/apps/settings/ModelsAndStorageSection.tsx:124
 #: src/apps/settings/styles/StyleEditor.tsx:182
 #: src/shell/pages/FilesPage.tsx:402
 #: src/shell/pages/MusicStudioPages.tsx:189
@@ -15667,13 +15667,18 @@ msgid "Licence not stated"
 msgstr "Licencia no indicada"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:150
+#: src/apps/settings/ModelsAndStorageSection.tsx:75
+msgid "Licence: {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:151
 #, needs-review
 msgid "Licences"
 msgstr "Licencias"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:160
+#: src/apps/settings/ModelsAndStorageSection.tsx:161
 #, needs-review
 msgid "Licences of the AI models Home installs"
 msgstr "Licencias de los modelos de IA que instala Home"
@@ -17858,7 +17863,7 @@ msgid "Models"
 msgstr "Modelos"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:206
+#: src/apps/settings/ModelsAndStorageSection.tsx:207
 #, needs-review
 msgid "Models and storage"
 msgstr "Modelos y almacenamiento"
@@ -19490,8 +19495,8 @@ msgstr "Aún no se sabe"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:191
-#: src/apps/settings/ModelsAndStorageSection.tsx:110
-#: src/apps/settings/ModelsAndStorageSection.tsx:173
+#: src/apps/settings/ModelsAndStorageSection.tsx:111
+#: src/apps/settings/ModelsAndStorageSection.tsx:174
 #: src/apps/settings/styles/stylesShared.tsx:24
 #: src/apps/setup/CloseAppsStep.tsx:56
 #: src/apps/setup/CloseAppsStep.tsx:73
@@ -21725,12 +21730,6 @@ msgid "area.Picture tools"
 msgstr "Herramientas de imagen"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
-#, needs-review
-msgid "Picture tools"
-msgstr "Herramientas de imágenes"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:192
 msgid "pictures"
 msgstr ""
@@ -22754,13 +22753,13 @@ msgid "Recommended"
 msgstr "Recomendado"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:182
+#: src/apps/settings/ModelsAndStorageSection.tsx:183
 #, needs-review
 msgid "Recommended extras"
 msgstr "Extras recomendados"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:184
+#: src/apps/settings/ModelsAndStorageSection.tsx:185
 #, needs-review
 msgid "Recommended extras are not installed"
 msgstr "Los extras recomendados no están instalados"
@@ -25053,7 +25052,7 @@ msgid "See all activity"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:155
+#: src/apps/settings/ModelsAndStorageSection.tsx:156
 #, needs-review
 msgid "See the licences"
 msgstr "Ver las licencias"
@@ -28176,7 +28175,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
-#: src/apps/settings/ModelsAndStorageSection.tsx:213
+#: src/apps/settings/ModelsAndStorageSection.tsx:214
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
 #: src/apps/settings/ReferenceLibrarySettings.tsx:224
@@ -28587,7 +28586,7 @@ msgstr "La IA se está instalando. El chat funciona después."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:170
-#: src/apps/settings/ModelsAndStorageSection.tsx:212
+#: src/apps/settings/ModelsAndStorageSection.tsx:213
 #, needs-review
 msgid "The AI is waiting for its helper to start. The Status page shows what is happening."
 msgstr "La IA espera a que su asistente inicie. La página Estado muestra lo que ocurre."
@@ -28888,8 +28887,8 @@ msgid "setting.safety.alarm.voice.help"
 msgstr "La voz fija de la alarma; la ruta determinista de la alarma no usa un modelo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:107
-#: src/apps/settings/ModelsAndStorageSection.tsx:168
+#: src/apps/settings/ModelsAndStorageSection.tsx:108
+#: src/apps/settings/ModelsAndStorageSection.tsx:169
 #, needs-review
 msgid "The full licence:"
 msgstr "La licencia completa:"
@@ -29013,7 +29012,7 @@ msgstr "La línea para decir"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:65
-#: src/apps/settings/ModelsAndStorageSection.tsx:211
+#: src/apps/settings/ModelsAndStorageSection.tsx:212
 #, needs-review
 msgid "The list did not load"
 msgstr "La lista no se cargó"
@@ -29778,7 +29777,7 @@ msgid "api.error.list_restore_none"
 msgstr "No queda nada para restaurar. Actualiza la lista e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:161
+#: src/apps/settings/ModelsAndStorageSection.tsx:162
 #, needs-review
 msgid "These are the licences that come with parts Home installs for you. Accepting covers all of them."
 msgstr "Estas son las licencias que vienen con las piezas que Home instala por ti. Aceptar cubre todas."
@@ -30034,7 +30033,7 @@ msgid "failure.ask_form.stale"
 msgstr "Este formulario expiró o ya se envió. Pregúntame de nuevo para obtener un formulario nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:120
+#: src/apps/settings/ModelsAndStorageSection.tsx:121
 #, needs-review
 msgid "This frees {sizeWords}. You can install it again later."
 msgstr "Esto libera {sizeWords}. Puedes instalarlo de nuevo más tarde."
@@ -30479,6 +30478,7 @@ msgid "Too many tries. Wait a minute, then try again."
 msgstr "Demasiados intentos. Espera un minuto y luego inténtalo de nuevo."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/shell/pages/MusicWorkspacePage.tsx:236
 #: src/shell/pages/MusicWorkspacePage.tsx:236
 #, needs-review
@@ -30712,7 +30712,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/people/FaceEnrollmentPage.tsx:111
 #: src/apps/people/FaceEnrollmentPage.tsx:690
 #: src/apps/settings/CommandsSection.tsx:113
-#: src/apps/settings/ModelsAndStorageSection.tsx:91
+#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:160
 #: src/apps/settings/VoiceBrowserSection.tsx:95
@@ -30755,7 +30755,7 @@ msgid "Try again, or skip this step. Home works without it."
 msgstr "Intenta de nuevo u omite este paso. Home funciona sin ello."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:91
+#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #, needs-review
 msgid "Try again: {label}"
 msgstr "Inténtalo de nuevo: {label}"
@@ -31199,20 +31199,20 @@ msgid "Undo"
 msgstr "Deshacer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:94
-#: src/apps/settings/ModelsAndStorageSection.tsx:124
+#: src/apps/settings/ModelsAndStorageSection.tsx:95
+#: src/apps/settings/ModelsAndStorageSection.tsx:125
 #, needs-review
 msgid "Uninstall"
 msgstr "Desinstalar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:94
+#: src/apps/settings/ModelsAndStorageSection.tsx:95
 #, needs-review
 msgid "Uninstall {label}"
 msgstr "Desinstalar {label}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:119
+#: src/apps/settings/ModelsAndStorageSection.tsx:120
 #, needs-review
 msgid "Uninstall {label}?"
 msgstr "¿Desinstalar {label}?"
