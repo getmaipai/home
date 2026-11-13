@@ -101,7 +101,7 @@ sttRoutes.get(
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
                 // STT-SMARTTURN-01 and TALK-OVER-01: the client's labels and counts for the speculative start and the acknowledgement clip.
-                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms, edge_partials: value.edge_partials, clip_started_ms: value.clip_started_ms, clip_ended_ms: value.clip_ended_ms, clip_completed: value.clip_completed, echo_drops: value.echo_drops, talk_over_reason: value.talk_over_reason, pool_size: value.pool_size });
+                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms, edge_partials: value.edge_partials, clip_started_ms: value.clip_started_ms, clip_ended_ms: value.clip_ended_ms, clip_completed: value.clip_completed, echo_drops: value.echo_drops, talk_over_reason: value.talk_over_reason, pool_size: value.pool_size, filler_group: value.filler_group, filler_source: value.filler_source, filler_choose_ms: value.filler_choose_ms, filler_pool_ready: value.filler_pool_ready });
               }
             }
           } catch {

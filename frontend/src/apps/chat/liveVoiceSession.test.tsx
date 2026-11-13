@@ -5,7 +5,7 @@
 // own established shape), so this exercises the actual listen -> send ->
 // speak -> listen-again loop with a scripted STT fixture and a trivial
 // runtime adapter that just records what it received.
-import { describe, expect, test, afterEach, mock, spyOn } from "bun:test";
+import { describe, expect, test, afterEach, mock, spyOn, jest } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { Link, MemoryRouter } from "react-router-dom";
@@ -446,9 +446,9 @@ describe("live voice session", () => {
 
   // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 4): the acknowledgement clip and the protected overlap window.
   // A fake pool: a clip ends on its own after `durationMs` (completed) and nothing on the handle can stop it; stopAll is the call closing.
-  function fakeClipPool(played: Array<{ ended: boolean; completed: boolean; closed: boolean; endedAt: number | null }>, durationMs = 300) {
-    return {
-      size: 2,
+  function fakeClipPool(played: Array<{ ended: boolean; completed: boolean; closed: boolean; endedAt: number | null }>, durationMs = 300, size = 2, grouped?: Array<string>) {
+    const pool = {
+      size,
       play: (at = performance.now()) => {
         const handle = { durationMs, startedAt: at, ended: false, endedAt: null as number | null, completed: false, closed: false };
         setTimeout(() => { if (!handle.ended) { handle.ended = true; handle.completed = true; handle.endedAt = performance.now(); } }, durationMs);
@@ -456,8 +456,10 @@ describe("live voice session", () => {
       },
       stopAll: () => { for (const handle of played) if (!handle.ended) { handle.ended = true; handle.completed = false; handle.closed = true; handle.endedAt = performance.now(); } },
     };
+    if (grouped) Object.assign(pool, { playGroup: (group: string, at = performance.now()) => { grouped.push(group); return pool.play(at); } });
+    return pool;
   }
-  function talkOverHarness(options: { grant?: { level: "gentle" | "natural"; window_ms: number; clips: string[] } | null; speculate?: ReturnType<typeof spyOn>; discard?: ReturnType<typeof spyOn>; durationMs?: number } = {}) {
+  function talkOverHarness(options: { grant?: { level: "gentle" | "natural"; window_ms: number; clips: string[] } | null; speculate?: ReturnType<typeof spyOn>; discard?: ReturnType<typeof spyOn>; durationMs?: number; poolSize?: number; grouped?: string[]; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null } = {}) {
     const played: Array<{ ended: boolean; completed: boolean; closed: boolean; endedAt: number | null }> = [];
     const sentTexts: string[] = [];
     const rendered: string[][] = [];
@@ -472,9 +474,9 @@ describe("live voice session", () => {
       setTimeout(() => { if (grant) handlers.onMessage({ t: "ready", talk_over: grant } as unknown as SttServerMessage); }, 1);
       return inner;
     };
-    const renderClips = async (clips: readonly string[]) => { rendered.push([...clips]); return fakeClipPool(played, options.durationMs) as never; };
+    const renderClips = async (clips: readonly string[]) => { rendered.push([...clips]); return fakeClipPool(played, options.durationMs, options.poolSize, options.grouped) as never; };
     let ended = 0;
-    const element = (speakingEndedAt: number) => <Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={speakingEndedAt} fixture={[]} sentTexts={sentTexts} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />;
+    const element = (speakingEndedAt: number) => <Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={speakingEndedAt} activeTurn={options.activeTurn === undefined ? null : options.activeTurn} fixture={[]} sentTexts={sentTexts} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, ackClipPlayedRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />;
     const view = render(element(0));
     // The reply finished speaking (chatModelAdapter's onSpeakingChange, relayed as state): the session goes back to listening.
     const endReply = () => { ended += 1; view.rerender(element(ended)); };
@@ -1662,4 +1664,153 @@ describe("live voice session", () => {
     const gear = view.getByRole("link", { name: "Voice settings" });
     expect(gear.getAttribute("href")).toBe("/settings/voices");
   });
+  test("INSTANT-FILLER-01c: stable partial requests once, throttles for 600 ms, and observes request, turn, pool and word guards", async () => {
+    const requests: string[] = [];
+    let resolveRequest!: (answer: { group: "question"; source: "model"; ms: number }) => void;
+    const filler = spyOn(api, "fillerGroup").mockImplementation((text) => { requests.push(text); return new Promise((resolve) => { resolveRequest = resolve; }); });
+    try {
+      const h = talkOverHarness();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => h.socket.send({ t: "partial", v: "one two" } as never));
+      act(() => jest.advanceTimersByTime(250));
+      expect(filler).not.toHaveBeenCalled();
+      act(() => h.socket.send({ t: "partial", v: "one two three four" } as never));
+      act(() => jest.advanceTimersByTime(199));
+      expect(filler).not.toHaveBeenCalled();
+      act(() => jest.advanceTimersByTime(1));
+      expect(requests).toEqual(["one two three four"]);
+      act(() => h.socket.send({ t: "second request while first is in flight" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      expect(filler).toHaveBeenCalledTimes(1);
+      resolveRequest({ group: "question", source: "model", ms: 2 });
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      act(() => h.socket.send({ t: "third stable partial words" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      expect(filler).toHaveBeenCalledTimes(1);
+      act(() => jest.advanceTimersByTime(400));
+      expect(filler).toHaveBeenCalledTimes(1);
+      h.close();
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: drops a stale answer when the partial text changes", async () => {
+    let resolveRequest!: (answer: { group: "question"; source: "model"; ms: number }) => void;
+    const filler = spyOn(api, "fillerGroup").mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    try {
+      const h = talkOverHarness();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => h.socket.send({ t: "partial", v: "older answer text" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      act(() => h.socket.send({ t: "partial", v: "newer answer text" } as never));
+      resolveRequest({ group: "question", source: "model", ms: 1 });
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      act(() => h.socket.send({ t: "partial", v: "newer answer text", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      await act(async () => { await Promise.resolve(); });
+      expect(h.played).toHaveLength(1);
+      expect(h.timings).toHaveLength(0);
+      expect(filler).toHaveBeenCalledTimes(1);
+      h.close();
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: skips filler requests while a turn is active or the clip pool is empty", async () => {
+    const filler = spyOn(api, "fillerGroup").mockResolvedValue({ group: "question", source: "model", ms: 1 });
+    try {
+      const busy = talkOverHarness({ activeTurn: { turnId: "busy-turn", heardVisibleEnd: () => 0 } });
+      const empty = talkOverHarness({ poolSize: 0 });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => busy.socket.send({ t: "partial", v: "turn is currently active" } as never));
+      act(() => empty.socket.send({ t: "partial", v: "pool currently has zero" } as never));
+      act(() => jest.advanceTimersByTime(250));
+      expect(filler).not.toHaveBeenCalled();
+      busy.close();
+      empty.close();
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: a same-text question answer selects its group immediately at the edge", async () => {
+    const selected: string[] = [];
+    const filler = spyOn(api, "fillerGroup").mockResolvedValue({ group: "question", source: "model", ms: 8 });
+    try {
+      const h = talkOverHarness({ grouped: selected });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => h.socket.send({ t: "partial", v: "what time is it now" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      act(() => h.socket.send({ t: "partial", v: "what time is it now", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(selected).toEqual(["question"]);
+      h.close();
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: an unanswered edge waits 150 ms then plays backchannel, and null answers use backchannel", async () => {
+    let resolveRequest!: (answer: { group: null; source: "rule"; ms: number }) => void;
+    const filler = spyOn(api, "fillerGroup").mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    try {
+      const selected: string[] = [];
+      const h = talkOverHarness({ grouped: selected });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => h.socket.send({ t: "partial", v: "unanswered edge text" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      act(() => h.socket.send({ t: "partial", v: "unanswered edge text", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      act(() => jest.advanceTimersByTime(149));
+      expect(selected).toEqual([]);
+      await act(async () => { jest.advanceTimersByTime(1); await Promise.resolve(); });
+      expect(selected).toEqual(["backchannel"]);
+      h.close();
+      resolveRequest({ group: null, source: "rule", ms: 4 });
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: a null group answer immediately chooses backchannel", async () => {
+    const selected: string[] = [];
+    const filler = spyOn(api, "fillerGroup").mockResolvedValue({ group: null, source: "rule", ms: 4 });
+    try {
+      const h = talkOverHarness({ grouped: selected });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      jest.useFakeTimers();
+      act(() => h.socket.send({ t: "partial", v: "neutral words here" } as never));
+      act(() => jest.advanceTimersByTime(200));
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      act(() => h.socket.send({ t: "partial", v: "neutral words here", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      expect(selected).toEqual(["backchannel"]);
+      h.close();
+    } finally { filler.mockRestore(); jest.useRealTimers(); }
+  });
+
+  test("INSTANT-FILLER-01c: setting off makes no filler request and timing reports filler fields only after playback", async () => {
+    const filler = spyOn(api, "fillerGroup").mockResolvedValue({ group: "question", source: "model", ms: 5 });
+    try {
+      const off = talkOverHarness({ grant: null });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      act(() => off.socket.send({ t: "partial", v: "a stable partial text" } as never));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(filler).not.toHaveBeenCalled();
+      act(() => off.socket.send({ t: "partial", v: "question at the edge", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      act(() => off.socket.send({ t: "timing", speech_end_to_final_ms: 200, silence_wait_ms: 200 }));
+      act(() => off.socket.send({ t: "final", v: "question at the edge" } as never));
+      expect(off.played).toHaveLength(0);
+      expect(off.timings.find((timing) => timing.phase === "final")?.talkOver).not.toHaveProperty("filler_group");
+      off.close();
+
+      const selected: string[] = [];
+      const on = talkOverHarness({ grouped: selected });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      act(() => on.socket.send({ t: "partial", v: "one two three four" } as never));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      act(() => on.socket.send({ t: "partial", v: "one two three four", edge: true, end: { score: 1, level: "gentle", unfinished: false } } as never));
+      await new Promise((resolve) => setTimeout(resolve, 160));
+      act(() => on.socket.send({ t: "timing", speech_end_to_final_ms: 200, silence_wait_ms: 200 }));
+      act(() => on.socket.send({ t: "final", v: "one two three four" } as never));
+      const timing = on.timings.find((entry) => entry.phase === "final")?.talkOver;
+      expect(timing).toMatchObject({ filler_group: "question", filler_source: "model", filler_pool_ready: 2 });
+      on.close();
+    } finally { filler.mockRestore(); }
+  });
+
 });

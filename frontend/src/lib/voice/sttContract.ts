@@ -52,6 +52,7 @@ export interface SttTimingExtras {
   head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string;
   speculative?: SpeculativeOutcome;
   talk_over_level?: "off" | TalkOverLevel; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number;
+  filler_group?: import("./ackClip").AckGroupId | null; filler_source?: "model" | "rule" | "late" | "none"; filler_choose_ms?: number; filler_pool_ready?: number;
   /** How many edge partials the hub marked in the utterance; the clip's start and end against the end of speech (negative is
    * before the person finished: a wrong start in a pause), and whether it played to its natural end (false only when the call closed). */
   edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean;
@@ -73,4 +74,5 @@ export const SttTimingReportSchema = z.object({
   decision: z.enum(["none", "confirmed", "continued"]).optional(), yield_ms: z.number().finite().nonnegative().optional(),
   edge_partials: z.number().int().nonnegative().optional(), clip_started_ms: z.number().finite().optional(), clip_ended_ms: z.number().finite().optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().optional(),
   talk_over_reason: z.enum(["granted", "setting_off", "speculative_off", "robot", "not_adult", "unknown"]).optional(), pool_size: z.number().int().nonnegative().optional(),
+  filler_group: z.enum(["backchannel", "thinking", "request", "question", "good_news", "bad_news"]).nullable().optional(), filler_source: z.enum(["model", "rule", "late", "none"]).optional(), filler_choose_ms: z.number().finite().nonnegative().optional(), filler_pool_ready: z.number().int().nonnegative().optional(),
 }).strict();

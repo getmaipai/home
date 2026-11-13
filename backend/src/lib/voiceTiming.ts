@@ -66,6 +66,10 @@ export interface VoiceTimingRecord {
    * how many acknowledgement clips the client had ready (0 means none could play). */
   talk_over_reason?: string | null;
   pool_size?: number | null;
+  filler_group?: "backchannel" | "thinking" | "request" | "question" | "good_news" | "bad_news" | null;
+  filler_source?: "model" | "rule" | "late" | "none" | null;
+  filler_choose_ms?: number | null;
+  filler_pool_ready?: number | null;
 }
 
 export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
@@ -82,14 +86,18 @@ type VoiceTimingStage = "stt_ms" | "turn_start_ms" | "first_token_ms" | "first_s
 export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(), first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(), cue_playback_ms: z.number().finite().nonnegative().optional(), head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(), ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
   // STT-SMARTTURN-01 and TALK-OVER-01: counts and labels only. The server's own `confirmed` mark (set at the confirmation) is never overwritten by a client label.
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(), talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().min(-60_000).max(60_000).optional(), overlap_ms: z.number().finite().nonnegative().max(60_000).optional(), decision: z.enum(TALK_OVER_DECISIONS).optional(), yield_ms: z.number().finite().nonnegative().max(60_000).optional(),
-  edge_partials: z.number().int().nonnegative().max(1000).optional(), clip_started_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_ended_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().max(1000).optional(), talk_over_reason: z.enum(["granted", "setting_off", "speculative_off", "robot", "not_adult", "unknown"]).optional(), pool_size: z.number().int().nonnegative().max(100).optional() }).strict();
+  edge_partials: z.number().int().nonnegative().max(1000).optional(), clip_started_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_ended_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().max(1000).optional(), talk_over_reason: z.enum(["granted", "setting_off", "speculative_off", "robot", "not_adult", "unknown"]).optional(), pool_size: z.number().int().nonnegative().max(100).optional(), filler_group: z.enum(["backchannel", "thinking", "request", "question", "good_news", "bad_news"]).nullable().optional(), filler_source: z.enum(["model", "rule", "late", "none"]).optional(), filler_choose_ms: z.number().finite().nonnegative().max(60_000).optional(), filler_pool_ready: z.number().int().nonnegative().max(100).optional() }).strict();
 
 /** The speculative start's outcome and the talk-over labels, from the client's timing message or the server's own confirmation. */
-export function setVoiceOutcome(record: VoiceTimingRecord | undefined, fields: { speculative?: SpeculativeOutcome; talk_over_level?: VoiceTimingRecord["talk_over_level"]; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number; edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean; echo_drops?: number; talk_over_reason?: string; pool_size?: number }): void {
+export function setVoiceOutcome(record: VoiceTimingRecord | undefined, fields: { speculative?: SpeculativeOutcome; talk_over_level?: VoiceTimingRecord["talk_over_level"]; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number; edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean; echo_drops?: number; talk_over_reason?: string; pool_size?: number; filler_group?: NonNullable<VoiceTimingRecord["filler_group"]> | null; filler_source?: NonNullable<VoiceTimingRecord["filler_source"]>; filler_choose_ms?: number; filler_pool_ready?: number }): void {
   if (!record) return;
   if (fields.speculative !== undefined && record.speculative !== "confirmed") record.speculative = fields.speculative;
   if (fields.talk_over_level !== undefined) record.talk_over_level = fields.talk_over_level;
   if (fields.talk_over_reason !== undefined) record.talk_over_reason = fields.talk_over_reason;
+  if (fields.filler_group !== undefined) record.filler_group = fields.filler_group;
+  if (fields.filler_source !== undefined) record.filler_source = fields.filler_source;
+  if (fields.filler_choose_ms !== undefined && Number.isFinite(fields.filler_choose_ms)) record.filler_choose_ms = Math.round(fields.filler_choose_ms);
+  if (fields.filler_pool_ready !== undefined && Number.isFinite(fields.filler_pool_ready)) record.filler_pool_ready = Math.round(fields.filler_pool_ready);
   for (const key of ["early_release_ms", "overlap_ms", "yield_ms", "edge_partials", "clip_started_ms", "clip_ended_ms", "echo_drops", "pool_size"] as const) { const value = fields[key]; if (value !== undefined && Number.isFinite(value)) record[key] = Math.round(value); }
   if (fields.decision !== undefined) record.decision = fields.decision;
   if (fields.clip_completed !== undefined) record.clip_completed = fields.clip_completed;

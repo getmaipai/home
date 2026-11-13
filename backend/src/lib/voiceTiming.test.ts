@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, recordPrewarmTiming, setCuePlaybackTiming, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
+import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, recordPrewarmTiming, setCuePlaybackTiming, setVoiceOutcome, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
 import { prewarmFailureReason } from "./prefixPrewarm";
 
 beforeEach(() => {
@@ -23,6 +23,13 @@ test("ties an incoming spoken-turn measurement to its turn id without content", 
   markVoiceTiming(record, "first_audio_ms", 210);
   markVoiceTiming(record, "first_playback_ms", 340);
   expect(voiceTimingRecords(1)[0]).toMatchObject({ turn_id: "turn-123", stt_ms: 240, turn_start_ms: 1000, first_token_ms: 80, first_sentence_ms: 120, first_audio_ms: 210, first_playback_ms: 340 });
+});
+
+test("records filler group measurements on the turn row without utterance text", () => {
+  const record = beginVoiceTimingFor("turn-filler", 240, 1000);
+  setVoiceOutcome(record, { filler_group: "question", filler_source: "model", filler_choose_ms: 87, filler_pool_ready: 9 });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ turn_id: "turn-filler", filler_group: "question", filler_source: "model", filler_choose_ms: 87, filler_pool_ready: 9 });
+  expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-filler", stt_ms: 10, filler_group: "backchannel", filler_source: "late", filler_pool_ready: 3 }).success).toBe(true);
 });
 
 test("attaches numeric engine stats and context duration by turn id, while old records remain readable", () => {
