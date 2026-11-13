@@ -75,7 +75,7 @@ registerEdit("adjust", "Adjust", "Adjust brightness, contrast, saturation and wa
 registerEdit("rotate", "Rotate", "Turn the picture a quarter or half turn.", rotateArgs, [{ kind: "choice", name: "degrees", label: "Turn", options: ["90", "180", "270"] }], "rotate");
 registerEdit("flip", "Flip", "Mirror the picture left to right, or turn it upside down.", flipArgs, [{ kind: "choice", name: "direction", label: "Direction", options: ["horizontal", "vertical"] }], "flip");
 registerEdit("blur_background", "Blur background", "Blur the picture background while keeping the subject clear.", blurArgs, [{ kind: "number", name: "radius", label: "Blur", min: 1, max: 40 }], "blur_background");
-registerEdit("make_clearer", "Make clearer", "Make it clearer. Quick is here and fast, Better and Best use AI. The numbers are how many times bigger (1 keeps the size).", clearerArgs, [{ kind: "choice", name: "level", label: "Level", options: ["quick", "better", "best"] }, { kind: "choice", name: "size", label: "Times bigger", options: ["1", "1.5", "2"] }], "clearer", CLEARER_LEVELS);
+registerEdit("make_clearer", "Make clearer", "Make the picture clearer, and bigger if you like. Quick is fast, Better and Best use AI.", clearerArgs, [{ kind: "choice", name: "level", label: "Level", options: ["quick", "better", "best"] }, { kind: "choice", name: "size", label: "Size", options: ["1", "1.5", "2"] }], "clearer", CLEARER_LEVELS);
 
 registerMediaOp({
   id: "picture.save_subject",
