@@ -108,6 +108,8 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
       currentVersionId: versions.some((version) => version.id === currentId) ? currentId : versions[0]!.id,
       onSelectVersion: setCurrentId,
       tools: { markup: tool("markup"), comment: tool("comment"), remove_background: tool("remove_background"), erase: tool("erase"), resize: tool("resize") },
+      // One upscaler (MAKE-CLEARER-2026-11-13): the Resize bar draws no Upscale buttons; Make clearer in the Studio is the upscaler.
+      resizeUpscale: false,
       statusNote: status?.note ?? null,
       downloadName: `${downloadBase}-edited.png`,
       onClose: close,
