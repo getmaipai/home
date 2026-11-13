@@ -107,6 +107,35 @@ export function joinOps(transition: JoinTransition = "cut", duration: number = D
   return [{ op: "concat" }];
 }
 
+/**
+ * The join steps for a film whose seams may each use their own kind (`kinds[i]` is the seam between file i and file i + 1; file 0 is the working clip).
+ * The Stack's `transition`, `crossfade` and `concat` steps take one kind for every file they join and name the files in `with` (stack editOps.ts
+ * TransitionOp), so a run of seams with one kind is one step that joins those files onto the working clip, and the next run is the next step.
+ * That joins every file exactly once, in order. The Stack allows at most MAX_EDIT_OPS (12, stack editOps.ts) steps in all, so `maxOps` is what the
+ * join may spend: when the runs need more, the whole film takes its most common kind in one step (a tie takes the earliest seam's kind).
+ * `crossfade` is the same blend as the `fade` transition and is sent as that, which also avoids the six-clip limit of the crossfade step.
+ */
+export function seamJoinOps(kinds: ReadonlyArray<JoinTransition>, duration: number = DEFAULT_CROSSFADE_S, maxOps: number = MAX_EDIT_OPS): EditOp[] {
+  if (kinds.length === 0) return [];
+  const step = (kind: JoinTransition, files: number[], all: boolean): EditOp => {
+    const named = all ? {} : { with: files };
+    if (kind === "cut") return { op: "concat", ...named };
+    return { op: "transition", kind: (kind === "crossfade" ? "fade" : kind) as (typeof TRANSITION_KINDS)[number], duration_s: duration, ...named };
+  };
+  const runs: Array<{ kind: JoinTransition; files: number[] }> = [];
+  kinds.forEach((kind, seam) => {
+    const last = runs.at(-1);
+    if (last && last.kind === kind) last.files.push(seam + 1); else runs.push({ kind, files: [seam + 1] });
+  });
+  if (runs.length > Math.max(1, maxOps)) {
+    const counts = new Map<JoinTransition, number>();
+    for (const kind of kinds) counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    const common = [...counts.entries()].reduce((best, entry) => entry[1] > best[1] ? entry : best)[0];
+    return [step(common, [], true)];
+  }
+  return runs.map((run) => step(run.kind, run.files, runs.length === 1));
+}
+
 /** LENGTH-01: the fixed parts of a finished film, defined once. The title card and the credits are sent with these exact lengths (the Stack would otherwise
  *  size the credits from the picture height, 6 to 12 s for one line), and each seam between two clips overlaps by SEAM_SECONDS. */
 export const TITLE_CARD_SECONDS = 3;

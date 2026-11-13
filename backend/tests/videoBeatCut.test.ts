@@ -56,6 +56,15 @@ describe("beat cut planning", () => {
     const short = planBeatCut({ beats: grid(20), downbeats: [0], beatsPerCut: 8, lengthS: 8, clipSeconds: [2] });
     expect(short.ok).toBe(false);
   });
+  test("rotates to a clip with footage left instead of showing the same footage again", () => {
+    const p = planBeatCut({ beats: grid(40), downbeats: [0], beatsPerCut: 4, lengthS: 12, clipSeconds: [3, 20] });
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    const real = p.segments.filter((s) => s.length > 0);
+    for (const [i, a] of real.entries()) for (const b of real.slice(i + 1)) {
+      if (a.clipIndex === b.clipIndex) expect(a.outS <= b.inS || b.outS <= a.inS).toBe(true);
+    }
+  });
   test("refuses sparse beats and accepts unknown clip length", () => {
     expect(planBeatCut({ beats: [0, 1, 2], downbeats: [], beatsPerCut: 4, lengthS: 8, clipSeconds: [null] }).ok).toBe(false);
     expect(planBeatCut({ beats: grid(20), downbeats: [0], beatsPerCut: 4, lengthS: 4, clipSeconds: [null] }).ok).toBe(true);

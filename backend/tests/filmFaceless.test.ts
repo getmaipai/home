@@ -105,9 +105,47 @@ describe("FILM-05 faceless films", () => {
     expect(creditNames).toEqual(["Mira Lane", "MaiPai"]); // a first real run drew "Unnamed" credits: placeholder names are dropped
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "film_look", preset: "noir" });
     expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "letterbox", ratio: "2.39:1" });
-    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "audio_overlay", input: 2, gain_db: -12, clip_gain_db: 0, start_s: 0, duck: false, fade_out_s: 2 });
+    expect(edit.jobs[0]!.input.ops).toContainEqual({ op: "audio_overlay", input: 2, gain_db: -12, clip_gain_db: 0, start_s: 0, duck: false, fade_out_s: 1.5, end_s: 16.5 });
     expect(id).toBeTruthy();
   });
+
+  // Which input files end up in the picture, in order: the working clip is file 0, each join step adds its files (or every file that is not the music).
+  function joined(ops: Array<Record<string, unknown>>, files: number): number[] {
+    const working = [0];
+    for (const op of ops) {
+      if (op.op !== "concat" && op.op !== "crossfade" && op.op !== "transition") continue;
+      const members = (op.with as number[] | undefined) ?? Array.from({ length: files }, (_, i) => i).filter((i) => i > 0 && i < files - 1);
+      working.push(...members);
+    }
+    return working;
+  }
+
+  for (const count of [2, 3, 4, 10]) {
+    test(`a ${count} shot faceless film joins each shot once, in order, inside the Stack's 12 steps, and its music ends with the picture`, async () => {
+      const actor = person(`person-filmjoin${count}`), production = createMediaProduction(actor, { title: plan.title, summary: plan.summary });
+      const keep = (mediaType: string, bytes: Uint8Array, name: string) => {
+        const result = storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes, provenance: "test:file", retention: "kept", name, deduplicate: false });
+        if (!result.ok) throw new Error(result.error);
+        return result.value.id;
+      };
+      const ids = Array.from({ length: count }, (_, i) => `shot${i}`);
+      const clips = ids.map((id) => keep("video/mp4", testMp4(), `${id}.mp4`));
+      const music = keep("audio/mpeg", new Uint8Array([1, 2, 3]), "music.mp3");
+      updateMediaProduction(actor, production.id, { episodes: [{ id: "episode", scenes: [{ id: "scene", shots: ids.map((id, i) => ({ id, subject_ids: [], clip_file_id: clips[i] })) }] }] });
+      const kinds = ["dissolve", "fade", "wipeleft", "fade", "dissolve", "cut", "slideup", "fade", "fadeblack", "fade"];
+      const shots = ids.map((id, i) => ({ ...plan.shots[0]!, id, seconds: 5, ...(i > 0 ? { transition: kinds[i - 1] } : {}) }));
+      const engines = realFilmEngines({ actor, productionId: production.id, signal: new AbortController().signal, faceless: true });
+      await engines.assemble({ plan: { ...plan, shots, look: "noir", letterbox: "2.39:1" } as never, clipFileIds: clips, musicFileId: music }, { signal: new AbortController().signal });
+      const ops = edit.jobs[0]!.input.ops as Array<Record<string, unknown>>;
+      expect(ops.length).toBeLessThanOrEqual(12); // MAX_EDIT_OPS in the Stack's editOps.ts
+      expect(joined(ops, count + 1)).toEqual(Array.from({ length: count }, (_, i) => i));
+      const overlay = ops.find((op) => op.op === "audio_overlay")!;
+      const joinOps = ops.filter((op) => op.op === "transition" || op.op === "concat");
+      const blended = joinOps.reduce((sum, op) => op.op === "concat" ? sum : sum + ((op.with as number[] | undefined)?.length ?? count - 1), 0);
+      expect(overlay.end_s).toBeCloseTo(count * 5 - blended * 0.5 + 3 + 4, 2); // shots, minus each overlap, plus the title card and the credits
+      expect(overlay.fade_out_s).toBe(1.5);
+    });
+  }
 
   test("refuses an overlong faceless film before submitting a job", async () => {
     const actor = person("person-filmfacelong"), production = createMediaProduction(actor, { title: plan.title, summary: plan.summary });

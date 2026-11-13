@@ -30,7 +30,7 @@ import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
-import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
+import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { RESTYLE_FAILURE_COPY, SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
@@ -85,6 +85,8 @@ export const editVideoArgs = z.object({
   length_s: z.number().int().min(5).max(60).optional(),
   transition: z.string().optional(),
   transition_s: z.number().min(MIN_CROSSFADE_S).max(MAX_CROSSFADE_S).optional(),
+  /** A film from a production: the kind of each seam, in order (seam i is between shot i and shot i + 1), from the planner's per-shot choices. Used only with `film` and no single `transition`. */
+  seam_transitions: z.array(z.enum(JOIN_TRANSITIONS)).max(23).optional(),
   title: z.string().trim().min(1).max(120).optional(),
   subtitle: z.string().trim().max(160).optional(),
   credits: z.array(z.object({ role: z.string().trim().max(40).optional(), name: z.string().trim().min(1).max(60) })).min(1).max(60).optional(),
@@ -602,13 +604,18 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       if (tooShort) return refused(callId, args, tooShort, "crossfade_too_short");
     }
     const videoSeconds = sources.map((job) => job.files[0]?.seconds ?? job.request.seconds ?? null);
-    const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - (transition === "cut" ? 0 : (sources.length - 1) * duration) : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
+    // A film from a production honours the planner's per-shot transitions; a single `transition` given by the caller wins, and fade stays the default.
+    const seams = film && value.transition === undefined && value.seam_transitions?.length === sources.length - 1 ? value.seam_transitions as Array<(typeof JOIN_TRANSITIONS)[number]> : null;
     const title = value.no_title ? undefined : film?.production.title ?? value.title;
     const subtitle = value.no_title ? undefined : film ? titleSubtitle(film.production.summary) : value.subtitle;
     const creditLines = value.no_credits ? undefined : film?.credits ?? value.credits;
+    const rest = filmOps({ title, summary: subtitle, credits: creditLines, creditsTitle: value.credits_title, look: value.look as (typeof FILM_LOOK_PRESETS)[number] | undefined, letterbox: value.letterbox, includeJoin: false });
+    const join = seams ? seamJoinOps(seams, duration, MAX_EDIT_OPS - rest.length) : filmOps({ transition, duration, includeJoin: true });
+    const blended = seams ? join.reduce((sum, op) => op.op === "concat" ? sum : sum + ((op as { with?: number[] }).with?.length ?? seams.length), 0) : transition === "cut" ? 0 : sources.length - 1;
+    const baseLength = videoSeconds.every((n) => n !== null) ? videoSeconds.reduce((sum, n) => sum + (n ?? 0), 0) - blended * duration : videoSeconds.reduce<number>((sum, n) => sum + (n ?? 0), 0);
     const added = filmOverhead(!!title, !!creditLines, (creditLines?.length ?? 0) + (value.credits_title ? 1 : 0));
     if (baseLength + added > MAX_EDIT_SECONDS) return refused(callId, args, "That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.", "film_too_long");
-    inputs = clipFiles; ops = filmOps({ title, summary: subtitle, credits: creditLines, creditsTitle: value.credits_title, look: value.look as (typeof FILM_LOOK_PRESETS)[number] | undefined, letterbox: value.letterbox, transition, duration });
+    inputs = clipFiles; ops = [...join, ...rest];
     if (ops.length > MAX_EDIT_OPS) return refused(callId, args, `That edit needs ${ops.length} steps, but the video editor allows up to ${MAX_EDIT_OPS}. Remove a title, credits, look, or letterbox option.`, "too_many_edit_ops");
     describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
   } else if (value.change === "cut_to_beat") {

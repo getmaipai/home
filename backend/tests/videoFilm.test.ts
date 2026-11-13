@@ -56,6 +56,17 @@ describe("film a Production", () => {
     expect(getMediaProduction(owner, production.id)?.finished_cut_file_ids).toEqual(before);
   });
 
+  test("per-shot transitions: a run of one kind is one join step that names its files; no list keeps fade", async () => {
+    const owner = person("person-filmseams");
+    const clips = [await clip(owner), await clip(owner), await clip(owner), await clip(owner)];
+    const production = createMediaProduction(owner, { title: "Seams", summary: "Four shots", episodes: [{ id: "ep", scenes: [{ id: "sc", shots: clips.map((made, i) => ({ id: `s${i}`, subject_ids: [], clip_file_id: made.files[0]!.id })) }] }] });
+    const cut = await finished(owner, await runEditVideo({ state: state(owner), args: { change: "film", production: production.id, no_title: true, no_credits: true, seam_transitions: ["dissolve", "dissolve", "wipeleft"] }, callId: "seams", spoken: false }));
+    expect(cut.state).toBe("done");
+    expect(stack.jobs[0]!.input.ops).toEqual([{ op: "transition", kind: "dissolve", duration_s: 0.5, with: [1, 2] }, { op: "transition", kind: "wipeleft", duration_s: 0.5, with: [3] }]);
+    await finished(owner, await runEditVideo({ state: state(owner), args: { change: "film", production: production.id, no_title: true, no_credits: true }, callId: "default", spoken: false }));
+    expect(stack.jobs[1]!.input.ops).toEqual([{ op: "transition", kind: "fade", duration_s: 0.5 }]);
+  });
+
   test("fewer than two clips refuses without starting an edit", async () => {
     const owner = person("person-filmshort");
     const production = createMediaProduction(owner, { title: "Short", episodes: [{ id: "ep", scenes: [{ id: "scene", shots: [{ id: "s1", subject_ids: [] }] }] }] });

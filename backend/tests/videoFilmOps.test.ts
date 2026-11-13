@@ -69,3 +69,17 @@ describe("film finishing ops", () => {
     expect(stack.jobs).toHaveLength(0);
   });
 });
+
+describe("seamJoinOps", () => {
+  test("a run of one kind is one step; a different kind starts the next step; cut is a concat", async () => {
+    const { seamJoinOps } = await import("@/lib/videos/editPlan");
+    expect(seamJoinOps(["fade", "fade", "cut", "dissolve"])).toEqual([{ op: "transition", kind: "fade", duration_s: 0.5, with: [1, 2] }, { op: "concat", with: [3] }, { op: "transition", kind: "dissolve", duration_s: 0.5, with: [4] }]);
+    expect(seamJoinOps(["dissolve", "dissolve"])).toEqual([{ op: "transition", kind: "dissolve", duration_s: 0.5 }]);
+    expect(seamJoinOps([])).toEqual([]);
+  });
+  test("when the runs need more steps than allowed, the film takes its most common kind in one step", async () => {
+    const { seamJoinOps } = await import("@/lib/videos/editPlan");
+    const kinds = ["fade", "dissolve", "fade", "wipeleft", "fade", "dissolve", "fade", "dissolve", "fade"] as const;
+    expect(seamJoinOps(kinds, 0.5, 5)).toEqual([{ op: "transition", kind: "fade", duration_s: 0.5 }]);
+  });
+});

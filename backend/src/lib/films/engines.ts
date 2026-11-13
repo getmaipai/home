@@ -27,7 +27,7 @@ import { audioSeconds } from "@/lib/videos/audioLength";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { measureClipDrift } from "./fidelity";
 import { runStackEdit } from "@/lib/videos/stackEdit";
-import { filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, type JoinTransition } from "@/lib/videos/editPlan";
+import { DEFAULT_CROSSFADE_S, filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, seamJoinOps, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { changeMusic, isTransientStackError, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
@@ -221,13 +221,19 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const shots = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
         const clipIds = clipFileIds;
         if (clipIds.length < 2) throw new Error("Make at least two shots first.");
-        const transitionCount = Math.max(0, clipIds.length - 1);
-        const videoSeconds = shots.map((shot) => plan.shots.find((item) => item.id === shot.id)?.seconds ?? null);
-        const baseLength = videoSeconds.every((seconds): seconds is number => seconds !== null)
-          ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - transitionCount * 0.5
-          : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
+        const transitions = plan.shots.slice(1, clipIds.length).map((shot) => (shot.transition ?? "fade") as JoinTransition);
         const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd|(?:a )?real person'?s name)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
         const showTitle = plan.title_card !== false, showCredits = plan.credits_card !== false;
+        const rest = filmOps({ includeJoin: false, title: showTitle ? plan.title : undefined, summary: plan.summary, credits: showCredits ? creditLines : undefined, look: plan.look, letterbox: plan.letterbox });
+        // The join may spend what the Stack's 12 steps leave after the look, letterbox, title, credits and the music step.
+        const join = seamJoinOps(transitions, DEFAULT_CROSSFADE_S, MAX_EDIT_OPS - rest.length - 1);
+        // Every seam but a straight cut overlaps by the blend length, the same sum the Stack makes (a collapsed join uses one kind for all seams).
+        const blended = join.reduce((sum, op) => op.op === "concat" ? sum : sum + ((op as { with?: number[] }).with?.length ?? transitions.length), 0);
+        const videoSeconds = shots.map((shot) => plan.shots.find((item) => item.id === shot.id)?.seconds ?? null);
+        const lengthsKnown = videoSeconds.every((seconds): seconds is number => seconds !== null);
+        const baseLength = lengthsKnown
+          ? videoSeconds.reduce<number>((sum, seconds) => sum + seconds, 0) - blended * DEFAULT_CROSSFADE_S
+          : videoSeconds.reduce<number>((sum, seconds) => sum + (seconds ?? 0), 0);
         const added = filmOverhead(showTitle, showCredits, creditLines.length);
         const totalSeconds = baseLength + added;
         if (totalSeconds > MAX_EDIT_SECONDS) throw new Error("That film would be longer than 10 minutes. Use shorter videos or fewer title and credit lines.");
@@ -235,12 +241,10 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const music = readAttachment(actor, musicFileId);
         if (clips.some((item) => !item.ok) || !music.ok) throw new Error("A film clip or music file is missing.");
         const credits = creditLines;
-        const transitions = plan.shots.slice(1).map((shot) => (shot.transition ?? "fade") as JoinTransition);
         const ops: import("@/lib/videos/stackEdit").EditOp[] = [];
-        if (transitions.length) ops.push(...filmOps({ transition: transitions[0], includeJoin: true }));
-        for (let i = 1; i < transitions.length; i++) ops.push(...filmOps({ transition: transitions[i], includeJoin: true }));
-        ops.push(...filmOps({ includeJoin: false, title: showTitle ? plan.title : undefined, summary: plan.summary, credits: showCredits ? credits : undefined, look: plan.look, letterbox: plan.letterbox }));
-        ops.push(overlayOp(clipIds.length, { gain_db: -12, clip_gain_db: 0, fade_out_s: 2 }, 0, false));
+        // The music bed ends with the picture: end_s is the film's length (known only when every shot has its length), and it fades out over its last 1.5 s.
+        const overlay = overlayOp(clipIds.length, { gain_db: -12, clip_gain_db: 0, fade_out_s: 1.5, ...(lengthsKnown ? { end_s: Math.round(totalSeconds * 100) / 100 } : {}) }, 0, false);
+        ops.push(...join, ...rest, overlay);
         if (ops.length > MAX_EDIT_OPS) throw new Error("That film needs too many editing steps.");
         const editInputs = clips.map((item) => {
           if (!item.ok) throw new Error("A film clip is missing.");
@@ -257,7 +261,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         if (!saved.ok) throw new Error(saved.error);
         return saved.value.id;
       }
-      const film = await runEditVideo({ state, args: { change: "film", production: productionId, ...(plan.title_card === false ? { no_title: true } : {}), ...(plan.credits_card === false ? { no_credits: true } : {}), ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
+      const film = await runEditVideo({ state, args: { change: "film", production: productionId, seam_transitions: plan.shots.slice(1).map((shot) => shot.transition ?? "fade"), ...(plan.title_card === false ? { no_title: true } : {}), ...(plan.credits_card === false ? { no_credits: true } : {}), ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
       let id = (film.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { console.error("[film] assemble refused", JSON.stringify(film.result?.reply ?? film).slice(0, 600)); throw new Error("The film could not be assembled."); }
       let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? (/isn.t ready/i.test(value.error ?? "") ? "The video editor is restarting." : "The film could not be assembled.") : null);

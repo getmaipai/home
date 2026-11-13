@@ -25,10 +25,18 @@ export function planBeatCut(input: { beats: number[]; downbeats: number[]; beats
   let prior = 0;
   for (const end of cuts) {
     const length = end - prior;
-    const clipIndex = out.length % clipSeconds.length;
+    // Round robin from the next clip; a clip with no footage left for this cut is skipped for the next one that has some, so footage is not shown twice
+    // while another clip still has unused footage. Only when every clip is used up does the planned clip start over from its first second.
+    const turn = out.length % clipSeconds.length;
+    const room = (index: number) => { const known = clipSeconds[index] ?? null; return known === null || cursors[index]! + length <= known; };
+    let clipIndex = turn;
+    for (let k = 0; k < clipSeconds.length; k++) {
+      const candidate = (turn + k) % clipSeconds.length;
+      if (room(candidate)) { clipIndex = candidate; break; }
+    }
     const known = clipSeconds[clipIndex] ?? null;
     if (known !== null && length > known) return { ok: false, line: `One of those videos is shorter than a cut every ${step} beats. Use a longer video or cut on fewer beats.` };
-    if (known !== null && cursors[clipIndex]! + length > known) cursors[clipIndex] = 0;
+    if (!room(clipIndex)) cursors[clipIndex] = 0;
     const inS = cursors[clipIndex]!;
     const outS = inS + length;
     out.push({ clipIndex, inS: round(inS), outS: round(outS), length: round(length) });
