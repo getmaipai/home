@@ -15,9 +15,10 @@ export function __setQuickReactionRunnerForTests(fn: typeof completeBackground |
 export function __resetQuickReactionForTests(): void { recent.clear(); runner = completeBackground; }
 
 const SYSTEM = [
-  "You are the listening half of a voice assistant. The person just spoke. Reply with exactly one line in one of three forms.",
+  "You are the listening half of a voice assistant. The person just spoke. Reply with exactly one line in one of four forms.",
   "REACT: followed by one to six words a friend would say out loud right away, in the same mood, when the person shares sad or frustrating news, good news, or something surprising or exciting.",
   "ACK: followed by one or two words, only a natural thinking sound such as hmm, mm, well, okay, right or let's see, when the person asks a question, makes a request or asks for a story; never use any other word, never promise anything, never mention time, and do not use the same sound every time.",
+  "WHISPER: followed by okay, only when the person asks you to whisper, to speak quietly or softly, or to whisper from now on.",
   "NONE when the person only greeted you, said a plain okay or mm, or left a sentence unfinished.",
   "Never answer, advise, name an emotion, or repeat their words.",
 ].join(" ");
@@ -29,13 +30,21 @@ export interface QuickCue {
   text: string;
   /** A reaction to news is spoken the moment it is ready; a thinking sound only if the answer is not there yet. */
   immediate: boolean;
+  /** WHISPER-02: the small model heard the person ask for a whisper. Stopping stays with the main model's [normal voice] tag (the small model mistook a question about quiet for it half the time). Home turns the mode on before the first word is spoken, so the quick "okay" is already whispered and the reply does not depend on the main model remembering its tag. */
+  voice?: "whisper";
 }
 
 /** One line from the model ("REACT: Oh no.", "ACK: Hmm.", "NONE") to a cue, or null. */
 export function parseQuickCue(raw: string, said: string, banned: readonly string[], lastFew: readonly string[], tags: readonly string[]): QuickCue | null {
   const line = raw.trim().split("\n")[0] ?? "";
-  const match = line.match(/^(REACT|ACK)\s*:\s*(.+)$/i);
+  const match = line.match(/^(REACT|ACK|WHISPER)\s*:\s*(.+)$/i);
   if (!match) return null;
+  const kind = match[1]!.toUpperCase();
+  if (kind === "WHISPER") {
+    const sound = match[2]!.trim();
+    const spoken = THINKING_SOUND.test(sound) && !banned.some((phrase) => sound.toLowerCase().includes(phrase.toLowerCase())) ? sound : "";
+    return { text: spoken, immediate: false, voice: "whisper" };
+  }
   if (match[1]!.toUpperCase() === "REACT") {
     const text = cleanReaction(match[2]!, said, banned, lastFew, tags);
     return text ? { text, immediate: true } : null;

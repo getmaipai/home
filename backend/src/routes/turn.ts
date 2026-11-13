@@ -17,7 +17,7 @@ import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue, pickStillCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
-import { createWhisperDeltaFilter, noteWhisperTag } from "@/lib/whisperTurns";
+import { createWhisperDeltaFilter, noteWhisperTag, setWhisperMode, markWhisperTurn } from "@/lib/whisperTurns";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safetyRefusalLine } from "@/lib/failureCopy";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
@@ -809,6 +809,11 @@ export async function* streamTurnEvents(
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
     const quick: Promise<QuickCue | null | undefined> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags, previousReply(result.conversationId)) : Promise.resolve(undefined);
+    // WHISPER-02: the person asked to whisper: the mode is set the moment the small model answers, before its "okay" is spoken (this
+    // handler is attached first, so it runs first), and even when the main reply is already streaming.
+    void quick.then((cue) => {
+      if (cue?.voice === "whisper") { setWhisperMode(actorId, result.conversationId, true); markWhisperTurn(result.turnId); }
+    });
     const timer = delay(remainingDelayMs);
     // VOICE-OPENER-01: the small model's short reaction or acknowledgment is spoken the moment it is ready (about 0.3 s), not after a
     // wait: the main model's first word takes 1 to 3 s, and the gap in between is what felt like a walkie-talkie. A status line wakes the
@@ -829,7 +834,7 @@ export async function* streamTurnEvents(
       else if (race === "quick") {
         quickSettled = true;
         const cue = await quick;
-        if (cue && !earlyCueSent && !result.cueSuppressed && !cueSpoken) {
+        if (cue && cue.text && !earlyCueSent && !result.cueSuppressed && !cueSpoken) {
           if (cue.immediate) yield sayCue(cue.text);
           else if (ackDue) yield sayCue(cue.text);
           else heldAck = cue;

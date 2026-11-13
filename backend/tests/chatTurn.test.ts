@@ -2643,6 +2643,30 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     } finally { __resetQuickReactionForTests(); }
   });
 
+  test("WHISPER-02: when the small model hears a request to whisper, the mode is on before the quick okay and the reply, with no tag from the main model", async () => {
+    const { __setQuickReactionRunnerForTests, __resetQuickReactionForTests } = await import("@/lib/quickReaction");
+    const { isWhisperMode, isWhisperTurn, __resetWhisperTurnsForTests } = await import("@/lib/whisperTurns");
+    __resetWhisperTurnsForTests();
+    const slow = async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((r) => setTimeout(r, 900));
+      yield "Of course.";
+      return undefined;
+    };
+    try {
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "WHISPER: okay" })) as never);
+      const events: TurnStreamEvent[] = [];
+      let modeWhenCueSpoken: boolean | null = null;
+      for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5000, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "whisper from now on", stillCueGapMs: 5000 })) {
+        if (event.type === "spoken_cue") modeWhenCueSpoken = isWhisperMode("test-person", "conv-testfixture");
+        events.push(event);
+      }
+      expect((events.find((e) => e.type === "spoken_cue") as { text: string }).text).toBe("okay");
+      expect(modeWhenCueSpoken).toBe(true);
+      expect(isWhisperMode("test-person", "conv-testfixture")).toBe(true);
+      expect(isWhisperTurn("turn-testfixture")).toBe(true);
+    } finally { __resetQuickReactionForTests(); __resetWhisperTurnsForTests(); }
+  });
+
   test("a thinking sound is spoken only when the first word is late, and a reaction to news is spoken at once", async () => {
     const { __setQuickReactionRunnerForTests, __resetQuickReactionForTests } = await import("@/lib/quickReaction");
     const answerAt = (ms: number) => async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {

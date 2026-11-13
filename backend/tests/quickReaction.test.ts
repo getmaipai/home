@@ -32,6 +32,9 @@ describe("cleanReaction", () => {
     expect(parseQuickCue("ACK: Hmm, well.", "why is the sky blue", [], [], [])).toEqual({ text: "Hmm, well.", immediate: false });
     expect(parseQuickCue("ACK: Maybe tomorrow.", "when is snow", [], [], [])).toBeNull();
     expect(parseQuickCue("ACK: Eight seventeen.", "alarm", [], [], [])).toBeNull();
+    expect(parseQuickCue("WHISPER: Okay.", "whisper from now on", [], [], [])).toEqual({ text: "Okay.", immediate: false, voice: "whisper" });
+    expect(parseQuickCue("WHISPER: Sure thing.", "whisper please", [], [], [])).toEqual({ text: "", immediate: false, voice: "whisper" });
+    expect(parseQuickCue("NORMAL: Okay.", "talk normally", [], [], [])).toBeNull();
     expect(parseQuickCue("NONE", "hello", [], [], [])).toBeNull();
     expect(parseQuickCue("Sure, here you go.", "x", [], [], [])).toBeNull();
     expect(parseQuickCue("ACK: Hmm.", "x", [], ["hmm."], [])).toBeNull();
