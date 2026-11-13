@@ -20,6 +20,7 @@ import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
+import { listFragments } from "@/lib/media/templates";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
@@ -120,6 +121,7 @@ registerAppPageFill("video", "create", (person, page) => {
     { state: "voices", label: "Sound", align: "end", icon_only: true, default: DEFAULT_VIDEO_VOICES, quiet_value: DEFAULT_VIDEO_VOICES, ...soundTiers(), options: VIDEO_VOICES.map(({ id }) => id === "clean" ? ({ value: id, label: "No music or effects", icon: "volume-x" }) : ({ value: id, label: "Music and effects", icon: "volume-2" })) },
     // VIDEO-LORA-09: Styles, Characters and Strength join the Style popover; the person's own access and the Stack's LoRA report decide what shows and when it is disabled.
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
+    ...shotCardChips(person),
   ];
   // Make it Max shows only when this person holds Max and the Stack reports the Max model ready (the same offer the level segment makes); otherwise the
   // action is not drawn, so nobody presses a button whose answer is a refusal.
@@ -133,6 +135,15 @@ registerAppPageFill("video", "create", (person, page) => {
     delete bar.submit_detail;
   }
 });
+
+/** CREATOR-20b: the Video composer reads the all-ages shot-card vocabulary from the fragment catalog. */
+function shotCardChips(person: PersonRow): Array<Record<string, unknown>> {
+  const groups = [["framing", "Framing"], ["camera", "Camera"], ["lens", "Lens"], ["light", "Light"], ["film_stock", "Film stock"], ["look", "Look"], ["grade", "Grade"]] as const;
+  return groups.flatMap(([group, label]) => {
+    const rows = listFragments({ actor: person, group });
+    return rows.length ? [{ state: `card_${group}`, label, group: "Shot card", presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "None" }, ...rows.map((row) => ({ value: row.id, label: row.title }))] }] : [];
+  });
+}
 
 /** CLIPS-FEED-01: Make another opens the Create page, which is for adults; a person below that floor gets the feed without the button. */
 registerAppPageFill("video", "clips-feed", (person, page) => {

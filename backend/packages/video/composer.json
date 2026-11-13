@@ -15,7 +15,14 @@
       "chat_tool": "generate_video",
       "chat_args": {
         "orientation": "orientation",
-        "seconds": "seconds"
+        "seconds": "seconds",
+        "card_framing": "card.framing",
+        "card_camera": "card.camera",
+        "card_lens": "card.lens",
+        "card_light": "card.light",
+        "card_film_stock": "card.film_stock",
+        "card_look": "card.look",
+        "card_grade": "card.grade"
       }
     },
     {

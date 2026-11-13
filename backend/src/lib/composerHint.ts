@@ -14,6 +14,8 @@ import { composerHintSpec } from "@/lib/composer/modes";
 import { loadManifestOnly, validatePackageArgs } from "@/lib/plugins";
 import type { ContextItem } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";
+import { getFragment } from "@/lib/media/templates";
+import { composeShotPrompt, type ShotCard } from "@/lib/media/shotCard";
 
 /** The validated hint a turn carries: what the person chose that they may actually use, and the tool and arguments it may fill. */
 export interface ComposerHint {
@@ -80,10 +82,27 @@ export function fillComposerDefaults(hint: ComposerHint | undefined, tool: strin
   if (!hint || tool !== hint.tool) return args;
   const filled: Record<string, unknown> = { ...args };
   let changed = false;
+  const card: ShotCard = {};
+  let hasCard = false;
+  const originalPrompt = String(args.prompt ?? "");
   for (const [key, value] of Object.entries(hint.settings)) {
     const argument = hint.fill[key];
-    if (!argument || args[argument] !== undefined) continue;
+    if (!argument) continue;
+    if (argument.startsWith("card.")) {
+      if (tool !== "generate_video") continue;
+      const group = argument.slice("card.".length) as keyof ShotCard;
+      const fragment = typeof value === "string" ? getFragment(value) : null;
+      if (fragment && originalPrompt.includes(fragment.prompt)) continue;
+      (card as Record<string, unknown>)[group] = value;
+      hasCard = true;
+      continue;
+    }
+    if (args[argument] !== undefined) continue;
     filled[argument] = value;
+    changed = true;
+  }
+  if (hasCard) {
+    filled.prompt = composeShotPrompt({ subject: originalPrompt, ...card }).prompt;
     changed = true;
   }
   if (!changed) return args;
