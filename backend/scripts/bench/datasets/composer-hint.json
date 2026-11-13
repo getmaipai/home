@@ -1,0 +1,26 @@
+{
+  "id": "composer-hint",
+  "note": "ONE-COMPOSER-2026-11-13 COMPOSER-04, architect condition 6. The picture rows and plain rows are new and written for this bench; the fresh rows come from chat-ab-01.json (`fresh.items`), which ships a dev split only, so the bench splits them by a stable hash of the row id (even hash = held-out) and measures the held-out half. Nothing was tuned on any row.",
+  "rows": [
+    { "id": "pic-01", "group": "picture-request", "split": "heldout", "prompt": "a dog on a beach" },
+    { "id": "pic-02", "group": "picture-request", "split": "heldout", "prompt": "a red fox in the snow at dawn" },
+    { "id": "pic-03", "group": "picture-request", "split": "heldout", "prompt": "a lighthouse at dusk, watercolor" },
+    { "id": "pic-04", "group": "picture-request", "split": "heldout", "prompt": "a sleepy bear reading a book" },
+    { "id": "pic-05", "group": "picture-request", "split": "heldout", "prompt": "a tiny cabin by a mountain lake" },
+    { "id": "pic-06", "group": "picture-request", "split": "heldout", "prompt": "a robot watering tomato plants" },
+    { "id": "pic-07", "group": "picture-request", "split": "heldout", "prompt": "a hot air balloon over a green valley" },
+    { "id": "pic-08", "group": "picture-request", "split": "heldout", "prompt": "a cozy kitchen with a cat on the windowsill" },
+    { "id": "pic-09", "group": "picture-request", "split": "dev", "prompt": "a dragon asleep on a pile of books" },
+    { "id": "pic-10", "group": "picture-request", "split": "dev", "prompt": "a rainy city street with neon signs" },
+    { "id": "pic-11", "group": "picture-request", "split": "dev", "prompt": "a paper boat on a puddle" },
+    { "id": "pic-12", "group": "picture-request", "split": "dev", "prompt": "an old library with tall windows" },
+    { "id": "plain-01", "group": "plain", "split": "heldout", "prompt": "what is a dog" },
+    { "id": "plain-02", "group": "plain", "split": "heldout", "prompt": "why is the sky blue" },
+    { "id": "plain-03", "group": "plain", "split": "heldout", "prompt": "give me three tips for sleeping better" },
+    { "id": "plain-04", "group": "plain", "split": "heldout", "prompt": "how many ounces are in a pound" },
+    { "id": "plain-05", "group": "plain", "split": "heldout", "prompt": "how does a lighthouse work" },
+    { "id": "plain-06", "group": "plain", "split": "dev", "prompt": "what do foxes eat" },
+    { "id": "plain-07", "group": "plain", "split": "dev", "prompt": "explain how a hot air balloon rises" },
+    { "id": "plain-08", "group": "plain", "split": "dev", "prompt": "write a two line poem about rain" }
+  ]
+}
