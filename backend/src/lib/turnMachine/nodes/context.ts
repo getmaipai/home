@@ -62,10 +62,9 @@ import { getRobotCheckin } from "@/lib/robotCheckin";
 import { getDeviceState } from "@/lib/deviceStates";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
-import { fuseScene, getScene, setScene, observationsForTurn } from "@/lib/scene";
+import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
-import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 import type { Surface, SpeakerEvidence } from "@/lib/turnShared";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -79,10 +78,10 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 export const TOOL_ROUND_SHARE = 0.25;
 const SCENE_RENDER_TOKEN_LIMIT = 320;
 const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
-function sceneCountsForTrace(scene: Scene, sceneTokens: number) {
+function sceneCountsForTrace(scene: FusedScene, sceneTokens: number) {
   return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens };
 }
-export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): Scene["speaker"] {
+export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): FusedScene["speaker"] {
   if (evidence) return { ...evidence };
   // A signed-in actor is the speaker only on private, non-robot sessions (chat and phone); robot and shared surfaces require speaker evidence.
   return surface === "chat" || surface === "phone" ? { person: actorId, basis: "signed_in", level: "confirmed" } : null;
@@ -114,13 +113,13 @@ async function fitSceneBlockMeasured(text: string, required: string, count: (val
   const finalCount = await count(candidate);
   return finalCount !== null && finalCount <= limit ? { text: candidate, tokens: finalCount } : { text: required, tokens: finalCount ?? 0 };
 }
-export function renderScene(scene: Scene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
+export function renderScene(scene: FusedScene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
   const members = new Map(household.map((person) => [person.id, person]));
   const age = (at: number) => {
     const elapsed = Math.max(0, now - at);
     return elapsed < 60_000 ? "just now" : elapsed < 5 * 60_000 ? "a few minutes ago" : "a while ago";
   };
-  const basis = (p: Scene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
+  const basis = (p: FusedScene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
   if (scene.speaker?.person === actor.id && (scene.speaker.level === "confirmed" || scene.speaker.basis === "signed_in")) lines.push(`With ${actor.displayName}:`);
   else lines.push("With: someone the system has not identified.");
@@ -134,7 +133,7 @@ export function renderScene(scene: Scene, now: number, actor: PersonRow, househo
     });
     lines.push(`People here: ${people.join(", ")}.`);
   } else lines.push("No other person is known to be here.");
-  lines.push((scene as Scene & { alone_observed?: boolean }).alone_observed && scene.alone ? "Alone: positively observed." : scene.alone ? "Alone: not confirmed." : "Other people are present.");
+  lines.push(scene.alone_observed && scene.alone ? "Alone: positively observed." : scene.alone ? "Alone: not confirmed." : "Other people are present.");
   lines.push(scene.child_present ? "A child is in the room." : "No child is known to be in the room.");
   const place = scene.place;
   if (place && place.where !== "unknown") lines.push(`Place: ${place.where === "home" ? "at home" : "away"}${place.setting !== "unknown" ? `, ${place.setting === "indoor" ? "indoors" : place.setting}` : ""}.`);

@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, outcomeText, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { worryingConversation } from "@/lib/turnContext";
-import { fuseScene, observationsForTurn } from "@/lib/scene";
+import { fuseScene, observationsForTurn, sceneForTests } from "@/lib/scene";
 import { sceneSpeakerForTurn } from "@/lib/turnMachine/nodes/context";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
@@ -60,7 +60,7 @@ test("sensitiveAllowed(): retains the robot floor and tightens shared surfaces",
   expect(sensitiveAllowed("robot", confirmed, [...present, { person: "unknown", basis: "unknown", level: "tentative" }], owner, scene)).toBe(false);
   expect(sensitiveAllowed("robot", confirmed, [], owner, scene)).toBe(false);
   expect(sensitiveAllowed("robot", confirmed, undefined, owner, scene)).toBe(false);
-  const other = { conversation_id: "c", people: [{ person_id: null, label: null, relation: "unknown" as const, band: "unknown" as const, level: "claimed" as const, basis: ["typed" as const], last_seen_at: 0, expires_at: 1 }], speaker: null, place: null, ambient: null, weather: null, alone: false, child_present: false, updated_at: 0 };
+  const other = sceneForTests({ conversation_id: "c", people: [{ person_id: null, label: null, relation: "unknown", band: "unknown", level: "claimed", basis: ["typed"], last_seen_at: 0, expires_at: 1 }], alone: false });
   for (const surface of ["chat", "phone"] as const) {
     expect(sensitiveAllowed(surface, null, null, owner, scene)).toBe(true);
     expect(sensitiveAllowed(surface, null, null, owner, other)).toBe(false);

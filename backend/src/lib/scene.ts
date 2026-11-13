@@ -8,19 +8,35 @@ import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 export const SCENE_TTL = { face: 90_000, voice: 120_000, typed: 1_800_000, look: 90_000, gps: 600_000, signed_in: Number.POSITIVE_INFINITY, robot_room: 1_800_000, ha_entity: 1_800_000, sound: 60_000, light: 300_000, temperature: 300_000, motion: 60_000 } as const;
 const MAX_SCENES = 200;
 const IDLE_TTL = 30 * 60_000;
-const store = new Map<string, Scene>();
+const store = new Map<string, FusedScene>();
 type Person = Scene["people"][number];
 export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null };
+
+export function sceneForTests(scene: Partial<Scene> & Pick<Scene, "conversation_id"> = { conversation_id: "test" }): FusedScene {
+  return {
+    conversation_id: scene.conversation_id,
+    people: scene.people ?? [],
+    speaker: scene.speaker ?? null,
+    place: scene.place ?? null,
+    ambient: scene.ambient ?? null,
+    weather: scene.weather ?? null,
+    alone: scene.alone ?? true,
+    alone_observed: false,
+    alone_observed_until: null,
+    child_present: scene.child_present ?? false,
+    updated_at: scene.updated_at ?? 0,
+  };
+}
 
 function personKey(p: Pick<Person, "person_id" | "label">): string { return p.person_id ? `id:${p.person_id}` : `label:${p.label ?? "unknown"}`; }
 function isExpired(expires: number, now: number): boolean { return expires <= now; }
 function clampExpires(o: SceneObservation): number { return Math.min(o.expires_at, o.at + (SCENE_TTL[o.source.sensor as keyof typeof SCENE_TTL] ?? IDLE_TTL)); }
 
-export function fuseScene(previous: Scene | null | undefined, observations: readonly SceneObservation[], now: number, conversationId = previous?.conversation_id ?? "", speaker: Scene["speaker"] = previous?.speaker ?? null): FusedScene {
+export function fuseScene(previous: FusedScene | null | undefined, observations: readonly SceneObservation[], now: number, conversationId = previous?.conversation_id ?? "", speaker: Scene["speaker"] = previous?.speaker ?? null): FusedScene {
   const live = (previous?.people ?? []).filter((p) => !isExpired(p.expires_at, now));
   let place = previous?.place && !isExpired(previous.place.expires_at, now) ? previous.place : null;
   let countFloor = 0;
-  let aloneObservedUntil = (previous as FusedScene | null | undefined)?.alone_observed_until ?? null;
+  let aloneObservedUntil = previous?.alone_observed_until ?? null;
   if (aloneObservedUntil !== null && aloneObservedUntil <= now) aloneObservedUntil = null;
   const typedLeft = new Set<string>();
   const strongIds = new Set<string>();
@@ -36,7 +52,7 @@ export function fuseScene(previous: Scene | null | undefined, observations: read
       const index = live.findIndex((p) => personKey(p) === key);
       const next: Person = { ...value, basis: [o.source.sensor], last_seen_at: o.at, expires_at: clampExpires(o) };
       if (o.strength === "strong" && value.person_id) strongIds.add(value.person_id);
-      if (o.strength === "strong" && value.person_id && value.person_id === speaker?.person) { aloneObservedUntil = clampExpires(o); continue; }
+      if (o.strength === "strong" && value.person_id && value.person_id === speaker?.person) continue;
       if (index < 0) live.push(next);
       else {
         const old = live[index]!;
@@ -48,7 +64,15 @@ export function fuseScene(previous: Scene | null | undefined, observations: read
       }
       continue;
     }
-    if (o.kind === "place" || o.kind === "room") {
+    if (o.kind === "room") {
+      if (!["robot_room", "ha_entity", "typed"].includes(o.source.sensor)) continue;
+      const value = o.value as { room: string };
+      const priority = (sensor: string) => sensor === "typed" ? 3 : sensor === "signed_in" ? 2 : sensor === "robot_room" || sensor === "ha_entity" ? 1 : 0;
+      if (place && priority(o.source.sensor) < priority(place.basis)) continue;
+      place = { where: place?.where ?? "unknown", setting: place?.setting ?? "indoor", area: value.room, precision: "room", basis: o.source.sensor, expires_at: clampExpires(o) };
+      continue;
+    }
+    if (o.kind === "place") {
       const priority = (sensor: string) => sensor === "gps" ? 4 : sensor === "typed" ? 3 : sensor === "signed_in" ? 2 : sensor === "robot_room" || sensor === "ha_entity" ? 1 : 0;
       const oldPriority = place ? priority(place.basis) : -1;
       if (priority(o.source.sensor) >= oldPriority) {
@@ -74,14 +98,14 @@ export function fuseScene(previous: Scene | null | undefined, observations: read
   return { conversation_id: conversationId, people, speaker, place, ambient: previous?.ambient ?? null, weather: previous?.weather ?? null, alone: people.length === 0, alone_observed: aloneObservedUntil !== null && aloneObservedUntil > now, alone_observed_until: aloneObservedUntil, child_present: people.some((p) => p.band === "child"), updated_at: now };
 }
 
-export function getScene(conversationId: string, now = Date.now()): Scene | null {
+export function getScene(conversationId: string, now = Date.now()): FusedScene | null {
   const value = store.get(conversationId);
   if (!value) return null;
   if (now - value.updated_at >= IDLE_TTL) { store.delete(conversationId); return null; }
   setBounded(store, conversationId, value, MAX_SCENES);
   return value;
 }
-export function setScene(scene: Scene, now = Date.now()): void { const value = { ...scene, updated_at: now }; setBounded(store, scene.conversation_id, value, MAX_SCENES); }
+export function setScene(scene: FusedScene, now = Date.now()): void { dropIdleScenes(now); const value = { ...scene, updated_at: now }; setBounded(store, scene.conversation_id, value, MAX_SCENES); }
 export function dropScene(conversationId: string): void { store.delete(conversationId); }
 export function clearScenes(): void { store.clear(); }
 export function dropIdleScenes(now = Date.now()): void { for (const [id, scene] of store) if (now - scene.updated_at >= IDLE_TTL) store.delete(id); }

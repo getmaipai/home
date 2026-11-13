@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn } from "@/lib/scene";
+import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, sceneForTests, type FusedScene } from "@/lib/scene";
+import { sensitiveAllowed } from "@/lib/turnContext";
 import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
-import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 import { renderScene, fitSceneBlock } from "@/lib/turnMachine/nodes/context";
 import { TraceRecorder } from "@/lib/turnMachine/trace";
 
 const person = (id: string | null, band: "child" | "teen" | "adult" | "unknown" = "adult", level: "confirmed" | "tentative" | "claimed" = "confirmed") => ({ person_id: id, label: null, relation: id ? "household" as const : "unknown" as const, band, level });
 const obs = (kind: SceneObservation["kind"], value: unknown, sensor: SceneObservation["source"]["sensor"], now: number, strength: SceneObservation["strength"] = "strong", expires = SCENE_TTL[sensor as keyof typeof SCENE_TTL]): SceneObservation => ({ id: `${sensor}-${now}-${kind}`, source: { surface: "robot", device_id: "device-1", sensor }, kind, value, confidence: strength === "strong" ? 0.9 : 0.5, strength, at: now, expires_at: now + expires });
-const empty = (conversation_id = "conversation-1"): Scene => ({ conversation_id, people: [], speaker: null, place: null, ambient: null, weather: null, alone: true, child_present: false, updated_at: 0 });
+const empty = (conversation_id = "conversation-1"): FusedScene => sceneForTests({ conversation_id });
 
 describe("scene fusion", () => {
   test("context trace scene counts contain the measured token count and no identity fields", () => {
@@ -24,16 +24,16 @@ describe("scene fusion", () => {
     const at = 1_000_000;
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
     const marlow = { id: "person-marlow", displayName: "Marlow", role: "teen", birthdate: null } as never;
-    const scene: Scene = { ...empty(), speaker: { person: "person-sage", basis: "signed_in", level: "confirmed" }, people: [
+    const scene = sceneForTests({ ...empty(), speaker: { person: "person-sage", basis: "signed_in", level: "confirmed" }, people: [
       { person_id: "person-marlow", label: null, relation: "household", band: "teen", level: "confirmed", basis: ["face"], last_seen_at: at - 10_000, expires_at: at + 1 },
       { person_id: null, label: null, relation: "unknown", band: "unknown", level: "tentative", basis: ["look"], last_seen_at: at - 10_000, expires_at: at + 1 },
       { person_id: null, label: "Bruno", relation: "unknown", band: "adult", level: "claimed", basis: ["typed"], last_seen_at: at - 90_000, expires_at: at + 1 },
-    ] };
+    ] });
     const first = renderScene(scene, at, sage, [sage, marlow]);
     expect(first).toContain("With Sage:");
-    expect(first).toContain("Marlow (teen, seen by the camera just now)");
+    expect(first).toContain("Marlow (teen) (seen by the camera just now)");
     expect(first).toContain("someone the camera does not know");
-    expect(first).toContain("Bruno (adult, Sage said so a few minutes ago)");
+    expect(first).toContain("Bruno (adult) (Sage said so a few minutes ago)");
     expect(renderScene(scene, at + 20_000, sage, [sage, marlow])).toBe(first);
     const counts = JSON.stringify(sceneCounts(scene));
     expect(counts).not.toContain("Sage");
@@ -74,6 +74,20 @@ describe("scene fusion", () => {
     const weak = obs("people_count", 1, "look", 10, "weak");
     expect(fuseScene(empty(), [weak], 10).alone_observed).toBe(false);
   });
+  test("speaker sighting alone is not alone evidence, and does not open shared sensitive surfaces", () => {
+    const actorId = "person-sage";
+    const scene = fuseScene({ ...empty(), speaker: { person: actorId, basis: "signed_in", level: "confirmed" } }, [obs("person_here", person(actorId), "face", 10)], 10);
+    expect(scene.alone_observed).toBe(false);
+    expect(scene.alone_observed_until).toBeNull();
+    for (const surface of ["tv", "overlay", "pod"] as const) {
+      expect(sensitiveAllowed(surface, null, null, actorId, scene)).toBe(false);
+    }
+    const observed = fuseScene(scene, [obs("people_count", 1, "look", 11)], 11);
+    expect(observed.alone_observed).toBe(true);
+    const cleared = fuseScene(observed, [obs("person_here", person("person-other"), "face", 12)], 12);
+    expect(cleared.alone_observed).toBe(false);
+    expect(cleared.alone_observed_until).toBeNull();
+  });
   test("an unknown robot speaker remains unknown and absent evidence does not list the signed-in actor", () => {
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
     const observations = observationsForTurn({ surface: "robot", actorId: "person-sage", actorBand: "adult", present: [{ person: "person-sage", basis: "signed_in", level: "confirmed" }], now: 10 });
@@ -83,7 +97,7 @@ describe("scene fusion", () => {
   });
   test("speaker names are shown only when the scene confirms the actor", () => {
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
-    const scene: Scene = { ...empty(), speaker: { person: "person-other", basis: "voice", level: "confirmed" } };
+    const scene = sceneForTests({ ...empty(), speaker: { person: "person-other", basis: "voice", level: "confirmed" } });
     const text = renderScene(scene, 10, sage, [sage]);
     expect(text).not.toContain("With Sage:");
     expect(text).toContain("With: someone the system has not identified.");
@@ -91,7 +105,7 @@ describe("scene fusion", () => {
   test("many typed people with long labels retain speaker, alone, and child lines", () => {
     const at = 10_000;
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
-    const scene: Scene & { alone_observed?: boolean } = {
+    const scene: FusedScene = {
       ...empty(),
       speaker: { person: "person-sage", basis: "signed_in", level: "confirmed" },
       people: Array.from({ length: 20 }, (_, index) => ({
@@ -136,6 +150,17 @@ describe("scene fusion", () => {
       if (kind === "place") expect(fused.place).toBeNull();
     }
   });
+  test("room observations preserve place identity and only accepted room sensors set it", () => {
+    const t = 100;
+    const home = obs("place", { where: "home", setting: "indoor", area: "house", precision: "area" }, "typed", t, "weak");
+    const room = obs("room", { room: "kitchen" }, "robot_room", t + 1);
+    const updated = fuseScene(fuseScene(empty(), [home], t), [room], t + 1).place;
+    expect(updated).toMatchObject({ where: "home", setting: "indoor", area: "house", precision: "area", basis: "typed" });
+    const created = fuseScene(empty(), [room], t + 1).place;
+    expect(created).toMatchObject({ where: "unknown", setting: "indoor", area: "kitchen", precision: "room" });
+    const gpsRoom = obs("room", { room: "kitchen" }, "gps", t + 2);
+    expect(fuseScene(empty(), [gpsRoom], t + 2).place).toBeNull();
+  });
   test("conversation scene store supports touch, end, and temporary conversation cleanup", () => {
     clearScenes();
     const item = fuseScene(empty("temporary-1"), [obs("person_here", person("person-guest1"), "typed", 50, "weak", SCENE_TTL.typed)], 50);
@@ -144,6 +169,17 @@ describe("scene fusion", () => {
     dropScene("temporary-1");
     expect(getScene("temporary-1", 52)).toBeNull();
     expect(sceneCounts(null)).toEqual({ people: 0, strong: 0, typed: 0, place_known: false, child_present: false, events: 0 });
+  });
+  test("a write opportunistically drops idle scenes using its injected time", () => {
+    clearScenes();
+    const stale = fuseScene(empty("idle-scene"), [], 10);
+    const active = fuseScene(empty("active-scene"), [], 10);
+    setScene(stale, 10);
+    setScene(active, 10);
+    setScene(fuseScene(empty("next-write"), [], 10), 10 + 30 * 60_000);
+    expect(getScene("idle-scene", 10 + 30 * 60_000)).toBeNull();
+    expect(getScene("active-scene", 10 + 30 * 60_000)).toBeNull();
+    expect(getScene("next-write", 10 + 30 * 60_000)).not.toBeNull();
   });
   test("different scene tails keep the system prefix byte-identical", () => {
     const id = "scene-prefix-test";
