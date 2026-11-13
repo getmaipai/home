@@ -11,6 +11,7 @@ import sharp, { type OverlayOptions } from "sharp";
 import type { PersonRow } from "@/types";
 import type { PictureReading, PictureRole } from "@/lib/pictures/roles";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
+import type { Pose, SeatBox } from "@/lib/pictures/pose";
 
 /** The two steps' names, as the card shows them on this route. */
 export const FIRST_FRAME_STEP_NAMES = ["Creating the first picture", "Creating the video"] as const;
@@ -50,6 +51,8 @@ export interface FirstFrameTools {
   compose(input: { pictured: PicturedInput[]; scene: string; signal: AbortSignal }): Promise<Uint8Array>;
   /** SFace cosine of two vectors. */
   cosine(a: Float32Array, b: Float32Array): number;
+  readPose?(image: Uint8Array): Promise<{ pose: Pose }>;
+  readSeatBox?(plate: Uint8Array): Promise<SeatBox | null>;
 }
 
 const sleepOrAbort = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
@@ -92,6 +95,8 @@ function realTools(actor: PersonRow | null): FirstFrameTools {
       } catch (error) { void pictures.cancelOrDelete(submitted.job); throw error; }
     },
     cosine(a, b) { let dot = 0, aa = 0, bb = 0; for (let i = 0; i < a.length; i++) { dot += a[i]! * b[i]!; aa += a[i]! * a[i]!; bb += b[i]! * b[i]!; } return a.length === b.length && aa && bb ? dot / Math.sqrt(aa * bb) : 0; },
+    async readPose(image) { return (await import("@/lib/pictures/pose")).readPose(image); },
+    async readSeatBox(plate) { return (await import("@/lib/pictures/pose")).readSeatBox(plate); },
   };
 }
 let toolsOverride: Partial<FirstFrameTools> | null = null;
@@ -251,8 +256,12 @@ export async function buildFirstPicture(pictures: ReadonlyArray<FirstFramePictur
   }
   if (!png) {
     // Their own pixels, over the plate: less natural, never a changed face.
-    png = await pasteOver(plate, people.map((person) => person.image));
-    notes.push(`${reason ?? "The first picture could not be composed."} The first picture is therefore each person's own cut-out photo pasted over the place: it may look less natural, but the faces are exactly the photos'.`);
+    const poseResults = await Promise.all(people.map((person) => (tools.readPose ?? (async (image: Uint8Array) => (await import("@/lib/pictures/pose")).readPose(image)))(new Uint8Array(person.image)).catch(() => ({ pose: "standing" as const }))));
+    const seated = poseResults.some((result) => result.pose === "seated");
+    const seat = seated ? await (tools.readSeatBox ?? (async (image: Uint8Array) => (await import("@/lib/pictures/pose")).readSeatBox(image)))(new Uint8Array(plate)).catch(() => null) : null;
+    const { composeNatural } = await import("@/lib/videos/firstPictureCompose");
+    png = await composeNatural(plate, people.map((person, index) => ({ image: person.image, pose: poseResults[index]!.pose, seat: poseResults[index]!.pose === "seated" ? seat : null })));
+    notes.push(`${reason ?? "The first picture could not be composed."} The first picture is therefore each person's own cut-out photo, cleaned and colour-matched, pasted into the place; the faces are exactly the photos'.`);
     if (objectInputs.length) notes.push("The objects are not in the first picture; the video's words still name them.");
     scores = own.map(() => null);
   }

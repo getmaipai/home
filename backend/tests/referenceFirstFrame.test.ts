@@ -282,7 +282,8 @@ describe("the face gate and its fallback", () => {
     expect(recipe.firstPicture!.notes.join(" ")).toContain("pasted");
     // The person's own pixels stand on the place picture: the middle of the bottom is their colour, the corner is the place's.
     const still = await storedFirstPicture(job);
-    expect(await pixel(still, 512, 500)).toBe(PERSON_A);
+    // CREATOR-07: the person stands on the floor line (55 percent), cleaned and colour-matched, so their pixels are no longer the exact photo colour but are not the place's either.
+    expect(await pixel(still, 512, 280)).not.toBe(PLACE);
     expect(await pixel(still, 5, 5)).toBe(PLACE);
     expect(job.request.edit?.note).toContain("pasted");
   });
@@ -305,8 +306,9 @@ describe("the face gate and its fallback", () => {
     composeResult = async () => solid(PERSON_A, 1024, 576);
     const pasted = await buildFirstPicture([{ id: "a", bytes: await solid(PERSON_A), mediaType: "image/png", name: "woman in a green coat", role: "actor", look: "two friends" }, { id: "p", bytes: await solid(PLACE), mediaType: "image/png", name: "stone building", role: "end_shot", look: "a stone building" }], { scene: "they meet", tools: firstFrameToolsWith() });
     expect(pasted.how).toBe("pasted");
-    expect(await pixel(pasted.png, 256, 500)).toBe(PERSON_A);
-    expect(await pixel(pasted.png, 768, 500)).toBe(PERSON_B);
+    // CREATOR-07: both people stand on the floor line, cleaned and colour-matched: neither pixel is the place's flat colour any more.
+    expect(await pixel(pasted.png, 256, 280)).not.toBe(PLACE);
+    expect(await pixel(pasted.png, 768, 280)).not.toBe(PLACE);
   });
   test("more than two people, or objects that do not fit beside two people, are named in the notes", async () => {
     pairNames.add("woman in a green coat");
