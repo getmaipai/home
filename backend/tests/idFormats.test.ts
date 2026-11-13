@@ -57,6 +57,7 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newMadeRevisionId", "mrev-", 10],
   ["newApiKeyId", "key_", 24],
   ["newLoraId", "lora-", 10],
+  ["newCreationId", "crt-", 10],
   ["newTranscriptId", "transcript-", 10],
   ["newTranscriptRevisionId", "trev-", 10],
   ["newCaptionTrackId", "caption-", 10],
