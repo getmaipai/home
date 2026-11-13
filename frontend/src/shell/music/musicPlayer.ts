@@ -48,7 +48,8 @@ export interface MusicPlayerStore {
   stop(): void;
   /** The shell's audio session, and what to do when this player starts (the bar clears the media dock). */
   bind(session: AudioSession | null, onStart?: () => void): void;
-  /** Seconds now, read by whatever draws the clock (a frame loop; never a React state of its own). */
+  /** Seconds and length as of the last clock tick (a frame while playing, and every seek, time and length event). The same object until
+   * the next tick: React reads it twice per render, and Safari's `currentTime` moves between two reads (2026-11-13 crash). */
   clock(): { time: number; duration: number };
   subscribeClock(listener: () => void): () => void;
 }
@@ -66,8 +67,14 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   const listeners = new Set<() => void>();
   const clockListeners = new Set<() => void>();
   let frame = 0;
+  let clockNow = { time: 0, duration: 0 };
   const set = (patch: Partial<MusicSnapshot>) => { snap = { ...snap, ...patch }; listeners.forEach((listener) => listener()); };
-  const clockTick = () => clockListeners.forEach((listener) => listener());
+  /** Reads the element once and keeps the result until the next tick; a new object only when a number changed. */
+  const readClock = () => {
+    const time = el?.currentTime ?? 0, duration = el && Number.isFinite(el.duration) ? el.duration : snap.track?.duration ?? 0;
+    if (time !== clockNow.time || duration !== clockNow.duration) clockNow = { time, duration };
+  };
+  const clockTick = () => { readClock(); clockListeners.forEach((listener) => listener()); };
   // A smooth clock for the waveform and the karaoke wipe: the element's own timeupdate is about four a second. Runs only while sound plays and someone watches.
   const startFrames = () => {
     if (frame || typeof requestAnimationFrame !== "function" || !snap.playing || clockListeners.size === 0) return;
@@ -112,6 +119,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     audio.src = track.url;
     audio.loop = track.loop === true;
     set({ track, queue, index, failed: false });
+    clockTick();
     handle?.requestFocus();
     void audio.play().catch(() => set({ playing: false }));
   };
@@ -180,8 +188,8 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       if (session !== next) { handle?.release(); handle = null; session = next; if (snap.track && el && next) register(snap.track); }
       onStart = start;
     },
-    clock: () => ({ time: el?.currentTime ?? 0, duration: el && Number.isFinite(el.duration) ? el.duration : snap.track?.duration ?? 0 }),
-    subscribeClock(listener) { clockListeners.add(listener); startFrames(); return () => { clockListeners.delete(listener); }; },
+    clock: () => clockNow,
+    subscribeClock(listener) { readClock(); clockListeners.add(listener); startFrames(); return () => { clockListeners.delete(listener); }; },
   };
   return store;
 }
@@ -201,12 +209,8 @@ export function useMusicVolume(store: MusicPlayerStore = musicPlayer): { volume:
   return store.volume();
 }
 
-let lastClock = { time: 0, duration: 0 };
-/** Seconds into the song and its length, refreshed about 60 times a second while it plays. Only what draws a clock should call this. */
+/** Seconds into the song and its length, refreshed about 60 times a second while it plays. Only what draws a clock should call this.
+ * The snapshot is the store's cached tick, never a fresh element read (a fresh read differs between React's two reads in Safari). */
 export function useMusicClock(store: MusicPlayerStore = musicPlayer): { time: number; duration: number } {
-  return useSyncExternalStore(store.subscribeClock, () => {
-    const now = store.clock();
-    if (now.time !== lastClock.time || now.duration !== lastClock.duration) lastClock = now;
-    return lastClock;
-  }, () => lastClock);
+  return useSyncExternalStore(store.subscribeClock, store.clock, store.clock);
 }

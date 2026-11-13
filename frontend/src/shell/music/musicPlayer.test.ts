@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { createMusicPlayer } from "./musicPlayer";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { cleanup, renderHook } from "@testing-library/react";
+import { createMusicPlayer, useMusicClock } from "./musicPlayer";
 import { setPlayMode } from "@/shell/media/playMode";
 import type { Track } from "./musicQueue";
 
@@ -98,5 +99,43 @@ describe("music player", () => {
     expect(player.get().failed).toBe(true);
     player.next();
     expect(player.get().failed).toBe(false);
+  });
+});
+
+// 2026-11-13 live crash: Safari's audio element moves `currentTime` on every read while it plays. The clock hook read the element inside
+// React's getSnapshot, so two reads in one render differed, React warned "The result of getSnapshot should be cached" and then threw
+// "Maximum update depth exceeded" in the bar's SeekRow, which took the whole page down to the "Something went wrong" screen.
+describe("music clock", () => {
+  /** An element like Safari's: every read of currentTime while playing is a little later than the last. */
+  class LiveClockAudio extends FakeAudio {
+    constructor() {
+      super();
+      let at = 0;
+      Object.defineProperty(this, "currentTime", { get: () => { if (!this.paused) at += 0.001; return at; }, set: (value: number) => { at = value; } });
+    }
+  }
+  const makeLive = () => { const live = new LiveClockAudio(); return { live, player: createMusicPlayer(() => live as unknown as HTMLAudioElement) }; };
+  afterEach(cleanup);
+
+  test("the clock reads the same between ticks even while the element's time moves", () => {
+    const { live, player } = makeLive();
+    player.toggle(t("a"), queue);
+    const first = player.clock();
+    expect(player.clock()).toBe(first);
+    live.dispatchEvent(new Event("timeupdate"));
+    expect(player.clock()).not.toBe(first);
+    expect(player.clock().time).toBeGreaterThan(first.time);
+  });
+  test("the clock hook renders a playing song without looping", () => {
+    const { player } = makeLive();
+    player.toggle(t("a"), queue);
+    const errors: unknown[] = [];
+    const before = console.error;
+    console.error = (...args: unknown[]) => { errors.push(args[0]); };
+    try {
+      const { result } = renderHook(() => useMusicClock(player));
+      expect(result.current.duration).toBe(100);
+    } finally { console.error = before; }
+    expect(errors.map(String).filter((line) => /getSnapshot|Maximum update depth/.test(line))).toEqual([]);
   });
 });
