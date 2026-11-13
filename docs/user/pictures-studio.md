@@ -16,7 +16,7 @@ You only see your own pictures. A locked picture shows a lock until you unlock i
 
 ## The tools
 
-- **Comment.** Tell Home what to change, like "make the sky pink". Tap or drag a box on the picture, or choose **Brush** and paint the part to change. Only that part changes.
+- **Comment.** Tell Home what to change, like "make the sky pink". Tap or drag a box on the picture, or choose **Brush** and paint the part to change. Only that part changes. Press **Add a reference picture** to show Home a second picture to draw on, such as a dog to add. Pick one of your own open pictures. If Home cannot use a second picture yet, it says so. Children use words only, so they get no reference.
 - **Erase.** Paint over something and Home fills the hole.
 - **Remove BG.** Keeps the subject and makes the background clear.
 - **Crop.** Drag the box, pick a shape, turn the picture or flip it. Turning and flipping come first, then the crop.

@@ -10,7 +10,7 @@ import { storeFile } from "@/lib/attachments";
 import { createShare } from "@/lib/shares";
 import { __resetImageEditForTests, __setImageToolsForTests, LIBRARY_PICTURE_LOCKED } from "@/lib/imageEdit";
 import { getMediaOp, runMediaOp } from "@/lib/mediaOps/registry";
-import { PICTURES_NOT_READY_LINE } from "@/lib/mediaOps/studio";
+import { PICTURES_NOT_READY_LINE, pngBase64 } from "@/lib/mediaOps/studio";
 import { withAttachments } from "@/lib/mediaOps/http";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
@@ -307,6 +307,15 @@ describe("the Studio's reference picture and tool readiness (STUDIO-GAPS-02, STU
     expect(same.status).toBe(422);
     expect(((await same.json()) as { code: string }).code).toBe("reference_same");
     expect(other.id).not.toBe(base.id);
+  });
+
+  test("a whole-picture change arrives with its empty fields still written as {mask} and {region}: that is no painted area, not a broken one", async () => {
+    const base = await libraryPicture(sageActor);
+    const res = await studioCall(sage, "studio-comment", { file: base.id, prompt: "make it sunny", region: "{region}", mask: "{mask}", reference: "{reference}" });
+    // It gets as far as the picture engine (not set up here); it is never refused for an unreadable painted area.
+    expect(((await res.json()) as { code: string }).code).not.toBe("bad_mask");
+    expect(pngBase64("{mask}", "The painted area")).toBeNull();
+    expect(pngBase64("data:image/png;base64,AAAA", "The painted area")).toBe("AAAA");
   });
 
   test("every built-in tool has a readiness row, ready ones are enabled, and a tool the engine cannot run says why before a click", async () => {

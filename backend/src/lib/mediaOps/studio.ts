@@ -119,6 +119,8 @@ export function studioPickerRows(person: PersonRow, input: { id?: unknown }): Ar
 /** A PNG the browser drew, as a data URL, to raw base64 (the generic routes take base64 beside `args`). */
 export function pngBase64(value: unknown, what: string): string | null {
   if (value === null || value === undefined || value === "") return null;
+  // The page's call leaves `{mask}` as written when the editor had nothing painted (a null is not substituted): that is no painted area, not a mask.
+  if (typeof value === "string" && /^\{[a-z_]+\}$/.test(value)) return null;
   if (typeof value !== "string") throw new ImageEditError(422, `${what} could not be read. Try again.`, "bad_mask");
   const at = value.indexOf("base64,");
   return at >= 0 ? value.slice(at + 7) : value;

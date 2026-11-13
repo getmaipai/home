@@ -116,6 +116,16 @@
               "reference": "{reference}"
             }
           }
+        },
+        "pick_reference": {
+          "call": {
+            "target": "/api/plugins/image/actions/studio-reference",
+            "method": "POST",
+            "args": {
+              "file": "{file}",
+              "ref": "{ref}"
+            }
+          }
         }
       },
       "on_close": {
