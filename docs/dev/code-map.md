@@ -551,7 +551,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/creations/backfill.ts` | backfillCreationForFile |
 | `backend/src/lib/creations/purge.ts` | dropCreationsForFile |
 | `backend/src/lib/creations/store.ts` | FILE_ID, creationIdOfFile, creationIdOfJob, recordCreation, syncCreationMarkForFile, creationOfFile |
-| `backend/src/lib/creations/writers.ts` | generationBlock, recordPictureCreation, recordEditedPicture, recordClipCreation, recordFilmCreation, recordLongTakeCreation |
+| `backend/src/lib/creations/writers.ts` | __setWriterFaultForTests, safely, generationBlock, recordPictureCreation, recordEditedPicture, recordClipCreation |
 | `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, PROFILE_SIGNIN_LOCKOUT_THRESHOLD, checkSigninAddress, failSigninAddress, resetSigninAddress, __resetSigninAddressForTests |
 | `backend/src/lib/dashboard.ts` | getDashboard |
 | `backend/src/lib/dataClasses.ts` | DATA_CLASSES, dataClassById |
