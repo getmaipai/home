@@ -227,7 +227,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
               if (!((error as { cancelled?: boolean })?.cancelled || memoryBusy) || attempt >= maxAttempts - 1 || run.cancelled) throw error;
               if (stackJob) await cancelOrDeleteVideo(stackJob);
               run.stackJob = null; stackJob = null;
-              run.phase = "waiting"; run.label = "Waiting for memory, then trying again";
+              run.phase = "waiting"; run.label = "Waiting its turn, then trying again";
               await new Promise((resolve) => setTimeout(resolve, takeRetryWaitMs));
               if (run.cancelled) break;
               const nextSeed = Math.floor(Math.random() * 2_147_483_647);

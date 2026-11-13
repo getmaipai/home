@@ -162,3 +162,19 @@ hidden.
 A speculative run still generating holds the engine while the real turn starts after a discard (measured by the discard
 rate and the discarded run's `prompt_ms`); the edge partial can be a mid-sentence pause (the 10 s and 40-word guards and the
 discard path bound it); GPU share with TTS of the previous reply (the conversation prewarm already runs there).
+
+## The warms are bounded (CONVO-PREWARM-04, 2026-11-12)
+
+**What happened.** The chat engine keeps the state of every request it served (a warm, a bench turn, a discarded speculative run)
+until its memory budget is full, and no idle time evicts one (the resume probe above). On the live hub, 35 minutes after a restart,
+the Splash chat process held 61.2 GB, the whole budget the Stack had given it; the Stack's ledger counted 35 GB for chat, and a song
+and a clip waited for memory that was never free. Three distinct 2,627-token prompts grew the process by about 0.33 GB each. The
+post-turn warm and the warm after every fold (CONVO-PREWARM-03) ran for every conversation warmed since the hub started, up to 64,
+each leaving one more state behind.
+
+**Fix.** The Stack's side (SPLASH-MEM-01 in `stack/docs/dev.md`): the engine's budget is the model's need plus the headroom
+setting, and the ledger counts that whole budget for chat, so other jobs never plan on it. Home's side (`prefixPrewarm.ts`): the
+household keeps at most 8 conversations warm (the oldest is dropped when a newer one is warmed; a fold of a dropped conversation
+sends nothing), and a conversation is warmed again after a fold only within 30 minutes of its last warm; older ones are dropped
+and left to their next turn, which warms them again. One warm per conversation stays in flight (unchanged). Tests:
+`backend/tests/prefixPrewarm.test.ts` (the ninth conversation drops the first; a 31-minute-old warm is not repeated).

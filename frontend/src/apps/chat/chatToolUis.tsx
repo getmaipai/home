@@ -838,6 +838,6 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const byline = useSongByline(card, me ?? null);
   if (!result) return null;
   if (result.locked) return <LockTile shape="card" />;
-  if (!query.data) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that song", message: "I couldn't check on that song" })} detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title={i18n._({ id: "Your song", message: "Your song" })} waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
+  if (!query.data) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that song", message: "I couldn't check on that song" })} detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title={i18n._({ id: "Your song", message: "Your song" })} waitingForMemory copy={{ waitingForMemory: "Waiting its turn, your song starts when there is room" }} />;
   return <MusicTrack {...trackProps} {...(byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
 };

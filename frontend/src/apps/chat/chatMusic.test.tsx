@@ -54,7 +54,7 @@ describe("MusicToolRender", () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const view = mount();
     expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
-    expect(view.getByRole("status").textContent).toContain("Waiting for memory, your song starts when there is room");
+    expect(view.getByRole("status").textContent).toContain("Waiting its turn, your song starts when there is room");
     expect(view.container.textContent).toContain("Your song");
     expect(view.queryByRole("progressbar")).toBeNull();
     expect(view.container.textContent).not.toContain("25%");
@@ -70,7 +70,7 @@ describe("MusicToolRender", () => {
   test("queued shows the busy line's place in line and the title", async () => {
     card = make({ state: "queued", stage: "queued", stage_label: "Home is busy making another picture, video or song. It will start in a minute.", position: 2 });
     const view = mount();
-    await waitFor(() => expect(view.getByRole("status").textContent).toBe("Waiting for memory, your song starts when there is room. You are number 2 in line."));
+    await waitFor(() => expect(view.getByRole("status").textContent).toBe("Waiting its turn, your song starts when there is room. You are number 2 in line."));
     expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
     expect(view.container.textContent).toContain("Pancakes");
   });
@@ -105,7 +105,7 @@ describe("MusicToolRender", () => {
   test("waiting for memory keeps the calm kit status and never shows an error", async () => {
     card = make({ state: "queued", stage: "queued", stage_label: "Home is busy making another picture, video or song. It will start in a minute.", progress: 0, eta_seconds: null });
     const view = mount();
-    await waitFor(() => expect(view.getByRole("status").textContent).toBe("Waiting for memory, your song starts when there is room"));
+    await waitFor(() => expect(view.getByRole("status").textContent).toBe("Waiting its turn, your song starts when there is room"));
     expect(view.queryByRole("alert")).toBeNull();
     expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
   });

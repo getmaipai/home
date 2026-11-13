@@ -842,8 +842,8 @@ describe("household companion routes", () => {
     __setVideosFetchForTests((async (input, init) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") { videoNumber++; return Response.json({ job: `stop-retry-${videoNumber}` }, { status: 202 }); } if (url.pathname.endsWith("/stop-retry-1") && method === "GET") return Response.json({ job: "stop-retry-1", state: "cancelled", progress: 21, data: [] }); if (url.pathname.endsWith("/stop-retry-1") && method === "DELETE") return new Response(null, { status: 204 }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
     const started = await request(`companions/${stopId}/states/idle/generate`, adult, "POST", { count: 1 }); const { job } = await started.json() as { job: string };
     let progress: any;
-    for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.label === "Waiting for memory, then trying again") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
-    expect(progress.label).toBe("Waiting for memory, then trying again"); expect((await request(`companions/${stopId}/states/jobs/run/${job}`, adult, "DELETE")).status).toBe(204);
+    for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.label === "Waiting its turn, then trying again") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.label).toBe("Waiting its turn, then trying again"); expect((await request(`companions/${stopId}/states/jobs/run/${job}`, adult, "DELETE")).status).toBe(204);
     for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.state === "cancelled") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress.state).toBe("cancelled"); expect(videoNumber).toBe(1); expect(submitted).toHaveLength(4);
 
