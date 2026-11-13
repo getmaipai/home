@@ -35745,7 +35745,7 @@
         "tags": [
           "Devices"
         ],
-        "summary": "Ask a paired robot to mute or unmute its microphone",
+        "summary": "Ask a paired robot to mute, unmute, chirp, dance, run its music test or read out an announcement",
         "parameters": [
           {
             "schema": {
@@ -35768,13 +35768,30 @@
                     "enum": [
                       "mute",
                       "unmute",
-                      "find_me"
+                      "find_me",
+                      "dance",
+                      "music_test",
+                      "announce"
                     ]
                   },
                   "seconds": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 30
+                  },
+                  "fast": {
+                    "type": "boolean",
+                    "description": "music_test only: a shorter run, about 40 seconds."
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 400,
+                    "description": "announce only: what the robot says."
+                  },
+                  "urgent": {
+                    "type": "boolean",
+                    "description": "announce only: the robot says it even when it would hold a normal one back."
                   }
                 },
                 "required": [
@@ -37159,6 +37176,22 @@
                           "type": "integer",
                           "nullable": true
                         },
+                        "timers_active": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "self_restarts": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "heal_hold": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "mic_level": {
+                          "type": "integer",
+                          "nullable": true
+                        },
                         "heap": {
                           "type": "object",
                           "properties": {
@@ -37191,6 +37224,10 @@
                         "battery",
                         "boot_reason",
                         "crash_resets",
+                        "timers_active",
+                        "self_restarts",
+                        "heal_hold",
+                        "mic_level",
                         "heap"
                       ]
                     },

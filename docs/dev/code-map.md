@@ -221,7 +221,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
 | `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
-| `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
+| `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | checkinFacts, HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
@@ -230,6 +230,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
 | `frontend/src/apps/settings/PlainSection.tsx` | PlainSection |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
+| `frontend/src/apps/settings/RobotActions.tsx` | robotHasDance, RobotActions |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
 | `frontend/src/apps/settings/RobotCards.tsx` | fetchFamilyBots, familyBotsQueryKey, RobotCards |
 | `frontend/src/apps/settings/RobotCompanionChoices.tsx` | RobotCompanionChoices |
