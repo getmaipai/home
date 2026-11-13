@@ -13,7 +13,7 @@ import { appendLogLine } from "@/lib/log";
 
 /** About ten seconds of calm speech: the engine needs a sample of 6 to 30 seconds. */
 export const WHISPER_SAMPLE_TEXT = "[whispers] Come closer. Don't wake the kids. I have something to tell you, and it is a secret, so keep your voice down.";
-const RETRY_AFTER_MS = 10 * 60_000;
+const RETRY_AFTER_MS = 60_000; // short on purpose: a brand-new voice has no transcript for its first minute, and that attempt must not block the next
 
 const inFlight = new Map<string, Promise<boolean>>();
 const failedAt = new Map<string, number>();

@@ -22,3 +22,41 @@ export function isWhisperTurn(turnId: string | undefined): boolean {
 export function __resetWhisperTurnsForTests(): void {
   turns.clear();
 }
+
+const TAG = /\[\s*(?:whisper|whispers|whispering|whispered)\s*\]/i;
+const MAY_BECOME_TAG = /\[[A-Za-z ]{0,12}$/;
+
+/** WHISPER-01: the streamed reply must never show the tag, and the first sentence is spoken before the turn finishes, so the tag is noted and
+ * hidden here, as the text streams. A tag split across two chunks ("[whis" then "pering]") is held back until it is whole. */
+export function createWhisperDeltaFilter(onWhisper: () => void): { feed(text: string): string; flush(): string } {
+  let pending = "";
+  let emitted = false;
+  const clean = (text: string): string => {
+    let out = text;
+    for (;;) {
+      const m = TAG.exec(out);
+      if (!m) return out;
+      onWhisper();
+      const before = out.slice(0, m.index), after = out.slice(m.index + m[0].length);
+      // Drop the space after the tag, and the space before it when nothing has been shown yet.
+      out = (emitted || before ? before : "") + after.replace(/^ /, "");
+      if (!emitted && !before) out = out.replace(/^\s+/, "");
+    }
+  };
+  return {
+    feed(text) {
+      const joined = pending + text;
+      const held = MAY_BECOME_TAG.exec(joined);
+      pending = held ? held[0] : "";
+      const out = clean(held ? joined.slice(0, held.index) : joined);
+      if (out) emitted = true;
+      return out;
+    },
+    flush() {
+      const rest = clean(pending);
+      pending = "";
+      if (rest) emitted = true;
+      return rest;
+    },
+  };
+}

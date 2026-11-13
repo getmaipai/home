@@ -14,7 +14,7 @@ import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "
 import { clonedVoicesDir } from "@/lib/paths";
 import { __resetWhisperSamplesForTests, ensureWhisperSample, hasWhisperSample, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
 import { hasWhisperTag, stripWhisperTags } from "@/lib/voiceCues";
-import { __resetWhisperTurnsForTests, isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
+import { __resetWhisperTurnsForTests, createWhisperDeltaFilter, isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
 
 const whisperAudio = new Uint8Array(120_000);
 whisperAudio.set([82, 73, 70, 70]); // "RIFF"
@@ -122,7 +122,7 @@ describe("whisper sample", () => {
     expect(existsSync(whisperSamplePath(id))).toBe(false);
   });
 
-  test("a failed attempt is not repeated for ten minutes", async () => {
+  test("a failed attempt is not repeated for a minute", async () => {
     ready = false;
     const id = await savedVoice();
     ready = true; available = false;
@@ -136,3 +136,24 @@ describe("whisper sample", () => {
 function owner0() {
   return db.select().from(people).get();
 }
+
+describe("whisper tag in the streamed reply", () => {
+  const run = (chunks: string[]) => {
+    let noted = 0;
+    const filter = createWhisperDeltaFilter(() => { noted++; });
+    const out = chunks.map((c) => filter.feed(c)).join("") + filter.flush();
+    return { out, noted };
+  };
+  test("a whole tag is noted and never streamed", () => {
+    expect(run(["[whispering] Come closer."])).toEqual({ out: "Come closer.", noted: 1 });
+    expect(run(["Oh! [whispers] Come closer."])).toEqual({ out: "Oh! Come closer.", noted: 1 });
+  });
+  test("a tag split across chunks is held until it is whole", () => {
+    expect(run(["[whi", "spering] Come", " closer."])).toEqual({ out: "Come closer.", noted: 1 });
+    expect(run(["Hi [", "whisper", "] there"])).toEqual({ out: "Hi there", noted: 1 });
+  });
+  test("other brackets and ordinary text pass through, even when held for a moment", () => {
+    expect(run(["See [1] and ", "[link](https://example.com)"])).toEqual({ out: "See [1] and [link](https://example.com)", noted: 0 });
+    expect(run(["An unfinished [bracket"])).toEqual({ out: "An unfinished [bracket", noted: 0 });
+  });
+});

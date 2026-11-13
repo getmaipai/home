@@ -17,6 +17,7 @@ import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue, pickStillCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
+import { createWhisperDeltaFilter, markWhisperTurn } from "@/lib/whisperTurns";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safetyRefusalLine } from "@/lib/failureCopy";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
@@ -742,12 +743,15 @@ export async function* streamTurnEvents(
   // mapping): each ThinkSpan[] this converts came from either
   // feedThinkSplit() (mid-stream) or flushThinkSplit() (once, at the
   // end) - the mapping itself doesn't care which.
+  // WHISPER-01: a whisper tag is noted for the speech route and never streamed.
+  const whisperFilter = createWhisperDeltaFilter(() => markWhisperTurn(result.turnId));
   function* spanEvents(spans: readonly ThinkSpan[]): Generator<TurnStreamEvent, void, void> {
     for (const span of spans) {
       if (span.reasoning) {
         if (!dropReasoning) yield { type: "reasoning", text: span.text };
       } else {
-        yield { type: "delta", text: span.text };
+        const text = whisperFilter.feed(span.text);
+        if (text) yield { type: "delta", text };
       }
     }
   }
@@ -905,6 +909,7 @@ export async function* streamTurnEvents(
     // treats as real and expected - or the last few characters of
     // visible text that were never actually the start of a tag).
     yield* spanEvents(flushThinkSplit(thinkSplit));
+    { const rest = whisperFilter.flush(); if (rest) yield { type: "delta", text: rest }; }
     while (true) {
       yield* sideEvents();
       if (result.status.closed) break;
