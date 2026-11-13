@@ -30894,6 +30894,7 @@
                               "picturesdetailed",
                               "videos",
                               "music",
+                              "sounds",
                               "stems",
                               "voice",
                               "wakeword",
@@ -30928,6 +30929,7 @@
                                     "picturesdetailed",
                                     "videos",
                                     "music",
+                                    "sounds",
                                     "stems",
                                     "voice",
                                     "wakeword",
@@ -31050,6 +31052,41 @@
                                       "sizeBytes"
                                     ]
                                   }
+                                },
+                                "licence": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "summary": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "accepted_at": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "covered": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "url",
+                                    "summary",
+                                    "accepted_at"
+                                  ]
                                 }
                               },
                               "required": [
@@ -31074,7 +31111,8 @@
                                 "action",
                                 "setting",
                                 "chosenNotReady",
-                                "details"
+                                "details",
+                                "licence"
                               ]
                             }
                           },
@@ -31132,6 +31170,7 @@
                                   "picturesdetailed",
                                   "videos",
                                   "music",
+                                  "sounds",
                                   "stems",
                                   "voice",
                                   "wakeword",
