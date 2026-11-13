@@ -7,14 +7,17 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, settingsValues } from "@/db/schema";
 import { storeFile } from "@/lib/attachments";
-import { BEST_NEEDS_DOWNLOAD, LIBRARY_SOURCE, loadSource, saveVersion, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
+import { BEST_NEEDS_DOWNLOAD, LIBRARY_SOURCE, loadSource, pollEdit, saveVersion, startEdit, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
+import { LINES, __setLikenessDepsForTests, type LikenessDeps } from "@/lib/pictures/likeness/edit";
+import type { Face } from "@/lib/pictures/likeness/faces";
+import { jobs as jobsTable } from "@/db/schema";
 import { listMediaOps, runMediaOp } from "@/lib/mediaOps/registry";
 import { studioOperationRows } from "@/lib/mediaOps/studio";
 import { readFileSync } from "node:fs";
 import { appPackageProblems } from "@/lib/apps";
 import { editVideoArgs } from "@/lib/videos/editTool";
 import { QUICK_CLEARER, quickClearerOps } from "@/lib/videos/editPlan";
-import { videoClearerLevels } from "@/lib/videos/clearerLevels";
+import { BEST_VIDEO_NOT_YET, videoClearerLevels } from "@/lib/videos/clearerLevels";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
@@ -65,7 +68,7 @@ beforeEach(async () => {
   sageActor = db.select().from(people).where(eq(people.id, ((await made.json()) as { person: { id: string } }).person.id)).get()!;
   allowPhotos(sageActor.id);
 });
-afterEach(() => { __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __resetImageEditForTests(); });
+afterEach(() => { __setLikenessDepsForTests(null); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __resetImageEditForTests(); });
 
 describe("Make clearer in the operations table", () => {
   test("there is one tool: the old Upscale is not listed, and an old caller still runs it as Make clearer at Better", async () => {
@@ -97,7 +100,7 @@ describe("Make clearer in the operations table", () => {
     expect(off.enabled).toBe(true);
     expect(off.levels!.map((level) => [level.id, level.enabled])).toEqual([["quick", true], ["better", true], ["best", false]]);
     expect(off.levels![2]!.reason).toBe(BEST_NEEDS_DOWNLOAD);
-    expect(BEST_NEEDS_DOWNLOAD).toBe("Best is not available on this home yet.");
+    expect(BEST_NEEDS_DOWNLOAD).toBe("Best can be added in Settings, AI & models.");
     __setImageToolsForTests({ ...READY, operations: [...READY.operations, "restore"] }, true);
     expect((await listMediaOps(sageActor, { input: "picture" })).find((op) => op.id === "picture.make_clearer")!.levels!.map((level) => level.enabled)).toEqual([true, true, true]);
     // The picture Studio's rows carry the levels, so the page draws Best off with its line rather than leaving it out.
@@ -218,7 +221,7 @@ describe("Make clearer for videos", () => {
   test("Best is off with the same plain line while the Stack has no video restore", async () => {
     const levels = await videoClearerLevels(sageActor);
     expect(levels.best.enabled).toBe(false);
-    if (levels.quick.enabled) expect(levels.best.reason).toBe(BEST_NEEDS_DOWNLOAD);
+    if (levels.quick.enabled) expect(levels.best.reason).toBe(BEST_VIDEO_NOT_YET);
   });
 
   test("the chat tool's upscale takes a clarity; no other change does", () => {
@@ -245,3 +248,82 @@ describe("the pages that carry Make clearer still pass the UI schema", () => {
     expect(text).toContain("Make clearer: Better");
   });
 });
+
+// MAKE-CLEARER-2026-11-13: the Best level (the Stack's `restore`, SeedVR2 3B). It is generative, so it is an engine edit for the Adult lock and a picture with people
+// is kept only when every face still matches (the measured bar of a face edit, restoredFacesRefusal).
+describe("Make clearer, Best level", () => {
+  const BEST_READY = (): StackImageToolsStatus => ({ ...READY, operations: [...READY.operations, "restore"] });
+  const face = (w = 80): Face => ({ bbox: [60, 40, w, w], rightEye: [80, 60], leftEye: [120, 60], nose: [100, 80], rightMouth: [85, 100], leftMouth: [115, 100], score: 0.9 });
+  const faceDeps = (opts: { faces?: Face[]; assets?: boolean; embedFails?: boolean }): LikenessDeps => ({
+    ensureAssets: async () => { if (opts.assets === false) throw new Error("no models"); },
+    detect: async () => ({ ok: true, value: opts.faces ?? [face()] }),
+    embed: async () => opts.embedFails ? { ok: false, kind: "FacesUnavailable", line: "x" } : { ok: true, value: new Float32Array([1, 0]) },
+    silhouette: async () => new Uint8Array(0), head: async () => new Uint8Array(0), edit: async () => { throw new Error("not used"); }, editMasked: async () => { throw new Error("not used"); }, seed: () => 1,
+  });
+  // The source embeds as [1, 0]; the restored picture as [cos, sin], so the face match is exactly `cosine`.
+  const matched = (cosine: number, over: Parameters<typeof faceDeps>[0] = {}): LikenessDeps => {
+    let call = 0;
+    return { ...faceDeps(over), embed: async () => ({ ok: true, value: call++ % 2 === 0 ? new Float32Array([1, 0]) : new Float32Array([cosine, Math.sqrt(1 - cosine * cosine)]) }) };
+  };
+  async function startBest(bytes?: Uint8Array) {
+    const source = await libraryPicture(bytes ?? await softPicture(0));
+    const asked: FormData[] = [];
+    const restored = await softPicture(0);
+    const { __setStackClientForTests } = await import("@/lib/stackEngine");
+    __setStackClientForTests({ imageEdit: async (form: FormData) => { asked.push(form); return { kind: "job", job: "best-1" }; }, job: async () => ({ id: "best-1", state: "done", percent: 100, position: null, result: { images: [{ width: W, height: H, engine: "image-gen", model: "seedvr2-3b", ms: 6100 }] } }), imageEditResult: async () => restored, cancelJob: async () => ({}) } as never);
+    __setImageToolsForTests(BEST_READY(), true);
+    const started = await startEdit(sageActor, LIBRARY_SOURCE, source.id, { operation: "clearer", level: "best" });
+    return { source, asked, started, restore: __setStackClientForTests };
+  }
+  const row = () => db.select().from(jobsTable).all().find((r) => r.id.startsWith("image-edit:best-1"));
+
+  test("Best asks the Stack to restore without waiting, at the picture's size, and the Activity row opens and finishes", async () => {
+    const { asked, started, restore } = await startBest();
+    expect(started).toMatchObject({ state: "running", job: "best-1" });
+    expect(asked[0]!.get("operation")).toBe("restore");
+    expect(asked[0]!.get("timeout_ms")).toBe("1");
+    expect(asked[0]!.get("scale")).toBeNull();
+    expect(row()).toMatchObject({ state: "running", title: "Making a picture clearer" });
+    __setLikenessDepsForTests(faceDeps({ faces: [] }));
+    const done = await pollEdit(sageActor, "best-1");
+    expect(done.state).toBe("done");
+    expect(row()).toMatchObject({ state: "done" });
+    restore(null);
+  });
+
+  test("a face that still matches keeps the result; one that does not is kept out with one plain line that offers Better, and the row closes", async () => {
+    const kept = await startBest();
+    __setLikenessDepsForTests(matched(0.9));
+    expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
+    kept.restore(null); __resetImageEditForTests(); resetJobs();
+    const lost = await startBest();
+    __setLikenessDepsForTests(matched(0.5));
+    const result = await pollEdit(sageActor, "best-1");
+    expect(result).toMatchObject({ state: "failed", error: LINES.restoredFace, code: "faces_changed" });
+    expect(LINES.restoredFace).toContain("Better");
+    expect(row()).toMatchObject({ state: "failed" });
+    expect(lost.started.state).toBe("running");
+    lost.restore(null);
+  });
+
+  test("a face that is gone from the result, or cannot be compared, is kept out; no face or no face models leaves the ordinary path with nothing said", async () => {
+    const gone = await startBest();
+    let n = 0;
+    __setLikenessDepsForTests({ ...matched(0.95), detect: async () => ({ ok: true, value: n++ === 0 ? [face()] : [] }) });
+    expect(await pollEdit(sageActor, "best-1")).toMatchObject({ state: "failed", error: LINES.restoredFace });
+    gone.restore(null); __resetImageEditForTests(); resetJobs();
+    const cant = await startBest();
+    __setLikenessDepsForTests(faceDeps({ embedFails: true }));
+    expect(await pollEdit(sageActor, "best-1")).toMatchObject({ state: "failed", error: LINES.restoredUnchecked });
+    cant.restore(null); __resetImageEditForTests(); resetJobs();
+    const none = await startBest();
+    __setLikenessDepsForTests(faceDeps({ faces: [face(40)] }));
+    expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
+    none.restore(null); __resetImageEditForTests(); resetJobs();
+    const bare = await startBest();
+    __setLikenessDepsForTests(faceDeps({ assets: false }));
+    expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
+    bare.restore(null);
+  });
+});
+function resetJobs() { db.delete(jobsTable).run(); }

@@ -49,6 +49,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { StackError } from "@/lib/stack/errors";
 import { fetchImageToolResult, submitImageTool } from "@/lib/imaging/tools";
+import { restoredFacesRefusal } from "@/lib/pictures/likeness/edit";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
 
@@ -78,7 +79,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 
 /** MAKE-CLEARER-01: the three levels of Make clearer. Quick is local pixel work, Better the AI upscaler, Best the AI restore. */
 export type ClearerLevel = "quick" | "better" | "best";
-export const BEST_NEEDS_DOWNLOAD = "Best is not available on this home yet.";
+export const BEST_NEEDS_DOWNLOAD = "Best can be added in Settings, AI & models.";
 export interface EditToolState { enabled: boolean; reason?: string }
 export type EditToolKey = "markup" | "comment" | "clearer" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
@@ -119,7 +120,7 @@ function off(reason: string): Record<EditToolKey, EditToolState> {
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
   if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), clearer: { quick: { enabled: false, reason: PICTURES_OFF_REASON }, better: { enabled: false, reason: PICTURES_OFF_REASON }, best: { enabled: false, reason: PICTURES_OFF_REASON } }, limits: {} };
   const comment: EditToolState = await commentState(actor);
-  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment, clearer: { enabled: true }, crop: { enabled: true }, adjust: { enabled: true }, rotate: { enabled: true }, flip: { enabled: true } }, clearer: { quick: { enabled: true }, better: { enabled: false, reason: note }, best: { enabled: false, reason: BEST_NEEDS_DOWNLOAD } }, limits: {} });
+  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment, clearer: { enabled: true }, crop: { enabled: true }, adjust: { enabled: true }, rotate: { enabled: true }, flip: { enabled: true } }, clearer: { quick: { enabled: true }, better: { enabled: false, reason: note }, best: { enabled: false, reason: note } }, limits: {} });
   if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't set up on this computer yet. Ask an admin to set them up.", "unavailable");
   let status: StackImageToolsStatus | null;
   try {
@@ -378,7 +379,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 interface Preview { level?: ClearerLevel; token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
-interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
+interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; /** Make clearer: the level, so the Best result is face-checked before it is kept. */ level?: ClearerLevel; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
 const jobs = new Map<string, EditJob>();
 
 /**
@@ -414,6 +415,13 @@ export type EditProgress =
 function sweep(now = Date.now()): void {
   for (const [token, value] of previews) if (now - value.createdAt > PREVIEW_TTL_MS) previews.delete(token);
   for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) { jobs.delete(id); trackEdit(id, { state: "failed", errorKind: "expired", waitingReason: "This edit stopped waiting. Start it again." }); }
+}
+
+/** MAKE-CLEARER-2026-11-13: the Best level redraws detail, so a picture with people is kept only when every face of 60 px or more still matches (the bar of a face edit). A child's picture is a cartoon of their own and takes no face check. Throws the one plain line that says what was kept and what to try. */
+async function guardBest(actor: PersonRow, source: SourcePicture, png: Uint8Array): Promise<void> {
+  if (laneOfPerson(actor) === "child") return;
+  const refusal = await restoredFacesRefusal(source.bytes, png);
+  if (refusal) throw new ImageEditError(422, refusal, "faces_changed");
 }
 
 function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only"; level?: ClearerLevel }): PreviewInfo {
@@ -614,13 +622,15 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
         ? { kind: "done", png: new Uint8Array(Buffer.from(peopleReply.item.b64_json, "base64")), item: peopleReply.item }
         : { kind: "job", job: peopleReply.job };
     } else {
-      reply = await submitImageTool(operation, source.bytes, input, { signal, timeoutMs: EDIT_WAIT_MS, mediaType: source.mediaType });
+      reply = await submitImageTool(operation, source.bytes, input, { signal, timeoutMs: operation === "restore" ? 1 : EDIT_WAIT_MS, mediaType: source.mediaType });
     }
+    const best = input.operation === "clearer" && input.level === "best";
     if (reply.kind === "done") {
+      if (best) await guardBest(actor, source, reply.png);
       return { state: "done", preview: keepPreview(actor, source, input.operation, reply.png, reply.item) };
     }
     sweep();
-    jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now() });
+    jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now(), ...(input.operation === "clearer" && input.level ? { level: input.level } : {}) });
     openEditRow(actor, source, reply.job, input.operation, false);
     return { state: "running", job: reply.job, percent: null, label: "Working on it" };
   } catch (error) {
@@ -654,6 +664,7 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
     job.finalising = (async () => {
       const png = await fetchImageToolResult(jobId);
+      if (job.level === "best") await guardBest(actor, source, png);
       const meta = await sharp(png).metadata();
       const made = outcome?.images?.[0];
       stoppedGuard(jobId);
@@ -666,6 +677,8 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
   } catch (error) {
     if (error instanceof ImageEditError && error.code === "cancelled") return { state: "cancelled", error: error.message, code: "cancelled" };
     const mapped = editErrorFrom(error);
+    // The Best result was kept out by the face check: the job is over, so its Activity row closes with the same plain line.
+    if (mapped.code === "faces_changed") { jobs.delete(jobId); trackEdit(jobId, { state: "failed", errorKind: mapped.code, waitingReason: mapped.message }); }
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
 }
