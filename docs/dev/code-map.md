@@ -337,7 +337,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
 | `frontend/src/shell/pages/MusicComposer.tsx` | BRING_LINE, MusicComposer |
 | `frontend/src/shell/pages/MusicLibrary.tsx` | useWide, MusicLibrary |
-| `frontend/src/shell/pages/MusicLibraryColumn.tsx` | MusicLibraryColumn |
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
 | `frontend/src/shell/pages/MusicSongDetails.tsx` | useBedPicker, songReason, SongDetails |
