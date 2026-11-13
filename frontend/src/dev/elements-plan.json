@@ -5110,6 +5110,23 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "track-studio-fx.ts",
+      "name": "track-studio-fx",
+      "group": "track",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.636; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }

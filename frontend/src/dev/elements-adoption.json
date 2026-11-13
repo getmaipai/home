@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-13T14:49:31.059Z",
-  "kitTag": "ui-v0.5.635",
+  "generatedAt": "2026-11-13T14:59:02.831Z",
+  "kitTag": "ui-v0.5.636",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -2037,6 +2037,14 @@
       "group": "track",
       "verdict": "support",
       "verdictReason": "Internal part of the kit's TrackStudio (VIDEO-STUDIO-04): timeline model, engine and media loading; not a Home adoption target on its own.",
+      "implemented": false
+    },
+    {
+      "file": "track-studio-fx.ts",
+      "name": "track-studio-fx",
+      "group": "track",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.636; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
