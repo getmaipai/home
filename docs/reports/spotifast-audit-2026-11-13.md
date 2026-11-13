@@ -32,3 +32,7 @@ LRCLIB lyrics lookup, the MilkDrop preset download on first use, GitHub update c
 SF-01 queue (two tiers, drag, save as playlist); SF-02 player audio chain (EQ 10 band with presets, preamp, limiter last, 30 ms and 50 ms ramps, loudness gain); SF-03 favourites and history per person (30 s rule); SF-04 lyrics behaviour; SF-05 speed (snapshot-first, cover variants, virtualised list, pause and hidden power ladder); SF-06 analyser visualizer in the expanded player, shortcuts dialog and MediaSession; SF-07 later: library sorts and pins, gapless, MilkDrop, skins.
 
 Port priority is from `audit-c-performance.md` section 14.
+
+## 5. Rebuild-level specs (added 2026-11-13 at Jesse's request: audit fully, bring every trick, feature and UI)
+
+`spotifast-audit-attachments/spec-1-shell-browse.md` (sidebar, top bar, Home, Search, collection pages), `spec-2-playback.md` (bar, queue, lyrics, mini player, shortcuts), `spec-3-settings-rest.md` (settings, EQ, visualizers, themes, 35 tricks worth copying). Corrections to the first audit: 26 built-in EQ presets (not 23); balance and mono live in the mini player, not Settings; the limiter has no UI or setting; the preamp allows +/-12 dB. Absent in spotifast and therefore not copied: hover scrub, marquee text, like-heart animation, search-history dropdown, sticky table header, shelf arrows; Home keeps the kit's motion, hover and loading states everywhere regardless.
