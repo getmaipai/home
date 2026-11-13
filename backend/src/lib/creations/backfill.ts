@@ -17,16 +17,18 @@ export function backfillCreationForFile(actor: PersonRow, fileId: string): boole
     if (!file) return false;
     const note = libraryProvenance(file.provenance);
     const jobId = typeof note.job === "string" ? note.job : null;
+    // The pointer already in the note is the record's id: reuse it, so the note and the record agree.
+    const creationId = typeof note.creation === "string" && /^crt-[a-z0-9]{6,}$/.test(note.creation) ? note.creation : undefined;
     if (!jobId) return false;
     if (note.writer === "picture-gen") {
       const job = getPictureJob(actor, jobId);
       const made = job?.state === "done" ? job.files.find((f) => f.id === fileId) : undefined;
-      return Boolean(job && made && !job.request.edit && recordPictureCreation(actor, job, made));
+      return Boolean(job && made && !job.request.edit && recordPictureCreation(actor, job, made, creationId));
     }
     if (note.writer === "video-gen" || note.writer === "video-edit" || note.writer === "video-poster") {
       const job = getVideoJobFor(actor, jobId);
       if (!job || job.state !== "done" || !job.files.some((f) => f.id === fileId || f.poster_id === fileId)) return false;
-      return Boolean(recordClipCreation(actor, job, job.files, job.kind === "edit" || job.request.edit ? "video-edit" : "video-gen"));
+      return Boolean(recordClipCreation(actor, job, job.files, job.kind === "edit" || job.request.edit ? "video-edit" : "video-gen", creationId));
     }
     return false;
   } catch { return false; }

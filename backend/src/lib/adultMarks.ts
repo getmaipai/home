@@ -117,6 +117,9 @@ function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
   if (!/^[A-Za-z0-9_-]+$/.test(jobId)) return;
   const posters = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `video-poster:%"job":"${jobId}"%`))).all();
   for (const poster of posters) if (libraryProvenance(poster.provenance).job === jobId) apply(poster.id, poster.provenance);
+  // CREATOR-02: the clip's other files from the same job (its 5.1 sibling) take the same mark, so the creation record that holds them follows.
+  const siblings = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `video-%"job":"${jobId}"%`))).all();
+  for (const sibling of siblings) { const meta = libraryProvenance(sibling.provenance); if (meta.job === jobId && sibling.id !== row.id && meta.writer !== "video-poster" && LOCKED_WRITERS.includes(meta.writer ?? "")) apply(sibling.id, sibling.provenance); }
 }
 
 /**

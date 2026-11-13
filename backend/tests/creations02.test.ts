@@ -13,6 +13,7 @@ import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
 import { attachments, conversationTurns, creationCast, creations } from "@/db/schema";
+import { createMediaSubject } from "@/lib/mediaSubjects";
 import { purgeFileRecord } from "@/lib/attachments";
 import { __resetAdultLockForTests, __unlockedForTests, withMark } from "@/lib/adultLock";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
@@ -101,9 +102,10 @@ describe("CREATOR-02 writing", () => {
   test("the cast index is written with the record, and rebuilds from the records", async () => {
     const h = await household(); const actor = h.row("Marlow");
     const picture = await makePicture(actor, "all-ages", "boat");
-    const record = recordCreation(actor, { kind: "picture", fileIds: [picture.id], recipe: { tool: "pictures", route: "text" }, cast: [{ subject_id: "msub-aaaaaaaaaa", synth_id: "nova", role: "lead" }, { subject_id: "not-a-subject", role: "x" }] })!;
+    const subject = createMediaSubject(actor, { name: "Mop", kind: "character", look: "a small grey mop", referenceIds: [], real: false } as never);
+    const record = recordCreation(actor, { kind: "picture", fileIds: [picture.id], recipe: { tool: "pictures", route: "text" }, cast: [{ subject_id: subject.id, synth_id: "nova", role: "lead" }, { subject_id: "not-a-subject", role: "x" }] })!;
     expect(record.cast).toHaveLength(1);
-    expect(db.select().from(creationCast).all()).toEqual([{ creationId: record.id, subjectId: "msub-aaaaaaaaaa", synthId: "nova" }]);
+    expect(db.select().from(creationCast).all()).toEqual([{ creationId: record.id, subjectId: subject.id, synthId: "nova" }]);
     db.delete(creationCast).run();
     expect(rebuildCreationCast()).toBe(1);
     expect(db.select().from(creationCast).all()).toHaveLength(1);

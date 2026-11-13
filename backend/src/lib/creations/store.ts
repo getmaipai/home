@@ -11,7 +11,7 @@
 // - Purge: a record goes with its main file (`dropCreationsForFile`, called from `purgeFileRecord`).
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, creationCast, creations } from "@/db/schema";
+import { attachments, creationCast, creations, mediaSubjects } from "@/db/schema";
 import { canReadFileAudience } from "@/lib/access";
 import { fileLockState, lockItemOfProvenance, lockState, newItemMark, requestProof, type AdultProof, type ItemMark, type MarkSource } from "@/lib/adultLock";
 import { nextHlc } from "@/lib/hlc";
@@ -203,6 +203,8 @@ export function readCreationByFile(actor: PersonRow, fileId: string, proof: Adul
   if (!canReadFileAudience(actor, { ownerPersonId: file.owner, provenance: file.provenance })) return { state: "none" };
   let row = rowOfFile(actor.id, fileId);
   if (!row) {
+    // The back-fill runs only when the reader would get the record: a hidden or locked item (a minor, an adult without the unlock) is never rebuilt, and answers like a file with no record.
+    if (fileLockState(actor, fileId, proof) !== "open") return { state: "none" };
     backfill?.(actor, fileId);
     row = rowOfFile(actor.id, fileId);
   }
@@ -229,7 +231,8 @@ export function rebuildCreationCast(): number {
   const rows = db.select({ id: creations.id, body: creations.body }).from(creations).all();
   db.transaction(() => {
     db.delete(creationCast).run();
-    for (const row of rows) writeCast(row.id, (JSON.parse(row.body) as Creation).cast);
+    const known = new Set(db.select({ id: mediaSubjects.id }).from(mediaSubjects).all().map((r) => r.id));
+    for (const row of rows) writeCast(row.id, (JSON.parse(row.body) as Creation).cast.filter((member) => known.has(member.subject_id)));
   });
   return rows.length;
 }

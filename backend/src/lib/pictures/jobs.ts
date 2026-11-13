@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { attachments, conversationTurns, people } from "@/db/schema";
 import { createAttachment, purgeFileRecord, removeFileBlobs, storeFile, storeTemporaryChatImage } from "@/lib/attachments";
 import { newCreationId, newFileId, newPictureJobId } from "@/lib/id";
-import { recordPictureCreation } from "@/lib/creations/writers";
+import { recordPictureCreation, safely } from "@/lib/creations/writers";
 import { loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
@@ -360,7 +360,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   queuedPictureSubmits.delete(job.id);
   savePictureJob(job);
   // CREATOR-02: the record of how each stored picture was made, written only now that the job has finished (never for a temporary chat, which stores no file).
-  for (const file of files) { const creationId = creationIds.get(file.id); if (creationId) recordPictureCreation(actor, job, file, creationId); }
+  for (const file of files) { const creationId = creationIds.get(file.id); if (creationId) safely(() => recordPictureCreation(actor, job, file, creationId)); }
   const callback = generatedPictureCallbacks.get(job.id);
   generatedPictureCallbacks.delete(job.id);
   if (callback) for (const file of files) void callback(file.id).catch(() => undefined);

@@ -6,6 +6,15 @@ import type { PictureJob } from "@/lib/pictures/jobStore";
 import type { VideoJob, VideoFile } from "@/lib/videos/jobs";
 import type { PersonRow } from "@/types";
 
+let fault: (() => void) | null = null;
+/** Test-only: make every builder throw, to prove a failing record writer never breaks a job. */
+export function __setWriterFaultForTests(fn: (() => void) | null): void { fault = fn; }
+
+/** Run a record writer at a job's call site: whatever it throws, the job goes on (its callbacks, notice and shot clip still run). Logs the kind of failure only, never the words. */
+export function safely(write: () => unknown): void {
+  try { write(); } catch (error) { console.error(`[creations] a record was not written (${error instanceof Error ? error.name : "error"})`); }
+}
+
 type Generation = NonNullable<Creation["generation"]>;
 const MAX_WORDS = 20000;
 const words = (written: string | undefined, composed: string | undefined): CreationInput["words"] => {
@@ -33,6 +42,7 @@ const sizeOf = (size: string): { width?: number; height?: number } => {
 
 /** A picture a picture job stored (a new picture or a variation; an edit goes through `recordEditedPicture`). */
 export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: { id: string; width: number; height: number; seed: number | null; model: string | null }, creationId?: string): Creation | null {
+  fault?.();
   const source = job.request.source_file_id;
   return recordCreation(actor, {
     ...(creationId ? { id: creationId } : {}),
@@ -50,6 +60,7 @@ export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: {
 
 /** A Picture Studio save or a described edit: the next version of a picture, linked to its source. */
 export function recordEditedPicture(actor: PersonRow, input: { fileId: string; sourceId: string; width: number; height: number; op: string; label: string; model?: string; ms?: number; creationId?: string; jobId?: string; words?: string }): Creation | null {
+  fault?.();
   return recordCreation(actor, {
     ...(input.creationId ? { id: input.creationId } : {}),
     kind: "picture", fileIds: [input.fileId], jobIds: input.jobId ? [input.jobId] : [],
@@ -76,6 +87,7 @@ function sourcesOfVideo(job: VideoJob): NonNullable<CreationInput["sources"]> {
 
 /** A clip a video job stored: the clip, its poster and its 5.1 sibling are one creation. `writer` is the file writer that stored the clip. */
 export function recordClipCreation(actor: PersonRow, job: VideoJob, files: VideoFile[], writer: "video-gen" | "video-edit", creationId?: string): Creation | null {
+  fault?.();
   const clip = files[0];
   if (!clip) return null;
   const recipe = job.request.reference;
@@ -104,6 +116,7 @@ export function recordClipCreation(actor: PersonRow, job: VideoJob, files: Video
 
 /** A finished film (its cut): the plan, the cast, the clips it was cut from. If the cut is already a creation (the edit job that assembled it wrote one), that record becomes the film. */
 export function recordFilmCreation(actor: PersonRow, input: { cutFileId: string; productionId: string; runId: string; plan: { shots: Array<Record<string, unknown>>; title?: string }; castSubjects: Array<{ subject_id: string; role: string }>; clipFileIds: string[]; faceless: boolean }): Creation | null {
+  fault?.();
   return recordCreation(actor, {
     kind: "film", fileIds: [input.cutFileId], jobIds: [`film-run:${input.runId}`],
     productionId: input.productionId,
@@ -117,6 +130,7 @@ export function recordFilmCreation(actor: PersonRow, input: { cutFileId: string;
 
 /** A long take: the joined clip of a production's parts. */
 export function recordLongTakeCreation(actor: PersonRow, input: { fileId: string; productionId: string; partFileIds: string[]; seconds: number | null; prompt: string }): Creation | null {
+  fault?.();
   return recordCreation(actor, {
     kind: "video", fileIds: [input.fileId], productionId: input.productionId,
     recipe: { tool: "long-take", route: "other" },

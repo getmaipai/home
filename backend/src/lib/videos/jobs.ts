@@ -9,7 +9,7 @@ import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile, purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
 import { notifyClipReady } from "./clipNotice";
 import { newCreationId, newFileId, newVideoJobId } from "@/lib/id";
-import { recordClipCreation } from "@/lib/creations/writers";
+import { recordClipCreation, safely } from "@/lib/creations/writers";
 import { nextHlc } from "@/lib/hlc";
 import { setShotClip } from "@/lib/mediaProductions";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
@@ -733,7 +733,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.error = null;
   saveVideoJob(job);
   // CREATOR-02: the record of how this clip was made, written only now that the job has finished (a temporary chat stores no file, so it keeps no record).
-  if (!job.temporary) recordClipCreation(actor, job, job.files, writer, creationId);
+  if (!job.temporary) safely(() => recordClipCreation(actor, job, job.files, writer, creationId));
   void notifyClipReady(job, actor);
   if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
 }

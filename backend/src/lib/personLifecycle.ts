@@ -309,6 +309,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM podcast_show_rates WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM creation_cast WHERE creation_id IN (SELECT id FROM creations WHERE person_id = ?)").run(personId);
   sqlite.query("DELETE FROM creations WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM creation_cast WHERE subject_id IN (SELECT id FROM media_subjects WHERE owner_person_id = ?)").run(personId);
   sqlite.query("DELETE FROM media_subjects WHERE owner_person_id = ?").run(personId);
   const subjectShares = sqlite.query("SELECT id, shared_with FROM media_subjects WHERE EXISTS (SELECT 1 FROM json_each(media_subjects.shared_with) WHERE value = ?)").all(personId) as Array<{ id: string; shared_with: string }>;
   for (const subject of subjectShares) {

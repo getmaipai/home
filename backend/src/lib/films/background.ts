@@ -1,5 +1,5 @@
 import type { PersonRow } from "@/types";
-import { recordFilmCreation } from "@/lib/creations/writers";
+import { recordFilmCreation, safely } from "@/lib/creations/writers";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { createMediaProduction } from "@/lib/mediaProductions";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
@@ -63,7 +63,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       if(!fileId) throw new Error("The finished film is unavailable. Press Resume to try again.");
       updateFilmRun(actor,run.id,{state:"done",stage:"Assemble",done_steps:latest.total_steps,film_file_id:fileId,note:engines.note ?? null,error_line:null});
       // CREATOR-02: the record of how this film was made (its plan, its cast, the clips it was cut from); the cut may already hold the record of the edit job that assembled it, which becomes the film.
-      if(prod) recordFilmCreation(actor,{cutFileId:fileId,productionId:prod.id,runId:run.id,plan:{shots:plan.shots as unknown as Array<Record<string,unknown>>,title:plan.title},castSubjects:prod.cast.map(m=>({subject_id:m.subject_id,role:m.role})),clipFileIds:prod.episodes.flatMap(e=>e.scenes.flatMap(sc=>sc.shots)).map(s=>s.clip_file_id).filter((id):id is string=>!!id),faceless:current.faceless});
+      if(prod) safely(()=>recordFilmCreation(actor,{cutFileId:fileId,productionId:prod.id,runId:run.id,plan:{shots:plan.shots as unknown as Array<Record<string,unknown>>,title:plan.title},castSubjects:prod.cast.map(m=>({subject_id:m.subject_id,role:m.role})),clipFileIds:prod.episodes.flatMap(e=>e.scenes.flatMap(sc=>sc.shots)).map(s=>s.clip_file_id).filter((id):id is string=>!!id),faceless:current.faceless}));
     } catch(error) {
       console.error("[film] run failed", run.id, error);
       if(controller.signal.aborted) return;

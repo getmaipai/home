@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { attachments, mediaSubjects, mediaProductions, people } from "@/db/schema";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -49,7 +49,7 @@ export function deleteMediaSubject(actor: PersonRow, id: string): boolean {
     return cast.some((c) => c.subject_id === id || c.wardrobe_variant_ids?.includes(id)) || sets.includes(id) || props.includes(id) || episodes.some((e) => e.scenes.some((s) => s.shots.some((shot) => shot.subject_ids.includes(id))));
   }).map((p) => p.title);
   if (names.length) throw new Error(`This subject is used in ${names.join(", ")}. Remove it from those productions first.`);
-  db.delete(mediaSubjects).where(eq(mediaSubjects.id, id)).run(); return true;
+  db.delete(mediaSubjects).where(eq(mediaSubjects.id, id)).run(); sqlite.query("DELETE FROM creation_cast WHERE subject_id = ?").run(id); return true; // CREATOR-02: the cast index forgets a deleted subject
 }
 export function shareMediaSubject(actor: PersonRow, id: string, personId: string, shared: boolean): MediaSubject | null {
   const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return null;
