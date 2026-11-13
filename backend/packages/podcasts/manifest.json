@@ -68,8 +68,8 @@
       },
       {
         "id": "new-show",
-        "label": "New show",
-        "icon": "mic",
+        "label": "Add a show",
+        "icon": "plus",
         "nav": false,
         "kind": "schema",
         "module": "new-show"
@@ -130,7 +130,7 @@
       {
         "id": "saved",
         "label": "Saved",
-        "icon": "hard-drive",
+        "icon": "bookmark",
         "nav": true,
         "kind": "schema",
         "module": "saved"
@@ -150,6 +150,108 @@
         "nav": false,
         "kind": "schema",
         "module": "episode"
+      },
+      {
+        "id": "new-episodes",
+        "label": "New episodes",
+        "icon": "sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "new-episodes"
+      },
+      {
+        "id": "categories",
+        "label": "Categories",
+        "icon": "compass",
+        "nav": false,
+        "kind": "schema",
+        "module": "categories"
+      },
+      {
+        "id": "trending",
+        "label": "Trending",
+        "icon": "star",
+        "nav": false,
+        "kind": "schema",
+        "module": "trending"
+      },
+      {
+        "id": "recommended",
+        "label": "Recommended",
+        "icon": "wand-sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "recommended"
+      },
+      {
+        "id": "downloads",
+        "label": "Downloads",
+        "icon": "download",
+        "nav": false,
+        "kind": "schema",
+        "module": "downloads"
+      },
+      {
+        "id": "history",
+        "label": "History",
+        "icon": "history",
+        "nav": false,
+        "kind": "schema",
+        "module": "history"
+      },
+      {
+        "id": "make-podcast",
+        "label": "Make a podcast",
+        "icon": "wand-sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "make-podcast",
+        "min_role": "adult"
+      },
+      {
+        "id": "record",
+        "label": "Record an episode",
+        "icon": "audio-waveform",
+        "nav": false,
+        "kind": "schema",
+        "module": "record",
+        "min_role": "adult"
+      },
+      {
+        "id": "podcast-voices",
+        "label": "Voices",
+        "icon": "user-round",
+        "nav": false,
+        "kind": "schema",
+        "module": "podcast-voices",
+        "min_role": "adult"
+      },
+      {
+        "id": "chapters",
+        "label": "Chapters",
+        "icon": "list-video",
+        "nav": false,
+        "kind": "schema",
+        "module": "chapters",
+        "min_role": "adult"
+      },
+      {
+        "id": "transcripts",
+        "label": "Transcripts",
+        "icon": "file-text",
+        "nav": false,
+        "kind": "schema",
+        "module": "transcripts",
+        "min_role": "adult"
+      },
+      {
+        "id": "cover-art",
+        "label": "Cover art",
+        "icon": "image",
+        "nav": false,
+        "kind": "schema",
+        "module": "cover-art",
+        "min_role": "adult"
       }
     ],
     "sidebar": {
@@ -169,15 +271,64 @@
       },
       "groups": [
         {
-          "id": "listen",
+          "id": "play",
+          "mode": "play",
           "pages": [
             "index",
+            "new-episodes",
+            "queue"
+          ]
+        },
+        {
+          "id": "play-discover",
+          "mode": "play",
+          "title": "Discover",
+          "pages": [
+            "categories",
+            "trending",
+            "recommended"
+          ]
+        },
+        {
+          "id": "play-library",
+          "mode": "play",
+          "title": "Library",
+          "pages": [
             "shows",
             "episodes",
-            "queue",
             "saved",
+            "downloads",
+            "history"
+          ]
+        },
+        {
+          "id": "play-tools",
+          "mode": "play",
+          "title": "Tools",
+          "pages": [
             "filters",
             "stats"
+          ]
+        },
+        {
+          "id": "create-make",
+          "mode": "create",
+          "title": "Make",
+          "pages": [
+            "new-show",
+            "make-podcast",
+            "record",
+            "podcast-voices"
+          ]
+        },
+        {
+          "id": "create-edit",
+          "mode": "create",
+          "title": "Edit",
+          "pages": [
+            "chapters",
+            "transcripts",
+            "cover-art"
           ]
         }
       ]
@@ -185,7 +336,21 @@
     "header": {
       "search": {
         "label": "Search Podcasts"
-      }
+      },
+      "modes": [
+        {
+          "id": "play",
+          "label": "Browse",
+          "icon": "headphones",
+          "page": "index"
+        },
+        {
+          "id": "create",
+          "label": "Create",
+          "icon": "sparkles",
+          "page": "make-podcast"
+        }
+      ]
     },
     "data": [
       {

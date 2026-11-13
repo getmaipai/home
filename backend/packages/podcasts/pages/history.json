@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-history",
+  "title": "History",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "history",
+      "text": "Episodes you listened to lately will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/episodes"
+        }
+      },
+      "action_label": "Open Episodes"
+    }
+  ]
+}

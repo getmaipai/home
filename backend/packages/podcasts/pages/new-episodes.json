@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-new-episodes",
+  "title": "New episodes",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "New episodes from the shows you follow will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/episodes"
+        }
+      },
+      "action_label": "Open Episodes"
+    }
+  ]
+}

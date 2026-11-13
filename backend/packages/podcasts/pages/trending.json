@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-trending",
+  "title": "Trending",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "star",
+      "text": "What other homes are listening to is not shared, so this will show what is popular in your own library. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

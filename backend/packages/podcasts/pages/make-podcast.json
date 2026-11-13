@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-make-podcast",
+  "title": "Make a podcast",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "wand-sparkles",
+      "text": "Make your own show from an idea here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

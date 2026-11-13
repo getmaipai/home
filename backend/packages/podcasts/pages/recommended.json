@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-recommended",
+  "title": "Recommended",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "wand-sparkles",
+      "text": "Shows picked from what you listen to will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

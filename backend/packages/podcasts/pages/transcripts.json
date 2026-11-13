@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-transcripts",
+  "title": "Transcripts",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "file-text",
+      "text": "Read and fix the words of an episode here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

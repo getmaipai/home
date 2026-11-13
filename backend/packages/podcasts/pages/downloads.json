@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-downloads",
+  "title": "Downloads",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "download",
+      "text": "Episodes saved on the hub for offline listening will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/saved"
+        }
+      },
+      "action_label": "Open Saved"
+    }
+  ]
+}

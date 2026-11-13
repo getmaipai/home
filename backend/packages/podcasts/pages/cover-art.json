@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-cover-art",
+  "title": "Cover art",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "image",
+      "text": "Make cover pictures for your shows here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

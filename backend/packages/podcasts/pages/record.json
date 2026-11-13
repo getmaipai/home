@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-record",
+  "title": "Record an episode",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "audio-waveform",
+      "text": "Record an episode with your own voice here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

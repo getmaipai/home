@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-chapters",
+  "title": "Chapters",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "list-video",
+      "text": "Add and fix chapters on your episodes here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

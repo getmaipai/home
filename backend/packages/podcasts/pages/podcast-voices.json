@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "podcasts-podcast-voices",
+  "title": "Voices",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "user-round",
+      "text": "Pick the voices for your shows here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/podcasts/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}
