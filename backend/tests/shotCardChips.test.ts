@@ -15,13 +15,17 @@ describe("Video shot card chips", () => {
     const page = getAppPage(row, "video", "create");
     expect(page.ok).toBe(true);
     if (!page.ok) return;
-    const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; label: string; options: Array<{ value: string; label: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
-    const expected = { framing: 9, camera: 7, lens: 4, light: 9, film_stock: 6, look: 8, grade: 7 };
+    const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; label: string; group: string; icon: string; options: Array<{ value: string; label: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
+    const expected = { framing: ["Framing", 9], camera: ["Camera", 7], lens: ["Lens", 4], light: ["Light", 9], film_stock: ["Film", 6], look: ["Look", 8], grade: ["Grade", 7] } as const;
     for (const [group, count] of Object.entries(expected)) {
       const chip = bar.chips!.find((item) => item.state === `card_${group}`)!;
+      expect(chip.label).toBe(count[0]);
+      expect(chip.group).toBe("Shot");
+      expect(chip.icon).toBe("camera");
       expect(chip.options[0]).toEqual({ value: "none", label: "None" });
-      expect(chip.options.slice(1)).toHaveLength(count);
+      expect(chip.options.slice(1)).toHaveLength(count[1]);
     }
+    expect(bar.chips!.filter((item) => item.state.startsWith("card_")).length).toBe(Object.keys(expected).length);
   });
 
   test("Video hint displays settings and fills generate_video prompt in shot-card order", async () => {

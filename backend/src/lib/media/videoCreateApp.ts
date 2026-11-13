@@ -138,10 +138,10 @@ registerAppPageFill("video", "create", (person, page) => {
 
 /** CREATOR-20b: the Video composer reads the all-ages shot-card vocabulary from the fragment catalog. */
 function shotCardChips(person: PersonRow): Array<Record<string, unknown>> {
-  const groups = [["framing", "Framing"], ["camera", "Camera"], ["lens", "Lens"], ["light", "Light"], ["film_stock", "Film stock"], ["look", "Look"], ["grade", "Grade"]] as const;
+  const groups = [["framing", "Framing"], ["camera", "Camera"], ["lens", "Lens"], ["light", "Light"], ["film_stock", "Film"], ["look", "Look"], ["grade", "Grade"]] as const;
   return groups.flatMap(([group, label]) => {
     const rows = listFragments({ actor: person, group });
-    return rows.length ? [{ state: `card_${group}`, label, group: "Shot card", presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "None" }, ...rows.map((row) => ({ value: row.id, label: row.title }))] }] : [];
+    return rows.length ? [{ state: `card_${group}`, label, group: "Shot", icon: "camera", presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "None" }, ...rows.map((row) => ({ value: row.id, label: row.title }))] }] : [];
   });
 }
 
