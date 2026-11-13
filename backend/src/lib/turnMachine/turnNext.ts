@@ -57,6 +57,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import { isWrittenAdultTurn, surfaceClassOf } from "@/lib/surfaceClass";
 import { languageLineFor } from "@/lib/turnMachine/languageLine";
+import { whisperLineFor } from "@/lib/turnMachine/whisperLine";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
@@ -732,7 +733,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     persona,
     answerVia,
     topicBlock: topicBlockForTurn(actor, band),
-    languageLine: isWrittenAdultTurn(surfaceClass, band) ? languageLineFor(resolveLocale(actor), surfaceClass, band) : "",
+    languageLine: [isWrittenAdultTurn(surfaceClass, band) ? languageLineFor(resolveLocale(actor), surfaceClass, band) : "", whisperLineFor(surfaceClass, band)].filter(Boolean).join("\n\n"),
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
