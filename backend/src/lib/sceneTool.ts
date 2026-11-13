@@ -1,16 +1,9 @@
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import type { FusedScene } from "@/lib/scene";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { turnAgeBand } from "@/lib/turnMachine/speaker";
-import { loadManifestOnly } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
 
 export const SCENE_TOOL_ID = "scene";
-export const SCENE_TOOL_SPEC = (() => {
-  const loaded = loadManifestOnly(SCENE_TOOL_ID);
-  if (!loaded.ok) throw new Error("Bundled scene manifest is unavailable");
-  return { id: SCENE_TOOL_ID, description: loaded.value.description, args: loaded.value.args };
-})();
 
 export function sceneToolStreamArgs(args: Record<string, unknown>): { action: unknown } {
   return { action: args.action };
@@ -39,8 +32,7 @@ export function sceneObservations(args: Record<string, unknown>, actor: PersonRo
     if (!id || !protectedIds.has(id)) observations.push({ ...base, kind: "person_here", value: { person_id: id, label: resolvedLabel ?? null, relation, band: matched ? speakerAgeBand(matched, new Date(now)) : "unknown", level: "tentative" } });
   } else if (action === "left") {
     if (!matched && (!label || label.toLocaleLowerCase() === "unknown")) return { observations, line: "I need a person's name to mark them as gone." };
-    if (!matched || (label && !roster.some((p) => p.displayName.toLocaleLowerCase() === label.toLocaleLowerCase()))) return { observations, line: "I couldn't match that person to the household." };
-    if (actorBand !== "adult" && speakerAgeBand(matched, new Date(now)) === "adult") return { observations, line: "I can't mark a household adult as gone." };
+    if (matched && actorBand !== "adult" && speakerAgeBand(matched, new Date(now)) === "adult") return { observations, line: "I can't mark a household adult as gone." };
     if (matched && protectedIds.has(matched.id)) return { observations, line: "I won't mark the speaker or acting account as gone." };
     const sensed = scene?.people.find((p) => (matched ? p.person_id === matched.id : resolvedLabel && p.label?.toLocaleLowerCase() === resolvedLabel.toLocaleLowerCase()) && p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in"));
     if (sensed) return { observations, line: "Someone is still seen by the camera." };

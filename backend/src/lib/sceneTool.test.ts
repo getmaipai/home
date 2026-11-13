@@ -36,12 +36,15 @@ describe("SCENE-01c tool", () => {
 
   test("left with no target, unknown, or an unmatched label removes nothing", () => {
     const lookScene = fuseScene(sceneForTests({ conversation_id: "look" }), [{ id: "look", source: { surface: "robot", device_id: null, sensor: "look" }, kind: "people_count", value: 2, confidence: 1, strength: "strong", at: 100, expires_at: 90_100 }], 100);
-    for (const args of [{ action: "left" }, { action: "left", label: "unknown" }, { action: "left", label: "Nobody" }]) {
+    for (const args of [{ action: "left" }, { action: "left", label: "unknown" }]) {
       const result = sceneObservations(args, owner, "look", null, 101, [owner, adult], lookScene);
       expect(result.observations).toHaveLength(0);
       expect(result.line).toBeTruthy();
       expect(fuseScene(lookScene, result.observations, 101).people).toHaveLength(2);
     }
+    // A label that matches no typed entry changes nothing: the camera-counted people stay.
+    const nobody = sceneObservations({ action: "left", label: "Nobody" }, owner, "look", null, 101, [owner, adult], lookScene);
+    expect(fuseScene(lookScene, nobody.observations, 101).people).toHaveLength(2);
   });
 
   test("robot age band blocks an unknown speaker but allows a confirmed adult speaker", () => {
@@ -82,5 +85,18 @@ describe("SCENE-01c tool", () => {
       expect(value).not.toContain(id);
     }
     expect(event.args).toEqual({ action: "place" });
+  });
+});
+
+describe("SCENE-01c typed guest and pet leaving", () => {
+  test("left removes a typed guest, and refuses a sensor-seen one", () => {
+    const typed = sceneObservations({ action: "arrived", label: "Juniper", relation: "guest" }, owner, "g", null, 100, [owner, adult]).observations;
+    const withGuest = fuseScene(sceneForTests({ conversation_id: "g" }), typed, 100);
+    expect(withGuest.people.some((p) => p.label === "Juniper")).toBe(true);
+    const left = sceneObservations({ action: "left", label: "Juniper" }, owner, "g", null, 101, [owner, adult], withGuest);
+    expect(fuseScene(withGuest, left.observations, 101).people.some((p) => p.label === "Juniper")).toBe(false);
+    const seen = fuseScene(withGuest, [{ id: "f", source: { surface: "robot", device_id: null, sensor: "face" }, kind: "person_here", value: { person_id: null, label: "Juniper", relation: "guest", band: "unknown", level: "confirmed" }, confidence: 0.9, strength: "strong", at: 102, expires_at: 102 + 90_000 }], 102);
+    const refused = sceneObservations({ action: "left", label: "Juniper" }, owner, "g", null, 103, [owner, adult], seen);
+    expect(refused.observations).toHaveLength(0);
   });
 });
