@@ -8,6 +8,9 @@ interface KnownMusicModel { revision: string; licence: string; commercial_use: "
 /** Keyed by the Stack's pin id (the `model` of a job result). Revisions are the Stack's pins (design note section 3). */
 export const KNOWN_MUSIC_MODELS: Record<string, KnownMusicModel> = {
   "ace-step-1-5-turbo": { revision: "19671f406d603126926c1b7e2adc169acbcade22", licence: "MIT", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
+  // The Boost and Max DiTs the Stack pins (stack modelCatalog.ts): community bf16 conversions of ACE-Step 1.5 XL, Apache-2.0, same training-data statement.
+  "ace-step-1-5-xl-turbo-bf16": { revision: "2d5092dee202829616bea161c10d095d587bff42", licence: "Apache-2.0", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
+  "ace-step-1-5-xl-sft-bf16": { revision: "982a1af323046af40d1da43cde2c307000bed75b", licence: "Apache-2.0", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
   "ace-step-1-5-lm-0-6b": { revision: "148d8ea0225bdab342ee1ae3a354275ccd60ca80", licence: "MIT", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
 };
 /** Tasks that run no model: the result inherits its parent's model fields and clearance. */

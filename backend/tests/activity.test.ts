@@ -41,6 +41,19 @@ describe("ACTIVITY-PAGE-01: the list", () => {
     expect(byId.get("song:s1")).toMatchObject({ state: "making", title: "Rainy porch song", percent: 30, href: "/apps/audio/create?song=s1" });
   });
 
+  test("MUSIC-PORT-01: a sound, a cover and a stem split are their own rows, named for what they are", async () => {
+    const { ownerRow } = await household();
+    song("snd", ownerRow.id, { request: JSON.stringify({ description: "rain on a tin roof", sound: { loop: false, surprise: false } }) });
+    song("cov", ownerRow.id, { task: "cover" });
+    song("stm", ownerRow.id, { task: "stems" });
+    song("trm", ownerRow.id, { task: "trim" });
+    const byId = new Map(activityForViewer(ownerRow).items.map((item) => [item.id, item]));
+    expect(byId.get("song:snd")).toMatchObject({ state: "making", title: "rain on a tin roof", line: "Singing the verse" });
+    expect(byId.get("song:cov")?.state).toBe("making");
+    expect(byId.get("song:stm")?.state).toBe("making");
+    expect(byId.has("song:trm")).toBe(false);
+  });
+
   test("never lists another person's job, an admin's included", async () => {
     const { ownerRow, childRow } = await household();
     picture("kid-pic", childRow.id);

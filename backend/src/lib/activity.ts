@@ -134,20 +134,22 @@ function videoItems(actor: PersonRow): ActivityItem[] {
 
 function songItems(actor: PersonRow): ActivityItem[] {
   const audience = audienceOf(actor);
-  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), inArray(musicJobs.task, ["text2music"]))).orderBy(desc(musicJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
+  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), inArray(musicJobs.task, ["text2music", "cover", "repaint", "extend", "remake", "variation", "stems"]))).orderBy(desc(musicJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
   const out: ActivityItem[] = [];
   for (const row of rows) {
     if (row.state === "cancelled" || !recent(row.updatedAt)) continue;
     const job = getMusicJobFor(actor, row.id);
     if (job && musicJobLockState(job, actor) !== "open") continue;
     if (row.fileId && !fileIsOpenFor(actor, row.fileId)) continue;
-    let request: { title?: string; description?: string } = {};
+    let request: { title?: string; description?: string; sound?: unknown } = {};
     try { request = JSON.parse(row.request) as typeof request; } catch { request = {}; }
-    const title = titleFor(actor, "song", request.title ?? request.description ?? "", "A song");
+    // A sound is a text2music job with `request.sound`; an edit or stem split is its own row. Each says what it is (MUSIC-PORT-01 MP-01).
+    const noun = request.sound ? "sound" : row.task === "stems" ? "stems" : row.task === "text2music" ? "song" : "song edit";
+    const title = titleFor(actor, "song", request.title ?? request.description ?? "", noun === "sound" ? "A sound" : noun === "stems" ? "Song stems" : noun === "song edit" ? "A song edit" : "A song");
     const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/audio/create?song=${encodeURIComponent(row.id)}` };
     if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
-    else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? "Making your song.", percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
-    else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? "The song did not finish. Open it to try again.", percent: null, typicalMinutes: null });
+    else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? `Making your ${noun}.`, percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
+    else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? `The ${noun} did not finish. Open it to try again.`, percent: null, typicalMinutes: null });
     else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
   }
   return out;

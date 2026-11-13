@@ -53,6 +53,8 @@ describe("provenance comes from the Stack's job result", () => {
       expect(noteOf(job)).toMatchObject({ model: { licence: "unknown", revision: "unknown" }, commercial_use: "unknown" });
       expect(commercialUseOf(job.fileId!)).toBe("unknown");
     }
+    expect(modelStampFor("text2music", "ace-step-1-5-xl-turbo-bf16", null)).toMatchObject({ commercial_use: "cleared", model: { id: "ace-step-1-5-xl-turbo-bf16", licence: "Apache-2.0" } });
+    expect(modelStampFor("text2music", "ace-step-1-5-xl-sft-bf16", null).commercial_use).toBe("cleared");
     expect(modelStampFor("trim", "none", null).commercial_use).toBe("unknown");
     expect(modelStampFor("text2music", "__proto__", null).commercial_use).toBe("unknown");
   });
