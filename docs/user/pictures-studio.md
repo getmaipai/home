@@ -35,7 +35,7 @@ Each tool shows a preview first. Press **Apply** to keep it as a new version, or
 - **Compare.** Press **Compare** to slide between an earlier picture of the same shape and the one you have now. After a crop or a turn, the newest earlier picture with the same shape is used. If there is none, Compare is off and says so.
 - **Undo.** Open the **Versions** menu and choose the version before. Nothing is deleted.
 - Each version is also a picture in your [Library](library.md).
-- A picture you uploaded yourself has no age label, so an edit of it is saved behind your Adult lock. The Studio then says so and keeps showing the picture you were editing. Unlock it in the Library to open the new version.
+- A picture you uploaded yourself has no age label and no Adult lock. Turning, flipping, cropping, resizing, adjusting or drawing on it saves a new version that is just as open as the original: the people who can see your upload can see it, and nobody else can. Tools that make new picture content (change in words, erase, remove background, blur background, enlarge) are saved behind your Adult lock instead. The Studio then says so and keeps showing the picture you were editing. Unlock it in the Library to open the new version.
 
 ## Make a video from it
 

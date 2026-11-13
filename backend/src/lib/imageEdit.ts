@@ -170,8 +170,18 @@ export interface SourcePicture {
   rootId: string;
   audience?: "all-ages" | "adult-only";
   adultMark?: MarkSource;
+  /** True when the stored picture has no lock item of its own (a plain upload): the Adult lock does not cover it, so its owner sees it open. */
+  uncovered?: boolean;
   ownerPersonId?: string;
 }
+
+/**
+ * Owner decision (Jesse, 2026-11-13): a feature that makes no content has no age gate, and these make none. A simple local pixel edit of a picture with no audience
+ * label that the Adult lock does not cover (no lock item, for example an upload) is saved with that same state (no label, lock off), so it is visible to exactly who
+ * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale) and any operation not listed here
+ * locks as before (fail closed).
+ */
+const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "resize", "markup"]);
 
 /** A picture addressed by its Library file id rather than by a chat: the "conversation" of a Library source (IMG-OPS-02). Such an edit is owner-only and its result is a new Library picture. */
 export const LIBRARY_SOURCE = "library";
@@ -229,7 +239,7 @@ function loadLibrarySource(actor: PersonRow, id: string): SourcePicture {
   const read = readAttachment(actor, id);
   if (!read.ok) throw gone;
   const provenance = parseProvenance(row.provenance);
-  return { id, conversationId: LIBRARY_SOURCE, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, ownerPersonId: row.ownerPersonId, name: (row.name ?? row.provenance.replace(/^composer:/, "")).slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  return { id, conversationId: LIBRARY_SOURCE, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: (row.name ?? row.provenance.replace(/^composer:/, "")).slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 function loadSourceChecked(actor: PersonRow, conversationId: string, id: string, write: boolean, gone: ImageEditError): SourcePicture {
@@ -249,7 +259,7 @@ function loadSourceChecked(actor: PersonRow, conversationId: string, id: string,
   }
   const provenance = parseProvenance(row.provenance);
   const item = lockItemOfProvenance(row.ownerPersonId, row.provenance);
-  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, ownerPersonId: row.ownerPersonId, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
+  return { id, conversationId, temporary: false, turnId: row.turnId, mediaType: row.mediaType, audience: fileAudience(row.provenance) ?? "adult-only", adultMark: item ? { madeAudience: item.madeAudience, lock: item.lock } : { madeAudience: fileAudience(row.provenance) ?? null, lock: "on" }, uncovered: !item, ownerPersonId: row.ownerPersonId, name: row.provenance.replace(/^composer:/, "").slice(0, 120) || "picture", bytes: read.value.bytes, sha256: row.sha256, rootId: provenance?.root ?? row.id };
 }
 
 export interface PictureVersion { id: string; url: string; label: string; created_at: string; op: EditProvenanceOp | "original"; width: number | null; height: number | null; media_type: string; source: string | null; source_sha256: string | null }
@@ -312,11 +322,14 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
   }
   const bytes = new Uint8Array(clean);
-  const sourceMark = source.adultMark ?? { madeAudience: source.audience ?? null, lock: "on" as const };
-  // The caller's audience (a new adult-only result of an all-ages source) still raises the mark; an already adult-only source keeps its own lock state.
-  const mark = newItemMark([sourceMark], meta.audience === "adult-only" && sourceMark.madeAudience !== "adult-only");
+  const stored = source.adultMark ?? { madeAudience: source.audience ?? null, lock: "on" as const };
+  // A simple local edit (no new content) of a picture with no audience label that the Adult lock does not cover (an upload, or an earlier such edit) carries the
+  // source's own state: no audience label and lock off, so exactly the people who can see the source see the result. Nothing is raised or lowered. Everything else,
+  // and any result the caller marks adult-only, goes through newItemMark as before.
+  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
+  const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
-  const provenance: EditProvenance & ReturnType<typeof markFields> = { v: 1, ...markFields(mark), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, ...(carries ? { lock: "off" as const } : markFields(mark)), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
     storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, audience, made_audience: audience } });
@@ -326,13 +339,13 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     // IMG-OPS-02: an edit of a Library picture is a NEW Library file (kept, with no chat), linked to its source and root by the note. The source is never written.
     const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "kept", name: null });
     if (!stored.ok) throw new ImageEditError(stored.status === 403 ? 403 : 500, stored.status === 403 ? stored.error : "The edited picture could not be saved. Try again.", stored.status === 403 ? "storage_full" : "save_failed");
-    if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
+    if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
     return { id: stored.value.id, url: pictureUrl(LIBRARY_SOURCE, stored.value.id), label: provenance.label, created_at: stored.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "conversation" });
   if (!created.ok) throw new ImageEditError(created.status === 403 ? 403 : created.status === 404 ? 404 : 500, created.status === 403 ? created.error : "The edited picture could not be saved. Try again.", created.status === 403 ? "storage_full" : "save_failed");
-  if (mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
+  if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
   return { id: created.value.id, url: pictureUrl(source.conversationId, created.value.id), label: provenance.label, created_at: created.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
 }
 
@@ -382,6 +395,28 @@ export function editErrorFrom(error: unknown): ImageEditError {
 }
 
 export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical"; /** A crop in the Studio: turn and mirror first, then cut (one preview, one Apply). */ rotate?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean }
+
+/**
+ * Auto tone: one gain and offset for all channels (no colour shift) that stretches the 1st to 99th percentile of brightness onto 6..249, so the darkest pixels
+ * keep a little shadow instead of being pushed to pure black, then a mild lift toward mid grey only when the picture is dark. The old `normalize()` crushed
+ * dark pictures and shifted a well exposed one.
+ */
+async function autoTone(pipeline: ReturnType<typeof sharp>, bytes: Uint8Array): Promise<ReturnType<typeof sharp>> {
+  const { data } = await sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" }).rotate().resize(256, 256, { fit: "inside", withoutEnlargement: true }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const histogram = new Array<number>(256).fill(0);
+  for (const value of data) histogram[value]!++;
+  const percentile = (fraction: number): number => { let seen = 0; for (let v = 0; v < 256; v++) { seen += histogram[v]!; if (seen >= fraction * data.length) return v; } return 255; };
+  const low = percentile(0.01);
+  const high = percentile(0.99);
+  if (high - low < 8) return pipeline; // a flat picture: nothing to stretch
+  const gain = Math.min(4, (249 - 6) / (high - low));
+  const stretched = pipeline.linear(gain, 6 - low * gain);
+  let sum = 0;
+  for (let v = 0; v < 256; v++) sum += histogram[v]! * Math.min(255, Math.max(0, 6 + (v - low) * gain));
+  const mean = sum / data.length / 255;
+  if (mean >= 0.35) return stretched;
+  return stretched.gamma(Math.min(1.4, Math.max(1, Math.log(Math.max(mean, 0.02)) / Math.log(0.4))));
+}
 
 /** Local, metadata-free pixel transforms used by picture.crop and picture.adjust. */
 export async function processLocalPicture(bytes: Uint8Array, input: StartEditInput): Promise<{ png: Uint8Array; width: number; height: number }> {
@@ -434,7 +469,7 @@ export async function processLocalPicture(bytes: Uint8Array, input: StartEditInp
     width = cropWidth; height = cropHeight;
     pipeline = pipeline.extract({ left, top, width, height });
   } else {
-    if (input.auto) pipeline = pipeline.normalize();
+    if (input.auto) pipeline = await autoTone(pipeline, bytes);
     const brightness = 1 + (input.brightness ?? 0) / 100;
     const contrast = 1 + (input.contrast ?? 0) / 100;
     const saturation = Math.max(0, 1 + (input.saturation ?? 0) / 100);
@@ -535,14 +570,21 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
       const png = await fetchImageToolResult(jobId);
       const meta = await sharp(png).metadata();
       const made = outcome?.images?.[0];
+      stoppedGuard(jobId);
       return keepPreview(actor, source, job.op, png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, engine: made?.engine, model: made?.model, ms: made?.ms, audience: job.audience });
     })();
     job.finalising.catch(() => { job.finalising = undefined; });
     return { state: "done", preview: await job.finalising };
   } catch (error) {
+    if (error instanceof ImageEditError && error.code === "cancelled") return { state: "cancelled", error: error.message, code: "cancelled" };
     const mapped = editErrorFrom(error);
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
+}
+
+/** Stop was pressed while the result was on its way: the late result is dropped here and never kept or saved. */
+function stoppedGuard(jobId: string): void {
+  if (!jobs.has(jobId)) throw new ImageEditError(409, "That edit was stopped. Nothing was changed.", "cancelled");
 }
 
 export async function cancelEdit(actor: PersonRow, jobId: string): Promise<void> {
@@ -739,6 +781,7 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     const checks = await checkImages([png], "picture");
     const decision = await gateFinished({ actor, kind: "picture", jobId, adultOnly: job.adultOnly === true, checks, images: [png], ...(job.promptHash ? { promptHash: job.promptHash } : {}) });
     if (decision.action === "withhold") throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
+    stoppedGuard(jobId);
     const kept = keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms, audience: job.audience });
     await cancelOrDelete(jobId);
     return kept;
@@ -746,6 +789,8 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
   try {
     return { state: "done", preview: await job.finalising };
   } catch (error) {
+    // Stop already cancelled the job and removed the engine's copy: the late result is dropped.
+    if (error instanceof ImageEditError && error.code === "cancelled") return { state: "cancelled", error: error.message, code: "cancelled" };
     // A picture that cannot be kept ends the job here, with the engine's copy removed, instead of failing on every poll.
     jobs.delete(jobId);
     void cancelOrDelete(jobId);

@@ -232,6 +232,8 @@ One rule point in the media host: the media store's request path (`createMediaSt
 
 The same rows apply to pictures and songs; their slices call the same function.
 
+**Simple edits of an unlabelled picture (owner decision, Jesse, 2026-11-13).** A feature that makes no content has no age gate. A crop, turn, flip, adjust, resize or markup of a picture the Adult lock does not cover and that has no audience label (an upload, or an earlier such edit) is saved with the source's own state: no audience label and `lock` off, so exactly the people who can see the source can see the result, nothing raised and nothing lowered. A teen who owns the upload opens and keeps editing the crop. Any model or generative edit (change in words, erase, remove background, blur background, enlarge), any source with a lock item, any result the caller marks adult-only, and any operation not on the list (the list is `SIMPLE_LOCAL_OPS` in `lib/imageEdit.ts`) go through `newItemMark` as in the table.
+
 ## 4. Data model
 
 ### 4.1 The `Lora` record (commons `spec`, `records`, first; slice VIDEO-LORA-02)

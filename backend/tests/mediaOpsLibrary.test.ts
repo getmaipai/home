@@ -164,7 +164,7 @@ describe("an edit by Library file id", () => {
     expect(open.status).toBe(200);
   });
 
-  test("the result keeps the source's audience: adult-only stays adult-only (lock kept), all-ages stays all-ages, an unlabelled upload is treated as adult-only", async () => {
+  test("the result keeps the source's audience: adult-only stays adult-only (lock kept), all-ages stays all-ages, a simple edit of an unlabelled upload carries the upload's own state (no label, lock off)", async () => {
     const adult = await libraryPicture(sageActor, ADULT_OPEN);
     const fromAdult = await runAndApply(sage, "picture.flip", adult.id, { direction: "horizontal" });
     expect(note(fromAdult.version.id)).toMatchObject({ audience: "adult-only", made_audience: "adult-only", lock: "off" });
@@ -173,7 +173,8 @@ describe("an edit by Library file id", () => {
     expect(note(fromPlain.version.id)).toMatchObject({ audience: "all-ages", made_audience: "all-ages", lock: "off" });
     const upload = await libraryPicture(sageActor, "composer:upload");
     const fromUpload = await runAndApply(sage, "picture.flip", upload.id, { direction: "horizontal" });
-    expect(note(fromUpload.version.id)).toMatchObject({ audience: "adult-only" });
+    expect(note(fromUpload.version.id)).toMatchObject({ lock: "off" });
+    expect(note(fromUpload.version.id).audience).toBeUndefined();
   });
 
   test("an app cannot run an operation the list does not offer: helpers, unknown ids and bad arguments are refused", async () => {

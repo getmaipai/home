@@ -188,7 +188,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     expect((await studioCall(marlow, "studio-run", { file: mine.id, operation: "adjust", args: { brightness: 10 } })).status).toBe(404);
   });
 
-  test("an edit of a plain upload is saved locked and Apply says so; the lock rule itself is unchanged (IMG-STUDIO-03)", async () => {
+  test("a simple edit of a plain upload carries the upload's own state (no label, lock off): seen by exactly who sees the source (IMG-STUDIO-03, owner decision 2026-11-13)", async () => {
     const upload = await libraryPicture(sageActor, "library:upload");
     const run1 = await studioCall(sage, "studio-run", { file: upload.id, operation: "crop", args: { x: 0, y: 0, width: 0.5, height: 1 } });
     expect(run1.status).toBe(200);
@@ -196,19 +196,97 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     const applied = await studioCall(sage, "studio-apply", { file: upload.id, token: made.token, label: "Cropped" });
     expect(applied.status).toBe(200);
     const reply = (await applied.json()) as { id: string; locked?: boolean; note?: string };
-    expect(reply.locked).toBe(true);
-    expect(reply.note).toBe("Saved to your Library behind your Adult lock. Unlock it there to keep editing it.");
-    // Still stored the way it always was: adult-only, Adult lock on; and its picture cannot be fetched without the unlock.
-    expect(note(reply.id)).toMatchObject({ made_audience: "adult-only", lock: "on" });
-    expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(423);
-    expect(((await (await studioRows(sage, reply.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: true });
-    // The same for Markup, and an open edit carries no lock flag.
-    const marked = (await (await studioCall(sage, "studio-markup", { file: upload.id, png: await dataUrl(await twoColour()) })).json()) as { locked?: boolean };
-    expect(marked.locked).toBe(true);
-    const open = await libraryPicture(sageActor);
-    const openRun = (await (await studioCall(sage, "studio-run", { file: open.id, operation: "crop", args: { x: 0, y: 0, width: 0.5, height: 1 } })).json()) as { token: string };
-    const openApplied = (await (await studioCall(sage, "studio-apply", { file: open.id, token: openRun.token })).json()) as { locked?: boolean };
-    expect(openApplied.locked).toBeUndefined();
+    // No "saved behind your Adult lock" line; the note carries no audience label (the source had none) and lock off.
+    expect(reply.locked).toBeUndefined();
+    expect(reply.note).toBeUndefined();
+    const stored = note(reply.id);
+    expect(stored.lock).toBe("off");
+    expect(stored.audience).toBeUndefined();
+    expect(stored.made_audience).toBeUndefined();
+    expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(200);
+    expect(((await (await studioRows(sage, reply.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: false });
+    // Anyone who cannot see the source cannot see the crop: the same answer for the upload and its crop.
+    for (const person of [marlow, nova, lucia]) {
+      const a = (await person.get(`/api/media-ops/files/${encodeURIComponent(upload.id)}/content`)).status;
+      const b = (await person.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status;
+      expect(b).toBe(a);
+    }
+    expect((await marlow.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(404);
+    // Sharing follows the same rule: to an adult as the upload does, to a minor refused as the upload is.
+    const toMinor = (id: string) => createShare(sageActor, { fileId: id, to: db.select().from(people).where(eq(people.displayName, "Marlow")).get()!.id }).ok;
+    expect(toMinor(reply.id)).toBe(toMinor(upload.id));
+    // Markup, turn, flip and adjust are simple too.
+    const marked = (await (await studioCall(sage, "studio-markup", { file: upload.id, png: await dataUrl(await twoColour()) })).json()) as { id: string; locked?: boolean };
+    expect(marked.locked).toBeUndefined();
+    expect(note(marked.id).lock).toBe("off");
+    for (const [op, args] of [["picture.rotate", { degrees: 90 }], ["picture.flip", { direction: "horizontal" }], ["picture.adjust", { brightness: 10 }]] as const) {
+      const out = await runAndApply(sage, op, upload.id, args);
+      expect(note(out.version.id)).toMatchObject({ lock: "off" });
+      expect(note(out.version.id).made_audience).toBeUndefined();
+    }
+    // A crop of the crop (keep editing) stays the same.
+    const again = await runAndApply(sage, "picture.crop", reply.id, { x: 0, y: 0, width: 0.5, height: 1 });
+    expect(note(again.version.id)).toMatchObject({ lock: "off" });
+    expect(note(again.version.id).made_audience).toBeUndefined();
+  });
+
+  test("a teen who owns a plain upload crops it, opens the crop and keeps editing it", async () => {
+    const teenActor = db.select().from(people).where(eq(people.displayName, "Marlow")).get()!;
+    const teenUpload = await libraryPicture(teenActor, "library:upload");
+    const crop = await runAndApply(marlow, "picture.crop", teenUpload.id, { x: 0, y: 0, width: 0.5, height: 1 });
+    expect(note(crop.version.id).lock).toBe("off");
+    expect(note(crop.version.id).made_audience).toBeUndefined();
+    expect((await marlow.get(`/api/media-ops/files/${encodeURIComponent(crop.version.id)}/content`)).status).toBe(200);
+    expect(((await (await studioRows(marlow, crop.version.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: false });
+    const next = await runAndApply(marlow, "picture.flip", crop.version.id, { direction: "horizontal" });
+    expect((await marlow.get(`/api/media-ops/files/${encodeURIComponent(next.version.id)}/content`)).status).toBe(200);
+    // The upload's owner is the only reader besides adults: the other teen-less household member (an adult) is no different from the source.
+    const a = (await lucia.get(`/api/media-ops/files/${encodeURIComponent(teenUpload.id)}/content`)).status;
+    expect((await lucia.get(`/api/media-ops/files/${encodeURIComponent(crop.version.id)}/content`)).status).toBe(a);
+  });
+
+  test("a change in words or a background removal of a plain upload still saves locked, and Apply says so", async () => {
+    const upload = await libraryPicture(sageActor, "library:upload");
+    const png = new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer());
+    __setImageToolsForTests({ ...READY }, true);
+    for (const operation of ["remove_background", "blur_background"] as const) {
+      const stub = { client: { imageTools: async () => READY, roles: async () => ({ roles: [] }), imageEdit: async () => ({ kind: "done", job: "j", item: { b64_json: Buffer.from(png).toString("base64"), width: 40, height: 30, content_type: "image/png", operation: "remove_background" } }), imageEditResult: async () => png } as unknown as StackClient };
+      __setStackClientForTests(stub.client);
+      const ran = await studioCall(sage, "studio-run", { file: upload.id, operation, args: {} });
+      expect(ran.status).toBe(200);
+      const { token } = (await ran.json()) as { token: string };
+      const reply = (await (await studioCall(sage, "studio-apply", { file: upload.id, token })).json()) as { id: string; locked?: boolean; note?: string };
+      expect(reply.locked).toBe(true);
+      expect(reply.note).toBe("Saved to your Library behind your Adult lock. Unlock it there to keep editing it.");
+      expect(note(reply.id)).toMatchObject({ made_audience: "adult-only", lock: "on" });
+      expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(423);
+    }
+  });
+
+  test("a crop of an adult-only locked source stays locked, and a crop of a source whose creator cleared the lock stays as it was", async () => {
+    const locked = await libraryPicture(sageActor, ADULT_LOCKED);
+    const proof = ((await (await sage.post("/api/adult-lock/unlock", { secret: "correcthorse", visit: "studio-test" })).json()) as { proof: string }).proof;
+    const res = await sage.request("/api/media-ops/picture.crop", { method: "POST", body: { file_id: locked.id, args: { x: 0, y: 0, width: 0.5, height: 1 } }, headers: { "x-adult-unlock": proof } });
+    expect(res.status).toBe(200);
+    const token = ((await res.json()) as { preview: { token: string } }).preview.token;
+    const applied = await sage.request(`/api/media-ops/previews/${token}/apply`, { method: "POST", body: {}, headers: { "x-adult-unlock": proof } });
+    expect(applied.status).toBe(200);
+    const version = ((await applied.json()) as { version: { id: string } }).version;
+    expect(note(version.id)).toMatchObject({ made_audience: "adult-only", lock: "on" });
+    const cleared = await libraryPicture(sageActor, ADULT_OPEN);
+    const fromCleared = await runAndApply(sage, "picture.crop", cleared.id, { x: 0, y: 0, width: 0.5, height: 1 });
+    expect(note(fromCleared.version.id)).toMatchObject({ made_audience: "adult-only", lock: "off" });
+  });
+
+  test("an edit the caller marks adult-only locks even for a plain upload; an unknown operation locks (fail closed)", async () => {
+    const { saveVersion, loadSource, LIBRARY_SOURCE } = await import("@/lib/imageEdit");
+    const upload = await libraryPicture(sageActor, "library:upload");
+    const source = loadSource(sageActor, LIBRARY_SOURCE, upload.id, true);
+    const png = await twoColour();
+    const adult = await saveVersion(sageActor, source, png, { op: "crop", label: "x", audience: "adult-only" });
+    expect(note(adult.id)).toMatchObject({ lock: "on" });
+    const unknown = await saveVersion(sageActor, source, png, { op: "something_new" as never, label: "x" });
+    expect(note(unknown.id)).toMatchObject({ lock: "on" });
   });
 
   test("the opened version is named for the picture it came from, not Picture (IMG-STUDIO-03)", async () => {
