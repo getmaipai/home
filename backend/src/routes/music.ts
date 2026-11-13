@@ -232,10 +232,15 @@ async function musicCardOrLocked(actor: PersonRow, job: MusicJob) {
   return lockedJob(actor, job) ? lockedMusicTile(job) : musicCardView(actor, job);
 }
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,
-  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable(), file_effects: z.boolean().describe("Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need.") }) } }, description: "Music capability." }, ...refusals } });
+  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable(), file_effects: z.boolean().describe("Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need."), tiers: z.array(z.enum(["standard", "boost", "max"])).describe("The quality levels this person can ask for now (Standard always; Boost and Max follow the song card's gates).") }) } }, description: "Music capability." }, ...refusals } });
 musicRoutes.openapi(statusRoute, async (c) => {
+  const actor = c.get("person");
   const engine = await musicEngineStatus(); const ready = musicStatusReady(engine);
-  return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null, file_effects: musicAudioTools().ffmpeg !== null }, 200);
+  // The same gates as the song card's levels (TIER-HOME-03, MUSIC-MAX-01), so the composer's Quality chip offers only what works.
+  const boost = !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
+  const max = maxOffered(actor, "music", undefined, musicMaxOffered(engine));
+  const tiers: Array<"standard" | "boost" | "max"> = ["standard", ...(boost ? ["boost" as const] : []), ...(max ? ["max" as const] : [])];
+  return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null, file_effects: musicAudioTools().ffmpeg !== null, tiers }, 200);
 });
 const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], summary: "The owner's songs, newest first", middleware: viewMiddleware,
   responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
@@ -292,6 +297,7 @@ const makeSongBody = z.object({
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).optional(),
   takes: z.number().int().min(1).max(3).optional().describe("How many different takes to make, 1 to 3; they are made one after another and show as one song card."),
   seed: z.number().int().min(1).max(2147483646).optional().describe("The seed of the first take; leave out for a fresh one."),
+  tier: z.enum(["standard", "boost", "max"]).optional().describe("The quality level; the same gate as the generate_music tool applies. Leave out for Standard."),
   song_style: z.string().optional().describe("A saved song style's id (starter or the person's own)."), band: z.string().optional().describe("A made band's id: make the song in that band's sound."),
 });
 const makeSongRoute = createRoute({ method: "post", path: "/songs", tags: ["Music"], summary: "Make a song from the Make a song page", middleware,
@@ -303,7 +309,7 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const args: Record<string, unknown> = { description: body.idea, ...(body.lyrics?.trim() ? { lyrics: body.lyrics } : {}), ...(body.instrumental ? { instrumental: true } : {}),
     ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.language ? { language: body.language } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
-    ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.takes && body.takes > 1 ? { takes: body.takes } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
+    ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.takes && body.takes > 1 ? { takes: body.takes } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.tier && body.tier !== "standard" ? { tier: body.tier } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
   if (refusal) return c.json({ error: refusal.line }, 403) as never;

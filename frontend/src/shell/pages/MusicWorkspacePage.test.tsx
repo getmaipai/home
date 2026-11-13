@@ -5,7 +5,7 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MusicWorkspace } from "./MusicWorkspacePage";
-import { MAKES, makeSoundBody } from "./MusicWorkspacePage";
+import { MAKES } from "./MusicWorkspacePage";
 import { soundCardCopy } from "@/apps/chat/MusicCardView";
 import { RemixSong, remixRequest } from "./MusicRemix";
 import type { MusicCard } from "@/lib/musicApi";
@@ -13,16 +13,17 @@ import type { MusicCard } from "@/lib/musicApi";
 let baseFetch: typeof fetch;
 let calls: Array<{ url: string; method: string; body: string }>;
 let engine = true;
+let tiers: string[] = ["standard"];
 let uploadStatus = 200;
 const song = { id: "mus-1", title: "Neon Rain", state: "done", progress: 1, versions: [{ id: "v1", url: "/f/1" }], current_id: "v1" } as unknown as MusicCard;
 
 
 beforeEach(() => {
-  calls = []; engine = true; uploadStatus = 200; baseFetch = globalThis.fetch;
+  calls = []; engine = true; tiers = ["standard"]; uploadStatus = 200; baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     calls.push({ url, method: init?.method ?? "GET", body: String(init?.body ?? "") });
-    if (url.startsWith("/api/music/status")) return Promise.resolve(Response.json({ can_make: engine, engine_ready: engine, limits: {} }));
+    if (url.startsWith("/api/music/status")) return Promise.resolve(Response.json({ can_make: engine, engine_ready: engine, limits: {}, tiers }));
     if (url.startsWith("/api/music/sounds") && (init?.method ?? "GET") === "POST") return Promise.resolve(Response.json({ ...song, id: "sound-new", sound: { loop: true, surprise: true } }));
     if (url === "/api/music/sounds") return Promise.resolve(Response.json([]));
     if (url === "/api/library/upload") return Promise.resolve(new Response(JSON.stringify(uploadStatus === 200 ? { id: "file-audio", name: "song.mp3", kind: "audio", media_type: "audio/mpeg", size_bytes: 5, duplicate: false } : { error: "plain upload refusal" }), { status: uploadStatus === 200 ? 201 : uploadStatus }));
@@ -48,34 +49,32 @@ const withJobs = (cards: unknown[]) => {
 };
 const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
 
+/** Open one chip's popover on the composer and choose a value in it. */
+const choose = async (view: ReturnType<typeof open>, group: string, value: string | RegExp) => {
+  const trigger = await view.findByRole("button", { name: new RegExp(`^${group}:`) });
+  if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
+  fireEvent.click(await view.findByRole("radio", { name: value }));
+};
+const field = (view: ReturnType<typeof open>) => view.container.querySelector('[data-slot="prompt-bar"] textarea') as HTMLTextAreaElement;
+const primary = (view: ReturnType<typeof open>) => view.container.querySelector('[data-slot="prompt-bar"] button[type="submit"]') as HTMLButtonElement;
+
 describe("Create controls", () => {
-  test("includes Sound mode, sound body mapping and sound card copy without changing song controls", async () => {
+  test("the Sound make takes the composer's words and the sound chips, and the body carries them", async () => {
     expect(MAKES().some(mode => mode.id === "sound" && mode.label === "Sound")).toBe(true);
     expect(soundCardCopy.saveToLibrary).toBe("Save to Sounds");
-    expect(makeSoundBody({ description: "door creak", seconds: "10", loop: true, stick: "surprise" })).toEqual({ description: "door creak", seconds: 10, loop: true, stick_to_words: false });
     const view = open();
-    const bar = within(await view.findByTestId("music-docked-bar"));
-    fireEvent.click(bar.getByRole("button", { name: "Sound" }));
-    fireEvent.change(await bar.findByLabelText("Describe the sound"), { target: { value: "A quiet bell" } });
-    expect(bar.getByTestId("sound-maker-footer").className).toContain("sticky");
-    expect(within(bar.getByTestId("sound-maker-footer")).getByRole("button", { name: "Generate" })).toBeTruthy();
-    fireEvent.click(bar.getByRole("switch", { name: "Loop it" }));
-    fireEvent.click(bar.getByRole("radio", { name: "Surprise me" }));
-    fireEvent.change(bar.getByLabelText("Seconds"), { target: { value: "10" } });
-    fireEvent.click(bar.getByRole("button", { name: "Generate" }));
-    await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"loop":true') && call.body.includes('"stick_to_words":false'))).toBe(true));
-  });
-  test("the Sound tab asks for takes and a short length, and the body carries them", async () => {
-    expect(makeSoundBody({ description: "a knock", seconds: "3", loop: false, stick: "words", takes: 3 })).toEqual({ description: "a knock", seconds: 3, loop: false, stick_to_words: true, takes: 3 });
-    expect(makeSoundBody({ description: "a knock", seconds: "3", loop: false, stick: "words", takes: 1 })).not.toHaveProperty("takes");
-    const view = open();
-    const bar = within(await view.findByTestId("music-docked-bar"));
-    fireEvent.click(bar.getByRole("button", { name: "Sound" }));
-    expect((bar.getByLabelText("Seconds") as HTMLInputElement).value).toBe("3");
-    fireEvent.change(await bar.findByLabelText("Describe the sound"), { target: { value: "A quiet knock" } });
-    fireEvent.click(bar.getByRole("radio", { name: "3" }));
-    fireEvent.click(bar.getByRole("button", { name: "Generate" }));
-    await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"takes":3') && call.body.includes('"seconds":3'))).toBe(true));
+    await view.findByTestId("music-docked-bar");
+    await choose(view, "Make", "Sound");
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make a sound"));
+    fireEvent.change(field(view), { target: { value: "A quiet knock" } });
+    await choose(view, "Sound", "Loop it");
+    await choose(view, "Words", "Surprise me");
+    await choose(view, "Sound", "10 seconds");
+    await choose(view, "Takes", "3 takes");
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make 3 sounds"));
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
+    await waitFor(() => expect(calls.some(call => call.url === "/api/music/sounds" && call.body.includes('"loop":true') && call.body.includes('"stick_to_words":false') && call.body.includes('"seconds":10') && call.body.includes('"takes":3'))).toBe(true));
   });
   test("adult Edit surface uploads a Library file and offers the supported actions", async () => {
     const view = open("?song=mus-1");
@@ -101,54 +100,88 @@ describe("Create controls", () => {
     expect(view.queryByText("plain upload refusal")).toBeNull();
   });
 
-  test("mode, lyrics, instrumental, length and styles chips each change state", async () => {
+  test("the song chips each change what is sent: instrumental, length, language, Quality and Make 2 songs", async () => {
+    engine = true;
     const view = open();
-    const bar = within(await view.findByTestId("music-docked-bar"));
-    for (const name of ["Lyrics", "Instrumental", "Quick", "Full"]) {
-      const chip = bar.getByRole("button", { name });
-      fireEvent.click(chip);
-      await waitFor(() => expect(bar.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("true"));
-    }
-    fireEvent.click(bar.getByRole("button", { name: "Styles" }));
-    const panel = within(await view.findByTestId("music-styles-panel"));
-    fireEvent.click(panel.getAllByRole("button")[0]!);
-    await waitFor(() => expect(bar.getByRole("button", { name: "Styles (1)" })).toBeTruthy());
-    fireEvent.click(bar.getByRole("button", { name: "Album" }));
-    await waitFor(() => expect(bar.getByRole("button", { name: "Album" }).getAttribute("aria-pressed")).toBe("true"));
+    await view.findByTestId("music-docked-bar");
+    fireEvent.change(field(view), { target: { value: "a slow song about rain" } });
+    await choose(view, "Vocals", /^Instrumental/);
+    await choose(view, "Length", /^Quick/);
+    fireEvent.click(await view.findByRole("button", { name: /^Custom/ }));
+    fireEvent.click(await view.findByRole("radio", { name: "2 takes" }));
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make 2 songs"));
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/songs" && call.method === "POST" && call.body.includes('"instrumental":true') && call.body.includes('"length":"quick"') && call.body.includes('"takes":2'))).toBe(true));
   });
 
-  test("Voice chip opens the voiceover form", async () => {
+  test("Quality offers only the levels the hub lists", async () => {
+    tiers = ["standard", "boost"];
     const view = open();
-    fireEvent.click(await view.findByRole("button", { name: "Voice" }));
+    fireEvent.click(await view.findByRole("button", { name: /^Quality:/ }));
+    expect((await view.findAllByRole("radio")).map((radio) => radio.textContent)).toEqual(["StandardFast", "BoostMore detail"]);
+  });
+
+  test("the Custom section takes lyrics with structure tags and sends them with a title and seed", async () => {
+    const view = open();
+    fireEvent.change(field(view), { target: { value: "a slow song about rain" } });
+    fireEvent.click(await view.findByRole("button", { name: /^Custom/ }));
+    fireEvent.click(await view.findByRole("button", { name: "[Verse]" }));
+    fireEvent.change(view.getByLabelText("Title"), { target: { value: "Rain" } });
+    fireEvent.change(view.getByLabelText("Seed"), { target: { value: "4242" } });
+    await waitFor(() => expect((view.getByLabelText("Lyrics") as HTMLTextAreaElement).value).toContain("[Verse]"));
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/songs" && call.body.includes('"title":"Rain"') && call.body.includes('"seed":4242') && call.body.includes("[Verse]"))).toBe(true));
+  });
+
+  test("a band, album or style sends the person to the form under the composer; Voice opens the voiceover form", async () => {
+    const view = open();
+    await view.findByTestId("music-docked-bar");
+    await choose(view, "Make", "Album");
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Use the form below"));
+    expect(primary(view).disabled).toBe(true);
+    await choose(view, "Make", "Voice");
     expect(await view.findByTestId("music-voice-create")).toBeTruthy();
     expect(view.getByLabelText("Script")).toBeTruthy();
   });
 
-  test("a starter sound adds a style and opens the styles panel", async () => {
+  test("a song brought to change shows in the composer and Change the style restyles it", async () => {
+    const view = open();
+    await view.findByTestId("music-docked-bar");
+    fireEvent.change(view.getByTestId("music-reference-input"), { target: { files: [new File(["audio"], "song.mp3", { type: "audio/mpeg" })] } });
+    await view.findByText("song.mp3");
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Change the style"));
+    fireEvent.change(field(view), { target: { value: "soft jazz" } });
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/from-file/edit" && call.body.includes('"style":"soft jazz"') && call.body.includes('"change":"restyle"'))).toBe(true));
+  });
+
+  test("a starter sound adds a style chip under the composer", async () => {
     const view = open();
     const sound = (await view.findAllByRole("button", { name: /Use/ }))[0]!;
     fireEvent.click(sound);
-    expect(await view.findByTestId("music-styles-panel")).toBeTruthy();
-    expect(view.getByRole("button", { name: "Styles (1)" })).toBeTruthy();
+    expect(await view.findByTestId("music-picked-styles")).toBeTruthy();
   });
 
-  test("Generate stays off with a plain reason until the idea is written, then makes the song", async () => {
+  test("the button stays off with a plain reason until the idea is written, then makes the song", async () => {
     const view = open();
-    const generate = await view.findByRole("button", { name: "Generate" }) as HTMLButtonElement;
-    await waitFor(() => expect(view.getByTestId("music-hint").textContent).toContain("Say what the song is about"));
-    expect(generate.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.change(view.getByLabelText("Describe your song"), { target: { value: "a slow song about rain" } });
-    await waitFor(() => expect((view.getByRole("button", { name: "Generate" }) as HTMLButtonElement).getAttribute("aria-disabled")).toBe("false"));
-    fireEvent.click(view.getByRole("button", { name: "Generate" }));
+    await waitFor(() => expect(primary(view)).toBeTruthy());
+    await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar-note"]')?.textContent).toContain("Say what the song is about"));
+    expect(primary(view).disabled).toBe(true);
+    fireEvent.change(field(view), { target: { value: "a slow song about rain" } });
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/music/songs" && call.method === "POST")).toBe(true));
   });
 
-  test("with no music model, Generate is off and says so", async () => {
+  test("with no music model, the button is off and says so", async () => {
     engine = false;
     const view = open();
-    fireEvent.change(await view.findByLabelText("Describe your song"), { target: { value: "a slow song about rain" } });
-    expect(await view.findByTestId("music-no-engine")).toBeTruthy();
-    expect(view.getByRole("button", { name: "Generate" }).getAttribute("aria-disabled")).toBe("true");
+    fireEvent.change(field(view), { target: { value: "a slow song about rain" } });
+    await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar-note"]')?.textContent).toContain("no music model"));
+    expect(primary(view).disabled).toBe(true);
   });
 
   test("Your songs shows a row whose More menu has Remix, and it opens the panel, never chat", async () => {

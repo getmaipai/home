@@ -411,6 +411,17 @@ describe("Make a song page routes", () => {
     expect(after.lyrics).toContain("Waffles too");
     expect((await client.post(`/api/music/jobs/${card.id}/details`, {})).status).toBe(422);
   });
+  test("the status lists the levels this person may ask for, and the page accepts tier, takes and seed", async () => {
+    const { actor, client } = await owner();
+    const status = await (await client.get("/api/music/status")).json() as { tiers: string[] };
+    expect(status.tiers[0]).toBe("standard");
+    const made = await client.post("/api/music/songs", { idea: "a gentle folk song about pancakes", lyrics: LYRICS, title: "Pancakes", takes: 2, seed: 4242, tier: "standard" });
+    expect(made.status).toBe(201);
+    const card = await made.json() as { id: string; takes: { total: number } | null };
+    expect(card.takes?.total).toBe(2);
+    expect(getMusicJobFor(actor, card.id)?.request.seed).toBe(4242);
+    expect((await client.post("/api/music/songs", { idea: "a song about rain", tier: "gold" })).status).toBe(400);
+  });
   test("says plainly what to do when no music model is installed", async () => {
     const { client } = await owner();
     __setMusicStatusForTests(null);

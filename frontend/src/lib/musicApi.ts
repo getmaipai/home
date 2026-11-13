@@ -61,9 +61,9 @@ export interface EffectBody {
   compressor?: { threshold_db: number; ratio: number; attack_ms: number; release_ms: number; makeup_db: number };
   from_s?: number; to_s?: number; file_id?: string;
 }
-export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; limits: { min_seconds: number; max_seconds: number } | null }
+export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; /** The quality levels this person can ask for now. Absent on an older hub: Standard only. */ tiers?: Array<"standard" | "boost" | "max">; limits: { min_seconds: number; max_seconds: number } | null }
 
-export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; language?: string; bpm?: number; key?: string; /** MP-05: 1 to 3 takes (one card, one job each) and the seed of the first take. */ takes?: number; seed?: number; song_style?: string; band?: string }
+export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; language?: string; bpm?: number; key?: string; /** MP-05: 1 to 3 takes (one card, one job each) and the seed of the first take. */ takes?: number; seed?: number; tier?: "standard" | "boost" | "max"; song_style?: string; band?: string }
 export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean; takes?: number }
 export interface SavedSound { id: string; title: string; duration_s: number; src: string; loop: boolean; job_id?: string | null }
 export interface SoundTake { job_id: string; index: number; total: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; file_id: string | null; src: string | null; saved: boolean; loop: boolean; seconds: number | null }
