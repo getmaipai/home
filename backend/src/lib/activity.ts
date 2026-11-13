@@ -155,7 +155,7 @@ function songItems(actor: PersonRow): ActivityItem[] {
   return out;
 }
 
-const OTHER_JOB_KINDS = new Set(["backup", "import", "chat_plan", "approval", "chat_ask"]);
+const OTHER_JOB_KINDS = new Set(["backup", "import", "chat_plan", "approval", "chat_ask", "picture_edit"]);
 
 /** The rest of the viewer's own work from the unified job list (a backup, a chat plan, a question waiting on them). Already per viewer; only
  * their own rows with a state and a title come through, never a row about someone else and never a reminder or routine. */
@@ -170,7 +170,8 @@ function otherItems(actor: PersonRow): ActivityItem[] {
     const state: ActivityState | null = row.state === "waiting_for_you" ? "attention" : row.state === "queued" ? "waiting" : row.state === "running" || row.state === "paused" ? "making" : row.state === "done" ? "done" : row.state === "failed" ? "failed" : null;
     if (!state) continue;
     const conversationId = typeof row.conversationId === "string" ? row.conversationId : null;
-    const href = conversationId ? `/chat?conversation=${encodeURIComponent(conversationId)}` : kind === "backup" || kind === "import" ? "/backups" : null;
+    // A Studio picture edit opens back in the Studio (its result ref); the title is the plain label, never the person's words.
+    const href = conversationId ? `/chat?conversation=${encodeURIComponent(conversationId)}` : kind === "backup" || kind === "import" ? "/backups" : kind === "picture_edit" && typeof row.resultRef === "string" ? row.resultRef : null;
     const line = state === "attention" ? "This is waiting for your answer." : state === "failed" ? "It did not finish. Open it to try again." : null;
     out.push({ id: `job:${String(row.id)}`, source: "job", state, title: oneLine(row.title), line, percent: null, typicalMinutes: null, href, at });
   }

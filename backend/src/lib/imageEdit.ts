@@ -32,6 +32,7 @@ import { and, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversations } from "@/db/schema";
 import { newFileId } from "@/lib/id";
+import { createJob, updateJob } from "@/lib/jobs";
 import { createAttachment, readAttachment, storeFile, getTemporaryChatImage, getTemporaryChatImageForReader, listTemporaryChatImageVersions, readAttachmentForConversation, storeTemporaryChatImage } from "@/lib/attachments";
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
@@ -357,6 +358,30 @@ const previews = new Map<string, Preview>();
 interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
 const jobs = new Map<string, EditJob>();
 
+/**
+ * The existing activity status (RULES.md S6): a slow engine edit is one row of the unified jobs table, so the Activity page and the progress strip show it
+ * with no second poller. The title is a plain label, never the person's words. An edit of an adult-only picture, or one the words mark adult-only, makes no
+ * row at all (a locked or adult-only item is never named). Instant local edits never reach here.
+ */
+export const EDIT_JOB_KIND = "picture_edit";
+const homeRows = new Map<string, string>();
+const EDIT_TITLES: Record<AnyEditOp, string> = { comment: "Changing a picture", erase: "Erasing from a picture", remove_background: "Removing a background", blur_background: "Blurring a background", upscale: "Enlarging a picture", resize: "Resizing a picture", crop: "Cropping a picture", adjust: "Adjusting a picture", rotate: "Turning a picture", flip: "Flipping a picture" };
+function openEditRow(actor: PersonRow, source: SourcePicture, jobId: string, op: AnyEditOp, adultOnly: boolean): void {
+  if (adultOnly || source.adultMark?.madeAudience === "adult-only") return;
+  const id = `image-edit:${jobId}`;
+  const href = source.conversationId === LIBRARY_SOURCE ? `/apps/image/studio?file=${encodeURIComponent(source.id)}` : null;
+  try {
+    createJob({ id, kind: EDIT_JOB_KIND, startedBy: actor.id, forPerson: actor.id, title: EDIT_TITLES[op], state: "running", progress: { stage: "Working on it" }, conversationId: null, resultRef: href, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "image_edit", editJob: jobId } });
+    homeRows.set(jobId, id);
+  } catch { /* the status row is a view: a failure to write it never stops the edit */ }
+}
+function trackEdit(jobId: string, patch: Parameters<typeof updateJob>[1]): void {
+  const id = homeRows.get(jobId);
+  if (!id) return;
+  try { updateJob(id, patch); } catch { /* same: never fails the edit */ }
+  if (patch.state === "done" || patch.state === "failed" || patch.state === "cancelled") homeRows.delete(jobId);
+}
+
 export interface PreviewInfo { token: string; url: string; width: number; height: number; operation: AnyEditOp; engine: string | null; model: string | null; ms: number | null; transparent: boolean }
 export type EditProgress =
   | { state: "done"; preview: PreviewInfo }
@@ -365,7 +390,7 @@ export type EditProgress =
 
 function sweep(now = Date.now()): void {
   for (const [token, value] of previews) if (now - value.createdAt > PREVIEW_TTL_MS) previews.delete(token);
-  for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) jobs.delete(id);
+  for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) { jobs.delete(id); trackEdit(id, { state: "failed", errorKind: "expired", waitingReason: "This edit stopped waiting. Start it again." }); }
 }
 
 function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only" }): PreviewInfo {
@@ -534,6 +559,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
     }
     sweep();
     jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now() });
+    openEditRow(actor, source, reply.job, input.operation, false);
     return { state: "running", job: reply.job, percent: null, label: "Working on it" };
   } catch (error) {
     throw editErrorFrom(error);
@@ -551,16 +577,18 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
     if (job.generative) return await pollComment(actor, jobId, job);
     const stack = await getStackClient().job(jobId);
     if (stack.state === "queued" || stack.state === "running" || stack.state === "paused" || stack.state === "stalled" || stack.state === "waiting_for_you") {
+      trackEdit(jobId, { state: stack.state === "queued" ? "queued" : "running", progress: { stage: OP_LABEL[job.op], ...(stack.percent > 0 ? { percent: stack.percent } : {}) } });
       return { state: stack.state === "queued" ? "queued" : "running", job: jobId, percent: stack.percent > 0 ? stack.percent : null, label: stack.position && stack.position > 1 ? `Waiting your turn (${stack.position})` : OP_LABEL[job.op] };
     }
-    if (stack.state === "cancelled") { jobs.delete(jobId); return { state: "cancelled", error: "The edit was cancelled.", code: "cancelled" }; }
+    if (stack.state === "cancelled") { jobs.delete(jobId); trackEdit(jobId, { state: "cancelled" }); return { state: "cancelled", error: "The edit was cancelled.", code: "cancelled" }; }
     if (stack.state === "failed") {
       jobs.delete(jobId);
+      trackEdit(jobId, { state: "failed", errorKind: "failed", waitingReason: stack.reason ?? "The editing tools could not finish this edit. Try again." });
       return { state: "failed", error: stack.reason ?? "The editing tools could not finish this edit. Try again.", code: "failed" };
     }
     // A tool that declines the picture (an empty mask, no subject found) finishes the job with a reason, not a failure.
     const outcome = stack.result as { images?: Array<{ width: number; height: number; engine?: string; model?: string; ms?: number }>; rejected?: { code: string; message: string } } | null;
-    if (outcome?.rejected) { jobs.delete(jobId); return { state: "failed", error: outcome.rejected.message, code: outcome.rejected.code }; }
+    if (outcome?.rejected) { jobs.delete(jobId); trackEdit(jobId, { state: "failed", errorKind: outcome.rejected.code, waitingReason: outcome.rejected.message }); return { state: "failed", error: outcome.rejected.message, code: outcome.rejected.code }; }
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
     job.finalising = (async () => {
       const png = await fetchImageToolResult(jobId);
@@ -570,7 +598,9 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
       return keepPreview(actor, source, job.op, png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, engine: made?.engine, model: made?.model, ms: made?.ms, audience: job.audience });
     })();
     job.finalising.catch(() => { job.finalising = undefined; });
-    return { state: "done", preview: await job.finalising };
+    const preview = await job.finalising;
+    trackEdit(jobId, { state: "done", progress: { stage: "Done", percent: 100 } });
+    return { state: "done", preview };
   } catch (error) {
     if (error instanceof ImageEditError && error.code === "cancelled") return { state: "cancelled", error: error.message, code: "cancelled" };
     const mapped = editErrorFrom(error);
@@ -586,9 +616,23 @@ function stoppedGuard(jobId: string): void {
 export async function cancelEdit(actor: PersonRow, jobId: string): Promise<void> {
   const job = jobs.get(jobId);
   if (!job || job.personId !== actor.id) return;
+  await stopEditJob(jobId);
+}
+
+async function stopEditJob(jobId: string): Promise<void> {
+  const job = jobs.get(jobId);
+  if (!job) return;
   jobs.delete(jobId);
+  trackEdit(jobId, { state: "cancelled" });
   if (job.generative) { await cancelOrDelete(jobId); return; }
   try { await getStackClient().cancelJob(jobId); } catch { /* it had already finished or the Stack is gone: either way nothing is running for this person */ }
+}
+
+/** Stop from the Activity page (the jobs route has already checked who may stop it): the same cancel as the Studio's Stop. Returns false when this is not an edit row. */
+export async function stopEditFromActivity(homeJobId: string): Promise<boolean> {
+  if (!homeJobId.startsWith("image-edit:")) return false;
+  await stopEditJob(homeJobId.slice("image-edit:".length));
+  return true;
 }
 
 export function readPreview(actor: PersonRow, token: string): Preview {
@@ -674,6 +718,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const uniqueReferences = new Set(referenceKeys);
   if (uniqueReferences.size !== referenceRefs.length) throw new ImageEditError(422, "Choose different reference pictures.", "reference_same");
   const references: Array<{ source: SourcePicture; prepared: Extract<Awaited<ReturnType<typeof prepareEditSource>>, { ok: true }> }> = [];
+  let referenceAdult = false;
   let audience: "all-ages" | "adult-only" = source.audience ?? "all-ages";
   const referenceFields = ["reference", "reference2"] as const;
   if (referenceRefs.length) {
@@ -689,6 +734,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
       if (!referencePrepared.ok) throw new ImageEditError(referencePrepared.status, referencePrepared.line, referencePrepared.code);
       references.push({ source: referenceSource, prepared: referencePrepared });
       if (referenceSource.audience === "adult-only") audience = "adult-only";
+      if (referenceSource.adultMark?.madeAudience === "adult-only") referenceAdult = true;
     }
   }
   const form = new FormData();
@@ -714,6 +760,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     sweep();
     attachKid(kidSlot, job);
     jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt) || audience === "adult-only", audience, promptHash: promptHash(prompt) });
+    openEditRow(actor, source, job, "comment", mentionsSexualWord(prompt) || referenceAdult);
     return { state: "running", job, percent: null, label: OP_LABEL.comment };
   } catch (error) {
     releaseKid(kidSlot);
@@ -760,13 +807,15 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
   } catch (error) {
     jobs.delete(jobId);
     const mapped = commentErrorFrom(error);
+    trackEdit(jobId, { state: "failed", errorKind: mapped.code, waitingReason: mapped.message });
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
   if (status.state === "queued" || status.state === "running") {
+    trackEdit(jobId, { state: status.state, progress: { stage: OP_LABEL.comment, ...(status.progress > 0 ? { percent: Math.min(99, Math.round(status.progress)) } : {}) } });
     return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : OP_LABEL.comment };
   }
-  if (status.state === "cancelled") { jobs.delete(jobId); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
-  if (status.state === "failed") { jobs.delete(jobId); return { state: "failed", error: status.error ?? "That change did not work. Try again, or describe it differently.", code: status.code ?? "failed" }; }
+  if (status.state === "cancelled") { jobs.delete(jobId); trackEdit(jobId, { state: "cancelled" }); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
+  if (status.state === "failed") { jobs.delete(jobId); trackEdit(jobId, { state: "failed", errorKind: status.code ?? "failed", waitingReason: status.error ?? "That change did not work. Try again, or describe it differently." }); return { state: "failed", error: status.error ?? "That change did not work. Try again, or describe it differently.", code: status.code ?? "failed" }; }
   job.finalising = (async () => {
     // The finished picture is kept as a preview first; the engine's copy is deleted only after that worked.
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
@@ -783,7 +832,9 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     return kept;
   })();
   try {
-    return { state: "done", preview: await job.finalising };
+    const preview = await job.finalising;
+    trackEdit(jobId, { state: "done", progress: { stage: "Done", percent: 100 } });
+    return { state: "done", preview };
   } catch (error) {
     // Stop already cancelled the job and removed the engine's copy: the late result is dropped.
     if (error instanceof ImageEditError && error.code === "cancelled") return { state: "cancelled", error: error.message, code: "cancelled" };
@@ -791,8 +842,9 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     jobs.delete(jobId);
     void cancelOrDelete(jobId);
     const mapped = commentErrorFrom(error);
+    trackEdit(jobId, { state: "failed", errorKind: mapped.code, waitingReason: mapped.message });
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
 }
 
-export function __resetImageEditForTests(): void { previews.clear(); jobs.clear(); toolsStatusForTests = undefined; imageEngineForTests = undefined; }
+export function __resetImageEditForTests(): void { previews.clear(); jobs.clear(); homeRows.clear(); toolsStatusForTests = undefined; imageEngineForTests = undefined; }

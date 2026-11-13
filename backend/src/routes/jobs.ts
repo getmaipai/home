@@ -7,6 +7,7 @@ import { jobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { canStopJob, createJob, listJobsForViewerLive } from "@/lib/jobs";
 import { activeGenerationRows } from "@/lib/activity";
+import { stopEditFromActivity } from "@/lib/imageEdit";
 import { trigger } from "@/lib/notifications";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 
@@ -62,6 +63,8 @@ jobsRoutes.openapi(stopRoute, async (c) => {
     const parsed: unknown = JSON.parse(row.provenance);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) provenance = parsed as Record<string, unknown>;
   } catch { /* keep the empty object */ }
+  // A Studio picture edit is cancelled by the same path as the Studio's Stop (the picture engine or the editing tools, and its late result dropped).
+  if (provenance.producer === "image_edit") await stopEditFromActivity(id);
   if (typeof provenance.stackJobId === "string" && isStackConfigured()) {
     try {
       const stopped = await getStackClient().cancelJob(provenance.stackJobId);

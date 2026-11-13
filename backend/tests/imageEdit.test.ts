@@ -252,6 +252,25 @@ describe("picture editor routes", () => {
     expect(db.select().from(attachments).all().filter((row) => row.provenance.startsWith("image-edit:"))).toHaveLength(0);
   });
 
+  test("a slow edit of a Library picture is a named Activity row that opens the Studio; an adult-only (unlocked) source makes no row", async () => {
+    const { client, actor } = await owner();
+    const stub = stubStack();
+    stub.script.reply = async () => ({ kind: "running", job: "lib-job" });
+    __setStackClientForTests(stub.client);
+    const { storeFile } = await import("@/lib/attachments");
+    const png = new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 3, background: "white" } }).png().toBuffer());
+    const put = (provenance: string) => { const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: png, provenance, retention: "kept", deduplicate: false }); if (!stored.ok) throw new Error(stored.error); return stored.value.id; };
+    const plain = put("library:upload");
+    const adult = put('picture-gen:{"v":1,"audience":"adult-only","made_audience":"adult-only","lock":"off","prompt":"a boat"}');
+    const rows = async () => ((await (await client.get("/api/jobs")).json()) as Array<Record<string, unknown>>).filter((row) => row.kind === "picture_edit");
+    expect((await client.post("/api/media-ops/picture.remove_background", { file_id: plain, args: {} })).status).toBe(200);
+    expect(await rows()).toHaveLength(1);
+    expect((await rows())[0]).toMatchObject({ id: "image-edit:lib-job", title: "Removing a background", resultRef: `/apps/image/studio?file=${plain}` });
+    stub.script.reply = async () => ({ kind: "running", job: "lib-adult" });
+    expect((await client.post("/api/media-ops/picture.remove_background", { file_id: adult, args: {} })).status).toBe(200);
+    expect(await rows()).toHaveLength(1);
+  });
+
   test("a job the tool declines (no subject found) reads as a plain failure with the Stack's sentence", async () => {
     const { client, actor } = await owner();
     const stub = stubStack();
@@ -399,6 +418,40 @@ describe("picture editor routes", () => {
       const applied = (await (await client.post(`/api/image-edit/previews/${progress.preview!.token}/apply`, {})).json()) as { version: { id: string; label: string; op: string } };
       expect(applied.version).toMatchObject({ label: "Changed as described", op: "comment" });
       expect(db.select().from(attachments).all()).toHaveLength(2);
+    });
+
+    test("a change in words shows on the Activity list as making then done, for its owner only; a nude-words edit is never named; Stop from Activity cancels it", async () => {
+      const { client, actor } = await owner();
+      const made = await client.post("/api/people", { displayName: "Lucia", role: "adult", secret: "0000" });
+      const other = new TestClient();
+      await other.post("/api/auth/verify-secret", { personId: ((await made.json()) as { id: string }).id, secret: "0000" });
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const editRows = async (who: TestClient) => ((await (await who.get("/api/jobs")).json()) as Array<Record<string, unknown>>).filter((row) => row.kind === "picture_edit");
+      const started = (await (await commented(client, conversation.value.id, picture.id, { prompt: "Make the sky pink secretly", region: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 } })).json()) as { job: string };
+      const making = await editRows(client);
+      expect(making).toHaveLength(1);
+      expect(making[0]).toMatchObject({ id: `image-edit:${started.job}`, state: "running", title: "Changing a picture", forPerson: actor.id });
+      expect(JSON.stringify(making)).not.toContain("secretly");
+      expect((await editRows(other)).filter((row) => row.title !== undefined)).toHaveLength(0);
+      const activity = (await (await client.get("/api/activity")).json()) as { items: Array<{ source: string; state: string; title: string }> };
+      expect(activity.items.find((item) => item.title === "Changing a picture")).toMatchObject({ source: "job", state: "making" });
+      let progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as { state: string };
+      for (let i = 0; i < 6 && progress.state !== "done"; i += 1) progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as typeof progress;
+      expect(progress.state).toBe("done");
+      expect((await editRows(client))[0]).toMatchObject({ state: "done" });
+      // An edit whose words are sexual makes no row at all.
+      const before = (await editRows(client)).length;
+      const adult = await commented(client, conversation.value.id, picture.id, { prompt: "Make her nude", region: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 } });
+      if (adult.status === 200) expect((await editRows(client)).length).toBe(before);
+      // Stop from the Activity page.
+      const second = (await (await commented(client, conversation.value.id, picture.id, { prompt: "Add a hat", region: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 } })).json()) as { job: string };
+      expect((await editRows(client)).find((row) => row.id === `image-edit:${second.job}`)).toMatchObject({ state: "running", actions: ["stop"] });
+      expect((await client.post(`/api/jobs/${encodeURIComponent(`image-edit:${second.job}`)}/stop`, {})).status).toBe(200);
+      expect((await editRows(client)).find((row) => row.id === `image-edit:${second.job}`)).toMatchObject({ state: "cancelled" });
+      expect(fake.jobs.find((job) => job.id === second.job)?.deleted).toBe(true);
+      expect((await client.get(`/api/image-edit/jobs/${second.job}`)).status).toBe(404);
     });
 
     test("IMGEDIT-01: a painted area rides as the mask (only it can change) and a second picture of this chat is sent as the reference, an upload with no one in it as an upload", async () => {
