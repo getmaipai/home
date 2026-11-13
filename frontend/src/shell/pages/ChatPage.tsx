@@ -1907,7 +1907,7 @@ export function ChatPage({ person }: { person: Roster }) {
                 data-slot="desktop-canvas-wrapper"
                 className={cn(
                   // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate this panel's own dynamic width, the same rule the rail's own collapse animation above is already exempted for
-                  "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-out motion-reduce:transition-none lg:block",
+                  "hidden shrink-0 overflow-hidden transition-[width] duration-(--motion-slide-in) ease-(--motion-ease-slide) motion-reduce:transition-none lg:block",
                   openArtifactId !== null ? "w-full max-w-xl" : imageEditor.props !== null ? "w-full max-w-3xl" : "w-0",
                 )}
                 onTransitionEnd={(e) => {
