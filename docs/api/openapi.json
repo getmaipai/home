@@ -113535,13 +113535,26 @@
                     "file_effects": {
                       "type": "boolean",
                       "description": "Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need."
+                    },
+                    "tiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "standard",
+                          "boost",
+                          "max"
+                        ]
+                      },
+                      "description": "The quality levels this person can ask for now (Standard always; Boost and Max follow the song card's gates)."
                     }
                   },
                   "required": [
                     "can_make",
                     "engine_ready",
                     "limits",
-                    "file_effects"
+                    "file_effects",
+                    "tiers"
                   ]
                 }
               }
@@ -116115,6 +116128,15 @@
                     "minimum": 1,
                     "maximum": 2147483646,
                     "description": "The seed of the first take; leave out for a fresh one."
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ],
+                    "description": "The quality level; the same gate as the generate_music tool applies. Leave out for Standard."
                   },
                   "song_style": {
                     "type": "string",
