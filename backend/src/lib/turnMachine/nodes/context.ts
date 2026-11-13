@@ -79,24 +79,30 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 export const TOOL_ROUND_SHARE = 0.25;
 const SCENE_RENDER_TOKEN_LIMIT = 320;
 const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
+function sceneCountsForTrace(scene: Scene, sceneTokens: number) {
+  return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens };
+}
 export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): Scene["speaker"] {
   if (evidence) return { ...evidence };
   // A signed-in actor is the speaker only on private, non-robot sessions (chat and phone); robot and shared surfaces require speaker evidence.
   return surface === "chat" || surface === "phone" ? { person: actorId, basis: "signed_in", level: "confirmed" } : null;
 }
 export async function fitSceneBlock(text: string, required: string, count: (value: string) => Promise<number | null>, limit = SCENE_RENDER_TOKEN_LIMIT): Promise<string> {
+  return (await fitSceneBlockMeasured(text, required, count, limit)).text;
+}
+async function fitSceneBlockMeasured(text: string, required: string, count: (value: string) => Promise<number | null>, limit = SCENE_RENDER_TOKEN_LIMIT): Promise<{ text: string; tokens: number }> {
   let candidate = text;
   const optional = [/ Ambient events:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
   for (const pattern of optional) {
     const measured = await count(candidate);
-    if (measured === null) return required;
-    if (measured <= limit) return candidate;
+    if (measured === null) return { text: required, tokens: 0 };
+    if (measured <= limit) return { text: candidate, tokens: measured };
     candidate = candidate.replace(pattern, "");
   }
   while (true) {
     const measured = await count(candidate);
-    if (measured === null) return required;
-    if (measured <= limit) return candidate;
+    if (measured === null) return { text: required, tokens: 0 };
+    if (measured <= limit) return { text: candidate, tokens: measured };
     const roster = candidate.match(/People here: ([^.]+)\./);
     if (!roster) break;
     const people = roster[1]!.split(", ");
@@ -106,7 +112,7 @@ export async function fitSceneBlock(text: string, required: string, count: (valu
     candidate = candidate.replace(roster[0], people.length ? `People here: ${people.join(", ")}.` : "");
   }
   const finalCount = await count(candidate);
-  return finalCount !== null && finalCount <= limit ? candidate : required;
+  return finalCount !== null && finalCount <= limit ? { text: candidate, tokens: finalCount } : { text: required, tokens: finalCount ?? 0 };
 }
 export function renderScene(scene: Scene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
   const members = new Map(household.map((person) => [person.id, person]));
@@ -132,8 +138,7 @@ export function renderScene(scene: Scene, now: number, actor: PersonRow, househo
   lines.push(scene.child_present ? "A child is in the room." : "No child is known to be in the room.");
   const place = scene.place;
   if (place && place.where !== "unknown") lines.push(`Place: ${place.where === "home" ? "at home" : "away"}${place.setting !== "unknown" ? `, ${place.setting === "indoor" ? "indoors" : place.setting}` : ""}.`);
-  const text = lines.join(" ");
-  return text.length <= 1200 ? text : `${SCENE_PROLOGUE} People here.`;
+  return lines.join(" ");
 }
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
@@ -197,6 +202,7 @@ export interface ContextOutput {
    * (with scores) that became context items. Set on every non-temporary,
    * non-bare turn, empty arrays included; absent otherwise. */
   memoryTrace?: import("@/wire").MemoryTraceStats;
+  sceneCounts?: NonNullable<import("../contract").NodeExecution["scene"]>;
 }
 
 /** KS-02E: the household's chat model's `model_cutoff` from its catalog
@@ -583,7 +589,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
   const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
   const speakerLine = currentScene.speaker?.person === state.actor.id && (currentScene.speaker.level === "confirmed" || currentScene.speaker.basis === "signed_in") ? `With ${state.actor.displayName}:` : "With: someone the system has not identified.";
-  sceneItem.text = await fitSceneBlock(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine}`, sceneTokenCount);
+  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine}`, sceneTokenCount);
+  sceneItem.text = fittedScene.text;
+  const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
   items.push(sceneItem);
 
   // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries
@@ -787,7 +795,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   stageMs.count_ms = countTotalMs;
   stageMs.count_calls = countCalls;
 
-  return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } as ContextOutput };
+  return { outcome: { ok: true }, output: { __stages: stageMs, conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, sceneCounts, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}), ...(memoryTrace ? { memoryTrace } : {}) } as ContextOutput };
 };
 
 
@@ -808,6 +816,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   if (output.searchAssist) state.searchAssist = output.searchAssist;
   if (output.weatherAssist) state.weatherAssist = output.weatherAssist;
   if (output.memoryTrace) state.memoryTrace = output.memoryTrace;
+  if (output.sceneCounts) state.sceneCounts = output.sceneCounts;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question

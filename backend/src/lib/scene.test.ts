@@ -4,12 +4,22 @@ import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 import { renderScene, fitSceneBlock } from "@/lib/turnMachine/nodes/context";
+import { TraceRecorder } from "@/lib/turnMachine/trace";
 
 const person = (id: string | null, band: "child" | "teen" | "adult" | "unknown" = "adult", level: "confirmed" | "tentative" | "claimed" = "confirmed") => ({ person_id: id, label: null, relation: id ? "household" as const : "unknown" as const, band, level });
 const obs = (kind: SceneObservation["kind"], value: unknown, sensor: SceneObservation["source"]["sensor"], now: number, strength: SceneObservation["strength"] = "strong", expires = SCENE_TTL[sensor as keyof typeof SCENE_TTL]): SceneObservation => ({ id: `${sensor}-${now}-${kind}`, source: { surface: "robot", device_id: "device-1", sensor }, kind, value, confidence: strength === "strong" ? 0.9 : 0.5, strength, at: now, expires_at: now + expires });
 const empty = (conversation_id = "conversation-1"): Scene => ({ conversation_id, people: [], speaker: null, place: null, ambient: null, weather: null, alone: true, child_present: false, updated_at: 0 });
 
 describe("scene fusion", () => {
+  test("context trace scene counts contain the measured token count and no identity fields", () => {
+    const trace = new TraceRecorder();
+    trace.record("context", "context", "v1", 1, 2, { ok: true });
+    trace.setSceneCounts("context", { people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
+    expect(trace.nodes()[0]?.scene).toEqual({ people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
+    expect(typeof trace.nodes()[0]?.scene?.scene_tokens).toBe("number");
+    expect(JSON.stringify(trace.nodes()[0]?.scene)).not.toMatch(/name|label|room|person.?id/i);
+  });
+
   test("scene prompt names household members with stable age buckets; trace counts contain no names", () => {
     const at = 1_000_000;
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
@@ -77,6 +87,32 @@ describe("scene fusion", () => {
     const text = renderScene(scene, 10, sage, [sage]);
     expect(text).not.toContain("With Sage:");
     expect(text).toContain("With: someone the system has not identified.");
+  });
+  test("many typed people with long labels retain speaker, alone, and child lines", () => {
+    const at = 10_000;
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const scene: Scene & { alone_observed?: boolean } = {
+      ...empty(),
+      speaker: { person: "person-sage", basis: "signed_in", level: "confirmed" },
+      people: Array.from({ length: 20 }, (_, index) => ({
+        person_id: null,
+        label: `Guest ${index} ${"with a very long typed label ".repeat(5)}`,
+        relation: "unknown" as const,
+        band: "unknown" as const,
+        level: "claimed" as const,
+        basis: ["typed" as const],
+        last_seen_at: at,
+        expires_at: at + 1,
+      })),
+      alone: true,
+      alone_observed: true,
+      child_present: true,
+    };
+    const text = renderScene(scene, at, sage, [sage]);
+    expect(text).toContain("With Sage:");
+    expect(text).toContain("Alone: positively observed.");
+    expect(text).toContain("A child is in the room.");
+    expect(text.length).toBeGreaterThan(1200);
   });
   test("scene budget keeps speaker, alone, and child lines over cap and with a missing tokenizer", async () => {
     const required = "With: someone the system has not identified. Alone: not confirmed. A child is in the room.";

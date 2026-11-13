@@ -61,7 +61,6 @@ import { whisperLineFor } from "@/lib/turnMachine/whisperLine";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
-import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
 import { resolveLocale } from "@/lib/locale";
@@ -98,6 +97,7 @@ import type { GateDecision } from "@/lib/gate/types";
 // Last on purpose: composerHint reaches the composer modes, which reach the app and page catalogs; imported earlier it reorders module loading.
 import { composerHintAllowed, resolveComposerHint } from "@/lib/composerHint";
 import { getScene } from "@/lib/scene";
+import { countTokens } from "@/lib/tokenCount";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -876,10 +876,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // windowRoleFromId() and nodes/answer.ts's policyRefusalLine() are
   // written this way too).
   const trace = (finalSnapshot.context as { trace: TraceRecorder }).trace;
-  const currentScene = getScene(conversationId);
-  const renderedScene = state.context.find((item) => item.id === "scene")?.text ?? "";
-  const sceneTokenCount = await countTokens([{ role: "system", content: renderedScene }]);
-  trace.setSceneCounts("context", { people: currentScene?.people.length ?? 0, strong: currentScene?.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length ?? 0, typed: currentScene?.people.filter((p) => p.basis.includes("typed")).length ?? 0, place_known: !!currentScene?.place && currentScene.place.where !== "unknown", child_present: currentScene?.child_present ?? false, events: currentScene?.ambient?.events.length ?? 0, scene_tokens: sceneTokenCount ?? 0 });
+  if (state.sceneCounts) trace.setSceneCounts("context", state.sceneCounts);
   const ranNodes = new Set(state.nodes.map((n) => n.node));
   if (!ranNodes.has("safety")) trace.skip("safety", "not reached this turn");
   if (!ranNodes.has("commands")) trace.skip("commands", "not reached this turn");

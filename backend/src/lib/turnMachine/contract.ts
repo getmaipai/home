@@ -226,6 +226,8 @@ export interface TurnState {
    * this turn's prompt (set by applyContext; absent on a temporary or bare
    * turn, which injects none). Written into the turn's stats JSON. */
   memoryTrace?: import("@/wire").MemoryTraceStats;
+  /** Counts-only scene summary measured with the final rendered context block. */
+  sceneCounts?: NonNullable<NodeExecution["scene"]>;
   contextStageStats?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number };
   contextShadowStartedAt?: number;
   setContextShadowDuration?: (duration: number) => void;
