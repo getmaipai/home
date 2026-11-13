@@ -8,6 +8,7 @@ import { runPictureTool } from "@/lib/pictures/people";
 import { readPictureRoles } from "@/lib/pictures/roles";
 import { detectFaces } from "@/lib/pictures/likeness/faces";
 import { drawViews, type ViewTools } from "./sheetViews";
+import { cleanJunk, type JunkTools, type Side } from "./junkCleanup";
 
 /** Whether the two pinned face models are installed. They are installed from the install wizard and Settings, AI & models, never silently by a feature; without them a
  *  photo of several people cannot be split, and the sheet says so. A dynamic import keeps the face code off the chat picture path. */
@@ -23,11 +24,30 @@ export interface SheetTools {
   findFaces(bytes: Uint8Array, mediaType: string): Promise<Array<{ x: number; y: number; w: number; h: number }>>;
   /** Optional: a plain name and look for one picture (used for each person of a split photo, so every panel says who is in it). */
   describe?(bytes: Uint8Array, mediaType: string): Promise<{ name: string; look: string } | null>;
+  /** Optional: the masked picture edit and face check that remove the neighbour's slivers from a person split out of a photo (see junkCleanup.ts). Without it the plain cut-out is used. */
+  junk?: Pick<JunkTools, "editMasked" | "faceSimilarity">;
 }
 export interface MadeSheet { png: Uint8Array; description: string; panels: Array<{ name: string; view: string; slot: string }>; /** Plain sentences for the person about what the sheet could not do (for example, the face models are not installed). */ notes: string[] }
 
 export const SHEET_W = 768, SHEET_H = 448, PLACE_W = 288, GAP = 2, MAX_PLACES = 2;
+async function realFaceSimilarity(before: Uint8Array, after: Uint8Array, face: { x: number; y: number; w: number; h: number }): Promise<number | null> {
+  const { embedFace, faceCosine } = await import("@/lib/pictures/likeness/faces");
+  const a = await detectFaces(before), b = await detectFaces(after);
+  if (!a.ok || !b.ok) return null;
+  const pick = (faces: typeof a.value) => faces.map((f) => ({ f, d: Math.hypot(f.bbox[0] + f.bbox[2] / 2 - (face.x + face.w / 2), f.bbox[1] + f.bbox[3] / 2 - (face.y + face.h / 2)) })).sort((x, y) => x.d - y.d)[0]?.f;
+  const fa = pick(a.value), fb = pick(b.value);
+  if (!fa || !fb) return null;
+  const [ea, eb] = await Promise.all([embedFace(before, fa), embedFace(after, fb)]);
+  return ea.ok && eb.ok ? faceCosine(ea.value, eb.value) : null;
+}
 const realTools: SheetTools = {
+  junk: {
+    async editMasked(png, mask, width, height, prompt) {
+      const { realDeps } = await import("@/lib/pictures/likeness/edit");
+      return (await realDeps.editMasked(png, mask, width, height, prompt, 2, Math.floor(Math.random() * 2 ** 31), AbortSignal.timeout(600_000))).bytes;
+    },
+    faceSimilarity: realFaceSimilarity,
+  },
   async removeBackground(bytes, mediaType) { return (await runPictureTool("remove_background", bytes, mediaType, {})).png; },
   async describe(bytes) {
     const read = await readPictureRoles([bytes]);
@@ -48,6 +68,15 @@ const white = (w: number, h: number) => sharp({ create: { width: w, height: h, c
 /** Pause before the first retry of a cut-out (tests set it to 0). */
 export const cutOutPause = { ms: 1500 };
 let fellBack: string[] | null = null;
+let junkNotes: string[] | null = null;
+/** A person split out of a photo of several: the neighbour's slivers and specks are removed by a masked edit that cannot reach the face; the plain cut-out is kept (with a note) if any check fails. */
+async function withoutJunk(image: Buffer, neighbours: Side[], name: string, tools: SheetTools): Promise<Buffer> {
+  if (!tools.junk || !neighbours.length) return image;
+  const result = await cleanJunk(image, neighbours, { findFaces: tools.findFaces, ...tools.junk });
+  if (result.kind === "cleaned") return result.png;
+  if (result.kind === "failed") junkNotes?.push(`The leftover pieces of the other person could not be cleaned off the picture of ${name} safely, so it is on the sheet as it was cut out. ${result.reason}`);
+  return image;
+}
 async function cutOut(picture: SheetPicture, tools: SheetTools, box?: { x: number; y: number; w: number; h: number }): Promise<Buffer> {
   let source = Buffer.from(picture.bytes);
   if (box) {
@@ -124,7 +153,7 @@ async function panelsFor(picture: SheetPicture, tools: SheetTools): Promise<Pane
       const right = next ? Math.round((centre + next.x + next.w / 2) / 2) : Math.min(width, Math.round(centre + face.w * 2.4));
       const top = Math.max(0, Math.round(face.y - face.h * 0.9));
       const box = { x: left, y: top, w: Math.max(8, right - left), h: Math.max(8, height - top) };
-      const image = await cutOut(picture, tools, box);
+      const image = await withoutJunk(await cutOut(picture, tools, box), [...(prev ? ["left" as const] : []), ...(next ? ["right" as const] : [])], name, tools);
       // A photo of several people: each person is described on their own cut-out, so a panel never says "a man and a woman".
       const own = faces.length > 1 ? await tools.describe?.(new Uint8Array(image), "image/png").catch(() => null) ?? null : null;
       panels.push({ ...base, name: own?.name ? `${own.name}` : name, look: own?.look ?? base.look, kind: "subject", single: true, view: "Front View", image, onWhite: true });
@@ -150,12 +179,14 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
   const all: Panel[] = [];
   const fallbacks: string[] = [];
   fellBack = fallbacks;
+  const cleanupNotes: string[] = [];
+  junkNotes = cleanupNotes;
   try {
     for (const [index, picture] of pictures.entries()) {
       all.push(...await panelsFor(picture, tools));
       options.onStep?.({ phase: "cut", done: index + 1, total: pictures.length });
     }
-  } finally { fellBack = null; }
+  } finally { fellBack = null; junkNotes = null; }
   // Views the photos do not show (a side view, a clean front, an angled object) are drawn from the person's own cut-out and added after the originals.
   if (options.drawViews) {
     // One panel at a time: a person is drawn only from a panel that holds exactly one person (never from a photo the face finder could not split).
@@ -191,6 +222,7 @@ export async function makeSheetFromPictures(pictures: ReadonlyArray<SheetPicture
   const png = await white(SHEET_W, SHEET_H).composite(layers).png().toBuffer();
   const notes: string[] = [];
   if (fallbacks.length) notes.push(`The background could not be removed from ${[...new Set(fallbacks)].join(", ")}, so ${fallbacks.length === 1 ? "it is" : "they are"} on the sheet as ${fallbacks.length === 1 ? "it was" : "they were"} sent. Try again in a minute.`);
+  notes.push(...cleanupNotes);
   if (pictures.some((picture) => picture.role === "actor") && !subjects.some((panel) => panel.role === "actor" && panel.single) && !(await faceModelsInstalled())) {
     notes.push("The face models are not installed, so photos of several people could not be split into one panel each and no views were drawn of people. An admin can install them in Settings, AI and models.");
   }
