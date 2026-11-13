@@ -11554,8 +11554,8 @@ msgstr "Visualizador a pantalla completa"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:89
-#: src/shell/pages/musicStudioFx.ts:18
-#: src/shell/pages/musicStudioFx.ts:18
+#: src/shell/pages/musicStudioFx.ts:20
+#: src/shell/pages/musicStudioFx.ts:20
 #, needs-review
 msgid "Full song"
 msgstr "Canción completa"
@@ -13802,7 +13802,7 @@ msgid "I couldn't check on that picture"
 msgstr "No pude revisar esa imagen"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:841
+#: src/apps/chat/chatToolUis.tsx:843
 #, needs-review
 msgid "I couldn't check on that song"
 msgstr "No pude revisar esa canción"
@@ -24192,6 +24192,11 @@ msgid "Save a song style for me. Ask me what sound I want if you need to."
 msgstr "Guárdame un estilo de canción. Pregúntame qué sonido quiero si lo necesitas."
 
 #. js-lingui-explicit-id
+#: src/apps/chat/chatToolUis.tsx:785
+msgid "Save as GIF"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:65
 #, needs-review
 msgid "Save audience"
@@ -29182,7 +29187,7 @@ msgid "the recorded voice engine"
 msgstr "el motor de voz grabado"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:810
+#: src/apps/chat/chatToolUis.tsx:812
 msgid "The reference sheet made from your pictures"
 msgstr ""
 
@@ -33821,7 +33826,7 @@ msgid "setting.ui.home_layout.option.shelves"
 msgstr "Tus programas, música y cosas que hiciste están al frente con el día al lado."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatToolUis.tsx:841
+#: src/apps/chat/chatToolUis.tsx:843
 #: src/shell/pages/MusicWorkspacePage.tsx:214
 #, needs-review
 msgid "Your song"
