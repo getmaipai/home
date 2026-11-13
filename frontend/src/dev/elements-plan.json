@@ -5076,6 +5076,40 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "image-editor-compare.tsx",
+      "name": "image-editor-compare",
+      "group": "image",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.625; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
+    },
+    {
+      "file": "image-editor-crop.tsx",
+      "name": "image-editor-crop",
+      "group": "image",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.625; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-13T06:38:53.481Z",
-  "kitTag": "ui-v0.5.624",
+  "generatedAt": "2026-11-13T07:13:28.517Z",
+  "kitTag": "ui-v0.5.625",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1071,6 +1071,22 @@
       "group": "other",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "image-editor-compare.tsx",
+      "name": "image-editor-compare",
+      "group": "image",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.625; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
+      "file": "image-editor-crop.tsx",
+      "name": "image-editor-crop",
+      "group": "image",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.625; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
