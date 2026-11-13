@@ -322,15 +322,17 @@ describe("Create is adult-only; Browse is unchanged", () => {
   test("the create group, the Create header mode and the three pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
     const adultApp = await appRow(adult.client);
-    expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "create"]);
-    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "create").pages.map((p: { page: string }) => p.page)).toEqual(["create", "studio", "clips"]);
+    expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover", "create-make", "create-edit"]);
+    const adultCreatePages = adultApp.sidebar.groups.filter((g: { id: string }) => g.id.startsWith("create")).flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page));
+    for (const page of PAGES) expect(adultCreatePages).toContain(page);
     expect(adultApp.header.modes.map((m: { id: string }) => m.id)).toEqual(["play", "create"]);
     for (const other of [teen, child]) {
       const row = await appRow(other.client);
-      expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play"]);
-      expect(row.sidebar.groups[0].pages.map((p: { page: string }) => p.page)).toEqual(["index", "library", "clips-feed", "history", "watch-later", "liked", "playlists"]);
+      expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover"]);
+      expect(row.sidebar.groups.flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page))).toEqual(["index", "clips-feed", "library", "watch-later", "liked", "history", "playlists", "new-uploads", "channels", "categories"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
-      for (const page of [...PAGES, "make-video", "creations"]) expect((await other.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
+      // Every Create page, including the coming-soon rows, is adult-only: a teen and a child get 404.
+      for (const page of [...PAGES, "from-picture", "talking-avatar", "animate", "film-maker", "templates", "trim", "captions", "voiceover", "drafts", "make-video", "creations"]) expect((await other.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
       expect((await other.client.get("/api/plugins/video/pages/index")).status).toBe(200);
     }
     for (const page of PAGES) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(200);
