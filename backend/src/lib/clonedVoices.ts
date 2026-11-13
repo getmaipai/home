@@ -164,7 +164,7 @@ export function saveClonedVoice(
   }
   // One audit line: the role of the maker and the settings; never a person id or name, a voice id, the voice's name or the clip (rule 6a).
   appendLogLine(`voice.created role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}${inspired ? ` kind=inspired level=${inspired}${inspiredBaseId ? " blended=yes" : ""}` : ""}`);
-  void transcribeClonedVoiceOnce(id, bytes, mimeType).then((transcript) => (transcript ? ensureWhisperSample(id, { onlyIfReady: true }) : false)).catch(() => {});
+  void transcribeClonedVoiceOnce(id, bytes, mimeType).then((transcript) => (transcript ? ensureWhisperSample(id) : false)).catch(() => {});
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 

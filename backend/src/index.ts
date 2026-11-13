@@ -245,6 +245,8 @@ void reverifyStoredLists().then(() => warmHostIndex()).catch((err) => console.wa
 // household hasn't turned stack.updates.enabled on.
 ensureCoreJob("stack.updates.maintenance", "every:1d");
 ensureCoreJob("stack.image_jobs", "every:1m");
+// WHISPER-01: makes any missing whisper sample once the recorded engine is installed; quiet when there is nothing to do.
+ensureCoreJob("voice.whisper_samples", "every:5m");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands

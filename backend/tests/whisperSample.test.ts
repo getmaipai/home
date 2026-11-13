@@ -12,7 +12,7 @@ import { people } from "@/db/schema";
 import { clonedVoiceUrl, deleteClonedVoice, saveClonedVoice, whisperSamplePath, whisperVoiceSpeech } from "@/lib/clonedVoices";
 import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 import { clonedVoicesDir } from "@/lib/paths";
-import { __resetWhisperSamplesForTests, ensureWhisperSample, hasWhisperSample, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
+import { __resetWhisperSamplesForTests, ensureWhisperSample, hasWhisperSample, makeMissingWhisperSamples, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
 import { hasWhisperTag, stripWhisperTags } from "@/lib/voiceCues";
 import { __resetWhisperTurnsForTests, createWhisperDeltaFilter, isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
 
@@ -30,13 +30,15 @@ function owner() {
   return row;
 }
 
-async function savedVoice(): Promise<string> {
+async function savedVoice(opts: { attemptOnSave?: boolean } = {}): Promise<string> {
   __setClonedVoiceTranscriberForTests(async () => "exact sample words");
+  if (!opts.attemptOnSave) available = false; // the save makes its own attempt; these tests start from a voice with no sample
   const saved = saveClonedVoice(owner() as never, "Voice", new Uint8Array([1, 2]), "audio/wav");
   if (!saved.ok) throw new Error("voice setup failed");
   await transcribeClonedVoiceOnce(saved.value.id, new Uint8Array([1, 2]), "audio/wav");
-  await new Promise((resolve) => setTimeout(resolve, 20)); // the save's own background attempt settles (the engine is not ready then)
-  __resetWhisperSamplesForTests();
+  await new Promise((resolve) => setTimeout(resolve, 30)); // the save's own background attempt settles
+  available = true;
+  if (!opts.attemptOnSave) __resetWhisperSamplesForTests();
   return saved.value.id;
 }
 
@@ -76,9 +78,7 @@ describe("whisper sample", () => {
   afterEach(() => { __setRecordedSpeechFetchForTests(null); __setClonedVoiceTranscriberForTests(null); __setTtsTagsForTests(null); __resetStackEngineForTests(); });
 
   test("makes the sample once, from the voice's own clip, with the whisper cue", async () => {
-    ready = false;
     const id = await savedVoice();
-    ready = true;
     expect(await ensureWhisperSample(id)).toBe(true);
     expect(hasWhisperSample(id)).toBe(true);
     expect(submitted).toEqual([WHISPER_SAMPLE_TEXT]);
@@ -87,22 +87,31 @@ describe("whisper sample", () => {
     expect(submitted).toHaveLength(1);
   });
 
-  test("saving a voice never starts the engine: onlyIfReady is a no-op until it is loaded", async () => {
-    ready = false;
-    const id = await savedVoice();
-    expect(await ensureWhisperSample(id, { onlyIfReady: true })).toBe(false);
+  test("saving a voice makes its whisper sample at once, nobody waits for the first whisper", async () => {
+    const id = await savedVoice({ attemptOnSave: true });
+    expect(hasWhisperSample(id)).toBe(true);
+    expect(submitted).toEqual([WHISPER_SAMPLE_TEXT]);
+  });
+
+  test("the scheduled job makes every missing sample once the engine is installed, and is idle when none is missing", async () => {
+    const first = await savedVoice();
+    owner0(); // one voice, no sample yet
+    available = false;
+    expect(await makeMissingWhisperSamples()).toEqual({ made: 0, missing: 1 });
     expect(submitted).toHaveLength(0);
-    expect(hasWhisperSample(id)).toBe(false);
+    available = true;
+    expect(await makeMissingWhisperSamples()).toEqual({ made: 1, missing: 0 });
+    expect(hasWhisperSample(first)).toBe(true);
+    expect(await makeMissingWhisperSamples()).toEqual({ made: 0, missing: 0 });
+    expect(submitted).toHaveLength(1);
   });
 
   test("a whispered reply is spoken from the sample, and a voice without one speaks normally", async () => {
-    ready = false;
     const id = await savedVoice();
     const voice = clonedVoiceUrl(id);
     expect(whisperVoiceSpeech(voice)).toBeNull();
     await synthesizeSpeech("Come closer.", voice, { whisper: true });
     expect(String(spoken[0]!.get("voice_url"))).not.toContain("w=1");
-    ready = true;
     __resetWhisperSamplesForTests();
     expect(await ensureWhisperSample(id)).toBe(true);
     await synthesizeSpeech("Come closer.", voice, { whisper: true });
@@ -112,9 +121,7 @@ describe("whisper sample", () => {
   });
 
   test("deleting the voice removes its sample", async () => {
-    ready = false;
     const id = await savedVoice();
-    ready = true;
     await ensureWhisperSample(id);
     expect(existsSync(whisperSamplePath(id))).toBe(true);
     const result = deleteClonedVoice(owner0() as never, id);
@@ -123,9 +130,8 @@ describe("whisper sample", () => {
   });
 
   test("a failed attempt is not repeated for a minute", async () => {
-    ready = false;
     const id = await savedVoice();
-    ready = true; available = false;
+    available = false;
     expect(await ensureWhisperSample(id)).toBe(false);
     available = true;
     expect(await ensureWhisperSample(id)).toBe(false);

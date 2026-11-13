@@ -43,6 +43,7 @@ import { embedPendingEpisodes } from "@/lib/episodes";
 import { pollActiveStackImageJobs } from "@/lib/jobProducers";
 import { reconcileLoraInstalls } from "@/lib/loras/install";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
+import { makeMissingWhisperSamples } from "@/lib/whisperSample";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
 import { createJob, updateJob } from "@/lib/jobs";
@@ -319,7 +320,7 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void | CoreJobIdle>;
  * activity row. Such a job also writes no "running" row up front, so a tick that does work records one finished row. */
 export type CoreJobIdle = { idle: true };
 const IDLE: CoreJobIdle = { idle: true };
-const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs", "talent.history.refresh"]);
+const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs", "talent.history.refresh", "voice.whisper_samples"]);
 let talentShowsDuePromise: Promise<void> | null = null;
 export function isQuietCoreJob(job: string): boolean { return QUIET_CORE_JOBS.has(job); }
 
@@ -435,6 +436,11 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     const polled = await pollActiveStackImageJobs();
     const reconciled = await reconcileLoraInstalls();
     return polled === 0 && reconciled === 0 ? IDLE : undefined;
+  },
+  // WHISPER-01: every household voice gets its whisper sample as soon as the recorded engine is installed, so nobody waits for the first whisper.
+  "voice.whisper_samples": async () => {
+    const { made, missing } = await makeMissingWhisperSamples();
+    return made === 0 && missing === 0 ? IDLE : undefined;
   },
   "memory.embedding_retry": async () => {
     const drained = await drainPendingEmbeddings();
@@ -591,7 +597,7 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
  * a companion's daily life, engine updates) or reaches outside the hub (devices through Home Assistant, the Tailscale certificate,
  * the update check). Everything a person starts by hand still works. */
 export const WORKBENCH_SKIPPED_JOBS = ["packages.warm", "stack.updates.maintenance", "talent.life.tick", "talent.history.refresh", "talent.shows.due",
-  "schedules.device.fire", "schedules.reconcile", "tailscale.renew_certificate", "updates.check"] as const;
+  "schedules.device.fire", "schedules.reconcile", "tailscale.renew_certificate", "updates.check", "voice.whisper_samples"] as const;
 export function isWorkbench(env: Record<string, string | undefined> = process.env): boolean {
   return env.MAIPAI_WORKBENCH === "1";
 }
@@ -678,7 +684,7 @@ export function runDueJobs(
 // query returned it. A plain, exported function (not inlined into
 // runDueJobsUnguarded below) so the ordering rule itself is directly
 // testable without running real jobs.
-const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.shelf.summaries", "news.full_text.prefetch"]);
+const LOW_PRIORITY_CORE_JOBS = new Set(["voice.whisper_samples", "memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.shelf.summaries", "news.full_text.prefetch"]);
 export function sortDueJobsForPriority<T extends { job: string }>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => Number(LOW_PRIORITY_CORE_JOBS.has(a.job)) - Number(LOW_PRIORITY_CORE_JOBS.has(b.job)));
 }

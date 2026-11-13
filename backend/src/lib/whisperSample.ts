@@ -5,7 +5,12 @@
 // by the recorded engine (Fish Audio Drama 3, which has a real [whispers] cue) from the voice's own clip and transcript. A reply the model
 // marks as whispered is then spoken from that sample. The file is derived data (no record), so deleting the voice removes it and a lost
 // file is made again.
+//
+// Nobody waits for it (owner rule, 2026-11-13): a sample is made when the voice is saved, and a scheduled job (voice.whisper_samples) makes
+// every missing one as soon as the recorded engine is installed, for voices that were there before it, and again for any that failed.
 import { existsSync, renameSync, writeFileSync } from "node:fs";
+import { db } from "@/db";
+import { clonedVoices } from "@/db/schema";
 import { readClonedVoiceClip, whisperSamplePath } from "@/lib/clonedVoices";
 import { fetchRecordedSpeech, recordedSpeechStatus, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
@@ -22,15 +27,14 @@ export function hasWhisperSample(id: string): boolean {
   return existsSync(whisperSamplePath(id));
 }
 
-/** Makes the whisper sample for a household voice when it has none. True when one exists afterwards.
- * `onlyIfReady` makes it a no-op unless the recorded engine is already loaded, so saving a voice never starts a big model. */
-export function ensureWhisperSample(id: string, opts: { onlyIfReady?: boolean } = {}): Promise<boolean> {
+/** Makes the whisper sample for a household voice when it has none. True when one exists afterwards. */
+export function ensureWhisperSample(id: string): Promise<boolean> {
   if (hasWhisperSample(id)) return Promise.resolve(true);
   const running = inFlight.get(id);
   if (running) return running;
   const failed = failedAt.get(id);
   if (failed !== undefined && Date.now() - failed < RETRY_AFTER_MS) return Promise.resolve(false);
-  const job = make(id, opts).catch(() => false).then((ok) => {
+  const job = make(id).catch(() => false).then((ok) => {
     if (!ok) failedAt.set(id, Date.now()); else failedAt.delete(id);
     inFlight.delete(id);
     return ok;
@@ -39,15 +43,13 @@ export function ensureWhisperSample(id: string, opts: { onlyIfReady?: boolean } 
   return job;
 }
 
-async function make(id: string, opts: { onlyIfReady?: boolean }): Promise<boolean> {
+async function make(id: string): Promise<boolean> {
   const clip = readClonedVoiceClip(id);
   if (!clip) return false;
   const transcript = clip.transcript?.trim() || (await transcribeClonedVoiceOnce(id, clip.bytes, clip.mimeType))?.trim();
   if (!transcript) return false;
-  // Saving a voice looks once and never waits for, or starts, the big model; a whisper reply that needs the sample waits for it as a render does.
-  const status = opts.onlyIfReady ? await recordedSpeechStatus() : await waitForRecordedSpeech();
+  const status = await waitForRecordedSpeech();
   if (!status?.available || !status.installed) return false;
-  if (opts.onlyIfReady && !status.ready) return false;
   const submitted = await submitRecordedSpeech(WHISPER_SAMPLE_TEXT, clip.bytes, clip.mimeType, transcript);
   const audio = await fetchRecordedSpeech(submitted.job, submitted.done ? submitted.data : null);
   // A real WAV with some length to it (the engine wrote about ten seconds): an empty or cut-off reply is not a usable sample.
@@ -57,6 +59,20 @@ async function make(id: string, opts: { onlyIfReady?: boolean }): Promise<boolea
   renameSync(`${path}.tmp`, path);
   appendLogLine("voice.whisper_sample made=yes");
   return true;
+}
+
+const PER_TICK = 4;
+
+/** The scheduled job: make the whisper sample of every household voice that has none, a few at a time, once the recorded engine is installed.
+ * Returns how many voices still lack one after this tick (0 when there was nothing to do, so the job stays quiet). */
+export async function makeMissingWhisperSamples(): Promise<{ made: number; missing: number }> {
+  const missing = db.select({ id: clonedVoices.id }).from(clonedVoices).all().map((row) => row.id).filter((id) => !hasWhisperSample(id));
+  if (missing.length === 0) return { made: 0, missing: 0 };
+  const status = await recordedSpeechStatus();
+  if (!status?.available || !status.installed) return { made: 0, missing: missing.length };
+  let made = 0;
+  for (const id of missing.slice(0, PER_TICK)) if (await ensureWhisperSample(id)) made++;
+  return { made, missing: missing.length - made };
 }
 
 export function __resetWhisperSamplesForTests(): void {
