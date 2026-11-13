@@ -2457,7 +2457,11 @@ export const mediaSubjects = sqliteTable(
     hlc: text("hlc").notNull(),
     provenance: text("provenance").notNull(),
   },
-  (table) => [index("media_subjects_owner_idx").on(table.ownerPersonId)],
+  (table) => [
+    index("media_subjects_owner_idx").on(table.ownerPersonId),
+    uniqueIndex("media_subjects_person_idx").on(table.personId).where(sql`${table.personId} IS NOT NULL`),
+    uniqueIndex("media_subjects_synth_idx").on(table.synthId).where(sql`${table.synthId} IS NOT NULL`),
+  ],
 );
 
 // PRODUCTION-01: the spec's private, shareable production record. Structured media stays in JSON

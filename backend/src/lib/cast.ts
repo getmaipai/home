@@ -34,7 +34,7 @@ export interface CastEntry {
   audience: "all-ages" | "adult-only";
 }
 export interface ResolvedCast extends CastEntry { subject_id: string; subject: MediaSubject; synth: SynthRecord | null }
-export interface CastResult { members: ResolvedCast[]; refused: Array<{ ref: string; line: string }> }
+export interface CastResult { members: ResolvedCast[]; refused: Array<{ ref: string; line: string; ambiguous?: boolean }> }
 
 const isMinorBand = (actor: PersonRow) => speakerAgeBand(actor, new Date()) !== "adult";
 export const REAL_REFUSED_LINE = "Real-person subjects are not available for this profile yet. Ask a parent or admin if you need one.";
@@ -72,8 +72,8 @@ function memberEntry(person: PersonRow): CastEntry {
   const facts = subjectFacts({ real: false, synthId: null, personId: person.id });
   return {
     id: subject?.id ?? person.id, kind: "member", subject_kind: "character", name: person.displayName, subject_id: subject?.id ?? null, synth_id: null, person_id: person.id,
-    look: { description: subject?.look ?? person.displayName, sheet_file_id: files.sheetId, medium: "photo" }, locked_description: subject?.locked_description ?? null, voice: subject?.voice ?? null,
-    avatar: { url: files.firstId ? `/api/files/${files.firstId}/content` : null, seed: person.avatarSeed }, real: facts.real, minor: facts.minor, audience: files.adultOnly ? "adult-only" : "all-ages",
+    look: { description: subject?.look ?? person.displayName, sheet_file_id: facts.minor ? null : files.sheetId, medium: "photo" }, locked_description: subject?.locked_description ?? null, voice: subject?.voice ?? null,
+    avatar: { url: null, seed: person.avatarSeed }, real: facts.real, minor: facts.minor, audience: files.adultOnly ? "adult-only" : "all-ages",
   };
 }
 function householdPeople(): PersonRow[] { return db.select().from(people).where(and(isNull(people.deletedAt), eq(people.enabled, true))).all().filter((p) => p.role !== "guest" && !p.memorializedAt); }
@@ -81,14 +81,21 @@ function householdPeople(): PersonRow[] { return db.select().from(people).where(
 /** What this viewer may cast: synths (the synth gate, band filtering included), saved subjects, and household members (adults only, `generation.household_likeness` alone). */
 export function listCast(actor: PersonRow): CastEntry[] {
   if (actor.role === "guest") return [];
-  const entries: CastEntry[] = listSynths(actor).map(synthEntry);
+  const minorViewer = isMinorBand(actor);
+  const entries: CastEntry[] = [];
+  for (const synth of listSynths(actor)) {
+    const entry = synthEntry(synth);
+    if (minorViewer && entry.real) continue; // a real subject is refused to a minor downstream, so it is not offered
+    if (synth.based_on.kind === "household_member" && synth.based_on.person_id !== actor.id && !householdLikenessAllowed()) continue; // rule 0: household_likeness alone
+    entries.push(entry);
+  }
   for (const subject of listMediaSubjects(actor)) {
     if (subject.synth_id || subject.person_id) continue;
-    if (subject.real && isMinorBand(actor)) continue;
+    if (subject.real && minorViewer) continue;
     entries.push(subjectEntry(subject));
   }
-  if (!isMinorBand(actor)) for (const person of householdPeople()) if (person.id === actor.id || householdLikenessAllowed()) entries.push(memberEntry(person));
-  return entries;
+  if (!minorViewer) for (const person of householdPeople()) if (person.id === actor.id || householdLikenessAllowed()) entries.push(memberEntry(person));
+  return minorViewer ? entries.filter((e) => e.audience !== "adult-only") : entries; // filtered, not labelled: an adult-only entry never reaches a minor
 }
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 function refusalFor(actor: PersonRow, ref: string): string {
@@ -100,7 +107,10 @@ function refusalFor(actor: PersonRow, ref: string): string {
 export async function resolveCast(actor: PersonRow, refs: string[]): Promise<CastResult> {
   const available = listCast(actor), members: ResolvedCast[] = [], refused: CastResult["refused"] = [], seen = new Set<string>();
   for (const ref of refs) {
-    const hit = available.find((e) => e.id === ref || e.subject_id === ref || e.synth_id === ref || e.person_id === ref) ?? available.find((e) => same(e.name, ref));
+    const byId = available.find((e) => e.id === ref || e.subject_id === ref || e.synth_id === ref || e.person_id === ref);
+    const named = byId ? [] : available.filter((e) => same(e.name, ref));
+    if (named.length > 1) { refused.push({ ref, ambiguous: true, line: `More than one cast member is called "${ref}". Pick the one you mean from the cast list.` }); continue; }
+    const hit = byId ?? named[0];
     if (!hit) { refused.push({ ref, line: refusalFor(actor, ref) }); continue; }
     if (seen.has(hit.id)) continue;
     if (members.length >= MAX_CAST) { refused.push({ ref, line: `A cast can have at most ${MAX_CAST} members. Remove one and try again.` }); continue; }

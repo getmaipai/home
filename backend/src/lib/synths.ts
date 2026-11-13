@@ -1,6 +1,6 @@
 import { Synth, type Synth as SynthShape } from "@maipai/spec/gen/ts/synth.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
@@ -14,7 +14,7 @@ import { canManage } from "@/lib/personLifecycle";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
 import { registerCastSynthGate } from "@/lib/mediaProductions";
-import { createMediaSubject, registerSynthFactDeriver, subjectRowById } from "@/lib/mediaSubjects";
+import { canUseSubject, createMediaSubject, registerSynthFactDeriver, subjectRowById } from "@/lib/mediaSubjects";
 import { mediaSubjects } from "@/db/schema";
 import { readLook, versionPath } from "@/lib/companionLook";
 import { readFileSync } from "node:fs";
@@ -140,40 +140,54 @@ export function updateSynth(actor: PersonRow, id: string, patch: Partial<Pick<Sy
 
 /**
  * CREATOR-04: the two-link write. `synth.subject_id` is the source of truth; the subject's `synth_id` is written in the same transaction, so no reader
- * sees one without the other. The synth file is written last: when it fails the subject row rolls back with it.
+ * sees one without the other. The synth file is written last: when it fails the subject row rolls back with it. The actor must be able to edit the synth
+ * and use the subject; a household member's subject is never linked (it is managed through the cast); a real subject is never linked to a fictional synth;
+ * relinking clears the old subject's `synth_id`; `synth_id` is unique.
  */
 export function linkSynthSubject(actor: PersonRow, synthId: string, subjectId: string): void {
   db.transaction(() => {
+    const synth = synthById(synthId);
+    if (!synth) throw new Error("That synth could not be found. Check its ID and try again.");
+    if (synth.owner_person_id !== actor.id && actor.role !== "owner" && actor.role !== "admin") throw new Error("Only the synth's maker or an admin can link its subject.");
     const row = subjectRowById(subjectId);
-    if (!row) throw new Error("That subject could not be found. Choose another and try again.");
+    if (!row || !canUseSubject(actor, row)) throw new Error("That subject could not be found. Choose another and try again.");
+    if (row.personId) throw new Error("A household member's subject is managed through the cast and cannot be linked to a synth.");
     if (row.synthId && row.synthId !== synthId) throw new Error("That subject already belongs to another synth. Choose a different subject.");
+    if (row.real && synth.based_on.kind === "none") throw new Error("That subject is a real person and this synth is invented. Base the synth on that person, or choose another subject.");
+    db.update(mediaSubjects).set({ synthId: null, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(and(eq(mediaSubjects.synthId, synthId), ne(mediaSubjects.id, subjectId))).run();
     db.update(mediaSubjects).set({ synthId, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, subjectId)).run();
     const saved = updateSynth(actor, synthId, { subject_id: subjectId });
     if (!saved.ok) throw new Error(`The synth's subject could not be saved. ${saved.error}`);
   });
 }
-/** Reuse the synth's one saved media subject across every production; made the first time the synth is cast anywhere. `real` is derived from `based_on`, never stored by hand. */
+/** Reuse the synth's one saved media subject across every production; made the first time the synth is cast anywhere. Everything runs in one synchronous
+ *  transaction that re-checks first, so two calls (or a stale synth record) make one subject. `real` is derived from `based_on`, never stored by hand. */
 export async function ensureSubject(synth: SynthRecord): Promise<string> {
-  if (synth.subject_id) return synth.subject_id;
-  const actor = ownerActor(synth);
-  if (!actor) throw new Error("The synth's maker is unavailable. Choose another synth or restore its maker.");
-  let referenceIds: string[] = [];
-  const rest = readLook(synth.id).rest;
-  const path = rest ? versionPath(synth.id, rest) : null;
-  if (path) {
-    try {
-      const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array(readFileSync(path)), provenance: "media-subject-reference", name: `${synth.persona.display_name}.png` });
-      if (stored.ok) referenceIds = [stored.value.id];
-    } catch { /* A missing portrait does not prevent a text-only subject. */ }
-  }
+  if (synthById(synth.id)?.subject_id) return synthById(synth.id)!.subject_id!;
   let subjectId = "";
   try {
     db.transaction(() => {
-      const subject = createMediaSubject(actor, { name: synth.persona.display_name, kind: "character", look: synth.persona.look_prompt ?? synth.persona.display_name, referenceIds }, `talent:synth:${synth.id}`);
+      const current = synthById(synth.id);
+      if (!current) throw new Error("gone");
+      if (current.subject_id) { subjectId = current.subject_id; return; }
+      const actor = ownerActor(current);
+      if (!actor) throw new Error("The synth's maker is unavailable. Choose another synth or restore its maker.");
+      const existing = db.select().from(mediaSubjects).where(eq(mediaSubjects.synthId, current.id)).get();
+      if (existing) { linkSynthSubject(actor, current.id, existing.id); subjectId = existing.id; return; }
+      let referenceIds: string[] = [];
+      const rest = readLook(current.id).rest;
+      const path = rest ? versionPath(current.id, rest) : null;
+      if (path) {
+        try {
+          const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array(readFileSync(path)), provenance: "media-subject-reference", name: `${current.persona.display_name}.png` });
+          if (stored.ok) referenceIds = [stored.value.id];
+        } catch { /* A missing portrait does not prevent a text-only subject. */ }
+      }
+      const subject = createMediaSubject(actor, { name: current.persona.display_name, kind: "character", look: current.persona.look_prompt ?? current.persona.display_name, referenceIds }, `talent:synth:${current.id}`);
+      linkSynthSubject(actor, current.id, subject.id);
       subjectId = subject.id;
-      linkSynthSubject(actor, synth.id, subject.id);
     });
-  } catch { throw new Error("The synth's subject could not be saved. Try again."); }
+  } catch (error) { throw new Error(error instanceof Error && error.message.startsWith("The synth's maker") ? error.message : "The synth's subject could not be saved. Try again."); }
   return subjectId;
 }
 registerSynthFactDeriver((id) => { const synth = synthById(id); return synth ? { real: synth.based_on.kind !== "none", minor: synth.based_on.minor === true, personId: synth.based_on.kind === "household_member" ? synth.based_on.person_id ?? null : null } : null; });

@@ -7,7 +7,6 @@ import { attachmentFilePath } from "@/lib/attachments";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { canReadFileAudience } from "@/lib/access";
-import { householdLikenessAllowed } from "@/lib/likeness";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 
@@ -23,19 +22,21 @@ function personBand(personId: string): "child" | "teen" | "adult" | null {
   const person = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
   return person ? speakerAgeBand(person, new Date()) : null;
 }
-/** The one place the real-person and minor facts of a subject are worked out. A household member's subject is real and minor when the person is under 18 now. */
+/** The one place the real-person and minor facts of a subject are worked out: real is the strictest of the synth's `based_on`, the stored flag and the person link, so
+ *  real is never laundered into fictional. A synth that is gone fails safe (the stored flag or the person link still count). A household member's subject is real,
+ *  and minor when the person is under 18 now. */
 export function subjectFacts(row: Pick<typeof mediaSubjects.$inferSelect, "real" | "synthId" | "personId">): { real: boolean; minor: boolean } {
   let real = row.real, minor = false;
-  if (row.synthId) { const facts = synthFacts(row.synthId); if (facts) { real = facts.real; minor = facts.minor; if (facts.personId) { const band = personBand(facts.personId); if (band && band !== "adult") minor = true; } } }
+  if (row.synthId) { const facts = synthFacts(row.synthId); if (facts) { real = real || facts.real; minor = facts.minor; if (facts.personId) { const band = personBand(facts.personId); if (band && band !== "adult") minor = true; } } }
   if (row.personId) { const band = personBand(row.personId); real = true; minor = minor || (band !== null && band !== "adult"); }
   return { real, minor };
 }
 function view(row: typeof mediaSubjects.$inferSelect): MediaSubject { const facts = subjectFacts(row); return { id: row.id, name: row.name, kind: row.kind as SubjectKind, owner_person_id: row.ownerPersonId, shared_with: JSON.parse(row.sharedWith), look: row.look, reference_ids: JSON.parse(row.referenceIds), real: facts.real, minor: facts.minor, synth_id: row.synthId, person_id: row.personId, voice: row.voice, trained_style_id: row.trainedStyleId, locked_description: row.lockedDescription, created_at: row.createdAt, updated_at: row.updatedAt, hlc: row.hlc, provenance: row.provenance }; }
 export function isSheetReference(fileProvenance: string): boolean { if (!fileProvenance.startsWith("media-subject-reference:")) return false; try { return (JSON.parse(fileProvenance.slice("media-subject-reference:".length)) as { role?: string }).role === "sheet"; } catch { return false; } }
 function rowById(id: string) { return db.select().from(mediaSubjects).where(eq(mediaSubjects.id, id)).get(); }
-/** A household member's subject (`person_id`) is open to adults by `generation.household_likeness` alone (rule 0), never `synths.of_me`; a child or teen never uses a real subject. */
-function canUsePersonSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return !!row.personId && speakerAgeBand(actor, new Date()) === "adult" && actor.role !== "guest" && (row.personId === actor.id || householdLikenessAllowed()); }
-export function canUseSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return actor.role !== "guest" && (row.ownerPersonId === actor.id || (JSON.parse(row.sharedWith) as string[]).includes(actor.id) || canUsePersonSubject(actor, row)); }
+/** A household member's subject (`person_id`) is reached only through the cast resolver (`lib/cast.ts`, under `generation.household_likeness`), never through these subject paths:
+ *  its pictures are a person's own photos and no path here may show them to anyone `main` did not already show them to. */
+export function canUseSubject(actor: PersonRow, row: typeof mediaSubjects.$inferSelect): boolean { return actor.role !== "guest" && !row.personId && (row.ownerPersonId === actor.id || (JSON.parse(row.sharedWith) as string[]).includes(actor.id)); }
 /** The synth a subject is linked to, or null (the link `synth.subject_id` points back through). */
 export function synthIdOfSubject(subjectId: string): string | null { return rowById(subjectId)?.synthId ?? null; }
 /** The subject made from a household member's own photos, or null; no reader access check (callers apply `canUseSubject`). */
@@ -66,7 +67,7 @@ export function createMediaSubject(actor: PersonRow, input: SubjectInput, source
   return getMediaSubject(actor, id)!;
 }
 export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<SubjectInput>): MediaSubject | null {
-  const existing = rowById(id); if (!existing || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
+  const existing = rowById(id); if (!existing || existing.personId || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
   const updated: SubjectInput = { name: patch.name ?? existing.name, kind: patch.kind ?? existing.kind as SubjectKind, look: patch.look ?? existing.look, referenceIds: patch.referenceIds ?? JSON.parse(existing.referenceIds), real: patch.real ?? existing.real };
   if (existing.synthId || existing.personId) updated.real = existing.real; // a linked subject's `real` is derived, never set by hand
   if (updated.real && (actor.role === "child" || actor.role === "teen")) throw new Error("Real-person subjects are not available for this profile yet.");
@@ -76,7 +77,7 @@ export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<
   return getMediaSubject(actor, id);
 }
 export function deleteMediaSubject(actor: PersonRow, id: string): boolean {
-  const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return false;
+  const row = rowById(id); if (!row || row.personId || row.ownerPersonId !== actor.id) return false;
   const names = db.select().from(mediaProductions).all().filter((p) => p.ownerPersonId === actor.id).filter((p) => {
     const cast = JSON.parse(p.cast) as Array<{subject_id:string;wardrobe_variant_ids?:string[]}>;
     const sets = JSON.parse(p.sets) as string[], props = JSON.parse(p.props) as string[];
@@ -87,7 +88,7 @@ export function deleteMediaSubject(actor: PersonRow, id: string): boolean {
   db.delete(mediaSubjects).where(eq(mediaSubjects.id, id)).run(); sqlite.query("DELETE FROM creation_cast WHERE subject_id = ?").run(id); return true; // CREATOR-02: the cast index forgets a deleted subject
 }
 export function shareMediaSubject(actor: PersonRow, id: string, personId: string, shared: boolean): MediaSubject | null {
-  const row = rowById(id); if (!row || row.ownerPersonId !== actor.id) return null;
+  const row = rowById(id); if (!row || row.personId || row.ownerPersonId !== actor.id) return null;
   const target = db.select({ id: people.id, role: people.role }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
   if (!target || target.role === "guest" || personId === actor.id) throw new Error("Choose a named household member.");
   const ids = new Set<string>(JSON.parse(row.sharedWith)); shared ? ids.add(personId) : ids.delete(personId);

@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaSubjects, people } from "@/db/schema";
 import { createSynth, linkSynthSubject, synthById, ensureSubject, listSynths, type SynthRecord } from "@/lib/synths";
-import { createMediaSubject, shareMediaSubject, updateMediaSubject } from "@/lib/mediaSubjects";
+import { createMediaSubject, shareMediaSubject, updateMediaSubject, subjectFacts } from "@/lib/mediaSubjects";
+import { storeFile } from "@/lib/attachments";
 import { listCast, resolveCast, type CastEntry } from "@/lib/cast";
 import { LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
@@ -76,12 +77,64 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     const ada = await makeSynth(sage, "Ada", real);
     expect(names(listCast(teenRow))).toEqual([]);
     setValue(sage, `person:${teenRow.id}`, "synths.real_people", "all");
-    expect(names(listCast(teenRow))).toEqual(["Ada"]);
+    expect(names(listCast(teenRow))).toEqual([]); // a real subject is refused to a minor downstream, so it is not offered either
     setValue(sage, `person:${teenRow.id}`, "synths.real_people", "off");
     expect(names(listCast(teenRow))).toEqual([]);
     expect(listCast(teenRow).some((e) => e.kind === "member")).toBe(false);
     expect(mine(listCast(teenRow)).some((e) => e.real)).toBe(false);
     expect(ada.id).toBeTruthy();
+  });
+
+  test("a synth based on a household member needs household_likeness on (or the viewer is that member); a minor never gets it", async () => {
+    const { sage, kid, teenRow } = await world();
+    const synth = await makeSynth(sage, "Poppy Fox", { kind: "household_member", person_id: kid.id, name: null, refresh: "7d", minor: true });
+    const other = db.select().from(people).where(eq(people.displayName, "Sage")).get()! as PersonRow;
+    expect(names(listCast(other))).toContain("Poppy Fox");
+    setHouseholdSettingValue("generation.household_likeness", false);
+    expect(names(listCast(sage))).not.toContain("Poppy Fox");
+    expect((await resolveCast(sage, [synth.id])).members).toEqual([]);
+    expect(names(listCast(teenRow))).not.toContain("Poppy Fox");
+    expect((await resolveCast(teenRow, [synth.id, "Poppy Fox"])).members).toEqual([]);
+    expect(names(listCast(kid))).not.toContain("Poppy Fox");
+    setHouseholdSettingValue("generation.household_likeness", true);
+    expect(names(listCast(teenRow))).not.toContain("Poppy Fox");
+  });
+
+  test("adult-only subjects are filtered out for a minor, not just labelled", async () => {
+    const { sage, teenRow } = await world();
+    const stored = storeFile(sage, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array([137, 80, 78, 71]), provenance: 'picture-gen:{"audience":"adult-only"}', name: "a.png" });
+    if (!stored.ok) throw new Error("fixture picture failed");
+    const subject = createMediaSubject(sage, { name: "Night club", kind: "place", look: "a club", referenceIds: [stored.value.id] });
+    const plain = createMediaSubject(sage, { name: "Park", kind: "place", look: "a park" });
+    shareMediaSubject(sage, subject.id, teenRow.id, true); shareMediaSubject(sage, plain.id, teenRow.id, true);
+    expect(names(listCast(sage))).toContain("Night club");
+    expect(listCast(sage).find((e) => e.name === "Night club")).toMatchObject({ audience: "adult-only" });
+    expect(names(listCast(teenRow))).toEqual(["Park"]);
+    expect((await resolveCast(teenRow, ["Night club"])).members).toEqual([]);
+  });
+
+  test("a household member's subject is not reachable through the subject paths or the pictures of a minor", async () => {
+    const { sage, kid } = await world();
+    const { getMediaSubject, listMediaSubjects, subjectsForNames, deleteMediaSubject } = await import("@/lib/mediaSubjects");
+    const member = (await resolveCast(sage, ["Poppy"])).members[0]!;
+    expect(getMediaSubject(sage, member.subject_id)).toBeNull();
+    expect(listMediaSubjects(sage).map((s) => s.id)).not.toContain(member.subject_id);
+    expect(subjectsForNames(sage, ["Poppy"])).toBeNull();
+    expect(getMediaSubject(kid, member.subject_id)).toBeNull();
+    expect(shareMediaSubject(kid, member.subject_id, sage.id, true)).toBeNull();
+    expect(deleteMediaSubject(kid, member.subject_id)).toBe(false);
+    expect(listCast(sage).find((e) => e.person_id === kid.id)!.avatar.url).toBeNull();
+  });
+
+  test("an id is exact; a name shared by two cast members is ambiguous, never the first hit", async () => {
+    const { sage } = await world();
+    const one = createMediaSubject(sage, { name: "Rex", kind: "prop", look: "a toy" });
+    const two = createMediaSubject(sage, { name: "rex", kind: "prop", look: "another toy" });
+    const byName = await resolveCast(sage, ["REX"]);
+    expect(byName.members).toEqual([]);
+    expect(byName.refused[0]).toMatchObject({ ref: "REX", ambiguous: true });
+    expect((await resolveCast(sage, [two.id])).members[0]!.subject_id).toBe(two.id);
+    expect((await resolveCast(sage, [one.id, two.id])).members).toHaveLength(2);
   });
 
   test("the household option off hides other members from adults, keeps their own entry, and the line names the setting", async () => {
@@ -119,7 +172,7 @@ describe("a synth-linked subject", () => {
     const { sage } = await world();
     const synth = await makeSynth(sage, "Ada", real);
     const first = await resolveCast(sage, [synth.id]);
-    const second = await resolveCast(sage, ["Ada"]);
+    const second = await resolveCast(sage, [first.members[0]!.subject_id]);
     expect(first.members[0]!.subject_id).toBe(second.members[0]!.subject_id);
     expect(first.members[0]).toMatchObject({ kind: "synth", synth_id: synth.id, real: true, minor: false });
     expect(first.members[0]!.synth?.subject_id).toBe(first.members[0]!.subject_id);
@@ -128,9 +181,14 @@ describe("a synth-linked subject", () => {
     expect(mine(listCast(sage)).filter((e) => e.name === "Ada")).toHaveLength(1);
     const invented = await makeSynth(sage, "Marlow Fox");
     const made = (await resolveCast(sage, [invented.id])).members[0]!;
-    db.update(mediaSubjects).set({ real: true }).where(eq(mediaSubjects.id, made.subject_id)).run();
-    expect((await resolveCast(sage, [invented.id])).members[0]!.real).toBe(false);
-    expect(updateMediaSubject(sage, made.subject_id, { real: true })?.real).toBe(false);
+    expect(updateMediaSubject(sage, made.subject_id, { real: true })?.real).toBe(false); // never set by hand on a linked subject
+    // The derived fact is the stricter of the synth and the subject's own flag: a stored real flag is never laundered away.
+    expect(subjectFacts({ real: true, synthId: invented.id, personId: null }).real).toBe(true);
+    expect(subjectFacts({ real: false, synthId: synth.id, personId: null }).real).toBe(true);
+    // A synth that is gone fails safe: real when any stored flag or person link says so.
+    expect(subjectFacts({ real: true, synthId: "hc-gone", personId: null }).real).toBe(true);
+    expect(subjectFacts({ real: false, synthId: "hc-gone", personId: "person-x" }).real).toBe(true);
+    expect(subjectFacts({ real: false, synthId: "hc-gone", personId: null }).real).toBe(false);
   });
 
   test("a minor household-member synth keeps based_on.minor", async () => {
@@ -190,5 +248,61 @@ describe("the film runner", () => {
     const production = createMediaProduction(sage, { title: "Draft" });
     await runFilm({ actor: sage, productionId: production.id, plan, engines, signal: new AbortController().signal });
     expect(getMediaProduction(sage, production.id)!.cast.map((c) => [c.role, c.synth_id])).toEqual([["Marlow Fox", synth.id], ["Mira", null]]);
+  });
+});
+
+describe("link guards and the race", () => {
+  test("only someone who may edit the synth and use the subject links them; real is never laundered to a fictional synth", async () => {
+    const { sage, kid } = await world();
+    const synth = await makeSynth(sage, "Marlow Fox");
+    const mine = createMediaSubject(sage, { name: "Loose", kind: "character", look: "a character" });
+    expect(() => linkSynthSubject(kid, synth.id, mine.id)).toThrow();
+    expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.id, mine.id)).get()!.synthId).toBeNull();
+    const realOne = createMediaSubject(sage, { name: "Real friend", kind: "character", look: "a friend", real: true });
+    expect(() => linkSynthSubject(sage, synth.id, realOne.id)).toThrow(/real/i);
+    expect(synthById(synth.id)!.subject_id).toBeNull();
+    const ada = await makeSynth(sage, "Ada", real);
+    linkSynthSubject(sage, ada.id, realOne.id); // a real synth may take a real subject
+    expect(synthById(ada.id)!.subject_id).toBe(realOne.id);
+  });
+
+  test("relinking clears the old subject's synth_id, and synth_id is unique", async () => {
+    const { sage } = await world();
+    const synth = await makeSynth(sage, "Marlow Fox"), other = await makeSynth(sage, "Marlow Two");
+    const a = createMediaSubject(sage, { name: "A", kind: "character", look: "a" }), b = createMediaSubject(sage, { name: "B", kind: "character", look: "b" });
+    linkSynthSubject(sage, synth.id, a.id);
+    linkSynthSubject(sage, synth.id, b.id);
+    expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.id, a.id)).get()!.synthId).toBeNull();
+    expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.id, b.id)).get()!.synthId).toBe(synth.id);
+    expect(() => db.update(mediaSubjects).set({ synthId: synth.id }).where(eq(mediaSubjects.id, a.id)).run()).toThrow();
+    expect(other.id).toBeTruthy();
+  });
+
+  test("two ensureSubject calls on one synth make one subject", async () => {
+    const { sage } = await world();
+    const synth = await makeSynth(sage, "Marlow Fox");
+    const [x, y] = await Promise.all([ensureSubject(synth), ensureSubject(synth)]);
+    expect(x).toBe(y);
+    expect(db.select().from(mediaSubjects).all().filter((r) => r.synthId === synth.id)).toHaveLength(1);
+    // A stale synth record (subject_id still null) reuses the subject that exists for it.
+    expect(await ensureSubject(synth)).toBe(x);
+  });
+});
+
+describe("the migration back-fill", () => {
+  test("guards bad json, links only the oldest subject per synth, and leaves everything else alone", async () => {
+    const { Database } = await import("bun:sqlite");
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync(new URL("../src/db/migrations/0194_media_subject_cast.sql", import.meta.url), "utf8");
+    const sqlite = new Database(":memory:");
+    sqlite.exec("CREATE TABLE media_subjects (id text primary key, provenance text not null, created_at text not null, real integer not null default 0)");
+    const add = (id: string, prov: string, at: string) => sqlite.query("INSERT INTO media_subjects (id, provenance, created_at) VALUES (?, ?, ?)").run(id, prov, at);
+    add("old", 'media-subject:{"v":1,"source":"talent:synth:hc-a"}', "2026-01-01");
+    add("new", 'media-subject:{"v":1,"source":"talent:synth:hc-a"}', "2026-02-01");
+    add("bad", "media-subject:{not json", "2026-01-01");
+    add("plain", 'media-subject:{"v":1,"source":"api"}', "2026-01-01");
+    for (const part of sql.split("--> statement-breakpoint")) sqlite.exec(part);
+    const rows = Object.fromEntries((sqlite.query("SELECT id, synth_id FROM media_subjects").all() as Array<{ id: string; synth_id: string | null }>).map((r) => [r.id, r.synth_id]));
+    expect(rows).toEqual({ old: "hc-a", new: null, bad: null, plain: null });
   });
 });
