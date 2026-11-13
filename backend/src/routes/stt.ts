@@ -18,6 +18,7 @@ import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
 import { scoreEdgePartial, talkOverGrantFor } from "@/lib/talkOver";
+import { noteListeningActivity } from "@/lib/turnActivity";
 
 export const sttRoutes = apiRouter();
 
@@ -63,7 +64,11 @@ sttRoutes.get(
           const config = endpointer
             ? { ...base, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
             : base;
-          session = new SttSession(config, (msg) => ws.send(JSON.stringify(msg)));
+          session = new SttSession(config, (msg) => {
+            // LISTEN-GATE-01: the person is talking in an open call, so background model work (the memory judge) waits.
+            if ((msg.t === "vad" && msg.speaking) || msg.t === "final") noteListeningActivity();
+            ws.send(JSON.stringify(msg));
+          });
           for (const frame of pendingPcm) session.pushPcm(frame);
           pendingPcm.length = 0;
           ws.send(JSON.stringify(grant ? { t: "ready", talk_over: grant } : { t: "ready" }));

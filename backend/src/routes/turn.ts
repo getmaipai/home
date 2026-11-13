@@ -1281,11 +1281,14 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     });
   }
 
+  // A warm still in flight for this person is superseded by the real turn (and by a held run): without this the stream request
+  // queued behind the warm's prompt read on the engine. Noted on the voice timing record so a slow first token names its cause.
+  const prewarmInFlight = abortConversationPrewarm(actor.id);
   const session: ResumeSession = {
     generation: 0,
     startedAtMs: Date.now(),
     sttMs: typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 && body.stt_ms < 600_000 ? body.stt_ms : null,
-    timing: body.spoken === true ? beginVoiceTimingFor(result.turnId, typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 ? body.stt_ms : null) : undefined,
+    timing: body.spoken === true ? Object.assign(beginVoiceTimingFor(result.turnId, typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 ? body.stt_ms : null), { prewarm_in_flight: prewarmInFlight }) : undefined,
     token: resumeToken,
     ownerId: actor.id,
     viewer: actor,

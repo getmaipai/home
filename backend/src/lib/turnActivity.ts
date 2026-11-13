@@ -32,6 +32,17 @@ let lastTurnStartedAt = 0;
 // a voice answer that streams for longer than the window would otherwise
 // look "idle" before it is even done.
 let lastTurnFinishedAt = 0;
+// LISTEN-GATE-01 (2026-11-12): an open voice call is a conversation in progress even in a pause longer than the judge's 5 s window.
+// Two live spoken turns with a warm cache took 1.8 and 2.6 s to the first token (twice the others) while the memory judge was
+// mid-batch; the 2026-09-07 diagnosis measured the same 2 to 4.7 s. The hub notes every voiced onset and final transcript of a
+// listening session, and background work stays gated for a minute after the last one.
+let lastListeningActivityAt = 0;
+export const LISTENING_ACTIVE_WINDOW_MS = 60_000;
+
+/** A voice call heard the person (a voiced onset or a final transcript): background model work waits, as after a turn. */
+export function noteListeningActivity(): void {
+  lastListeningActivityAt = now();
+}
 // A lease held this long is reported as stale by turnActiveWithin(), once
 // per lease. No real turn takes anywhere near this long; a lease that
 // does is a leak to find, not a count to quietly fix.
@@ -122,6 +133,7 @@ export function turnActiveWithin(windowMs: number): boolean {
   }
   if (held.size > 0) return true;
   if (lastTurnFinishedAt !== 0 && t - lastTurnFinishedAt < windowMs) return true;
+  if (lastListeningActivityAt !== 0 && t - lastListeningActivityAt < Math.max(windowMs, LISTENING_ACTIVE_WINDOW_MS)) return true;
   return lastTurnStartedAt !== 0 && t - lastTurnStartedAt < windowMs;
 }
 
@@ -134,6 +146,7 @@ export function activeTurnCount(): number {
 export function __resetTurnActivityForTests(): void {
   lastTurnStartedAt = 0;
   lastTurnFinishedAt = 0;
+  lastListeningActivityAt = 0;
   held.clear();
   now = () => Date.now();
 }

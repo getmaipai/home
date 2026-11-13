@@ -137,3 +137,18 @@ describe("turnActiveWithin()", () => {
     }
   });
 });
+
+describe("LISTEN-GATE-01: an open voice call keeps background model work gated", () => {
+  test("a voiced onset or final in a listening session counts as activity for a minute, then clears", async () => {
+    const { noteListeningActivity, LISTENING_ACTIVE_WINDOW_MS } = await import("@/lib/turnActivity");
+    __resetTurnActivityForTests();
+    let clock = 1_000_000;
+    __setTurnActivityClockForTests(() => clock);
+    expect(turnActiveWithin(5_000)).toBe(false);
+    noteListeningActivity();
+    clock += 20_000; // a pause longer than the judge's window, inside an open call
+    expect(turnActiveWithin(5_000)).toBe(true);
+    clock += LISTENING_ACTIVE_WINDOW_MS;
+    expect(turnActiveWithin(5_000)).toBe(false);
+  });
+});

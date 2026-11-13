@@ -146,9 +146,13 @@ export function prewarmPrefixHit(conversationId: string, messages: readonly LlmM
   return { warmed: true, hit: true, first_diff: null };
 }
 
-/** A new utterance or real turn supersedes any quiet-period cache warm. */
-export function abortConversationPrewarm(actorId: string): void {
-  conversationWarms.get(actorId)?.abort();
+/** A new utterance or real turn supersedes any quiet-period cache warm. Returns whether one was in flight: a turn that starts while
+ * the engine is still reading the warm's prompt waits behind it, so the voice timing record keeps the fact (`prewarm_in_flight`). */
+export function abortConversationPrewarm(actorId: string): boolean {
+  const warm = conversationWarms.get(actorId);
+  if (!warm) return false;
+  warm.abort();
+  return true;
 }
 
 /** A hub that just started has recorded nothing, so the first spoken turn after every restart read the whole prompt cold (3 s to the first word,
