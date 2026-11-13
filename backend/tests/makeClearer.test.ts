@@ -7,10 +7,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, settingsValues } from "@/db/schema";
 import { storeFile } from "@/lib/attachments";
-import { BEST_NEEDS_DOWNLOAD, LIBRARY_SOURCE, loadSource, pollEdit, saveVersion, startEdit, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
+import { BEST_NEEDS_DOWNLOAD, LIBRARY_SOURCE, applyPreview, cancelEdit, loadSource, pollEdit, saveVersion, startEdit, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
 import { LINES, __setLikenessDepsForTests, type LikenessDeps } from "@/lib/pictures/likeness/edit";
 import type { Face } from "@/lib/pictures/likeness/faces";
 import { jobs as jobsTable } from "@/db/schema";
+import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { listMediaOps, runMediaOp } from "@/lib/mediaOps/registry";
 import { studioOperationRows } from "@/lib/mediaOps/studio";
 import { readFileSync } from "node:fs";
@@ -68,7 +69,7 @@ beforeEach(async () => {
   sageActor = db.select().from(people).where(eq(people.id, ((await made.json()) as { person: { id: string } }).person.id)).get()!;
   allowPhotos(sageActor.id);
 });
-afterEach(() => { __setLikenessDepsForTests(null); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __resetImageEditForTests(); });
+afterEach(async () => { __setPicturesFetchForTests(null); const { __setStackClientForTests } = await import("@/lib/stackEngine"); __setStackClientForTests(null); __setLikenessDepsForTests(null); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __resetImageEditForTests(); });
 
 describe("Make clearer in the operations table", () => {
   test("there is one tool: the old Upscale is not listed, and an old caller still runs it as Make clearer at Better", async () => {
@@ -269,11 +270,22 @@ describe("Make clearer, Best level", () => {
     const source = await libraryPicture(bytes ?? await softPicture(0));
     const asked: FormData[] = [];
     const restored = await softPicture(0);
+    const resultImage = await sharp(Buffer.from(restored)).composite([{ input: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><circle cx="100" cy="80" r="42" fill="#d8a080"/></svg>') }]).png().toBuffer();
     const { __setStackClientForTests } = await import("@/lib/stackEngine");
-    __setStackClientForTests({ imageEdit: async (form: FormData) => { asked.push(form); return { kind: "job", job: "best-1" }; }, job: async () => ({ id: "best-1", state: "done", percent: 100, position: null, result: { images: [{ width: W, height: H, engine: "image-gen", model: "seedvr2-3b", ms: 6100 }] } }), imageEditResult: async () => restored, cancelJob: async () => ({}) } as never);
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/generations/best-1")) {
+        if (init?.method === "DELETE") return new Response(null, { status: 204 });
+        return Response.json({ job: "best-1", state: "done", progress: 100, data: [{ width: W, height: H, model: "seedvr2-3b", ms: 6100 }] });
+      }
+      if (url.endsWith("/v1/images/generations/best-1/0.png")) return new Response(resultImage, { status: 200, headers: { "content-type": "image/png" } });
+      if (url.endsWith("/v1/images/edits/best-1")) return Response.json({ error: "No such result" }, { status: 404 });
+      throw new Error(`Unexpected Stack request: ${url}`);
+    }) as typeof fetch);
+    __setStackClientForTests({ imageEdit: async (form: FormData) => { asked.push(form); return { kind: "job", job: "best-1" }; } } as never);
     __setImageToolsForTests(BEST_READY(), true);
     const started = await startEdit(sageActor, LIBRARY_SOURCE, source.id, { operation: "clearer", level: "best" });
-    return { source, asked, started, restore: __setStackClientForTests };
+    return { source, asked, started, restore: __setStackClientForTests, restored };
   }
   const row = () => db.select().from(jobsTable).all().find((r) => r.id.startsWith("image-edit:best-1"));
 
@@ -287,7 +299,39 @@ describe("Make clearer, Best level", () => {
     __setLikenessDepsForTests(faceDeps({ faces: [] }));
     const done = await pollEdit(sageActor, "best-1");
     expect(done.state).toBe("done");
+    expect(done).toMatchObject({ preview: { operation: "clearer", width: W, height: H } });
+    if (done.state === "done") { const saved = await applyPreview(sageActor, done.preview.token); expect(note(saved.id).lock).not.toBe("off"); }
     expect(row()).toMatchObject({ state: "done" });
+    expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
+    restore(null);
+  });
+
+  test("Best can use the inline generation picture", async () => {
+    const { started, restore, restored } = await startBest();
+    const { __setPicturesFetchForTests } = await import("@/lib/pictures/stack");
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/generations/best-1") && init?.method === "DELETE") return new Response(null, { status: 204 });
+      if (url.endsWith("/v1/images/generations/best-1")) return Response.json({ job: "best-1", state: "done", progress: 100, data: [{ b64_json: Buffer.from(restored).toString("base64"), width: W, height: H }] });
+      throw new Error(`Unexpected Stack request: ${url}`);
+    }) as typeof fetch);
+    __setLikenessDepsForTests(faceDeps({ faces: [] }));
+    expect(started.state).toBe("running");
+    expect((await pollEdit(sageActor, "best-1")).state).toBe("done");
+    restore(null);
+  });
+
+  test("Stop cancels Best's generation job", async () => {
+    const { started, restore } = await startBest();
+    let deleted = false;
+    __setPicturesFetchForTests((async (input, init) => {
+      if (String(input).endsWith("/v1/images/generations/best-1") && init?.method === "DELETE") { deleted = true; return new Response(null, { status: 204 }); }
+      throw new Error("Unexpected Stack request");
+    }) as typeof fetch);
+    expect(started.state).toBe("running");
+    await cancelEdit(sageActor, "best-1");
+    expect(deleted).toBe(true);
+    await expect(pollEdit(sageActor, "best-1")).rejects.toMatchObject({ status: 404 });
     restore(null);
   });
 

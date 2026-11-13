@@ -631,7 +631,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
       return { state: "done", preview: keepPreview(actor, source, input.operation, reply.png, reply.item) };
     }
     sweep();
-    jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now(), ...(input.operation === "clearer" && input.level ? { level: input.level } : {}) });
+    jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now(), ...(input.operation === "clearer" && input.level ? { level: input.level } : {}), ...(best ? { generative: true } : {}) });
     openEditRow(actor, source, reply.job, input.operation, false);
     return { state: "running", job: reply.job, percent: null, label: "Working on it" };
   } catch (error) {
@@ -647,7 +647,7 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
   if (!job || job.personId !== actor.id) throw new ImageEditError(404, "That edit isn't running any more. Start it again.", "not_found");
   try {
     if (job.finalising) return { state: "done", preview: await job.finalising };
-    if (job.generative) return await pollComment(actor, jobId, job);
+    if (job.generative) return await pollGenerativeEdit(actor, jobId, job);
     const stack = await getStackClient().job(jobId);
     if (stack.state === "queued" || stack.state === "running" || stack.state === "paused" || stack.state === "stalled" || stack.state === "waiting_for_you") {
       trackEdit(jobId, { state: stack.state === "queued" ? "queued" : "running", progress: { stage: OP_LABEL[job.op], ...(stack.percent > 0 ? { percent: stack.percent } : {}) } });
@@ -883,7 +883,7 @@ export async function isGeneratedPicture(actor: PersonRow, source: SourcePicture
   return typeof row?.provenance === "string" && row.provenance.startsWith("picture-gen:");
 }
 
-async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promise<EditProgress> {
+async function pollGenerativeEdit(actor: PersonRow, jobId: string, job: EditJob): Promise<EditProgress> {
   let status;
   try {
     status = await getGenerationJob(jobId);
@@ -893,25 +893,28 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     trackEdit(jobId, { state: "failed", errorKind: mapped.code, waitingReason: mapped.message });
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
+  const label = OP_LABEL[job.op];
   if (status.state === "queued" || status.state === "running") {
-    trackEdit(jobId, { state: status.state, progress: { stage: OP_LABEL.comment, ...(status.progress > 0 ? { percent: Math.min(99, Math.round(status.progress)) } : {}) } });
-    return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : OP_LABEL.comment };
+    trackEdit(jobId, { state: status.state, progress: { stage: label, ...(status.progress > 0 ? { percent: Math.min(99, Math.round(status.progress)) } : {}) } });
+    return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : label };
   }
   if (status.state === "cancelled") { jobs.delete(jobId); trackEdit(jobId, { state: "cancelled" }); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
   if (status.state === "failed") { jobs.delete(jobId); trackEdit(jobId, { state: "failed", errorKind: status.code ?? "failed", waitingReason: status.error ?? "That change did not work. Try again, or describe it differently." }); return { state: "failed", error: status.error ?? "That change did not work. Try again, or describe it differently.", code: status.code ?? "failed" }; }
   job.finalising = (async () => {
     // The finished picture is kept as a preview first; the engine's copy is deleted only after that worked.
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
-    const png = await fetchPicture(jobId, 0);
+    const png = status.data[0]?.b64_json ? new Uint8Array(Buffer.from(status.data[0].b64_json, "base64")) : await fetchPicture(jobId, 0);
     const meta = await sharp(png).metadata();
     const made = status.data[0];
     // IMGGEN-SAFE-01: a described change is a new picture, so it passes the same finished-output check before it is kept as a preview.
     const checks = await checkImages([png], "picture");
     const decision = await gateFinished({ actor, kind: "picture", jobId, adultOnly: job.adultOnly === true, checks, images: [png], ...(job.promptHash ? { promptHash: job.promptHash } : {}) });
     if (decision.action === "withhold") throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
+    // Best is a restore: the same face check as the editing-tools path (2026-11-07 likeness bar) before it is kept.
+    if (job.level === "best") await guardBest(actor, source, png);
     stoppedGuard(jobId);
-    const kept = keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms, audience: job.audience });
-    await cancelOrDelete(jobId);
+    const kept = keepPreview(actor, source, job.op, png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms, audience: job.audience, ...(job.level ? { level: job.level } : {}) });
+    if (job.op === "comment") await cancelOrDelete(jobId);
     return kept;
   })();
   try {
