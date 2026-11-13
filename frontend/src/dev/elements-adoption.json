@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-13T16:49:35.474Z",
-  "kitTag": "ui-v0.5.640",
+  "generatedAt": "2026-11-13T17:02:13.855Z",
+  "kitTag": "ui-v0.5.642",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1416,7 +1416,7 @@
       "group": "prompt",
       "verdict": "wire-after",
       "verdictReason": "VIDEO-CREATE-02 picture-card chooser (look and length cards); Home wires it when the Create screen is built.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "option-list.tsx",
