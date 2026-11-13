@@ -18,6 +18,8 @@ import { streamTurnEvents } from "@/routes/turn";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { __setSearchAssistLoaderForTests } from "@/lib/searchAssist/shadow";
 import { __setWeatherHeadForTests } from "@/lib/searchAssist/weatherAssist";
+import * as plugins from "@/lib/plugins";
+import { spyOn } from "bun:test";
 import { __resetSearchAssistCountersForTests, searchAssistCounters } from "@/lib/searchAssist/counters";
 import { newPersonId } from "@/lib/id";
 import type { SearchAssistManifest } from "@/lib/searchAssist/weights";
@@ -78,7 +80,7 @@ afterEach(() => {
 
 interface Script { reply?: string; call?: { name: string; args: string }; place?: string | null }
 
-async function run(actor: BenchPeople["owner"], script: Script, opts: { spoken?: boolean; utterance?: string } = {}) {
+async function run(actor: BenchPeople["owner"], script: Script, opts: { spoken?: boolean; surface?: "chat" | "robot"; utterance?: string } = {}) {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const requests: ChatCompletionRequest[] = [];
   let mainSeen = 0;
@@ -88,7 +90,7 @@ async function run(actor: BenchPeople["owner"], script: Script, opts: { spoken?:
       requests.push(req);
       if ((req as { response_format?: unknown }).response_format) return JSON.stringify({ place: script.place ?? null });
       mainSeen += 1;
-      return mainSeen === 1 ? (script.reply ?? PLAIN) : "Final answer from the weather.";
+      return mainSeen === 1 ? (script.reply ?? PLAIN) : "Rain is expected tonight, with a 70% chance.";
     },
     scriptedToolCalls: (req: ChatCompletionRequest) => {
       if (!script.call || !req.tools || req.tools.length === 0 || (req as { response_format?: unknown }).response_format) return undefined;
@@ -100,7 +102,7 @@ async function run(actor: BenchPeople["owner"], script: Script, opts: { spoken?:
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
   __resetLlmSupervisorForTests();
   try {
-    const stream = await runTurnNextStream(actor, "chat", opts.utterance ?? UTTERANCE, opts.spoken ? { spoken: true } : {});
+    const stream = await runTurnNextStream(actor, opts.surface ?? "chat", opts.utterance ?? UTTERANCE, opts.spoken ? { spoken: true } : {});
     if (!stream.ok || stream.kind !== "stream") throw new Error("expected a stream result");
     const events: Array<{ type: string; text?: string; value?: unknown }> = [];
     for await (const event of streamTurnEvents(stream, actor.id)) events.push(event as { type: string; text?: string; value?: unknown });
@@ -139,6 +141,22 @@ describe("weather rescue", () => {
     const r = await run(people.owner, {}, { spoken: true });
     expect(r.action).toBe("rescued");
     expect(r.outcomes.some((o) => o.packageId === "weather")).toBe(true);
+  });
+
+  test("a robot weather promise runs the tool and speaks its forecast result", async () => {
+    setHouseholdSettingValue("chat.search_assist", "off");
+    const originalReply = "Let me check the actual forecast for tonight in Springfield.";
+    // The initial reply is a promise; the phrasing round reads the result supplied by the fake package.
+    const original = plugins.runPlugin;
+    const weather = spyOn(plugins, "runPlugin").mockImplementation(async (id, ...rest) => {
+      if (id === "weather") return { ok: true as const, value: { reply: { text: "Rain is expected tonight, with a 70% chance." }, data: { place: "Springfield", conditions: "rain" }, actions: [] } } as never;
+      return original(id, ...rest);
+    });
+    try {
+      const r = await run(people.owner, { reply: originalReply }, { surface: "robot", utterance: "Is it going to rain tonight?" });
+      expect(r.outcomes.some((o) => o.packageId === "weather")).toBe(true);
+      expect(r.deltaText).toContain("Rain is expected tonight, with a 70% chance.");
+    } finally { weather.mockRestore(); }
   });
 
   test("it works for a child and a teen", async () => {

@@ -142,6 +142,10 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, language: input.language, sources: input.outcome.sources ?? [], provenance } };
     }
     case "model_text": {
+      const promiseOnly = input.text.trim().replace(/[.!?]+$/, "");
+      if (state.outcomes.length === 0 && /^(?:one moment|just a moment|let me (?:check|look|find|see)|i(?:'| a)m (?:checking|looking)|i(?:'| a)ll (?:check|look|find))\b/i.test(promiseOnly)) {
+        return { outcome: { ok: true }, output: { text: "I couldn't look that up just now.", sources: [] } };
+      }
       // CHAT-AUTO-LEAD-IMAGE-01: only start after the model has chosen a
       // text answer. A show_images call (or an earlier image pipeline) owns
       // this turn's pictures. Starting here keeps a slow picture host beside

@@ -1281,6 +1281,16 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
   const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && !continuing && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));
+  const promiseWeather = !isPhrasingRound && state.outcomes.length === 0 && attempt.ok && !attempt.toolCalls?.length && lookupPromiseOnly(attempt.text) && /\b(?:weather|forecast|rain|snow|temperature)\b/i.test(input.utterance) && tools.some((tool) => tool.id === WEATHER_TOOL);
+  if (promiseWeather) {
+    gate?.reset();
+    const place = weatherPlaceFromUtterance(input.utterance);
+    const reasoning = attempt.ok && state.reasoning.emit ? attempt.reasoning : undefined;
+    return { outcome: { ok: true }, output: { kind: "tool_calls", calls: [{ tool: WEATHER_TOOL, args: place ? { place } : {}, id: "promise-weather" }], reasoning } };
+  }
+  if (!isPhrasingRound && state.outcomes.length === 0 && attempt.ok && !attempt.toolCalls?.length && lookupPromiseOnly(attempt.text)) {
+    attempt = { ...attempt, text: "I couldn't look that up just now." };
+  }
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
   // keep cutting until the request fits or the prompt carries no search
@@ -1488,6 +1498,17 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     return { outcome: draft ? { ok: true, draft_discarded: true } : { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning, ...(draft ? { draft } : {}) } };
   }
 
+  // RULES.md rule 6: a lookup promise with no call and no result is not an answer.
+  if (!isPhrasingRound && state.outcomes.length === 0 && lookupPromiseOnly(attempt.text)) {
+    if (/\b(?:weather|forecast|rain|snow|temperature)\b/i.test(input.utterance) && tools.some((tool) => tool.id === WEATHER_TOOL)) {
+      gate?.reset();
+      const place = weatherPlaceFromUtterance(input.utterance);
+      const recovered: ModelOutput = { kind: "tool_calls", calls: [{ tool: WEATHER_TOOL, args: place ? { place } : {}, id: "promise-weather" }], reasoning };
+      return { outcome: { ok: true }, output: recovered };
+    }
+    attempt = { ...attempt, text: "I couldn't look that up just now." };
+  }
+
   // The one exit that ever ships real, streamable text - settle the
   // gate here, once, on the FINAL attempt (post-retry) alone.
   //
@@ -1567,6 +1588,17 @@ const PLACE_WRITER_SCHEMA = {
 } as const;
 const PLACE_WRITER_INSTRUCTION = "The person asked about the weather. If their message names a place, give that place exactly as they wrote it; if it names none, give null. Never guess or add a place they did not write.";
 const PLACE_WRITER_MAX_TOKENS = 32;
+
+/** A spoken reply that only announces a lookup leaves the question unanswered. */
+export function lookupPromiseOnly(text: string): boolean {
+  const normalized = text.trim().replace(/[.!?]+$/, "");
+  return normalized.length > 0 && normalized.length <= 180 && /^(?:okay[, ]+)?(?:one moment|just a moment|let me (?:check|look|find|see)|i(?:'| a)m (?:checking|looking|going to check|going to look)|i(?:'| a)ll (?:check|look|find)|checking (?:the|that|for)|looking (?:up|at|for))(?:\b|$)/i.test(normalized);
+}
+
+function weatherPlaceFromUtterance(utterance: string): string | null {
+  const match = utterance.match(/\b(?:in|for)\s+([\p{L}][\p{L} .,'’-]{1,60}?)(?:\s+(?:tonight|today|tomorrow|this evening|next week)|[?.!]|$)/iu);
+  return match?.[1]?.trim() || null;
+}
 
 /** One grammar-constrained generation reading the place a weather question names (null: none, so the tool uses the
  * household home). A failed or malformed answer is no place named. */
