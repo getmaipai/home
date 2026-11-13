@@ -120,7 +120,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/from-picture.json` | video | From a picture |
 | `backend/packages/video/pages/history.json` | video | History |
 | `backend/packages/video/pages/index.json` | video | Video |
-| `backend/packages/video/pages/library.json` | video | Library |
+| `backend/packages/video/pages/library.json` | video | All videos |
 | `backend/packages/video/pages/liked.json` | video | Liked videos |
 | `backend/packages/video/pages/new-uploads.json` | video | New uploads |
 | `backend/packages/video/pages/playlist.json` | video | Playlist |
