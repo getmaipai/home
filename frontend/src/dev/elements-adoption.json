@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-13T15:48:09.359Z",
-  "kitTag": "ui-v0.5.637",
+  "generatedAt": "2026-11-13T16:12:02.743Z",
+  "kitTag": "ui-v0.5.638",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -727,6 +727,14 @@
       "verdict": "later",
       "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
       "implemented": false
+    },
+    {
+      "file": "composer-parts.tsx",
+      "name": "composer-parts",
+      "group": "composer",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.638; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": true
     },
     {
       "file": "composer-slash-commands.aui.tsx",
