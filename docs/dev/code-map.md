@@ -23,6 +23,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/audio/pages/index.json` | audio | Listen now |
 | `backend/packages/audio/pages/library.json` | audio | Your Library |
 | `backend/packages/audio/pages/liked.json` | audio | Liked |
+| `backend/packages/audio/pages/lyrics-browse.json` | audio | Lyrics |
 | `backend/packages/audio/pages/lyrics.json` | audio | Lyrics |
 | `backend/packages/audio/pages/made-for-you.json` | audio | Made for you |
 | `backend/packages/audio/pages/make-album.json` | audio | Make an album |
