@@ -8,7 +8,7 @@ import { attachments, conversationTurns, people } from "@/db/schema";
 import { createAttachment, purgeFileRecord, removeFileBlobs, storeFile, storeTemporaryChatImage } from "@/lib/attachments";
 import { newCreationId, newFileId, newPictureJobId } from "@/lib/id";
 import { recordPictureCreation, safely } from "@/lib/creations/writers";
-import { loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
+import { LIBRARY_SOURCE, loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
@@ -309,7 +309,6 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       if (stopped(job)) { discardStored(storedIds); return; }
       const { raw, width, height, meta } = made[index]!;
       const conversationId = job.conversationId;
-      if (!conversationId) throw new Error("no conversation");
       const sourceId = job.request.source_file_id;
       const sourceRow = sourceId ? db.select({ owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, sourceId)).get() : undefined;
       const sourceItem = sourceRow ? lockItemOfProvenance(sourceRow.owner, sourceRow.provenance) : null;
@@ -321,23 +320,23 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
         : newItemMark(sourceItem ? [{ madeAudience: sourceItem.madeAudience, lock: sourceItem.lock }] : [], adult);
       if (job.request.edit) {
         // IMGEDIT-01: a change to a picture already in the chat is the next version of that picture (its Original and Undo stay in the editor).
-        const source = loadSource(actor, conversationId, job.request.edit.source_id, true);
+        const source = loadSource(actor, conversationId ?? LIBRARY_SOURCE, job.request.edit.source_id, true);
         const version = await saveVersion(actor, source, raw, { op: "comment", audience: adult ? "adult-only" : "all-ages", label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
         storedIds.push(version.id);
         files.push({ id: version.id, width: version.width ?? width, height: version.height ?? height, ...meta });
         continue;
       }
-      if (job.temporary) {
+      if (job.temporary && conversationId) {
         const id = newFileId();
         storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: mark.madeAudience, generated: true });
         files.push({ id, width, height, ...meta });
         continue;
       }
-      const turnExists = !!job.turnId && await waitForTurnRow(job.turnId, job);
+      const turnExists = !!conversationId && !!job.turnId && await waitForTurnRow(job.turnId, job);
       if (stopped(job)) { discardStored(storedIds); return; }
       const creationId = newCreationId();
       const provenance = `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), creation: creationId, job: job.id, index, ...meta, width, height, ...(!turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`;
-      const created = turnExists ? createAttachment(actor, { conversationId, turnId: job.turnId!, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "conversation" }) : storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "kept" });
+      const created = turnExists && conversationId ? createAttachment(actor, { conversationId, turnId: job.turnId!, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "conversation" }) : storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "kept", name: "Generated picture" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;

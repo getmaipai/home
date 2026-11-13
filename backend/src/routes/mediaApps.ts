@@ -34,6 +34,8 @@ import { changePlaylistMembers, musicPlaylistOps, playlistFor } from "@/lib/medi
 import { reportKeptSongs, clearMusicSearches, musicQueueAction, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
+import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
+import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { isReshape, startReshape, startSharpen } from "@/lib/videos/clipEditStart";
@@ -445,7 +447,15 @@ export const mediaAppRoutes: ReadonlyArray<{ id: MediaAppId; routes: ReturnType<
  */
 export function createImageAppRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "image", ["/actions/op", "/actions/op-apply", "/actions/studio-run", "/actions/studio-comment", "/actions/studio-apply", "/actions/studio-markup", "/actions/studio-reference"]);
+  gateMediaApp(routes, "image", ["/actions/make", "/actions/op", "/actions/op-apply", "/actions/studio-run", "/actions/studio-comment", "/actions/studio-apply", "/actions/studio-markup", "/actions/studio-reference"]);
+  routes.post("/actions/make", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!appRouteAllowed(person, "image", "actions", "make")) return next();
+    const read = readPictureMakeBody(await jsonBody(c));
+    if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
+    const made = await makePictureFor(person, read.body);
+    return made.ok ? c.json({ ok: true as const, id: made.ids[0], ids: made.ids, state: getPictureJob(person, made.ids[0]!)?.state ?? "queued", notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
   routes.post("/actions/op", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!appRouteAllowed(person, "image", "actions", "op")) return next();

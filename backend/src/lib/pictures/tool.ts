@@ -27,8 +27,10 @@ import { runMediaOp } from "@/lib/mediaOps/registry";
 import { subjectsForNames } from "@/lib/mediaSubjects";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture, latestPictureId } from "./editTool";
-import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
+import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
 import { lockedPictureStyleOutcome } from "./lock";
+import { ImageEditError, isGeneratedPicture, LIBRARY_SOURCE, loadSource } from "@/lib/imageEdit";
+import { prepareEditSource } from "./editSources";
 
 const KID_MAX_COUNT = 2;
 let templateMediaOpRunner = runMediaOp;
@@ -97,6 +99,7 @@ function refused(callId: string, args: Record<string, unknown>, refusal: Picture
 
 export async function runGenerateImage(input: RunGenerateImageInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
+  const createPage = !state.conversationId && state.temporary !== true && state.ephemeral !== true;
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
   let template: ReturnType<typeof getTemplate> = null;
@@ -148,6 +151,28 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const resolvedSubjects = namedSubjects && mergeSubjects(namedSubjects, castChosen.subjects);
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
 
+  // CREATOR-15: without a conversation, references are Library files. Resolve ownership and Adult lock in the Library reader,
+  // then screen each source just like an edit source. Chat references keep their existing routing below.
+  const libraryRefs: Array<{ id: string; bytes: Uint8Array; mediaType: string; imageSource: "generated" | "uploaded"; adultMark: { madeAudience: "adult-only" | "all-ages" | null; lock: "on" | "off" } }> = [];
+  if (createPage && Array.isArray(args.references)) {
+    const childLine = CHILD_NO_PHOTOS_LINE;
+    for (const entry of args.references.slice(0, 3)) {
+      const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
+      if (!id) continue;
+      let source;
+      try { source = loadSource(state.actor as PersonRow, LIBRARY_SOURCE, id, true); }
+      catch (error) {
+        const line = error instanceof ImageEditError && error.code === "locked" ? error.message : error instanceof ImageEditError && error.code === "child_cartoons_only" ? childLine : "I can't find that picture.";
+        return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${line}` }, data: { refused: error instanceof ImageEditError && error.code === "locked" ? "locked" : "reference_gone" }, actions: [] } });
+      }
+      const generated = await isGeneratedPicture(state.actor as PersonRow, source);
+      if (laneOf(audience) === "child" && !generated) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${childLine}` }, data: { refused: "child_cartoons_only" }, actions: [] } });
+      const screened = await prepareEditSource({ audience, bytes: source.bytes, generated, text: typeof args.prompt === "string" ? args.prompt : "" });
+      if (!screened.ok) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${screened.line}` }, data: { refused: screened.code }, actions: [] } });
+      libraryRefs.push({ id, bytes: source.bytes, mediaType: source.mediaType, imageSource: screened.imageSource, adultMark: source.adultMark ?? { madeAudience: null, lock: "on" } });
+    }
+  }
+
   // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
   if (typeof normalized.change === "string" && normalized.change.trim() !== "") {
     const mapped = { ...normalized };
@@ -165,7 +190,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     }
     return runEditPicture({ state, args: mapped, callId, audience });
   }
-  if (Array.isArray(normalized.references) && normalized.references.length) {
+  if (!createPage && Array.isArray(normalized.references) && normalized.references.length) {
     const sourceId = latestPictureId(state.actor as PersonRow, state.conversationId, state.temporary === true || state.ephemeral === true);
     if (!sourceId) return failed(callId, args, "no_picture", "bad_arguments");
     const references = (normalized.references as unknown[]).flatMap((entry) => {
@@ -181,7 +206,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     return failed(callId, args, "no_engine", "unavailable", "no picture model is installed on the Stack");
   }
   const maxN = engine.limits?.max_n ?? 4;
-  const count = clampCount(args.count, maxN);
+  const wantedCount = typeof args.count === "number" && Number.isFinite(args.count) ? Math.max(1, Math.min(8, Math.round(args.count))) : 1;
+  const totalCount = createPage ? (laneOf(audience) === "child" ? Math.min(wantedCount, KID_MAX_COUNT) : wantedCount) : clampCount(wantedCount, maxN);
+  const count = clampCount(totalCount, maxN);
   const aspectSize: Record<string, string> = { "1:1":"square", "3:2":"landscape", "2:3":"portrait", "16:9":"wide", "9:16":"tall" };
   const chosenAspect = template?.aspect ?? presetAspect;
   const size = PICTURE_SIZES[chosenAspect ? aspectSize[chosenAspect] ?? "square" : typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
@@ -211,7 +238,11 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
     .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
     .slice(0, Math.max(1, 1 + (engine.edit?.references ?? 0)));
-  const strictAudience = subjectRefs.some((ref) => ref.audience === "adult-only") || castIsAdultOnly(castChosen) ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
+  const referenceCapacity = Math.max(1, 1 + (engine.edit?.references ?? 0));
+  const combinedRefs = [...libraryRefs.map((ref) => ({ ...ref, kind: "character" as const })), ...subjectRefs].slice(0, referenceCapacity);
+  const usedLibraryRefs = libraryRefs.filter((ref) => combinedRefs.some((used) => used.id === ref.id));
+  const droppedReferences = libraryRefs.length + subjectRefs.length > combinedRefs.length;
+  const strictAudience = usedLibraryRefs.some((ref) => ref.adultMark.madeAudience !== "all-ages" || ref.adultMark.lock === "on") || subjectRefs.some((ref) => ref.audience === "adult-only") || castIsAdultOnly(castChosen) ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
   const second = refusePrompt(`${subjectPrompt} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   if (plan && !plan.ok) return refused(callId, args, { kind: "plan", why: "style_plan", line: plan.line });
@@ -227,35 +258,37 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (kid && !slot) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   try {
     const temporary = state.temporary === true || state.ephemeral === true;
-    const job = await startPictureJob({
+    // One take. A Create-page run asks for more takes as more jobs of one picture each (`extra`), with no chat behind them.
+    const startTake = (extra: boolean) => startPictureJob({
       actor: state.actor as PersonRow,
+      sources: usedLibraryRefs.map(({ adultMark }) => adultMark),
       subjectIds: resolvedSubjects.map(({ subject }) => subject.id),
-      conversationId: state.conversationId,
-      turnId: state.turnId,
-      companionId: state.persona?.id ?? null,
-      temporary,
+      conversationId: extra ? null : state.conversationId,
+      turnId: extra ? null : state.turnId,
+      companionId: extra ? null : state.persona?.id ?? null,
+      temporary: extra ? false : temporary,
       kind: "generate",
       prompt: subjectPrompt,
       tier: jobTier("image", tierAsked.tier, choice.quality),
       body: {
         prompt: kid ? forceCartoon(subjectPrompt) : subjectPrompt,
         size,
-        n: kid ? Math.min(count, KID_MAX_COUNT) : count,
+        n: extra ? 1 : kid ? Math.min(count, KID_MAX_COUNT) : createPage && combinedRefs.length ? 1 : count,
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
         ...(plan?.ok ? { loras: plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength })) } : adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
-      ...(subjectRefs.length ? { submit: async () => {
+      ...(combinedRefs.length ? { submit: async () => {
         const form = new FormData();
-        form.append("image", new File([new Uint8Array(subjectRefs[0]!.bytes)], "subject-reference", { type: subjectRefs[0]!.mediaType }));
+        form.append("image", new File([new Uint8Array(combinedRefs[0]!.bytes)], "picture-reference", { type: combinedRefs[0]!.mediaType }));
         form.append("operation", "edit");
         form.append("instruction", subjectPrompt);
-        form.append("image_source", "uploaded");
-        if (subjectRefs[1] && (engine.edit?.references ?? 0) > 0) {
-          form.append("reference", new File([new Uint8Array(subjectRefs[1].bytes)], "subject-reference-2", { type: subjectRefs[1].mediaType }));
-          form.append("reference_source", "uploaded");
+        form.append("image_source", "imageSource" in combinedRefs[0]! ? combinedRefs[0]!.imageSource : "uploaded");
+        for (const [index, ref] of combinedRefs.slice(1).entries()) {
+          form.append("reference", new File([new Uint8Array(ref.bytes)], `picture-reference-${index + 2}`, { type: ref.mediaType }));
+          form.append("reference_source", "imageSource" in ref ? ref.imageSource : "uploaded");
         }
         form.append("timeout_ms", "1");
         const { submitEdit } = await import("./stack");
@@ -265,12 +298,16 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         await templateMediaOpRunner(state.actor as PersonRow, BACKGROUND_REMOVAL_OP, { source: { kind: "picture", via: "chat", id: fileId, conversationId: state.conversationId ?? "" }, args: {} }, input.signal);
       } } : {}),
     });
-    const many = count > 1 ? ` ${count} pictures are` : " The picture is";
+    const job = await startTake(false);
+    const jobs = [job];
+    const additionalCount = createPage ? Math.max(0, totalCount - (combinedRefs.length ? 1 : count)) : 0;
+    for (let i = 0; i < additionalCount; i += 1) jobs.push(await startTake(true));
+    const many = totalCount > 1 ? ` ${totalCount} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}` },
-        data: { pictureJobId: job.id },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${droppedReferences ? " Some extra reference pictures were not used." : ""}${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}` },
+        data: { pictureJobId: job.id, ...(jobs.length > 1 ? { pictureJobIds: jobs.map((item) => item.id) } : {}) },
         actions: [],
       },
     });
