@@ -44,6 +44,10 @@ export interface AppData {
   /** The page has no place to show: nothing was chosen and the person has no default or household home. */
   needs?: "place";
 }
+/** Package-owned app data for small local app surfaces (for example the Image app's Library shelves). */
+export type AppDataHandler = (person: PersonRow, dataId: string, body: unknown) => unknown | null;
+const appDataHandlers = new Map<string, AppDataHandler>();
+export function registerAppData(packageId: string, handler: AppDataHandler): void { appDataHandlers.set(packageId, handler); }
 
 export type AppResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 404 | 400 | 502; error: string; kind?: "down" | "timed_out" | "found_nothing" | "needs_place" };
 
@@ -568,6 +572,8 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
 
   const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const appData = appDataHandlers.get(packageId)?.(person, dataId, input);
+  if (appData !== null && appData !== undefined) return { ok: true, status: 200, value: appData as AppData };
   const chosen = typeof input.place === "string" && input.place.trim() ? input.place.trim() : null;
   const current = chosen === "current" ? parseCurrentLocation(input.current) : null;
   // A saved place is named by its id in the picker. Anything that is not a place this person can see is refused,

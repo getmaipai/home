@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "image-collections",
+  "title": "Collections",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "package",
+      "text": "Collections will be here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      },
+      "action_label": "Browse templates"
+    }
+  ]
+}

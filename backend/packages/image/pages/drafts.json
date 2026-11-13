@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "image-drafts",
+  "title": "Drafts",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "file-text",
+      "text": "Drafts will be here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      },
+      "action_label": "Browse templates"
+    }
+  ]
+}

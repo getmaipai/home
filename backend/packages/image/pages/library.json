@@ -1,0 +1,20 @@
+{
+  "type": "page",
+  "id": "image-library",
+  "title": "All images",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "All images",
+      "bind": {
+        "source": "package",
+        "path": "library"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square"
+    }
+  ]
+}

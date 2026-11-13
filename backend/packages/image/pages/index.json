@@ -1,0 +1,43 @@
+{
+  "type": "page",
+  "id": "image-index",
+  "title": "Image",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Templates",
+      "bind": {
+        "source": "package",
+        "path": "templates"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently made",
+      "bind": {
+        "source": "package",
+        "path": "recent"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/library"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "type": "page",
+  "id": "image-templates",
+  "title": "Templates",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Start with a template",
+      "bind": {
+        "source": "package",
+        "path": "templates"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square"
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import "@/lib/imageApp";
 
 export const pluginsRoutes = apiRouter();
 

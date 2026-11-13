@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "image-recent",
+  "title": "Recently made",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "clock",
+      "text": "Recently made will be here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      },
+      "action_label": "Browse templates"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "image-character-sheet",
+  "title": "Character sheet",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "palette",
+      "text": "Character sheet will be here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      },
+      "action_label": "Browse templates"
+    }
+  ]
+}

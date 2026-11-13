@@ -1,0 +1,321 @@
+{
+  "id": "image",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Media",
+  "display": "Image",
+  "description": "Browse your pictures and templates, and explore ways to make and edit images.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "open Image",
+      "show my image templates",
+      "show all my images",
+      "find my recent pictures",
+      "make an image from a template"
+    ],
+    "patterns": []
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "degraded",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "sidebar": {
+      "groups": [
+        {
+          "id": "browse-home",
+          "mode": "browse",
+          "pages": [
+            "index",
+            "templates",
+            "favorites"
+          ]
+        },
+        {
+          "id": "browse-library",
+          "mode": "browse",
+          "title": "Library",
+          "pages": [
+            "library",
+            "collections",
+            "recent",
+            "shared"
+          ]
+        },
+        {
+          "id": "browse-cast",
+          "mode": "browse",
+          "title": "Cast and places",
+          "pages": [
+            "characters",
+            "props",
+            "places",
+            "productions"
+          ]
+        },
+        {
+          "id": "create-make",
+          "mode": "create",
+          "title": "Make",
+          "pages": [
+            "create",
+            "from-reference",
+            "from-template",
+            "character-sheet"
+          ]
+        },
+        {
+          "id": "create-edit",
+          "mode": "create",
+          "title": "Edit and yours",
+          "pages": [
+            "edit",
+            "remove-object",
+            "crop-adjust",
+            "blur-background",
+            "combine",
+            "upscale",
+            "creations",
+            "drafts"
+          ]
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "index",
+        "label": "Image",
+        "icon": "image",
+        "nav": true,
+        "kind": "schema",
+        "module": "index"
+      },
+      {
+        "id": "templates",
+        "label": "Templates",
+        "icon": "sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "templates"
+      },
+      {
+        "id": "favorites",
+        "label": "Favorites",
+        "icon": "heart",
+        "nav": true,
+        "kind": "schema",
+        "module": "favorites"
+      },
+      {
+        "id": "library",
+        "label": "All images",
+        "icon": "layout-grid",
+        "nav": true,
+        "kind": "schema",
+        "module": "library"
+      },
+      {
+        "id": "collections",
+        "label": "Collections",
+        "icon": "package",
+        "nav": true,
+        "kind": "schema",
+        "module": "collections"
+      },
+      {
+        "id": "recent",
+        "label": "Recently made",
+        "icon": "clock",
+        "nav": true,
+        "kind": "schema",
+        "module": "recent"
+      },
+      {
+        "id": "shared",
+        "label": "Shared with home",
+        "icon": "users",
+        "nav": true,
+        "kind": "schema",
+        "module": "shared"
+      },
+      {
+        "id": "characters",
+        "label": "Characters",
+        "icon": "user-round",
+        "nav": true,
+        "kind": "schema",
+        "module": "characters"
+      },
+      {
+        "id": "props",
+        "label": "Props",
+        "icon": "box",
+        "nav": true,
+        "kind": "schema",
+        "module": "props"
+      },
+      {
+        "id": "places",
+        "label": "Places",
+        "icon": "map-pin",
+        "nav": true,
+        "kind": "schema",
+        "module": "places"
+      },
+      {
+        "id": "productions",
+        "label": "Productions",
+        "icon": "clapperboard",
+        "nav": true,
+        "kind": "schema",
+        "module": "productions"
+      },
+      {
+        "id": "create",
+        "label": "Image",
+        "icon": "wand-sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "create"
+      },
+      {
+        "id": "from-reference",
+        "label": "From a reference",
+        "icon": "camera",
+        "nav": true,
+        "kind": "schema",
+        "module": "from-reference"
+      },
+      {
+        "id": "from-template",
+        "label": "From a template",
+        "icon": "rectangle-horizontal",
+        "nav": true,
+        "kind": "schema",
+        "module": "from-template"
+      },
+      {
+        "id": "character-sheet",
+        "label": "Character sheet",
+        "icon": "palette",
+        "nav": true,
+        "kind": "schema",
+        "module": "character-sheet"
+      },
+      {
+        "id": "edit",
+        "label": "Edit a picture",
+        "icon": "pencil",
+        "nav": true,
+        "kind": "schema",
+        "module": "edit"
+      },
+      {
+        "id": "remove-object",
+        "label": "Remove an object",
+        "icon": "scissors",
+        "nav": true,
+        "kind": "schema",
+        "module": "remove-object"
+      },
+      {
+        "id": "crop-adjust",
+        "label": "Crop and adjust",
+        "icon": "crop",
+        "nav": true,
+        "kind": "schema",
+        "module": "crop-adjust"
+      },
+      {
+        "id": "blur-background",
+        "label": "Blur background",
+        "icon": "eye",
+        "nav": true,
+        "kind": "schema",
+        "module": "blur-background"
+      },
+      {
+        "id": "combine",
+        "label": "Combine pictures",
+        "icon": "layers",
+        "nav": true,
+        "kind": "schema",
+        "module": "combine"
+      },
+      {
+        "id": "upscale",
+        "label": "Upscale",
+        "icon": "maximize",
+        "nav": true,
+        "kind": "schema",
+        "module": "upscale"
+      },
+      {
+        "id": "creations",
+        "label": "My creations",
+        "icon": "folder",
+        "nav": true,
+        "kind": "schema",
+        "module": "creations"
+      },
+      {
+        "id": "drafts",
+        "label": "Drafts",
+        "icon": "file-text",
+        "nav": true,
+        "kind": "schema",
+        "module": "drafts"
+      }
+    ],
+    "data": [
+      {
+        "id": "templates",
+        "rows": "list"
+      },
+      {
+        "id": "library",
+        "rows": "list"
+      },
+      {
+        "id": "recent",
+        "rows": "list"
+      }
+    ],
+    "header": {
+      "modes": [
+        {
+          "id": "browse",
+          "label": "Browse",
+          "icon": "image",
+          "page": "index"
+        },
+        {
+          "id": "create",
+          "label": "Create",
+          "icon": "sparkles",
+          "page": "create"
+        }
+      ]
+    }
+  },
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected",
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

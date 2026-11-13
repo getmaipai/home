@@ -52,7 +52,7 @@ describe("status routes", () => {
     expect(ownerResponse.status).toBe(200);
     const ownerApps = await ownerResponse.json() as Array<{ id: string; needs?: unknown[]; history: Array<{ minutes: { operational: number; degraded: number; outage: number; maintenance: number } }> }>;
     // Core apps first, then every installed package of kind "app" (MEDIA-VIDEOS-01 bundles Videos, MEDIA-PODCASTS-01 Podcasts, MEDIA-BOOKS-01 Books, MEDIA-SHOWS-01 Shows and Films, TALENT-02 Talent).
-    expect(ownerApps.map((app) => app.id)).toEqual(["home", "chat", "books", "podcasts", "videos", "shows", "talent"]);
+    expect(ownerApps.map((app) => app.id)).toEqual(["home", "chat", "books", "image", "podcasts", "videos", "shows", "talent"]);
     expect(ownerApps.every((app) => app.needs && app.history.length === 90)).toBe(true);
     expect(ownerApps.every((app) => app.history.every((day) => Object.keys(day.minutes).sort().join(",") === "degraded,maintenance,operational,outage"))).toBe(true);
     const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });

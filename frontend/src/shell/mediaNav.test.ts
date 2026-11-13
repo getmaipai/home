@@ -22,10 +22,11 @@ test("apps come back in MEDIA_APP_ORDER even when the rows arrive reversed", () 
     row({ package: "books", label: "Books" }),
     row({ package: "podcasts", label: "Podcasts" }),
     row({ package: "audio", label: "Audio" }),
+    row({ package: "image", label: "Image" }),
     row({ package: "shows", label: "Shows" }),
     row({ package: "videos", label: "Videos" }),
   ];
-  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "shows", "audio", "podcasts", "books"]);
+  expect(mediaNav(rows).map((app) => app.id)).toEqual(["videos", "shows", "audio", "image", "podcasts", "books"]);
 });
 
 test("an app that is missing from the rows is simply absent, and the rest keep their place", () => {

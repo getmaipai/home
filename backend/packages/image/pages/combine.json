@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "image-combine",
+  "title": "Combine pictures",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "layers",
+      "text": "Combine pictures will be here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/image/templates"
+        }
+      },
+      "action_label": "Browse templates"
+    }
+  ]
+}
