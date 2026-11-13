@@ -50,6 +50,17 @@ describe("scene fusion", () => {
     expect(fuseScene(fuseScene(weak, [left], t + 2), [strong], t + 3).people).toHaveLength(1);
     expect(fuseScene(weak, [], t + SCENE_TTL.typed).people).toHaveLength(0);
   });
+  test("typed leave never removes a look-only unknown person", () => {
+    const t = 20;
+    const look = obs("people_count", 2, "look", t);
+    const scene = fuseScene(empty(), [look], t);
+    const left = obs("person_left", person(null, "unknown", "claimed"), "typed", t + 1, "weak");
+    expect(fuseScene(scene, [left], t + 1).people).toHaveLength(2);
+    const claimed = obs("person_here", { ...person(null, "unknown", "claimed"), label: "Guest" }, "typed", t, "weak");
+    const typedScene = fuseScene(empty(), [claimed], t);
+    const namedLeft = obs("person_left", { ...person(null, "unknown", "claimed"), label: "Guest" }, "typed", t + 1, "weak");
+    expect(fuseScene(typedScene, [namedLeft], t + 1).people).toHaveLength(0);
+  });
   test("conflicting strong identities become unknown and never edits speaker", () => {
     const speaker = { person: "person-sage1", basis: "voice" as const, level: "confirmed" as const };
     const base = { ...empty(), speaker };

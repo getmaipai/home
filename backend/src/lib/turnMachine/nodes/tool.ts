@@ -196,7 +196,7 @@ async function retryEmptySearches(
 
 import { speculationConfirmed } from "@/lib/speculation";
 import { fillComposerDefaults } from "@/lib/composerHint";
-import { runSceneTool } from "@/lib/sceneTool";
+import { runSceneTool, sceneToolStreamArgs } from "@/lib/sceneTool";
 import { listActivePeople } from "@/lib/access";
 import { getScene, observeSceneClaims } from "@/lib/scene";
 
@@ -320,7 +320,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === MAKE_INSPIRED_VOICE_TOOL_ID && !proposal.redactArgs) args = { name: args.name, level: args.level };
     // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
     const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
-    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === MAKE_INSPIRED_VOICE_TOOL_ID ? { name: args.name, level: args.level } : tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : args, ...(stepLabel ? { label: stepLabel } : {}) });
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === "scene" ? sceneToolStreamArgs(args as Record<string, unknown>) : tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : tool === MAKE_INSPIRED_VOICE_TOOL_ID ? { name: args.name, level: args.level } : args, ...(stepLabel ? { label: stepLabel } : {}) });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
@@ -372,7 +372,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, toolStatusMoment(tool), state.persona), stage: "tool" });
 
     if (tool === "scene") {
-      const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, observe: observeSceneClaims });
+      const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), observe: observeSceneClaims });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
       continue;

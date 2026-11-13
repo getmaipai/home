@@ -323,6 +323,54 @@
       "expected": "none",
       "band": "adult",
       "heldOut": false
+    },
+    {
+      "id": "not-aimed-01",
+      "kind": "not_aimed_at_me",
+      "prompt": "Marlow: Did you finish the puzzle? Quill: Almost, let me show you.",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "not-aimed-02",
+      "kind": "not_aimed_at_me",
+      "prompt": "Quill asks Marlow whether the dog has been fed. Marlow says yes, just now.",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "not-aimed-03",
+      "kind": "not_aimed_at_me",
+      "prompt": "Marlow: Want to play outside? Quill: Sure, after I put on my shoes.",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": true
+    },
+    {
+      "id": "not-aimed-04",
+      "kind": "not_aimed_at_me",
+      "prompt": "Quill tells Marlow the bus arrives in ten minutes, and Marlow says thanks.",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "not-aimed-05",
+      "kind": "not_aimed_at_me",
+      "prompt": "Marlow: I found your blue notebook. Quill: Could you leave it on the table?",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "not-aimed-06",
+      "kind": "not_aimed_at_me",
+      "prompt": "Quill and Marlow discuss which movie to watch, then agree on a comedy.",
+      "expected": "none",
+      "band": "adult",
+      "heldOut": true
     }
   ]
 }

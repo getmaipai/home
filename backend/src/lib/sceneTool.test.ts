@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { PersonRow } from "@/types";
-import { cleanSceneLabel, runSceneTool, sceneObservations } from "@/lib/sceneTool";
+import { cleanSceneLabel, runSceneTool, sceneObservations, sceneToolStreamArgs } from "@/lib/sceneTool";
+import { fuseScene, sceneForTests } from "@/lib/scene";
+import { turnAgeBand } from "@/lib/turnMachine/speaker";
 
 const person = (id: string, displayName: string, role: string, birthdate?: string) => ({ id, displayName, role, birthdate, createdAt: 1, updatedAt: 1 } as unknown as PersonRow);
 const owner = person("person-owner123", "Sage", "owner");
@@ -18,7 +20,7 @@ describe("SCENE-01c tool", () => {
   });
 
   test("cannot mark an adult away as a child; output contains no change", () => {
-    const result = sceneObservations({ action: "left", label: "Quill" }, child, "c2", null, 100, [child, adult]);
+    const result = sceneObservations({ action: "left", label: "Quill" }, child, "c2", null, 100, [child, adult], null, "chat", "child");
     expect(result.observations).toHaveLength(0);
     expect(result.line).toContain("can't mark a household adult");
   });
@@ -28,8 +30,30 @@ describe("SCENE-01c tool", () => {
     const scene = { people: [{ person_id: adult.id, label: "private sensor text", relation: "household", band: "adult", level: "confirmed", basis: ["face"], last_seen_at: now, expires_at: now + 90_000 }] } as never;
     const result = sceneObservations({ action: "left", person_id: adult.id }, owner, "c3", null, now, [owner, adult], scene);
     expect(result.observations).toHaveLength(0);
-    expect(result.line).toBe("The camera still sees Quill.");
+    expect(result.line).toBe("Someone is still seen by the camera.");
     expect(result.line).not.toContain("private sensor text");
+  });
+
+  test("left with no target, unknown, or an unmatched label removes nothing", () => {
+    const lookScene = fuseScene(sceneForTests({ conversation_id: "look" }), [{ id: "look", source: { surface: "robot", device_id: null, sensor: "look" }, kind: "people_count", value: 2, confidence: 1, strength: "strong", at: 100, expires_at: 90_100 }], 100);
+    for (const args of [{ action: "left" }, { action: "left", label: "unknown" }, { action: "left", label: "Nobody" }]) {
+      const result = sceneObservations(args, owner, "look", null, 101, [owner, adult], lookScene);
+      expect(result.observations).toHaveLength(0);
+      expect(result.line).toBeTruthy();
+      expect(fuseScene(lookScene, result.observations, 101).people).toHaveLength(2);
+    }
+  });
+
+  test("robot age band blocks an unknown speaker but allows a confirmed adult speaker", () => {
+    const evidence = null;
+    const band = turnAgeBand("robot", owner, evidence, new Date(100));
+    expect(band).toBe("child");
+    const blocked = sceneObservations({ action: "left", person_id: adult.id }, owner, "age", null, 100, [owner, adult], null, "robot", band);
+    expect(blocked.observations).toHaveLength(0);
+    expect(blocked.line).toContain("can't mark a household adult");
+    const adultSpeakerBand = turnAgeBand("robot", owner, { person: owner.id, basis: "voice", level: "confirmed" }, new Date(100));
+    const allowed = sceneObservations({ action: "left", person_id: adult.id }, owner, "age", owner.id, 100, [owner, adult], null, "robot", adultSpeakerBand);
+    expect(allowed.observations).toHaveLength(1);
   });
 
   test("labels cannot carry control characters, delimiters, or overlong text", () => {
@@ -45,9 +69,18 @@ describe("SCENE-01c tool", () => {
     expect(pet.observations[0]?.value).toMatchObject({ relation: "pet", band: "unknown" });
   });
 
-  test("stored tool outcome carries no label, name, room, or person id", () => {
-    const outcome = runSceneTool({ actor: owner, args: { action: "arrived", label: "Quill", relation: "guest" }, callId: "c", conversationId: "c5", speakerId: null, roster: [owner], surface: "chat", observe: () => undefined });
+  test("stored tool outcome and streamed tool event carry no call identity fields", () => {
+    const label = "VelvetFox";
+    const room = "SecretAtrium";
+    const id = "person-private987";
+    const outcome = runSceneTool({ actor: owner, args: { action: "place", label, room, person_id: id, where: "home" }, callId: "c", conversationId: "c5", speakerId: null, roster: [owner], surface: "chat", actorBand: "adult", observe: () => undefined });
+    const event = { t: "tool_call", package_id: "scene", call_id: "c", args: sceneToolStreamArgs({ action: "place", label, room, person_id: id }) };
     expect(outcome.args).toEqual({});
-    expect(JSON.stringify(outcome)).not.toMatch(/Quill|person-owner123|room|label/i);
+    for (const value of [JSON.stringify(outcome), JSON.stringify(event)]) {
+      expect(value).not.toContain(label);
+      expect(value).not.toContain(room);
+      expect(value).not.toContain(id);
+    }
+    expect(event.args).toEqual({ action: "place" });
   });
 });

@@ -29,11 +29,6 @@
     "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",
     "catalog_path": "plugins/info/place-lookup"
   },
-  "scene": {
-    "sha256": "942e4ab08d2d5e92eedd99b7a739787ef5b3c9d3efd9987d06f7bcffb6d92411",
-    "source_commit": "ae6275e915512cc535c7cfeeff323024d5776f8e",
-    "catalog_path": "plugins/utilities/scene"
-  },
   "storytime-style": {
     "sha256": "aea745f9cb83564dbc6fd738c784a9f5447e0703255c7269a57ab9100808d21a",
     "source_commit": "d8f0e48f471ac15386aa2c9383ea6aaa85181916",

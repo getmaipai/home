@@ -83,7 +83,7 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
   }
   for (let i = live.length - 1; i >= 0; i--) {
     const p = live[i]!;
-    if (typedLeft.has(personKey(p)) && !p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")) live.splice(i, 1);
+    if (typedLeft.has(personKey(p)) && p.basis.length > 0 && p.basis.every((b) => b === "typed")) live.splice(i, 1);
   }
   // Face and voice evidence naming different people is ambiguous. Collapse both to one unnamed cue.
   const sensed = live.filter((p) => p.basis.some((b) => b === "face" || b === "voice") && p.person_id && strongIds.has(p.person_id));
