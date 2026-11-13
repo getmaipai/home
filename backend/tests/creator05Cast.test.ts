@@ -8,6 +8,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { createSynth, ensureSubject, type SynthRecord } from "@/lib/synths";
 import { createMediaSubject, shareMediaSubject, subjectViewById } from "@/lib/mediaSubjects";
 import { castMentionIds, listCast } from "@/lib/cast";
+import { withMentionedCast } from "@/lib/mentionedCastArgs";
 import { listSynthCreditItems } from "@/lib/creations/credits";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
@@ -178,5 +179,17 @@ describe("the `@` mentions the composer sends", () => {
     }
     expect(castMentionIds(sage, asked).sort()).toEqual([plain.id, real.id, sage.id, teenRow.id].filter((id) => listCast(sage).some((e) => e.id === id)).sort());
     expect(subjectViewById(plain.id)).not.toBeNull();
+  });
+});
+
+describe("picked mentions reach a media tool call", () => {
+  test("a call that names no cast gets the picked ones; a call that names cast, or another tool, is left alone", () => {
+    expect(withMentionedCast("generate_image", { prompt: "x" }, ["a", "b"])).toEqual({ prompt: "x", cast: ["a", "b"] });
+    for (const tool of ["generate_video", "make_film", "make_reference_video"]) expect(withMentionedCast(tool, {}, ["a"])).toEqual({ cast: ["a"] });
+    expect(withMentionedCast("generate_image", { cast: ["z"] }, ["a"])).toEqual({ cast: ["z"] });
+    expect(withMentionedCast("generate_image", { cast: [] }, ["a"])).toEqual({ cast: [] });
+    expect(withMentionedCast("websearch", { q: "x" }, ["a"])).toEqual({ q: "x" });
+    expect(withMentionedCast("generate_image", { prompt: "x" }, undefined)).toEqual({ prompt: "x" });
+    expect(withMentionedCast("generate_image", { prompt: "x" }, [])).toEqual({ prompt: "x" });
   });
 });

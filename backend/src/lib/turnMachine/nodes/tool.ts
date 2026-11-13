@@ -38,6 +38,7 @@ import { redactLockedVideoOutcome } from "@/lib/videos/lock";
 import { LOCKED_MUSIC_RESULT_TEXT, redactLockedMusicOutcome } from "@/lib/music/lock";
 import { EDIT_VIDEO_TOOL_ID, runEditVideo } from "@/lib/videos/editTool";
 import { MAKE_FILM_TOOL_ID, runMakeFilmTurn } from "@/lib/films/tool";
+import { withMentionedCast } from "@/lib/mentionedCastArgs";
 import { MAKE_REFERENCE_VIDEO_TOOL_ID, runMakeReferenceVideoTurn } from "@/lib/videos/referenceVideo";
 import { isProductionCall, runMakeProduction } from "@/lib/longform/tool";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
@@ -299,8 +300,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // shape `llm.ts`'s `MAIPAI_BENCH_CACHE_PROMPT_FALSE` already uses -
     // never read outside a bench, never a real household setting.
     let args = modelFacingArgs(tool, proposal.request.args);
-    // CREATOR-05: a cast member the person picked from the `@` list reaches a media tool as structured data (never found in the words): a call that names no cast gets the picked ones.
-    if ((tool === GENERATE_IMAGE_TOOL_ID || tool === GENERATE_VIDEO_TOOL_ID || tool === MAKE_FILM_TOOL_ID || tool === MAKE_REFERENCE_VIDEO_TOOL_ID) && state.castMentions?.length && (args as Record<string, unknown>).cast === undefined) args = { ...(args as Record<string, unknown>), cast: state.castMentions } as typeof args;
+    // CREATOR-05: people picked from the `@` list reach a media tool as structured data (never found in the words); see lib/mentionedCastArgs.ts.
+    args = withMentionedCast(tool, args as Record<string, unknown>, state.castMentions) as typeof args;
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.

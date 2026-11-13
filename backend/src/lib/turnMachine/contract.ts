@@ -318,7 +318,7 @@ export interface TurnState {
   context: ContextItem[];
   /** Raw one-turn page metadata, resolved in nodes/context.ts. */
   pageContextRaw?: unknown;
-  /** CREATOR-05: cast ids the composer sent as structured `@` mentions, already checked against the viewer's cast list (never read from the words). */
+  /** CREATOR-05: ids the composer sent as structured `@` mentions, already checked against what the viewer may pick (never read from the words). */
   castMentions?: string[];
   /** Set by the `context` node (ContextOutput.temporary). Not in the
    * design record's own TurnState listing, which otherwise fixes this
