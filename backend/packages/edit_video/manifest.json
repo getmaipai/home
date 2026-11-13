@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Change a Video",
-  "description": "Change a video made here: remix, trim, join, film, mix, continue, grade, speed, captions.",
+  "description": "Change a video made here.",
   "offer": {
     "mode": "conditional",
     "gate": "videoEditAllowed",
@@ -74,7 +74,7 @@
           "spatial_sound",
           "restyle"
         ],
-        "description": "remix: redo with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks. restyle: colorize adds colour (Max only, up to 10 s), words steer. grade: only if asked. Each keeps the first video. A video exists only if you called this tool in this reply."
+        "description": "remix: redo with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks. restyle: colorize adds colour (Max only, up to 10 s), words steer. grade: only if asked. Only claim a video if you called this tool."
       },
       "prompt": {
         "type": "string",
@@ -180,7 +180,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "mix music or cut_to_beat: one of the person's own songs: its music job id (musicJobId of an earlier generate_music result in this chat), a Library file id, or latest for the newest song finished in this chat. For 'use the song I just made as the music', pass latest. A locked or unfinished song is refused; say so plainly."
+        "description": "mix, cut_to_beat: a song's music job id or Library file id, or latest (newest finished here). Locked or unfinished is refused; say so."
       },
       "make_music": {
         "type": "string",
@@ -311,7 +311,7 @@
       "background": {
         "type": "string",
         "grounded": false,
-        "description": "Behind the subject: black, white, green, blur, transparent or hex."
+        "description": "black, white, green, blur, transparent or hex."
       },
       "restyle": {
         "type": "string",
