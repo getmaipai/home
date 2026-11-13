@@ -59,12 +59,13 @@ const ttsSynthesizeRoute = createRoute({
 });
 
 ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
+  const handlerStarted = performance.now();
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.turn_id) abortConversationPrewarm(actor.id);
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
   const voiceId = body.voice ?? (body.turn_id ? voiceForTurn(body.turn_id, actor.id) : undefined) ?? voiceForSpeech({ actor, deviceId: c.get("deviceId") });
-  const startedAt = Date.now();
+  const prepStarted = handlerStarted;
   // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
   let spoken = body.text;
   // WHISPER-01: the model marked this reply as whispered. Only where voice cues are allowed (never a child or a teen), and no laugh or sigh is added to a whisper.
@@ -82,14 +83,18 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
       spoken = planForPerson(actor.id, { text: body.text, turnId: body.turn_id, level, band, supportedTags, blocked, choice }).text;
     }
   }
+  const prepMs = Math.max(0, Math.round(performance.now() - prepStarted));
   const result = await synthesizeSpeech(spoken, voiceId, whisper ? { whisper: true } : {});
   if (result.ok && body.turn_id) {
     const turn = await import("@/routes/turn");
-    turn.markTurnFirstAudio(body.turn_id, actor.id, Date.now() - startedAt);
+    turn.markTurnFirstAudio(body.turn_id, actor.id, Math.round(performance.now() - handlerStarted));
+    if (result.value.tts_resolve_ms !== undefined && result.value.tts_stack_ms !== undefined) turn.markTurnTtsSteps(body.turn_id, actor.id, { tts_prep_ms: prepMs, tts_resolve_ms: result.value.tts_resolve_ms, tts_stack_ms: result.value.tts_stack_ms });
     turn.noteSpokenAudioHandedOff(body.turn_id, actor.id, body.text);
   }
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
-  return new Response(result.value.stream, { headers: { "content-type": result.value.contentType, "x-maipai-tts-ttfa-ms": String(Math.max(0, Date.now() - startedAt)) } });
+  const resolveMs = result.value.tts_resolve_ms ?? 0, stackMs = result.value.tts_stack_ms ?? 0;
+  const stepsHeader = `prep=${prepMs},resolve=${resolveMs},stack=${stackMs}`;
+  return new Response(result.value.stream, { headers: { "content-type": result.value.contentType, "x-maipai-tts-ttfa-ms": String(Math.max(0, Math.round(performance.now() - handlerStarted))), "x-maipai-tts-steps-ms": stepsHeader } });
 });

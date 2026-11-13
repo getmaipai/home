@@ -100,6 +100,7 @@ describe("POST /api/tts", () => {
 
       const res = await owner.post("/api/tts", { text: "hi" });
       expect(res.status).toBe(200);
+      expect(res.headers.get("x-maipai-tts-steps-ms")).toMatch(/^prep=\d+,resolve=\d+,stack=\d+$/);
       expect(receivedVoiceUrls).toEqual([null]);
     });
 

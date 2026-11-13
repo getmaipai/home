@@ -38,7 +38,7 @@ import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { getDeviceById } from "@/lib/devices";
-import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, setVoiceOutcome, type VoiceTimingRecord } from "@/lib/voiceTiming";
+import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, setVoiceOutcome, type VoiceTimingRecord } from "@/lib/voiceTiming";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -248,6 +248,12 @@ export function markTurnFirstAudio(turnId: string, ownerId: string, elapsedMs: n
   if (!session || session.ownerId !== ownerId || !session.spokenTurn) return;
   if (session.firstAudioAtMs === undefined) session.firstAudioAtMs = session.startedAtMs + elapsedMs;
   markVoiceTiming(session.timing, "first_audio_ms", session.firstAudioAtMs - session.startedAtMs);
+}
+
+export function markTurnTtsSteps(turnId: string, ownerId: string, steps: { tts_prep_ms: number; tts_resolve_ms: number; tts_stack_ms: number }): void {
+  const session = inFlightTurns.get(turnId);
+  if (!session || session.ownerId !== ownerId || !session.spokenTurn) return;
+  markVoiceTtsSteps(session.timing, steps);
 }
 
 export function staleGenerationEvent(event: TurnStreamEvent | ToolStreamEvent, stale: boolean): TurnStreamEvent | ToolStreamEvent | null {

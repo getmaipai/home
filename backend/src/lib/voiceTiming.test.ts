@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, recordPrewarmTiming, setCuePlaybackTiming, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
+import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, recordPrewarmTiming, setCuePlaybackTiming, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
 import { prewarmFailureReason } from "./prefixPrewarm";
 
 beforeEach(() => {
@@ -32,6 +32,15 @@ test("attaches numeric engine stats and context duration by turn id, while old r
   expect(voiceTimingRecords(1)[0]).toMatchObject({ prompt_n: 900, cache_n: 700, prewarm_hit: true, time_to_first_token_ms: 410, context_node_ms: 75, cue_playback_ms: 330 });
   expect(voiceTimingReport()).toContain("turns that extended their conversation warm: 1 of 1 warmed");
   expect(() => JSON.parse(JSON.stringify({ turn_id: "old", stt_ms: null, turn_start_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, first_playback_ms: null }))).not.toThrow();
+});
+
+test("stores first-request TTS steps once and reports medians, including empty data", () => {
+  const record = beginVoiceTimingFor("tts-step-record", 10, 20);
+  markVoiceTtsSteps(record, { tts_prep_ms: 11, tts_resolve_ms: 22, tts_stack_ms: 33 });
+  markVoiceTtsSteps(record, { tts_prep_ms: 99, tts_resolve_ms: 99, tts_stack_ms: 99 });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ tts_prep_ms: 11, tts_resolve_ms: 22, tts_stack_ms: 33 });
+  expect(voiceTimingReport(1)).toContain("tts prep median: 11 ms");
+  expect(voiceTimingReport(1)).toContain("tts prep median: 11 ms");
 });
 
 test("attaches context stage stamps and reports their medians while legacy rows omit them", () => {

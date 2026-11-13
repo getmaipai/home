@@ -21,6 +21,8 @@ const MAX_TEXT_LENGTH = 4_000;
 export interface TtsSynthesizeValue {
   stream: ReadableStream<Uint8Array>;
   contentType: string;
+  tts_resolve_ms?: number;
+  tts_stack_ms?: number;
 }
 
 export type RecordedSpeechEngine = "fish-audio-drama-3" | "chatterbox-turbo";
@@ -68,15 +70,18 @@ async function synthesizeViaStack(text: string, voiceUrl?: string, household?: {
   form.append("model", "tts");
   try {
     const client = getStackClient();
+    const stackStarted = performance.now();
     const res = await client.speak(form);
+    const tts_stack_ms = Math.max(0, Math.round(performance.now() - stackStarted));
     resolveStackOffline("tts");
-    return { ok: true, value: { stream: res.body!, contentType: res.headers.get("content-type") ?? "audio/wav" } };
+    return { ok: true, value: { stream: res.body!, contentType: res.headers.get("content-type") ?? "audio/wav", tts_resolve_ms: 0, tts_stack_ms } };
   } catch (err) {
     return stackFailureResult(err, "tts");
   }
 }
 
 export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean; whisper?: boolean } = {}): Promise<TtsOpResult> {
+  const resolveStarted = performance.now();
   // REG-02: a bracketed tag the active engine does not advertise is dropped here, the last step before the engine, so "[laugh]" is never read aloud.
   const taggedText = typeof rawText === "string" ? sanitizeSpeechTags(rawText, await getTtsTags()) : rawText;
   const text = typeof taggedText === "string" && opts.normalize !== false ? toSpokenText(taggedText) : taggedText;
@@ -111,7 +116,7 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
     const result = household
       ? await synthesizeViaStack(text, household.voiceUrl, household)
       : await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);
-    return result.ok ? result : { ...result, error: TTS_UNAVAILABLE_COPY };
+    return result.ok ? { ...result, value: { ...result.value, tts_resolve_ms: Math.max(0, Math.round(performance.now() - resolveStarted - (result.value.tts_stack_ms ?? 0))) } } : { ...result, error: TTS_UNAVAILABLE_COPY };
   } catch {
     return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };
   }
