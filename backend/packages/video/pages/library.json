@@ -37,7 +37,8 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -60,7 +61,8 @@
         }
       },
       "hide_when_empty": true,
-      "card_radius": "soft"
+      "card_radius": "soft",
+      "look": "backdrop"
     },
     {
       "type": "picker",
@@ -164,7 +166,8 @@
         ]
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     }
   ]
 }

@@ -179,7 +179,8 @@
         ]
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -203,7 +204,8 @@
           "media_id": "{id}"
         }
       },
-      "card_radius": "soft"
+      "card_radius": "soft",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -236,7 +238,8 @@
           "to": "/apps/video/clips-feed"
         }
       },
-      "card_radius": "soft"
+      "card_radius": "soft",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -310,7 +313,8 @@
         }
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -384,7 +388,8 @@
         }
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -458,7 +463,8 @@
         }
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -532,7 +538,8 @@
         }
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     },
     {
       "type": "media_shelf",
@@ -612,7 +619,8 @@
         "action_label": "Make a video"
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     }
   ]
 }

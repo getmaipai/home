@@ -78,7 +78,8 @@
           }
         },
         "action_label": "Browse videos"
-      }
+      },
+      "look": "backdrop"
     }
   ]
 }

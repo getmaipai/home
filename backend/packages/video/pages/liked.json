@@ -74,7 +74,8 @@
         "action_label": "Browse videos"
       },
       "card_radius": "soft",
-      "item_avatar_field": "channel_avatar"
+      "item_avatar_field": "channel_avatar",
+      "look": "backdrop"
     }
   ]
 }
