@@ -966,6 +966,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/likeness/masks.ts` | grayMask, encodeMask, morphology, union, subtract, invert |
 | `backend/src/lib/pictures/likeness/stackSegment.ts` | stackSegment |
 | `backend/src/lib/pictures/lock.ts` | isAdultPictureStyle, LOCKED_PICTURE_STYLE_LINE, lockedPictureStyleOutcome, pictureJobLockItem, pictureJobLockState, pictureJobGroupLockState |
+| `backend/src/lib/pictures/make.ts` | readPictureMakeBody, makePictureFor |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | runPictureTool |
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
