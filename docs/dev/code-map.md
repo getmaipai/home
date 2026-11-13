@@ -789,6 +789,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/text.ts` | decodeEntities, plainText, stripExtension, extensionOf, spaced, naturalCompare |
 | `backend/src/lib/media/parsers/tv.ts` | seasonFolderNumber, parseTvName, findFolderArt |
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
+| `backend/src/lib/media/pictureFragments.ts` | RELIGHT_KEEP, PICTURE_PICK_KEYS, resolvePicks, composePicturePrompt, pictureFragmentChips |
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine, podcastSnipLabel, podcastSnipRowsForRoute |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
@@ -811,7 +812,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/serve.ts` | lightArt, parseRange, resolveUnderRoot, serveBytes, serveItemBytes, serveItemArtwork |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
-| `backend/src/lib/media/templates.ts` | listTemplates, getTemplate |
+| `backend/src/lib/media/templates.ts` | listTemplates, getTemplate, listFragments, getFragment |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, SHORT_CLIP_MAX_S, isShortClip, shortClipRows |
