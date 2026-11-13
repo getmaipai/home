@@ -20,7 +20,7 @@ Status: design note, 2026-11-13, architect ruling pending (commit only; nothing 
 - Rule 9 and 9b: kit Elements as they ship; no `className` that changes shape or layout, no Home wrapper. A look that cannot be reached by tokens and props gets a prop in `commons` first, tagged (PINNING.md "Changing a shared kit element").
 - Platform principle 6 (assistant-ui Elements for chat) and principle 4 (one definition, one place): modes are data, defined once.
 - S6: a slow job reports through Activity. The composer starts the job; it draws no status of its own.
-- Owner rulings that name what we drop: [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) (Standard, Boost, Max, model names only under Details), memory "No resource words for users" (2026-11-01), [ai-models-simple-2026-10-25.md](ai-models-simple-2026-10-25.md), the images note's leader table ("credits and prices on buttons, dozens of model names" left out), `submit_detail` "a time, never credits" (VIDEO-UI-03), no fixed colours (2026-10-19), the model-picker gate on the chat page (adults with an active model only), Phosphene rule (a hand-off fills a form and starts nothing).
+- Owner rulings that name what we drop: [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) (Standard, Boost, Max, model names only under Details), memory "No resource words for users" (2026-11-01), [ai-models-simple-2026-10-25.md](ai-models-simple-2026-10-25.md), the images note's leader table ("credits and prices on buttons, dozens of model names" left out), `submit_detail` "a time, never credits" (VIDEO-UI-03, `docs/design/UI-DECISIONS.md:41`), no fixed colours (2026-10-19), the model-picker gate on the chat page (adults with an active model only), Phosphene rule (a hand-off fills a form and starts nothing).
 
 ## 1. Recommendation (the short form)
 
@@ -110,11 +110,24 @@ The handoff from Home (`composerHref`) uses the same field: `/chat?ask=...&mode=
 
 Cost to measure (rule 8 and the owner's "Done means run for real"): the hint adds one context item. A bench pass checks the picture tool's offer rate with and without the hint over the existing offer-rate rows, and that no other tool's offer rate moves (the hint must not bias the model toward a tool the person did not pick).
 
+### 4.1 Conditions of the architect ruling (APPROVED, 2026-11-13, ten wording conditions; record `data-scratch/architect/ONE-COMPOSER-2026-11-13.verdict`)
+
+1. The `composer` field is honored only on written chat turns. It is ignored on spoken, robot, satellite and shared turns.
+2. The hint never adds or removes an offered tool. The 16-tool budget is unchanged. Arguments filled from the chips pass the same policy and validation as any model-written argument.
+3. For a child or teen the Quality chip never offers Thinking or a model choice; its tiers follow [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md).
+4. The hint's context item is placed after the stable prefix, like the page-context item.
+5. No log, trace or status carries mode settings, cast ids or chip values. Counts only (rule 6a).
+6. COMPOSER-04's "no other offer rate moves" is measured on the CHAT-AB-01 fresh set, held-out split, three or more repeats, paired 95% intervals, search decisions included.
+7. COMPOSER-03's band filter calls the same policy functions `beginTurn` uses. Readiness comes only from `roleHealth` through `healthSnapshot` or `useMakingAvailability`, never polled; Music and Voices readiness are new `roleHealth` reasons, each with a `failureCopy` line.
+8. The `composer` request shape is a `@maipai/spec` type landed in commons spec before COMPOSER-04.
+9. COMPOSER-02: the kit draws the mode pill, slots and chips inside `Thread`; Home passes data only; no `ComposerInputOverride`; the parts are listed in `frontend/src/dev/elements-adoption.json`.
+10. The VIDEO-UI-03 citation is `docs/design/UI-DECISIONS.md:41`.
+
 ## 5. What we drop from Artlist, and why
 
 | Artlist | Home | Ruling |
 |---|---|---|
-| Credits, a credit count on the button, "Generate free" | the button says Generate and, for video and film, a time line ("About 3 minutes") | `submit_detail` is "a time, never credits" (VIDEO-UI-03); images note: credits and prices left out; no plans or purchases in Home |
+| Credits, a credit count on the button, "Generate free" | the button says Generate and, for video and film, a time line ("About 3 minutes") | `submit_detail` is "a time, never credits" (VIDEO-UI-03, `docs/design/UI-DECISIONS.md:41`); images note: credits and prices left out; no plans or purchases in Home |
 | "Unlimited" toggle | none; the household's own machine has no quota to toggle | same |
 | A model picker with brand names | one **Quality** chip: Standard, Boost, Max, with the one-line verb per category ("Fast", "More detail", "Best quality"; video "Quick clip", "With sound", "Best quality"; music "Quick", "Full song", "Studio quality") | resource-tiers section 3; "No resource words for users"; model names only under Details in Settings |
 | The adult-only chat model picker | stays exactly as it is in chat, behind its existing gate, in its existing place (the trailing slot); not added to Create | model-picker gate (adults with an active model) |
