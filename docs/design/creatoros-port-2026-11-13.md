@@ -2,9 +2,30 @@
 
 Status: design note, 2026-11-13. Owner ask (Jesse, 2026-11-13): bring all of CreatorOS Studio's functionality over, each function in the right Home app and page, on our own models where one does the job and on a named proposed model where none does. Source: github.com/thePloggy/CreatorOS-Studio (Apache-2.0), read as data by five readers; nothing was run. Their reports (kept in the session scratchpad, not in the repo): the feature audit (57 unique functions, every preset list), the UI audit, the engine audit (recipes, speed tricks, clip checks, queue), the gap map against Home and the Stack, and the editor consistency audit. Related notes this one extends: [phosphene-parity-2026-11-13](phosphene-parity-2026-11-13.md) and its [deep audit](../reports/phosphene-deep-audit-2026-11-13.md), [VIDEO-LD-PORT-2026-11-13](VIDEO-LD-PORT-2026-11-13.md), [images-app-2026-11-03](images-app-2026-11-03.md), [make-film-2026-11-06](make-film-2026-11-06.md), [talent-2026-11-07](talent-2026-11-07.md), [companion-pack-2026-11-10](companion-pack-2026-11-10.md), [reference video](../dev/reference-video.md).
 
+## Supersedes
+
+What this note replaces or absorbs. Nothing else is superseded; `RULES.md` is not touched.
+
+| Replaced or absorbed | By | What stays |
+|---|---|---|
+| PRODUCTION-VIDEO-02 (a separate character turnaround sheet) and `lib/mediaSubjectSheet.ts` `makeSubjectSheet` | CREATOR-06: one sheet builder, `films/sheetMaker.ts`. The row PRODUCTION-VIDEO-02 is marked absorbed | its idea of a locked sentence per subject (stored by CREATOR-04) and the `generate_video` and `generate_image` use of it |
+| `make_film` argument `characters` (plain text hints) | `cast` (ids from `resolveCast`), CREATOR-05; `characters` stays as an alias until removed | the planner's `castHints` for names that match no cast member |
+| Rolling credits written from the plan's text (`lib/films/engines.ts`, the `credits` option of `edit_video`) | credits read from the stored cast link, CREATOR-03 | the credit roll geometry fixes (CREATOR-IP-05) |
+| The face check inside the reference route (`measureClipFaces`, `CLIP_FACE_LOW` 0.35 warn, six frames) | the shared clip check, CREATOR-10 | the first-picture gate `FACE_GATE` 0.5 |
+| `VideoRequest.reference` (`ReferenceRecipe`) as the only place a made clip's sheet, prompt and route are kept | the creation record, CREATOR-02; the type is a reader until the last writer moves | Another take and `reuse_video` behave as today |
+| IVY-QC-01's three-to-five-still check (`lib/videos/frameCheck.ts`) | grows into the shared clip check, CREATOR-10, keeping its numbers | its plain "never says a clip is fine" wording |
+| `MusicStudioView.tsx` and `MusicWaveform.tsx` | retired when the Music Studio moves onto `TrackStudio`, CREATOR-38 | the Studio's behaviour (EQ, Compressor, stems) |
+| The hand-written editor shells and busy cards of the picture editor and the Video Studio | the kit editor frame, CREATOR-33 to CREATOR-36 | every tool and shortcut that exists |
+| The `@` list in the composer | Not replaced. Spec 4.3 of `companions-shared-chat-and-presence-2026-10-24.md` (the one-turn guest `@mention`) is unchanged: companion items keep their one-turn routing. Cast items are a distinct item type in the same kit `ComposerMentions` popover and insert a cast chip; the list is filtered per band (a child or teen sees only what their band allows) | `mention_companion_id` and the persona that answers |
+| Parts of CreatorOS's Film entry, Keep and Re-roll, and redo | Absorbed by the rows that already own them: FILM-06 (the Film entry), FILM-GRADE-01 (Keep, Re-roll, Cut), FILM-02 (redo one shot). CREATOR-25 keeps only the shot-card plan fields and the four takes | their scope as written |
+| CREATOR-27 (a One take page) | Absorbed by LONGTAKE-02 (the Length dropdown up to the longest take, then New production) | LONGTAKE-01's backend |
+| A separate automatic-captions job in the Stack | Absorbed by CAPTION-01b (the long-file transcript job) and `lib/transcripts/*`; CREATOR-58 and -59 only add script matching and the made-clip hook | the `CaptionTrack` record and its writers |
+
+Not superseded and kept as written: VIDEO-LD-03b (saved Studio projects; the boundary with the creation record is in section 7.3), the 2026-11-05 child-LoRA conditions (CREATOR-47 carries them), the talent note's architect condition 13 (CREATOR-04 keeps it), RULES S2 and S6.
+
 ## Findings
 
-CreatorOS is a ComfyUI studio on one NVIDIA card. Its README counts 62 functions; they are 62 menu entries and 57 unique names (Restore, Movie Studio, Lip Sync, Talking Avatar and Add Sound sit in two menus). Against Home, of the 62 entries 24 are built and reachable, 3 are built with no page that reaches them, 13 are partial or designed, 22 have nothing (one of those is a duplicate row, one is the ComfyUI workflow download, which a Home rule leaves out). The biggest gaps are not models. They are pages: the Images Create page, the Film entry, the Talking avatar page and the one-take page are "coming soon" stubs over code that works. The second gap is one family of Max-only video adapters (remove people, edit by words, change background, motion copy, another angle) that one Stack route already serves for Colorizer and Ingredients. The third is a set of habits CreatorOS has and Home lacks: a clip check after every render with a re-shoot rule, a face check against the character's photo, the same job order by model, presets kept as data, and a read-only "how it was made". Home is ahead on editing (the kit editors), on safety (child and teen floors, CSAM check), on speech and music, and on the reference-picture video work, which this note builds on. Nothing in CreatorOS needs ComfyUI to be reproduced: every function has a Home place and either an engine we run or a named proposed model. What is left out is left out by a named Home rule (section 8). Four owner additions shape the plan: the reference video work gets fixed and extended first (section 5), cast members are real synths, companions and saved characters that every feature takes through one record (section 6), every made item stores what it was made from (section 7), and a synth's profile page shows its credits from that same link (section 7).
+CreatorOS is a ComfyUI studio on one NVIDIA card. Its README counts 62 functions; they are 62 menu entries and 57 unique names (Restore, Movie Studio, Lip Sync, Talking Avatar and Add Sound sit in two menus). Against Home, of the 62 entries 24 are built and reachable, 3 are built with no page that reaches them, 13 are partial or designed, 22 have nothing (one of those is a duplicate row, one is the ComfyUI workflow download, which a Home rule leaves out). The biggest gaps are not models. They are pages: the Images Create page, the Film entry, the Talking avatar page and the one-take page are "coming soon" stubs over code that works. The second gap is one family of Max-only video adapters (remove people, edit by words, change background, motion copy, another angle) that one Stack route already serves for Colorizer and Ingredients. The third is a set of habits CreatorOS has and Home lacks: a clip check after every render with a re-shoot rule, a face check against the character's photo, the same job order by model, presets kept as data, and a read-only "how it was made". Home is ahead on editing (the kit editors), on safety (child and teen floors, CSAM check), on speech and music, and on the reference-picture video work, which this note builds on. Nothing in CreatorOS needs ComfyUI to be reproduced: every function has a Home place and either an engine we run or a named proposed model. What is left out is left out by a named Home rule (section 8). Five owner additions shape the plan (the fifth, section 10, is the range from a 10-second joke to a feature film): the reference video work gets fixed and extended first (section 5), cast members are real synths, companions and saved characters that every feature takes through one record (section 6), every made item stores what it was made from (section 7), and a synth's profile page shows its credits from that same link (section 7).
 
 ## 0. Rules that bind this work
 
@@ -74,7 +95,7 @@ Key. Row: the backlog row that builds it (CREATOR-nn is new in this note; other 
 | 28 | Movie Studio shot card (camera, lens, light, film stock, 4 takes) | Video > Create "Shot card"; Film shot cards | LTX words | `generate_video` arg `card`; shot-card answer block | yes | CREATOR-20, CREATOR-25, CREATOR-39 |
 | 29 | Sketch to video | Images > Create "From a sketch", then Video | LTX edge IC-LoRA (proposed) | `generate_video` arg `from_sketch` | yes | CREATOR-49 |
 | 30 | 3D Scene (block a shot in 3D) | Video Studio "Scene" tab | LTX Layout-to-Render IC-LoRA plus a kit 3D blocker (proposed) | `generate_video` recipe `scene` | yes | CREATOR-49, CREATOR-41 |
-| 31 | Seamless loop | Video > Create "Loop" chip | LTX with the end picture equal to the start; seam SSIM at least 0.9; the `loop` op seam is CREATOR-IP-06 | `generate_video` arg `loop` | yes | CREATOR-22, CREATOR-IP-06 |
+| 31 | Looping clip | Video > Create "Loop" chip | LTX with the end picture equal to the start; seam SSIM at least 0.9; the `loop` op seam is CREATOR-IP-06 | `generate_video` arg `loop` | yes | CREATOR-22, CREATOR-IP-06 |
 | 32 | Green screen, transparent background | Video Studio | Apple Vision subject mask, SAM 2.1 | `edit_video` | yes | Built |
 | 33 | Masters export (HLG HEVC, ProRes, EXR) | Video Studio export presets; Settings | ffmpeg on the Stack | `edit_video` change `master` | yes | CREATOR-29, CREATOR-45 |
 | 34 | Upscale to 1080p; restore a clip | Video feed menu; Video Studio "Restore" | Real-ESRGAN (have); SeedVR2 (proposed) | `edit_video` change `upscale`, `restore` | yes | Built, CREATOR-52 |
@@ -84,10 +105,10 @@ Key. Row: the backlog row that builds it (CREATOR-nn is new in this note; other 
 | 38 | Next shot (coverage, push-in, next beat); Extend (sequel, prequel) | Video feed menu "Next shot" | LTX extend and continue (Max); Klein stills | `edit_video` change `next_shot` | yes | CREATOR-23 |
 | 39 | Re-shoot (same inputs, new seed, checks) | Video feed menu; "Another take" | Same engine | `edit_video` change `reshoot` | yes | CREATOR-10, CREATOR-23 |
 | 40 | Re-shoot from a new angle | Video feed menu "Another angle" | CrossView-Warp IC-LoRA plus MoGe-2 (proposed) | `edit_video` change `angle` | yes | CREATOR-50 |
-| 41 | Long take (17 s to 1 min) | Video > Create, "One take" | LONGTAKE-01 chain (built backend) | `generate_video` arg `seconds` | yes | CREATOR-27 |
-| 42 | Dubbing, lip sync | Video Studio "Dub" | MuseTalk 1.5, LatentSync 1.6 or InfiniteTalk (proposed, benches in LOCAL-BENCH-02) | `edit_video` change `dub` | yes | CREATOR-51 |
+| 41 | Long take (17 s to 1 min) | Video > Create, the Length dropdown up to the longest take, then New production | LONGTAKE-01 chain (built backend) | `generate_video` arg `seconds` | yes | LONGTAKE-02 |
+| 42 | Dubbing, lip sync | Video Studio "Dub" | MuseTalk 1.5 or LatentSync 1.6 (proposed, benches in LOCAL-BENCH-02) | `edit_video` change `dub` | yes | CREATOR-51 |
 | 43 | Reframe 9:16, 16:9, 1:1, 4:5 | Video feed menu | Blurred fill (built); AI edge fill (bench) | `edit_video` change `reframe` | yes | Built |
-| 44 | Motion control (animate a still with a driver clip) | Video > Create "Copy motion" | LTX pose and depth IC-LoRAs (proposed); Wan2.2-Animate only as a fallback | `generate_video` recipe `copy_motion` | yes | CREATOR-49 |
+| 44 | Motion control (animate a still with a driver clip) | Video > Create "Copy motion" | LTX pose and depth IC-LoRAs (proposed); no Wan model | `generate_video` recipe `copy_motion` | yes | CREATOR-49 |
 | 45 | Change background; retouch by words (Ripple); place object; remove objects (Clean-Plate); add water; fix | Video feed menu; Video Studio "Retouch" | LTX IC-LoRAs on Max plus SAM 2.1 (proposed) | `edit_video` change `retouch`, `remove`, `background` | yes | CREATOR-48 |
 | 46 | Swap or Mix characters (one to three people) | Video Studio "Swap character", takes a cast member | LTX IC-LoRA plus SAM 2.1 masks first; Wan2.2-Animate fallback (needs Jesse's yes) | `edit_video` change `swap` | yes | CREATOR-57 |
 | 47 | Dance (34 dances, 20 studios) | Video > Create "Dance", takes a cast member | Pose IC-LoRA plus our own dance clip set (CreatorOS's mocap files are not in its repo and their licence is unchecked) | `generate_video` recipe `dance` | yes | CREATOR-49 |
@@ -96,7 +117,7 @@ Key. Row: the backlog row that builds it (CREATOR-nn is new in this note; other 
 | 50 | Generated transition between two shots | Video Studio, between clips | LTX with start and end pictures; the transition LoRA only after a bench (proposed) | `edit_video` change `bridge` | yes | CREATOR-60 |
 | 51 | Add sound to a clip (video to audio) | Video Studio "Add sound" | LTX-2.5 video to audio (bench VIDEO-INPUTS-04); MMAudio or HunyuanVideo-Foley (proposed) | `edit_video` change `add_sound` | yes | CREATOR-54 |
 | 52 | Auto clip check (black, frozen, jump, blur, face drift) | Automatic; Library badge | CPU checks plus YuNet and SFace (have) | note on the video card | no (it runs inside the job) | CREATOR-09, CREATOR-10 |
-| 53 | Social check (hook, subject, tips) | Video Watch right pane | Qwen3-VL (have) plus the clip check | `edit_video` change `review` (read only) | yes | CREATOR-28 |
+| 53 | Social check (hook, subject, tips) | A tab of the Video Watch right pane (S2) | Qwen3-VL (have) plus the clip check | `edit_video` change `review` (read only) | yes | CREATOR-28 |
 | 54 | Talking avatar (photo plus voice or typed line) | Video > Talking avatar | LTX quoted line now; talking-head LoRA or audio-driven route later | `generate_video` arg `cast` with a spoken line | yes | CREATOR-26, CREATOR-51 |
 
 ### 2.3 Sound, characters, library, platform
@@ -136,7 +157,7 @@ Source: the editor consistency audit (2026-11-13), read against kit tag ui-v0.5.
 | `EditorShell` (extends `studio-layout.tsx`) | header (close, title, versions, download, primary action), notices, bar, stage, inspector and footer slots; container-width `compact`; fit-height; variants pane and screen | picture, video, music |
 | `EditorToolbar` and `EditorToolButton` | one tool-action table (id, label, icon, shortcut, group verb or property, enabled, reason, run) feeding the bar, a More menu and the right-click menu; a disabled tool stays visible and says why; tooltip ends with the shortcut | all |
 | `EditorInspector` | right panel on wide, bottom sheet on phone; sections with title, Reset, "Selected: name"; properties live here, verbs on the bar | all |
-| `EditorBusy` | one job card: name, size, wait, Stop, queue position; its `onProgress` mirrors into Activity (S6) so the picture editor's busy card reaches the Activity page | all |
+| `EditorBusy` | one busy card inside the editor: name, size, wait, Stop, queue position, read from the job. A slow editor operation is started as a `createJob` job, so it already appears in Activity (S6); the Element mirrors nothing into Activity itself | all |
 | `EditorHistory`, `EditorZoom` | one undo and redo model with coalescing; one zoom control (percent, Fit, Ctrl+wheel, plus and minus) | all |
 | `EditorCompare`, `EditorVersions` | before and after as slots (two pictures or two synced clips); a versions popover | all; music keeps `versions` |
 | keymap and Esc ladder | one table; Esc cancels the run, closes the tool, discards the preview, closes the editor | all |
@@ -183,7 +204,7 @@ One definition per kind, none typed into code (principle 4). The picture and vid
 
 ### 4.5 "How it was made" panel
 
-A read-only panel on every picture, clip, film and song, in the Library viewer, on the Video Watch page and in the editors' version popover. It reads the creation record (section 7): model, revision and licence, seed, size, length, tier, styles, cast, sources, the check result, what it was made from. The words and the plan show to the person who made it only. Phosphene's "how it was made" idea and CreatorOS's per-render details are the same panel. A "Make another like this" and "Clone settings" button open the editor or Create with the record loaded. Slice CREATOR-18.
+A read-only view on every picture, clip, film and song. It extends the Library viewer's info panel (LIBRARY-REVAMP-09); on the Video Watch page it is a tab of the S2 right pane, never a Home panel; the editors' version popover links to it. It reads the creation record (section 7): model, revision and licence, seed, size, length, tier, styles, cast, sources, the check result, what it was made from. The words and the plan show to the person who made it only. Phosphene's "how it was made" idea and CreatorOS's per-render details are the same panel. A "Make another like this" and "Clone settings" button open the editor or Create with the record loaded. Slice CREATOR-18.
 
 ### 4.6 Finishing: titles, credits, transitions, looks, captions, mixing, loops
 
@@ -205,12 +226,12 @@ What this note plans on top of them:
 
 | Function | Home place | Engine and model | Chat tool | Activity | Row |
 |---|---|---|---|---|---|
-| Auto captions timed to the speech | Video Studio Captions lane; Video Watch captions list; film card | MLX Whisper large-v3-turbo (already pinned in the Stack as `STACK_MUSIC_WHISPER`, `mlx-community/whisper-large-v3-turbo`, about 1.6 GB, Apple GPU) plus the existing forced aligner (`align/`) | `edit_video` change `captions` with no lines means auto | yes | CREATOR-58, CREATOR-59 |
+| An automatic caption track for a made clip | Video Studio Captions lane; Video Watch captions list; film card | The transcript job of CAPTION-01b (engine per its spike verdict) through `lib/transcripts/*`; the only new part is matching the known script to the heard words | `edit_video` change `captions` with no lines means the stored track | yes | CREATOR-58, CREATOR-59 |
 | Generated bridge between two shots ("Make a transition") | Video Studio between two clips; film assembly option | LTX-2.5 already installed, first and last frame guides (`end_frame`); the transition LoRA enters through our LoRA library only after a prompt-only bench | `edit_video` change `bridge` | yes | CREATOR-60 |
 | Studio transition and look controls | Video Studio seam menu (all 20 kinds) and a look chooser with a preview sheet | ffmpeg `xfade`, `film_look`, `frame` ops (have) | `edit_video` (have) | yes (export) | CREATOR-61, CREATOR-62 |
 | Loop made and checked | Video > Create "Loop" chip | LTX with `end_frame` equal to the start; seam SSIM from the clip check | `generate_video` arg `loop` | yes | CREATOR-22 with CREATOR-10 |
 
-Captions method (Phosphene's, carried): the script words are known (the clip's request holds the quoted lines, and the creation record keeps them); Whisper hears the clip with word times; the script is matched to the heard words and snapped by forced alignment; 42 characters a row, 1.0 s minimum cue, 0.35 s hold, 0.08 s lead; the existing `captions` op burns them with a 2 px outline added to the style, and `.srt` and `.vtt` are stored next to the clip and fill the Player's captions list (CAPTION-01, VIDEO-LD-05). Lines Whisper cannot hear (sung under loud music) keep the script timing from the alignment. The Whisper pin exists for the music sung-words check (MUSIC-GEN-15); the row checks it is the MLX build, and its Settings, AI and models line already lists size and licence.
+Captions method: captions already exist as a workspace (CAPTION-01: `Transcript`, `TranscriptRevision` and `CaptionTrack` records in the spec, the Stack long-file job with word times CAPTION-01b, Home store, cue builder and SRT, VTT writers CAPTION-01c, burn-in CAPTION-03, translation CAPTION-02). So this note adds no captions job and no model. CREATOR-58 adds the one thing a made clip has that a recording does not: the script is known (the quoted lines in the creation record), so after a clip finishes the heard words are matched to the script words (Phosphene's method: match, then snap to the heard times; 42 characters a row, 1.0 s minimum cue, 0.35 s hold, 0.08 s lead) and written as a spec `CaptionTrack` through the existing writers. CREATOR-59 reads that track in the Studio lane, in `edit_video` `captions` (no lines means the stored track, burned by CAPTION-03's `media.edit` `captions` op with a 2 px outline added to the style) and on the film card.
 
 Bridge method (CreatorOS's, carried): the last frame of clip A and the first frame of clip B are the two guides; nine effect sentences (morph, smoke, ink, light burst, zoom through, whip pan, wind vortex, water, melt) written in our wording as video templates; 3 to 5 s; then A, bridge, B are joined with a cut or a 0.3 s dissolve. A bridge takes the strictest lock and audience of the two clips (section 7.3). Bench first with the prompt alone, then with the LoRA.
 
@@ -265,6 +286,7 @@ Evidence of the gaps: a synth reaches pictures and films only if `ensureSubject`
 
 Decision: a cast member is not a new record. It is a synth or a saved subject seen through one function. The saved subject (`media-subject`) is the look store and the one id every made item stores; a synth always has one, linked both ways (`synth.subject_id` and `media-subject.synth_id`). The talent note already rules "one synth has one name, one backstory, one voice and one life whatever it is assigned to" and keeps the two look stores unmerged "the link makes them one person"; this note finishes that link and adds nothing beside it. A prop or a place is a subject with no synth.
 
+- Source of truth: `synth.subject_id` is the link. Home writes `media-subject.synth_id` in the same transaction that sets `synth.subject_id` (CREATOR-04 has a test that fails when they differ), so no reader can see one without the other. The subject's `real` is derived from `synth.based_on.kind` and never set by hand on a linked subject (the talent note's architect condition 13; principle 4, one place for the real-person fact).
 - Spec, additive, in `commons/spec` first (CREATOR-01): `media-subject` gains `locked_description` (a sentence of colours, markings, outfit and what is never true, 400 characters, the film plan's `locked` field made permanent). The fields `synth_id`, `voice` and `trained_style_id` already exist in the spec.
 - Home (CREATOR-04): the table gains the three columns the spec has plus the new one; `ensureSubject` writes `synth_id` back, and is called the first time a synth is cast anywhere, not only by shows; one function `resolveCast(actor, ids or names)` returns, for each cast member, the subject, the synth if any, the sheet file, the locked sentence, the pack look (medium: photo or stylised, from the rest picture), the voice and the audience; every tool and page calls it and nothing else. `GET /api/cast` lists what the viewer may use: their own synths and subjects, shared ones, and household members under the rulings below.
 - Personality and voice are read through the link when used, never copied: the film planner reads the synth's tagline and backstory to write a shot in character; a spoken line uses the synth's voice (6.5).
@@ -276,14 +298,14 @@ One ladder, used by every feature, strongest first:
 1. The reference sheet, built once per cast member by the one sheet builder (CREATOR-06, replaces PRODUCTION-VIDEO-02's separate turnaround sheet) from the member's pictures: a synth feeds in its rest picture and approved sheet views, a household member their own photos, an invented character its generated portrait. Stored as the subject's sheet reference. The sheet is how the look is captured; the cast member is what the person picks.
 2. The locked sentence in every shot prompt (CREATOR-04 stores it; PRODUCTION-VIDEO-02's idea).
 3. The route: photographed real face or a household member, first picture then clip; stylised, bot, clay or cartoon, sheet route (Ingredients). The choice reads the rest picture's medium from the pack, so a companion with a pack never needs a guess.
-4. An optional identity LoRA trained from the sheet and its 12 varied images (CreatorOS's character flow), kept as a `Lora` record (VIDEO-LORA-12) and named by `trained_style_id`, applied to pictures and first pictures (CREATOR-46, -47; Stack trainer). Real children: off by default, per child, a parent or admin switches it on, every output counts as a known minor for the CSAM check (`character-consistency-research-2026-11-04.md`, decision 2).
+4. An optional identity LoRA trained from the sheet and its 12 varied images (CreatorOS's character flow), kept as a `Lora` record (VIDEO-LORA-12) and named by `trained_style_id`, applied to pictures and first pictures (CREATOR-46, -47; Stack trainer). Real children follow every condition the architect set on 2026-11-05 (`character-consistency-research-2026-11-04.md`, decision 2): it applies to every minor; off by default; per child; only a parent or admin switches it on, never the child or teen; revoking deletes the trained LoRA; every output counts as a known minor for the CSAM check (rule 10); a child never gets it in their own lane. The record is a `likeness-adapter` change named in CREATOR-47.
 5. The face check per take with the automatic re-take (4.2).
 
 ### 6.4 How a person picks cast
 
 | Where | Today | Plan |
 |---|---|---|
-| Chat | Composer `@` lists companions; sends `mention_companion_id`; `generate_image` and `generate_video` take `subjects` names (max 3); `make_film` takes `characters` text | One `@` list of cast (synths, subjects, allowed household members). The composer sends the chosen mentions as structured `mentions` beside `mention_companion_id` (the persona that answers is unchanged). A media tool takes `cast` (ids, up to 6; `subjects` stays as an alias). The model chooses the tool and may fill `cast` from the structured mentions; no regex on the text (rule 1). The tool validates every id with `resolveCast` and the viewer's access, one plain refusal line each (CREATOR-05) |
+| Chat | Composer `@` lists companions; sends `mention_companion_id`; `generate_image` and `generate_video` take `subjects` names (max 3); `make_film` takes `characters` text | The one `@` list is the kit `ComposerMentions` popover with two distinct item types: companion items (unchanged, spec 4.3 of the companions note: one-turn routing) and cast items (insert a cast chip), each filtered per band. The composer sends the chosen cast mentions as structured `mentions` beside `mention_companion_id`. A media tool takes `cast` (ids, up to 6; `subjects` stays as an alias). The model chooses the tool and may fill `cast` from the structured mentions; no regex on the text (rule 1). The tool validates every id with `resolveCast` and the viewer's access, one plain refusal line each (CREATOR-05) |
 | Images > Create, Video > Create, shot cards, Film | stubs, or a name field | Kit `prompt_bar` cast chips from `GET /api/cast`, a cast shelf with the kit `media_shelf` as shipped, `@` in the prompt field (CREATOR-39 in `commons`, CREATOR-15, -40, -25 in Home) |
 | A synth's page, Library | none | "Use in a picture", "Use in a video", "Use in a film" open the Create page with the cast member in place (a hand-off fills the form and starts nothing, the Phosphene rule) |
 
@@ -303,7 +325,7 @@ At most 6 cast in a film (the plan's own cap), 3 on a still or a clip prompt chi
 - `talent-2026-11-07.md` section 2.2: "Only an adult makes a real-person synth"; teens and children get one under `synths.real_people` (a child is `ask` by default and never `all`); "When the member is under 18, the synth's context and the CSAM check carry 'this being is a minor', so sexual output about it is a CSAM candidate and a check that cannot run fails closed."
 - Code today that already enforces it: `mediaSubjects.ts` refuses a `real` subject to a child or teen ("Real-person subjects are not available for this profile yet."); `videos/tool.ts` refuses real or non-character subjects for kids.
 
-`resolveCast` applies exactly these: a household member or real person is a subject with `real: true` and, for a household member, `based_on.kind: household_member` with the `minor` flag; no new consent step, prompt or word list is added; the minor flag reaches the CSAM check on every output that includes the member.
+`resolveCast` applies exactly these. A household member or a real person is cast through a synth: a synth whose `based_on.kind` is `household_member` or `real_person`, with the `minor` fact in `synth.based_on` (the spec has no `based_on` on `media-subject`). For a household member the `minor` fact is read from the person's age band when the synth is read (`based_on.refresh`), not typed. The linked subject's `real` is derived from `based_on.kind`. A household member is therefore always cast through a synth; the first time one is cast, `ensureSubject` makes the synth if the person does not have one. A loose set of someone's photos that a person attaches in chat stays a one-off, unsaved cast member with no `minor` fact; the picture-level CSAM check (possible-minor detection, rule 10) still runs on every output, and a child or teen is refused as above. No new consent step, prompt or word list is added.
 
 ### 6.7 Every feature takes people one way (cross-reference)
 
@@ -360,12 +382,16 @@ creation-record
   settings              size, seconds, quality, styles with strength, camera or shot card, takes, loop, route
   checks                what the clip check and the face check measured
   parent_id?            the record this one was made from: another take, re-shoot, next shot, edit
+  review                pending | kept | rejected (the one state FILM-GRADE-01, VIDEO-TAKES-01 and the clip check's re-shoot rule read)
   audience, made_audience, lock       copied by the same function as the file note
+  provenance, hlc       the record envelope every spec record carries
 ```
 
-Home stores it in one table `creations` (JSON body, one row per made item), with `creation_cast(creation_id, subject_id, synth_id)` as an index written in the same transaction by the same function and rebuildable from the records; nothing else writes it. The file's existing provenance note gains one pointer `creation:<id>` and keeps working; old items are back-filled best effort from the job rows (T2: a migration). The job rows stay what they are for running a job. Reading: `GET /api/creations/by-file/:fileId` for the maker. Reopening: an editor, Another take, Re-shoot and Next shot read the record and start a new job from `recipe`, `sources`, `cast`, `settings` with a new seed and `parent_id` set; a Studio plan still refers to its source clips by file id. The "how it was made" panel (4.5) is a view of this record. IVY's saved sheet and prompt are the first writer (CREATOR-02 moves `ReferenceRecipe` into it).
+Home stores it in one table `creations` (JSON body, one row per made item), with `creation_cast(creation_id, subject_id, synth_id)` as an index written in the same transaction by the same function and rebuildable from the records; nothing else writes it. The file's existing provenance note gains one pointer `creation:<id>` and keeps working; old items are back-filled best effort from the job rows (T2: a migration). The job rows stay what they are for running a job. Reading: `GET /api/creations/by-file/:fileId` for the maker. Reopening: an editor, Another take, Re-shoot and Next shot read the record and start a new job from `recipe`, `sources`, `cast`, `settings` with a new seed and `parent_id` set; a Studio plan still refers to its source clips by file id. The "how it was made" view (4.5) is a read of this record. Words and the plan are never copied into `file.provenance.generation` (that block stays small and visible to anyone who can open the file); they live only in the creation record. Reuse check for the record: `project.schema.json` is a background work unit with a plan, not a made-from record, so it is not extended; `file.provenance` stays the pointer; `media-item.parent_id` is the lineage field `parent_id` follows. IVY's saved sheet and prompt are the first writer (CREATOR-02 moves `ReferenceRecipe` into it).
 
 ### 7.3 Locks and audiences
+
+- Boundary with VIDEO-LD-03b (saved Studio projects): a creation record is written only by a finished job's writer (a picture, clip, film or song that exists as a file), never from a live Studio plan or an autosave. A Studio plan is a different record (03b's), is never saved with a locked or adult-only source, and is not a creation record until an export finishes as a job.
 
 - The record's `audience`, `made_audience` and `lock` are the maximum over its sources, written by the same function as the file note (`lib/adultLock.ts` `newItemMark`, `markFields`); it is read through `lockState`, `canReadFileAudience` and `lockedFilterSql`. A viewer who cannot open the file cannot read the record. A locked or adult-only record is never returned by any list, panel or credits call to a minor, a shared screen, an unknown viewer or an adult without the unlock, and never named in a count.
 - Words and plan are private to the person who made the item; someone the item is shared with sees cast, models, date and the checks.
@@ -409,20 +435,103 @@ Any model and licence may be downloaded (owner, 2026-11-13). Each one gets a Sta
 | FLUX.2 Klein 4B LoRA training (mflux) | Identity LoRA from a sheet and 12 images | training adds minutes of GPU and about the pack size in memory | Apache-2.0 | mflux trains FLUX.1; the Klein path is unverified; fallback ai-toolkit (MIT) on MPS, CUDA-centric | proposed |
 | SeedVR2 3B or 7B | Picture and clip restore and upscale, faces | 7 to 16 GB | Apache-2.0 | Better than frame-by-frame Real-ESRGAN; built for CUDA, an MPS port is unverified | proposed |
 | GFPGAN v1.4 | Face repair in Restore | about 350 MB | Apache-2.0 | Small, PyTorch with MPS | proposed |
-| TripoSR, then TRELLIS.2 | Photo to 3D object (GLB) | about 1.7 GB; 4B | MIT; MIT | TripoSR is small and has an MPS report; TRELLIS.2 needs CUDA extensions, a Mac port unverified. Hunyuan3D-2.1 (Tencent licence, regional limits) is the third choice | proposed |
+| TripoSR, then TRELLIS.2 | Photo to 3D object (GLB); its own bench row CREATOR-55 first | about 1.7 GB; 4B | MIT; MIT | TripoSR is small and has an MPS report; TRELLIS.2 needs CUDA extensions, a Mac port unverified. Hunyuan3D-2.1 (Tencent licence, regional limits) is the third choice | proposed |
 | LTX IC-LoRA family on Max: Clean-Plate, Ripple, pose, depth and edge control, Layout-to-Render, talking-head, transition, camera control, effects | Remove people, edit by words, change background, place object, sketch to video, copy motion, dance, 3D scene, AI transition, talking head | 0.5 to 2 GB each; Max peak about 81 GB | LTX-2.x Community Licence; some adapters carry their own (OpenRAIL), to confirm each | One install-and-wire pattern on the route the Stack already serves for Colorizer and Ingredients | proposed |
 | CrossView-Warp IC-LoRA plus MoGe-2 ViT-L | Another angle on a clip | about 1.3 GB plus the adapter | Apache-2.0; MIT | The warp step is ComfyUI code and needs a small port | proposed |
-| MuseTalk 1.5, LatentSync 1.6, InfiniteTalk | Lip sync and dubbing from a voice clip | under 2 GB; 18 GB; Wan 2.1 base | MIT; Apache-2.0 code with OpenRAIL++ weights; Apache-2.0 | MuseTalk is fast; InfiniteTalk's Wan base is fine for dubbing, the Wan ruling is about generation | benches in LOCAL-BENCH-02 |
+| MuseTalk 1.5, LatentSync 1.6 | Lip sync and dubbing from a voice clip | under 2 GB; 18 GB | MIT; Apache-2.0 code with OpenRAIL++ weights | MuseTalk is fast. InfiniteTalk is not proposed: it is built on Wan 2.1, so it would run only after Jesse's yes as CREATOR-57 does | benches in LOCAL-BENCH-02 |
 | RIFE 4.25 through rife-mlx | Smooth motion | 23 MB | MIT | Benched in LOCAL-BENCH-01, not built | benched, not shipped |
-| Stable Audio 3 small sfx | Sound effects | to confirm | Stability Community Licence | About 1 s a clip against ACE-Step's 3 s in CreatorOS; MUSIC-GEN-11 already names it | proposed |
+| Stable Audio 3 small sfx | Sound effects | to confirm | Stability Community Licence (outputs stay `personal_only`; the owner's 2026-11-13 "any licence may be downloaded" is the answer to MUSIC-STUDIO-01's Q2) | About 1 s a clip against ACE-Step's 3 s in CreatorOS; MUSIC-GEN-11 already names it | proposed |
 | MMAudio or HunyuanVideo-Foley | Sound for a clip | to confirm | to confirm | Fallback if LTX-2.5 video to audio does not pass the VIDEO-INPUTS-04 bench | proposed |
 | Chatterbox VC | Voice changer for speech | same family as the installed Turbo | MIT | Same family as the voice we run | proposed |
-| Wan2.2-Animate-14B | Swap and Mix characters, only if the LTX route fails | about 34 GB bf16 | Apache-2.0 | Speed on Apple Silicon unknown; needs Jesse's yes because of the Wan ruling | fallback |
+| Wan2.2-Animate-14B | Swap and Mix characters (CREATOR-57 only), and only after Jesse says yes; never a fallback for motion copy or dance | about 34 GB bf16 | Apache-2.0 | Speed on Apple Silicon unknown; needs Jesse's yes because of the Wan ruling | fallback |
 | YuNet and SFace | Face finder and face match | 0.23 MB and 38.7 MB | MIT, Apache-2.0 | Already installed (REFVIDEO-PARTS-01) | in use |
 
-Models we already run are not repeated: Klein, Z-Image-Turbo, ERNIE-Image, Qwen-Image, LTX-2.5 q8 and bf16, FastWan2.2 (the Quick slot), Real-ESRGAN, SAM 2.1, LivePortrait, ACE-Step, Chatterbox Turbo, Pocket TTS, Fish Audio Drama, Qwen3-VL.
+Models we already run are not repeated: Klein, Z-Image-Turbo, ERNIE-Image, Qwen-Image, LTX-2.5 q8 and bf16, FastWan2.2 (Wan family, rejected on quality for generation on 2026-11-01; it stays only in the Quick slot the tier note keeps for minors), Real-ESRGAN, SAM 2.1, LivePortrait, ACE-Step, Chatterbox Turbo, Pocket TTS, Fish Audio Drama, Qwen3-VL.
 
-## 10. Build order
+## 10. From a 10-second joke to a feature film
+
+Short answer to the owner's question (2026-11-13): the plan covered the bottom and the top only in pieces. Home can make a clip, an unbroken take of up to 40 seconds and a film of up to 12 shots today, and has a design (not yet built) for a long production. It has no single format ladder, no Short, music video or episode entry, and no film has been timed beyond about a minute. This section adds the ladder as data, the structure that scales, the limits, and the chat path, and says for each piece whether it exists, is planned in an existing row, or is a new row (CREATOR-63 to CREATOR-70).
+
+### 10.1 What exists (read from code, notes and the backlog)
+
+| Form | Exists | Evidence |
+|---|---|---|
+| A quick funny clip | Yes, in chat; the Create page is a stub until VIDEO-UI-06 | `generate_video`; a clip is at most 10 s at Standard and 5 s at Boost (`maxSecondsFor`, `lib/videos/quality.ts`); 10 s at Standard measured at about 43 s |
+| A take up to 40 s | Backend built, no page | LONGTAKE-01: `MAX_TAKE_SECONDS` 40, `MAX_PARTS` 12 in `lib/videos/longTake.ts`; page is LONGTAKE-02 (the Length dropdown, then New production) |
+| A film of up to 12 shots, faceless narrated films, redo one shot | Yes, in chat | FILM-01, -02, -04, -05, -07 landed; the finished file lands within a second or two of the asked length (title card 3 s and credits 4 s counted, `filmOverhead` in `videos/editPlan.ts`); the Create entry is FILM-06 (open), the animatic FILM-ANIMATIC-01 and grading FILM-GRADE-01 (open) |
+| Longer than 12 shots, a production | Designed; partly built | `make_film` CHANGELOG 0.4.0: a request over two minutes "writes a long production in steps: treatment, then cast and places, then scenes, each approved before the next"; later entries: only the first part has the title and only the last has the credits; a synth can play a part. The backlog rows LONGFORM-01 (tool and store), -03 (storyboard and scene runner), -04 (dailies), -05 (page) are unchecked and LONGFORM-02 (script and shot list) is landed; I did not trace which of 0.4.0's steps run today |
+| Series, episodes, scenes, shots as one structure | In the spec | `media-production`: `episodes[]` each with `scenes[]` each with `shots[]` (clip, picture, music line, voice line ids); the talent shows already use episodes, derived recaps and chapters (`talent-2026-11-07.md`) |
+| A music video | Designed, not built | AUDIO-PARITY-01 slice MUSIC-VIDEO-01 (`audio-parity-2026-11-05.md` section 4: song DNA, a shot plan per section, cut on the beat, one MP4); beat cutting (`lib/videos/beatCut.ts`, Stack `/v1/audio/beats`) and Add music are built; minors refused until a later row |
+| A Short or Reel | No entry | `VIDEO_ASPECTS` has 9:16; reel formats are CREATOR-24 |
+
+### 10.2 One format ladder, as data
+
+A format is a record, not code: aspect, length range, structure, planner prompt, finishing and the Create entry that starts it. The shape already exists for audio shows: spec `show-format.schema.json` (`parts`, `structure` of kinds with a share, `length_s`, `first_app`, `min_audience`). CREATOR-63 extends it additively (a `medium` of video, `aspect`, `finishing`, a planner prompt id, a Create entry id, and the structure kinds cold open, act, sequence, recap, end card, verse and chorus). If the architect rules that `show-format` cannot carry video, a sibling record with the same shape is the fallback, never two shapes in code. The reel formats of CREATOR-24 are rows of this ladder.
+
+| Format | Aspect | Length | Structure | Planner prompt | Finishing | Starts from | Exists / row |
+|---|---|---|---|---|---|---|---|
+| Quick clip | any; 16:9 default | 3 to 10 s (a take to 40 s) | one shot | the prompt rewrite only | none; captions if it speaks | Create "Make a video"; `generate_video` | built; LONGTAKE-02 for takes |
+| Short or Reel | 9:16 | 15 to 60 s | hook in the first 2 s, 5 to 12 beats (the six reel formats), payoff or loop | reel prompts (CREATOR-24) | burned captions, optional music, no credits; hook check: no black or frozen frame and visible motion in the first 2 s (the clip check on those frames) | Create "Short"; `make_film` with `format: short` | CREATOR-64 |
+| Music video | 16:9 or 9:16 | the song's length | song sections from the beats engine, one shot plan per section, cuts on the beat, lyric moments on chorus lines | music-video prompt | the song's audio from 0:00 (no ducking), optional lyric captions from the forced-alignment word times (`lib/music/lyricsAlign.ts`), title card, credits optional | Music "Make a video for this song"; Create entry | MUSIC-VIDEO-01, CREATOR-65 |
+| Episode (TV or YouTube) | 16:9 | 5 to 30 min | cold open, title, 3 or 4 acts of scenes of 60 to 180 s, end card; "Previously" recap from earlier episodes | treatment, then per scene (LONGFORM-02's script and shot list) | title on the first part only, credits on the last only, chapters per scene and act (`videos/chapters.ts`), captions, end card | Create "Episode"; `make_production` kind episode | LONGFORM-01 to -05, CREATOR-66 |
+| Feature film | 16:9, widescreen look optional (`letterbox`) | 60 to 120 min | script, 3 acts, 8 to 12 sequences, scenes, shots | outline, then script and shot list per scene | title, credit roll, chapters per sequence, captions | Create "Movie"; `make_production` kind movie | LONGFORM-01 to -05, CREATOR-67 |
+
+All of these are adult-only on the adult's own written screen, as FILM-04 rules; a child or teen sees none, and a music video for a minor stays refused until its own row (the audio parity note). No format loosens rule 0 or rule 10.
+
+### 10.3 The structure that scales
+
+- One structure, no second store: series is the production, episodes are the spec's `episodes[]`, scenes and shots are the spec's `scenes[]` and `shots[]`. Acts and sequences are two optional string labels on a scene (`act`, `sequence`), an additive spec field added in CREATOR-01, so the Timeline can group scenes without reading the outline. The outline, script and shot lists stay in `production_documents` (LONGFORM-01's migration); each scene run is a film run with `parent_id` and `scene_key`. Nothing here adds a table beyond what LONGFORM-01 already plans.
+- One record per made level: each scene run writes a creation record (kind film, section 7) with its cast, sheets, shot plan and seeds; the episode's cut writes one whose `sources` are the scene clips (role clip) and whose `parent_id` is the production; Another take, Re-shoot and "redo this scene" read these records. A production's finished cuts are in `finished_cut_file_ids`.
+- Continuity: cast, wardrobe, places and props are bible entries that live at production level and persist across scenes and episodes. A cast member is a saved subject linked to its synth with a stored reference sheet and locked sentence (CREATOR-04, -06); a place or prop is a subject of kind place or prop captured by the same sheet builder (IVY's places-as-panels); wardrobe is a variant of the member (`wardrobe_variant_ids`, already in the spec) with its own sheet; every shot's still starts from the bible and the previous shot (LONGFORM design, step 5). Series continuity is the same bible reused by the next episode plus a "Previously" recap written from the earlier episodes' scene summaries, derived and not stored twice (the talent shows' rule for recaps).
+- Script and storyboard first: the Story, Cast, Locations, Props, Music, Storyboard, Scenes and Timeline tabs of LONGFORM-05; the animatic (FILM-ANIMATIC-01: stills held for their seconds with the plan's motion, no clip GPU) is shown and approved before any clip renders.
+- Editing one scene without redoing the film: a scene is its own clip and creation record. Redo a shot or a scene replaces that scene's clip and re-assembles only the levels above it. This needs hierarchical assembly. Today one `film` edit is limited to 600 s of film and 12 ops (`media/editOps.ts`, `lib/videos/editPlan.ts`, per the finishing report), so a 22-minute episode or a 90-minute feature cannot be assembled in one call. CREATOR-68 assembles scene clips into sequences, then acts, then the episode, each level inside those limits, with hard cuts by stream copy checked for audio length (CREATOR-IP-07) and the title and credits on the first and last part only. A saved Studio project (VIDEO-LD-03b) of scene clips is the person's manual way to edit across scenes and keeps its lock rule (never saved with a locked or adult-only source).
+
+### 10.4 The real limits on the Mac Studio
+
+Measured per-clip numbers exist (Stack and `video-tiers-2026-11-02.md`); no film of more than about a minute has been timed end to end, so everything below is arithmetic from the per-clip numbers, marked estimate. Assumptions: an average shot of 5 s (12 shots per finished minute); one Klein still per shot at about 9 s (the relight bench was 8.5 s); clips one at a time. Measured clip times: Standard 512x256, 5 s clip 27 to 52 s and a 10 s clip about 43 s; Boost 640x320, 5 s clip 42 to 49 s; Boost 768x448, 5 s clip 64 to 74 s; Max 1024x576 fails the 64 GB per-clip cap, so a feature is made at 768x448 and widescreen is a look, not a size. Optional upscale (Real-ESRGAN x2, FILM-UPSCALE-01) runs at about 5 frames a second, which adds about 5 minutes per finished minute.
+
+| Per finished minute | Standard | Boost 768x448 |
+|---|---|---|
+| Clips (12 shots) | 5.4 to 10.4 min | 12.8 to 14.8 min |
+| Stills (12) | about 1.8 min | about 1.8 min |
+| Total, no retakes (estimate) | 7 to 12 min | 15 to 17 min |
+
+| Format and finished length | Standard (estimate) | Boost 768x448 (estimate) |
+|---|---|---|
+| Quick clip, 10 s | about 45 s | not measured at 10 s |
+| Short, 45 s | 5 to 9 min | 11 to 13 min |
+| Music video, 3.5 min | 25 to 42 min | 52 to 60 min |
+| Episode, 22 min | 2.6 to 4.4 h | 5.5 to 6.2 h |
+| Feature, 90 min | 10.5 to 18 h | 22.5 to 25.5 h |
+
+A retake allowance comes on top (the dailies' measured retake rate, LONGFORM design section 4; an assumed 30 percent would make the feature 14 to 23 h at Standard and about 29 to 33 h at Boost). What makes a feature practical:
+- The animatic first. Stills only, about 2.7 h for 1,080 shots, no clip GPU: mistakes in the script, cast and look are caught before 10 to 25 hours of clips.
+- Drafts first, keepers last (FILM-GRADE-01): render every shot at Standard, mark Keep, Re-roll or Cut, finish only the keepers at Boost. This saves GPU only when many shots are rejected; its larger value is the early reject.
+- Reuse of takes: a kept take is never re-rendered; a rejected take stays as a take (the re-shoot rule never deletes) and a clean-up action removes rejected drafts.
+- Nights and days: the production shares the household queue at normal video priority; chat is never blocked and steps down to Reduced chat while a bigger job runs (`reducedChatLease.ts`, TIER-HOME-05). A multi-day run is a set of nights; the card says "scene 7 of 10, about 40 minutes left" and no resource words (LONGFORM design).
+- Resume after a restart: a film run resumes at the step that stopped (FILM-02); a long take loses at most the part in flight because each part is recorded as it finishes (LONGTAKE-01); LONGFORM-03 adds pause, resume and cancel. What is not known: whether a Stack job outlives a Home restart over many hours; CREATOR-69 measures it.
+- Activity: one row per production through `createJob` and `updateJob` (a generic `job` source in `lib/activity.ts`), with phase "scene 7 of 10" and a time left; its shot jobs are not listed one by one, so a feature does not put a thousand rows in Activity. No new surface (S6).
+- Disk is not measured. Known: the Library keeps one stored file per hash (LIBRARY-DEDUP-01), retention is per type, rejected takes are kept. CREATOR-69 records bytes per finished minute for stills, drafts and finished clips so the production card can show what a feature will take before it starts.
+
+### 10.5 Chat: from a joke to a feature
+
+The model chooses the tool and the format (rule 1); the tool's `format` choices are built from the format records at offer time, as `edit_picture` builds its `op` choices from the registry, and each has a bench row for offer rate and false offers.
+
+| The person says | Tool | Card |
+|---|---|---|
+| "Make a 10-second funny video of the dog and the vacuum" | `generate_video` | the video card with Another take |
+| "A YouTube Short about my morning, 40 seconds" | `make_film` `format: short` | the film card: stage list, then the 9:16 player with captions |
+| "Make a music video for this song" (a song card, or the Library) | `make_film` `format: music_video` with the song | the film card with song sections as stages |
+| "A 20-minute episode of the cooking show with Nova" | `make_production` kind episode | the production card: pitch, cast, places and outline each wait for an approval; time estimate shown first |
+| "Plan a feature film about a lighthouse keeper" | `make_production` kind movie | the production card; nothing renders until the person approves the outline and the animatic; it says how long a render will take on this hub in plain words |
+
+The Create page shows the same ladder: one entry per format, the format chosen on the billboard, the same record behind the chat tool and the page (one definition).
+
+### 10.6 Rows
+
+New: CREATOR-63 (the format ladder as data), CREATOR-64 (Short entry and hook check), CREATOR-65 (music video), CREATOR-66 (episode and series continuity), CREATOR-67 (feature film), CREATOR-68 (hierarchical assembly, Activity by parts, resume), CREATOR-69 (measure real runs: a Short, a 5-minute film, one overnight episode; disk, memory, restart), CREATOR-70 (chat format choice and cards). Planned in existing rows and extended: LONGFORM-01 to -05, FILM-04, FILM-06, FILM-ANIMATIC-01, FILM-GRADE-01, MUSIC-VIDEO-01 inside AUDIO-PARITY-01, LONGTAKE-02, TALENT-06 (spoken shows stay audio; an on-screen episode with synths is TALENT-09 and CREATOR-66), VIDEO-LD-03b.
+
+## 11. Build order
 
 Home work on engines we already run first, then the kit, then new Stack models. Each slice is at most about six files; a row that would exceed that splits at pickup. Stack slices are marked. Each row's full text is in `docs/BACKLOG.md`, section "CreatorOS port".
 
@@ -445,58 +554,59 @@ B. Reference video (section 5)
 C. Pictures
 13. CREATOR-13: picture presets as data (looks, relights, formats, angles).
 14. CREATOR-14: reference templates with cast slots.
-15. CREATOR-15: the Images Create page.
-16. CREATOR-16: carousel.
-17. CREATOR-17: Studio operations: expand, restore, angle, coverage, next shot.
-18. CREATOR-18: the "how it was made" panel.
-19. CREATOR-19: the Characters page.
+15. CREATOR-16: carousel.
+16. CREATOR-17: Studio operations: expand, restore, angle, coverage, next shot.
+17. CREATOR-19: the Characters page.
 
 D. Video, film and the rest of Home
-20. CREATOR-20: shot-card builder, vocabulary, four takes.
-21. CREATOR-21: camera and effect presets as Styles.
-22. CREATOR-22: loop made with an end picture and the loop check.
-23. CREATOR-23: Re-shoot, Next shot and Extend on a clip.
-24. CREATOR-24: reel formats and presets in the film planner.
-25. CREATOR-25: film shot cards, takes per shot, redo with a new motion, the Film entry.
-26. CREATOR-26: the Talking avatar page.
-27. CREATOR-27: the One take page.
-28. CREATOR-28: Social check.
-29. CREATOR-29: masters and output formats.
-30. CREATOR-30: Library review.
-31. CREATOR-31: phone capture.
-32. CREATOR-32: MCP face over Home's tools.
-33. CREATOR-58 (Stack, no new model) then CREATOR-59 (Home): auto captions timed to the speech.
-34. CREATOR-60: generated bridge transitions.
-35. In progress elsewhere, not planned again: CREATOR-IP-01 to CREATOR-IP-07 (section 4.6).
+18. CREATOR-20: shot-card builder, vocabulary, four takes.
+19. CREATOR-21: camera and effect presets as Styles.
+20. CREATOR-22: loop made with an end picture and the loop check.
+21. CREATOR-23: Re-shoot, Next shot and Extend on a clip.
+22. CREATOR-24: reel formats and presets in the film planner.
+23. CREATOR-25: shot-card plan fields and four takes per shot (the Film entry stays FILM-06, Keep and Re-roll FILM-GRADE-01, redo FILM-02).
+24. CREATOR-26: the Talking avatar page.
+25. The One take page is LONGTAKE-02 (CREATOR-27 is absorbed into it).
+26. CREATOR-28: Social check.
+27. CREATOR-29: masters and output formats.
+28. CREATOR-30: the one review state (Approve, Reject) in the creation record.
+29. CREATOR-31: phone capture.
+30. CREATOR-32: MCP face over Home's tools (the build of the Speak MCP item).
+31. CREATOR-58, then CREATOR-59 (Home, after CAPTION-01b and -01c): an automatic caption track for a made clip.
+32. CREATOR-60: generated bridge transitions.
+33. CREATOR-63 to CREATOR-70: the format ladder, Short, music video, episode, feature, long-run operation and measuring, chat formats (section 10), after LONGFORM-01 to -04 where marked.
+34. In progress elsewhere, not planned again: CREATOR-IP-01 to CREATOR-IP-07 (section 4.6).
 
 E. Kit (`commons`, then Home pins)
-36. CREATOR-33, -34, -35: the editor frame in three parts.
+35. CREATOR-33, -34, -35: the editor frame in three parts.
+36. CREATOR-18: the "how it was made" view (a tab of the Video Watch right pane and the Library info panel; after CREATOR-35).
 37. CREATOR-36: picture and video editors move onto the frame.
 38. CREATOR-37: `TrackStudio` audio kind.
 39. CREATOR-38: Music Studio moves onto it, follows the theme.
 40. CREATOR-39: `prompt_bar` shot-card chips, cast `@`, reference slot with a cast chip, takes.
-41. CREATOR-40: reference and cast slots in the Create panel and the film shot cards (Home).
-42. CREATOR-41: 3D viewer Element.
-43. CREATOR-61 (kit) then CREATOR-62 (Home): Studio seam menu with 20 kinds and the look chooser with a preview sheet.
+41. CREATOR-15: the Images Create page (needs CREATOR-39).
+42. CREATOR-40: reference and cast slots in the Create panel and the film shot cards (Home).
+43. CREATOR-41: 3D viewer Element.
+44. CREATOR-61 (kit) then CREATOR-62 (Home): Studio seam menu with 20 kinds and the look chooser with a preview sheet.
 
 F. Stack (new models and ops; each "Stack then Home")
-44. CREATOR-42 (Stack): job grouping by model.
-45. CREATOR-43: Qwen-Image-Edit-2511.
-46. CREATOR-44: Depth Anything V2 Small.
-47. CREATOR-45: stabilize and master profiles (ffmpeg ops).
-48. CREATOR-46, -47: identity LoRA trainer, then Train from the sheet.
-49. CREATOR-48: IC-LoRA edits: remove, retouch by words, change background, place object.
-50. CREATOR-49: IC-LoRA motion: sketch, copy motion, dance, 3D scene.
-51. CREATOR-50: another angle.
-52. CREATOR-51: voice-driven talking and dubbing.
-53. CREATOR-52: SeedVR2 and face repair.
-54. CREATOR-53: RIFE smooth motion.
-55. CREATOR-54: sound models.
-56. CREATOR-55: Image to 3D.
-57. CREATOR-56: Chatterbox VC.
-58. CREATOR-57: Swap characters (fallback model, needs Jesse's yes).
+45. CREATOR-42 (Stack): job grouping by model.
+46. CREATOR-43: Qwen-Image-Edit-2511.
+47. CREATOR-44: Depth Anything V2 Small.
+48. CREATOR-45: stabilize and master profiles (ffmpeg ops).
+49. CREATOR-46, -47: identity LoRA trainer, then Train from the sheet.
+50. CREATOR-48: IC-LoRA edits: remove, retouch by words, change background, place object.
+51. CREATOR-49: IC-LoRA motion: sketch, copy motion, dance, 3D scene.
+52. CREATOR-50: another angle.
+53. CREATOR-51: voice-driven talking and dubbing.
+54. CREATOR-52: SeedVR2 and face repair.
+55. CREATOR-53: RIFE smooth motion.
+56. CREATOR-54: sound models.
+57. CREATOR-55: Image to 3D bench, then CREATOR-71: the build.
+58. CREATOR-56: Chatterbox VC.
+59. CREATOR-57: Swap characters (fallback model, needs Jesse's yes).
 
-## 11. Open points and what is not known
+## 12. Open points and what is not known
 
 - Which refusal stopped the first-picture clip above 512x256 (cap, free memory or Home's level choice): CREATOR-11's first check decides.
 - Whether Klein's mask edit plus pasted-back faces looks natural enough, or Qwen-Image-Edit-2511 is needed for step 08: the bench decides.
