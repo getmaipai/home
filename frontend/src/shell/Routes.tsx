@@ -31,6 +31,7 @@ import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
 import { AdultLockProvider } from "@maipai/ui/src/elements/adult-lock";
 import { AdultLockController, useAdultLockProps } from "@/shell/AdultLockHost";
 import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
+import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { MusicPlayerBar } from "@/shell/music/MusicPlayerBar";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
@@ -421,7 +422,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
       {shellWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
       <GlobalMiniPlayer />
-      <MusicPlayerBar />
+      {/* A fault inside the song bar must never blank the page: it fails quietly (the song stops, the page stays). */}
+      <ErrorBoundary fallback={null}><MusicPlayerBar /></ErrorBoundary>
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({
