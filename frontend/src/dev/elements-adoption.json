@@ -732,8 +732,8 @@
       "file": "composer-parts.tsx",
       "name": "composer-parts",
       "group": "composer",
-      "verdict": "later",
-      "verdictReason": "New in ui-v0.5.638; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "verdict": "wire-after",
+      "verdictReason": "ONE-COMPOSER COMPOSER-01 and COMPOSER-02 (ui-v0.5.638): the mode pill, reference slots, combined chip popovers, Presets button, field tools and Quality chip, drawn by the kit inside PromptBar (modes) and inside Thread (components.composerModes). Home passes data only, never a ComposerInputOverride. Wired by COMPOSER-05 once COMPOSER-03 serves the modes.",
       "implemented": true
     },
     {
