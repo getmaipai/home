@@ -42,14 +42,20 @@ function synthFor(manifest: PackageManifest, id: string): SynthRecord | null {
   return parsed.success ? parsed.data : null;
 }
 function awaitSynthSchema() { return Synth; }
+/** A bundled (catalog) synth has no household record to hold `subject_id`, so its link lives in the subject row (`media_subjects.synth_id`) and is read back here: still one link, one place. */
+function withBundledLink(synth: SynthRecord | null): SynthRecord | null {
+  if (!synth || synth.subject_id || getHouseholdCompanion(synth.id)) return synth;
+  const row = db.select({ id: mediaSubjects.id }).from(mediaSubjects).where(eq(mediaSubjects.synthId, synth.id)).get();
+  return row ? { ...synth, subject_id: row.id } : synth;
+}
 export function synthById(id: string): SynthRecord | null {
   const manifest = manifestOf(id);
   if (!manifest) { synthCache.delete(id); return null; }
   const signature = JSON.stringify(manifest), cached = synthCache.get(id);
-  if (cached?.signature === signature) return cached.value;
+  if (cached?.signature === signature) return withBundledLink(cached.value);
   const value = synthFor(manifest, id);
   if (value) synthCache.set(id, { signature, value }); else synthCache.delete(id);
-  return value;
+  return withBundledLink(value);
 }
 export function synthPersona(synth: SynthRecord): Persona | null {
   const manifest = manifestOf(synth.id);
@@ -160,6 +166,7 @@ export function linkSynthSubject(actor: PersonRow, synthId: string, subjectId: s
     if (row.real && synth.based_on.kind === "none") throw new Error("That subject is a real person and this synth is invented. Base the synth on that person, or choose another subject.");
     db.update(mediaSubjects).set({ synthId: null, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(and(eq(mediaSubjects.synthId, synthId), ne(mediaSubjects.id, subjectId))).run();
     db.update(mediaSubjects).set({ synthId, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, subjectId)).run();
+    if (!getHouseholdCompanion(synthId)) return; // a bundled synth: the subject row's synth_id written above is the link
     const saved = updateSynth(actor, synthId, { subject_id: subjectId });
     if (!saved.ok) throw new Error(`The synth's subject could not be saved. ${saved.error}`);
   });

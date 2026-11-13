@@ -223,6 +223,16 @@ describe("the two-link transaction", () => {
     expect(ownerActor({ ...orphaned, forked_from: "hc-other" })).toBeNull();
   });
 
+  test("a bundled catalog synth (Rivet) can be cast: the link lives in the subject row and reads back", async () => {
+    await world();
+    const rivet = synthById("rivet")!;
+    expect(rivet).toBeTruthy();
+    const subjectId = await ensureSubject(rivet);
+    expect(synthById("rivet")!.subject_id).toBe(subjectId);
+    expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.id, subjectId)).get()!.synthId).toBe("rivet");
+    expect(await ensureSubject(synthById("rivet")!)).toBe(subjectId);
+  });
+
   test("a failed synth write leaves no half link, and a subject cannot serve two synths", async () => {
     const { sage } = await world();
     const subject = createMediaSubject(sage, { name: "Loose", kind: "character", look: "a loose character" });
