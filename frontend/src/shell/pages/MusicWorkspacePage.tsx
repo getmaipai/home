@@ -24,7 +24,6 @@ import { songLine, songStatusCard } from "./musicSongStatus";
 export { songLine, songStatusCard };
 export { songAddress, studioAddress, stemsAddress, remixAddress } from "./musicAddresses";
 import { songAddress, studioAddress, stemsAddress, remixAddress } from "./musicAddresses";
-import { BringSong } from "./BringSong";
 import { MusicLibrary } from "./MusicLibrary";
 import { MusicComposer } from "./MusicComposer";
 import { AddSoundToSong, SoundTakes } from "./SoundExtras";
@@ -127,7 +126,6 @@ export function MusicWorkspace({ adult, search }: { adult: boolean; search: stri
       {openedCard.data.state === "done" ? <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => setAddingSound(openedCard.data!.id)}>{i18n._({ id: "Add to a song", message: "Add to a song" })}</Button></div> : null}
       {openedCard.data.sound.takes ? <SoundTakes group={openedCard.data.sound.takes.group} onChanged={() => { void openedCard.refetch(); }} /> : null}
     </div> : null}
-    {song ? <BringSong adult={adult} /> : null}
     <Hero search={search} styles={styles} onStyles={setStyles} onMade={open} adult={adult} />
     <div className="flex shrink-0 flex-col gap-3" data-testid="music-your-songs">
       <div className="flex flex-col gap-1"><h2 className="text-section">{i18n._({ id: "Your songs", message: "Your songs" })}</h2><p className="text-muted-foreground text-sm">{i18n._({ id: "Open one to play it and see everything you can do.", message: "Open one to play it and see everything you can do." })}</p></div>

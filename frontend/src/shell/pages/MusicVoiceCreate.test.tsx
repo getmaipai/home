@@ -1,120 +1,73 @@
+// The Voiceover mode's state and results. The mode itself (chips, tags, the file slot, the button) is driven through the composer in
+// MusicWorkspacePage.test.tsx; this file holds the voice helpers and the failure lines.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { VoiceCreate } from "./MusicVoiceCreate";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
+import { MusicWorkspace } from "./MusicWorkspacePage";
+import { VoiceResults, tagsOf, withTag, type VoiceOption } from "./MusicVoiceCreate";
 
 let baseFetch: typeof fetch;
-let calls: Array<{ url: string; method: string; body: string }>;
 let available = true;
 let postStatus = 200;
-let changeStatus = 200;
-const voices = [
+const voices: VoiceOption[] = [
   { id: "fish", label: "Recorded voice", kind: "preset", engine: "fish-audio-drama-3", tags: ["sighs", "whispers"] },
-  { id: "chat", label: "Standard voice", kind: "preset", engine: "chatterbox-turbo", tags: ["laughs"] },
   { id: "plain", label: "Plain voice", kind: "preset", engine: "chatterbox-turbo", tags: [] },
 ];
-
 beforeEach(() => {
-  calls = []; available = true; postStatus = 200; changeStatus = 200; baseFetch = globalThis.fetch;
-  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  available = true; postStatus = 200; baseFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
-    calls.push({ url, method: init?.method ?? "GET", body: String(init?.body ?? "") });
     if (url === "/api/voiceover/options") return Promise.resolve(Response.json({ voices }));
     if (url === "/api/health") return Promise.resolve(Response.json({ engines: { voice: available ? { availability: "ready" } : { kind: "failed", alive: false } } }));
-    if (url === "/api/voiceover") return Promise.resolve(new Response(JSON.stringify(postStatus === 200 ? { file_id: "voice-file", seconds: 4.2, engine: "fish-audio-drama-3", voice: "fish", kind: "preset" } : { error: "That script could not be spoken." }), { status: postStatus }));
-    if (url === "/api/library/upload") return Promise.resolve(Response.json({ id: "source-file", name: "clip.mp4" }));
-    if (url === "/api/voiceover/change") return Promise.resolve(new Response(JSON.stringify(changeStatus === 200 ? { file_id: "changed-file", kind_of_source: "video", seconds: 8, spoken_seconds: 9.2, source_seconds: 8, difference_seconds: 1.2, engine: "fish-audio-drama-3", voice: "fish", kind: "preset" } : { error: "That file could not be changed." }), { status: changeStatus }));
-    return Promise.resolve(Response.json({}));
+    if (url === "/api/voiceover") return Promise.resolve(new Response(JSON.stringify({ error: "That script could not be spoken." }), { status: postStatus }));
+    if (url === "/api/music/status") return Promise.resolve(Response.json({ can_make: true, engine_ready: true, limits: {}, tiers: ["standard"] }));
+    return Promise.resolve(Response.json(url.endsWith("/sounds") || url.endsWith("/jobs") ? [] : {}));
   }) as typeof fetch;
 });
 afterEach(() => { cleanup(); globalThis.fetch = baseFetch; });
 
-const render = () => renderWithQueryClient(<MemoryRouter><VoiceCreate /></MemoryRouter>);
+const open = () => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search="?make=voice" /></MemoryRouter></ToastProvider>);
+const field = (view: ReturnType<typeof open>) => view.container.querySelector('[data-slot="prompt-bar"] textarea') as HTMLTextAreaElement;
+const primary = (view: ReturnType<typeof open>) => view.container.querySelector('[data-slot="prompt-bar"] button[type="submit"]') as HTMLButtonElement;
 
-describe("Voice Create", () => {
-  test("loads options and shows only the picked voice's tags; a chip inserts its tag", async () => {
-    const view = render();
-    const select = await view.findByRole("combobox", { name: "Voice" });
-    expect(await view.findByRole("button", { name: "[sighs]" })).toBeTruthy();
-    expect(view.queryByRole("button", { name: "[laughs]" })).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "[sighs]" }));
-    expect((view.getByLabelText("Script") as HTMLTextAreaElement).value).toBe("[sighs]");
-    fireEvent.click(select);
-    fireEvent.click(await view.findByRole("option", { name: "Standard voice" }));
-    await waitFor(() => expect(view.getByRole("button", { name: "[laughs]" })).toBeTruthy());
-    expect(view.queryByRole("button", { name: "[sighs]" })).toBeNull();
-    expect((view.getByLabelText("Script") as HTMLTextAreaElement).value).toBe("[sighs]");
+describe("the voice helpers", () => {
+  test("tags are the picked voice's own, and a tag goes after the script with one space", () => {
+    expect(tagsOf(voices, "fish")).toEqual(["sighs", "whispers"]);
+    expect(tagsOf(voices, "plain")).toEqual([]);
+    expect(tagsOf(voices, "missing")).toEqual(["sighs", "whispers"]);
+    expect(withTag("", "sighs")).toBe("[sighs]");
+    expect(withTag("Hello", "sighs")).toBe("Hello [sighs]");
+    expect(withTag("Hello ", "sighs")).toBe("Hello [sighs]");
   });
-
-  test("posts the script and voice, then shows the player, engine and Library link", async () => {
-    const view = render();
-    fireEvent.change(await view.findByLabelText("Script"), { target: { value: "Hello there." } });
-    fireEvent.click(view.getByRole("button", { name: "Make voiceover" }));
-    await waitFor(() => expect(calls.some((call) => call.url === "/api/voiceover" && call.method === "POST" && call.body === JSON.stringify({ script: "Hello there.", voice: "fish" }))).toBe(true));
-    await waitFor(() => expect(view.container.querySelector('[data-slot="player"]')).toBeTruthy());
+  test("results show a player, who spoke and a Library link; a difference line only past half a second", () => {
+    const view = render(<MemoryRouter><VoiceResults results={[
+      { operation: "voiceover", value: { key: 1, file_id: "a", seconds: 3, engine: "fish-audio-drama-3", voice: "fish", kind: "preset" } },
+      { operation: "change", value: { key: 2, file_id: "b", kind_of_source: "audio", seconds: 8, spoken_seconds: 7, source_seconds: 8, difference_seconds: -1, engine: "chatterbox-turbo", voice: "plain", kind: "preset" } },
+    ]} /></MemoryRouter>);
     expect(view.getByText("Spoken by the recorded voice engine")).toBeTruthy();
-    expect(view.getByRole("link", { name: "Open in Library" }).getAttribute("href")).toBe("/files?file=voice-file");
+    expect(view.getByText("The new voice is 1 seconds shorter, so the end is quiet.")).toBeTruthy();
+    expect(view.getAllByRole("link", { name: "Open in Library" })).toHaveLength(2);
   });
+});
 
-  test("shows the API error line and disables Make for an empty script", async () => {
+describe("the Voiceover mode's failures", () => {
+  test("a failed request shows one plain line and the button waits for words", async () => {
     postStatus = 422;
-    const view = render();
-    const button = await view.findByRole("button", { name: "Make voiceover" }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    fireEvent.change(await view.findByLabelText("Script"), { target: { value: "Hello." } });
-    fireEvent.click(button);
-    expect(await view.findByRole("alert")).toHaveTextContent("Home could not make that voiceover. Try again.");
+    const view = open();
+    await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make voiceover"));
+    expect(primary(view).disabled).toBe(true);
+    fireEvent.change(field(view), { target: { value: "Hello." } });
+    await waitFor(() => expect(primary(view).disabled).toBe(false));
+    fireEvent.click(primary(view));
+    expect(await view.findByText("Home could not make that voiceover. Try again.")).toBeTruthy();
   });
-
-  test("a voice with no tags has no chip row", async () => {
-    const view = render();
-    fireEvent.click(await view.findByRole("combobox", { name: "Voice" }));
-    fireEvent.click(await view.findByRole("option", { name: "Plain voice" }));
-    await waitFor(() => expect(view.queryByRole("group", { name: "Voice tags" })).toBeNull());
-  });
-
-  test("shows the voice unavailable reason and disables Make when voice is down", async () => {
+  test("with the voice engine down the button is off and says Home can't speak", async () => {
     available = false;
-    const view = render();
-    fireEvent.change(await view.findByLabelText("Script"), { target: { value: "Hello." } });
+    const view = open();
+    fireEvent.change(field(view), { target: { value: "Hello." } });
     expect(await view.findByText("Home can't speak right now. Try again in a minute.")).toBeTruthy();
-    expect((view.getByRole("button", { name: "Make voiceover" }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  test("switch shows both modes and has no Translate option", async () => {
-    const view = render();
-    expect(await view.findByRole("radio", { name: "Voiceover" })).toBeTruthy();
-    expect(view.getByRole("radio", { name: "Change voice" })).toBeTruthy();
-    expect(view.queryByText("Translate")).toBeNull();
-    fireEvent.click(view.getByRole("radio", { name: "Change voice" }));
-    expect(await view.findByText("Choose an audio or video file or drop it here")).toBeTruthy();
-    expect(view.queryByRole("group", { name: "Voice tags" })).toBeNull();
-  });
-
-  test("uploads then posts file id and voice, and shows video result and duration line", async () => {
-    const view = render();
-    fireEvent.click(await view.findByRole("radio", { name: "Change voice" }));
-    const picker = view.container.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(picker, { target: { files: [new File(["clip"], "clip.mp4", { type: "video/mp4" })] } });
-    expect(await view.findByText("clip.mp4")).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Change voice" }));
-    await waitFor(() => expect(calls.some((call) => call.url === "/api/voiceover/change" && call.method === "POST" && call.body === JSON.stringify({ file_id: "source-file", voice: "fish" }))).toBe(true));
-    expect(await view.findByText("The new voice is 1 seconds longer than the video, so the end was cut.")).toBeTruthy();
-    expect(view.container.querySelector("video[controls]")).toBeTruthy();
-    expect(view.getByText("Spoken by the recorded voice engine")).toBeTruthy();
-  });
-
-  test("shows change error and disables action before choosing a file", async () => {
-    changeStatus = 422;
-    const view = render();
-    fireEvent.click(await view.findByRole("radio", { name: "Change voice" }));
-    const button = view.getByRole("button", { name: "Change voice" }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    const picker = view.container.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(picker, { target: { files: [new File(["clip"], "clip.mp4", { type: "video/mp4" })] } });
-    await view.findByText("clip.mp4");
-    fireEvent.click(button);
-    expect(await view.findByRole("alert")).toHaveTextContent("Home could not change that voice. Try again.");
+    expect(primary(view).disabled).toBe(true);
   });
 });

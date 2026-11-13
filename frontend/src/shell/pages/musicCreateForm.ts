@@ -2,7 +2,7 @@
 // (musicComposerMode.ts) and the chat tool (`generate_music`) take the same fields: description, words, title, instrumental, vocal
 // language, tier, takes, seed, length, tempo and key. The sound maker's fields live here too (`soundBody`).
 import { i18n } from "@lingui/core";
-import type { MakeSongBody, MakeSoundBody } from "@/lib/musicApi";
+import type { FileEditBody, MakeSongBody, MakeSoundBody } from "@/lib/musicApi";
 
 export type Takes = 1 | 2 | 3;
 export type Tier = "standard" | "boost" | "max";
@@ -141,4 +141,26 @@ export function soundBody(description: string, sound: SoundForm, takes: number):
 /** "Make another like this": the form filled from a made song, with its seed, so the same seed with changed words keeps the feel. */
 export function formLikeSong(card: { title: string | null; description: string | null; lyrics: string | null; seed?: number | null }): CreateForm {
   return { ...EMPTY_FORM, idea: card.description ?? "", lyrics: card.lyrics ?? "", title: card.title ?? "", seed: card.seed ? String(card.seed) : "" };
+}
+
+/** What a brought song can become (the Change chip). Restyle is the composer's own words; the others need no words. */
+export type EditChange = "restyle" | "parts" | "stems" | "voice_swap";
+export const EDIT_CHANGES: readonly EditChange[] = ["restyle", "parts", "stems", "voice_swap"];
+
+/** The request for a brought song. `style` is the words the person typed (and the picked style chips); `voice` a household voice id. */
+export function editBody(fileId: string, change: EditChange, style: string, voice: string): FileEditBody {
+  return { file_id: fileId, change, ...(change === "voice_swap" ? { voice } : {}), ...(change === "restyle" ? { style: style.trim() } : {}), ...(change === "parts" ? { parts: { drop: ["vocals"] } } : {}) };
+}
+/** Why the button is off for a brought song, or "". Restyle needs a few words; a voice swap needs a household voice. */
+export function editBlocker(change: EditChange, style: string, voice: string): string {
+  if (change === "restyle" && style.trim().length < 3) return i18n._({ id: "Say how the song should sound instead, in at least 3 characters.", message: "Say how the song should sound instead, in at least 3 characters." });
+  if (change === "voice_swap" && !voice) return i18n._({ id: "Choose a voice to sing it.", message: "Choose a voice to sing it." });
+  return "";
+}
+
+/** A band, an album or a style starts from its name; the editor opens on it for the rest. */
+export type RecordKind = "band" | "album" | "song_style";
+export function recordBlocker(kind: RecordKind, name: string): string {
+  if (name.trim()) return "";
+  return kind === "band" ? i18n._({ id: "Name your band to start.", message: "Name your band to start." }) : kind === "album" ? i18n._({ id: "Name your album to start.", message: "Name your album to start." }) : i18n._({ id: "Name your style to start.", message: "Name your style to start." });
 }

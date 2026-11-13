@@ -25,11 +25,11 @@ import { bandImageSrc } from "@/apps/chat/useBandCard";
 import { musicRefOf, type MusicCardKind } from "@/apps/chat/useMusicCard";
 import { useMusicBlock } from "@/apps/chat/useMusicBlock";
 
-export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "creations", "edit", "studio", "stems", "remix"] as const;
+export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "sound-effects", "creations", "edit", "studio", "stems", "remix"] as const;
 export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "audio" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
 
 type Kind = MusicCardKind;
-const COLLECTION: Record<Kind, string> = { band: "bands", album: "albums", song_style: "styles" };
+export const COLLECTION: Record<Kind, string> = { band: "bands", album: "albums", song_style: "styles" };
 const PRODUCER: Record<Kind, string> = { band: "make_band", album: "make_album", song_style: "make_song_style" };
 const PAGE_OF: Record<Kind, string> = { band: "make-band", album: "make-album", song_style: "make-style" };
 const ASK: () => Record<Kind, string> = () => ({
@@ -199,7 +199,9 @@ function songStyleProps(props: Record<string, unknown>) {
 /** The Audio app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
   if (pageId === "create") return <MusicWorkspace adult={adult} search={search} />;
-  if (pageId === "make-song" || pageId === "make-band" || pageId === "make-album" || pageId === "make-style") return <Navigate to={`/apps/audio/create${search}`} replace />;
+  // Each Make page is a mode of the one composer on Create: the address names the mode (`make`), the rest of the query stays.
+  const MODE_OF: Record<string, string> = { "make-band": "band", "make-album": "album", "make-style": "song_style", "sound-effects": "sound" };
+  if (pageId === "make-song" || MODE_OF[pageId]) { const params = new URLSearchParams(search); if (MODE_OF[pageId]) params.set("make", MODE_OF[pageId]!); const query = params.toString(); return <Navigate to={`/apps/audio/create${query ? `?${query}` : ""}`} replace />; }
   if (pageId === "studio") return new URLSearchParams(search).get("song") ? <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-24 lg:px-0 lg:pb-0" data-testid="music-studio-view"><MusicStudioView adult={adult} search={search} /></div> : <PickSong adult={adult} title={i18n._({ id: "Studio", message: "Studio" })} line={i18n._({ id: "Pick a song to open its tracks.", message: "Pick a song to open its tracks." })} go={(card) => studioAddress(card.id)} />;
   if (pageId === "stems") return <PickSong adult={adult} title={i18n._({ id: "Stems", message: "Stems" })} line={i18n._({ id: "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio.", message: "Pick a song to split into vocals, drums, bass and other. The rows open in the Studio." })} go={(card) => stemsAddress(card.id)} />;
   if (pageId === "remix") return <PickSong adult={adult} title={i18n._({ id: "Remix and edit", message: "Remix and edit" })} line={i18n._({ id: "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made.", message: "Pick a song, then say what to change: the style, the words, the tempo or the voice. You see the request before anything is made." })} go={(card) => remixAddress(card.id)} />;

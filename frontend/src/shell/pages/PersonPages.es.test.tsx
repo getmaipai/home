@@ -77,7 +77,7 @@ const cases: Array<[string, () => ReactElement, string[], string?]> = [
   ["Make a song (child)", () => at("/music", <MakeSongPage adult={false} search="" />), ["MakeSongPage.tsx"]],
   ["Make a band (child)", () => at("/music/create", <CreatePage kind="band" adult={false} />), ["MusicStudioPages.tsx"]],
   ["Music workspace", () => at("/music", <MusicWorkspace adult search="" />), ["MusicWorkspacePage.tsx"]],
-  ["Bring a song", () => at("/music", <BringSong adult />), ["BringSong.tsx"]],
+  ["Bring a song", () => at("/music", <BringSong />), ["BringSong.tsx"]],
   ["Companion flow", () => at("/companions/new", <CompanionFlowPage />), ["companionFlow/CompanionFlowPage.tsx"], "Making a synth is for teens and adults. Ask an owner or admin if you want one."],
   ["Companion audience", () => at("/", <CompanionAudienceDialog companionId="sprout" name="Sprout" onClose={() => undefined} />), ["CompanionAudienceDialog.tsx"]],
   ["Showcase", () => at("/showcase", <UiShowcasePage person={person("owner")} />), ["UiShowcasePage.tsx"]],

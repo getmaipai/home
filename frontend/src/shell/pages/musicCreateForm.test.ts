@@ -1,6 +1,6 @@
 // MP-U1 and MP-05: the composer's form-to-request mapping.
 import { describe, expect, test } from "bun:test";
-import { EMPTY_FORM, EMPTY_SOUND, KEYS, STARTER_STYLE_CHIPS, STRUCTURE_TAGS, createBlocker, createBody, createLabel, describeSong, formLikeSong, insertStructureTag, parseSeed, setStarter, soundBody, soundLabel, starterOf, toggleTag, type CreateForm } from "./musicCreateForm";
+import { EMPTY_FORM, EMPTY_SOUND, KEYS, STARTER_STYLE_CHIPS, STRUCTURE_TAGS, createBlocker, createBody, createLabel, describeSong, editBlocker, editBody, formLikeSong, insertStructureTag, parseSeed, recordBlocker, setStarter, soundBody, soundLabel, starterOf, toggleTag, type CreateForm } from "./musicCreateForm";
 
 const ok = { engineMissing: false, statusPending: false, making: false, adult: true, blocked: "" };
 const lines = { adult: "adult line", engine: "engine line" };
@@ -84,5 +84,31 @@ describe("Make another like this", () => {
   test("fills the form from a song with its seed", () => {
     expect(formLikeSong({ title: "Rain", description: "slow folk", lyrics: "[Verse]\nhi", seed: 99 })).toMatchObject({ idea: "slow folk", title: "Rain", lyrics: "[Verse]\nhi", seed: "99" });
     expect(formLikeSong({ title: null, description: null, lyrics: null }).seed).toBe("");
+  });
+});
+
+describe("a brought song", () => {
+  test("the edit request carries only what its change needs", () => {
+    expect(editBody("f1", "restyle", "  soft jazz ", "v1")).toEqual({ file_id: "f1", change: "restyle", style: "soft jazz" });
+    expect(editBody("f1", "parts", "ignored", "v1")).toEqual({ file_id: "f1", change: "parts", parts: { drop: ["vocals"] } });
+    expect(editBody("f1", "stems", "ignored", "v1")).toEqual({ file_id: "f1", change: "stems" });
+    expect(editBody("f1", "voice_swap", "ignored", "v1")).toEqual({ file_id: "f1", change: "voice_swap", voice: "v1" });
+  });
+  test("restyle needs a few words and a voice swap needs a voice; the rest are always ready", () => {
+    expect(editBlocker("restyle", "ab", "")).toContain("at least 3");
+    expect(editBlocker("restyle", "soft jazz", "")).toBe("");
+    expect(editBlocker("voice_swap", "", "")).toContain("Choose a voice");
+    expect(editBlocker("voice_swap", "", "v1")).toBe("");
+    expect(editBlocker("parts", "", "")).toBe("");
+    expect(editBlocker("stems", "", "")).toBe("");
+  });
+});
+
+describe("a band, album or style", () => {
+  test("starts from a name and says which one is missing", () => {
+    expect(recordBlocker("band", "  ")).toBe("Name your band to start.");
+    expect(recordBlocker("album", "")).toBe("Name your album to start.");
+    expect(recordBlocker("song_style", "")).toBe("Name your style to start.");
+    expect(recordBlocker("band", "The Owls")).toBe("");
   });
 });

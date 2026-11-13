@@ -1,27 +1,22 @@
+// Bring a song to split into stems (the Studio's Stems page). Changing a brought song's style, removing its vocals or singing it in
+// another household voice are now chips of the Song mode of the one Music composer (MusicComposer.tsx), not a form here.
 import { i18n } from "@lingui/core";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Dropzone } from "@maipai/ui/src/ui/dropzone";
-import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { request } from "@/lib/api";
-import { musicApi, type MusicCard } from "@/lib/musicApi";
-import { householdVoicesApi } from "@/lib/householdVoicesApi";
-import { songAddress, stemsAddress } from "./MusicWorkspacePage";
+import { musicApi } from "@/lib/musicApi";
+import { stemsAddress } from "./musicAddresses";
 
 export const BRING_SONG_LINE = () => i18n._({ id: "Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac.", message: "Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac." });
 const ERROR_LINE = () => i18n._({ id: "Something went wrong. Try again.", message: "Something went wrong. Try again." });
 
-export function BringSong({ mode = "edit", adult = false }: { mode?: "edit" | "stems"; adult?: boolean }) {
+export function BringSong() {
   const [file, setFile] = useState<{ id: string; name: string } | null>(null);
-  const [style, setStyle] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [problem, setProblem] = useState("");
-  const [voice, setVoice] = useState("");
-  const voices = useQuery({ queryKey: ["household-voices"], queryFn: () => householdVoicesApi.list(), enabled: adult && mode === "edit", staleTime: 30_000 });
   const navigate = useNavigate();
   const add = async (picked: File) => {
     setProblem("");
@@ -31,33 +26,17 @@ export function BringSong({ mode = "edit", adult = false }: { mode?: "edit" | "s
     catch (error) { console.error(error); setProblem(ERROR_LINE()); }
     finally { setUploading(false); }
   };
-  const start = async (change: "restyle" | "parts" | "stems" | "voice_swap") => {
+  const split = async () => {
     if (!file) return;
     setProblem(""); setBusy(true);
-    try {
-      const card: MusicCard = await musicApi.editFromFile({ file_id: file.id, change, ...(change === "voice_swap" ? { voice } : {}), ...(change === "restyle" ? { style: style.trim() } : {}), ...(change === "parts" ? { parts: { drop: ["vocals"] } } : {}) });
-      navigate(change === "stems" ? stemsAddress(card.id) : songAddress(card.id));
-    } catch (error) { console.error(error); setProblem(ERROR_LINE()); }
+    try { const card = await musicApi.editFromFile({ file_id: file.id, change: "stems" }); navigate(stemsAddress(card.id)); }
+    catch (error) { console.error(error); setProblem(ERROR_LINE()); }
     finally { setBusy(false); }
   };
   return <section aria-label={i18n._({ id: "Bring a song", message: "Bring a song" })} data-testid="bring-song" className="flex flex-col gap-2">
     <p className="text-sm font-medium">{i18n._({ id: "Bring a song", message: "Bring a song" })}</p>
     <Dropzone label={uploading ? i18n._({ id: "Adding your song…", message: "Adding your song…" }) : file ? file.name : i18n._({ id: "Choose an audio file or drop it here", message: "Choose an audio file or drop it here" })} accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" disabled={uploading || busy} onFile={(picked) => { void add(picked); }} />
-    {file && !uploading ? <div className="flex flex-col gap-2">
-      {mode === "edit" ? <div className="flex flex-col gap-1"><label htmlFor="bring-song-style">{i18n._({ id: "How should it sound?", message: "How should it sound?" })}</label><Input id="bring-song-style" value={style} maxLength={600} onChange={(event) => setStyle(event.currentTarget.value)} /></div> : null}
-      <div className="flex flex-wrap gap-2">
-        {mode === "edit" ? <Button type="button" disabled={busy || style.trim().length < 3} onClick={() => { void start("restyle"); }}>{i18n._({ id: "Change the style", message: "Change the style" })}</Button> : null}
-        {mode === "edit" ? <Button type="button" variant="secondary" disabled={busy} onClick={() => { void start("parts"); }}>{i18n._({ id: "Remove the vocals", message: "Remove the vocals" })}</Button> : null}
-        <Button type="button" variant={mode === "edit" ? "secondary" : "default"} disabled={busy} onClick={() => { void start("stems"); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
-        {adult && mode === "edit" ? <>
-          <Select value={voice} onValueChange={(value) => setVoice(value ?? "")}>
-            <SelectTrigger aria-label={i18n._({ id: "Household voice", message: "Household voice" })}><SelectValue placeholder={i18n._({ id: "Choose a voice", message: "Choose a voice" })} /></SelectTrigger>
-            <SelectContent>{(voices.data?.voices ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}</SelectContent>
-          </Select>
-          <Button type="button" variant="secondary" disabled={busy || !voice} onClick={() => { void start("voice_swap"); }}>{i18n._({ id: "Sing it in another voice", message: "Sing it in another voice" })}</Button>
-        </> : null}
-      </div>
-    </div> : null}
+    {file && !uploading ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={busy} onClick={() => { void split(); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button></div> : null}
     {problem ? <p role="status">{problem}</p> : null}
   </section>;
 }

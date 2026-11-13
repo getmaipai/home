@@ -1,11 +1,13 @@
-// The Music mode of the one composer (ONE-COMPOSER-01). The kit's PromptBar draws the panel from the mode record that
-// `musicComposerMode.ts` builds (placeholder, Make / Singing / Length chips, Quality, Presets, a song to change, the primary button).
+// The Music side of the one composer (ONE-COMPOSER-01). The kit's PromptBar draws the panel from the mode records that
+// `musicComposerMode.ts` builds: the mode pill picks Song, Sound effect, Voiceover, Band, Album or Style, and each mode brings its own
+// placeholder, chips (every setting is reachable through one chip popover), Presets, song or file slot and primary button.
 // What the kit has no slot for sits under it as one Custom section made of kit parts: lyrics with structure tags, a title, style chips
 // and the advanced settings (takes, seed, key, tempo). It is one composer with one drawer, not a second composer.
 // Create runs the same path as the generate_music tool (POST /api/music/songs), so every field here is a tool argument too.
 import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { PromptBar } from "@maipai/ui/src/elements/prompt-bar";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
@@ -21,12 +23,14 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { request } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE } from "./MakeSongPage";
-import { CreatePage } from "./MusicStudioPages";
-import { VoiceCreate } from "./MusicVoiceCreate";
-import { FORM_MAKES, musicMode, musicQuality, type Make } from "./musicComposerMode";
+import { COLLECTION, createBody as recordBody, editPath } from "./MusicStudioPages";
+import { stemsAddress } from "./musicAddresses";
+import { VoiceResults, useVoiceMode } from "./MusicVoiceCreate";
+import { RECORD_MAKES, fieldOf, isMake, musicModes, musicQuality, type Make } from "./musicComposerMode";
+import { householdVoicesApi } from "@/lib/householdVoicesApi";
 import {
   BPM_MAX, BPM_MIN, EMPTY_FORM, EMPTY_SOUND, KEYS, STARTER_STYLE_CHIPS, STRUCTURE_TAGS,
-  createBlocker, createBody, formLikeSong, insertStructureTag, soundBody, toggleTag, type CreateForm, type SoundForm, type Takes, type Tier,
+  createBlocker, createBody, editBlocker, editBody, formLikeSong, insertStructureTag, recordBlocker, soundBody, toggleTag, type CreateForm, type EditChange, type RecordKind, type SoundForm, type Takes, type Tier,
 } from "./musicCreateForm";
 
 type StyleRow = { id: string; title?: string };
@@ -62,7 +66,11 @@ export interface MusicComposerProps {
 export function MusicComposer({ search = "", tags, onTags, onMade, adult = true }: MusicComposerProps) {
   const { push } = useToast();
   const prefill = new URLSearchParams(search);
-  const [make, setMake] = useState<Make>("song");
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [make, setMake] = useState<Make>(isMake(prefill.get("make")) ? (prefill.get("make") as Make) : "song");
+  const [change, setChange] = useState<EditChange>("restyle");
+  const [householdVoice, setHouseholdVoice] = useState("");
   const [form, setFormState] = useState<CreateForm>({ ...EMPTY_FORM, styleId: prefill.get("style"), bandId: prefill.get("band") });
   const [sound, setSoundState] = useState<SoundForm>(EMPTY_SOUND);
   const [custom, setCustom] = useState(false);
@@ -72,10 +80,13 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
   const [problem, setProblem] = useState("");
   const lyricsRef = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const sourcePicker = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<CreateForm>) => setFormState((current) => ({ ...current, ...patch }));
   const status = useQuery({ queryKey: ["music-status"], queryFn: () => musicApi.status(), staleTime: 10_000, retry: false });
   const styles = useQuery({ queryKey: ["music-made", "song_style"], queryFn: () => request<StyleRow[]>("/api/music/styles?scope=all"), staleTime: 15_000, enabled: adult });
   const bands = useQuery({ queryKey: ["music-made", "band"], queryFn: () => request<BandRow[]>("/api/music/bands"), staleTime: 15_000, enabled: adult });
+  const voice = useVoiceMode(make === "voice");
+  const householdVoices = useQuery({ queryKey: ["household-voices"], queryFn: () => householdVoicesApi.list(), enabled: adult && !!reference, staleTime: 30_000 });
   const like = prefill.get("like");
   const likeSeed = prefill.get("seed");
   const liked = useQuery({ queryKey: ["music-song", like], queryFn: ({ signal }) => musicApi.card(like!, signal), enabled: !!like, staleTime: 60_000 });
@@ -87,14 +98,19 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
     setFormState((current) => ({ ...current, ...formLikeSong({ ...song, seed: likeSeed ? Number(likeSeed) : song.seed }), styleId: current.styleId, bandId: current.bandId }));
     setCustom(true);
   }, [like, likeSeed, liked.data]);
+  useEffect(() => { const next = new URLSearchParams(search).get("make"); if (isMake(next)) setMake(next); }, [search]);
   useEffect(() => { const params = new URLSearchParams(search); setFormState((current) => ({ ...current, styleId: params.get("style") ?? current.styleId, bandId: params.get("band") ?? current.bandId })); }, [search]);
 
   const withTags: CreateForm = { ...form, tags };
   const engineMissing = status.data ? !status.data.can_make : false;
   const blocked = status.isError ? text(status.error, "") : "";
   const noun = make === "sound" ? "sound" : "song";
-  const formMake = FORM_MAKES.includes(make);
-  const blocker = formMake ? i18n._({ id: "Fill in the form below to make this.", message: "Fill in the form below to make this." }) : createBlocker(withTags, { engineMissing, statusPending: status.isPending, making: making || uploading, adult, blocked }, { adult: MAKE_SONG_ADULT_LINE(), engine: NO_MUSIC_ENGINE_LINE() }, noun);
+  const recordKind = RECORD_MAKES.includes(make) ? (make as RecordKind) : null;
+  const blocker = !adult ? MAKE_SONG_ADULT_LINE()
+    : make === "voice" ? voice.blocker
+      : recordKind ? (making ? i18n._({ id: "Saving…", message: "Saving…" }) : recordBlocker(recordKind, form.idea))
+        : make === "song" && reference ? (engineMissing ? NO_MUSIC_ENGINE_LINE() : making || uploading ? i18n._({ id: "Your song is being started.", message: "Your song is being started." }) : editBlocker(change, describe(withTags), householdVoice))
+          : createBlocker(withTags, { engineMissing, statusPending: status.isPending, making: making || uploading, adult, blocked }, { adult: MAKE_SONG_ADULT_LINE(), engine: NO_MUSIC_ENGINE_LINE() }, noun);
   const limits = status.data?.limits ?? null;
 
   const upload = async (picked: File) => {
@@ -111,13 +127,22 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
 
   const create = () => {
     if (blocker) { if (!making) push(blocker); return; }
+    if (make === "voice") { voice.run(); return; }
     setMaking(true); setProblem("");
     const failure = (error: unknown) => { const line = text(error, noun === "song" ? i18n._({ id: "Home could not start the song. Check the request and try again.", message: "Home could not start the song. Check the request and try again." }) : i18n._({ id: "Home could not start the sound. Check the request and try again.", message: "Home could not start the sound. Check the request and try again." })); setProblem(line); push(line); };
-    const done = (card: MusicCard) => { setFormState((current) => ({ ...EMPTY_FORM, tier: current.tier, styleId: current.styleId, bandId: current.bandId })); onTags([]); setReference(null); onMade(card.id); };
+    if (recordKind) {
+      const patch = recordKind === "band" ? { name: form.idea } : { title: form.idea };
+      request<{ id: string }>(`/api/music/${COLLECTION[recordKind]}`, { method: "POST", body: JSON.stringify(recordBody(recordKind, patch)) })
+        .then((made) => { void queryClient.invalidateQueries({ queryKey: ["music-made"] }); set({ idea: "" }); push(i18n._({ id: "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}", message: "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}", values: { kind: recordKind } })); navigate(editPath(recordKind, made.id)); })
+        .catch((error: unknown) => { const line = text(error, i18n._({ id: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", message: "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}", values: { kind: recordKind } })); setProblem(line); push(line); })
+        .finally(() => setMaking(false));
+      return;
+    }
+    const done = (card: MusicCard) => { setFormState((current) => ({ ...EMPTY_FORM, tier: current.tier, styleId: current.styleId, bandId: current.bandId })); onTags([]); setReference(null); if (change === "stems" && reference) navigate(stemsAddress(card.id)); else onMade(card.id); };
     const run = make === "sound" ? musicApi.makeSound(soundBody(form.idea, sound, form.takes))
-      : reference ? musicApi.editFromFile({ file_id: reference.id, change: "restyle", style: describe(withTags) })
+      : reference ? musicApi.editFromFile(editBody(reference.id, change, describe(withTags), householdVoice))
         : musicApi.makeSong(createBody(withTags));
-    run.then(done).catch(failure).finally(() => setMaking(false));
+    run.then(done).catch((error: unknown) => { console.error(error); failure(error); }).finally(() => setMaking(false));
   };
   const addStructure = (tag: string) => {
     const box = lyricsRef.current;
@@ -131,21 +156,26 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
   const input = {
     make, form: withTags, sound, tiers,
     styles: Array.isArray(styles.data) ? styles.data : [], bands: Array.isArray(bands.data) ? bands.data : [],
+    change, householdVoice, householdVoices: Array.isArray(householdVoices.data?.voices) ? householdVoices.data!.voices : [], setChange, setHouseholdVoice, voice, onPickSource: () => sourcePicker.current?.click(),
     reference, referenceReason: adult ? (uploading ? i18n._({ id: "Adding your song.", message: "Adding your song." }) : "") : MAKE_SONG_ADULT_LINE(),
-    setMake: (next: Make) => { setMake(next); setProblem(""); }, setForm: set, setSound: (patch: Partial<SoundForm>) => setSoundState((current) => ({ ...current, ...patch })),
+    setForm: set, setSound: (patch: Partial<SoundForm>) => setSoundState((current) => ({ ...current, ...patch })),
     onPickReference: () => picker.current?.click(), onClearReference: () => setReference(null), onTags,
-    onClear: () => set({ idea: "" }),
+    onClear: () => (make === "voice" ? voice.clear() : set({ idea: "" })),
   };
-  const mode = musicMode(input);
+  const modes = musicModes(input);
+  const mode = modes.find((one) => one.id === make)!;
+  const shown = fieldOf(input);
+  const setField = (next: string) => { if (!shown.typed) return; if (make === "voice") voice.setScript(next); else set({ idea: next }); };
   const detailedLine = form.takes > 1 && make === "song" ? i18n._({ id: "{count} songs are made one after another, about a minute each, and show on one card you can step through.", message: "{count} songs are made one after another, about a minute each, and show on one card you can step through.", values: { count: form.takes } }) : "";
 
   return <>
     <PromptBar
-      label={make === "sound" ? i18n._({ id: "Describe the sound", message: "Describe the sound" }) : i18n._({ id: "Describe your song", message: "Describe your song" })}
-      value={form.idea} onValueChange={(idea) => set({ idea })} maxLength={make === "sound" ? 600 : 1200}
-      layout="chat" modes={[mode]} mode="music" onModeChange={() => undefined} quality={make === "song" && !reference ? musicQuality(input) : undefined}
-      onSubmit={create} busy={making || uploading} disabledReason={blocker} error={problem || null} submitLabel={mode.primaryLabel}
+      label={make === "sound" ? i18n._({ id: "Describe the sound", message: "Describe the sound" }) : make === "voice" ? i18n._({ id: "Script", message: "Script" }) : recordKind ? i18n._({ id: "Name", message: "Name" }) : i18n._({ id: "Describe your song", message: "Describe your song" })}
+      value={shown.value} onValueChange={setField} maxLength={make === "voice" ? 2000 : recordKind ? 200 : make === "sound" ? 600 : 1200}
+      layout="chat" modes={modes} mode={make} onModeChange={(next) => { if (isMake(next)) { setMake(next); setProblem(""); } }} quality={make === "song" && !reference ? musicQuality(input) : undefined}
+      onSubmit={create} busy={making || voice.making} disabledReason={blocker} error={(make === "voice" ? voice.problem : problem) || null} submitLabel={mode.primaryLabel}
     />
+    <input ref={sourcePicker} type="file" hidden accept="audio/*,video/*" data-testid="voice-source-input" onChange={(event) => { const picked = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (picked) void voice.addSource(picked); }} />
     <input ref={picker} type="file" hidden accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,audio/*" data-testid="music-reference-input" onChange={(event) => { const picked = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (picked) void upload(picked); }} />
     {tags.length ? <div className="flex flex-wrap gap-2" role="group" aria-label={i18n._({ id: "Picked styles", message: "Picked styles" })} data-testid="music-picked-styles">
       {tags.map((name) => <Chip key={name} onRemove={() => onTags(toggleTag(tags, name))} removeLabel={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name } })}>{name}</Chip>)}
@@ -211,7 +241,7 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
         </div>
       </CollapsibleContent>
     </Collapsible> : null}
-    {make === "band" || make === "album" || make === "song_style" ? <CreatePage kind={make} adult={adult} /> : make === "voice" ? <VoiceCreate /> : null}
+    {make === "voice" ? <VoiceResults results={voice.results} /> : null}
   </>;
 }
 

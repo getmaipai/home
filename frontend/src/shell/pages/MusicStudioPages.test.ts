@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { render } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createElement } from "react";
 import { makeSongBody, songAddress } from "./MakeSongPage";
-import { createBody, editPath, isStudioPage } from "./MusicStudioPages";
+import { MusicStudioPage, createBody, editPath, isStudioPage } from "./MusicStudioPages";
 import { stemsAddress, studioAddress } from "./MusicWorkspacePage";
 import manifest from "../../../../backend/packages/audio/manifest.json";
 
@@ -10,6 +13,23 @@ describe("music studio pages", () => {
     expect(isStudioPage("audio", "make-song")).toBe(true);
     expect(isStudioPage("audio", "browse")).toBe(false);
     expect(isStudioPage("books", "create")).toBe(false);
+  });
+  test("each Make page is a mode of the one composer: the address names the mode and keeps the rest of the query", () => {
+    const where = (pageId: string, search: string): string => {
+      const Here = () => { const location = useLocation(); return createElement("p", { "data-testid": "here" }, `${location.pathname}${location.search}`); };
+      const view = render(createElement(MemoryRouter, { initialEntries: [`/apps/audio/${pageId}${search}`] }, createElement(Routes, null,
+        createElement(Route, { path: "/apps/audio/create", element: createElement(Here) }),
+        createElement(Route, { path: "/apps/audio/:page", element: createElement(MusicStudioPage, { pageId, search, adult: true }) }))));
+      const text = view.getByTestId("here").textContent ?? "";
+      view.unmount();
+      return text;
+    };
+    expect(where("make-band", "")).toBe("/apps/audio/create?make=band");
+    expect(where("make-album", "?style=s1")).toBe("/apps/audio/create?style=s1&make=album");
+    expect(where("make-style", "")).toBe("/apps/audio/create?make=song_style");
+    expect(where("sound-effects", "")).toBe("/apps/audio/create?make=sound");
+    expect(where("make-song", "?band=b1")).toBe("/apps/audio/create?band=b1");
+    expect(isStudioPage("audio", "sound-effects")).toBe(true);
   });
   test("edit address names the kind and the id", () => {
     expect(editPath("album", "malbum-abc")).toBe("/apps/audio/edit?kind=album&id=malbum-abc");

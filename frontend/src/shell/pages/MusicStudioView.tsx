@@ -139,7 +139,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const ready = !locked && lanes.length > 0;
   // The Studio is drawn as direct children (no box of Home's own around the TrackStudio, rule 9); the page that places this view gives them their column.
   return <>
-    <BringSong mode="stems" adult={adult} />
+    <BringSong />
     <div className="flex shrink-0 flex-wrap items-center gap-4">
       <div className="size-16 shrink-0 overflow-hidden rounded-xl sm:size-20"><Cover id={songId} title={card?.title ?? i18n._({ id: "Studio", message: "Studio" })} url={card?.cover_url ?? null} bare /></div>
       <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Studio", message: "Studio" })}</p>
