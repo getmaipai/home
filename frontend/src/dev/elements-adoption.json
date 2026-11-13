@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T16:20:26.109Z",
+  "generatedAt": "2026-11-13T16:36:32.054Z",
   "kitTag": "ui-v0.5.638",
   "items": [
     {
@@ -2077,7 +2077,7 @@
       "group": "track",
       "verdict": "support",
       "verdictReason": "Internal part of the kit's TrackStudio (VIDEO-STUDIO-04): timeline model, engine and media loading; not a Home adoption target on its own.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "track-studio-model.ts",

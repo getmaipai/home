@@ -309,6 +309,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
 | `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, ListenStatusContext, MediaDockContext, useMediaDock, MAKING_NOT_READY_LINE |
+| `frontend/src/shell/music/MusicPlayerBar.tsx` | LAST_SONG_LINE, keyBelongsToControl, useMusicKeys, MusicPlayerBar |
+| `frontend/src/shell/music/WaveformSeek.tsx` | barsOf, usePeaks, WaveformSeek |
 | `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
 | `frontend/src/shell/pageHeaderTitle.tsx` | headerEntryFor, HeaderTitle, PageHeaderTitle, PageHeaderActions |
 | `frontend/src/shell/pages/ActivityPage.tsx` | groupByDay, ActivityPage |
