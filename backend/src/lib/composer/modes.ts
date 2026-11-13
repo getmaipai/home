@@ -116,7 +116,8 @@ export function qualityFor(person: PersonRow, band: AgeBand, category: TierCateg
 
 /** `{{name|label|default}}` blanks of a template, filled with their default (else their label) so the Presets list can start the words. */
 function startingWords(prompt: string): string {
-  return prompt.replace(/\{\{[a-z][a-z0-9_]*\|([^|}]+)\|([^}]*)\}\}/g, (_whole, label: string, fallback: string) => (fallback.trim() || label).trim());
+  // CREATOR-14: a cast_* blank is a person chosen with the Cast slot, so it reads "this person" (as runGenerateImage does).
+  return prompt.replace(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g, (_whole, name: string, label: string, fallback: string) => name.startsWith("cast_") ? "this person" : (fallback.trim() || label).trim());
 }
 
 function presetsOf(person: PersonRow, d: Descriptor): ComposerModeRecord["presets"] {

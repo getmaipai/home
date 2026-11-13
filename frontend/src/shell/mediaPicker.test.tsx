@@ -81,6 +81,41 @@ describe("MediaHost.pickMedia", () => {
     fireEvent.keyDown(view.getByRole("dialog"), { key: "Escape" });
     expect(await picked).toBeNull();
   });
+
+  test("character picks list cast names and return the cast id", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/cast")) return Response.json({ cast: [{ id: "cast-ada", kind: "subject", subject_kind: "character", name: "Ada", real: false, minor: false, audience: "all-ages", look: { description: "", sheet_file_id: "sheet-1", sheet_stale: false, medium: null }, avatar: { url: "/ada.png", seed: "ada" } }] });
+      return Response.json({ items: [], next_cursor: null });
+    }) as unknown as typeof fetch;
+    const view = mount("person-1");
+    let picked!: Promise<unknown>;
+    act(() => { picked = host!.pickMedia!("character"); });
+    fireEvent.click(await view.findByRole("button", { name: "Choose Ada" }));
+    expect(await picked).toEqual({ id: "cast-ada", thumb: "/ada.png" });
+  });
+
+  test("a cast member without a sheet can be selected and capture look refreshes cast", async () => {
+    let listCalls = 0;
+    const requests: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/api/cast") && init?.method === "POST") return Response.json({ sheet_file_id: "sheet-2", reused: false, description: "Ada", locked_description: null, notes: [], cast: {} });
+      if (url.includes("/api/cast")) {
+        listCalls++;
+        return Response.json({ cast: [{ id: "cast-ada", kind: "subject", subject_kind: "character", name: "Ada", real: false, minor: false, audience: "all-ages", look: { description: "", sheet_file_id: listCalls > 1 ? "sheet-2" : null, sheet_stale: false, medium: null }, avatar: { url: null, seed: "ada" } }] });
+      }
+      return Response.json({ items: [], next_cursor: null });
+    }) as unknown as typeof fetch;
+    const view = mount("person-1");
+    act(() => { void host!.pickMedia!("character"); });
+    await view.findByText("No look sheet yet");
+    fireEvent.click(view.getByRole("button", { name: "Capture look" }));
+    await waitFor(() => expect(listCalls).toBeGreaterThan(1));
+    expect(requests.some((request) => request.startsWith("POST /api/cast/cast-ada/look"))).toBe(true);
+    expect(view.queryByText("No look sheet yet")).toBeNull();
+    expect(view.getByRole("button", { name: "Choose Ada" })).toBeTruthy();
+  });
 });
 
 // VIDEO-STUDIO-07: the Studio's pickers. `video` lists the person's own made clips; `audio` is a typed line (handed back as `say:<line>`) or one of their songs.

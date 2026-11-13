@@ -123,6 +123,12 @@
           "label": "Image reference",
           "kind": "picture",
           "placement": "in_field"
+        },
+        {
+          "state": "cast",
+          "label": "Cast",
+          "kind": "character",
+          "placement": "row"
         }
       ],
       "submit": {
@@ -134,7 +140,8 @@
             "shape": "{shape}",
             "count": "{count}",
             "tier": "{tier}",
-            "reference": "{reference}"
+            "reference": "{reference}",
+            "cast": "{cast}"
           }
         }
       }

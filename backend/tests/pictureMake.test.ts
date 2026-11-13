@@ -53,6 +53,12 @@ describe("Images Create make", () => {
     expect(readPictureMakeBody({ prompt: "a boat", references: ["a", "b", "c", "d"] }).ok).toBe(false);
   });
 
+  test("a cast id from the Create page's Cast slot reaches the make body, and an unfilled slot reads as empty", () => {
+    expect(readPictureMakeBody({ prompt: "a boat", cast: "msub-abc" })).toMatchObject({ ok: true, body: { prompt: "a boat", cast: ["msub-abc"] } });
+    const empty = readPictureMakeBody({ prompt: "a boat", cast: "{cast}" });
+    expect(empty.ok && empty.body.cast).toBeFalsy();
+  });
+
   test("an empty prompt is allowed with a template and refused without one", () => {
     expect(readPictureMakeBody({ prompt: "", template: "mtpl-poster" })).toMatchObject({ ok: true, body: { prompt: "", template: "mtpl-poster" } });
     expect(readPictureMakeBody({ template: "mtpl-poster" }).ok).toBe(true);

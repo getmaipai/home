@@ -409,7 +409,7 @@ export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | 
 export type CompanionUpdateFields = CompanionFields & { pins?: { dials: string[]; examples: string[] } };
 export type CompanionCreateFields = CompanionFields & { status?: CompanionStatus; based_on?: { kind: "none" | "household_member" | "real_person"; person_id?: string | null; name?: string | null }; life?: { enabled: boolean; seed: string } };
 /** CREATOR-05: one line of GET /api/cast (the fields the `@` list needs). */
-export interface CastListEntry { id: string; kind: "synth" | "member" | "subject"; subject_kind: "character" | "prop" | "place"; name: string; real: boolean; minor: boolean; audience: "all-ages" | "adult-only" }
+export interface CastListEntry { id: string; kind: "synth" | "member" | "subject"; subject_kind: "character" | "prop" | "place"; name: string; real: boolean; minor: boolean; audience: "all-ages" | "adult-only"; look: { description: string; sheet_file_id: string | null; sheet_stale: boolean; medium: "photo" | "stylised" | null }; avatar: { url: string | null; seed: string | null } }
 export interface CompanionList {
   allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
@@ -1637,6 +1637,7 @@ export const api = {
   companions: () => request<CompanionList>("/api/companions"),
   /** CREATOR-05: what this person may cast in a picture, video or film (the `@` list's cast items). */
   cast: () => request<{ cast: CastListEntry[] }>("/api/cast"),
+  castLook: (id: string) => request<{ sheet_file_id: string; reused: boolean; description: string; locked_description: string | null; notes: string[]; cast: CastListEntry }>(`/api/cast/${encodeURIComponent(id)}/look`, { method: "POST", body: "{}" }),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   companionActivity: (id: string) => request<CompanionActivity>(`/api/companions/${encodeURIComponent(id)}/activity`),
   synthCredits: (id: string) => request<SynthCredits>(`/api/talent/synths/${encodeURIComponent(id)}/credits`),

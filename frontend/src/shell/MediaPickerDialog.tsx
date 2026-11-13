@@ -13,6 +13,7 @@ import { bedSongFirst } from "@/shell/library/musicBed";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
 import { localizedApiMessage } from "@/lib/apiErrorLines";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 
 export interface PickedMedia { id: string; thumb?: string }
 export type PickKind = "picture" | "character" | "place";
@@ -31,10 +32,24 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lookBusy, setLookBusy] = useState<string | null>(null);
   const pictures = useQuery({
     queryKey: ["media-picker", kind, personId],
     queryFn: async () => (await api.library({ type: "image", owner: "me", sort: "newest", limit: 60 })).items.filter((item) => item.owner.id === personId && PICTURE_TYPES.includes(item.media_type)),
   });
+  const cast = useQuery({ queryKey: ["media-picker-cast", personId], queryFn: async () => (await api.cast()).cast, enabled: kind === "character" });
+  const captureLook = async (id: string) => {
+    setLookBusy(id);
+    setError(null);
+    try {
+      await api.castLook(id);
+      await queryClient.invalidateQueries({ queryKey: ["media-picker-cast", personId] });
+    } catch (caught) {
+      setError(caught instanceof ApiError && caught.message ? localizedApiMessage(caught) : "Home could not capture this look. Try again.");
+    } finally {
+      setLookBusy(null);
+    }
+  };
   const upload = async (file: File | undefined) => {
     if (!file) return;
     if (!PICTURE_TYPES.split(",").includes(file.type)) { setError(i18n._({ id: "Choose a PNG, JPEG or WebP picture.", message: "Choose a PNG, JPEG or WebP picture." })); return; }
@@ -51,6 +66,20 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
   };
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      {kind === "character" ? <>
+        {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
+        <AsyncState data={cast.data} error={cast.isError} isFetching={cast.isFetching} onRetry={() => void cast.refetch()} errorMessage={i18n._({ id: "Your cast did not load. Close this and try again.", message: "Your cast did not load. Close this and try again." })} loadingLabel={i18n._({ id: "Loading your cast", message: "Loading your cast", })}>
+          {(rows) => rows.length === 0 ? <p className="text-supporting text-muted-foreground">Your cast is empty.</p> : <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Your cast">
+            {rows.map((member) => <li key={member.id} className="flex min-w-0 flex-col gap-1">
+              <button type="button" className="flex min-h-20 w-full items-center gap-2 rounded-md border border-border p-2 text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Choose ${member.name}`} onClick={() => onDone({ id: member.id, ...(member.avatar.url ? { thumb: member.avatar.url } : {}) })}>
+                {member.avatar.url ? <SafeImage src={member.avatar.url} alt="" draggable={false} className="size-12 shrink-0 rounded-full object-cover" /> : <SeededAvatar name={member.name} seed={member.avatar.seed ?? member.id} />}
+                <span className="truncate text-supporting">{member.name}</span>
+              </button>
+              {!member.look.sheet_file_id ? <><p className="text-supporting text-muted-foreground">No look sheet yet</p><Button type="button" size="sm" variant="secondary" disabled={lookBusy !== null} onClick={() => void captureLook(member.id)}>{lookBusy === member.id ? "Capturing look" : "Capture look"}</Button></> : null}
+            </li>)}
+          </ul>}
+        </AsyncState>
+      </> : <>
         <div className="flex flex-wrap items-center gap-2">
           <input ref={input} type="file" accept={PICTURE_TYPES} hidden data-testid="media-picker-file" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ""; }} />
           <Button type="button" variant="secondary" disabled={busy} onClick={() => input.current?.click()}>{busy ? i18n._({ id: "Adding", message: "Adding" }) : i18n._({ id: "Add a picture", message: "Add a picture" })}</Button>
@@ -69,6 +98,7 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
             </ul>
           )}
         </AsyncState>
+      </>}
     </div>
   );
 }
