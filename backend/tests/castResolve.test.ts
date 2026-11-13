@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaSubjects, people } from "@/db/schema";
-import { createSynth, linkSynthSubject, synthById, ensureSubject, listSynths, type SynthRecord } from "@/lib/synths";
+import { createSynth, linkSynthSubject, synthById, ensureSubject, ownerActor, listSynths, type SynthRecord } from "@/lib/synths";
 import { createMediaSubject, shareMediaSubject, updateMediaSubject, subjectFacts } from "@/lib/mediaSubjects";
 import { storeFile } from "@/lib/attachments";
 import { listCast, resolveCast, type CastEntry } from "@/lib/cast";
@@ -212,6 +212,15 @@ describe("the two-link transaction", () => {
     expect(synthById(synth.id)!.subject_id).toBe(subjectId);
     expect(row.synthId).toBe(synth.id);
     expect(await ensureSubject(synthById(synth.id)!)).toBe(subjectId);
+  });
+
+  test("a bundled synth whose recorded maker is gone is made by the household owner, so it can be cast", async () => {
+    const { sage } = await world();
+    const synth = await makeSynth(sage, "Rivet Fox");
+    const orphaned = { ...synth, owner_person_id: "person-unknown" };
+    expect(ownerActor(orphaned)?.id).toBe(sage.id);
+    expect(ownerActor({ ...orphaned, private_to: sage.id })).toBeNull();
+    expect(ownerActor({ ...orphaned, forked_from: "hc-other" })).toBeNull();
   });
 
   test("a failed synth write leaves no half link, and a subject cannot serve two synths", async () => {

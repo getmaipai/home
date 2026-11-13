@@ -60,7 +60,11 @@ export function synthFloor(synth: SynthRecord): AgeBand { return companionFloor(
 function personById(id: string): PersonRow | null { return db.select().from(people).where(and(eq(people.id, id), isNull(people.deletedAt))).get() ?? null; }
 export function ownerActor(synth: SynthRecord): PersonRow | null {
   const person = personById(synth.owner_person_id);
-  return person && person.enabled && !person.memorializedAt ? person : null;
+  if (person && person.enabled && !person.memorializedAt) return person;
+  // A bundled synth records the household owner at the moment it was first read; when that was before the owner existed ("person-unknown") or the owner has since changed, the current household owner is its maker. A private fork never falls back.
+  if (synth.private_to || synth.forked_from) return null;
+  const owner = personById(ownerId() ?? "");
+  return owner && owner.enabled && !owner.memorializedAt ? owner : null;
 }
 
 // THE one gate (architect, 2026-11-07): applies companion use, private fork oversight, and the two subject consent settings.
