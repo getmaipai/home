@@ -7,12 +7,13 @@ import { DeviceCommand, type DeviceCommand as DeviceCommandShape } from "@maipai
 import { RobotChannelFrame } from "@maipai/spec/gen/ts/robot-channel-frame.js";
 import type { WSEvents, WSContext } from "hono/ws";
 import { db } from "@/db";
-import { deviceCommands, devices } from "@/db/schema";
+import { deviceCommands, devices, settingsValues } from "@/db/schema";
 import { updateMutedFromDeviceCommand } from "@/lib/deviceStates";
 import { nextHlc } from "@/lib/hlc";
-import { getRegistryKey } from "@/lib/settingsRegistry";
+import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import { robotsEnabled } from "@/lib/robots";
 import { declineRobotOfferFromChannel, snoozeRobotOffer } from "@/lib/robotOffers";
+import { getHouseholdSettingValue, getDeviceSettingValue, getSettingValueForPerson } from "@/lib/settings";
 
 export const DEVICE_COMMAND_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const DEVICE_HEARTBEAT_MS = 15_000;
@@ -187,6 +188,38 @@ export function publishSettingsChanged(scope: string, key: string, value: unknow
   }
 }
 
+/** Explicitly stored settings that this robot consumes, resolved at connect time. */
+function robotSettingsSnapshot(deviceId: string): Record<string, unknown> {
+  const device = db.select({ personId: devices.personId }).from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.kind, "robot"))).get();
+  if (!device) return {};
+  const values: Record<string, unknown> = {};
+  for (const key of getRegistry()) {
+    if (!key.honoured_by.includes("bot") || key.secret) continue;
+    const scope = key.scope === "device" ? `device:${deviceId}` : key.scope === "person" ? (device.personId ? `person:${device.personId}` : "") : "household";
+    if (!scope || !db.select({ key: settingsValues.key }).from(settingsValues)
+      .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key.key))).get()) continue;
+    const value = key.scope === "device" ? getDeviceSettingValue(deviceId, key.key)
+      : key.scope === "person" ? getSettingValueForPerson(device.personId!, key.key)
+      : getHouseholdSettingValue(key.key);
+    if (value !== undefined) values[key.key] = value;
+  }
+  return values;
+}
+
+function replacePendingSettingsSnapshot(deviceId: string, values: Record<string, unknown>): void {
+  db.delete(deviceCommands).where(and(eq(deviceCommands.deviceId, deviceId), eq(deviceCommands.kind, "settings_changed"), isNull(deviceCommands.ackedAt))).run();
+  if (Object.keys(values).length) {
+    pruneOldCommands();
+    const issuedAt = new Date().toISOString();
+    const hlc = nextHlc();
+    const id = `${hlc}:${randomUUID()}`;
+    db.insert(deviceCommands).values({ id, deviceId, kind: "settings_changed", payload: JSON.stringify({ values }), issuedAt, deliveredAt: null, ackedAt: null }).run();
+    const connection = connections.get(deviceId);
+    if (connection) sendPending(connection);
+  }
+}
+
 /** The asset store calls this after a device manifest changes. */
 export function publishAssetChanged(manifestVersion: string, deviceId?: string): void {
   const robots = deviceId
@@ -257,6 +290,7 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
         timer: undefined,
       };
       connections.set(deviceId, connection);
+      replacePendingSettingsSnapshot(deviceId, robotSettingsSnapshot(deviceId));
       // Every new session gets the current hub clock as a spec command;
       // subsequent heartbeat frames carry hub_time so the client can track drift.
       const hubTime = new Date().toISOString();

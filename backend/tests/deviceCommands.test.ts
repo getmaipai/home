@@ -212,6 +212,9 @@ describe("GET /api/devices/me/events", () => {
     try {
       const socket = new DeviceSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`, { cookie });
       await socket.open();
+      // A robot gets a snapshot of its stored settings on connect (when any are stored): drain it so the
+      // assertions below see the live changes.
+      await socket.next((message) => message.type === "device-command" && message.kind === "settings_changed", 150).catch(() => undefined);
       const result = await owner.request("/api/settings", {
         method: "PUT",
         body: { scope: `device:${deviceId}`, key: "voice.wakeword.enabled", value: true },
@@ -244,6 +247,47 @@ describe("GET /api/devices/me/events", () => {
       const personEvent = await socket.next((message) => message.type === "device-command" && message.kind === "settings_changed");
       expect(personEvent.payload).toEqual({ values: { "ui.show_turn_stats": true } });
       socket.ws.close();
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("sends stored bot settings once on connect, including household values but not defaults", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot, deviceId } = await robotSession(personId);
+    for (const [scope, key, value] of [
+      [`device:${deviceId}`, "robot.dance.auto", true],
+      [`device:${deviceId}`, "robot.idle.level", "lively"],
+      ["household", "household.locale", "es"],
+    ] as const) {
+      expect((await owner.request("/api/settings", { method: "PUT", body: { scope, key, value } })).status).toBe(200);
+    }
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
+    const cookie = robot.getCookie();
+    if (!cookie) throw new Error("robot session cookie missing");
+    try {
+      const connect = async () => {
+        const socket = new DeviceSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`, { cookie });
+        await socket.open();
+        return socket;
+      };
+      const first = await connect();
+      const snapshot = await first.next((message) => message.type === "device-command" && message.kind === "settings_changed");
+      // Other stored values (for example quiet hours left by earlier tests in this file) may ride along.
+      expect((snapshot.payload as { values: Record<string, unknown> }).values).toMatchObject({
+        "robot.dance.auto": true,
+        "robot.idle.level": "lively",
+        "household.locale": "es",
+      });
+      first.ws.close();
+      await Bun.sleep(25);
+      const second = await connect();
+      const pending = db.select().from(deviceCommands).where(eq(deviceCommands.deviceId, deviceId)).all()
+        .filter((row) => row.kind === "settings_changed" && row.ackedAt === null);
+      expect(pending).toHaveLength(1);
+      const secondSnapshot = await second.next((message) => message.type === "device-command" && message.kind === "settings_changed");
+      expect(secondSnapshot.payload).toEqual(snapshot.payload);
+      second.ws.close();
     } finally {
       server.stop(true);
     }
