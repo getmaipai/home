@@ -1233,6 +1233,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt, turnWarmupRequest |
+| `backend/src/lib/turnMachine/whisperLine.ts` | WHISPER_LINE, whisperLineFor |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, carriesNoTask, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal |
 | `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
