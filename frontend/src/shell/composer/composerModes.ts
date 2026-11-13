@@ -35,10 +35,10 @@ const ASK_ONLY: ComposerModesResponse = {
   modes: [{ id: "ask", label: "Ask", icon: "message-circle", route: null, engine: null, placeholder: "Ask anything", references: [], chips: [], presets: null, tools: [], primary: { label: "Send" }, quality: null, availability: null, disabledReason: null }],
 };
 
-/** The modes this person may use. Read once per session: the answer changes only with the household's settings or the person's band,
- * and readiness is not in it (the live health query has that), so it is never polled. */
+/** The modes this person may use. Refetched on mount and on focus once it is 30 seconds old, so a tab never shows old modes for long;
+ * it is a plain read, not a status poll (no interval), and readiness is not in it (the live health query has that). */
 export function useComposerModes(): ComposerModesResponse {
-  const query = useQuery({ queryKey: COMPOSER_MODES_KEY, queryFn: api.composerModes, retry: false, staleTime: Infinity, refetchOnWindowFocus: false });
+  const query = useQuery({ queryKey: COMPOSER_MODES_KEY, queryFn: api.composerModes, retry: false, staleTime: 30_000, refetchOnMount: true, refetchOnWindowFocus: true });
   // An answer that is not a mode list (an older hub, a stubbed fetch) reads as Ask alone, never as a crash.
   const data = query.data;
   return data && Array.isArray(data.modes) && data.modes.length > 0 ? data : ASK_ONLY;
