@@ -115,7 +115,7 @@ msgid "setting.engines.stack.where.help"
 msgstr "\"This computer\" runs the engine on the machine Home is installed on. \"Another computer\" runs it on a different computer in your home that you reach over your network. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:195
+#: src/shell/pages/MusicComposer.tsx:196
 msgid "[Verse]\n"
 "Write your own words here, a line at a time.\n"
 "\n"
@@ -284,7 +284,7 @@ msgid "{count, plural, one {# song} other {# songs}}"
 msgstr "{count, plural, one {# song} other {# songs}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:213
+#: src/shell/pages/MusicComposer.tsx:214
 #: src/shell/pages/musicComposerMode.ts:85
 msgid "{count, plural, one {# take} other {# takes}}"
 msgstr "{count, plural, one {# take} other {# takes}}"
@@ -2095,7 +2095,7 @@ msgid "Add a pair"
 msgstr "Add a pair"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:191
+#: src/shell/pages/MusicComposer.tsx:192
 msgid "Add a part"
 msgstr "Add a part"
 
@@ -2553,7 +2553,7 @@ msgid "Adults only."
 msgstr "Adults only."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:208
+#: src/shell/pages/MusicComposer.tsx:209
 msgid "Advanced"
 msgstr "Advanced"
 
@@ -3561,9 +3561,9 @@ msgstr "Authenticator setup QR code"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:169
-#: src/shell/pages/MusicComposer.tsx:229
-#: src/shell/pages/MusicComposer.tsx:233
-#: src/shell/pages/MusicComposer.tsx:236
+#: src/shell/pages/MusicComposer.tsx:230
+#: src/shell/pages/MusicComposer.tsx:234
+#: src/shell/pages/MusicComposer.tsx:237
 #: src/shell/pages/musicComposerMode.ts:110
 #: src/shell/pages/musicCreateForm.ts:43
 msgid "Auto"
@@ -7767,7 +7767,7 @@ msgstr "Current work"
 #: src/apps/settings/VoiceManagerSection.tsx:109
 #: src/apps/settings/VoiceManagerSection.tsx:116
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:23
-#: src/shell/pages/MusicComposer.tsx:186
+#: src/shell/pages/MusicComposer.tsx:187
 msgid "Custom"
 msgstr "Custom"
 
@@ -8194,8 +8194,8 @@ msgid "Describe the character you want to create..."
 msgstr "Describe the character you want to create..."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:88
-#: src/apps/chat/MusicCardView.tsx:88
+#: src/apps/chat/MusicCardView.tsx:89
+#: src/apps/chat/MusicCardView.tsx:89
 msgid "Describe the new cover"
 msgstr "Describe the new cover"
 
@@ -8844,7 +8844,7 @@ msgid "Each row is a big job. Each column says what that category does while the
 msgstr "Each row is a big job. Each column says what that category does while the job runs. Chat is never paused, only made simpler."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:215
+#: src/shell/pages/MusicComposer.tsx:216
 msgid "Each take is a different song from the same words."
 msgstr "Each take is a different song from the same words."
 
@@ -10199,7 +10199,7 @@ msgid "Full screen visualizer"
 msgstr "Full screen visualizer"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:89
+#: src/apps/chat/MusicCardView.tsx:90
 #: src/shell/pages/musicStudioFx.ts:20
 #: src/shell/pages/musicStudioFx.ts:20
 msgid "Full song"
@@ -11539,7 +11539,7 @@ msgstr "Home only downloads what fits here."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:162
-#: src/shell/pages/MusicComposer.tsx:199
+#: src/shell/pages/MusicComposer.tsx:200
 msgid "Home picks one if you leave this empty"
 msgstr "Home picks one if you leave this empty"
 
@@ -11986,8 +11986,8 @@ msgid "How should Home share this computer?"
 msgstr "How should Home share this computer?"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:87
-#: src/apps/chat/MusicCardView.tsx:87
+#: src/apps/chat/MusicCardView.tsx:88
+#: src/apps/chat/MusicCardView.tsx:88
 msgid "How should it change? For example: heavy metal"
 msgstr "How should it change? For example: heavy metal"
 
@@ -12588,7 +12588,7 @@ msgstr "Instant"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:151
-#: src/shell/pages/MusicComposer.tsx:195
+#: src/shell/pages/MusicComposer.tsx:196
 #: src/shell/pages/musicComposerMode.ts:105
 msgid "Instrumental"
 msgstr "Instrumental"
@@ -12599,7 +12599,7 @@ msgid "Instrumental is on, so there are no words to sing."
 msgstr "Instrumental is on, so there are no words to sing."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:190
+#: src/shell/pages/MusicComposer.tsx:191
 msgid "Instrumental is on, so there are no words."
 msgstr "Instrumental is on, so there are no words."
 
@@ -13118,7 +13118,7 @@ msgstr "Kept. This song stays in your Library until you delete it."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:170
-#: src/shell/pages/MusicComposer.tsx:226
+#: src/shell/pages/MusicComposer.tsx:227
 #: src/shell/pages/performance/LabelsBody.tsx:28
 msgid "Key"
 msgstr "Key"
@@ -13395,7 +13395,7 @@ msgid "Layout"
 msgstr "Layout"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:190
+#: src/shell/pages/MusicComposer.tsx:191
 msgid "Leave empty and Home writes the words."
 msgstr "Leave empty and Home writes the words."
 
@@ -14608,13 +14608,13 @@ msgid "setting.search.web.teen_mode.option.on"
 msgstr "Looks things up online, with the safeguards described above."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:105
+#: src/apps/chat/MusicCardView.tsx:106
 #: src/shell/pages/MusicLibrary.tsx:123
 msgid "Loop"
 msgstr "Loop"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:105
+#: src/apps/chat/MusicCardView.tsx:106
 msgid "Loop is not seamless: this computer has no audio tool to blend the ends"
 msgstr "Loop is not seamless: this computer has no audio tool to blend the ends"
 
@@ -14635,7 +14635,7 @@ msgid "setting.network.lan_exposure.help"
 msgstr "Loopback keeps Home on this computer. LAN lets devices on your home network connect. Changing this needs a restart. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:105
+#: src/apps/chat/MusicCardView.tsx:106
 msgid "Loops without a seam"
 msgstr "Loops without a seam"
 
@@ -14701,11 +14701,11 @@ msgid "LTX-2.5"
 msgstr "LTX-2.5"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
-#: src/shell/pages/MusicComposer.tsx:190
-#: src/shell/pages/MusicComposer.tsx:194
+#: src/shell/pages/MusicComposer.tsx:191
+#: src/shell/pages/MusicComposer.tsx:195
 #: src/shell/pages/MusicSongDetails.tsx:105
 #: src/shell/pages/MusicSongDetails.tsx:106
 #: src/shell/pages/MusicSongDetails.tsx:162
@@ -14908,7 +14908,7 @@ msgid "Make a new picture for any song."
 msgstr "Make a new picture for any song."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 msgid "Make a new version"
 msgstr "Make a new version"
 
@@ -15069,7 +15069,7 @@ msgid "Make me an album, with a cover and a first song. Ask me what sound I want
 msgstr "Make me an album, with a cover and a first song. Ask me what sound I want if you need to."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:88
+#: src/apps/chat/MusicCardView.tsx:89
 msgid "Make new cover"
 msgstr "Make new cover"
 
@@ -19007,7 +19007,7 @@ msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:201
+#: src/shell/pages/MusicComposer.tsx:202
 msgid "Pick up to 8. Words only, never lyrics."
 msgstr "Pick up to 8. Words only, never lyrics."
 
@@ -19428,7 +19428,7 @@ msgid "setting.audio.speed.podcast.does"
 msgstr "Plays episodes faster or slower than normal."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:105
+#: src/apps/chat/MusicCardView.tsx:106
 msgid "Plays once"
 msgstr "Plays once"
 
@@ -19522,6 +19522,11 @@ msgstr "Posted by {name}, {when}"
 #: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Posting…"
 msgstr "Posting…"
+
+#. js-lingui-explicit-id
+#: src/apps/chat/MusicCardView.tsx:31
+msgid "Powered by Stability AI"
+msgstr "Powered by Stability AI"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:139
@@ -19794,7 +19799,7 @@ msgstr "QR code for your Home address away from home"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:781
-#: src/apps/chat/MusicCardView.tsx:90
+#: src/apps/chat/MusicCardView.tsx:91
 #: src/apps/settings/AddVoiceBox.tsx:60
 #: src/apps/settings/AddVoiceBox.tsx:60
 msgid "Quality"
@@ -19868,7 +19873,7 @@ msgid "area.Quick pictures"
 msgstr "Quick pictures"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:89
+#: src/apps/chat/MusicCardView.tsx:90
 msgid "Quick song"
 msgstr "Quick song"
 
@@ -19918,8 +19923,8 @@ msgid "setting.tts.voice_id.option_label.rafael"
 msgstr "Rafael"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:220
 #: src/shell/pages/MusicComposer.tsx:221
+#: src/shell/pages/MusicComposer.tsx:222
 msgid "Random"
 msgstr "Random"
 
@@ -20252,7 +20257,7 @@ msgstr "Reminders"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:782
-#: src/apps/chat/MusicCardView.tsx:87
+#: src/apps/chat/MusicCardView.tsx:88
 #: src/shell/pages/MusicLibrary.tsx:96
 #: src/shell/pages/MusicSongDetails.tsx:148
 #: src/shell/pages/MusicWorkspacePage.tsx:62
@@ -22137,7 +22142,7 @@ msgid "see the live roster"
 msgstr "see the live roster"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:218
+#: src/shell/pages/MusicComposer.tsx:219
 msgid "Seed"
 msgstr "Seed"
 
@@ -22147,12 +22152,12 @@ msgid "Seed {seed}"
 msgstr "Seed {seed}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 msgid "Seed {seed}."
 msgstr "Seed {seed}."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 msgid "Seed {seed}. Take {index} of {total}."
 msgstr "Seed {seed}. Take {index} of {total}."
 
@@ -23020,7 +23025,7 @@ msgid "Singing"
 msgstr "Singing"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:89
+#: src/apps/chat/MusicCardView.tsx:90
 msgid "Sings every verse"
 msgstr "Sings every verse"
 
@@ -23488,7 +23493,7 @@ msgid "setting.storage.library.songs.threshold_percent.label"
 msgstr "Songs storage warning (%)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:211
+#: src/shell/pages/MusicComposer.tsx:212
 msgid "Songs to make"
 msgstr "Songs to make"
 
@@ -23515,6 +23520,11 @@ msgstr "Sound"
 #: src/shell/pages/musicComposerMode.ts:18
 msgid "Sound effect"
 msgstr "Sound effect"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicComposer.tsx:183
+msgid "Sound effects are Powered by Stability AI."
+msgstr "Sound effects are Powered by Stability AI."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:617
@@ -23648,7 +23658,7 @@ msgid "Split a song into vocals, drums, bass and the rest."
 msgstr "Split a song into vocals, drums, bass and the rest."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:91
+#: src/apps/chat/MusicCardView.tsx:92
 #: src/shell/library/LibraryViewer.tsx:103
 #: src/shell/pages/BringSong.tsx:39
 #: src/shell/pages/musicComposerMode.ts:80
@@ -24300,7 +24310,7 @@ msgid "Studio"
 msgstr "Studio"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 #: src/apps/settings/styles/StyleBrowser.tsx:39
 #: src/apps/settings/styles/StyleBrowser.tsx:127
 #: src/apps/settings/styles/StyleConfirm.tsx:109
@@ -24323,8 +24333,8 @@ msgstr "Style and tags"
 #: src/apps/settings/styles/StylesTab.tsx:77
 #: src/shell/pages/MakeSongPage.tsx:144
 #: src/shell/pages/MakeSongPage.tsx:145
-#: src/shell/pages/MusicComposer.tsx:201
 #: src/shell/pages/MusicComposer.tsx:202
+#: src/shell/pages/MusicComposer.tsx:203
 #: src/shell/pages/MusicStudioPages.tsx:145
 #: src/shell/pages/settings/MediaCardViews.tsx:86
 msgid "Styles"
@@ -24720,7 +24730,7 @@ msgstr "Temperature unit"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:169
-#: src/shell/pages/MusicComposer.tsx:233
+#: src/shell/pages/MusicComposer.tsx:234
 msgid "Tempo (BPM)"
 msgstr "Tempo (BPM)"
 
@@ -25976,7 +25986,7 @@ msgid "setting.reason.stricter_robot.admin.line"
 msgstr "The robot's setting is stricter here."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:223
+#: src/shell/pages/MusicComposer.tsx:224
 msgid "The same seed with the same words makes a very similar song."
 msgstr "The same seed with the same words makes a very similar song."
 
@@ -26825,9 +26835,9 @@ msgid "Timing"
 msgstr "Timing"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
-#: src/shell/pages/MusicComposer.tsx:198
+#: src/apps/chat/MusicCardView.tsx:86
 #: src/shell/pages/MusicComposer.tsx:199
+#: src/shell/pages/MusicComposer.tsx:200
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/status/StatusBoard.tsx:107
 msgid "Title"
@@ -27738,7 +27748,7 @@ msgstr "Up one level"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:164
-#: src/shell/pages/MusicComposer.tsx:215
+#: src/shell/pages/MusicComposer.tsx:216
 msgid "Up to {minutes, plural, one {# minute} other {# minutes}} on this computer."
 msgstr "Up to {minutes, plural, one {# minute} other {# minutes}} on this computer."
 
@@ -29823,7 +29833,7 @@ msgid "area.Your data and apps"
 msgstr "Your data and apps"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/MusicCardView.tsx:85
+#: src/apps/chat/MusicCardView.tsx:86
 msgid "Your earlier version stays on this card."
 msgstr "Your earlier version stays on this card."
 
@@ -29929,7 +29939,7 @@ msgid "setting.resources.preset.option.custom"
 msgstr "Your own values."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:186
+#: src/shell/pages/MusicComposer.tsx:187
 msgid "Your own words, a title, styles, seed"
 msgstr "Your own words, a title, styles, seed"
 

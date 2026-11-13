@@ -25,7 +25,7 @@ import type { AppEnv } from "@/types";
 import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
-import { musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "@/lib/music/ready";
+import { soundEngineStatus, soundStatusReady, musicEngineStatus, musicStatusReady, musicMaxOffered, musicMaxInstalled, musicQualityFor, musicTierOf, MUSIC_MAX_NOT_INSTALLED_LINE } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, jobsForConversation, jobsForPerson, musicVersions, openMusicFile, plainMusicFailure, prepareOwnedStemsJob, prepareStemsJob, readMusicFile, resolveSongSource, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { authorizeTier, maxOffered } from "@/lib/tiers";
 import { REFUSED_PREFIX, generateMusicArgs, lengthOf, musicRefusalFor, prepareOwnedMusicEdit, runGenerateMusic, startOwnedMusicPartsJob, type MusicToolInput } from "@/lib/music/tool";
@@ -95,7 +95,7 @@ const musicCardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
-  sound: z.object({ loop: z.boolean(), surprise: z.boolean(), looped: z.boolean().optional().describe("False when this computer had no audio tool to make the loop seamless."), trimTo: z.number().optional(), trimmed: z.boolean().optional().describe("False when this computer had no audio tool to cut the sound to the length asked."), takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().optional() }).nullable(),
+  sound: z.object({ loop: z.boolean(), surprise: z.boolean(), engine: z.literal("sfx").optional().describe("Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."), looped: z.boolean().optional().describe("False when this computer had no audio tool to make the loop seamless."), trimTo: z.number().optional(), trimmed: z.boolean().optional().describe("False when this computer had no audio tool to cut the sound to the length asked."), takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().optional() }).nullable(),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
@@ -232,7 +232,7 @@ async function musicCardOrLocked(actor: PersonRow, job: MusicJob) {
   return lockedJob(actor, job) ? lockedMusicTile(job) : musicCardView(actor, job);
 }
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,
-  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable(), file_effects: z.boolean().describe("Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need."), tiers: z.array(z.enum(["standard", "boost", "max"])).describe("The quality levels this person can ask for now (Standard always; Boost and Max follow the song card's gates).") }) } }, description: "Music capability." }, ...refusals } });
+  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), sound_model: z.boolean().describe("The sound-effects model (Powered by Stability AI) is installed and ready, so sounds up to 47 seconds are made with it."), can_make_sound: z.boolean().describe("A sound can be made now, with the sound-effects model or the music model."), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable(), file_effects: z.boolean().describe("Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need."), tiers: z.array(z.enum(["standard", "boost", "max"])).describe("The quality levels this person can ask for now (Standard always; Boost and Max follow the song card's gates).") }) } }, description: "Music capability." }, ...refusals } });
 musicRoutes.openapi(statusRoute, async (c) => {
   const actor = c.get("person");
   const engine = await musicEngineStatus(); const ready = musicStatusReady(engine);
@@ -240,7 +240,8 @@ musicRoutes.openapi(statusRoute, async (c) => {
   const boost = !!engine?.quality.includes("detailed") && authorizeTier({ person: actor, category: "music", requested: "boost" }).tier === "boost";
   const max = maxOffered(actor, "music", undefined, musicMaxOffered(engine));
   const tiers: Array<"standard" | "boost" | "max"> = ["standard", ...(boost ? ["boost" as const] : []), ...(max ? ["max" as const] : [])];
-  return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null, file_effects: musicAudioTools().ffmpeg !== null, tiers }, 200);
+  const soundModel = soundStatusReady(await soundEngineStatus());
+  return c.json({ can_make: ready, engine_ready: ready, sound_model: soundModel, can_make_sound: ready || soundModel, limits: engine?.limits ?? null, file_effects: musicAudioTools().ffmpeg !== null, tiers }, 200);
 });
 const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], summary: "The owner's songs, newest first", middleware: viewMiddleware,
   responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
@@ -339,8 +340,7 @@ const makeSoundRoute = createRoute({ method: "post", path: "/sounds", tags: ["Mu
   responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The sound card." }, 422: { description: "The sound cannot be made as asked." }, ...refusals, ...errorResponses({ 503: "No music model is installed or the computer cannot make sounds now" }) } });
 musicRoutes.openapi(makeSoundRoute, async (c) => {
   const actor = c.get("person"), args = c.req.valid("json");
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  if (!soundStatusReady(await soundEngineStatus()) && !musicStatusReady(await musicEngineStatus())) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
   if (refusal) return c.json({ error: refusal.line }, 403) as never;
   const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});

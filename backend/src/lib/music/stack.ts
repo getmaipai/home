@@ -73,6 +73,36 @@ export async function musicStatus(): Promise<StackMusicStatus | null> {
     return body.music ?? (typeof body.available === "boolean" ? body as StackMusicStatus : null);
   } catch { return null; }
 }
+/** MP-07: the Stack's sound-effects role (`POST /v1/audio/sound`, `GET /stack/v1/sound`). Sounds share the music queue; the Stack returns the finished m4a already tail-trimmed and set to -16 LUFS. */
+export interface StackSoundStatus {
+  state: string; available: boolean; code?: string | null; reason?: string | null; tier?: string;
+  model: { id: string; installed: boolean; licence: string; licence_accepted_at: string | null };
+  limits: { min_seconds: number; max_seconds: number; default_seconds?: number; min_steps?: number; max_steps?: number; default_steps?: number; max_prompt_chars?: number; queue_max?: number; target_lufs?: number; loop: boolean };
+  install?: { component: string; models?: unknown[]; remaining_bytes: number };
+}
+export interface SoundBody { prompt: string; seconds: number; seed?: number; steps?: number; timeout_ms: number }
+export interface StackSoundEntry { url?: string; duration_s: number; seed: number; model?: string; licence?: string }
+export async function soundStatus(): Promise<StackSoundStatus | null> {
+  try {
+    const body = await (await checked(await request("/stack/v1/sound", {}, 5_000))).json() as { sound?: StackSoundStatus };
+    return body.sound && typeof body.sound.available === "boolean" && body.sound.limits ? body.sound : null;
+  } catch { return null; }
+}
+export async function submitSound(body: SoundBody): Promise<{ job: string; done: StackSong[] | null }> {
+  const res = await checked(await request("/v1/audio/sound", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, 60_000));
+  const parsed = await res.json() as { job?: string; data?: StackSoundEntry[] };
+  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+  return { job: parsed.job, done: res.status === 200 && parsed.data?.length ? parsed.data : null };
+}
+export async function getSoundJob(job: string): Promise<StackMusicJob> {
+  return await (await checked(await request(`/v1/audio/sound/${encodeURIComponent(job)}`))).json() as StackMusicJob;
+}
+export async function fetchSound(job: string): Promise<Uint8Array> {
+  return new Uint8Array(await (await checked(await request(`/v1/audio/sound/${encodeURIComponent(job)}/file`, {}, 120_000))).arrayBuffer());
+}
+export async function cancelOrDeleteSound(job: string): Promise<void> {
+  try { await (await request(`/v1/audio/sound/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack expires its own copy */ }
+}
 export async function stemsStatus(): Promise<StackStemsStatus | null> {
   try {
     const body = await (await checked(await request("/stack/v1/stems", {}, 5_000))).json() as { stems?: StackStemsStatus } & Partial<StackStemsStatus>;

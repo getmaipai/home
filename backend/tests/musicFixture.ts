@@ -1,6 +1,6 @@
 // A fetch-only Stack stand-in. No music service, audio encoder or model is started.
 import { __setMusicFetchForTests, type MusicBody, type StackMusicJob } from "@/lib/music/stack";
-import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
+import { __setMusicStatusForTests, __setSoundStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
 import { __resetWordTimingForTests, __setAlignPollMsForTests } from "@/lib/music/timedWords";
 import { __resetMusicJobsForTests, __setMusicPollMsForTests } from "@/lib/music/jobs";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
@@ -21,6 +21,8 @@ export function installFakeMusicStack() {
     lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
     stems: false,
+    /** MP-07: the Stack's sound-effects role. `status` null answers 404 (an older Stack), so make_sound falls back to ACE-Step; `fail` makes the job fail with that code. */
+    sound: { status: null as unknown, submitted: [] as Array<{ prompt: string; seconds: number; seed?: number; steps?: number; timeout_ms: number }>, deleted: [] as string[], polls: 0, fail: null as string | null },
     voiceConvert: { fail: false, submitted: [] as Array<{ source: string; reference: string; pitch_shift: number; auto_shift: boolean }>, polls: 0, deleted: 0 },
     stemDeleted: 0,
     stemFiles: new Map<string, Uint8Array>(),
@@ -30,13 +32,30 @@ export function installFakeMusicStack() {
       reply: ((lyrics: string) => { const lines = lyrics.split("\n"); const words: { t: number; end: number; text: string }[] = []; const line_starts: number[] = [];
         lines.forEach((line, i) => { line_starts.push(words.length); line.split(/\s+/).forEach((text, k) => words.push({ t: 1 + i * 5 + k * 0.5, end: 1 + i * 5 + k * 0.5 + 0.4, text })); });
         return { words, aligned_words: words.length, total_words: words.length, line_starts }; }) as (lyrics: string) => unknown, polls: 0 },
-    restore() { __resetWordTimingForTests(); __setAlignPollMsForTests(null); __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
+    restore() { __setSoundStatusForTests(undefined); __resetWordTimingForTests(); __setAlignPollMsForTests(null); __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
   };
   __resetMusicJobsForTests(); __resetWordTimingForTests(); __setAlignPollMsForTests(2); __setMusicPollMsForTests(2); __setMusicStatusForTests(readyMusicStatusForTests());
   __setMusicFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url).pathname;
     const method = init?.method ?? "GET";
     if (path === "/stack/v1/music") return json(readyMusicStatusForTests());
+    if (path === "/stack/v1/sound") return fake.sound.status ? json({ sound: fake.sound.status }) : json({ code: "unknown_route" }, 404);
+    if (path === "/v1/audio/sound" && method === "POST") {
+      const body = JSON.parse(String(init?.body)) as { prompt: string; seconds: number; seed?: number; steps?: number; timeout_ms: number };
+      fake.sound.submitted.push(body); fake.sound.polls = 0;
+      return json({ created: 1, job: `sjob-${fake.sound.submitted.length}`, data: [] }, 202);
+    }
+    const soundMatch = /^\/v1\/audio\/sound\/([^/]+)(\/file)?$/.exec(path);
+    if (soundMatch) {
+      const id = soundMatch[1]!;
+      if (method === "DELETE") { fake.sound.deleted.push(id); return json({ job: id, state: "deleted" }); }
+      if (soundMatch[2]) return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
+      fake.sound.polls++;
+      if (fake.sound.fail) return json({ job: id, state: "failed", code: fake.sound.fail });
+      const sent = fake.sound.submitted[Number(id.split("-")[1]) - 1]!;
+      return json(fake.sound.polls >= 2 ? { job: id, state: "done", data: [{ url: `/v1/audio/sound/${id}/file`, content_type: "audio/mp4", duration_s: sent.seconds, seed: sent.seed ?? 4242, model: "stable-audio-3-small-sfx", ms: 1000, bytes: 4096, licence: "Stability AI Community License; Gemma Terms of Use (T5Gemma text encoder)" }] }
+        : { job: id, state: "running", stage: "sound", stage_label: "Making the sound", progress_fraction: 0.4, eta_seconds: 5 });
+    }
     if (path === "/stack/v1/stems") return json({ available: fake.stems, state: fake.stems ? "idle" : "not-installed" });
     if (path === "/stack/v1/voice-convert") return json({ voice_convert: { available: true, state: fake.voiceConvert.fail ? "not-installed" : "idle", ready: !fake.voiceConvert.fail } });
     if (path === "/v1/audio/voice-convert" && method === "POST") {

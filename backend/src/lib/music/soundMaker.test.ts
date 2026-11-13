@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "../../../tests/reset-db";
 import { createBenchPeople } from "../../../scripts/bench/conversationRunner";
 import { installFakeMusicStack, musicState, waitForMusic } from "../../../tests/musicFixture";
-import { __setMusicStatusForTests, readyMusicStatusForTests } from "./ready";
+import { __setMusicStatusForTests, __setSoundStatusForTests, readyMusicStatusForTests, readySoundStatusForTests, soundStatusReady } from "./ready";
+import { __setMusicFetchForTests, cancelOrDeleteSound, fetchSound, getSoundJob, soundStatus, submitSound } from "./stack";
+import { KNOWN_MUSIC_MODELS, modelStampFor } from "./models";
 import { getMusicJobFor } from "./jobs";
 import { attachments } from "@/db/schema";
 import { db } from "@/db";
@@ -168,5 +170,107 @@ describe("add a sound to a song", () => {
     const { songId, soundId } = await songAndSound();
     wavRunner();
     expect(await addSoundToSong(people.child, { soundJobId: soundId, songId, startSeconds: 1 })).toMatchObject({ ok: false, status: 404 });
+  });
+});
+
+describe("the sound-effects model (MP-07)", () => {
+  const useSfx = (overrides = {}) => { fake.sound.status = readySoundStatusForTests(overrides); __setSoundStatusForTests(readySoundStatusForTests(overrides)); };
+  test("a ready sound model makes a sub-10 s sound at its own length, with no minimum or trim", async () => {
+    useSfx();
+    const out = await input(people.owner, { description: "a heavy wooden door slamming shut", seconds: 3 });
+    expect(out.status).toBe("succeeded");
+    expect(out.result?.reply?.text).not.toContain("minimum length");
+    const id = musicForOutcomes([out])!.id;
+    const job = getMusicJobFor(people.owner, id)!;
+    expect(job.request.sound).toMatchObject({ engine: "sfx", loop: false });
+    expect(job.request.sound?.trimTo).toBeUndefined();
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    expect(fake.sound.submitted).toEqual([{ prompt: "a heavy wooden door slamming shut", seconds: 3, timeout_ms: 1 }]);
+    expect(fake.submitted).toHaveLength(0);
+    expect(fake.sound.deleted).toContain("sjob-1");
+    const done = getMusicJobFor(people.owner, id)!;
+    expect(done.durationS).toBe(3);
+    const file = db.select().from(attachments).where(eq(attachments.id, done.fileId!)).get();
+    expect(generationOf(file?.provenance ?? null)).toMatchObject({ kind: "sound", task: "sfx", model: { id: "stable-audio-3-small-sfx", licence: "Stability AI Community Licence; Gemma Terms of Use" }, commercial_use: "personal_only" });
+    expect(file?.provenance).not.toContain("door slamming");
+    expect(done.coverJobId).toBeNull(); expect(fake.align.submitted).toHaveLength(0);
+  });
+  test("a long sound goes to ACE-Step when it is ready, and is cut to 47 s when it is not", async () => {
+    useSfx();
+    const long = await input(people.owner, { description: "a long steady rain", seconds: 55 });
+    expect(getMusicJobFor(people.owner, musicForOutcomes([long])!.id)!.request.sound?.engine).toBeUndefined();
+    expect(fake.submitted).toHaveLength(1); expect(fake.sound.submitted).toHaveLength(0);
+    await waitForMusic(() => getMusicJobFor(people.owner, musicForOutcomes([long])!.id)?.state === "done");
+    __setMusicStatusForTests({ available: false } as never);
+    const only = await input(people.owner, { description: "a long steady rain", seconds: 55 });
+    expect(getMusicJobFor(people.owner, musicForOutcomes([only])!.id)!.request).toMatchObject({ seconds: 47, sound: { engine: "sfx" } });
+  });
+  test("a model that is not installed falls back to ACE-Step, and with neither ready the answer is no engine", async () => {
+    __setSoundStatusForTests(readySoundStatusForTests({ model: { id: "stable-audio-3-small-sfx", installed: false, licence: "x", licence_accepted_at: null } }));
+    const out = await input(people.owner, { description: "rain on a window" });
+    expect(getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!.request.sound?.engine).toBeUndefined();
+    expect(fake.submitted).toHaveLength(1);
+    __setMusicStatusForTests({ available: false } as never);
+    expect(await input(people.owner, { description: "rain on a window" })).toMatchObject({ status: "failed", errorCode: "no_engine" });
+  });
+  test("takes run one after another through the sound model", async () => {
+    useSfx();
+    const out = await input(people.owner, { description: "a door knock", takes: 2 });
+    const group = getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!.request.sound!.takes!.group;
+    await waitForMusic(() => soundTakesOf(people.owner, group).length === 2 && soundTakesOf(people.owner, group).every((take) => take.state === "done"));
+    expect(fake.sound.submitted).toHaveLength(2); expect(fake.submitted).toHaveLength(0);
+  });
+  test("a failed sound says what happened in plain words and keeps the code", async () => {
+    useSfx(); fake.sound.fail = "silent";
+    const out = await input(people.owner, { description: "a door knock" });
+    const id = musicForOutcomes([out])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "failed");
+    const job = getMusicJobFor(people.owner, id)!;
+    expect(job.errorCode).toBe("silent"); expect(job.errorLine).toContain("couldn't make that sound");
+  });
+  test("readiness needs the model installed and a state that can take a job", () => {
+    expect(soundStatusReady(readySoundStatusForTests())).toBe(true);
+    expect(soundStatusReady(readySoundStatusForTests({ state: "needs-setup" }))).toBe(true);
+    expect(soundStatusReady(readySoundStatusForTests({ state: "not-installed", available: false }))).toBe(false);
+    expect(soundStatusReady(readySoundStatusForTests({ state: "off", available: false }))).toBe(false);
+    expect(soundStatusReady(null)).toBe(false);
+  });
+  test("the model's pin is in the provenance table and its licence is never cleared for commercial export", () => {
+    expect(KNOWN_MUSIC_MODELS["stable-audio-3-small-sfx"]).toMatchObject({ commercial_use: "personal_only" });
+    expect(modelStampFor("sfx", "stable-audio-3-small-sfx", null)).toMatchObject({ commercial_use: "personal_only", model: { id: "stable-audio-3-small-sfx" } });
+    expect(modelStampFor("sfx", "something-else", null).commercial_use).toBe("unknown");
+  });
+});
+
+describe("the Stack sound client", () => {
+  const calls: Array<{ path: string; method: string; body?: string }> = [];
+  const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
+  beforeEach(() => { calls.length = 0; });
+  test("submit, poll, file, cancel and status use the sound routes", async () => {
+    __setMusicFetchForTests((async (url: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+      calls.push({ path, method: init?.method ?? "GET", body: init?.body as string | undefined });
+      if (path === "/stack/v1/sound") return reply({ sound: readySoundStatusForTests() });
+      if (path === "/v1/audio/sound" && init?.method === "POST") return reply({ created: 1, job: "s1", data: [{ url: "/v1/audio/sound/s1/file", duration_s: 4, seed: 9, model: "stable-audio-3-small-sfx" }] });
+      if (path.endsWith("/file")) return new Response(new Uint8Array([1, 2, 3]));
+      if (init?.method === "DELETE") return reply({ job: "s1", state: "deleted" });
+      return reply({ state: "running", progress_fraction: 0.5 });
+    }) as typeof fetch);
+    expect((await soundStatus())?.model.installed).toBe(true);
+    const sent = await submitSound({ prompt: "a click", seconds: 4, seed: 9, timeout_ms: 1 });
+    expect(sent.job).toBe("s1"); expect(sent.done?.[0]?.seed).toBe(9);
+    expect(JSON.parse(calls[1]!.body!)).toEqual({ prompt: "a click", seconds: 4, seed: 9, timeout_ms: 1 });
+    expect((await getSoundJob("s1")).state).toBe("running");
+    expect([...await fetchSound("s1")]).toEqual([1, 2, 3]);
+    await cancelOrDeleteSound("s1");
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["GET /stack/v1/sound", "POST /v1/audio/sound", "GET /v1/audio/sound/s1", "GET /v1/audio/sound/s1/file", "DELETE /v1/audio/sound/s1"]);
+  });
+  test("an older Stack (404) or a refusal reads as no sound engine, with the Stack's code on a refused submit", async () => {
+    __setMusicFetchForTests((async (url: string | URL | Request) => {
+      const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+      return path === "/stack/v1/sound" ? reply({ code: "unknown_route" }, 404) : reply({ error: "Install it.", code: "licence_required" }, 409);
+    }) as typeof fetch);
+    expect(await soundStatus()).toBeNull();
+    await expect(submitSound({ prompt: "x y z", seconds: 5, timeout_ms: 1 })).rejects.toMatchObject({ code: "licence_required", status: 409 });
   });
 });

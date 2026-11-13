@@ -61,7 +61,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "music.voice" | "voice.standard" | "voice.better" | "voice.realistic" | "coding.helper" | "vision.reader" | "faces.finder" | "ingredients.adapter";
+type AiCopyKey = "stems.standard" | "stems.finer" | "stems.more" | "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "music.voice" | "music.sound" | "voice.standard" | "voice.better" | "voice.realistic" | "coding.helper" | "vision.reader" | "faces.finder" | "ingredients.adapter";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -69,7 +69,7 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "pictures", rows: ["pictures", "pictures-ernie", "image-tools", "tool-look"] },
   { id: "picturesdetailed", rows: ["pictures-zimage"] },
   { id: "videos", rows: ["video", "video-ltx25"] },
-  { id: "music", rows: ["music", "voice-convert"] },
+  { id: "music", rows: ["music", "voice-convert", "sound-effects"] },
   { id: "stems", rows: ["stems", "stems-ft", "stems-6s"] },
   { id: "voice", rows: ["voice", "voice-better", "recorded-speech"] },
   { id: "wakeword", rows: [] },
@@ -336,6 +336,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       case "music": {
         if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
         if (has("voice-convert")) specs.push({ id: "music.voice", job: "music", kind: "switch", row: rows.get("voice-convert")!, current: rowIsInstalled(rows.get("voice-convert")!, components), recommended: false, setting: null });
+        if (has("sound-effects")) specs.push({ id: "music.sound", job: "music", kind: "switch", row: rows.get("sound-effects")!, current: rowIsInstalled(rows.get("sound-effects")!, components), recommended: false, setting: null });
         break;
       }
       case "stems": {

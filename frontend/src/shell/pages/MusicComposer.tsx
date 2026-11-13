@@ -102,7 +102,7 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
   useEffect(() => { const params = new URLSearchParams(search); setFormState((current) => ({ ...current, styleId: params.get("style") ?? current.styleId, bandId: params.get("band") ?? current.bandId })); }, [search]);
 
   const withTags: CreateForm = { ...form, tags };
-  const engineMissing = status.data ? !status.data.can_make : false;
+  const engineMissing = status.data ? !(make === "sound" ? status.data.can_make_sound ?? status.data.can_make : status.data.can_make) : false;
   const blocked = status.isError ? text(status.error, "") : "";
   const noun = make === "sound" ? "sound" : "song";
   const recordKind = RECORD_MAKES.includes(make) ? (make as RecordKind) : null;
@@ -180,6 +180,7 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
     {tags.length ? <div className="flex flex-wrap gap-2" role="group" aria-label={i18n._({ id: "Picked styles", message: "Picked styles" })} data-testid="music-picked-styles">
       {tags.map((name) => <Chip key={name} onRemove={() => onTags(toggleTag(tags, name))} removeLabel={i18n._({ id: "Remove {name}", message: "Remove {name}", values: { name } })}>{name}</Chip>)}
     </div> : null}
+    {make === "sound" && status.data?.sound_model ? <p className="text-muted-foreground text-supporting" data-testid="music-sound-powered-by">{i18n._({ id: "Sound effects are Powered by Stability AI.", message: "Sound effects are Powered by Stability AI." })}</p> : null}
     {detailedLine ? <p className="text-muted-foreground text-supporting" role="status">{detailedLine}</p> : null}
     {make === "song" && !reference ? <Collapsible open={custom} onOpenChange={setCustom} data-testid="music-custom">
       <CollapsibleTrigger asChild>

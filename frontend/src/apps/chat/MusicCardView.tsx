@@ -28,6 +28,7 @@ export function soundHintOf(card: MusicCard): string {
   const notes: string[] = [];
   if (card.sound?.loop && card.sound.looped === false) notes.push(i18n._({ id: "The loop is not seamless: this computer has no audio tool to blend the ends. Install ffmpeg, then make it again.", message: "The loop is not seamless: this computer has no audio tool to blend the ends. Install ffmpeg, then make it again." }));
   if (card.sound?.trimTo && card.sound.trimmed === false) notes.push(i18n._({ id: "The sound is longer than asked: this computer has no audio tool to cut it. Install ffmpeg, then make it again.", message: "The sound is longer than asked: this computer has no audio tool to cut it. Install ffmpeg, then make it again." }));
+  if (card.sound?.engine === "sfx") notes.push(i18n._({ id: "Powered by Stability AI", message: "Powered by Stability AI" }));
   return notes.join(" ");
 }
 export const soundCardCopy = { saveToLibrary: "Save to Sounds", makeAnother: "Make another take", generating: "Making the sound", failed: "I couldn't make that sound.", queued: "Waiting its turn" };

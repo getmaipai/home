@@ -4,7 +4,7 @@
 // 20 seconds.
 import { isStackConfigured } from "@/lib/stackEngine";
 import { slotIsOff, type Tier } from "@/lib/tiers";
-import { musicStatus, type StackMusicStatus } from "./stack";
+import { musicStatus, musicStackConfigured, soundStatus, type StackMusicStatus, type StackSoundStatus } from "./stack";
 import type { MusicRequest } from "./types";
 
 let cached: { at: number; status: StackMusicStatus | null } | null = null;
@@ -34,7 +34,7 @@ export async function musicEngineStatus(): Promise<StackMusicStatus | null> {
   return status;
 }
 
-export function dropMusicStatusCache(): void { cached = null; lastReady = null; }
+export function dropMusicStatusCache(): void { cached = null; lastReady = null; soundCached = null; }
 
 /** The engine is installed and able to take a job (setting up, idle or running all count: the job queues). */
 export function musicStatusReady(status: StackMusicStatus | null): boolean {
@@ -70,4 +70,30 @@ export const musicTierOf = (quality: MusicRequest["quality"]): "standard" | "boo
 /** A ready status for tests. */
 export function readyMusicStatusForTests(overrides: Partial<StackMusicStatus> = {}): StackMusicStatus {
   return { state: "idle", available: true, limits: { min_seconds: 10, max_seconds: 600 }, quality: ["quick", "detailed"], ...overrides };
+}
+
+// MP-07: the Stack's sound-effects role. Read the same way as the music status (cached 20 s; a failed read is "not ready").
+let soundCached: { at: number; status: StackSoundStatus | null } | null = null;
+let soundForTests: StackSoundStatus | null | undefined;
+/** Test seam: the Stack's sound status (null: no sound engine), or undefined to read for real. */
+export function __setSoundStatusForTests(status: StackSoundStatus | null | undefined): void { soundForTests = status; soundCached = null; }
+export async function soundEngineStatus(): Promise<StackSoundStatus | null> {
+  if (soundForTests !== undefined) return soundForTests;
+  if (!musicStackConfigured()) return null;
+  if (soundCached && Date.now() - soundCached.at < TTL_MS) return soundCached.status;
+  const status = await soundStatus();
+  soundCached = { at: Date.now(), status };
+  return status;
+}
+/** The sound model is installed and the computer can run it. The worker builds or starts on the first sound, so needs-setup and building count (the job queues). */
+export function soundStatusReady(status: StackSoundStatus | null): boolean {
+  if (!status || !status.limits || !Number.isFinite(status.limits.max_seconds) || !Number.isFinite(status.limits.min_seconds) || status.limits.max_seconds <= 0) return false;
+  if (!["idle", "needs-setup", "building", "running"].includes(status.state)) return false;
+  return status.available === true && status.model?.installed === true;
+}
+/** A ready sound status for tests. */
+export function readySoundStatusForTests(overrides: Partial<StackSoundStatus> = {}): StackSoundStatus {
+  return { state: "idle", available: true, code: null, reason: null, tier: "standard",
+    model: { id: "stable-audio-3-small-sfx", installed: true, licence: "Stability AI Community License; Gemma Terms of Use (T5Gemma text encoder)", licence_accepted_at: "2026-11-13T00:00:00Z" },
+    limits: { min_seconds: 1, max_seconds: 47, default_seconds: 5, min_steps: 4, max_steps: 16, default_steps: 8, max_prompt_chars: 1000, queue_max: 4, target_lufs: -16, loop: false }, ...overrides };
 }

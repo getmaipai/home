@@ -113924,6 +113924,14 @@
                     "engine_ready": {
                       "type": "boolean"
                     },
+                    "sound_model": {
+                      "type": "boolean",
+                      "description": "The sound-effects model (Powered by Stability AI) is installed and ready, so sounds up to 47 seconds are made with it."
+                    },
+                    "can_make_sound": {
+                      "type": "boolean",
+                      "description": "A sound can be made now, with the sound-effects model or the music model."
+                    },
                     "limits": {
                       "type": "object",
                       "nullable": true,
@@ -113960,6 +113968,8 @@
                   "required": [
                     "can_make",
                     "engine_ready",
+                    "sound_model",
+                    "can_make_sound",
                     "limits",
                     "file_effects",
                     "tiers"
@@ -114068,6 +114078,13 @@
                               },
                               "surprise": {
                                 "type": "boolean"
+                              },
+                              "engine": {
+                                "type": "string",
+                                "enum": [
+                                  "sfx"
+                                ],
+                                "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                               },
                               "looped": {
                                 "type": "boolean",
@@ -114556,6 +114573,13 @@
                             "surprise": {
                               "type": "boolean"
                             },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
+                            },
                             "looped": {
                               "type": "boolean",
                               "description": "False when this computer had no audio tool to make the loop seamless."
@@ -115039,6 +115063,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -115541,6 +115572,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -116051,6 +116089,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -116612,6 +116657,13 @@
                             "surprise": {
                               "type": "boolean"
                             },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
+                            },
                             "looped": {
                               "type": "boolean",
                               "description": "False when this computer had no audio tool to make the loop seamless."
@@ -117134,6 +117186,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -117963,6 +118022,13 @@
                             "surprise": {
                               "type": "boolean"
                             },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
+                            },
                             "looped": {
                               "type": "boolean",
                               "description": "False when this computer had no audio tool to make the loop seamless."
@@ -118502,6 +118568,13 @@
                             "surprise": {
                               "type": "boolean"
                             },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
+                            },
                             "looped": {
                               "type": "boolean",
                               "description": "False when this computer had no audio tool to make the loop seamless."
@@ -119006,6 +119079,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -119515,6 +119595,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -120062,6 +120149,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -120745,6 +120839,13 @@
                             "surprise": {
                               "type": "boolean"
                             },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
+                            },
                             "looped": {
                               "type": "boolean",
                               "description": "False when this computer had no audio tool to make the loop seamless."
@@ -121256,6 +121357,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -121772,6 +121880,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",
@@ -122341,6 +122456,13 @@
                             },
                             "surprise": {
                               "type": "boolean"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "enum": [
+                                "sfx"
+                              ],
+                              "description": "Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."
                             },
                             "looped": {
                               "type": "boolean",

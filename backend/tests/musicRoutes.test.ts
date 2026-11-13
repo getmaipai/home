@@ -16,7 +16,7 @@ import { MUSIC_NOTE, generationOf } from "@/lib/music/types";
 import { COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { __setMusicStatusForTests } from "@/lib/music/ready";
+import { __setMusicStatusForTests, __setSoundStatusForTests, readySoundStatusForTests } from "@/lib/music/ready";
 import { attachmentFilePath } from "@/lib/attachments";
 import { existsSync, truncateSync, writeFileSync } from "node:fs";
 import { __setMusicMixToolsForTests, __setMusicMixRunnerForTests } from "@/lib/music/mixParts";
@@ -52,6 +52,22 @@ async function makeStems(client: TestClient, source: MusicJob) {
   return { response, client };
 }
 describe("music routes", () => {
+  test("a ready sound-effects model makes a sound through the sound route and the status says so (MP-07)", async () => {
+    const { actor, client } = await owner();
+    expect((await (await client.get("/api/music/status")).json() as { sound_model: boolean }).sound_model).toBe(false);
+    __setSoundStatusForTests(readySoundStatusForTests());
+    expect(await (await client.get("/api/music/status")).json()).toMatchObject({ sound_model: true, can_make_sound: true });
+    const made = await client.post("/api/music/sounds", { description: "a door knock", seconds: 3 });
+    expect(made.status).toBe(201);
+    const card = await made.json() as { id: string; sound: { engine?: string } | null };
+    expect(card.sound).toMatchObject({ engine: "sfx", loop: false });
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    expect(fake.sound.submitted).toHaveLength(1); expect(fake.submitted).toHaveLength(0);
+    __setMusicStatusForTests(null);
+    expect((await client.post("/api/music/sounds", { description: "a door knock" })).status).toBe(201);
+    __setSoundStatusForTests(null);
+    expect(await (await client.get("/api/music/status")).json()).toMatchObject({ sound_model: false, can_make_sound: false });
+  });
   test("creates, saves idempotently, lists sounds, and keeps them out of song cards", async () => {
     const { actor, client } = await owner();
     const made = await client.post("/api/music/sounds", { description: "rain on a tin roof", seconds: 8, loop: true });

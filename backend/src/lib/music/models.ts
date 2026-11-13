@@ -4,13 +4,17 @@ import type { GenerationProvenance, MusicTask } from "./types";
 
 export const MUSIC_ENGINE = { id: "music-gen", version: "ca1e85f" } as const;
 const ACE_STEP_BASIS = "MIT weights; the model card states it was trained on licensed, royalty-free and synthetic audio and that output may be used commercially (read 2026-10-17)";
-interface KnownMusicModel { revision: string; licence: string; commercial_use: "cleared"; commercial_basis: string }
+const SFX_BASIS = "Stability AI Community Licence: free for a person or a business under US$1 million a year; a business needs a free registration with Stability AI, and sounds may not be used to train another foundation model";
+interface KnownMusicModel { revision: string; licence: string; commercial_use: "cleared" | "personal_only"; commercial_basis: string }
 /** Keyed by the Stack's pin id (the `model` of a job result). Revisions are the Stack's pins (design note section 3). */
 export const KNOWN_MUSIC_MODELS: Record<string, KnownMusicModel> = {
   "ace-step-1-5-turbo": { revision: "19671f406d603126926c1b7e2adc169acbcade22", licence: "MIT", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
   // The Boost and Max DiTs the Stack pins (stack modelCatalog.ts): community bf16 conversions of ACE-Step 1.5 XL, Apache-2.0, same training-data statement.
   "ace-step-1-5-xl-turbo-bf16": { revision: "2d5092dee202829616bea161c10d095d587bff42", licence: "Apache-2.0", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
   "ace-step-1-5-xl-sft-bf16": { revision: "982a1af323046af40d1da43cde2c307000bed75b", licence: "Apache-2.0", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
+  // MP-07: the Stack's sound-effects model (stack modelCatalog.ts SFX_LICENCE_NOTICE). Free for a person or a business under US$1M a year, but a business needs a
+  // registration with Stability AI, so Home never clears it for export: personal_only, the closest honest value (the owner allows any model and licence).
+  "stable-audio-3-small-sfx": { revision: "977fd479", licence: "Stability AI Community Licence; Gemma Terms of Use", commercial_use: "personal_only", commercial_basis: SFX_BASIS },
   "ace-step-1-5-lm-0-6b": { revision: "148d8ea0225bdab342ee1ae3a354275ccd60ca80", licence: "MIT", commercial_use: "cleared", commercial_basis: ACE_STEP_BASIS },
 };
 /** Tasks that run no model: the result inherits its parent's model fields and clearance. */

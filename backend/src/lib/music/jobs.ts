@@ -8,7 +8,7 @@ import { attachmentFilePath, createAttachment, readAttachment, readAttachmentFor
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
+import { cancelOrDeleteMusic, cancelOrDeleteSound, fetchSound, getSoundJob, submitSound, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { partsDoneLine, prepareMusicEdit } from "./tool";
@@ -34,6 +34,9 @@ export type { MusicJob, MusicRequest } from "./types";
 let POLL_MS = 1000;
 export function __setMusicPollMsForTests(ms: number | null): void { POLL_MS = ms ?? 1000; }
 const starting = new Set<string>();
+/** MP-07: a sound the Stack's sound-effects model makes goes through the sound routes; everything else about the job is the music job's. */
+const isSfx = (job: MusicJob): boolean => job.request.sound?.engine === "sfx";
+const dropStackJob = (job: MusicJob, id: string): Promise<void> => isSfx(job) ? cancelOrDeleteSound(id) : cancelOrDeleteMusic(id);
 function saveMusicJob(job: MusicJob): void { persistMusicJob(job); refreshHouseholdQueue(); }
 registerQueueProvider(() => {
   const jobs = new Map<string, MusicJob>();
@@ -43,7 +46,7 @@ registerQueueProvider(() => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
     const phaseHold = PERSISTED_HOLDS.find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", category: "music", tier: requestTier(job.request), state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
-      position: job.position, estimateSeconds: job.etaSeconds, riseReason: phaseHold, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
+      position: job.position, estimateSeconds: job.etaSeconds, riseReason: phaseHold, typicalSeconds: job.request.sound?.engine === "sfx" ? 20 : 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveMusicJob(job); },
       stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelMusicJob(owner as PersonRow, job.id); } : undefined,
@@ -73,11 +76,12 @@ async function releaseMusic(job: MusicJob): Promise<void> {
     const partsJob = !!job.request.parts;
     const submitted = job.task === "stems" || partsJob
       ? { job: await submitStems(storedBody?.source ?? "", storedBody?.source_sha256 ?? "", storedBody?.origin), done: null }
+      : isSfx(job) ? await submitSound({ prompt: job.request.description, seconds: job.request.seconds, ...(job.request.seed !== undefined ? { seed: job.request.seed } : {}), timeout_ms: 1 })
       : await submitMusic({ ...slotBodyFor(job, storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
-    if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
+    if (job.state !== "queued" || !liveJobs.has(job.id)) { void dropStackJob(job, submitted.job); return; }
     job.stackJob = submitted.job; saveMusicJob(job);
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
-    if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
+    if (!actor) { await dropStackJob(job, submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
     if (job.task !== "stems" && !job.request.sound) void startSongCover(actor, job).catch(() => {});
   } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
@@ -197,7 +201,22 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : plainMusicFailure(code); saveMusicJob(job); }
+/** MP-07: what a failed sound from the sound-effects model says, in the person's terms. Other codes fall back to the song wording. */
+export function plainSoundFailure(code: string): string {
+  const prefix = "I couldn't make that sound.";
+  switch (code) {
+    case "not_installed": return `${prefix} The sound effects model is not installed. An admin can add it in Settings, AI and models.`;
+    case "licence_required": return `${prefix} An admin needs to accept the sound effects model's licence in Settings, AI and models first.`;
+    case "silent": return `${prefix} The model made silence. Try describing the sound differently.`;
+    case "bad_range": case "too_long": return `${prefix} Ask for a length from 1 to 47 seconds and a shorter description.`;
+    case "queue_full": return `${prefix} Other sounds are waiting. Try again when one finishes.`;
+    case "out_of_memory": return `${prefix} The computer ran out of memory. Try again in a minute.`;
+    case "timeout": return `${prefix} It took longer than expected. Try a shorter sound.`;
+    case "no_memory": case "storage_full": case "coding_mode": case "already_making": return plainMusicFailure(code);
+    default: return `${prefix} It did not finish. Try again or change the description.`;
+  }
+}
+function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : job.request.sound?.engine === "sfx" ? plainSoundFailure(code) : plainMusicFailure(code); saveMusicJob(job); }
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
@@ -207,7 +226,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     if (early && await finish(job, actor, early, controller.signal) !== false) return;
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
-      try { status = job.task === "stems" || job.request.parts ? await getStemsJob(job.stackJob) : await getMusicJob(job.stackJob); }
+      try { status = job.task === "stems" || job.request.parts ? await getStemsJob(job.stackJob) : isSfx(job) ? await getSoundJob(job.stackJob) : await getMusicJob(job.stackJob); }
       catch (error) {
         if (controller.signal.aborted) return;
         if (error instanceof StackMusicError && error.status === 404) { fail(job, "lost_job"); return; }
@@ -240,7 +259,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     watching.delete(job.id); if (job.state !== "queued") liveJobs.delete(job.id); forgetRemovedMusicJob(job.id);
     if (job.stackJob) {
       if (job.request.voiceSwap || job.request.parts) await deleteStemsJob(job.stackJob);
-      else await cancelOrDeleteMusic(job.stackJob);
+      else await dropStackJob(job, job.stackJob);
     }
     refreshHouseholdQueue();
   }
@@ -271,7 +290,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
       return false;
     }
   }
-  const bytes = await fetchSong(job.stackJob!);
+  const bytes = isSfx(job) ? await fetchSound(job.stackJob!) : await fetchSong(job.stackJob!);
   if (signal.aborted) return;
   if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }
   // The model comes from the Stack's own result, never from a constant: an unknown one is stamped unknown and never cleared.
@@ -326,7 +345,7 @@ async function startNextSoundTake(job: MusicJob, actor: PersonRow): Promise<void
   const sound = job.request.sound, takes = sound?.takes;
   if (!sound || !takes || takes.index + 1 >= takes.total || !job.conversationId || !job.turnId) return;
   const request: MusicRequest = { description: job.request.description, instrumental: true, lyrics: job.request.lyrics, seconds: job.request.seconds, quality: "quick", max_seconds: job.request.max_seconds,
-    sound: { loop: sound.loop, surprise: sound.surprise, ...(sound.trimTo ? { trimTo: sound.trimTo } : {}), takes: { ...takes, index: takes.index + 1 } } };
+    sound: { loop: sound.loop, surprise: sound.surprise, ...(sound.engine ? { engine: sound.engine } : {}), ...(sound.trimTo ? { trimTo: sound.trimTo } : {}), takes: { ...takes, index: takes.index + 1 } } };
   const body = musicBody(request, "text2music"); body.quality = "quick";
   await startMusicJob({ actor, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId ?? null, temporary: job.temporary, task: "text2music", request, body, parentFileId: null });
 }
@@ -480,7 +499,7 @@ export async function cancelMusicJob(actor: PersonRow, id: string): Promise<Musi
   // Drop it from the live set first: a submit still in flight sees the stop when it returns and frees the Stack's copy.
   watching.get(job.id)?.abort(); liveJobs.delete(job.id);
   job.state = "cancelled"; job.errorCode = null; job.errorLine = null; saveMusicJob(job);
-  if (job.stackJob) await cancelOrDeleteMusic(job.stackJob);
+  if (job.stackJob) await dropStackJob(job, job.stackJob);
   return job;
 }
 export function resumeMusicJobs(): void {

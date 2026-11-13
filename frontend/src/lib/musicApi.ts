@@ -32,7 +32,7 @@ export interface MusicCard {
   versions: MusicVersion[];
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
-  sound?: { loop: boolean; surprise: boolean; looped?: boolean; trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } | null } | null;
+  sound?: { loop: boolean; surprise: boolean; engine?: "sfx"; looped?: boolean; trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } | null } | null;
   length: "quick" | "full";
   /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
   quality: "quick" | "detailed" | "max";
@@ -61,7 +61,7 @@ export interface EffectBody {
   compressor?: { threshold_db: number; ratio: number; attack_ms: number; release_ms: number; makeup_db: number };
   from_s?: number; to_s?: number; file_id?: string;
 }
-export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; /** The quality levels this person can ask for now. Absent on an older hub: Standard only. */ tiers?: Array<"standard" | "boost" | "max">; limits: { min_seconds: number; max_seconds: number } | null }
+export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** The sound-effects model is ready (absent on an older hub). */ sound_model?: boolean; /** A sound can be made now, by either model (absent on an older hub: use can_make). */ can_make_sound?: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; /** The quality levels this person can ask for now. Absent on an older hub: Standard only. */ tiers?: Array<"standard" | "boost" | "max">; limits: { min_seconds: number; max_seconds: number } | null }
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; language?: string; bpm?: number; key?: string; /** MP-05: 1 to 3 takes (one card, one job each) and the seed of the first take. */ takes?: number; seed?: number; tier?: "standard" | "boost" | "max"; song_style?: string; band?: string }
 export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean; takes?: number }

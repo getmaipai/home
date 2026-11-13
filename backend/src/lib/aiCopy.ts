@@ -53,6 +53,7 @@ export const aiCopy: AiCopy = {
     const hub = HUB_CHOICES[id];
     if (hub) return hub();
     if (id === "music.voice") return { label: "Sing a song in another voice", description: "Let a saved household voice sing a song you made or own." };
+    if (id === "music.sound") return { label: "Make better sound effects", description: "Make short sound effects and ambience, like rain or a door slam, from a sentence. Sounds are Powered by Stability AI." };
     if (id === "voice.realistic") return { label: "Realistic voice for recordings", description: "Use a more natural voice for recorded work, such as voiceovers and video lines. This is not for live chat and needs a large Mac." };
     const [job = "", name = ""] = id.split(".");
     const listed = cardFor(job as AiJobId)?.choices?.find((choice) => choice.id === `${job}-${name}`)
