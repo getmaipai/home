@@ -1217,12 +1217,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/transcripts/burnIn.ts` | BURN_MAX_CUES, __setBurnRunnerForTests, __resetBurnJobsForTests, startBurnIn, burnJob |
 | `backend/src/lib/transcripts/captionTranslate.ts` | TRANSLATION_LANGUAGES, MAX_TRANSLATED_CUES, __setTranslationCompleterForTests, __resetTranslationJobsForTests, startCaptionTranslation, translationJob |
 | `backend/src/lib/transcripts/captions.ts` | listCaptionTracks, createCaptionTrack, refreshedCues, refreshCaptionTrack, captionTrackCues |
-| `backend/src/lib/transcripts/cues.ts` | buildCues |
+| `backend/src/lib/transcripts/cues.ts` | CAPTION_MIN_DURATION, CAPTION_HOLD_AFTER_LAST_WORD, CAPTION_LEAD_BEFORE_FIRST_WORD, buildCues |
 | `backend/src/lib/transcripts/findReplace.ts` | MAX_PREVIEW_LINES, EMPTY_FIND, previewFindReplace, applyFindReplace |
 | `backend/src/lib/transcripts/import.ts` | importTranscript |
+| `backend/src/lib/transcripts/madeClipCaptions.ts` | captionMadeClip |
 | `backend/src/lib/transcripts/parse.ts` | parseTranscriptDocument |
 | `backend/src/lib/transcripts/revisions.ts` | applyOps, undo, restoreRevision, __resetAutosavesForTests |
 | `backend/src/lib/transcripts/rework.ts` | NO_SPEECH_IN_RANGE, RANGE_PAST_END, RANGE_ORDER, speakerByOverlap, detectSpeakers, regenerateRange |
+| `backend/src/lib/transcripts/scriptMatch.ts` | quotedLines, matchScript, scriptCaptionCues |
 | `backend/src/lib/transcripts/stack.ts` | __setTranscriptStackClientForTests, isSupportedTranscriptLanguage, transcribeJob |
 | `backend/src/lib/transcripts/store.ts` | TranscriptError, CHILD_TRANSCRIPT_ERROR, canSeeItem, getTranscript, transcriptRowForItem, listTranscriptsForItem |
 | `backend/src/lib/transcripts/writers.ts` | writeSrt, writeVtt, writeText, writeMarkdown, writeJson |
