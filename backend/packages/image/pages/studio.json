@@ -1,0 +1,138 @@
+{
+  "type": "page",
+  "id": "image-studio",
+  "title": "Studio",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Pick a picture to edit",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "studio-picker",
+        "params": {
+          "id": "$state.file"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/studio",
+          "state": {
+            "file": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "image",
+        "text": "Your pictures will show up here. Add one in your Library, or make one with Create.",
+        "action": {
+          "navigate": {
+            "to": "/apps/image/create"
+          }
+        },
+        "action_label": "Make a picture"
+      }
+    },
+    {
+      "type": "image_editor",
+      "bind": {
+        "source": "package",
+        "path": "studio",
+        "params": {
+          "id": "$state.file"
+        }
+      },
+      "fields": {
+        "key": "id",
+        "title": "title",
+        "url": "url",
+        "width": "width",
+        "height": "height",
+        "versions": "versions",
+        "locked": "locked"
+      },
+      "tools": [
+        "comment",
+        "erase",
+        "remove_background",
+        "crop",
+        "adjust",
+        "resize",
+        "markup",
+        "more"
+      ],
+      "compare": true,
+      "comment_brush": true,
+      "operations": {
+        "bind": {
+          "source": "package",
+          "path": "studio-tools",
+          "params": {
+            "id": "$state.file"
+          }
+        }
+      },
+      "handlers": {
+        "run": {
+          "call": {
+            "target": "/api/plugins/image/actions/studio-run",
+            "method": "POST",
+            "args": {
+              "file": "{file}",
+              "operation": "{operation}",
+              "args": "{args}"
+            }
+          }
+        },
+        "apply": {
+          "call": {
+            "target": "/api/plugins/image/actions/studio-apply",
+            "method": "POST",
+            "args": {
+              "file": "{file}",
+              "token": "{token}",
+              "label": "{label}"
+            }
+          }
+        },
+        "markup": {
+          "call": {
+            "target": "/api/plugins/image/actions/studio-markup",
+            "method": "POST",
+            "args": {
+              "file": "{file}",
+              "png": "{png}"
+            }
+          }
+        },
+        "comment": {
+          "call": {
+            "target": "/api/plugins/image/actions/studio-comment",
+            "method": "POST",
+            "args": {
+              "file": "{file}",
+              "prompt": "{prompt}",
+              "region": "{region}",
+              "mask": "{mask}",
+              "reference": "{reference}"
+            }
+          }
+        }
+      },
+      "on_close": {
+        "navigate": {
+          "to": "/apps/image/library"
+        }
+      }
+    }
+  ]
+}

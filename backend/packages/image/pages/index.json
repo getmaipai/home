@@ -35,7 +35,10 @@
       "aspect": "square",
       "on_select": {
         "navigate": {
-          "to": "/apps/image/library"
+          "to": "/apps/image/studio",
+          "state": {
+            "file": "{id}"
+          }
         }
       }
     }

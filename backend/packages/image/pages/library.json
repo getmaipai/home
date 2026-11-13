@@ -14,7 +14,29 @@
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
-      "aspect": "square"
+      "aspect": "square",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/studio",
+          "state": {
+            "file": "{id}"
+          }
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "pencil",
+          "label": "Edit",
+          "action": {
+            "navigate": {
+              "to": "/apps/image/studio",
+              "state": {
+                "file": "{id}"
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

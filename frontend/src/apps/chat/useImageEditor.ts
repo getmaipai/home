@@ -3,6 +3,7 @@
 // picture is open and turns Home's `/api/image-edit` answers into the
 // Element's props. No JSX here.
 import { useCallback, useMemo, useState } from "react";
+import { i18n } from "@lingui/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ImageEditContextValue, ImageEditTarget } from "@maipai/ui/src/elements/attachment.aui";
 import type { ImageEditorOperation, ImageEditorPending, ImageEditorProps, ImageEditorVersion } from "@maipai/ui/src/elements/image-editor";
@@ -23,7 +24,11 @@ export function editTargetFrom(target: ImageEditTarget): OpenImage | null {
 function toVersion(version: PictureVersion): ImageEditorVersion {
   return { id: version.id, url: version.url, label: version.label, createdAt: version.created_at, ...(version.width ? { width: version.width } : {}), ...(version.height ? { height: version.height } : {}) };
 }
-function toRequest(op: ImageEditorOperation): EditRequest { return op; }
+/** The chat editor lists no Crop, Adjust or More, so those never arrive here; if one does, say where it lives instead of sending it. */
+function toRequest(op: ImageEditorOperation): EditRequest {
+  if (op.operation === "crop" || op.operation === "adjust" || op.operation === "custom") throw new Error(i18n._({ id: "That tool is in the Studio. Open this picture in Images, then choose Studio.", message: "That tool is in the Studio. Open this picture in Images, then choose Studio." }));
+  return op;
+}
 function pictureUrl(open: OpenImage, id: string): string { return `/api/image-edit/pictures/${encodeURIComponent(id)}?conversation_id=${encodeURIComponent(open.conversationId)}`; }
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {

@@ -5,6 +5,7 @@
 import { jsonBody } from "@/lib/validation";
 import { ImageEditError, applyPreview, editErrorFrom } from "@/lib/imageEdit";
 import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
+import { studioApply, studioComment, studioMarkup, studioRun } from "@/lib/mediaOps/studio";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter, respond, refuseWith } from "@/lib/openapi";
 import { appRouteAllowed } from "@/lib/apps";
@@ -424,7 +425,7 @@ export const mediaAppRoutes: ReadonlyArray<{ id: MediaAppId; routes: ReturnType<
  */
 export function createImageAppRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "image", ["/actions/op", "/actions/op-apply"]);
+  gateMediaApp(routes, "image", ["/actions/op", "/actions/op-apply", "/actions/studio-run", "/actions/studio-comment", "/actions/studio-apply", "/actions/studio-markup"]);
   routes.post("/actions/op", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!appRouteAllowed(person, "image", "actions", "op")) return next();
@@ -447,6 +448,19 @@ export function createImageAppRoutes() {
       return c.json({ error: mapped.message, code: mapped.code }, mapped.status as never);
     }
   });
+  // IMG-STUDIO-02: the Studio page's four calls (lib/mediaOps/studio.ts). Each answers in the shape the kit's `image_editor` handler names, or with one plain line.
+  const studio = { "studio-run": studioRun, "studio-comment": studioComment, "studio-apply": studioApply, "studio-markup": studioMarkup } as const;
+  for (const [name, handler] of Object.entries(studio)) {
+    routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (!appRouteAllowed(person, "image", "actions", name)) return next();
+      try { return c.json((await handler(person, await jsonBody(c), c.req.raw.signal)) as never, 200); }
+      catch (error) {
+        const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
+        return c.json({ error: mapped.message, code: mapped.code }, mapped.status as never);
+      }
+    });
+  }
   return routes;
 }
 export const imageAppRoutes = createImageAppRoutes();

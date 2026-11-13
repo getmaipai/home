@@ -84,12 +84,8 @@
           "mode": "create",
           "title": "Edit",
           "pages": [
-            "edit",
-            "remove-object",
-            "crop-adjust",
-            "blur-background",
-            "combine",
-            "upscale"
+            "studio",
+            "combine"
           ]
         }
       ]
@@ -216,36 +212,12 @@
         "module": "character-sheet"
       },
       {
-        "id": "edit",
-        "label": "Edit a picture",
+        "id": "studio",
+        "label": "Studio",
         "icon": "pencil",
         "nav": true,
         "kind": "schema",
-        "module": "edit"
-      },
-      {
-        "id": "remove-object",
-        "label": "Remove an object",
-        "icon": "scissors",
-        "nav": true,
-        "kind": "schema",
-        "module": "remove-object"
-      },
-      {
-        "id": "crop-adjust",
-        "label": "Crop and adjust",
-        "icon": "crop",
-        "nav": true,
-        "kind": "schema",
-        "module": "crop-adjust"
-      },
-      {
-        "id": "blur-background",
-        "label": "Blur background",
-        "icon": "eye",
-        "nav": true,
-        "kind": "schema",
-        "module": "blur-background"
+        "module": "studio"
       },
       {
         "id": "combine",
@@ -254,14 +226,6 @@
         "nav": true,
         "kind": "schema",
         "module": "combine"
-      },
-      {
-        "id": "upscale",
-        "label": "Upscale",
-        "icon": "maximize",
-        "nav": true,
-        "kind": "schema",
-        "module": "upscale"
       },
       {
         "id": "creations",
@@ -291,6 +255,18 @@
       },
       {
         "id": "recent",
+        "rows": "list"
+      },
+      {
+        "id": "studio",
+        "rows": "list"
+      },
+      {
+        "id": "studio-tools",
+        "rows": "list"
+      },
+      {
+        "id": "studio-picker",
         "rows": "list"
       }
     ],

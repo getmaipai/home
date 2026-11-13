@@ -22,6 +22,7 @@ day the hub arrives; the rest are for when you need them.
 - [Media](media.md): open the Videos, Shows and Films, Music, Podcasts and Books apps from one place.
 - [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
 - [Pictures](pictures.md): ask chat for a picture, stop it, change it, and choose who can make pictures and which styles are on.
+- [Edit a picture in the Studio](pictures-studio.md): crop, fix the light, remove a background, erase an object or change a picture in words.
 - [Videos](videos.md): make a short video in the Video app or in chat, change it, and choose who can make videos and which styles are on.
 - [Edit a video in the Studio](videos-studio.md): cut, join and mix your own clips by hand and export a new clip.
 - [Make a short film](videos-film.md): ask chat for a film, check the plan, press Go, and redo a shot.

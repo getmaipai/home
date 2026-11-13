@@ -45,7 +45,7 @@ export interface AppData {
   needs?: "place";
 }
 /** Package-owned app data for small local app surfaces (for example the Image app's Library shelves). */
-export type AppDataHandler = (person: PersonRow, dataId: string, body: unknown) => unknown | null;
+export type AppDataHandler = (person: PersonRow, dataId: string, body: unknown) => unknown | null | Promise<unknown | null>;
 const appDataHandlers = new Map<string, AppDataHandler>();
 export function registerAppData(packageId: string, handler: AppDataHandler): void { appDataHandlers.set(packageId, handler); }
 
@@ -572,7 +572,14 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
 
   const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  const appData = appDataHandlers.get(packageId)?.(person, dataId, input);
+  let appData: unknown;
+  try { appData = await appDataHandlers.get(packageId)?.(person, dataId, input); }
+  catch (error) {
+    // A handler may refuse in the person's words (a picture that is not theirs): the same line and status the picture routes give.
+    const refusal = error as { status?: unknown; message?: unknown };
+    if (error instanceof Error && typeof refusal.status === "number" && refusal.status >= 400 && refusal.status < 600) return { ok: false, status: refusal.status as 400 | 404 | 502, error: error.message };
+    throw error;
+  }
   if (appData !== null && appData !== undefined) return { ok: true, status: 200, value: appData as AppData };
   const chosen = typeof input.place === "string" && input.place.trim() ? input.place.trim() : null;
   const current = chosen === "current" ? parseCurrentLocation(input.current) : null;

@@ -381,7 +381,7 @@ export function editErrorFrom(error: unknown): ImageEditError {
   return new ImageEditError(500, "The edit could not be finished. Try again.", "failed");
 }
 
-export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical" }
+export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical"; /** A crop in the Studio: turn and mirror first, then cut (one preview, one Apply). */ rotate?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean }
 
 /** Local, metadata-free pixel transforms used by picture.crop and picture.adjust. */
 export async function processLocalPicture(bytes: Uint8Array, input: StartEditInput): Promise<{ png: Uint8Array; width: number; height: number }> {
@@ -390,6 +390,18 @@ export async function processLocalPicture(bytes: Uint8Array, input: StartEditInp
   const sourceWidth = meta.width ?? 0;
   const sourceHeight = meta.height ?? 0;
   if (!sourceWidth || !sourceHeight) throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
+  if (input.operation === "crop" && (input.rotate || input.flipHorizontal || input.flipVertical)) {
+    // The Studio's Crop carries a turn and a mirror: do them first (the crop box is in the turned picture), then cut once.
+    const step = async (buffer: Uint8Array | Buffer, apply: (image: ReturnType<typeof sharp>) => ReturnType<typeof sharp>) => new Uint8Array(await apply(sharp(buffer, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" })).png().toBuffer());
+    let turned = await step(bytes, (image) => image.rotate());
+    if (input.rotate) turned = await step(turned, (image) => image.rotate(input.rotate));
+    if (input.flipHorizontal) turned = await step(turned, (image) => image.flop());
+    if (input.flipVertical) turned = await step(turned, (image) => image.flip());
+    const { rotate: _r, flipHorizontal: _h, flipVertical: _v, ...plain } = input;
+    const upright = turned;
+    const noRect = plain.aspect === undefined && plain.width === undefined && plain.height === undefined;
+    return processLocalPicture(upright, noRect ? { ...plain, x: 0, y: 0, width: 1, height: 1 } : plain);
+  }
   let pipeline = image;
   let width = sourceWidth;
   let height = sourceHeight;

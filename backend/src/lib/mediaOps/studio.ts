@@ -1,0 +1,164 @@
+// IMG-STUDIO-02: what the picture Studio page (package `image`, page `studio`) reads and calls. The kit's `image_editor` node does the drawing; this file is
+// only the glue it asks the host for: the opened picture and its versions, the extra operations from the registry, and five calls (run, comment, apply,
+// markup) whose answers have the shapes the kit contract names. The kit's call has no way to poll a job, so `run` waits here until the operation is done
+// and answers once with the preview. Every gate is the one the generic routes use (registry gates in runMediaOp, source rules in loadSource); nothing here
+// decides who may edit.
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { attachments } from "@/db/schema";
+import { ImageEditError, LIBRARY_SOURCE, applyPreview, cancelEdit, editErrorFrom, listVersions, loadSource, pollEdit, saveUploadedVersion, type EditProgress, type PictureVersion } from "@/lib/imageEdit";
+import { listLibrary } from "@/lib/library";
+import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
+import { listMediaOps } from "@/lib/mediaOps/registry";
+import type { PersonRow } from "@/types";
+
+/** Operations the editor's own tool rail already draws. Everything else the registry lists goes under More. */
+const BUILT_IN = new Set(["picture.remove_background", "picture.erase", "picture.upscale", "picture.resize", "picture.crop", "picture.adjust", "picture.rotate", "picture.flip", "picture.change"]);
+const WAIT_MS = 10 * 60 * 1000;
+const POLL_MS = 700;
+const MAX_MARKUP_BYTES = 40 * 1024 * 1024;
+
+const nameOf = (id: string): string => db.select({ name: attachments.name }).from(attachments).where(eq(attachments.id, id)).get()?.name?.trim() || "Picture";
+const missing = (id: unknown) => typeof id !== "string" || id === "" || id.startsWith("$");
+
+function fail(error: unknown): never {
+  throw error instanceof ImageEditError ? error : editErrorFrom(error);
+}
+
+/** The opened picture as the `image_editor` node reads it: one row with its versions. A locked picture is a locked row (the node draws a lock tile and reads nothing else). */
+export function studioRows(person: PersonRow, input: { id?: unknown }): Array<Record<string, unknown>> {
+  if (missing(input.id)) return [];
+  const id = String(input.id);
+  try {
+    const source = loadSource(person, LIBRARY_SOURCE, id, false);
+    const versions = listVersions(person, LIBRARY_SOURCE, id);
+    return [{ id, title: nameOf(id), url: `/api/media-ops/files/${encodeURIComponent(id)}/content`, width: null, height: null, locked: false, root: source.rootId, versions: versions.map(versionRow) }];
+  } catch (error) {
+    const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
+    if (mapped.status === 423) return [{ id, title: "Locked picture", locked: true }];
+    throw mapped;
+  }
+}
+
+function versionRow(v: PictureVersion) {
+  return { id: v.id, url: v.url, label: v.label, created_at: v.created_at, width: v.width, height: v.height };
+}
+
+/** The registry's extra operations (Blur background and whatever is added later), with the reason a disabled one keeps. */
+export async function studioOperationRows(person: PersonRow, input: { id?: unknown }): Promise<Array<Record<string, unknown>>> {
+  let blocked: string | null = null;
+  if (!missing(input.id)) {
+    try { loadSource(person, LIBRARY_SOURCE, String(input.id), false); }
+    catch (error) { const mapped = error instanceof ImageEditError ? error : editErrorFrom(error); if (mapped.status !== 404) blocked = mapped.message; }
+  }
+  const ops = await listMediaOps(person, { input: "picture", output: "picture" });
+  return ops.filter((op) => !BUILT_IN.has(op.id)).map((op) => ({
+    id: op.id,
+    label: op.label,
+    summary: op.summary,
+    controls: op.controls.flatMap((control): Array<Record<string, unknown>> => {
+      const c = control as { kind: string; name: string; label: string; min?: number; max?: number; options?: string[] };
+      if (c.kind === "number" && typeof c.min === "number" && typeof c.max === "number") return [{ kind: "number" as const, name: c.name, label: c.label, min: c.min, max: c.max }];
+      if (c.kind === "choice" && Array.isArray(c.options)) return [{ kind: "choice" as const, name: c.name, label: c.label, options: c.options }];
+      return [];
+    }),
+    enabled: blocked ? false : op.enabled,
+    ...(blocked ? { reason: blocked } : op.reason ? { reason: op.reason } : {}),
+  }));
+}
+
+/** The person's own Library pictures, newest first: the picker shown when no picture is open. */
+export function studioPickerRows(person: PersonRow, input: { id?: unknown }): Array<Record<string, unknown>> {
+  if (!missing(input.id)) return [];
+  return listLibrary(person, { type: "image", owner: "me", sort: "newest", limit: 60 }).items.map((file) => ({ id: file.id, title: file.name, subtitle: "", thumbnail: file.thumb_url, kind: "image", created_at: file.created_at }));
+}
+
+/** A PNG the browser drew, as a data URL, to raw base64 (the generic routes take base64 beside `args`). */
+export function pngBase64(value: unknown, what: string): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new ImageEditError(422, `${what} could not be read. Try again.`, "bad_mask");
+  const at = value.indexOf("base64,");
+  return at >= 0 ? value.slice(at + 7) : value;
+}
+
+type Wanted = { opId: string; args: Record<string, unknown> };
+
+function wantedFrom(operation: string, rawArgs: Record<string, unknown>): Wanted {
+  const args = { ...rawArgs };
+  delete args.mask;
+  switch (operation) {
+    case "crop": {
+      // The rectangle is the truth; the aspect is only the preset the person chose.
+      const { x, y, width, height, rotate, flip_horizontal, flip_vertical } = args as Record<string, unknown>;
+      return { opId: "picture.crop", args: { x, y, width, height, ...(rotate ? { rotate } : {}), ...(flip_horizontal ? { flipHorizontal: true } : {}), ...(flip_vertical ? { flipVertical: true } : {}) } };
+    }
+    case "adjust": case "upscale": case "resize": case "remove_background": case "erase":
+      return { opId: `picture.${operation}`, args };
+    default:
+      return { opId: operation.startsWith("picture.") ? operation : `picture.${operation}`, args };
+  }
+}
+
+/** Waits for a started operation to finish and returns its preview. A person who closes the page stops the wait and the job. */
+async function settle(person: PersonRow, progress: EditProgress, signal?: AbortSignal): Promise<{ token: string; url: string; width: number; height: number }> {
+  const until = Date.now() + WAIT_MS;
+  let current = progress;
+  for (;;) {
+    if (current.state === "done") return current.preview;
+    if (current.state === "failed" || current.state === "cancelled") throw new ImageEditError(current.state === "cancelled" ? 409 : 502, current.error, current.code);
+    if (current.state !== "queued" && current.state !== "running") throw new ImageEditError(502, "That did not finish. Try again.", "failed");
+    if (signal?.aborted) { await cancelEdit(person, current.job); throw new ImageEditError(409, "Stopped. Nothing was changed.", "cancelled"); }
+    if (Date.now() > until) { await cancelEdit(person, current.job); throw new ImageEditError(502, "That took too long and was stopped. Try again, or try a smaller change.", "timed_out"); }
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    current = await pollEdit(person, current.job);
+  }
+}
+
+const preview = (p: { token: string; url: string; width: number; height: number }) => ({ token: p.token, preview_url: p.url, width: p.width, height: p.height });
+
+/** The kit's `run` handler: one operation on the open picture, answered with the preview. */
+export async function studioRun(person: PersonRow, body: Record<string, unknown>, signal?: AbortSignal) {
+  if (typeof body.file !== "string" || typeof body.operation !== "string") throw new ImageEditError(422, "Say which picture and which tool, then try again.", "bad_arguments");
+  const args = body.args && typeof body.args === "object" ? (body.args as Record<string, unknown>) : {};
+  const wanted = wantedFrom(body.operation, args);
+  const request = MediaOpRequest.safeParse({ file_id: body.file, args: wanted.args, mask: pngBase64(args.mask, "The painted area") });
+  if (!request.success) throw new ImageEditError(422, "That change doesn't fit this picture. Check the numbers and try again.", "bad_arguments");
+  const started = await startLibraryOp(person, wanted.opId, request.data, signal);
+  if (!started.ok) throw new ImageEditError(started.status as ImageEditError["status"], started.error, started.code);
+  return preview(await settle(person, started.progress, signal));
+}
+
+/** The kit's `comment` handler: a described change, whole picture or the painted area, with an optional second picture. */
+export async function studioComment(person: PersonRow, body: Record<string, unknown>, signal?: AbortSignal) {
+  if (typeof body.file !== "string" || typeof body.prompt !== "string" || !body.prompt.trim()) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
+  const region = body.region && typeof body.region === "object" ? body.region : null;
+  const reference = body.reference && typeof body.reference === "object" && typeof (body.reference as { id?: unknown }).id === "string" ? [(body.reference as { id: string }).id] : undefined;
+  const request = MediaOpRequest.safeParse({ file_id: body.file, args: { prompt: body.prompt.trim(), ...(region ? { region } : {}) }, mask: pngBase64(body.mask, "The painted area"), ...(reference ? { references: reference } : {}) });
+  if (!request.success) throw new ImageEditError(422, "That change doesn't fit this picture. Check your words and try again.", "bad_arguments");
+  const started = await startLibraryOp(person, "picture.change", request.data, signal);
+  if (!started.ok) throw new ImageEditError(started.status as ImageEditError["status"], started.error, started.code);
+  return { message: "Here is the change. Apply it to keep it, or discard it.", preview: preview(await settle(person, started.progress, signal)) };
+}
+
+/** The kit's `apply` handler: the previewed result becomes a new version of the picture. */
+export async function studioApply(person: PersonRow, body: Record<string, unknown>) {
+  if (typeof body.token !== "string" || body.token === "") throw new ImageEditError(422, "That result expired. Run the tool again.", "expired");
+  try {
+    const version = await applyPreview(person, body.token, typeof body.label === "string" ? body.label : undefined);
+    return { id: version.id, url: version.url, label: version.label, width: version.width, height: version.height, created_at: version.created_at };
+  } catch (error) { return fail(error); }
+}
+
+/** The kit's `markup` handler: the flattened drawing as a new version. */
+export async function studioMarkup(person: PersonRow, body: Record<string, unknown>) {
+  if (typeof body.file !== "string") throw new ImageEditError(422, "Say which picture to save the markup on, then try again.", "bad_arguments");
+  const base64 = pngBase64(body.png, "The markup");
+  if (!base64) throw new ImageEditError(422, "There is no markup to save. Draw something first.", "bad_arguments");
+  const bytes = new Uint8Array(Buffer.from(base64, "base64"));
+  if (bytes.byteLength === 0) throw new ImageEditError(422, "The markup could not be read. Try again.", "bad_mask");
+  if (bytes.byteLength > MAX_MARKUP_BYTES) throw new ImageEditError(413, "The markup is too big. Try a smaller picture.", "too_large");
+  try {
+    const version = await saveUploadedVersion(person, LIBRARY_SOURCE, body.file, bytes, "Markup");
+    return { id: version.id, url: version.url, label: version.label, width: version.width, height: version.height, created_at: version.created_at };
+  } catch (error) { return fail(error); }
+}
