@@ -123,9 +123,9 @@
           ]
         },
         {
-          "id": "play-library",
+          "id": "play-music",
           "mode": "play",
-          "title": "Library",
+          "title": "Music",
           "pages": [
             "songs",
             "albums",
@@ -134,6 +134,15 @@
             "liked",
             "history",
             "downloads"
+          ]
+        },
+        {
+          "id": "play-sounds",
+          "mode": "play",
+          "title": "Voices and sounds",
+          "pages": [
+            "voice-library",
+            "sound-library"
           ]
         },
         {
@@ -147,17 +156,11 @@
           ]
         },
         {
-          "id": "create",
-          "mode": "create",
-          "pages": [
-            "create"
-          ]
-        },
-        {
           "id": "create-tools",
           "mode": "create",
-          "title": "Tools",
+          "title": "Make",
           "pages": [
+            "create",
             "studio",
             "stems",
             "remix",
@@ -183,7 +186,7 @@
       {
         "id": "index",
         "label": "Audio",
-        "icon": "home",
+        "icon": "headphones",
         "nav": true,
         "kind": "schema",
         "module": "index"
@@ -215,7 +218,7 @@
       {
         "id": "artists",
         "label": "Artists",
-        "icon": "mic",
+        "icon": "users",
         "nav": false,
         "kind": "schema",
         "module": "artists"
@@ -469,6 +472,22 @@
         "nav": false,
         "kind": "schema",
         "module": "drafts"
+      },
+      {
+        "id": "voice-library",
+        "label": "Voices",
+        "icon": "mic",
+        "nav": false,
+        "kind": "schema",
+        "module": "voice-library"
+      },
+      {
+        "id": "sound-library",
+        "label": "Sound effects",
+        "icon": "audio-waveform",
+        "nav": false,
+        "kind": "schema",
+        "module": "sound-library"
       }
     ],
     "data": [

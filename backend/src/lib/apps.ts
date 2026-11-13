@@ -196,7 +196,7 @@ export function sidebarFor(person: PersonRow, manifest: PackageManifest, contrib
   const groups: AppSidebarGroup[] = [];
   for (const group of sidebar.groups) {
     if (group.pages) {
-      const entries = group.pages.flatMap((id) => { const entry = visible(id); return entry ? [{ page: entry.id, label: entry.id === "index" ? "Home" : entry.label ?? entry.id, icon: entry.icon ?? null }] : []; });
+      const entries = group.pages.flatMap((id) => { const entry = visible(id); return entry ? [{ page: entry.id, label: entry.id === "index" ? "Home" : entry.label ?? entry.id, icon: entry.id === "index" ? "home" : entry.icon ?? null }] : []; });
       if (entries.length > 0) groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), ...(group.mode ? { mode: group.mode } : {}), pages: entries });
     } else if (group.rows && actionVisible(group.rows.open)) {
       const { manage, ...rest } = group.rows;

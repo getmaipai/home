@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "audio-voice-library",
+  "title": "Voices",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "mic",
+      "text": "Voices you made or picked will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/voices"
+        }
+      },
+      "action_label": "Make a voice"
+    }
+  ]
+}
