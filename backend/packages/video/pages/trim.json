@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-trim",
+  "title": "Trim and join",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "scissors",
+      "text": "Cut and join your clips here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/clips"
+        }
+      },
+      "action_label": "Open My clips"
+    }
+  ]
+}

@@ -37,7 +37,7 @@
       {
         "id": "index",
         "label": "Shows and Films",
-        "icon": "monitor",
+        "icon": "tv",
         "nav": true,
         "kind": "schema",
         "module": "index"
@@ -45,7 +45,7 @@
       {
         "id": "shows",
         "label": "Shows",
-        "icon": "monitor",
+        "icon": "tv",
         "nav": true,
         "kind": "schema",
         "module": "shows"
@@ -53,7 +53,7 @@
       {
         "id": "films",
         "label": "Films",
-        "icon": "monitor",
+        "icon": "film",
         "nav": true,
         "kind": "schema",
         "module": "films"
@@ -61,7 +61,7 @@
       {
         "id": "watchlist",
         "label": "Watchlist",
-        "icon": "monitor",
+        "icon": "bookmark",
         "nav": true,
         "kind": "schema",
         "module": "watchlist"
@@ -89,6 +89,38 @@
         "nav": false,
         "kind": "schema",
         "module": "watch"
+      },
+      {
+        "id": "recently-added",
+        "label": "Recently added",
+        "icon": "sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "recently-added"
+      },
+      {
+        "id": "genres",
+        "label": "Genres",
+        "icon": "compass",
+        "nav": false,
+        "kind": "schema",
+        "module": "genres"
+      },
+      {
+        "id": "continue",
+        "label": "Continue watching",
+        "icon": "play",
+        "nav": false,
+        "kind": "schema",
+        "module": "continue"
+      },
+      {
+        "id": "history",
+        "label": "History",
+        "icon": "history",
+        "nav": false,
+        "kind": "schema",
+        "module": "history"
       }
     ],
     "data": [
@@ -191,6 +223,35 @@
             "folders",
             "saved copies",
             "trash"
+          ]
+        }
+      ]
+    },
+    "sidebar": {
+      "groups": [
+        {
+          "id": "home",
+          "pages": [
+            "index"
+          ]
+        },
+        {
+          "id": "library",
+          "title": "Library",
+          "pages": [
+            "shows",
+            "films",
+            "recently-added",
+            "genres"
+          ]
+        },
+        {
+          "id": "yours",
+          "title": "Yours",
+          "pages": [
+            "watchlist",
+            "continue",
+            "history"
           ]
         }
       ]

@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-categories",
+  "title": "Categories",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "compass",
+      "text": "Browse videos by topic here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/library"
+        }
+      },
+      "action_label": "Open Library"
+    }
+  ]
+}

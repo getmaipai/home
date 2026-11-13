@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "shows-continue",
+  "title": "Continue watching",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "play",
+      "text": "Shows and films you started will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/shows/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

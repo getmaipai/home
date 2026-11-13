@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-talking-avatar",
+  "title": "Talking avatar",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "user-round",
+      "text": "Make a picture talk here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/create"
+        }
+      },
+      "action_label": "Make a video"
+    }
+  ]
+}

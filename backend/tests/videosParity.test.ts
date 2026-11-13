@@ -95,7 +95,7 @@ describe("the package documents", () => {
   const pageOf = (id: string) => JSON.parse(readFileSync(join(pkg, "pages", `${id}.json`), "utf8"));
   test("Liked videos is a page, a sidebar entry and a data id, within the 16-id cap", () => {
     expect(manifest.contributes.pages.map((p: { id: string }) => p.id)).toContain("liked");
-    expect(manifest.contributes.sidebar.groups[0].pages).toContain("liked");
+    expect(manifest.contributes.sidebar.groups.some((group: { pages: string[] }) => group.pages.includes("liked"))).toBe(true);
     expect(manifest.contributes.data.map((d: { id: string }) => d.id)).toContain("liked");
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     expect(pageOf("liked").body[0].bind.path).toBe("liked");

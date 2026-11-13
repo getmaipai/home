@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "shows-genres",
+  "title": "Genres",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "compass",
+      "text": "Browse shows and films by genre here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/shows/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

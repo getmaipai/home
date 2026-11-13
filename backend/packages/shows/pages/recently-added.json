@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "shows-recently-added",
+  "title": "Recently added",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "New shows and films on this home will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/shows/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

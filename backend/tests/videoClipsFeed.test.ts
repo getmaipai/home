@@ -163,7 +163,7 @@ describe("the Clips page", () => {
     expect(entry.min_role).toBeUndefined();
     const groups = manifest.contributes.sidebar.groups;
     expect(groups.find((g: any) => g.id === "play").pages).toContain("clips-feed");
-    expect(groups.find((g: any) => g.id === "create").pages).toContain("clips");
+    expect(groups.filter((g: any) => g.mode === "create").some((g: any) => g.pages.includes("clips"))).toBe(true);
   });
 
   test.skipIf(!specAllowsClipFeed)("Videos home has a Clips shelf with an Open Clips link beside its heading", () => {

@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-channels",
+  "title": "Channels",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "tv",
+      "text": "The channels you follow will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/library"
+        }
+      },
+      "action_label": "Open Library"
+    }
+  ]
+}

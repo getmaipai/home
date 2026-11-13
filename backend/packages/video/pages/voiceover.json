@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-voiceover",
+  "title": "Voiceover",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "mic",
+      "text": "Record or make a voice for a video here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/clips"
+        }
+      },
+      "action_label": "Open My clips"
+    }
+  ]
+}

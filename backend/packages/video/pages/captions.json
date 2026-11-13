@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-captions",
+  "title": "Captions",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "captions",
+      "text": "Add and fix captions here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/clips"
+        }
+      },
+      "action_label": "Open My clips"
+    }
+  ]
+}

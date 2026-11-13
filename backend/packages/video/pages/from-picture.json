@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-from-picture",
+  "title": "From a picture",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "camera",
+      "text": "Turn a picture into a video here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/create"
+        }
+      },
+      "action_label": "Make a video"
+    }
+  ]
+}

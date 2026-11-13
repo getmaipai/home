@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-drafts",
+  "title": "Drafts",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "bookmark",
+      "text": "Videos you started and have not finished will show up here.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/create"
+        }
+      },
+      "action_label": "Make a video"
+    }
+  ]
+}

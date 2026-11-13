@@ -254,7 +254,7 @@ describe("the Videos pages", () => {
   test("playlists, channels and suggestions are wired: manifest pages, sidebar, reorder, avatar strip and search.suggest", () => {
     const ids = manifest.contributes.pages.map((p: { id: string }) => p.id);
     for (const id of ["playlists", "playlist", "channel"]) expect(ids).toContain(id);
-    expect(manifest.contributes.sidebar.groups[0].pages).toContain("playlists");
+    expect(manifest.contributes.sidebar.groups.some((group: { pages: string[] }) => group.pages.includes("playlists"))).toBe(true);
     expect(manifest.contributes.data.length).toBeLessThanOrEqual(16);
     const list = shelves("playlist").find((n) => n.reorder)!;
     expect(list.reorder).toEqual({ call: { call: { target: "/api/plugins/video/playlists/reorder", args: { playlist_id: "{playlist_id}" } } }, id_param: "ids" });

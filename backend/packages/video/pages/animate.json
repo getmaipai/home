@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-animate",
+  "title": "Animate a picture",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "layers",
+      "text": "Bring a still picture to life here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/create"
+        }
+      },
+      "action_label": "Make a video"
+    }
+  ]
+}

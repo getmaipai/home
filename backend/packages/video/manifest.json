@@ -65,21 +65,55 @@
           "mode": "play",
           "pages": [
             "index",
+            "clips-feed"
+          ]
+        },
+        {
+          "id": "play-library",
+          "mode": "play",
+          "title": "Library",
+          "pages": [
             "library",
-            "clips-feed",
-            "history",
             "watch-later",
             "liked",
+            "history",
             "playlists"
           ]
         },
         {
-          "id": "create",
+          "id": "play-discover",
+          "mode": "play",
+          "title": "Discover",
+          "pages": [
+            "new-uploads",
+            "channels",
+            "categories"
+          ]
+        },
+        {
+          "id": "create-make",
           "mode": "create",
+          "title": "Make",
           "pages": [
             "create",
+            "from-picture",
+            "talking-avatar",
+            "animate",
+            "film-maker",
+            "templates"
+          ]
+        },
+        {
+          "id": "create-edit",
+          "mode": "create",
+          "title": "Edit and yours",
+          "pages": [
             "studio",
-            "clips"
+            "trim",
+            "captions",
+            "voiceover",
+            "clips",
+            "drafts"
           ]
         }
       ]
@@ -189,8 +223,8 @@
       },
       {
         "id": "create",
-        "label": "Create",
-        "icon": "film",
+        "label": "Video",
+        "icon": "wand-sparkles",
         "nav": true,
         "kind": "schema",
         "module": "create",
@@ -199,7 +233,7 @@
       {
         "id": "studio",
         "label": "Studio",
-        "icon": "audio-waveform",
+        "icon": "sliders-horizontal",
         "nav": true,
         "kind": "schema",
         "module": "studio",
@@ -212,6 +246,111 @@
         "nav": true,
         "kind": "schema",
         "module": "clips",
+        "min_role": "adult"
+      },
+      {
+        "id": "new-uploads",
+        "label": "New uploads",
+        "icon": "sparkles",
+        "nav": false,
+        "kind": "schema",
+        "module": "new-uploads"
+      },
+      {
+        "id": "channels",
+        "label": "Channels",
+        "icon": "tv",
+        "nav": false,
+        "kind": "schema",
+        "module": "channels"
+      },
+      {
+        "id": "categories",
+        "label": "Categories",
+        "icon": "compass",
+        "nav": false,
+        "kind": "schema",
+        "module": "categories"
+      },
+      {
+        "id": "from-picture",
+        "label": "From a picture",
+        "icon": "camera",
+        "nav": false,
+        "kind": "schema",
+        "module": "from-picture",
+        "min_role": "adult"
+      },
+      {
+        "id": "talking-avatar",
+        "label": "Talking avatar",
+        "icon": "user-round",
+        "nav": false,
+        "kind": "schema",
+        "module": "talking-avatar",
+        "min_role": "adult"
+      },
+      {
+        "id": "animate",
+        "label": "Animate a picture",
+        "icon": "layers",
+        "nav": false,
+        "kind": "schema",
+        "module": "animate",
+        "min_role": "adult"
+      },
+      {
+        "id": "film-maker",
+        "label": "Film maker",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "film-maker",
+        "min_role": "adult"
+      },
+      {
+        "id": "templates",
+        "label": "Templates",
+        "icon": "rectangle-horizontal",
+        "nav": false,
+        "kind": "schema",
+        "module": "templates",
+        "min_role": "adult"
+      },
+      {
+        "id": "trim",
+        "label": "Trim and join",
+        "icon": "scissors",
+        "nav": false,
+        "kind": "schema",
+        "module": "trim",
+        "min_role": "adult"
+      },
+      {
+        "id": "captions",
+        "label": "Captions",
+        "icon": "captions",
+        "nav": false,
+        "kind": "schema",
+        "module": "captions",
+        "min_role": "adult"
+      },
+      {
+        "id": "voiceover",
+        "label": "Voiceover",
+        "icon": "mic",
+        "nav": false,
+        "kind": "schema",
+        "module": "voiceover",
+        "min_role": "adult"
+      },
+      {
+        "id": "drafts",
+        "label": "Drafts",
+        "icon": "bookmark",
+        "nav": false,
+        "kind": "schema",
+        "module": "drafts",
         "min_role": "adult"
       }
     ],

@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "shows-history",
+  "title": "History",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "history",
+      "text": "What you watched lately will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/shows/shows"
+        }
+      },
+      "action_label": "Open Shows"
+    }
+  ]
+}

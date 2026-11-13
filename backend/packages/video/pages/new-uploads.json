@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "video-new-uploads",
+  "title": "New uploads",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "New videos from the channels you follow will show up here. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/video/library"
+        }
+      },
+      "action_label": "Open Library"
+    }
+  ]
+}
