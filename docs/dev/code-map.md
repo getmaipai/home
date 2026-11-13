@@ -828,6 +828,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/clearerLevels.ts` | CLEARER_LEVELS, CLEARER_VIDEO_LEVELS |
+| `backend/src/lib/mediaOps/coverage.ts` | PICTURE_COVERAGE |
 | `backend/src/lib/mediaOps/http.ts` | MediaOpRequest, withAttachments, startLibraryOp |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP, VIDEO_CLEARER_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, getMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob |
