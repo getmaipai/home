@@ -375,7 +375,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/PackSection.tsx` | packPercent, PackSection |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/ArrangeHome.tsx` | ARRANGE_KEY, HOME_SECTIONS, sectionTitle, defaultSectionLayout, displayTitle, moveCard |
-| `frontend/src/shell/pages/dashboard/AskBox.tsx` | REFERENCE_SOON, installPlaceholder, askHref, AskBox |
+| `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/Attention.tsx` | updatesWaiting, Attention |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |
@@ -660,7 +660,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
-| `backend/src/lib/imageApp.ts` | imageAppData, REFERENCE_SOON |
+| `backend/src/lib/imageApp.ts` | imageAppData |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, BEST_NEEDS_DOWNLOAD |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
 | `backend/src/lib/imageSimilarity/fingerprint.ts` | FINGERPRINT_VERSION, hamming, fingerprint, hashDistance |
