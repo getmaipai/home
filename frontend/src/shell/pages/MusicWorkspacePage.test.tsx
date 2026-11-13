@@ -186,3 +186,32 @@ describe("Remix panel", () => {
     expect(remixRequest({ style: "jazz", lyrics: "", tempo: "90", voice: "" })).toContain("90 BPM");
   });
 });
+
+describe("Song cards that are stopped or stuck", () => {
+  const withJobs = (cards: unknown[]) => {
+    const before = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url === "/api/music/jobs" && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json(cards));
+      return before(input, init);
+    }) as typeof fetch;
+  };
+  test("a stopped song says Stopped and offers Try again", async () => {
+    withJobs([{ ...song, id: "mus-stopped", state: "cancelled", progress: 0, title: "Quiet Rain", versions: [] }]);
+    const view = open();
+    expect(await view.findByText("Stopped")).toBeTruthy();
+    expect(await view.findByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+  test("a song at 0% for over three minutes offers Stop, and Stop sends the stop call", async () => {
+    withJobs([{ ...song, id: "mus-stuck", state: "running", progress: 0, title: "Slow Bell", versions: [], stage_label: "Making your song", started_at: Date.now() - 5 * 60_000 }]);
+    const view = open();
+    fireEvent.click(await view.findByRole("button", { name: "Stop" }));
+    await waitFor(() => expect(calls.some(call => call.url === "/api/music/jobs/mus-stuck" && call.method === "DELETE")).toBe(true));
+  });
+  test("a song that just started has no Stop button", async () => {
+    withJobs([{ ...song, id: "mus-new", state: "running", progress: 0, title: "Fresh", versions: [], stage_label: "Making your song", started_at: Date.now() - 10_000 }]);
+    const view = open();
+    await view.findByText("Fresh");
+    expect(view.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+});
