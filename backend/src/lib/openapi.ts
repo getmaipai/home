@@ -37,7 +37,10 @@ export const emptyJsonBodyAsObject: MiddlewareHandler<AppEnv> = async (c, next) 
   if ((c.req.header("content-type") ?? "").includes("application/json")) {
     const text = await c.req.raw.clone().text();
     if (text.trim() === "") {
-      c.req.raw = new Request(c.req.raw.url, { method: c.req.raw.method, headers: c.req.raw.headers, body: "{}" });
+      // A copied "content-length: 0" would cut the new body to nothing again, so it is dropped.
+      const headers = new Headers(c.req.raw.headers);
+      headers.delete("content-length");
+      c.req.raw = new Request(c.req.raw.url, { method: c.req.raw.method, headers, body: "{}" });
     }
   }
   await next();

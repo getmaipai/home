@@ -84,6 +84,13 @@ describe("the list", () => {
 });
 
 describe("install and uninstall", () => {
+  test("install with a JSON content type and an empty body is a plain install, not a Malformed JSON refusal", async () => {
+    const { client } = await owner();
+    answers["POST /stack/v1/components/z-image-turbo/install"] = () => Response.json({ job: "job-2", component: "z-image-turbo", joined: false }, { status: 202 });
+    const res = await client.request("/api/components/z-image-turbo/install", { method: "POST", headers: { "content-type": "application/json" } });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ job: "job-2", component: "z-image-turbo" });
+  });
   test("install starts the Stack's job; a second tap joins it; already installed is a plain 200", async () => {
     const { client } = await owner();
     answers["POST /stack/v1/components/z-image-turbo/install"] = () => Response.json({ job: "job-1", component: "z-image-turbo", joined: false }, { status: 202 });

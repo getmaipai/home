@@ -4,7 +4,7 @@
 // chat model, a part Home needs on this computer, anything in use) and says why in a sentence; Home passes it on.
 // A household LoRA is also removed from Home's own switches so no dangling preference stays behind.
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses } from "@/lib/openapi";
+import { apiRouter, emptyJsonBodyAsObject, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { componentFailure, installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent } from "@/lib/stackComponents";
 import { licenceCovered } from "@/lib/licenceAcceptance";
@@ -67,7 +67,7 @@ componentsRoutes.openapi(listRoute, async (c) => {
 });
 
 const installRoute = createRoute({
-  method: "post", path: "/{id}/install", tags: ["Components"], summary: "Download and set up a part (progress on the install strip)", middleware: [requireRole("owner", "admin")] as const,
+  method: "post", path: "/{id}/install", tags: ["Components"], summary: "Download and set up a part (progress on the install strip)", middleware: [requireRole("owner", "admin"), emptyJsonBodyAsObject] as const,
   request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ accepted_licence: z.string().max(120).optional().describe("The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one.") }) } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), component: z.string() }) } }, description: "Started, or already running." }, 200: { content: { "application/json": { schema: z.object({ job: z.null(), component: z.string() }) } }, description: "Already installed." }, ...refusals },
 });
