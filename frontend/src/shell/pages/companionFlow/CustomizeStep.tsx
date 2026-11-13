@@ -4,10 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogFooter, DialogSection, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
+import { PromptBar } from "@maipai/ui/src/elements/prompt-bar";
 import { CompanionStage } from "@maipai/ui/src/elements/companion-stage";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type CompanionEditable, type CompanionPersonality } from "@/lib/api";
@@ -140,10 +140,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
             <ToggleGroupItem value="clone">{i18n._({ id: "Create / Clone", message: "Create / Clone" })}</ToggleGroupItem>
           </ToggleGroup>
           <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1"><Select value={selectedValue} onValueChange={setVoiceId} disabled={!choices}>
-              <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Voice", message: "Voice" })}><SelectValue /></SelectTrigger>
-              <SelectContent>{(choices?.options ?? [{ value: selectedValue, label: i18n._({ id: "Loading voices", message: "Loading voices" }) }]).map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-            </Select></div>
+            <p className="min-w-0 flex-1 truncate" data-testid="voice-name">{choices?.options.find((option) => option.value === selectedValue)?.label ?? i18n._({ id: "Loading voices", message: "Loading voices" })}</p>
             <Button variant="outline" shape="pill" disabled={!previewId || (playing && preview.busy)} onClick={() => playing ? voicePreviewPlayer.stop() : previewId && void voicePreviewPlayer.start(previewId)}>{playing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Preview", message: "Preview" })}</Button>
           </div>
           {voices.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(voices.error)} /> : null}
@@ -155,7 +152,14 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
           <ToggleGroup type="single" variant="chip" wrap value={personality} onValueChange={(next) => { if (next) setPersonality(next as CompanionPersonality); }} aria-label={i18n._({ id: "Personality", message: "Personality" })}>
             {PERSONALITIES().map((item) => <ToggleGroupItem key={item.id} value={item.id}>{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
-          <Textarea aria-label={i18n._({ id: "Personality notes", message: "Personality notes" })} shape="rounded" maxLength={NOTES_MAX} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={i18n._({ id: "How should your synth behave, speak, and interact? (Optional)", message: "How should your synth behave, speak, and interact? (Optional)" })} />
+          {/* ONE-COMPOSER-2026-11-13: the notes are the kit composer; the voice is a chip in it (it was a Select), and the notes seed the backstory. */}
+          <PromptBar label={i18n._({ id: "Personality notes", message: "Personality notes" })} value={notes} onValueChange={setNotes} maxLength={NOTES_MAX} layout="chat" shape="pill" accent="create" mode="notes"
+            modes={[{ id: "notes", label: i18n._({ id: "Personality", message: "Personality" }), icon: "heart", tools: ["clear"],
+              placeholder: i18n._({ id: "How should your synth behave, speak, and interact? (Optional)", message: "How should your synth behave, speak, and interact? (Optional)" }),
+              primaryLabel: generating ? i18n._({ id: "Writing", message: "Writing" }) : i18n._({ id: "Write backstory", message: "Write backstory" }),
+              chips: [{ id: "voice", label: i18n._({ id: "Voice", message: "Voice" }), group: i18n._({ id: "Voice", message: "Voice" }), value: selectedValue, onValueChange: (value) => setVoiceId(String(value)),
+                options: choices?.options ?? [{ value: selectedValue, label: i18n._({ id: "Loading voices", message: "Loading voices" }) }], ...(choices ? {} : { disabledReason: i18n._({ id: "Loading voices", message: "Loading voices" }) }) }] }]}
+            busy={generating || loading} onSubmit={() => void generate()} />
         </DialogSection>
         <DialogSection title={i18n._({ id: "Style", message: "Style" })}>
           <div className="flex flex-col gap-3">

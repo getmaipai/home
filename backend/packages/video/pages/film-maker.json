@@ -4,15 +4,21 @@
   "title": "Film maker",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "film",
-      "text": "Plan and make a short film from scenes here. This page is coming soon.",
-      "action": {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Describe the film",
+      "placeholder": "Describe the film. Name the people with @.",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Plan the film",
+      "starts": "video",
+      "submit": {
         "navigate": {
           "to": "/apps/video/create"
         }
-      },
-      "action_label": "Make a video"
+      }
     }
   ]
 }

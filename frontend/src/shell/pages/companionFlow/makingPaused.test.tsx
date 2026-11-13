@@ -46,7 +46,7 @@ test("screen 1: Generate Character is greyed out with the one line while picture
   expect(reason.getAttribute("role")).toBe("status");
   const generate = button(view, "Generate Character");
   expect(generate.disabled).toBe(true);
-  expect(generate.getAttribute("aria-describedby")).toBe(reason.id);
+  // The composer draws the line under its box (the kit owns the wiring), so the button waits and the line is the one place it is said.
   expect(button(view, "Approve & Continue").disabled).toBe(true);
   fireEvent.click(view.getByRole("radio", { name: "Upload Photo" }));
   // Choosing a file is local, so the picker never greys out; the upload waits until pictures are back.

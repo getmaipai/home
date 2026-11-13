@@ -4,15 +4,60 @@
   "title": "From a picture",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "camera",
-      "text": "Turn a picture into a video here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/video/create"
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Describe the video",
+      "placeholder": "Pick a picture, then describe how it should move.",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Make video",
+      "chips": [
+        {
+          "state": "orientation",
+          "label": "Shape",
+          "default": "landscape",
+          "group": "Settings",
+          "presentation": "popover",
+          "options": [
+            {
+              "value": "landscape",
+              "label": "Landscape"
+            },
+            {
+              "value": "portrait",
+              "label": "Portrait"
+            }
+          ]
+        }
+      ],
+      "references": [
+        {
+          "state": "start_frame",
+          "label": "Picture",
+          "kind": "picture",
+          "placement": "in_field"
+        }
+      ],
+      "submit": {
+        "call": {
+          "target": "/api/plugins/video/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "orientation": "{orientation}",
+            "start_frame": "{start_frame}",
+            "need_picture": true
+          },
+          "then": {
+            "navigate": {
+              "to": "/apps/video/create"
+            }
+          }
         }
       },
-      "action_label": "Make a video"
+      "starts": "video"
     }
   ]
 }

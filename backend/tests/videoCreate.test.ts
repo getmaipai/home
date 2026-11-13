@@ -305,6 +305,14 @@ describe("the Create page and the make action", () => {
     expect(fake.submitted[0]!.size).toBe("832x480");
     expect(String(fake.submitted[0]!.prompt)).toContain(videoRecipeFor("slow-orbit")!.wording);
   });
+  // ONE-COMPOSER-2026-11-13: the From a picture and Animate pages ask for a picture; an empty slot is one plain line and nothing starts.
+  test("need_picture refuses an empty Picture slot with one plain line, and starts nothing", async () => {
+    const { adult } = await household();
+    const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, start_frame: "{start_frame}", need_picture: true });
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("Pick a picture first");
+    expect(fake.submitted).toHaveLength(0);
+  });
   test("an unknown shape or camera move is a plain 422, and a child or teen cannot reach the action", async () => {
     const { adult, teen, child } = await household();
     const bad = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "sideways" });

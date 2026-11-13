@@ -129,3 +129,20 @@ test("a fresh draft that has no voice, notes or backstory fields still opens", a
   await waitFor(() => expect(chip(view, "Friendly").getAttribute("aria-checked")).toBe("true"));
   expect((view.getByLabelText("Backstory") as HTMLTextAreaElement).value).toBe("");
 });
+
+// ONE-COMPOSER-2026-11-13: the voice is a chip in the notes composer (it was a Select), and the composer's own button writes the backstory from the notes.
+test("the voice is a chip in the composer, and its button writes the backstory from the notes", async () => {
+  const { view, calls } = open();
+  await view.findByRole("radio", { name: "Friendly" });
+  expect(view.queryByRole("combobox")).toBeNull();
+  await waitFor(() => expect(view.getByRole("button", { name: /^Voice:/ })).toBeTruthy());
+  fireEvent.click(view.getByRole("button", { name: /^Voice:/ }));
+  fireEvent.click(await view.findByRole("radio", { name: /Alba/ }));
+  expect(button(view, "Write backstory").disabled).toBe(true);
+  fireEvent.change(view.getByLabelText("Personality notes"), { target: { value: "Calm and kind." } });
+  await act(async () => { fireEvent.click(button(view, "Write backstory")); });
+  await waitFor(() => expect(calls.backstory).toEqual([{ hint: "Calm and kind." }]));
+  await act(async () => { fireEvent.click(button(view, "Save Synth")); });
+  await waitFor(() => expect(calls.saved.length).toBe(1));
+  expect((calls.saved[0] as { voice_id: string }).voice_id).not.toBe("default");
+});

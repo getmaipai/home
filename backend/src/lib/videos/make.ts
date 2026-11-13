@@ -90,6 +90,8 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (startFrame.length > 200) return { ok: false, error: "Choose a picture from your Library, or leave the Picture slot empty." };
     body.start_frame = startFrame;
   }
+  // ONE-COMPOSER-2026-11-13: the From a picture and Animate pages make a clip from a picture, so they ask for one; an empty slot gets one plain line, nothing starts.
+  if ((raw.need_picture === true || raw.need_picture === "true") && !startFrame) return { ok: false, error: "Pick a picture first. Press the picture button in the box, choose one, then try again." };
   return { ok: true, body };
 }
 

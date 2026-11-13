@@ -4,10 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogSection } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
-import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
+import { PromptBar } from "@maipai/ui/src/elements/prompt-bar";
+import { ComposerChipPopover, type ComposerChipData } from "@maipai/ui/src/elements/composer-parts";
 import { GenerationStage } from "@maipai/ui/src/elements/generation-stage";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -226,26 +226,29 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     try { await api.cancelCompanionLookJob(draftId, jobId); setJobId(null); } catch (e) { setPreviewError(flowErrorText(e)); }
   }
 
+  // ONE-COMPOSER-2026-11-13: the description is the kit composer. "Based on" and the household member are chips in one popover, never a Select in a card.
+  const basedChips: ComposerChipData[] = companionId ? [] : [
+    { id: "based", label: i18n._({ id: "Based on", message: "Based on" }), group: i18n._({ id: "Based on", message: "Based on" }), value: basedKind,
+      onValueChange: (value) => { if (value === "none" || value === "household_member" || value === "real_person") setBasedKind(value); },
+      options: [
+        { value: "none", label: i18n._({ id: "Nobody", message: "Nobody" }) },
+        { value: "household_member", label: i18n._({ id: "A household member", message: "A household member" }) },
+        ...(adultViewer ? [{ value: "real_person", label: i18n._({ id: "A real person", message: "A real person" }) }] : []),
+      ] },
+    ...(basedKind === "household_member" && (peopleQuery.data ?? []).length > 0 ? [{
+      id: "person", label: i18n._({ id: "Household member", message: "Household member" }), group: i18n._({ id: "Based on", message: "Based on" }), value: basedPersonId,
+      onValueChange: (value: string | number) => setBasedPersonId(String(value)),
+      options: [{ value: "", label: i18n._({ id: "Choose a person", message: "Choose a person" }) }, ...(peopleQuery.data ?? []).map((person) => ({ value: person.id, label: person.display_name }))],
+    }] : []),
+  ];
+  const generateReason = !name.trim() ? i18n._({ id: "Type a name for your character first.", message: "Type a name for your character first." })
+    : customSelected && !customStyle.trim() ? i18n._({ id: "Type your own style first, or pick one of the styles.", message: "Type your own style first, or pick one of the styles." })
+    : making.reason ?? (look && !look.can_generate ? look.generate_reason ?? undefined : undefined);
+
   return (
     <>
     <DialogBody columns="three">
       <div className="flex flex-col gap-6">
-        {!companionId ? <DialogSection title={i18n._({ id: "Based on", message: "Based on" })}>
-          <Select value={basedKind} onValueChange={(value) => { if (value === "none" || value === "household_member" || value === "real_person") setBasedKind(value); }}>
-            <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Based on", message: "Based on" })}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">{i18n._({ id: "Nobody", message: "Nobody" })}</SelectItem>
-              <SelectItem value="household_member">{i18n._({ id: "A household member", message: "A household member" })}</SelectItem>
-              {adultViewer ? <SelectItem value="real_person">{i18n._({ id: "A real person", message: "A real person" })}</SelectItem> : null}
-            </SelectContent>
-          </Select>
-          {basedKind === "household_member" ? <Select value={basedPersonId} onValueChange={setBasedPersonId}>
-            <SelectTrigger shape="pill" width="full" aria-label={i18n._({ id: "Household member", message: "Household member" })}><SelectValue placeholder={i18n._({ id: "Choose a person", message: "Choose a person" })} /></SelectTrigger>
-            <SelectContent>{(peopleQuery.data ?? []).map((person) => <SelectItem key={person.id} value={person.id}>{person.display_name}</SelectItem>)}</SelectContent>
-          </Select> : null}
-          {basedKind === "real_person" ? <Input aria-label={i18n._({ id: "Real person name", message: "Real person name" })} shape="pill" maxLength={120} value={basedName} onChange={(event) => setBasedName(event.target.value)} placeholder={i18n._({ id: "Enter a real person's name", message: "Enter a real person's name" })} /> : null}
-          {peopleQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(peopleQuery.error)} /> : null}
-        </DialogSection> : null}
         <DialogSection title={i18n._({ id: "Character name", message: "Character name" })}>
           <Input aria-label={i18n._({ id: "Character name", message: "Character name" })} shape="pill" placeholder={i18n._({ id: "Enter character name", message: "Enter character name" })} maxLength={40} value={name} disabled={locked}
             onChange={(e) => setName(e.target.value)} onBlur={nameDone} />
@@ -256,8 +259,16 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             <ToggleGroupItem value="upload">{i18n._({ id: "Upload Photo", message: "Upload Photo" })}</ToggleGroupItem>
           </ToggleGroup>
           {mode === "describe"
-            ? <Textarea aria-label={i18n._({ id: "Describe the character", message: "Describe the character" })} shape="rounded" maxRows={12} placeholder={i18n._({ id: "Describe the character you want to create...", message: "Describe the character you want to create..." })} value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
+            ? <>
+              <PromptBar label={i18n._({ id: "Describe the character", message: "Describe the character" })} value={description} onValueChange={setDescription} maxLength={1200} layout="chat" shape="pill" accent="create"
+                modes={[{ id: "character", label: i18n._({ id: "Character", message: "Character" }), icon: "user", placeholder: i18n._({ id: "Describe the character you want to create...", message: "Describe the character you want to create..." }), chips: basedChips, tools: ["clear"],
+                  primaryLabel: makingCharacter ? i18n._({ id: "Making your character...", message: "Making your character..." }) : i18n._({ id: "Generate Character", message: "Generate Character" }) }]} mode="character"
+                busy={locked} disabledReason={generateReason} onSubmit={() => { if (canGenerate) void generate(); }} />
+            </>
             : <Input ref={fileInput} aria-label={i18n._({ id: "Photo", message: "Photo" })} type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
+          {mode === "upload" && basedChips.length ? <div className="flex flex-wrap gap-2"><ComposerChipPopover name={i18n._({ id: "Based on", message: "Based on" })} chips={basedChips} /></div> : null}
+          {!companionId && basedKind === "real_person" ? <Input aria-label={i18n._({ id: "Real person name", message: "Real person name" })} shape="pill" maxLength={120} value={basedName} onChange={(event) => setBasedName(event.target.value)} placeholder={i18n._({ id: "Enter a real person's name", message: "Enter a real person's name" })} /> : null}
+          {peopleQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(peopleQuery.error)} /> : null}
           {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt={i18n._({ id: "Your upload", message: "Your upload" })} draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
       </div>
@@ -271,9 +282,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {customSelected ? <Input aria-label={i18n._({ id: "Custom style", message: "Custom style" })} shape="pill" placeholder={i18n._({ id: "Type a style, for example paper cut-out", message: "Type a style, for example paper cut-out" })} maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
+          {mode === "upload" ? <>
           <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />{i18n._({ id: "Making your character...", message: "Making your character..." })}</> : <><Sparkles aria-hidden="true" />{i18n._({ id: "Generate Character", message: "Generate Character" })}</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
+          </> : null}
           {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         </div>
       </div>

@@ -9,7 +9,72 @@
       "engine": "video",
       "gate": "videos",
       "tier_category": "video",
-      "tools": ["clear"]
+      "tools": [
+        "clear"
+      ]
+    },
+    {
+      "id": "from-picture",
+      "label": "From a picture",
+      "icon": "image",
+      "page": "from-picture",
+      "route": "/apps/video/from-picture",
+      "engine": "video",
+      "gate": "videos",
+      "tools": [
+        "clear"
+      ]
+    },
+    {
+      "id": "animate",
+      "label": "Animate",
+      "icon": "layers",
+      "page": "animate",
+      "route": "/apps/video/animate",
+      "engine": "video",
+      "gate": "videos",
+      "tools": [
+        "clear"
+      ]
+    },
+    {
+      "id": "talking-avatar",
+      "label": "Talking avatar",
+      "icon": "user-round",
+      "page": "talking-avatar",
+      "route": "/apps/video/talking-avatar",
+      "engine": "video",
+      "gate": "videos",
+      "tools": [
+        "clear"
+      ],
+      "coming_soon": "Talking avatar is coming soon. Until then, make a video from a picture."
+    },
+    {
+      "id": "voiceover",
+      "label": "Voiceover",
+      "icon": "mic",
+      "page": "voiceover",
+      "route": "/apps/video/voiceover",
+      "engine": "voices",
+      "gate": "videos",
+      "tools": [
+        "clear"
+      ],
+      "coming_soon": "Voiceover is coming soon. Until then, open a clip in Studio to add a voice."
+    },
+    {
+      "id": "film",
+      "label": "Film",
+      "icon": "clapperboard",
+      "page": "film-maker",
+      "route": "/apps/video/film-maker",
+      "engine": "video",
+      "gate": "videos",
+      "tools": [
+        "clear"
+      ],
+      "coming_soon": "Film maker is coming soon. Until then, make one clip at a time on the Create page."
     }
   ]
 }

@@ -42,9 +42,10 @@ function open(options: { path?: string; canCreate?: boolean; lookData?: Companio
 
 test("Based on posts a real person at top level for an adult, and hides the option for a teen", async () => {
   const { view, calls } = open({ role: "adult" });
-  await view.findByRole("combobox", { name: "Based on" });
-  fireEvent.click(view.getByRole("combobox", { name: "Based on" }));
-  fireEvent.click(await view.findByRole("option", { name: "A real person" }));
+  // ONE-COMPOSER-2026-11-13: "Based on" is a chip in the composer that opens one popover, not a Select.
+  await view.findByRole("button", { name: /^Based on/ });
+  fireEvent.click(view.getByRole("button", { name: /^Based on/ }));
+  fireEvent.click(await view.findByRole("radio", { name: "A real person" }));
   fireEvent.change(view.getByLabelText("Real person name"), { target: { value: "Ada Lovelace" } });
   fireEvent.change(view.getByLabelText("Character name"), { target: { value: "Ada" } });
   fireEvent.blur(view.getByLabelText("Character name"));
@@ -52,9 +53,10 @@ test("Based on posts a real person at top level for an adult, and hides the opti
   expect(calls.created[0]).toMatchObject({ name: "Ada", based_on: { kind: "real_person", person_id: null, name: "Ada Lovelace" } });
   cleanup();
   const teen = open({ role: "teen" });
-  await teen.view.findByRole("combobox", { name: "Based on" });
-  fireEvent.click(teen.view.getByRole("combobox", { name: "Based on" }));
-  expect(teen.view.queryByRole("option", { name: "A real person" })).toBeNull();
+  await teen.view.findByRole("button", { name: /^Based on/ });
+  fireEvent.click(teen.view.getByRole("button", { name: /^Based on/ }));
+  await teen.view.findByRole("radio", { name: "A household member" });
+  expect(teen.view.queryByRole("radio", { name: "A real person" })).toBeNull();
 });
 const button = (view: ReturnType<typeof open>["view"], name: string) => view.getByRole("button", { name }) as HTMLButtonElement;
 async function nameIt(view: ReturnType<typeof open>["view"], value = "Marlow") {

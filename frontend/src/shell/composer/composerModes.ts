@@ -22,6 +22,8 @@ export interface ComposerModeRecord {
   quality: { default: string; options: Array<{ value: string | number; label: string; detail?: string }> } | null;
   availability: "ready" | "starting" | "unavailable" | null;
   disabledReason: string | null;
+  /** A mode whose page has no route behind it yet: the one plain line its primary shows while disabled. */
+  comingSoon?: string | null;
 }
 export interface ComposerModesResponse { band: "child" | "teen" | "adult"; modes: ComposerModeRecord[] }
 
@@ -54,6 +56,11 @@ export function composerHref(route: string | null, text: string, settings: Recor
   const query = new URLSearchParams({ prompt: words });
   for (const [key, value] of Object.entries(settings)) query.set(key, String(value));
   return `${route}?${query.toString()}`;
+}
+
+/** The coming-soon line of the Create page this path is, if its mode has no route behind it yet (the page's bar shows it as its not-ready line). */
+export function comingSoonFor(response: ComposerModesResponse, pathname: string): string | undefined {
+  return response.modes.find((m) => m.route !== null && m.route === pathname)?.comingSoon ?? undefined;
 }
 
 export interface ComposerState {

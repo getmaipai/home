@@ -17,6 +17,7 @@ const mode = z.object({
   quality: z.object({ default: z.string(), options: z.array(option) }).nullable(),
   availability: z.enum(["ready", "starting", "unavailable"]).nullable(),
   disabledReason: z.string().nullable(),
+  comingSoon: z.string().nullable().optional(),
 });
 const listRoute = createRoute({
   method: "get", path: "/modes", tags: ["Media"], summary: "The composer's modes this person may use, with each mode's slots, chips and presets", middleware: [requireAuth] as const,

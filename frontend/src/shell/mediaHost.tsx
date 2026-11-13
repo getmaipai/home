@@ -25,7 +25,7 @@ import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLive
 import { MediaPickerBody, StudioPickerBody, type PickKind, type PickedMedia } from "@/shell/MediaPickerDialog";
 import { makingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useHealthQuery } from "@/apps/chat/useChatAvailability";
-import { composerHostFor, useComposerModes } from "@/shell/composer/composerModes";
+import { comingSoonFor, composerHostFor, useComposerModes } from "@/shell/composer/composerModes";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type Hls from "hls.js";
 import { nextMusicQueueId, useMusicDj } from "@/shell/musicDj";
@@ -223,12 +223,15 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
   }), []);
   // VIDEO-UI-06 (K8): the one line a Start button shows while pictures or video are not ready. Same ["health"] query and same words as `useMakingAvailability`.
   const health = useHealthQuery().data;
+  const composerModes = useComposerModes();
+  const soonLine = comingSoonFor(composerModes, location.pathname);
   const makingNotice = useCallback((kind: "picture" | "video"): string | undefined => {
+    // A Create page whose route is not built yet (Voiceover, Film maker, Talking avatar) keeps its box and says why Generate waits.
+    if (soonLine) return soonLine;
     const reading = makingAvailability(health?.engines?.[kind === "picture" ? "image" : "video"], ageBand ? { age_band: ageBand } : null);
     return reading.disabled ? reading.reason ?? MAKING_NOT_READY_LINE[kind] : undefined;
-  }, [health, ageBand]);
+  }, [health, ageBand, soonLine]);
   // ONE-COMPOSER-2026-11-13 (COMPOSER-03): a Create page's prompt bar draws the one composer with the hub's modes (read once, never polled).
-  const composerModes = useComposerModes();
   const composer = useMemo(() => composerHostFor(composerModes, location.pathname, navigate), [composerModes, location.pathname, navigate]);
   const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);

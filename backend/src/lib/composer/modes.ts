@@ -45,6 +45,8 @@ export interface ComposerModeRecord {
   /** The reading of the engine's health row at request time (null for chat). The web composer reads the live health query instead. */
   availability: "ready" | "starting" | "unavailable" | null;
   disabledReason: string | null;
+  /** A page whose route is not built yet: the one plain line its primary button shows while it stays disabled. Null for every working mode. */
+  comingSoon: string | null;
 }
 export interface ComposerModesResponse { band: AgeBand; modes: ComposerModeRecord[] }
 
@@ -53,12 +55,14 @@ interface Descriptor {
   gate: "pictures" | "videos" | "music"; tier_category?: TierCategory; tools?: ComposerTool[];
   presets?: { label?: string; source: "templates"; kind: "picture" | "video" };
   fallback?: { placeholder?: string; primary?: string };
+  /** The plain line that replaces the primary button's action while no backend route exists for this mode (never a dead control, never hidden). */
+  coming_soon?: string;
 }
 
 /** The Chat mode: the person's own chat, today's behaviour, always first. It belongs to no package. */
 const CHAT_MODE: ComposerModeRecord = {
   id: "ask", label: "Ask", icon: "message-circle", route: null, engine: null, placeholder: "Ask anything", references: [], chips: [], presets: null, tools: [],
-  primary: { label: "Send" }, quality: null, availability: null, disabledReason: null,
+  primary: { label: "Send" }, quality: null, availability: null, disabledReason: null, comingSoon: null,
 };
 
 function readDescriptors(packageId: string): Descriptor[] {
@@ -147,6 +151,7 @@ export async function composerModesFor(person: PersonRow): Promise<ComposerModes
         quality: d.tier_category ? qualityFor(person, band, d.tier_category, bar) : null,
         availability: row?.availability ?? null,
         disabledReason: row && row.availability !== "ready" && notice ? (band === "adult" ? notice.adult : band === "teen" ? notice.teen : notice.child) : null,
+        comingSoon: d.coming_soon ?? null,
       });
     }
   }

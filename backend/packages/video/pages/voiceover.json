@@ -4,15 +4,21 @@
   "title": "Voiceover",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "mic",
-      "text": "Record or make a voice for a video here. This page is coming soon.",
-      "action": {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "What should be said",
+      "placeholder": "Type what you want said.",
+      "prompt_state": "prompt",
+      "max_length": 1200,
+      "submit_label": "Make voice",
+      "starts": "video",
+      "submit": {
         "navigate": {
-          "to": "/apps/video/clips"
+          "to": "/apps/video/create"
         }
-      },
-      "action_label": "Open My clips"
+      }
     }
   ]
 }
