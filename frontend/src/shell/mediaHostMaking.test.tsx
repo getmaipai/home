@@ -42,8 +42,8 @@ describe("MediaHost.makingNotice", () => {
     const calls = mount({ video: PAUSED, image: READY }, "adult");
     await waitFor(() => expect(host!.makingNotice!("video")).toBe(notice.adult));
     expect(host!.makingNotice!("picture")).toBeUndefined();
-    // The notice itself asks for nothing; the only other requests are the person's Music sound settings (crossfade and Equalizer) and the list of songs kept offline.
-    expect(calls.every((url) => url.includes("/api/health") || url.includes("/api/settings") || url.includes("/api/plugins/audio/offline"))).toBe(true);
+    // The notice itself asks for nothing; the only other requests are the person's Music sound settings (crossfade and Equalizer) the list of songs kept offline and the composer modes (read once, never polled).
+    expect(calls.every((url) => url.includes("/api/health") || url.includes("/api/settings") || url.includes("/api/plugins/audio/offline") || url.includes("/api/composer/modes"))).toBe(true);
     expect(calls.filter((url) => url.includes("/api/health")).length).toBeGreaterThan(0);
   });
 

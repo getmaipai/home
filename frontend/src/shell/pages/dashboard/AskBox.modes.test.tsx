@@ -1,13 +1,15 @@
 // ONE-COMPOSER-2026-11-13 (COMPOSER-03): the Home ask box draws the modes the hub lists, keeps the chosen mode through to its Create page,
 // shows the engine's S6 line (from the live health query) disabled, and has no hard-coded mode list.
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { api } from "@/lib/api";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { COMPOSER_MODES_KEY, composerHref, type ComposerModesResponse } from "@/shell/composer/composerModes";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 
-afterEach(cleanup);
+const spies: Array<{ mockRestore: () => void }> = [];
+afterEach(() => { cleanup(); while (spies.length) spies.pop()!.mockRestore(); });
 
 const mode = (over: Partial<ComposerModesResponse["modes"][number]> & { id: string; label: string }): ComposerModesResponse["modes"][number] => ({
   icon: "image", route: null, engine: null, placeholder: "Ask anything", references: [], chips: [], presets: null, tools: [], primary: { label: "Send" }, quality: null, availability: null, disabledReason: null, ...over,
@@ -26,9 +28,11 @@ const child: ComposerModesResponse = { band: "child", modes: [ASK, PICTURE] };
 
 function Where() { const l = useLocation(); return <p data-testid="where">{l.pathname}{l.search}</p>; }
 function setup(response: ComposerModesResponse, health?: unknown) {
+  // The hub's answer comes through the same api call the page makes, so another test's stubbed fetch cannot replace it.
+  spies.push(spyOn(api, "composerModes").mockResolvedValue(response));
   const view = renderWithQueryClient(<MemoryRouter><AskBox /><Where /></MemoryRouter>);
   view.queryClient.setQueryData(COMPOSER_MODES_KEY, response);
-  if (health) view.queryClient.setQueryData(["health"], health);
+  if (health) { spies.push(spyOn(api, "health").mockResolvedValue(health as never)); view.queryClient.setQueryData(["health"], health); }
   return view;
 }
 
