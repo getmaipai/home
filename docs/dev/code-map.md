@@ -334,9 +334,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, createBody, CreatePage, MusicStudioPage |
-| `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, studioTracks, timeLabel, MusicStudioView |
+| `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, EFFECT_FAILED_LINE, NO_AUDIO_TOOL_LINE, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicVoiceCreate.tsx` | VoiceCreate |
-| `frontend/src/shell/pages/MusicWaveform.tsx` | usePeaks, peaksOf, Waveform |
 | `frontend/src/shell/pages/MusicWorkspacePage.tsx` | MAKES, STEMS_LINE, COVER_SONG_LINE, songAddress, studioAddress, stemsAddress |
 | `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
@@ -832,7 +831,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
 | `backend/src/lib/music/djLines.ts` | DJ_ANGLES, DJ_LINE_PROMPT, writeDjLine, synthesizeDjLine, saveDjLine, pruneDjLines |
-| `backend/src/lib/music/effects.ts` | EFFECT_CHANGES, isEffectChange, EQ_PRESETS, EQ_BANDS_HZ, EFFECT_LABELS, EFFECT_UNAVAILABLE_LINE |
+| `backend/src/lib/music/effects.ts` | EFFECT_CHANGES, isEffectChange, EQ_PRESETS, EQ_BANDS_HZ, EFFECT_LABELS, COMPRESSOR_BOUNDS |
+| `backend/src/lib/music/exportFormat.ts` | EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, EXPORT_FAILED_LINE, convertSong |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, resolveSongSource |
 | `backend/src/lib/music/libraryAlign.ts` | QUICK_WINDOW_S, QUICK_LEAD_S, INSTANT_MATCH_S, RETRY_AFTER_MS, LIBRARY_ALIGN_MAX_BYTES, __setLibraryAlignPollMsForTests |
 | `backend/src/lib/music/lock.ts` | musicJobLockItem, musicJobLockState, musicRowIsLocked, lockedMusicTile, LOCKED_MUSIC_START_LINE, LOCKED_MUSIC_RESULT_TEXT |

@@ -113369,12 +113369,17 @@
                         "min_seconds",
                         "max_seconds"
                       ]
+                    },
+                    "file_effects": {
+                      "type": "boolean",
+                      "description": "Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need."
                     }
                   },
                   "required": [
                     "can_make",
                     "engine_ready",
-                    "limits"
+                    "limits",
+                    "file_effects"
                   ]
                 }
               }
@@ -121071,6 +121076,655 @@
           },
           "422": {
             "description": "The requested edit cannot be made."
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}/effect": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Make a new version of the song with a sound effect",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "change": {
+                    "type": "string",
+                    "enum": [
+                      "gain",
+                      "reverse",
+                      "speed",
+                      "pitch",
+                      "remove_silence",
+                      "limit",
+                      "echo",
+                      "reverb",
+                      "eq",
+                      "denoise",
+                      "compress"
+                    ]
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "preset": {
+                    "type": "string",
+                    "enum": [
+                      "bass_boost",
+                      "treble_boost",
+                      "vocal_clarity",
+                      "warm"
+                    ]
+                  },
+                  "bands": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "maxItems": 6
+                  },
+                  "compressor": {
+                    "type": "object",
+                    "properties": {
+                      "threshold_db": {
+                        "type": "number"
+                      },
+                      "ratio": {
+                        "type": "number"
+                      },
+                      "attack_ms": {
+                        "type": "number"
+                      },
+                      "release_ms": {
+                        "type": "number"
+                      },
+                      "makeup_db": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "from_s": {
+                    "type": "number"
+                  },
+                  "to_s": {
+                    "type": "number"
+                  },
+                  "file_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "change"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The card with a new version coming.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "conversation_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "made_from_file": {
+                          "type": "boolean"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "done",
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "stage": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "stage_label": {
+                          "type": "string"
+                        },
+                        "task": {
+                          "type": "string"
+                        },
+                        "sound": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "loop": {
+                              "type": "boolean"
+                            },
+                            "surprise": {
+                              "type": "boolean"
+                            },
+                            "looped": {
+                              "type": "boolean",
+                              "description": "False when this computer had no audio tool to make the loop seamless."
+                            },
+                            "trimTo": {
+                              "type": "number"
+                            },
+                            "trimmed": {
+                              "type": "boolean",
+                              "description": "False when this computer had no audio tool to cut the sound to the length asked."
+                            },
+                            "takes": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "group": {
+                                  "type": "string"
+                                },
+                                "index": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "group",
+                                "index",
+                                "total"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "loop",
+                            "surprise"
+                          ]
+                        },
+                        "fit_ask": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "job_id": {
+                              "type": "string"
+                            },
+                            "picked": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "actual": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "job_id",
+                            "picked",
+                            "actual"
+                          ],
+                          "description": "Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."
+                        },
+                        "cut": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "asked",
+                            "ceiling",
+                            null
+                          ]
+                        },
+                        "max_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "eta_seconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "position": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "error_line": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "stages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ]
+                          }
+                        },
+                        "stage_index": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "started_at": {
+                          "type": "number"
+                        },
+                        "making_version": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "stage_label": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "number"
+                            },
+                            "eta_seconds": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "position": {
+                              "type": "number",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "stage_label",
+                            "progress",
+                            "eta_seconds",
+                            "position"
+                          ]
+                        },
+                        "cover_pending": {
+                          "type": "boolean"
+                        },
+                        "cover_url": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "cover_versions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "url"
+                            ]
+                          }
+                        },
+                        "timed_lyrics": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "t": {
+                                "type": "number"
+                              },
+                              "line": {
+                                "type": "string"
+                              },
+                              "section": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "secondary": {
+                                "type": "string"
+                              },
+                              "words": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "t": {
+                                      "type": "number"
+                                    },
+                                    "end": {
+                                      "type": "number"
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "t",
+                                    "end",
+                                    "text"
+                                  ]
+                                },
+                                "description": "Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing."
+                              }
+                            },
+                            "required": [
+                              "t",
+                              "line",
+                              "section"
+                            ]
+                          }
+                        },
+                        "versions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label",
+                              "url"
+                            ]
+                          }
+                        },
+                        "current_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "length": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "full"
+                          ]
+                        },
+                        "quality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "detailed",
+                            "max"
+                          ]
+                        },
+                        "boost_offered": {
+                          "type": "boolean"
+                        },
+                        "max_offered": {
+                          "type": "boolean",
+                          "description": "Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."
+                        },
+                        "max_installed": {
+                          "type": "boolean",
+                          "description": "Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."
+                        },
+                        "title": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "lyrics": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "duration_s": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "state",
+                        "stage",
+                        "stage_label",
+                        "task",
+                        "sound",
+                        "fit_ask",
+                        "cut",
+                        "max_seconds",
+                        "progress",
+                        "eta_seconds",
+                        "position",
+                        "error_line",
+                        "stages",
+                        "stage_index",
+                        "started_at",
+                        "making_version",
+                        "cover_pending",
+                        "cover_url",
+                        "cover_versions",
+                        "timed_lyrics",
+                        "versions",
+                        "current_id",
+                        "length",
+                        "quality",
+                        "boost_offered",
+                        "max_offered",
+                        "max_installed",
+                        "title",
+                        "description",
+                        "lyrics",
+                        "duration_s"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "locked": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "making": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "locked",
+                        "making"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The change is out of range."
+          },
+          "423": {
+            "description": "The song is locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No audio tool on this computer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/files/{fileId}/as/{format}": {
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Download a song as wav or flac",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wav",
+                "flac"
+              ]
+            },
+            "required": true,
+            "name": "format",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audio bytes.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No audio tool on this computer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

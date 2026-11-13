@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T14:59:02.831Z",
+  "generatedAt": "2026-11-13T15:29:17.456Z",
   "kitTag": "ui-v0.5.636",
   "items": [
     {
@@ -2069,7 +2069,7 @@
       "group": "track",
       "verdict": "later",
       "verdictReason": "The kit's TrackStudio (VIDEO-STUDIO-04, the studio app-page node); the Videos studio work binds it, nothing in Home draws it yet.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "typing-indicator.tsx",
