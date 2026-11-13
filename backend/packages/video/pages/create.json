@@ -219,6 +219,51 @@
               }
             },
             {
+              "label": "Make clearer: Quick",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/clearer",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "level": "quick"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Make clearer: Better",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/clearer",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "level": "better"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Make clearer: Best",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/clearer",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "level": "best"
+                  }
+                }
+              }
+            },
+            {
               "label": "Spatial sound",
               "icon": "headphones",
               "starts": "video",

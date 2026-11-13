@@ -656,7 +656,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
 | `backend/src/lib/imageApp.ts` | imageAppData |
-| `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, __setImageToolsForTests |
+| `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, BEST_NEEDS_DOWNLOAD |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
 | `backend/src/lib/imageSimilarity/fingerprint.ts` | FINGERPRINT_VERSION, hamming, fingerprint, hashDistance |
 | `backend/src/lib/imageSimilarity/geometry.ts` | MIN_INLIERS, MIN_AGREEMENT, __setOpencvLoaderForTests, warmGeometry, geometricFeatures, verifyPair |
@@ -819,8 +819,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
+| `backend/src/lib/mediaOps/clearerLevels.ts` | CLEARER_LEVELS, CLEARER_VIDEO_LEVELS |
 | `backend/src/lib/mediaOps/http.ts` | MediaOpRequest, withAttachments, startLibraryOp |
-| `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
+| `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP, VIDEO_CLEARER_OP |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, getMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob |
 | `backend/src/lib/mediaOps/studio.ts` | PICTURES_NOT_READY_LINE, STUDIO_SAVED_LOCKED_NOTE, studioRows, studioOperationRows, studioPickerRows, pngBase64 |
 | `backend/src/lib/mediaOps/studioReference.ts` | REFERENCE_UNSUPPORTED_LINE, studioReference |
@@ -1280,6 +1281,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
 | `backend/src/lib/videos/beatCut.ts` | planBeatCut |
 | `backend/src/lib/videos/chapters.ts` | chaptersForMadeClip |
+| `backend/src/lib/videos/clearerLevels.ts` | STACK_HAS_VIDEO_RESTORE, videoClearerLevels |
 | `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen |
 | `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |

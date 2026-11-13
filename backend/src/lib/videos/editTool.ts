@@ -31,7 +31,7 @@ import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
 import { storedFilmCredits } from "@/lib/creations/credits";
-import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
+import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, quickClearerOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { RESTYLE_FAILURE_COPY, SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
@@ -49,6 +49,7 @@ import { setPendingMix, startMusicBed, takePendingMix, whenMusicDone } from "@/l
 import { musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { planBeatCut } from "./beatCut";
+import { videoClearerLevels } from "./clearerLevels";
 
 export const EDIT_VIDEO_TOOL_ID = "edit_video";
 
@@ -65,6 +66,8 @@ export const editVideoArgs = z.object({
   /** SPATIAL-07: with `spatial_sound`, force the sound to one side of the picture (an override; left out, the Stack decides). */
   side: z.enum(["left", "right"]).optional(),
   effect: z.enum(["speed_ramp", "reverse", "freeze", "loop", "fps_boost", "flip", "rotate", "sharpen", "denoise", "pip", "kenburns", "ripple"]).optional(),
+  /** MAKE-CLEARER-01, with `upscale` only: quick (less grain, sharper, same size), better (the AI upscaler, twice the size; the default) or best (AI restore, when the Stack has it). */
+  clarity: z.enum(["quick", "better", "best"]).optional(),
   amount: z.number().min(0).max(1.5).optional(), deblock: z.boolean().optional(), times: z.number().int().min(2).max(6).optional(), fps: z.union([z.literal(30), z.literal(48), z.literal(60)]).optional(),
   direction: z.enum(["horizontal", "vertical"]).optional(), degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).optional(), from_factor: z.number().min(0.25).max(4).optional(), to_factor: z.number().min(0.25).max(4).optional(),
   at_s: z.number().min(0).max(600).optional(), over_s: z.number().min(0.3).max(10).optional(), hold_s: z.number().min(0.5).max(5).optional(), corner: z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]).optional(), size: z.number().min(0.15).max(0.5).optional(), with_clip: z.string().trim().min(1).max(80).optional(),
@@ -130,7 +133,8 @@ export const editVideoArgs = z.object({
     if (value.restyle !== undefined) ctx.addIssue({ code: "custom", path: ["restyle"], message: "A style is only for restyle." });
     if (value.words !== undefined) ctx.addIssue({ code: "custom", path: ["words"], message: "Words are only for restyle." });
   }
-  if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip." });
+  if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change" && key !== "clarity") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip and a clarity." });
+  if (value.change !== "upscale" && value.clarity !== undefined) ctx.addIssue({ code: "custom", path: ["clarity"], message: "Clarity is only for upscale." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
 });
 
@@ -564,7 +568,12 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   if (files.some((file) => file === null)) return refused(callId, args, NO_CLIP_LINE, "no_clip");
   const clipFiles = files as EditFile[];
   const seconds = first.files[0]?.seconds ?? null;
+  const clarity = value.clarity ?? "better";
   if (value.change === "upscale") {
+    const level = (await videoClearerLevels(actor))[clarity];
+    if (!level.enabled) return refused(callId, args, level.reason ?? "That level isn't available yet.", "clarity_unavailable");
+  }
+  if (value.change === "upscale" && clarity === "better") {
     if (seconds !== null && seconds > 60) return refused(callId, args, "Sharpening works on clips up to a minute. Trim it first.", "upscale_too_long");
     if ((first.files[0]?.width ?? 0) >= 2048) return refused(callId, args, "This clip is already large; sharpening would make a very big file.", "upscale_too_wide");
   }
@@ -582,7 +591,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
   const marks: MarkSource[] = await Promise.all(sources.map(clipMarkOf));
   let describe: string;
   if (value.change === "upscale") {
-    inputs = [clipFiles[0]!]; ops = upscaleOps(); describe = "sharpened and doubled in size";
+    inputs = [clipFiles[0]!]; ops = clarity === "quick" ? quickClearerOps() : upscaleOps(); describe = clarity === "quick" ? "cleaned up and sharpened" : "sharpened and doubled in size";
   } else if (value.change === "spatial_sound") {
     // SPATIAL-04: a clip with no sound of its own has nothing to place; the Stack would refuse it, so the answer is the same plain line without a job.
     if (first.files[0]?.audio !== true) return refused(callId, args, SPATIAL_NO_SOUND_LINE, "no_audio");
@@ -757,12 +766,12 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     return { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms, ...spatial } };
   };
   const mark = newItemMark(marks, false);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? "sharpening" : value.change === "remove_background" ? "cutting out the subject" : value.change === "spatial_sound" ? "placing the sound" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? (clarity === "quick" ? "cleaning up" : "sharpening") : value.change === "remove_background" ? "cutting out the subject" : value.change === "spatial_sound" ? "placing the sound" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: value.change === "upscale" ? `A new sharper, twice-size version is being made; the first one is kept. It takes about ${Math.max(2, Math.ceil((seconds ?? 0) / 5) * 2)} minutes. The video card shows progress.` : value.change === "remove_background" ? `A new version with the background removed is being made; the first one is kept. It takes about ${Math.max(1, Math.ceil((seconds ?? 0) / 10))} minute${Math.max(1, Math.ceil((seconds ?? 0) / 10)) === 1 ? "" : "s"}. The video card shows progress.` : `A new version of the video (${describe}) is being made; the first one is kept. It takes under a minute and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way.` },
+      reply: { text: value.change === "upscale" && clarity === "quick" ? "A new cleaner, sharper version is being made at the same size; the first one is kept. It takes under a minute. The video card shows progress." : value.change === "upscale" ? `A new sharper, twice-size version is being made; the first one is kept. It takes about ${Math.max(2, Math.ceil((seconds ?? 0) / 5) * 2)} minutes. The video card shows progress.` : value.change === "remove_background" ? `A new version with the background removed is being made; the first one is kept. It takes about ${Math.max(1, Math.ceil((seconds ?? 0) / 10))} minute${Math.max(1, Math.ceil((seconds ?? 0) / 10)) === 1 ? "" : "s"}. The video card shows progress.` : `A new version of the video (${describe}) is being made; the first one is kept. It takes under a minute and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way.` },
       data: { videoJobId: started.job.id },
       actions: [],
     },

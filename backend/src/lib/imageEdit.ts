@@ -56,7 +56,7 @@ export class ImageEditError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 423 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
 }
 
-export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip"] as const;
+export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip", "clearer"] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
 /** The change a Comment asks for in words (the Stack's generative edit, IMGGEN-EDITOR-01). */
 export type AnyEditOp = EditOperation | "comment";
@@ -76,13 +76,18 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 
 // ---------------------------------------------------------------- tools status
 
+/** MAKE-CLEARER-01: the three levels of Make clearer. Quick is local pixel work, Better the AI upscaler, Best the AI restore. */
+export type ClearerLevel = "quick" | "better" | "best";
+export const BEST_NEEDS_DOWNLOAD = "Best quality needs an extra download. An admin can add it in Settings, AI & models.";
 export interface EditToolState { enabled: boolean; reason?: string }
-export type EditToolKey = "markup" | "comment" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
+export type EditToolKey = "markup" | "comment" | "clearer" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
   state: "ready" | "preparing" | "not_installed" | "unavailable" | "off";
   /** One plain line for the editor to show, or null when everything is ready. */
   note: string | null;
   tools: Record<EditToolKey, EditToolState>;
+  /** MAKE-CLEARER-01: each level of Make clearer, so a level that is not ready is drawn off with its reason (Quick runs here, so it needs no engine). */
+  clearer: Record<ClearerLevel, EditToolState>;
   /** Megapixels each Stack tool accepts, for wording a refusal before it happens. */
   limits: Record<string, number>;
 }
@@ -108,13 +113,13 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
-  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, rotate: { enabled: false, reason }, flip: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
+  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, clearer: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, rotate: { enabled: false, reason }, flip: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
-  if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
+  if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), clearer: { quick: { enabled: false, reason: PICTURES_OFF_REASON }, better: { enabled: false, reason: PICTURES_OFF_REASON }, best: { enabled: false, reason: PICTURES_OFF_REASON } }, limits: {} };
   const comment: EditToolState = await commentState(actor);
-  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment, crop: { enabled: true }, adjust: { enabled: true }, rotate: { enabled: true }, flip: { enabled: true } }, limits: {} });
+  const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment, clearer: { enabled: true }, crop: { enabled: true }, adjust: { enabled: true }, rotate: { enabled: true }, flip: { enabled: true } }, clearer: { quick: { enabled: true }, better: { enabled: false, reason: note }, best: { enabled: false, reason: BEST_NEEDS_DOWNLOAD } }, limits: {} });
   if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't set up on this computer yet. Ask an admin to set them up.", "unavailable");
   let status: StackImageToolsStatus | null;
   try {
@@ -140,6 +145,7 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
   const tools: Record<EditToolKey, EditToolState> = {
     markup: { enabled: true },
     comment,
+    clearer: { enabled: true },
     remove_background: needs("isnet", status.vision, "The background remover"),
     erase: needs("lama", false, "The eraser"),
     resize: preparing ? { enabled: false, reason: prepareReason } : { enabled: true },
@@ -151,9 +157,11 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     find_people: needs("vision", status.vision, "The people finder"),
     find_subjects: status.operations?.includes("find_subjects") ? { enabled: true } : needs("vision", status.vision, "The people finder"),
   };
-  if (preparing) return { state: "preparing", note: status.phase ? `Getting the editing tools ready (${status.phase}).` : "Getting the editing tools ready.", tools, limits };
-  if (status.state === "needs-setup") return { state: "ready", note: "The first edit takes a few minutes while the editing tools get ready.", tools, limits };
-  return { state: "ready", note: null, tools, limits };
+  // MAKE-CLEARER-01: Quick runs in Home. Better is the upscaler (ready when Resize is). Best is the AI restore: ready only when the Stack lists it.
+  const clearer: Record<ClearerLevel, EditToolState> = { quick: { enabled: true }, better: tools.resize, best: status.operations?.includes("restore") && !preparing ? { enabled: true } : { enabled: false, reason: preparing ? prepareReason : BEST_NEEDS_DOWNLOAD } };
+  if (preparing) return { state: "preparing", note: status.phase ? `Getting the editing tools ready (${status.phase}).` : "Getting the editing tools ready.", tools, clearer, limits };
+  if (status.state === "needs-setup") return { state: "ready", note: "The first edit takes a few minutes while the editing tools get ready.", tools, clearer, limits };
+  return { state: "ready", note: null, tools, clearer, limits };
 }
 
 // ---------------------------------------------------------------- sources and versions
@@ -181,7 +189,8 @@ export interface SourcePicture {
  * Owner decision (Jesse, 2026-11-13): a feature that makes no content has no age gate, and these make none. A simple local pixel edit of a picture with no audience
  * label that the Adult lock does not cover (no lock item, for example an upload) is saved with that same state (no label, lock off), so it is visible to exactly who
  * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale), resize (it runs on the engine, not here)
- * and any operation not listed here locks as before (fail closed). Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
+ * and any operation not listed here locks as before (fail closed). Make clearer at its Quick level (a median denoise and an unsharp mask in Home) joins the list only
+ * when the result has the same pixel size as the source (`simpleLocal`); Quick with a larger size, Better and Best are model or enlarging edits and lock as before. Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
  * otherwise it would be a way around that switch.
  */
 const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "markup"]);
@@ -314,7 +323,7 @@ export function readPicture(actor: PersonRow, conversationId: string, id: string
 }
 
 /** Writes a PNG as the next version of `source`'s chain. The bytes are re-encoded here (metadata dropped), never trusted as sent. */
-export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number }): Promise<PictureVersion> {
+export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; /** The edit ran in Home, added nothing and kept the picture size (Make clearer, Quick): it carries the source's state like the simple edits. */ simpleLocal?: boolean }): Promise<PictureVersion> {
   let clean: Buffer;
   let info: OutputInfo;
   try {
@@ -329,7 +338,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
   // A simple local edit (no new content) of a picture with no audience label that the Adult lock does not cover (an upload, or an earlier such edit) carries the
   // source's own state: no audience label and lock off, so exactly the people who can see the source see the result. Nothing is raised or lowered. Everything else,
   // and any result the caller marks adult-only, goes through newItemMark as before.
-  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
+  const carries = (SIMPLE_LOCAL_OPS.has(meta.op) || meta.simpleLocal === true) && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
   const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
   const creationId = newCreationId();
@@ -357,7 +366,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 // ---------------------------------------------------------------- running a Stack edit
 
-interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
+interface Preview { simpleLocal?: boolean; token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
 interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
 const jobs = new Map<string, EditJob>();
@@ -369,7 +378,7 @@ const jobs = new Map<string, EditJob>();
  */
 export const EDIT_JOB_KIND = "picture_edit";
 const homeRows = new Map<string, string>();
-const EDIT_TITLES: Record<AnyEditOp, string> = { comment: "Changing a picture", erase: "Erasing from a picture", remove_background: "Removing a background", blur_background: "Blurring a background", upscale: "Enlarging a picture", resize: "Resizing a picture", crop: "Cropping a picture", adjust: "Adjusting a picture", rotate: "Turning a picture", flip: "Flipping a picture" };
+const EDIT_TITLES: Record<AnyEditOp, string> = { comment: "Changing a picture", erase: "Erasing from a picture", remove_background: "Removing a background", blur_background: "Blurring a background", upscale: "Enlarging a picture", clearer: "Making a picture clearer", resize: "Resizing a picture", crop: "Cropping a picture", adjust: "Adjusting a picture", rotate: "Turning a picture", flip: "Flipping a picture" };
 function openEditRow(actor: PersonRow, source: SourcePicture, jobId: string, op: AnyEditOp, adultOnly: boolean): void {
   if (adultOnly || source.adultMark?.madeAudience === "adult-only") return;
   const id = `image-edit:${jobId}`;
@@ -397,12 +406,12 @@ function sweep(now = Date.now()): void {
   for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) { jobs.delete(id); trackEdit(id, { state: "failed", errorKind: "expired", waitingReason: "This edit stopped waiting. Start it again." }); }
 }
 
-function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only" }): PreviewInfo {
+function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only"; simpleLocal?: boolean }): PreviewInfo {
   sweep();
   const mine = [...previews.values()].filter((value) => value.personId === actor.id).sort((a, b) => a.createdAt - b.createdAt);
   for (const old of mine.slice(0, Math.max(0, mine.length - (PREVIEWS_PER_PERSON - 1)))) previews.delete(old.token);
   const token = `prev-${randomBytes(12).toString("hex")}`;
-  previews.set(token, { token, personId: actor.id, png, width: item.width, height: item.height, op, audience: item.audience, engine: item.engine, model: item.model, ms: item.ms, sourceId: source.id, conversationId: source.conversationId, createdAt: Date.now(),  });
+  previews.set(token, { token, ...(item.simpleLocal ? { simpleLocal: true } : {}), personId: actor.id, png, width: item.width, height: item.height, op, audience: item.audience, engine: item.engine, model: item.model, ms: item.ms, sourceId: source.id, conversationId: source.conversationId, createdAt: Date.now(),  });
   return { token, url: `/api/${source.conversationId === LIBRARY_SOURCE ? "media-ops" : "image-edit"}/previews/${token}`, width: item.width, height: item.height, operation: op, engine: item.engine ?? null, model: item.model ?? null, ms: item.ms ?? null, transparent: op === "remove_background" };
 }
 
@@ -424,7 +433,7 @@ export function editErrorFrom(error: unknown): ImageEditError {
   return new ImageEditError(500, "The edit could not be finished. Try again.", "failed");
 }
 
-export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical"; /** A crop in the Studio: turn and mirror first, then cut (one preview, one Apply). */ rotate?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean }
+export interface StartEditInput { operation: EditOperation; mask?: Uint8Array; people?: string; subjects?: string; scale?: number; width?: number; height?: number; factor?: number; x?: number; y?: number; aspect?: "1:1" | "4:3" | "3:2" | "16:9" | "9:16"; brightness?: number; contrast?: number; saturation?: number; warmth?: number; auto?: boolean; radius?: number; degrees?: 90 | 180 | 270; direction?: "horizontal" | "vertical"; /** A crop in the Studio: turn and mirror first, then cut (one preview, one Apply). */ rotate?: 0 | 90 | 180 | 270; flipHorizontal?: boolean; flipVertical?: boolean; /** Make clearer: the level (Quick, Better or Best) and how much larger (Quick 1, 1.5 or 2; Better 2 or 4). */ level?: ClearerLevel; size?: number }
 
 /**
  * Auto tone: one gain and offset for all channels (no colour shift) that stretches the 1st to 99th percentile of brightness onto 6..249, so the darkest pixels
@@ -510,6 +519,33 @@ export async function processLocalPicture(bytes: Uint8Array, input: StartEditInp
   return { png: new Uint8Array(data), width: info.width, height: info.height };
 }
 
+/**
+ * MAKE-CLEARER-01, Quick: less noise and sharper edges, in Home, in seconds. A 3x3 median takes out grain without smearing edges the way a blur does, then (after the
+ * optional Lanczos enlarge) an unsharp mask that leaves flat areas alone (`m1: 0`) so the noise that is left is not sharpened too. Nothing is added to the picture.
+ * `size` 1 keeps the pixel size; 1.5 and 2 enlarge it. The output is a PNG with no metadata and the phone's upright view baked in.
+ */
+export async function processClearerQuick(bytes: Uint8Array, size = 1): Promise<{ png: Uint8Array; width: number; height: number }> {
+  if (!(size === 1 || size === 1.5 || size === 2)) throw new ImageEditError(422, "Quick can keep the size, or make it 1.5 or 2 times bigger.", "bad_size");
+  const open = () => sharp(bytes, { limitInputPixels: MAX_SAVED_PIXELS, failOn: "error" }).rotate();
+  let cleaned: { data: Buffer; info: OutputInfo };
+  try { cleaned = await open().median(3).raw().toBuffer({ resolveWithObject: true }); }
+  catch { throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image"); }
+  const { width: sourceWidth, height: sourceHeight, channels } = cleaned.info;
+  const width = Math.round(sourceWidth * size);
+  const height = Math.round(sourceHeight * size);
+  if (width * height > MAX_SAVED_PIXELS) throw new ImageEditError(422, "That would be too big. Try keeping the size, or pick a smaller picture.", "too_large");
+  let pipeline = sharp(cleaned.data, { raw: { width: sourceWidth, height: sourceHeight, channels } });
+  if (size !== 1) pipeline = pipeline.resize(width, height, { kernel: "lanczos3" });
+  const { data, info } = await pipeline.sharpen({ sigma: size === 1 ? 1.4 : 1.8, m1: 0, m2: 4 }).png().toBuffer({ resolveWithObject: true });
+  return { png: new Uint8Array(data), width: info.width, height: info.height };
+}
+
+/** The size a picture shows at once its phone orientation is applied (a tag of 5 to 8 turns it a quarter). */
+function uprightSize(meta: { width?: number; height?: number; orientation?: number }): { width: number; height: number } {
+  const swap = (meta.orientation ?? 1) >= 5;
+  return swap ? { width: meta.height ?? 0, height: meta.width ?? 0 } : { width: meta.width ?? 0, height: meta.height ?? 0 };
+}
+
 /** Composite a supplied transparent cutout over a blurred copy of its source. */
 export async function processBackgroundBlur(bytes: Uint8Array, mattePng: Uint8Array, radius: number): Promise<{ png: Uint8Array; width: number; height: number }> {
   const metadata = await sharp(bytes).metadata();
@@ -529,6 +565,19 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   if (input.operation === "erase" && !input.mask?.byteLength && !input.people && !input.subjects) throw new ImageEditError(422, "Paint over what you want gone, then press Erase.", "mask_empty");
   if (input.operation === "erase" && Number(Boolean(input.mask?.byteLength)) + Number(Boolean(input.people)) + Number(Boolean(input.subjects)) > 1) throw new ImageEditError(422, "Choose exactly one area to erase.", "erase_target_conflict");
   const status = await editToolsStatus(actor);
+  if (input.operation === "clearer") {
+    // MAKE-CLEARER-01: one operation, three levels. Quick runs here; Better and Best go to the Stack's tools below, as an ordinary upscale or restore.
+    const level = input.level ?? "quick";
+    const state = status.clearer[level];
+    if (!state.enabled) throw new ImageEditError(503, state.reason ?? status.note ?? "This level isn't available yet.", "unavailable");
+    if (level === "quick") {
+      const quick = await processClearerQuick(source.bytes, input.size ?? 1);
+      // Owner decision (Jesse, 2026-11-13): Quick makes no content, so it is a simple local edit like Adjust, but only while the size is unchanged; any enlarging is an engine-style edit and locks as before.
+      const was = uprightSize(await sharp(source.bytes, { limitInputPixels: MAX_SAVED_PIXELS }).metadata());
+      return { state: "done", preview: keepPreview(actor, source, "clearer", quick.png, { ...quick, simpleLocal: quick.width === was.width && quick.height === was.height }) };
+    }
+    input = { ...input, scale: level === "better" ? (input.size === 4 ? 4 : 2) : undefined };
+  }
   const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" || input.operation === "rotate" || input.operation === "flip" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
   if (input.operation === "crop" || input.operation === "adjust" || input.operation === "blur_background" || input.operation === "rotate" || input.operation === "flip") {
@@ -543,7 +592,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
     return { state: "done", preview: keepPreview(actor, source, input.operation, png, { width, height }) };
   }
   try {
-    const operation = input.operation === "erase" && input.subjects ? "erase_subjects" : input.operation === "erase" && input.people ? "erase_people" : input.operation;
+    const operation = input.operation === "clearer" ? (input.level === "best" ? "restore" : "upscale") : input.operation === "erase" && input.subjects ? "erase_subjects" : input.operation === "erase" && input.people ? "erase_people" : input.operation;
     let reply: Awaited<ReturnType<typeof submitImageTool>>;
     if (input.people || input.subjects) {
       const form = new FormData();
@@ -570,7 +619,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   }
 }
 
-const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", rotate: "Turning", flip: "Flipping", comment: "Making your change" };
+const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", clearer: "Making it clearer", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", rotate: "Turning", flip: "Flipping", comment: "Making your change" };
 
 /** The state of a running edit; the first poll that sees it finished takes the PNG from the Stack and keeps it as a preview. */
 export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditProgress> {
@@ -657,8 +706,8 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
-  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
-  const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms });
+  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", clearer: "Made clearer", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
+  const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms, simpleLocal: preview.simpleLocal });
   previews.delete(token);
   return version;
 }

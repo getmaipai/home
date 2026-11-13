@@ -61,6 +61,9 @@ export const MAX_EDIT_OPS = 12;
 export const MAX_EDIT_SECONDS = 600;
 export function reframeOps(aspect: VideoAspect, fill: "crop" | "blur" = "crop"): EditOp[] { return [{ op: "reframe", aspect, fill }]; }
 export function upscaleOps(): EditOp[] { return [{ op: "upscale", factor: 2 }]; }
+/** MAKE-CLEARER-01, Quick: the Stack's own `denoise` then `sharpen` steps (ffmpeg hqdn3d and unsharp), one edit, same size. Mild on purpose: nothing is added to the picture. */
+export const QUICK_CLEARER = { denoise: 0.5, sharpen: 0.7 } as const;
+export function quickClearerOps(): EditOp[] { return [{ op: "denoise", amount: QUICK_CLEARER.denoise }, { op: "sharpen", amount: QUICK_CLEARER.sharpen }]; }
 export type CutoutBackground = "black" | "white" | "green" | "blur" | "transparent" | `#${string}`;
 export function cutoutOps(background: CutoutBackground): EditOp[] { return [{ op: "cutout", background }]; }
 export function gradeOps(values: GradeValues): EditOp[] { return [{ op: "grade", ...values }]; }

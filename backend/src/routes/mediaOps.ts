@@ -26,6 +26,7 @@ const OperationSchema = z.object({
   input: z.enum(["picture", "video", "audio"]), output: z.enum(["picture", "video", "audio", "data"]),
   controls: z.array(z.record(z.string(), z.unknown())).describe("What to draw for each argument: a mask, a number (min and max), a choice (options) or words."),
   params: z.record(z.string(), z.unknown()).describe("The arguments as a JSON Schema, for building the call."),
+  levels: z.array(z.object({ id: z.string(), label: z.string(), summary: z.string(), eta: z.string(), enabled: z.boolean(), reason: z.string().optional() })).optional().describe("Operations with levels (Make clearer): each level's one-line description, time estimate and whether it can run now, with the reason when it cannot."),
   enabled: z.boolean(), reason: z.string().optional().describe("When not enabled: one plain line saying why and what to do."),
 });
 const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Pictures are off for this profile", 404: "Picture unavailable", 409: "Cancelled", 413: "Picture too large", 422: "The edit cannot be done", 423: "The picture is locked", 502: "The editing tools failed", 503: "The editing tools are not available" });
@@ -48,6 +49,7 @@ export async function describeOperations(actor: PersonRow, query: { input?: "pic
       id: operation.id, label: operation.label, summary: operation.summary, input: operation.input, output: operation.output,
       controls: operation.controls.map((control) => ({ ...control })),
       params: z.toJSONSchema(operation.args, { unrepresentable: "any", io: "input" }) as Record<string, unknown>,
+      ...("levels" in operation && operation.levels ? { levels: operation.levels.map((level) => ({ ...level, ...(blocked ? { enabled: false, reason: blocked.message } : {}) })) } : {}),
       enabled: blocked ? false : operation.enabled,
       ...(blocked ? { reason: blocked.message } : operation.reason ? { reason: operation.reason } : {}),
     })),

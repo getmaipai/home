@@ -81,7 +81,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "remix, continue, retake: full new description; quoted lines, one speaker at a time."
+        "description": "remix, continue, retake: full new description; quoted lines."
       },
       "look": {
         "type": "string",
@@ -180,7 +180,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "mix, cut_to_beat: a song's music job id or Library file id, or latest (newest finished here). Locked or unfinished is refused; say so."
+        "description": "mix, cut_to_beat: a song's job id or Library file id, or latest."
       },
       "make_music": {
         "type": "string",
@@ -537,6 +537,15 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false
+      },
+      "clarity": {
+        "type": "string",
+        "enum": [
+          "quick",
+          "better",
+          "best"
+        ],
+        "description": "upscale only."
       }
     }
   },

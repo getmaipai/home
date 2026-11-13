@@ -4,13 +4,14 @@ import { roleHealth } from "@/lib/roleHealth";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { kidLaneOn } from "@/lib/pictures/lane";
-import type { MediaOp, MediaKind, MediaRef } from "./types";
+import type { MediaOp, MediaKind, MediaLevel, MediaRef } from "./types";
 import type { PersonRow } from "@/types";
 const ops = new Map<string, MediaOp>();
 let loadedPictures = false;
 async function ensureRegistered() {
  if (!loadedPictures) {
   await import("./picture");
+  await import("./video");
   loadedPictures = true;
  }
 }
@@ -37,9 +38,18 @@ function bandAllowed(actor: PersonRow, min: MediaOp["minBand"]): boolean {
  return rank[speakerAgeBand(actor, new Date())] >= rank[min];
 }
 
-async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boolean; reason?: string }> {
+type LevelState = { enabled: boolean; reason?: string };
+/** A level as listed: its words and whether it can run now (with the reason when it cannot). */
+export type ListedLevel = MediaLevel & LevelState;
+/** MAKE-CLEARER-01: the operation is ready when its first level is; each level also says whether it is, with the reason when it is not. */
+async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boolean; reason?: string; levels?: Record<string, LevelState> }> {
  if (!bandAllowed(actor, op.minBand)) {
   return { ready: false, reason: "This operation isn't available for this profile." };
+ }
+ if (op.input === "video") {
+  const { videoClearerLevels } = await import("@/lib/videos/clearerLevels");
+  const levels = await videoClearerLevels(actor);
+  return { ready: levels.quick.enabled, ...(levels.quick.enabled ? {} : { reason: levels.quick.reason }), levels };
  }
  if (op.needs === "image") {
   const health = await roleHealth("image");
@@ -49,6 +59,10 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
   return comment.enabled ? { ready: true } : { ready: false, reason: comment.reason ?? "Picture creation isn't available for this profile." };
  }
  const status = await editToolsStatus(actor);
+ if (op.id === "picture.make_clearer") {
+  const { clearer } = status;
+  return { ready: clearer.quick.enabled, ...(clearer.quick.enabled ? {} : { reason: clearer.quick.reason ?? status.note ?? "This operation isn't available yet." }), levels: clearer };
+ }
  const key = op.id === "picture.upscale"
   ? "resize"
   : op.id === "picture.locate"
@@ -59,21 +73,22 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
 }
 export async function listMediaOps(actor: PersonRow, filter: { input?: MediaKind; output?: MediaKind; includeHelpers?: boolean } = {}) {
  await ensureRegistered();
- if (!photoUploadsAllowed(actor) && !(laneOfPerson(actor) === "child" && kidLaneOn(actor))) return [];
+ const pictureOk = photoUploadsAllowed(actor) || (laneOfPerson(actor) === "child" && kidLaneOn(actor));
+ if (!pictureOk && filter.input !== "video") return [];
  const visible = [...ops.values()].filter((op) =>
   (filter.includeHelpers || op.listed !== false) &&
-  (!filter.input || op.input === filter.input) &&
+  (!filter.input || op.input === filter.input) && (pictureOk || op.input === "video") &&
   (!filter.output || op.output === filter.output) &&
   bandAllowed(actor, op.minBand));
- return Promise.all(visible.map(async (op) => { const state = await availability(actor, op); return { ...op, ready: state.ready, enabled: state.ready, ...(state.reason ? { reason: state.reason } : {}) }; }));
+ return Promise.all(visible.map(async (op) => { const state = await availability(actor, op); const { levels: states, ...rest } = state; const levels: ListedLevel[] | undefined = op.levels?.map((level) => ({ ...level, enabled: states?.[level.id]?.enabled ?? false, ...(states?.[level.id]?.reason ? { reason: states[level.id]!.reason } : {}) })); const { levels: _static, ...plain } = op; return { ...plain, ...(levels ? { levels } : {}), ready: rest.ready, enabled: rest.ready, ...(rest.reason ? { reason: rest.reason } : {}) }; }));
 }
 export async function runMediaOp(actor: PersonRow, id: string, input: { source: MediaRef; args: unknown }, signal?: AbortSignal) {
  await ensureRegistered();
- if (!photoUploadsAllowed(actor) && !(laneOfPerson(actor) === "child" && kidLaneOn(actor))) {
-  throw new ImageEditError(403, "Picture editing is off for this profile.", "pictures_off");
- }
  const op = ops.get(id);
  if (!op) throw new ImageEditError(404, "Unknown media operation.", "not_found");
+ if (op.input !== "video" && !photoUploadsAllowed(actor) && !(laneOfPerson(actor) === "child" && kidLaneOn(actor))) {
+  throw new ImageEditError(403, "Picture editing is off for this profile.", "pictures_off");
+ }
  if (!bandAllowed(actor, op.minBand)) {
   throw new ImageEditError(403, "This operation isn't available for this profile.", "forbidden");
  }

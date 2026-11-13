@@ -4,6 +4,8 @@ import { storeFile } from "@/lib/attachments";
 import { startComment } from "@/lib/imageEdit";
 import { runPictureTool } from "@/lib/pictures/people";
 import { registerMediaOp } from "./registry";
+import type { MediaOp } from "./types";
+import { CLEARER_LEVELS } from "./clearerLevels";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { db } from "@/db";
@@ -17,6 +19,10 @@ const resizeArgs = z.object({ width: z.number().int().min(1).max(8000), height: 
 const cropArgs = z.object({ x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(), width: z.number().min(0).max(1).optional(), height: z.number().min(0).max(1).optional(), aspect: z.enum(["1:1", "4:3", "3:2", "16:9", "9:16"]).optional(), rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional().describe("Clockwise turn applied before the crop box (the Studio's Crop)."), flipHorizontal: z.boolean().optional(), flipVertical: z.boolean().optional() }).refine((v) => v.aspect ? v.x === undefined && v.y === undefined && v.width === undefined && v.height === undefined : (v.width !== undefined && v.height !== undefined) || Boolean(v.rotate || v.flipHorizontal || v.flipVertical), "Choose an aspect or a fractional crop rectangle.");
 const adjustArgs = z.object({ brightness: z.number().min(-100).max(100).default(0), contrast: z.number().min(-100).max(100).default(0), saturation: z.number().min(-100).max(100).default(0), warmth: z.number().min(-100).max(100).default(0), auto: z.boolean().default(false) });
 const blurArgs = z.object({ radius: z.number().min(1).max(40).default(12) });
+const clearerArgs = z.object({
+  level: z.enum(["quick", "better", "best"]).default("quick").describe("quick: sharper and less grainy, here and fast. better: AI enlarges and cleans it. best: AI restore (may be unavailable)."),
+  size: z.enum(["1", "1.5", "2", "4"]).default("1").describe("Times bigger. quick: 1, 1.5 or 2. better: 2 or 4."),
+});
 const rotateArgs = z.object({ degrees: z.union([z.literal(90), z.literal(180), z.literal(270)]).describe("Clockwise quarter turns: 90, 180 or 270 degrees.") });
 const flipArgs = z.object({ direction: z.enum(["horizontal", "vertical"]).describe("horizontal mirrors left to right; vertical turns it upside down.") });
 const referenceSchema = z.object({ kind: z.literal("picture"), via: z.enum(["chat", "file"]), id: z.string(), conversationId: z.string().optional() });
@@ -38,7 +44,7 @@ function chatSource(source: { via?: "chat" | "file"; conversationId?: string; id
   return { conversationId: source.conversationId, id: source.id };
 }
 
-function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip") {
+function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "clearer", levels?: MediaOp["levels"]) {
   registerMediaOp({
     id: `picture.${id}`,
     label,
@@ -49,8 +55,9 @@ function registerEdit(id: string, label: string, summary: string, args: any, con
     controls,
     needs: null,
     minBand: "child",
+    ...(levels ? { levels } : {}),
     run: async ({ actor, signal }, { source, args: values }: any) => {
-      const result = await startEdit(actor, chatSource(source).conversationId, source.id, { operation, ...values }, signal);
+      const result = await startEdit(actor, chatSource(source).conversationId, source.id, { operation, ...values, ...(values.size !== undefined ? { size: Number(values.size) } : {}) }, signal);
       return "job" in result ? { job: result } : { file: result };
     },
   });
@@ -65,6 +72,7 @@ registerEdit("adjust", "Adjust", "Adjust brightness, contrast, saturation and wa
 registerEdit("rotate", "Rotate", "Turn the picture a quarter or half turn.", rotateArgs, [{ kind: "choice", name: "degrees", label: "Turn", options: ["90", "180", "270"] }], "rotate");
 registerEdit("flip", "Flip", "Mirror the picture left to right, or turn it upside down.", flipArgs, [{ kind: "choice", name: "direction", label: "Direction", options: ["horizontal", "vertical"] }], "flip");
 registerEdit("blur_background", "Blur background", "Blur the picture background while keeping the subject clear.", blurArgs, [{ kind: "number", name: "radius", label: "Blur", min: 1, max: 40 }], "blur_background");
+registerEdit("make_clearer", "Make clearer", "Make it clearer. Quick is here and fast, Better and Best use AI.", clearerArgs, [{ kind: "choice", name: "level", label: "Level", options: ["quick", "better", "best"] }, { kind: "choice", name: "size", label: "Times bigger", options: ["1", "1.5", "2", "4"] }], "clearer", CLEARER_LEVELS);
 
 registerMediaOp({
   id: "picture.save_subject",

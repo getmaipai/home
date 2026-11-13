@@ -9,6 +9,8 @@ import { studioApply, studioComment, studioMarkup, studioRun } from "@/lib/media
 import { studioReference } from "@/lib/mediaOps/studioReference";
 import { gateMediaApp } from "@/middleware/mediaAppGate";
 import { apiRouter, respond, refuseWith } from "@/lib/openapi";
+import { runMediaOp } from "@/lib/mediaOps/registry";
+import { VIDEO_CLEARER_OP } from "@/lib/mediaOps/ids";
 import { appRouteAllowed } from "@/lib/apps";
 import { requireAuth } from "@/middleware/auth";
 import { getCookie } from "hono/cookie";
@@ -305,6 +307,23 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const started = await startSharpen(person, typeof body.id === "string" ? body.id : "");
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  // MAKE-CLEARER-01: "Make clearer" (Quick, Better or Best) on a finished Create clip: the one registry operation, so the feed, the video Studio and chat start the same edit.
+  // A level that is not ready answers 503 with its plain line (the Best level, until the Stack has the AI restore); the original clip is kept.
+  routes.post("/actions/clearer", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "clearer")) return next();
+    const body = await jsonBody(c);
+    const level = typeof body.level === "string" ? body.level : "quick";
+    try {
+      const started = await runMediaOp(person, VIDEO_CLEARER_OP, { source: { kind: "video", via: "file", id: typeof body.id === "string" ? body.id : "" }, args: { level } });
+      return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+    } catch (error) {
+      const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
+      return c.json({ error: mapped.message, code: mapped.code, ...(mapped.status === 423 ? { locked: true } : {}) }, mapped.status as never);
+    }
   });
 
   // VIDEO-UI-06: the Favorite heart (the feed's player and My clips' tiles). `id` is the clip's job (the feed) or its Library file (My clips); a clip the person

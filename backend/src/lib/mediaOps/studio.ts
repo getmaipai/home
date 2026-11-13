@@ -98,6 +98,7 @@ export async function studioOperationRows(person: PersonRow, input: { id?: unkno
     id: op.id,
     label: op.label,
     summary: op.summary,
+    ...(op.levels ? { levels: op.levels } : {}),
     controls: op.controls.flatMap((control): Array<Record<string, unknown>> => {
       const c = control as { kind: string; name: string; label: string; min?: number; max?: number; options?: string[] };
       if (c.kind === "number" && typeof c.min === "number" && typeof c.max === "number") return [{ kind: "number" as const, name: c.name, label: c.label, min: c.min, max: c.max }];
