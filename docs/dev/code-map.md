@@ -54,6 +54,29 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/books/pages/read.json` | books | Reader |
 | `backend/packages/books/pages/series-detail.json` | books | Series |
 | `backend/packages/books/pages/series.json` | books | Series |
+| `backend/packages/image/pages/blur-background.json` | image | Blur background |
+| `backend/packages/image/pages/character-sheet.json` | image | Character sheet |
+| `backend/packages/image/pages/characters.json` | image | Characters |
+| `backend/packages/image/pages/collections.json` | image | Collections |
+| `backend/packages/image/pages/combine.json` | image | Combine pictures |
+| `backend/packages/image/pages/create.json` | image | Image |
+| `backend/packages/image/pages/creations.json` | image | My creations |
+| `backend/packages/image/pages/crop-adjust.json` | image | Crop and adjust |
+| `backend/packages/image/pages/drafts.json` | image | Drafts |
+| `backend/packages/image/pages/edit.json` | image | Edit a picture |
+| `backend/packages/image/pages/favorites.json` | image | Favorites |
+| `backend/packages/image/pages/from-reference.json` | image | From a reference |
+| `backend/packages/image/pages/from-template.json` | image | From a template |
+| `backend/packages/image/pages/index.json` | image | Image |
+| `backend/packages/image/pages/library.json` | image | All images |
+| `backend/packages/image/pages/places.json` | image | Places |
+| `backend/packages/image/pages/productions.json` | image | Productions |
+| `backend/packages/image/pages/props.json` | image | Props |
+| `backend/packages/image/pages/recent.json` | image | Recently made |
+| `backend/packages/image/pages/remove-object.json` | image | Remove an object |
+| `backend/packages/image/pages/shared.json` | image | Shared with home |
+| `backend/packages/image/pages/templates.json` | image | Templates |
+| `backend/packages/image/pages/upscale.json` | image | Upscale |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
 | `backend/packages/news/pages/index.json` | news | Today |
@@ -410,7 +433,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/appHelperInstall.ts` | helperScriptPath, canInstallHelper, installLogPath, installHelper |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
-| `backend/src/lib/apps.ts` | settingsAreaProblems, sidebarFor, headerFor, appPackageProblems, appVisibleTo, pageMinRole |
+| `backend/src/lib/apps.ts` | registerAppData, settingsAreaProblems, sidebarFor, headerFor, appPackageProblems, appVisibleTo |
 | `backend/src/lib/artifacts.ts` | toArtifact, createArtifact, updateArtifact, getArtifactRow, currentArtifactRow, deleteArtifactsForTurns |
 | `backend/src/lib/askForm.ts` | ASK_FORM_TTL_MS, ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues |
 | `backend/src/lib/askNames.ts` | subjectsForTurn, answerWhoTurn, NO_ASK_APPEND, askAppendFor |
@@ -594,6 +617,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
+| `backend/src/lib/imageApp.ts` | imageAppData |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, __setImageToolsForTests |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
 | `backend/src/lib/imageSimilarity/fingerprint.ts` | FINGERPRINT_VERSION, hamming, fingerprint, hashDistance |
