@@ -69,13 +69,13 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
       {kind === "character" ? <>
         {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
         <AsyncState data={cast.data} error={cast.isError} isFetching={cast.isFetching} onRetry={() => void cast.refetch()} errorMessage={i18n._({ id: "Your cast did not load. Close this and try again.", message: "Your cast did not load. Close this and try again." })} loadingLabel={i18n._({ id: "Loading your cast", message: "Loading your cast", })}>
-          {(rows) => rows.length === 0 ? <p className="text-supporting text-muted-foreground">Your cast is empty.</p> : <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Your cast">
+          {(rows) => rows.length === 0 ? <p className="text-supporting text-muted-foreground">{i18n._({ id: "Your cast is empty.", message: "Your cast is empty." })}</p> : <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label={i18n._({ id: "Your cast", message: "Your cast" })}>
             {rows.map((member) => <li key={member.id} className="flex min-w-0 flex-col gap-1">
               <button type="button" className="flex min-h-20 w-full items-center gap-2 rounded-md border border-border p-2 text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Choose ${member.name}`} onClick={() => onDone({ id: member.id, ...(member.avatar.url ? { thumb: member.avatar.url } : {}) })}>
                 {member.avatar.url ? <SafeImage src={member.avatar.url} alt="" draggable={false} className="size-12 shrink-0 rounded-full object-cover" /> : <SeededAvatar name={member.name} seed={member.avatar.seed ?? member.id} />}
                 <span className="truncate text-supporting">{member.name}</span>
               </button>
-              {!member.look.sheet_file_id ? <><p className="text-supporting text-muted-foreground">No look sheet yet</p><Button type="button" size="sm" variant="secondary" disabled={lookBusy !== null} onClick={() => void captureLook(member.id)}>{lookBusy === member.id ? "Capturing look" : "Capture look"}</Button></> : null}
+              {!member.look.sheet_file_id ? <><p className="text-supporting text-muted-foreground">{i18n._({ id: "No look sheet yet", message: "No look sheet yet" })}</p><Button type="button" size="sm" variant="secondary" disabled={lookBusy !== null} onClick={() => void captureLook(member.id)}>{lookBusy === member.id ? "Capturing look" : "Capture look"}</Button></> : null}
             </li>)}
           </ul>}
         </AsyncState>

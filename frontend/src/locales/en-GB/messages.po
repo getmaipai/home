@@ -16777,6 +16777,11 @@ msgid "No items match your search."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "No look sheet yet"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:54
 msgid "No maintenance is scheduled."
 msgstr ""
@@ -29798,8 +29803,18 @@ msgid "Your cards did not load"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:71
 msgid "Your cast did not load. Close this and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast is empty."
 msgstr ""
 
 #. js-lingui-explicit-id
