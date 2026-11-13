@@ -11,6 +11,7 @@ import { ensurePersonSubject, isSheetReference, listMediaSubjects, loadSubjectRe
 import { householdLikenessAllowed, LIKENESS_OFF_LINE } from "@/lib/likeness";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { readCompanionPack } from "@/lib/companionPack";
+import { lookSheetState } from "@/lib/castLookKey";
 import type { PersonRow } from "@/types";
 
 export const MAX_CAST = 6;
@@ -25,7 +26,7 @@ export interface CastEntry {
   synth_id: string | null;
   person_id: string | null;
   /** The look: its words, its stored reference sheet (a Library file id) when one exists, and the medium of the rest picture. */
-  look: { description: string; sheet_file_id: string | null; medium: "photo" | "stylised" | null };
+  look: { description: string; sheet_file_id: string | null; /** CREATOR-06: the sheet was built from pictures that have since changed; `captureLook` rebuilds it. */ sheet_stale: boolean; medium: "photo" | "stylised" | null };
   locked_description: string | null;
   voice: string | null;
   avatar: { url: string | null; seed: string | null };
@@ -53,6 +54,7 @@ function refFiles(subject: MediaSubject | null) {
   const plain = rows.find((row) => !isSheetReference(row.provenance));
   return { sheetId: sheet?.id ?? null, firstId: plain?.id ?? null, adultOnly: rows.some((row) => row.provenance.includes('"audience":"adult-only"')) };
 }
+const staleOf = (subject: MediaSubject | null, sheetId: string | null) => !!subject && !!sheetId && lookSheetState(subject.id).stale;
 function synthEntry(synth: SynthRecord): CastEntry {
   const subject = synth.subject_id ? subjectViewById(synth.subject_id) : null;
   const files = refFiles(subject), facts = subjectFacts({ real: false, synthId: synth.id, personId: null });
@@ -60,7 +62,7 @@ function synthEntry(synth: SynthRecord): CastEntry {
   const rest = (synth.persona as { animation?: { sheet?: { rest?: string } } }).animation?.sheet?.rest;
   return {
     id: subject?.id ?? synth.id, kind: "synth", subject_kind: "character", name: synth.persona.display_name, subject_id: subject?.id ?? null, synth_id: synth.id, person_id: null,
-    look: { description: subject?.look ?? synth.persona.look_prompt ?? synth.persona.display_name, sheet_file_id: files.sheetId, medium: source?.source ? (source.source === "photo" ? "photo" : "stylised") : null },
+    look: { description: subject?.look ?? synth.persona.look_prompt ?? synth.persona.display_name, sheet_file_id: files.sheetId, sheet_stale: staleOf(subject, files.sheetId), medium: source?.source ? (source.source === "photo" ? "photo" : "stylised") : null },
     locked_description: subject?.locked_description ?? null, voice: subject?.voice ?? synth.persona.voice_id ?? null,
     avatar: { url: rest ? `/api/companions/${encodeURIComponent(synth.id)}/animation/${encodeURIComponent(rest)}` : null, seed: synth.id },
     real: facts.real, minor: facts.minor || (subject?.minor ?? false), audience: synthFloor(synth) === "adult" || files.adultOnly ? "adult-only" : "all-ages",
@@ -70,7 +72,7 @@ function subjectEntry(subject: MediaSubject): CastEntry {
   const files = refFiles(subject);
   return {
     id: subject.id, kind: "subject", subject_kind: subject.kind, name: subject.name, subject_id: subject.id, synth_id: null, person_id: null,
-    look: { description: subject.look, sheet_file_id: files.sheetId, medium: null }, locked_description: subject.locked_description, voice: subject.voice,
+    look: { description: subject.look, sheet_file_id: files.sheetId, sheet_stale: staleOf(subject, files.sheetId), medium: null }, locked_description: subject.locked_description, voice: subject.voice,
     avatar: { url: files.sheetId ?? files.firstId ? `/api/files/${files.firstId ?? files.sheetId}/content` : null, seed: null },
     real: subject.real, minor: subject.minor, audience: files.adultOnly ? "adult-only" : "all-ages",
   };
@@ -80,7 +82,7 @@ function memberEntry(person: PersonRow): CastEntry {
   const facts = subjectFacts({ real: false, synthId: null, personId: person.id });
   return {
     id: subject?.id ?? person.id, kind: "member", subject_kind: "character", name: person.displayName, subject_id: subject?.id ?? null, synth_id: null, person_id: person.id,
-    look: { description: subject?.look ?? person.displayName, sheet_file_id: facts.minor ? null : files.sheetId, medium: "photo" }, locked_description: subject?.locked_description ?? null, voice: subject?.voice ?? null,
+    look: { description: subject?.look ?? person.displayName, sheet_file_id: facts.minor ? null : files.sheetId, sheet_stale: !facts.minor && staleOf(subject, files.sheetId), medium: "photo" }, locked_description: subject?.locked_description ?? null, voice: subject?.voice ?? null,
     avatar: { url: null, seed: person.avatarSeed }, real: facts.real, minor: facts.minor, audience: files.adultOnly ? "adult-only" : "all-ages",
   };
 }

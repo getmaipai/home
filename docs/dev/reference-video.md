@@ -45,6 +45,10 @@ Settings, AI and models and the setup wizard list both parts like every other mo
 - **New words, same sheet.** Tool arguments `reuse_video` (a video id, or `latest`) with `request`.
 - **Cleanup.** A sheet is a companion of its video's clip (`libraryTrash.companionsOf`): Trash and purge take it along only when no other video that is still being made or still has its clip uses it (`videos/referenceSheets.ts`). A kept sheet never protects its clip from the storage rules. A sheet of a video that failed or was stopped stays in the Library until the person deletes it.
 
+## One look sheet per cast member (CREATOR-06)
+
+`lib/castLook.ts` `captureLook(actor, ref)` builds a cast member's reference sheet once, through `films/sheetMaker.ts` (the one builder), from the member's pictures: a synth's rest picture and approved sheet views, a saved subject's reference pictures, or photos the person supplies for a household member (`POST /api/cast/{id}/look` with `photo_file_ids`). The sheet is stored as the subject's sheet reference; its file provenance carries a source key (`lib/castLookKey.ts`), so the same pictures reuse the stored sheet and changed pictures rebuild it (`look.sheet_stale` on the cast list shows it). A made-up character with no picture gets one portrait from the picture engine first; a real person never does. A household member who is under 18 is never captured. Features read the sheet through `resolveCast` (`look.sheet_file_id`); `POST /api/media/subjects/{id}/sheet` calls the same function.
+
 ## Not done
 
 The first-picture route has been tested only against fakes; no real run has been made (the owner of REFVIDEO-FIRSTFRAME-01 runs it by hand).

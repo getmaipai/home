@@ -501,6 +501,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/capabilities.ts` | unavailableCapabilities, missingRequired, missingOptional, capabilityWords, installRefusal |
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
 | `backend/src/lib/cast.ts` | MAX_CAST, REAL_REFUSED_LINE, listCast, TEMPORARY_CAST_LINE, resolveCast, castRefsOf |
+| `backend/src/lib/castLook.ts` | MAX_LOOK_SOURCES, LOOK_MINOR_LINE, LOOK_OWNER_LINE, LOOK_NO_PHOTOS_LINE, LOOK_FAILED_LINE, realPortraitMaker |
+| `backend/src/lib/castLookKey.ts` | LOOK_KEY_VERSION, SHEET_PROVENANCE_PREFIX, sheetNote, plainReferences, synthLookParts, lookSourceKey |
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/changeVoice.ts` | changeVoice |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
@@ -829,7 +831,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/studioReference.ts` | REFERENCE_UNSUPPORTED_LINE, studioReference |
 | `backend/src/lib/mediaOps/words.ts` | runPictureWords |
 | `backend/src/lib/mediaProductions.ts` | registerCastSynthGate, canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction |
-| `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | registerSynthFactDeriver, subjectFacts, isSheetReference, canUseSubject, synthIdOfSubject, subjectRowForPerson |
 | `backend/src/lib/memory.ts` | registerCompanionReadGate, registerCompanionWriteGate, validAt, EVENT_GRACE_DAYS, eventWithinGrace, isPrivilegedRecordKind |
 | `backend/src/lib/memoryContentPolicy.ts` | CREDENTIAL_SAFE_MESSAGE, CREDENTIAL_REDACTION, detectCredential, hasDeclaredCredentialField, redactCredentials |
