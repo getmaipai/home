@@ -302,7 +302,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       speculationInFlightRef.current = null;
       if (epoch !== reactionEpochRef.current) return;
       const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: unknown }).status : undefined;
-      const message = error instanceof Error ? error.message : "";
+      // Read only to recognise the hub's "speculative start is off" answer; it is never shown to the person.
+      const message = typeof error === "object" && error !== null && "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
       if (status === 400 && message.startsWith("Speculative start is off")) { speculationOffRef.current = true; speculativeOutcomeRef.current = "off"; return; }
       refusedThisUtteranceRef.current = true;
       speculativeOutcomeRef.current = status === 400 ? "refused" : "request_failed";
