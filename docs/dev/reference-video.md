@@ -51,3 +51,7 @@ The first-picture route has been tested only against fakes; no real run has been
 
 
 The Stack lane (`/v1/videos/ingredients`) was built in parallel and was not deployed when this landed: everything above is tested against a fake Stack, and no real run has been made. The adapter check before work needs the Stack to report `qualities.ltx25max.ingredients`; until it does, a missing adapter shows as the plain sentence on the card after the sheet is made.
+
+## Whole-clip quality check (CREATOR-10)
+
+The local Stack's `media.check` decodes the clip once and returns frame luma, difference, sharpness and optional camera flow. Home applies the sole threshold table, `CLIP_RULES` in `backend/src/lib/videos/frameCheck.ts`: black luma under 12 for 0.3 s; frozen difference under 0.35 for 1.0 s; a jump over max(28, 8 times median difference); soft sharpness under 0.35 of median for 0.5 s (serious at 1.5 s, with median above 20); camera motion below 8 motion units per second when a move was requested; and loop seam SSIM under 0.9 when supplied. Checks are advisory and never say a clip is fine.
