@@ -11,13 +11,12 @@ import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 // composer's `modes`, used by the Home ask box and every Create page host. Hand-copied from backend lib/composer/modes.ts (that file
 // has "@/" imports of its own); the route's zod schema is the contract.
 
-export interface ComposerChipRecord { id: string; label: string; group?: string; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerChipRecord { id: string; label: string; group?: string; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string; label: string; icon: string; route: string | null; engine: MakingKind | null; placeholder: string;
   references: Array<{ id: string; label: string; kind: "picture" | "character" | "place" | "audio" | "video"; max?: number }>;
   chips: ComposerChipRecord[];
-  /** `target` "words": a pick starts the person's words from the row's text (templates). "setting": a pick is kept as a setting that rides to the Create page and never touches the words (CREATOR-13). */
-  presets: { label: string; chips: Array<{ id: string; label: string; target?: "words" | "setting"; options: Array<{ value: string; label: string; text: string }>; default: string }> } | null;
+  presets: { label: string; chips: Array<{ id: string; label: string; options: Array<{ value: string; label: string; text: string }>; default: string }> } | null;
   tools: Array<"clear" | "improve" | "lyrics">;
   primary: { label: string };
   quality: { default: string; options: Array<{ value: string | number; label: string; detail?: string }> } | null;
@@ -92,7 +91,7 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     placeholder: words(m.placeholder),
     references: m.references.map((r) => ({ id: r.id, label: r.label, kind: r.kind, ...(r.max ? { max: r.max } : {}) })),
     chips: m.chips.map((c) => ({
-      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}),
+      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
       options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}) })),
       value: valueOf(m.id, c.id, c.default),
       onValueChange: (value: string | number) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value })),
@@ -100,10 +99,9 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     ...(m.presets ? { presets: { label: m.presets.label, chips: m.presets.chips.map((c) => ({
       id: c.id, label: c.label,
       options: c.options.map((o) => ({ value: o.value, label: o.label })),
-      // A preset starts the words or sets a setting; it never starts a job (the Phosphene rule: a pick fills the form).
-      ...(c.target === "setting"
-        ? { value: valueOf(m.id, c.id, c.default), onValueChange: (value: string | number) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value })) }
-        : { value: c.default, onValueChange: (value: string | number) => { const row = c.options.find((o) => o.value === value); if (row) setText(row.text); } }),
+      value: c.default,
+      // A preset starts the words; it never starts a job (the Phosphene rule: a pick fills the form).
+      onValueChange: (value: string | number) => { const row = c.options.find((o) => o.value === value); if (row) setText(row.text); },
     })) } } : {}),
     tools: m.tools,
   })), [response, valueOf, setText]);
@@ -117,11 +115,6 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     const out: Record<string, string | number> = {};
     for (const c of current.chips) out[c.id] = valueOf(current.id, c.id, c.default);
     if (current.quality) out.tier = valueOf(current.id, "tier", current.quality.default);
-    // A preset setting travels only when it was picked (its start value is "none"), so a plain hand-off stays a plain address.
-    for (const c of current.presets?.chips ?? []) {
-      const picked = c.target === "setting" ? valueOf(current.id, c.id, c.default) : c.default;
-      if (c.target === "setting" && picked !== c.default) out[c.id] = picked;
-    }
     return out;
   }, [current, valueOf]);
   const entry = current.engine ? health?.[current.engine] : undefined;

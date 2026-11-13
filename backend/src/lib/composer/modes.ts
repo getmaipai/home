@@ -16,7 +16,6 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { getAppPage } from "@/lib/apps";
 import { collectHealth } from "@/lib/healthSnapshot";
 import { listTemplates } from "@/lib/media/templates";
-import { pictureFragmentChips } from "@/lib/media/pictureFragments";
 import { musicsAllowed } from "@/lib/music/policy";
 import { routeAudience } from "@/lib/pictures/audience";
 import { picturesAllowed } from "@/lib/pictures/policy";
@@ -28,7 +27,7 @@ import type { PersonRow } from "@/types";
 export type ComposerEngine = "image" | "video" | "music" | "voices";
 export type ComposerTool = "clear" | "improve" | "lyrics";
 
-export interface ComposerModeChip { id: string; label: string; group?: string; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerModeChip { id: string; label: string; group?: string; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string;
   label: string;
@@ -39,7 +38,7 @@ export interface ComposerModeRecord {
   placeholder: string;
   references: Array<{ id: string; label: string; kind: "picture" | "character" | "place" | "audio" | "video"; max?: number }>;
   chips: ComposerModeChip[];
-  presets: { label: string; chips: ComposerPresetChip[] } | null;
+  presets: { label: string; chips: Array<{ id: string; label: string; options: Array<{ value: string; label: string; text: string }>; default: string }> } | null;
   tools: ComposerTool[];
   primary: { label: string };
   quality: { default: string; options: Array<{ value: string; label: string; detail?: string }> } | null;
@@ -49,14 +48,12 @@ export interface ComposerModeRecord {
   /** A page whose route is not built yet: the one plain line its primary button shows while it stays disabled. Null for every working mode. */
   comingSoon: string | null;
 }
-/** A Presets chip. "words" starts the person's words from the picked row's `text` (templates); "setting" keeps the pick as a setting that rides with the job and never touches the words (CREATOR-13). */
-export interface ComposerPresetChip { id: string; label: string; target: "words" | "setting"; options: Array<{ value: string; label: string; text: string }>; default: string }
 export interface ComposerModesResponse { band: AgeBand; modes: ComposerModeRecord[] }
 
 interface Descriptor {
   id: string; label: string; icon: string; page: string; route: string; engine: ComposerEngine;
   gate: "pictures" | "videos" | "music"; tier_category?: TierCategory; tools?: ComposerTool[];
-  presets?: { label?: string; source: "templates"; kind: "picture" | "video"; fragments?: "picture" };
+  presets?: { label?: string; source: "templates"; kind: "picture" | "video" };
   fallback?: { placeholder?: string; primary?: string };
   /** The plain line that replaces the primary button's action while no backend route exists for this mode (never a dead control, never hidden). */
   coming_soon?: string;
@@ -98,7 +95,8 @@ function chipsOf(bar: Node): ComposerModeChip[] {
     const id = text(chip.state), label = text(chip.label);
     if (!id || !label || options.length === 0) return [];
     const group = text(chip.group);
-    return [{ id, label, ...(group ? { group } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
+    const quiet = typeof chip.quiet_value === "string" || typeof chip.quiet_value === "number" ? chip.quiet_value : undefined;
+    return [{ id, label, ...(group ? { group } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
   });
 }
 
@@ -120,11 +118,8 @@ function startingWords(prompt: string): string {
 function presetsOf(person: PersonRow, d: Descriptor): ComposerModeRecord["presets"] {
   if (!d.presets) return null;
   const rows = listTemplates({ actor: person, kind: d.presets.kind });
-  const chips: ComposerPresetChip[] = rows.length === 0 ? [] : [{ id: "template", label: "Templates", target: "words", default: "", options: rows.map((row) => ({ value: row.id, label: row.title, text: startingWords(row.prompt) })) }];
-  // CREATOR-13: the picture presets are fragment records, read by the same reader; the pick is a setting, so its options carry no words.
-  if (d.presets.fragments === "picture") chips.push(...pictureFragmentChips(person).map((chip): ComposerPresetChip => ({ ...chip, target: "setting", options: chip.options.map((o) => ({ ...o, text: "" })) })));
-  if (chips.length === 0) return null;
-  return { label: d.presets.label ?? "Presets", chips };
+  if (rows.length === 0) return null;
+  return { label: d.presets.label ?? "Presets", chips: [{ id: "template", label: "Templates", default: "", options: rows.map((row) => ({ value: row.id, label: row.title, text: startingWords(row.prompt) })) }] };
 }
 
 const PACKAGES = ["image", "video", "audio"] as const;

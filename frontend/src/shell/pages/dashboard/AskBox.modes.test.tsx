@@ -64,21 +64,16 @@ describe("the Home ask box reads its modes from the hub", () => {
     await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1"));
   });
 
-  test("a picture preset pick is a setting: the words stay, and the pick rides to Create (CREATOR-13)", async () => {
-    const withPresets: ComposerModesResponse = { band: "adult", modes: [ASK, mode({
+  test("a chip whose start value is quiet reads as its group name until a value is picked (CREATOR-13)", async () => {
+    const withLight: ComposerModesResponse = { band: "adult", modes: [ASK, mode({
       ...PICTURE,
-      presets: { label: "Presets", chips: [{ id: "light", label: "Light", target: "setting", default: "none", options: [{ value: "none", label: "None", text: "" }, { value: "mtpl-lightgolden", label: "Golden hour", text: "" }] }] },
+      chips: [{ id: "light", label: "Light", group: "Light", quiet: "none", default: "none", options: [{ value: "none", label: "None" }, { value: "mtpl-lightgolden", label: "Golden hour" }] }],
     })] };
-    const view = setup(withPresets);
+    const view = setup(withLight);
     fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
     fireEvent.click(await view.findByText("Picture"));
-    fireEvent.change(view.getByLabelText("Ask"), { target: { value: "a red fox" } });
-    fireEvent.click(await view.findByText("Presets"));
-    fireEvent.click(await view.findByText("Light"));
-    fireEvent.click(await view.findByText("Golden hour"));
-    expect((view.getByLabelText("Ask") as HTMLTextAreaElement).value).toBe("a red fox");
-    fireEvent.click(view.getByLabelText("Make picture"));
-    await waitFor(() => expect(view.getByTestId("where").textContent).toContain("light=mtpl-lightgolden"));
+    const trigger = await waitFor(() => { const el = view.container.querySelector('[data-group="Light"]'); expect(el).toBeTruthy(); return el!; });
+    expect(trigger.textContent).toBe("Light");
   });
 
   test("a mode whose engine is not ready shows the health row's line and Send stays off", async () => {

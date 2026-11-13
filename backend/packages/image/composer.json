@@ -10,7 +10,7 @@
       "gate": "pictures",
       "tier_category": "image",
       "tools": ["clear"],
-      "presets": { "label": "Presets", "source": "templates", "kind": "picture", "fragments": "picture" }
+      "presets": { "label": "Presets", "source": "templates", "kind": "picture" }
     }
   ]
 }

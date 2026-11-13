@@ -27,15 +27,16 @@ export function imageAppData(person: PersonRow, dataId: string, body: unknown): 
 }
 registerAppData("image", imageAppData);
 
-/** CREATOR-13: the Create page's Presets pill. The chips come from the same preset records as the composer's Presets list (Look by family, Light, Angle,
- * Format; a Create page chip holds at most 24 options), under one "Presets" popover, and the submit line names the chosen ones for the picture tool. */
+/** CREATOR-13: the Create page's preset chips (Look by family, Light, Angle, Format), from the preset records. A Create page chip holds at most 24 options,
+ * and each chip is its own popover (the kit's popover has no height limit, so one popover over all 79 options is 3,100 px tall and cannot be reached).
+ * The composer's mode list reads this page's chips, so the Home ask box and every other composer show the same ones. The submit line names the chosen ones. */
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
   const chips = pictureFragmentChips(person);
   if (chips.length === 0) return;
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
-  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Presets", presentation: "popover", default: "none", options: chip.options }))];
+  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: chip.label, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   const ask = (bar.submit as { ask?: { prompt?: string } } | undefined)?.ask;
   if (ask?.prompt) ask.prompt = `${ask.prompt}\nPresets, where none means not chosen: ${chips.map((chip) => `${chip.id.startsWith("look_") ? "look" : chip.id} {${chip.id}}`).join(", ")}. Pass any chosen ones in the presets argument.`;
 });

@@ -68785,6 +68785,16 @@
                                 "group": {
                                   "type": "string"
                                 },
+                                "quiet": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
                                 "options": {
                                   "type": "array",
                                   "items": {
@@ -68850,13 +68860,6 @@
                                     "label": {
                                       "type": "string"
                                     },
-                                    "target": {
-                                      "type": "string",
-                                      "enum": [
-                                        "words",
-                                        "setting"
-                                      ]
-                                    },
                                     "default": {
                                       "type": "string"
                                     },
@@ -68886,7 +68889,6 @@
                                   "required": [
                                     "id",
                                     "label",
-                                    "target",
                                     "default",
                                     "options"
                                   ]
