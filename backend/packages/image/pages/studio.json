@@ -127,13 +127,24 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "image",
-        "text": "You have no pictures yet. Make one with Create, or add one in your Library.",
+        "text": "You have no pictures yet. Add one of your own, or make one with Create.",
         "action": {
           "navigate": {
             "to": "/apps/image/create"
           }
         },
         "action_label": "Make a picture"
+      },
+      "add_picture": {
+        "label": "Add a picture",
+        "action": {
+          "navigate": {
+            "to": "/apps/image/studio",
+            "state": {
+              "file": "{id}"
+            }
+          }
+        }
       }
     }
   ]

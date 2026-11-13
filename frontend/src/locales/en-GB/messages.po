@@ -5365,6 +5365,11 @@ msgid "Choose one computer, or add a bigger one for the AI."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:479
+msgid "Choose one of your own pictures, or add a new one."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:22
 msgid "Choose the AI models folder"
 msgstr ""
@@ -24474,7 +24479,7 @@ msgid "failure.slow.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/useImageEditor.ts:29
+#: src/apps/chat/useImageEditor.ts:30
 msgid "That tool is in the Studio. Open this picture in Images, then choose Studio."
 msgstr ""
 

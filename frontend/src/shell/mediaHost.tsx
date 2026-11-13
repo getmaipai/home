@@ -476,7 +476,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
             <DialogContent scroll="viewport">
               <DialogHeader>
                 <DialogTitle>{pick.kind === "video" ? i18n._({ id: "Choose a clip", message: "Choose a clip" }) : pick.kind === "audio" ? "Add a voice or music" : "Choose a picture"}</DialogTitle>
-                <DialogDescription>{pick.kind === "video" ? i18n._({ id: "Pick one of your own clips to put after this one.", message: "Pick one of your own clips to put after this one." }) : pick.kind === "audio" ? "Type a line for Home to say, or pick one of your songs." : "The video starts from this picture. Choose one from your Library or add a new one."}</DialogDescription>
+                <DialogDescription>{pick.kind === "video" ? i18n._({ id: "Pick one of your own clips to put after this one.", message: "Pick one of your own clips to put after this one." }) : pick.kind === "audio" ? "Type a line for Home to say, or pick one of your songs." : /^\/apps\/image(\/|$)/.test(pathRef.current) ? i18n._({ id: "Choose one of your own pictures, or add a new one.", message: "Choose one of your own pictures, or add a new one." }) : "The video starts from this picture. Choose one from your Library or add a new one."}</DialogDescription>
               </DialogHeader>
               {pick.kind === "video" || pick.kind === "audio"
                 ? <StudioPickerBody kind={pick.kind} start={pick.start} personId={personId} onDone={(picked) => { pick.resolve(picked); setPick(null); }} />
