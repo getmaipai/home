@@ -3,7 +3,7 @@
 // screen and as a sheet on a phone. Songs, takes and sounds come from the same routes as chat (one card per song, takes inside it);
 // every slow action runs as a job and shows in Activity. The locked tile the hub sends for a locked song is never opened or read.
 import { i18n } from "@lingui/core";
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StudioPickerBody } from "@/shell/MediaPickerDialog";
@@ -27,9 +27,10 @@ import { musicApi, type MusicCard, type MusicVersion, type SavedSound } from "@/
 import { likeThisMessage } from "./MusicLikeThisPage";
 import { remixAddress, stemsAddress, studioAddress } from "./musicAddresses";
 import { songStatusCard } from "./musicSongStatus";
-import { clockOf, isLockedTile, isMaking, libraryRows, playableVersion, styleTags, takeStrip, type LibraryFilter, type LibraryRow } from "./musicLibraryModel";
+import { clockOf, isLockedTile, isMaking, libraryRows, playableVersion, queueOf, styleTags, takeStrip, trackOf, type LibraryFilter, type LibraryRow } from "./musicLibraryModel";
 import { SongDetails, useBedPicker } from "./MusicSongDetails";
-import { useRowPlayer, type RowPlayer } from "./useRowPlayer";
+import { useMusicPlayer, type MusicPlayer } from "@/shell/music/musicPlayer";
+import type { Track } from "@/shell/music/musicQueue";
 
 const WIDE = "(min-width: 960px)";
 const subscribeWide = (onChange: () => void) => { const list = window.matchMedia?.(WIDE); list?.addEventListener?.("change", onChange); return () => list?.removeEventListener?.("change", onChange); };
@@ -52,16 +53,17 @@ interface RowActions {
 }
 
 /** One finished song as a row: the cover plays on hover or focus, the text opens the details, the take strip plays a take. */
-function SongRow({ card, selected, player, take, onTake, actions }: { card: MusicCard; selected: boolean; player: RowPlayer; take: string | null; onTake: (id: string) => void; actions: RowActions }) {
+function SongRow({ card, selected, player, queue, take, onTake, actions }: { card: MusicCard; selected: boolean; player: MusicPlayer; queue: readonly Track[]; take: string | null; onTake: (id: string) => void; actions: RowActions }) {
   const title = card.title ?? i18n._({ id: "Untitled song", message: "Untitled song" });
   const version = playableVersion(card, take);
   const strip = takeStrip(card);
-  const here = !!version && player.key === version.id;
+  const here = !!version && player.track?.key === version.id;
   const playing = here && player.playing;
   const Play = getIcon(playing ? "pause" : "play");
   const tags = styleTags(card.description, 4);
   const length = clockOf(card.duration_s);
-  const play = () => { if (version) player.toggle({ key: version.id, url: version.url, title, artworkUrl: card.cover_url }); };
+  const playTake = (takeId: string | null) => { const one = trackOf(card, takeId, i18n._({ id: "Untitled song", message: "Untitled song" })); if (one) player.toggle(one, queue); };
+  const play = () => playTake(version?.id ?? null);
   return <li data-testid="music-song-row" data-selected={selected ? "true" : undefined} className={`group relative flex items-start gap-3 rounded-xl p-2 transition-colors ${selected ? "bg-muted ring-border ring-1" : "hover:bg-muted/60"}`}>
     <div className="relative size-16 shrink-0 overflow-hidden rounded-lg sm:size-20">
       <Cover id={card.id} title={title} url={card.cover_url} bare />
@@ -80,7 +82,7 @@ function SongRow({ card, selected, player, take, onTake, actions }: { card: Musi
         {tags.length ? <span className="text-muted-foreground line-clamp-2 text-badge">{tags.join(", ")}</span> : null}
       </button>
       {strip.length ? <div className="flex flex-wrap gap-1" role="group" aria-label={i18n._({ id: "Takes of {title}", message: "Takes of {title}", values: { title } })}>
-        {strip.map((one) => <Chip key={one.id} tone="quiet" size="strip" selected={version?.id === one.id} onClick={() => { onTake(one.id); player.toggle({ key: one.id, url: card.versions.find((v) => v.id === one.id)!.url, title: `${title} (${one.label})`, artworkUrl: card.cover_url }); }}>{i18n._({ id: "Take {number}", message: "Take {number}", values: { number: one.number } })}</Chip>)}
+        {strip.map((one) => <Chip key={one.id} tone="quiet" size="strip" selected={version?.id === one.id} onClick={() => { onTake(one.id); playTake(one.id); }}>{i18n._({ id: "Take {number}", message: "Take {number}", values: { number: one.number } })}</Chip>)}
       </div> : null}
     </div>
     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -106,8 +108,8 @@ function SongRow({ card, selected, player, take, onTake, actions }: { card: Musi
 }
 
 /** A saved sound as a row: it plays (and loops, if it was made to), and can be laid into a song. */
-function SoundRow({ sound, player, onAdd }: { sound: SavedSound; player: RowPlayer; onAdd: (jobId: string) => void }) {
-  const here = player.key === `sound-${sound.id}`; const playing = here && player.playing;
+function SoundRow({ sound, player, onAdd }: { sound: SavedSound; player: MusicPlayer; onAdd: (jobId: string) => void }) {
+  const here = player.track?.key === `sound-${sound.id}`; const playing = here && player.playing;
   const Play = getIcon(playing ? "pause" : "play");
   return <li data-testid="music-sound-row" className="group relative flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/60">
     <div className="relative size-16 shrink-0 overflow-hidden rounded-lg">
@@ -135,7 +137,7 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
   const { push } = useToast();
   const queryClient = useQueryClient();
   const wide = useWide();
-  const player = useRowPlayer();
+  const player = useMusicPlayer();
   const list = useSongList();
   const sounds = useQuery({ queryKey: ["music-sounds"], queryFn: () => musicApi.listSounds(), staleTime: 2_000 });
   const [query, setQuery] = useState("");
@@ -145,7 +147,7 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
   const cards = useMemo(() => list.data ?? [], [list.data]);
   const hasLocked = cards.some(isLockedTile);
   const rows = useMemo(() => libraryRows(cards, sounds.data ?? [], filter, query), [cards, sounds.data, filter, query]);
-  useEffect(() => () => player.stop(), []); // eslint-disable-line react-hooks/exhaustive-deps -- stop the sound when the page goes
+  const queue = useMemo(() => queueOf(rows, takes, i18n._({ id: "Untitled song", message: "Untitled song" })), [rows, takes]);
 
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); };
   const restore = (ids: string[]) => { void Promise.allSettled(ids.map((id) => api.restoreLibraryFile(id))).then((results) => { refresh(); push(results.every((r) => r.status === "fulfilled") ? i18n._({ id: "Brought your song back.", message: "Brought your song back." }) : i18n._({ id: "Some of the song could not be brought back. Open Trash in the Library to restore the rest.", message: "Some of the song could not be brought back. Open Trash in the Library to restore the rest." })); }); };
@@ -167,7 +169,7 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
   const rowsView = (row: LibraryRow) => row.kind === "sound"
     ? <SoundRow key={row.key} sound={row.sound} player={player} onAdd={(jobId) => onAddSound?.(jobId)} />
     : isMaking(row.card) || row.card.state === "failed" || row.card.state === "cancelled" ? songStatusCard({ card: row.card, onOpen: () => onSelect(row.card.id) })
-      : <SongRow key={row.key} card={row.card} selected={row.card.id === selected} player={player} take={takes[row.card.id] ?? null} onTake={(id) => setTakes((current) => ({ ...current, [row.card.id]: id }))} actions={actions} />;
+      : <SongRow key={row.key} card={row.card} selected={row.card.id === selected} player={player} queue={queue} take={takes[row.card.id] ?? null} onTake={(id) => setTakes((current) => ({ ...current, [row.card.id]: id }))} actions={actions} />;
 
   const emptyText = query.trim() || filter !== "all"
     ? i18n._({ id: "No song matches that.", message: "No song matches that." })

@@ -27,7 +27,8 @@ import { SongResult } from "./MakeSongPage";
 import { RemixSong } from "./MusicRemix";
 import { stemsAddress, studioAddress } from "./musicAddresses";
 import { clockOf, isLockedTile, isMaking, playableVersion, styleTags } from "./musicLibraryModel";
-import type { RowPlayer } from "./useRowPlayer";
+import { useMusicClock, type MusicPlayer } from "@/shell/music/musicPlayer";
+import { trackOf } from "./musicLibraryModel";
 
 const problemText = (error: unknown, fallback: string): string => errorLine(error, fallback);
 const SECONDS_OR_MS = (value: number): number => (value < 1e12 ? value * 1000 : value);
@@ -59,10 +60,11 @@ export function songReason(card: MusicCard | undefined): string {
 
 /** The details of one song. `id` is the song; `player` is the list's shared player. */
 export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, onVideo }: {
-  id: string; player: RowPlayer; remix: boolean; onClose?: () => void;
+  id: string; player: MusicPlayer; remix: boolean; onClose?: () => void;
   onDelete: (card: MusicCard) => void; onLikeThis: (card: MusicCard) => void; onVideo: (version: MusicVersion) => void;
 }) {
   const { push } = useToast();
+  const clockNow = useMusicClock();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [remixing, setRemixing] = useState(remix);
@@ -92,15 +94,15 @@ export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, 
   const tags = styleTags(song.description);
   const length = clockOf(song.duration_s);
   const made = Number.isFinite(Number(song.started_at)) && Number(song.started_at) > 0 ? formatDate(new Date(SECONDS_OR_MS(Number(song.started_at))), { year: "numeric", month: "long", day: "numeric" }) : "";
-  const playingThis = !!version && player.key === version.id && player.playing;
+  const playingThis = !!version && player.track?.key === version.id && player.playing;
   const Play = getIcon(playingThis ? "pause" : "play");
-  const playCurrent = () => { if (version) player.toggle({ key: version.id, url: version.url, title, artworkUrl: song.cover_url }); };
+  const playCurrent = () => { const one = trackOf(song, version?.id ?? null, i18n._({ id: "Untitled song", message: "Untitled song" })); if (one) player.toggle(one, player.queue); };
   const lyricsText = song.lyrics?.trim() && song.lyrics.trim() !== "[Instrumental]" ? song.lyrics : "";
   const timed = song.timed_lyrics?.length ? song.timed_lyrics : null;
-  const liveTime = version && player.key === version.id ? player.time : 0;
+  const liveTime = version && player.track?.key === version.id ? clockNow.time : 0;
   // The kit's lyrics list, placed in the panel's Lyrics section: the section is page layout, not a frame drawn around the Element.
   const lyricsNode = timed
-    ? <LyricsList lines={timed} currentTime={liveTime} onSeek={(seconds) => { if (version && player.key !== version.id) playCurrent(); player.seek(seconds); }} labels={{ label: i18n._({ id: "Lyrics", message: "Lyrics" }), empty: i18n._({ id: "Instrumental. No lyrics were written.", message: "Instrumental. No lyrics were written." }) }} />
+    ? <LyricsList lines={timed} currentTime={liveTime} onSeek={(seconds) => { if (version && player.track?.key !== version.id) playCurrent(); player.seek(seconds); }} labels={{ label: i18n._({ id: "Lyrics", message: "Lyrics" }), empty: i18n._({ id: "Instrumental. No lyrics were written.", message: "Instrumental. No lyrics were written." }) }} />
     : <LyricsList {...(lyricsText ? { text: lyricsText } : {})} labels={{ label: i18n._({ id: "Lyrics", message: "Lyrics" }), empty: i18n._({ id: "Instrumental. No lyrics were written.", message: "Instrumental. No lyrics were written." }) }} />;
   const Icon = (name: string) => { const One = getIcon(name); return <One aria-hidden="true" />; };
 
@@ -166,9 +168,9 @@ export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, 
       <h3 className="text-muted-foreground text-badge font-semibold tracking-wide uppercase">{song.takes ? i18n._({ id: "Takes and versions", message: "Takes and versions" }) : i18n._({ id: "Versions", message: "Versions" })}</h3>
       <ul className="flex list-none flex-col gap-1 p-0">
         {song.versions.map((one) => {
-          const now = player.key === one.id && player.playing; const Row = getIcon(now ? "pause" : "play");
+          const now = player.track?.key === one.id && player.playing; const Row = getIcon(now ? "pause" : "play");
           return <li key={one.id} className="flex min-w-0 items-center gap-2">
-            <Button type="button" variant="ghost" size="icon-sm" aria-label={now ? i18n._({ id: "Pause {label}", message: "Pause {label}", values: { label: one.label } }) : i18n._({ id: "Play {label}", message: "Play {label}", values: { label: one.label } })} disabled={!ready} onClick={() => player.toggle({ key: one.id, url: one.url, title: `${title} (${one.label})`, artworkUrl: song.cover_url })}><Row aria-hidden="true" /></Button>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label={now ? i18n._({ id: "Pause {label}", message: "Pause {label}", values: { label: one.label } }) : i18n._({ id: "Play {label}", message: "Play {label}", values: { label: one.label } })} disabled={!ready} onClick={() => { const made = trackOf(song, one.id, title); if (made) player.toggle(made, player.queue); }}><Row aria-hidden="true" /></Button>
             <span className="min-w-0 flex-1 truncate text-supporting">{one.label}{typeof one.seed === "number" ? <span className="text-muted-foreground"> · {i18n._({ id: "Seed {seed}", message: "Seed {seed}", values: { seed: one.seed } })}</span> : null}</span>
             {one.id === song.current_id ? <Badge variant="outline">{i18n._({ id: "Current", message: "Current" })}</Badge> : <Button type="button" variant="ghost" size="sm" disabled={!ready} onClick={() => chooseVersion(one.id)}>{i18n._({ id: "Use this one", message: "Use this one" })}</Button>}
             <Button asChild variant="ghost" size="icon-sm"><a href={one.url} download aria-label={i18n._({ id: "Download {label}", message: "Download {label}", values: { label: one.label } })}>{Icon("download")}</a></Button>

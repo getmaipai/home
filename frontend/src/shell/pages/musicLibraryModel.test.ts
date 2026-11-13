@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { clockOf, isLockedTile, libraryRows, playableVersion, styleTags, takeStrip } from "./musicLibraryModel";
+import { clockOf, isLockedTile, libraryRows, playableVersion, queueOf, styleTags, takeStrip, trackOf } from "./musicLibraryModel";
 import type { MusicCard, SavedSound } from "@/lib/musicApi";
 
 const card = (patch: Partial<MusicCard>): MusicCard => ({ id: "a", state: "done", title: "Neon Rain", description: "dreamy indie pop, female vocal", versions: [], current_id: null, takes: null, sound: null, ...patch }) as MusicCard;
@@ -55,5 +55,22 @@ describe("libraryRows", () => {
     expect(libraryRows(cards, sounds, "all", "  CINEMATIC ").map((row) => row.key)).toEqual(["b"]);
     expect(libraryRows(cards, sounds, "all", "rain").map((row) => row.key)).toEqual(["a", "sound-s2"]);
     expect(libraryRows(cards, sounds, "all", "nothing like this")).toEqual([]);
+  });
+});
+
+describe("trackOf and queueOf (the player's queue)", () => {
+  const made = card({ id: "j1", cover_url: "/c.png", duration_s: 120, lyrics: "la la", timed_lyrics: [{ t: 1, line: "la", section: null }], versions: [{ id: "f1", label: "Take 1", url: "/f1" }, { id: "f2", label: "Take 2", url: "/f2" }], current_id: "f1", takes: { group: "g", index: 0, total: 2 } });
+  test("a song becomes a track with its ids, style line, words and chosen take", () => {
+    const one = trackOf(made, "f2", "Untitled song")!;
+    expect(one).toMatchObject({ key: "f2", url: "/f2", title: "Neon Rain (Take 2)", subtitle: "dreamy indie pop, female vocal", songId: "j1", jobId: "j1", lyrics: "la la" });
+    expect(one.timed?.length).toBe(1);
+    expect(trackOf(card({ versions: [] }), null, "Untitled song")).toBeNull();
+  });
+  test("an instrumental has no lyrics text", () => {
+    expect(trackOf(card({ lyrics: "[Instrumental]", versions: [{ id: "f", label: "x", url: "/f" }], current_id: "f" }), null, "Untitled song")?.lyrics).toBeUndefined();
+  });
+  test("the queue is the finished song rows in order, each as its chosen take; sounds and unfinished songs are left out", () => {
+    const rows = libraryRows([made, card({ id: "q", state: "running", versions: [] }), card({ id: "k", title: "Second", versions: [{ id: "g1", label: "x", url: "/g1" }], current_id: "g1" })], [sound({})], "all", "");
+    expect(queueOf(rows, { j1: "f2" }, "Untitled song").map((one) => one.key)).toEqual(["f2", "g1"]);
   });
 });

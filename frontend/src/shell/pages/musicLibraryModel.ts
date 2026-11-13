@@ -2,6 +2,7 @@
 // splits into tags, how long a row reads, and what the take strip offers. The hub returns one card per song; a song asked for as
 // several takes is already one card whose versions are the takes (MP-05), so nothing here regroups.
 import type { MusicCard, MusicVersion, SavedSound } from "@/lib/musicApi";
+import type { Track } from "@/shell/music/musicQueue";
 
 export type LibraryFilter = "all" | "songs" | "sounds";
 export type LibraryRow = { kind: "song"; key: string; card: MusicCard } | { kind: "sound"; key: string; sound: SavedSound };
@@ -52,4 +53,24 @@ export function libraryRows(cards: readonly MusicCard[], sounds: readonly SavedS
   const songRows: LibraryRow[] = filter === "sounds" ? [] : cards.filter((card) => !isLockedTile(card) && !card.sound && (!q || norm(`${card.title ?? ""} ${card.description ?? ""}`).includes(q))).map((card) => ({ kind: "song", key: card.id, card }));
   const soundRows: LibraryRow[] = filter === "songs" ? [] : sounds.filter((sound) => !q || norm(sound.title).includes(q)).map((sound) => ({ kind: "sound", key: `sound-${sound.id}`, sound }));
   return [...songRows, ...soundRows];
+}
+
+/** The track a song plays as: the chosen take (or the current version), its style line, cover, words and the ids the waveform route needs.
+ * Null when the song has nothing to play yet. A locked tile never reaches here (it is not a card). */
+export function trackOf(card: MusicCard, takeId: string | null | undefined, untitled: string): Track | null {
+  const version = playableVersion(card, takeId);
+  if (!version) return null;
+  const take = takeStrip(card).find((one) => one.id === version.id);
+  const lyrics = card.lyrics?.trim() && card.lyrics.trim() !== "[Instrumental]" ? card.lyrics : undefined;
+  return {
+    key: version.id, url: version.url, title: `${card.title ?? untitled}${take ? ` (${take.label})` : ""}`,
+    ...(styleTags(card.description, 3).length ? { subtitle: styleTags(card.description, 3).join(", ") } : {}),
+    artworkUrl: card.cover_url, songId: card.id, jobId: card.id, duration: card.duration_s,
+    ...(lyrics ? { lyrics } : {}), ...(card.timed_lyrics?.length ? { timed: card.timed_lyrics } : {}),
+  };
+}
+
+/** The songs a list plays one after another: every finished song row that has a version, in the order shown, each as the take chosen on its row. */
+export function queueOf(rows: readonly LibraryRow[], takes: Readonly<Record<string, string>>, untitled: string): Track[] {
+  return rows.flatMap((row) => (row.kind === "song" && row.card.state === "done" ? [trackOf(row.card, takes[row.card.id], untitled)] : [])).filter((one): one is Track => one !== null);
 }

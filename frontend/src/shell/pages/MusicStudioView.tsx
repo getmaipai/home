@@ -19,6 +19,9 @@ import { musicApi, type EffectBody, type MusicCard } from "@/lib/musicApi";
 import { MAKE_SONG_ADULT_LINE } from "./MakeSongPage";
 import { Cover } from "@maipai/ui/src/ui/media-tiles";
 import { BringSong } from "./BringSong";
+import { useMusicPlayer } from "@/shell/music/musicPlayer";
+import { trackOf } from "./musicLibraryModel";
+import { getIcon } from "@maipai/ui/src/icons";
 import { EFFECT_CHOICES, EFFECT_SLIDERS, EQ_PRESET_CHOICES, compressBody, currentVersion, effectBody, eqBody, nextVersionId, previousVersionId, studioLanes, type EffectChoice } from "./musicStudioFx";
 
 export const STEMS_UNAVAILABLE_LINE = () => i18n._({ id: "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here.", message: "This computer has no stem model installed, so the song cannot be split. An admin can add one in Settings. The full song still plays here." });
@@ -56,6 +59,10 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   const card = locked ? undefined : song.data;
   const stemsCard = stems.data && !isLockedCard(stems.data) ? stems.data : undefined;
   const version = currentVersion(card);
+  const player = useMusicPlayer();
+  const studioTrack = card && version && card.state === "done" ? trackOf(card, version.id, i18n._({ id: "Untitled song", message: "Untitled song" })) : null;
+  const studioPlaying = !!studioTrack && player.track?.key === studioTrack.key && player.playing;
+  const PlayGlyph = getIcon(studioPlaying ? "pause" : "play");
   const [probed, setProbed] = useState<{ url: string; seconds: number } | null>(null);
   const duration = card?.duration_s ?? (probed && probed.url === version?.url ? probed.seconds : 0);
   useEffect(() => {
@@ -138,6 +145,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
       <div className="flex min-w-0 flex-1 flex-col gap-1"><p className="text-muted-foreground text-sm">{i18n._({ id: "Studio", message: "Studio" })}</p>
         <h2 className="min-w-0 truncate text-title">{locked ? i18n._({ id: "Locked song", message: "Locked song" }) : card?.title ?? i18n._({ id: "Studio", message: "Studio" })}</h2></div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+        <Button type="button" variant="secondary" disabled={!studioTrack} title={studioTrack ? undefined : i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." })} aria-pressed={studioPlaying} data-testid="studio-play-in-bar" onClick={() => { if (studioTrack) player.toggle(studioTrack, player.queue); }}><PlayGlyph aria-hidden="true" />{studioPlaying ? i18n._({ id: "Pause", message: "Pause" }) : i18n._({ id: "Play in the player", message: "Play in the player" })}</Button>
         <Button asChild variant="secondary"><Link to={`/apps/audio/create?song=${encodeURIComponent(songId)}`}>{i18n._({ id: "Back to the song", message: "Back to the song" })}</Link></Button>
         <Button type="button" disabled={splitting || stemsBusy || hasStems || !card || card.state !== "done"} title={hasStems ? i18n._({ id: "This song is already split into stems.", message: "This song is already split into stems." }) : undefined}
           onClick={() => { setSplitting(true); setStemsProblem(""); void splitInto(songId); }}>{stemsBusy || splitting ? i18n._({ id: "Splitting into stems", message: "Splitting into stems" }) : hasStems ? i18n._({ id: "Split into stems (done)", message: "Split into stems (done)" }) : i18n._({ id: "Split into stems", message: "Split into stems" })}</Button>
