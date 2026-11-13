@@ -113686,6 +113686,11 @@
                       "full"
                     ]
                   },
+                  "language": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$"
+                  },
                   "bpm": {
                     "type": "number",
                     "minimum": 20,

@@ -783,6 +783,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/lock.ts` | musicJobLockItem, musicJobLockState, musicRowIsLocked, lockedMusicTile, LOCKED_MUSIC_START_LINE, LOCKED_MUSIC_RESULT_TEXT |
 | `backend/src/lib/music/lyricsAlign.ts` | buildLines, keepOrdered, spaceUnanchored, reconcile |
 | `backend/src/lib/music/lyricsTranslate.ts` | sourceHash, translateLines, cachedTranslation, fillTranslation, translationLanguage, cachedMadeTranslation |
+| `backend/src/lib/music/lyricsWriter.ts` | writeSongLyrics |
 | `backend/src/lib/music/m4a.ts` | m4aSeconds |
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
 | `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, SAMPLE_RATE, parseWav, mixPcmWav, run |
