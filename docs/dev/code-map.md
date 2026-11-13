@@ -958,7 +958,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
-| `backend/src/lib/pictures/likeness/edit.ts` | LIKENESS, LINES, whenFree, realDeps, runLikenessEdit, hasProtectableFace |
+| `backend/src/lib/pictures/likeness/edit.ts` | LIKENESS, LINES, whenFree, realDeps, runLikenessEdit, __setLikenessDepsForTests |
 | `backend/src/lib/pictures/likeness/faces.ts` | detectFaces, embedFace, faceCosine |
 | `backend/src/lib/pictures/likeness/guard.ts` | ssimGray, faceUntouched, matchFaces, coverage, ringDiff, smallFace |
 | `backend/src/lib/pictures/likeness/masks.ts` | grayMask, encodeMask, morphology, union, subtract, invert |
@@ -1284,7 +1284,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
 | `backend/src/lib/videos/beatCut.ts` | planBeatCut |
 | `backend/src/lib/videos/chapters.ts` | chaptersForMadeClip |
-| `backend/src/lib/videos/clearerLevels.ts` | STACK_HAS_VIDEO_RESTORE, videoClearerLevels |
+| `backend/src/lib/videos/clearerLevels.ts` | BEST_VIDEO_NOT_YET, STACK_HAS_VIDEO_RESTORE, videoClearerLevels |
 | `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen |
 | `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
