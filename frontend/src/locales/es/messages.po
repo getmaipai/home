@@ -2495,6 +2495,11 @@ msgid "Add a voice"
 msgstr "Añadir una voz"
 
 #. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Add a voice or music"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:124
 #, needs-review
 msgid "Add a word"
@@ -5347,6 +5352,16 @@ msgid "Captions unavailable"
 msgstr "Subtítulos no disponibles"
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "Capture look"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "Capturing look"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1466
 #, needs-review
 msgid "setting.tts.voice_id.option_label.caro_davy"
@@ -6095,6 +6110,11 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:74
+msgid "Choose {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/mediaHost.tsx:488
 #, needs-review
 msgid "Choose a clip"
@@ -6169,6 +6189,11 @@ msgstr "Elige un nombre para esta lista."
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:241
 msgid "Choose a person"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Choose a picture"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12702,8 +12727,18 @@ msgid "Home could not add that file. Try again."
 msgstr "Home no pudo agregar ese archivo. Vuelve a intentarlo."
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:63
+msgid "Home could not add that picture. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/SoundExtras.tsx:68
 msgid "Home could not add the sound to that song. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:48
+msgid "Home could not capture this look. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19349,6 +19384,11 @@ msgid "No items match your search."
 msgstr "Ningún elemento coincide con tu búsqueda."
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "No look sheet yet"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:54
 #, needs-review
 msgid "No maintenance is scheduled."
@@ -21939,6 +21979,11 @@ msgstr "Elige uno y se pone en la barra de arriba."
 #, needs-review
 msgid "Pick one of your own clips to put after this one."
 msgstr "Elige uno de tus clips para ponerlo después de este."
+
+#. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Pick someone from your cast"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:202
@@ -34327,8 +34372,18 @@ msgid "Your cards did not load"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:71
 msgid "Your cast did not load. Close this and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast is empty."
 msgstr ""
 
 #. js-lingui-explicit-id

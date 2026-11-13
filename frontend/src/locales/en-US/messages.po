@@ -2157,6 +2157,11 @@ msgid "Add a voice"
 msgstr "Add a voice"
 
 #. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Add a voice or music"
+msgstr "Add a voice or music"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:124
 msgid "Add a word"
 msgstr "Add a word"
@@ -4659,6 +4664,16 @@ msgid "Captions unavailable"
 msgstr "Captions unavailable"
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "Capture look"
+msgstr "Capture look"
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "Capturing look"
+msgstr "Capturing look"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1466
 msgid "setting.tts.voice_id.option_label.caro_davy"
 msgstr "Caro Davy"
@@ -5311,6 +5326,11 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr "Chit Chat"
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:74
+msgid "Choose {name}"
+msgstr "Choose {name}"
+
+#. js-lingui-explicit-id
 #: src/shell/mediaHost.tsx:488
 msgid "Choose a clip"
 msgstr "Choose a clip"
@@ -5374,6 +5394,11 @@ msgstr "Choose a name for this list."
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:241
 msgid "Choose a person"
 msgstr "Choose a person"
+
+#. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Choose a picture"
+msgstr "Choose a picture"
 
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:55
@@ -11005,9 +11030,19 @@ msgid "Home could not add that file. Try again."
 msgstr "Home could not add that file. Try again."
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:63
+msgid "Home could not add that picture. Check your connection and try again."
+msgstr "Home could not add that picture. Check your connection and try again."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/SoundExtras.tsx:68
 msgid "Home could not add the sound to that song. Try again."
 msgstr "Home could not add the sound to that song. Try again."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:48
+msgid "Home could not capture this look. Try again."
+msgstr "Home could not capture this look. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:27
@@ -16790,6 +16825,11 @@ msgid "No items match your search."
 msgstr "No items match your search."
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:78
+msgid "No look sheet yet"
+msgstr "No look sheet yet"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:54
 msgid "No maintenance is scheduled."
 msgstr "No maintenance is scheduled."
@@ -19040,6 +19080,11 @@ msgstr "Pick one and it goes into the bar above."
 #: src/shell/mediaHost.tsx:489
 msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
+
+#. js-lingui-explicit-id
+#: src/shell/mediaHost.tsx:488
+msgid "Pick someone from your cast"
+msgstr "Pick someone from your cast"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:202
@@ -29811,9 +29856,19 @@ msgid "Your cards did not load"
 msgstr "Your cards did not load"
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast"
+msgstr "Your cast"
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:71
 msgid "Your cast did not load. Close this and try again."
 msgstr "Your cast did not load. Close this and try again."
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:72
+msgid "Your cast is empty."
+msgstr "Your cast is empty."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:93
