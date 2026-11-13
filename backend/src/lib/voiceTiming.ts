@@ -50,6 +50,13 @@ export interface VoiceTimingRecord {
   overlap_ms?: number | null;
   decision?: TalkOverDecision | null;
   yield_ms?: number | null;
+  /** How many edge partials the hub marked in the utterance (a real voice pauses more than a clean recording). */
+  edge_partials?: number | null;
+  /** The acknowledgement clip's start and end against the end of speech (negative: before the person finished, a wrong start in a
+   * pause), and whether it played to its natural end (false only when the call closed under it: nothing else ever stops a clip). */
+  clip_started_ms?: number | null;
+  clip_ended_ms?: number | null;
+  clip_completed?: boolean | null;
 }
 
 export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
@@ -57,22 +64,25 @@ export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** `armed`: the client could start one and the final came first (no edge partial reached it); `no_conversation`: the voice chat had no
  * conversation id yet; `too_long`: over 40 words; `refused`: the hub said no; `request_failed`: the start request failed; `off`: the client
  * had no speculation at all (the setting or surface). The hub itself marks `started` and `confirmed`. */
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+
 export const TALK_OVER_DECISIONS = ["none", "confirmed", "continued"] as const;
 
 export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; reason?: "engine_busy" | "engine_error" | "timeout" | "other"; prompt_n?: number; cache_n?: number; elapsed_ms: number }
 type VoiceTimingStage = "stt_ms" | "turn_start_ms" | "first_token_ms" | "first_sentence_ms" | "first_audio_ms" | "first_playback_ms";
 export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_id: z.string(), stt_ms: z.number().finite().nonnegative(), first_playback_ms: z.number().finite().nonnegative().optional(), first_sentence_ms: z.number().finite().nonnegative().optional(), cue_playback_ms: z.number().finite().nonnegative().optional(), head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(), ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
   // STT-SMARTTURN-01 and TALK-OVER-01: counts and labels only. The server's own `confirmed` mark (set at the confirmation) is never overwritten by a client label.
-  speculative: z.enum(SPECULATIVE_OUTCOMES).optional(), talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().min(-60_000).max(60_000).optional(), overlap_ms: z.number().finite().nonnegative().max(60_000).optional(), decision: z.enum(TALK_OVER_DECISIONS).optional(), yield_ms: z.number().finite().nonnegative().max(60_000).optional() }).strict();
+  speculative: z.enum(SPECULATIVE_OUTCOMES).optional(), talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().min(-60_000).max(60_000).optional(), overlap_ms: z.number().finite().nonnegative().max(60_000).optional(), decision: z.enum(TALK_OVER_DECISIONS).optional(), yield_ms: z.number().finite().nonnegative().max(60_000).optional(),
+  edge_partials: z.number().int().nonnegative().max(1000).optional(), clip_started_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_ended_ms: z.number().finite().min(-60_000).max(60_000).optional(), clip_completed: z.boolean().optional() }).strict();
 
 /** The speculative start's outcome and the talk-over labels, from the client's timing message or the server's own confirmation. */
-export function setVoiceOutcome(record: VoiceTimingRecord | undefined, fields: { speculative?: SpeculativeOutcome; talk_over_level?: VoiceTimingRecord["talk_over_level"]; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number }): void {
+export function setVoiceOutcome(record: VoiceTimingRecord | undefined, fields: { speculative?: SpeculativeOutcome; talk_over_level?: VoiceTimingRecord["talk_over_level"]; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number; edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean }): void {
   if (!record) return;
   if (fields.speculative !== undefined && record.speculative !== "confirmed") record.speculative = fields.speculative;
   if (fields.talk_over_level !== undefined) record.talk_over_level = fields.talk_over_level;
-  for (const key of ["early_release_ms", "overlap_ms", "yield_ms"] as const) { const value = fields[key]; if (value !== undefined && Number.isFinite(value)) record[key] = Math.round(value); }
+  for (const key of ["early_release_ms", "overlap_ms", "yield_ms", "edge_partials", "clip_started_ms", "clip_ended_ms"] as const) { const value = fields[key]; if (value !== undefined && Number.isFinite(value)) record[key] = Math.round(value); }
   if (fields.decision !== undefined) record.decision = fields.decision;
+  if (fields.clip_completed !== undefined) record.clip_completed = fields.clip_completed;
   persist();
 }
 
@@ -203,7 +213,9 @@ export function voiceTimingReport(limit = 50): string {
   const contentionReport = [`turns that began while a conversation warm was still in flight: ${warmInFlight.length} (first token median ${median(warmInFlight.flatMap((r) => r.time_to_first_token_ms == null ? [] : [r.time_to_first_token_ms]))} ms) vs ${rows.filter((r) => r.prewarm_in_flight === false).length} that did not (median ${median(rows.flatMap((r) => r.prewarm_in_flight === false && r.time_to_first_token_ms != null ? [r.time_to_first_token_ms] : []))} ms)`];
   // TALK-OVER-01: the acknowledgement clip's timing, the window decisions and the hard-stop latency.
   const talkRows = rows.filter((r) => typeof r.early_release_ms === "number");
-  const talkReport = [`talk before I finish: clips played ${talkRows.length} (gentle ${talkRows.filter((r) => r.talk_over_level === "gentle").length}, natural ${talkRows.filter((r) => r.talk_over_level === "natural").length}), early release vs end of speech median ${median(talkRows.map((r) => r.early_release_ms as number))} ms, continued (wrong starts) ${rows.filter((r) => r.decision === "continued").length}, confirmed ${rows.filter((r) => r.decision === "confirmed").length}, overlap window median ${median(talkRows.flatMap((r) => r.overlap_ms == null ? [] : [r.overlap_ms]))} ms, hard stop median ${median(rows.flatMap((r) => r.yield_ms == null ? [] : [r.yield_ms]))} ms`];
+  const clipRows = rows.filter((r) => typeof r.clip_completed === "boolean");
+  const edgeRows = rows.flatMap((r) => r.edge_partials == null ? [] : [r.edge_partials]);
+  const talkReport = [`edge partials per utterance: median ${median([...edgeRows])}, max ${edgeRows.length ? Math.max(...edgeRows) : "n/a"} (${edgeRows.length} turns)`, `clips: ${clipRows.length} played, ${clipRows.filter((r) => r.clip_completed === true).length} played to the end, ${clipRows.filter((r) => r.clip_completed === false).length} stopped by the call closing; start vs end of speech median ${median(clipRows.flatMap((r) => r.clip_started_ms == null ? [] : [r.clip_started_ms]))} ms, end median ${median(clipRows.flatMap((r) => r.clip_ended_ms == null ? [] : [r.clip_ended_ms]))} ms`, `talk before I finish: clips played ${talkRows.length} (gentle ${talkRows.filter((r) => r.talk_over_level === "gentle").length}, natural ${talkRows.filter((r) => r.talk_over_level === "natural").length}), early release vs end of speech median ${median(talkRows.map((r) => r.early_release_ms as number))} ms, continued (wrong starts) ${rows.filter((r) => r.decision === "continued").length}, confirmed ${rows.filter((r) => r.decision === "confirmed").length}, overlap window median ${median(talkRows.flatMap((r) => r.overlap_ms == null ? [] : [r.overlap_ms]))} ms, hard stop median ${median(rows.flatMap((r) => r.yield_ms == null ? [] : [r.yield_ms]))} ms`];
   // Idle versus busy machine: the same headline split at 70 percent load, so a quiet baseline and a normal development day are read apart.
   const loaded = (r: typeof rows[number]) => typeof r.load_pct === "number" && r.load_pct >= 70;
   const withLoad = rows.filter((r) => typeof r.load_pct === "number");
