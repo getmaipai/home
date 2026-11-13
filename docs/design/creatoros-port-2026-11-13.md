@@ -286,7 +286,7 @@ Evidence of the gaps: a synth reaches pictures and films only if `ensureSubject`
 
 Decision: a cast member is not a new record. It is a synth or a saved subject seen through one function. The saved subject (`media-subject`) is the look store and the one id every made item stores; a synth always has one, linked both ways (`synth.subject_id` and `media-subject.synth_id`). The talent note already rules "one synth has one name, one backstory, one voice and one life whatever it is assigned to" and keeps the two look stores unmerged "the link makes them one person"; this note finishes that link and adds nothing beside it. A prop or a place is a subject with no synth.
 
-- Source of truth: `synth.subject_id` is the link. Home writes `media-subject.synth_id` in the same transaction that sets `synth.subject_id` (CREATOR-04 has a test that fails when they differ), so no reader can see one without the other. The subject's `real` is derived from `synth.based_on.kind` and never set by hand on a linked subject (the talent note's architect condition 13; principle 4, one place for the real-person fact).
+- Source of truth: `synth.subject_id` is the link. Home writes `media-subject.synth_id` in the same transaction that sets `synth.subject_id` (CREATOR-04 has a test that fails when they differ), so no reader can see one without the other. For a subject linked to a synth, `real` is derived from `synth.based_on.kind` and never set by hand (the talent note's architect condition 13; principle 4, one place for the real-person fact); for a household member with no synth it is derived from the subject's person link (6.6).
 - Spec, additive, in `commons/spec` first (CREATOR-01): `media-subject` gains `locked_description` (a sentence of colours, markings, outfit and what is never true, 400 characters, the film plan's `locked` field made permanent). The fields `synth_id`, `voice` and `trained_style_id` already exist in the spec.
 - Home (CREATOR-04): the table gains the three columns the spec has plus the new one; `ensureSubject` writes `synth_id` back, and is called the first time a synth is cast anywhere, not only by shows; one function `resolveCast(actor, ids or names)` returns, for each cast member, the subject, the synth if any, the sheet file, the locked sentence, the pack look (medium: photo or stylised, from the rest picture), the voice and the audience; every tool and page calls it and nothing else. `GET /api/cast` lists what the viewer may use: their own synths and subjects, shared ones, and household members under the rulings below.
 - Personality and voice are read through the link when used, never copied: the film planner reads the synth's tagline and backstory to write a shot in character; a spoken line uses the synth's voice (6.5).
@@ -325,7 +325,7 @@ At most 6 cast in a film (the plan's own cap), 3 on a still or a clip prompt chi
 - `talent-2026-11-07.md` section 2.2: "Only an adult makes a real-person synth"; teens and children get one under `synths.real_people` (a child is `ask` by default and never `all`); "When the member is under 18, the synth's context and the CSAM check carry 'this being is a minor', so sexual output about it is a CSAM candidate and a check that cannot run fails closed."
 - Code today that already enforces it: `mediaSubjects.ts` refuses a `real` subject to a child or teen ("Real-person subjects are not available for this profile yet."); `videos/tool.ts` refuses real or non-character subjects for kids.
 
-`resolveCast` applies exactly these. A household member or a real person is cast through a synth: a synth whose `based_on.kind` is `household_member` or `real_person`, with the `minor` fact in `synth.based_on` (the spec has no `based_on` on `media-subject`). For a household member the `minor` fact is read from the person's age band when the synth is read (`based_on.refresh`), not typed. The linked subject's `real` is derived from `based_on.kind`. A household member is therefore always cast through a synth; the first time one is cast, `ensureSubject` makes the synth if the person does not have one. A loose set of someone's photos that a person attaches in chat stays a one-off, unsaved cast member with no `minor` fact; the picture-level CSAM check (possible-minor detection, rule 10) still runs on every output, and a child or teen is refused as above. No new consent step, prompt or word list is added.
+`resolveCast` applies exactly these. Casting a household member is governed by `generation.household_likeness` alone (rule 0, Family clause); it never reads `synths.of_me` (that setting governs a synth whose `based_on` is a person, a different thing) and it never creates a synth. A household member is cast through an additive person link on the saved subject: `media-subject.person_id` (spec first, CREATOR-01). The subject's `real` and the `minor` fact are derived from that person at read time (their age band), never typed and never stored on the subject, so a child who turns eighteen changes without an edit. The first time a member is cast, the subject is made from their own photos with the person link set; no persona, backstory or life is attached. A person outside the household is a `real` subject made by an adult, as the talent note rules, and carries no `minor` fact; a synth that is `based_on` a person keeps its own rules (`based_on.minor`, `synths.of_me`, `synths.real_people`) when it is cast. A loose set of someone's photos attached in chat stays a one-off, unsaved cast member with no `minor` fact. In every case the picture-level CSAM check (possible-minor detection, rule 10) runs on every output, and a child or teen is refused a real subject as above. No new consent step, prompt or word list is added.
 
 ### 6.7 Every feature takes people one way (cross-reference)
 
@@ -344,7 +344,7 @@ At most 6 cast in a film (the plan's own cap), 3 on a still or a clip prompt chi
 | Re-shoot, Next shot, Another angle (CreatorOS) | the creation record's cast is reused as it was | CREATOR-23, -50 |
 | Swap, Dance, Retouch a person (CreatorOS) | the replacement person is a cast member | CREATOR-48, -49, -57 |
 | Picture Studio "change in words" reference slot | the slot accepts a cast chip (its sheet) as well as a picture | CREATOR-17 |
-| Long take and productions | production cast already holds `subject_id` and `synth_id`; the film runner now fills `synth_id` | CREATOR-04, -27 |
+| Long take and productions | production cast already holds `subject_id` and `synth_id`; the film runner now fills `synth_id` | CREATOR-04, LONGTAKE-02 |
 
 ## 7. One stored shape for what a made item was made from, and credits
 
@@ -466,7 +466,7 @@ Short answer to the owner's question (2026-11-13): the plan covered the bottom a
 
 ### 10.2 One format ladder, as data
 
-A format is a record, not code: aspect, length range, structure, planner prompt, finishing and the Create entry that starts it. The shape already exists for audio shows: spec `show-format.schema.json` (`parts`, `structure` of kinds with a share, `length_s`, `first_app`, `min_audience`). CREATOR-63 extends it additively (a `medium` of video, `aspect`, `finishing`, a planner prompt id, a Create entry id, and the structure kinds cold open, act, sequence, recap, end card, verse and chorus). If the architect rules that `show-format` cannot carry video, a sibling record with the same shape is the fallback, never two shapes in code. The reel formats of CREATOR-24 are rows of this ladder.
+A format is a record, not code: aspect, length range, structure, planner prompt, finishing and the Create entry that starts it. `show-format.schema.json` is audio-only (13 required fields: `parts`, `structure`, `talk_over`, `gap_ms`, `words_per_minute` and others), so it is not extended. CREATOR-63 adds a sibling spec record `video-format` that references show-format's `length_s` and `min_audience` definitions by `$ref` (one definition of each) and carries its own `aspect`, `structure` (kinds cold open, act, sequence, recap, end card, verse, chorus, hook, beat), `finishing`, a planner prompt id and a Create entry id. The reel formats of CREATOR-24 are rows of this ladder.
 
 | Format | Aspect | Length | Structure | Planner prompt | Finishing | Starts from | Exists / row |
 |---|---|---|---|---|---|---|---|
@@ -529,7 +529,7 @@ The Create page shows the same ladder: one entry per format, the format chosen o
 
 ### 10.6 Rows
 
-New: CREATOR-63 (the format ladder as data), CREATOR-64 (Short entry and hook check), CREATOR-65 (music video), CREATOR-66 (episode and series continuity), CREATOR-67 (feature film), CREATOR-68 (hierarchical assembly, Activity by parts, resume), CREATOR-69 (measure real runs: a Short, a 5-minute film, one overnight episode; disk, memory, restart), CREATOR-70 (chat format choice and cards). Planned in existing rows and extended: LONGFORM-01 to -05, FILM-04, FILM-06, FILM-ANIMATIC-01, FILM-GRADE-01, MUSIC-VIDEO-01 inside AUDIO-PARITY-01, LONGTAKE-02, TALENT-06 (spoken shows stay audio; an on-screen episode with synths is TALENT-09 and CREATOR-66), VIDEO-LD-03b.
+New: CREATOR-63 (the format ladder as data, a `video-format` record), CREATOR-64 (Short entry and hook check), CREATOR-65 (music video), CREATOR-66 (episode and series continuity), CREATOR-67 (feature film), CREATOR-68 (hierarchical assembly, Activity by parts, resume), CREATOR-69 (measure real runs: a Short, a 5-minute film, one overnight episode; disk, memory, restart), CREATOR-70 (chat format choice and cards). Planned in existing rows and extended: LONGFORM-01 to -05, FILM-04, FILM-06, FILM-ANIMATIC-01, FILM-GRADE-01, MUSIC-VIDEO-01 inside AUDIO-PARITY-01, LONGTAKE-02, TALENT-06 (spoken shows stay audio; an on-screen episode with synths is TALENT-09 and CREATOR-66), VIDEO-LD-03b.
 
 ## 11. Build order
 
@@ -602,7 +602,7 @@ F. Stack (new models and ops; each "Stack then Home")
 54. CREATOR-52: SeedVR2 and face repair.
 55. CREATOR-53: RIFE smooth motion.
 56. CREATOR-54: sound models.
-57. CREATOR-55: Image to 3D bench, then CREATOR-71: the build.
+57. CREATOR-55: Image to 3D bench, then CREATOR-72 (offer bench for `make_object`), then CREATOR-71: the build.
 58. CREATOR-56: Chatterbox VC.
 59. CREATOR-57: Swap characters (fallback model, needs Jesse's yes).
 
