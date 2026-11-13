@@ -208,7 +208,7 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
 // Plan rows whose label describes the job and not the model (issue 250). The parts line shows the model's own name instead.
 const MODEL_NAMES: Record<string, string> = {
   "reads-pictures": "Muse Glimmer 30B picture reader",
-  "image-tools": "ISNet, LaMa and Real-ESRGAN",
+  "image-tools": "ISNet, LaMa, Real-ESRGAN and Depth Anything V2 Small (99 MB, Apache-2.0)",
   "tool-look": "YOLOX Nano and YOLOX-s",
   "faces-finder": "YuNet and SFace",
   "ingredients-adapter": "LTX 2.5 Ingredients adapter 0.9",

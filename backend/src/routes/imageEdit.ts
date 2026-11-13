@@ -59,7 +59,7 @@ imageEditRoutes.openapi(pictureRoute, (c) => {
 
 const editForm = z.object({
   conversation_id: z.string().min(1).max(80),
-  operation: z.enum(["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip"]),
+  operation: z.enum(["remove_background", "depth", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip"]),
   mask: z.any().optional(),
   scale: z.string().optional(), width: z.string().optional(), height: z.string().optional(), factor: z.string().optional(),
   x: z.string().optional().describe("crop: left edge, 0 to 1 of the width."), y: z.string().optional().describe("crop: top edge, 0 to 1 of the height."),
@@ -84,8 +84,8 @@ imageEditRoutes.openapi(editRoute, async (c) => {
   const actor = c.get("person");
   try {
     const form = await c.req.parseBody();
-    const operation = String(form.operation ?? "") as "remove_background" | "erase" | "upscale" | "resize" | LOCAL_OPERATIONS;
-    if (!["remove_background", "erase", "upscale", "resize", ...LOCAL].includes(operation)) throw new ImageEditError(400, "Pick a tool to run.", "bad_operation");
+    const operation = String(form.operation ?? "") as "remove_background" | "depth" | "erase" | "upscale" | "resize" | LOCAL_OPERATIONS;
+    if (!["remove_background", "depth", "erase", "upscale", "resize", ...LOCAL].includes(operation)) throw new ImageEditError(400, "Pick a tool to run.", "bad_operation");
     if ((LOCAL as readonly string[]).includes(operation)) {
       // Crop, adjust, blur, rotate and flip run in Home on the registry's own argument rules (fractions, not pixels: a crop's width and height are 0 to 1).
       const number = (name: string) => (form[name] === undefined || form[name] === "" ? {} : { [name]: Number(form[name]) });

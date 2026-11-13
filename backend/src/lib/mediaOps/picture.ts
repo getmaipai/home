@@ -44,7 +44,7 @@ function chatSource(source: { via?: "chat" | "file"; conversationId?: string; id
   return { conversationId: source.conversationId, id: source.id };
 }
 
-function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "clearer", levels?: MediaOp["levels"], extra: { listed?: false; values?: (values: any) => any } = {}) {
+function registerEdit(id: string, label: string, summary: string, args: any, controls: any[], operation: "remove_background" | "depth" | "erase" | "upscale" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "clearer", levels?: MediaOp["levels"], extra: { listed?: false; values?: (values: any) => any } = {}) {
   registerMediaOp({
     id: `picture.${id}`,
     label,
@@ -66,6 +66,7 @@ function registerEdit(id: string, label: string, summary: string, args: any, con
 }
 
 registerEdit("remove_background", "Remove background", "Make the background transparent.", empty, [], "remove_background");
+registerEdit("depth", "Depth map", "Make a grayscale picture of how near or far things are.", empty, [], "depth");
 registerEdit("erase", "Erase", "Remove a painted area or selected people from the picture.", eraseArgs, [{ kind: "mask", name: "mask", label: "Area to erase" }], "erase");
 // MAKE-CLEARER-2026-11-13: there is one tool. The old `upscale` is not listed any more (no Studio entry); an old caller (the editor's Resize bar, chat, the image-edit route) still runs it, as Make clearer at the Better level.
 registerEdit("upscale", "Upscale", "Make the picture larger (the Better level of Make clearer).", upscaleArgs, [{ kind: "choice", name: "scale", label: "Scale", options: ["2", "4"] }], "clearer", undefined, { listed: false, values: (values: { scale: 2 | 4 }) => ({ level: "better", size: String(values.scale) }) });

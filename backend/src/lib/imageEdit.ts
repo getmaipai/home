@@ -57,7 +57,7 @@ export class ImageEditError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 423 | 500 | 501 | 502 | 503, message: string, readonly code = "failed") { super(message); }
 }
 
-export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip", "clearer"] as const;
+export const EDIT_OPERATIONS = ["remove_background", "depth", "erase", "upscale", "resize", "crop", "adjust", "blur_background", "rotate", "flip", "clearer"] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
 /** The change a Comment asks for in words (the Stack's generative edit, IMGGEN-EDITOR-01). */
 export type AnyEditOp = EditOperation | "comment";
@@ -81,7 +81,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 export type ClearerLevel = "quick" | "better" | "best";
 export const BEST_NEEDS_DOWNLOAD = "Best can be added in Settings, AI & models.";
 export interface EditToolState { enabled: boolean; reason?: string }
-export type EditToolKey = "markup" | "comment" | "clearer" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
+export type EditToolKey = "markup" | "comment" | "clearer" | "remove_background" | "depth" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
   state: "ready" | "preparing" | "not_installed" | "unavailable" | "off";
   /** One plain line for the editor to show, or null when everything is ready. */
@@ -114,7 +114,7 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
-  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, clearer: { enabled: false, reason }, remove_background: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, rotate: { enabled: false, reason }, flip: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
+  return { markup: { enabled: false, reason }, comment: { enabled: false, reason }, clearer: { enabled: false, reason }, remove_background: { enabled: false, reason }, depth: { enabled: false, reason }, erase: { enabled: false, reason }, resize: { enabled: false, reason }, crop: { enabled: false, reason }, adjust: { enabled: false, reason }, blur_background: { enabled: false, reason }, rotate: { enabled: false, reason }, flip: { enabled: false, reason }, find_people: { enabled: false, reason }, find_subjects: { enabled: false, reason } };
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
@@ -148,6 +148,7 @@ export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus
     comment,
     clearer: { enabled: true },
     remove_background: needs("isnet", status.vision, "The background remover"),
+    depth: status.models.depth === true && status.operations?.includes("depth") ? { enabled: true } : needs("depth", false, "Depth maps"),
     erase: needs("lama", false, "The eraser"),
     resize: preparing ? { enabled: false, reason: prepareReason } : { enabled: true },
     crop: { enabled: true },
@@ -389,7 +390,7 @@ const jobs = new Map<string, EditJob>();
  */
 export const EDIT_JOB_KIND = "picture_edit";
 const homeRows = new Map<string, string>();
-const EDIT_TITLES: Record<AnyEditOp, string> = { comment: "Changing a picture", erase: "Erasing from a picture", remove_background: "Removing a background", blur_background: "Blurring a background", upscale: "Enlarging a picture", clearer: "Making a picture clearer", resize: "Resizing a picture", crop: "Cropping a picture", adjust: "Adjusting a picture", rotate: "Turning a picture", flip: "Flipping a picture" };
+const EDIT_TITLES: Record<AnyEditOp, string> = { comment: "Changing a picture", erase: "Erasing from a picture", remove_background: "Removing a background", depth: "Making a depth map", blur_background: "Blurring a background", upscale: "Enlarging a picture", clearer: "Making a picture clearer", resize: "Resizing a picture", crop: "Cropping a picture", adjust: "Adjusting a picture", rotate: "Turning a picture", flip: "Flipping a picture" };
 function openEditRow(actor: PersonRow, source: SourcePicture, jobId: string, op: AnyEditOp, adultOnly: boolean): void {
   if (adultOnly || source.adultMark?.madeAudience === "adult-only") return;
   const id = `image-edit:${jobId}`;
@@ -595,7 +596,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
     }
     input = { ...input, scale: level === "better" ? (input.size === 4 ? 4 : 2) : undefined };
   }
-  const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" || input.operation === "rotate" || input.operation === "flip" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
+  const tool: EditToolKey = input.operation === "remove_background" || input.operation === "depth" ? input.operation : input.operation === "erase" ? "erase" : input.operation === "crop" || input.operation === "adjust" || input.operation === "rotate" || input.operation === "flip" ? input.operation : input.operation === "blur_background" ? "blur_background" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
   if (input.operation === "crop" || input.operation === "adjust" || input.operation === "blur_background" || input.operation === "rotate" || input.operation === "flip") {
     if (input.operation === "blur_background") {
@@ -638,7 +639,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   }
 }
 
-const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", clearer: "Making it clearer", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", rotate: "Turning", flip: "Flipping", comment: "Making your change" };
+const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", depth: "Making a depth map", erase: "Erasing", upscale: "Making it bigger", clearer: "Making it clearer", resize: "Resizing", crop: "Cropping", adjust: "Adjusting", blur_background: "Blurring the background", rotate: "Turning", flip: "Flipping", comment: "Making your change" };
 
 /** The state of a running edit; the first poll that sees it finished takes the PNG from the Stack and keeps it as a preview. */
 export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditProgress> {
@@ -728,7 +729,7 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
-  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", clearer: "Made clearer", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
+  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", depth: "Depth map", erase: "Object erased", upscale: "Enlarged", clearer: "Made clearer", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
   const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms, level: preview.level });
   previews.delete(token);
   return version;
