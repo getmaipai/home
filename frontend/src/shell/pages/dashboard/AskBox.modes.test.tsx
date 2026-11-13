@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { MediaHostContext, type MediaHost } from "@maipai/ui/src/schema/mediaHost";
 import { api } from "@/lib/api";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { COMPOSER_MODES_KEY, composerHref, type ComposerModesResponse } from "@/shell/composer/composerModes";
@@ -26,6 +27,8 @@ const VIDEO = mode({ id: "video", label: "Video", icon: "film", route: "/apps/vi
 const adult: ComposerModesResponse = { band: "adult", modes: [ASK, PICTURE, VIDEO] };
 const child: ComposerModesResponse = { band: "child", modes: [ASK, PICTURE] };
 
+/** The mode pill appears once the hub's list has more than one mode (the kit draws no pill for one), so tests wait for it. */
+const pill = (view: { container: HTMLElement }) => waitFor(() => { const el = view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]'); expect(el).toBeTruthy(); return el!; });
 function Where() { const l = useLocation(); return <p data-testid="where">{l.pathname}{l.search}</p>; }
 function setup(response: ComposerModesResponse, health?: unknown) {
   // The hub's answer comes through the same api call the page makes, so another test's stubbed fetch cannot replace it.
@@ -44,24 +47,40 @@ describe("the Home ask box reads its modes from the hub", () => {
 
   test("an answer that is not a mode list reads as Ask alone, never a crash", async () => {
     const view = setup({} as ComposerModesResponse);
-    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
-    await waitFor(() => expect(view.getAllByRole("option").map((o) => o.textContent)).toEqual(["Ask"]));
+    // One mode only: the kit draws no mode pill, and the box still takes words.
+    expect(view.getByLabelText("Ask")).toBeTruthy();
+    expect(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')).toBeNull();
   });
 
   test("a child's list has no Video mode in the menu", async () => {
     const view = setup(child);
-    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
+    fireEvent.click(await pill(view));
     await waitFor(() => expect(view.getAllByRole("option").map((o) => o.textContent)).toEqual(["Ask", "Picture"]));
   });
 
   test("the chosen mode and its chips reach Create with the words", async () => {
     const view = setup(adult);
-    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
+    fireEvent.click(await pill(view));
     fireEvent.click(await view.findByText("Picture"));
     const field = view.getByLabelText("Ask") as HTMLTextAreaElement;
     fireEvent.change(field, { target: { value: "a red fox" } });
     fireEvent.click(view.getByLabelText("Make picture"));
     await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1"));
+  });
+
+  test("the picture mode's Image reference is picked in the ask box and its id travels to Create", async () => {
+    const withReference: ComposerModesResponse = { band: "adult", modes: [ASK, mode({ ...PICTURE, references: [{ id: "reference", label: "Image reference", kind: "picture" }] })] };
+    spies.push(spyOn(api, "composerModes").mockResolvedValue(withReference));
+    const host = { onPlay: () => {}, pickMedia: () => Promise.resolve({ id: "file-9", thumb: "/t/9.png" }) } as unknown as MediaHost;
+    const view = renderWithQueryClient(<MemoryRouter><MediaHostContext.Provider value={host}><AskBox /><Where /></MediaHostContext.Provider></MemoryRouter>);
+    view.queryClient.setQueryData(COMPOSER_MODES_KEY, withReference);
+    fireEvent.click(await pill(view));
+    fireEvent.click(await view.findByText("Picture"));
+    fireEvent.click(await waitFor(() => { const el = view.container.querySelector('[data-slot="composer-add"]'); expect(el).toBeTruthy(); return el!; }));
+    await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar"] img')).toBeTruthy());
+    fireEvent.change(view.getByLabelText("Ask") as HTMLTextAreaElement, { target: { value: "a red fox" } });
+    fireEvent.click(view.getByLabelText("Make picture"));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1&reference=file-9"));
   });
 
   test("a chip whose start value is quiet reads as its group name until a value is picked (CREATOR-13)", async () => {
@@ -70,7 +89,7 @@ describe("the Home ask box reads its modes from the hub", () => {
       chips: [{ id: "light", label: "Light", group: "Light", quiet: "none", default: "none", options: [{ value: "none", label: "None" }, { value: "mtpl-lightgolden", label: "Golden hour" }] }],
     })] };
     const view = setup(withLight);
-    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
+    fireEvent.click(await pill(view));
     fireEvent.click(await view.findByText("Picture"));
     const trigger = await waitFor(() => { const el = view.container.querySelector('[data-group="Light"]'); expect(el).toBeTruthy(); return el!; });
     expect(trigger.textContent).toBe("Light");
@@ -84,7 +103,7 @@ describe("the Home ask box reads its modes from the hub", () => {
         image: { kind: "failed", pid: null, alive: false, availability: "unavailable", reason: "not_installed", cause: "not_installed", notice: { adult: "Picture making isn't set up on this computer yet. An owner can add it in Settings, Pictures and videos.", teen: "t", child: "c", repairs_link: null } },
       },
     });
-    fireEvent.click(view.container.querySelector('[data-slot="prompt-bar"] button[aria-haspopup]')!);
+    fireEvent.click(await pill(view));
     fireEvent.click(await view.findByText("Picture"));
     fireEvent.change(view.getByLabelText("Ask"), { target: { value: "a red fox" } });
     await waitFor(() => expect(view.getByText("Picture making isn't set up on this computer yet. An owner can add it in Settings, Pictures and videos.")).toBeTruthy());

@@ -63,6 +63,6 @@ test("Image Create fills every preset under Style and keeps Shape and Pictures t
   const bar = filledPage.body[0]!;
   expect(bar.chips.slice(0, 2).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Settings"], ["count", "Settings"]]);
   expect(bar.chips.slice(2).every((chip) => chip.group === "Style")).toBe(true);
-  expect(bar.chips[0]?.icon).toBe("crop");
+  expect(bar.chips[0]?.icon).toBe("rectangle-horizontal");
   expect(bar.chips[2]?.icon).toBe("palette");
 });

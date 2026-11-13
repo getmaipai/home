@@ -39,7 +39,7 @@ export function composePicturePrompt(base: string, picks: PictureFragmentPicks, 
   return { prompt, aspect };
 }
 
-const FAMILY_LABEL: Record<string, string> = { art: "Art and drawing", story: "Scenes", portrait: "People and outfits", product: "Products", other: "Colour and retouch" };
+const FAMILY_LABEL: Record<string, string> = { art: "Art", story: "Scenes", portrait: "People", product: "Products", other: "Colour" };
 export interface PresetChip { id: string; label: string; default: string; options: Array<{ value: string; label: string }> }
 
 /** The chips of the Presets pill, from the records: Look split by family (a Create page chip holds at most 24 options), then Light, Angle and Format.
@@ -50,7 +50,7 @@ export function pictureFragmentChips(actor: PersonRow): PresetChip[] {
   const families = [...new Set(looks.map((row) => row.category))];
   const chip = (id: string, label: string, rows: FragmentRecord[]): PresetChip => ({ id, label, default: "none", options: [none, ...rows.map((row) => ({ value: row.id, label: row.title }))] });
   return [
-    ...families.map((family) => chip(`look_${family}`, `Look: ${FAMILY_LABEL[family] ?? family}`, looks.filter((row) => row.category === family))),
+    ...families.map((family) => chip(`look_${family}`, FAMILY_LABEL[family] ?? family, looks.filter((row) => row.category === family))),
     ...([["light", "Light", "relight"], ["angle", "Angle", "angle"], ["format", "Format", "format"]] as const).flatMap(([id, label, group]) => {
       const rows = listFragments({ actor, group });
       return rows.length ? [chip(id, label, rows)] : [];

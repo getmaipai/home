@@ -1,8 +1,9 @@
 import { i18n } from "@lingui/core";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { PromptBar } from "@maipai/ui/src/elements/prompt-bar";
+import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type InstallStatusView } from "@/lib/api";
@@ -41,6 +42,9 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
   const [text, setText] = useState("");
   const response = useComposerModes();
   const composer = useComposerState(response, setText);
+  // A reference slot of the chosen mode (the picture's Image reference) is filled here the same way a Create page fills it: the host's picker, then the id travels to that page.
+  const mediaHost = useContext(MediaHostContext);
+  const [picked, setPicked] = useState<Record<string, { id: string; thumb?: string }>>({});
   const availability = useChatAvailability();
   const down = engineDownReason(availability);
   const install = useQuery({
@@ -58,9 +62,28 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
     const words = text.trim();
     if (!words) return;
     // The mode survives the trip: a Create mode opens its own Create page with the words and every chip value, Ask opens Chat (ONE-COMPOSER-2026-11-13).
-    navigate(composerHref(composer.current.route, words, composer.current.route === null ? {} : composer.settings));
+    const carried = Object.fromEntries(composer.current.references.flatMap((ref) => (picked[ref.id] ? [[ref.id, picked[ref.id]!.id]] : [])));
+    navigate(composerHref(composer.current.route, words, composer.current.route === null ? {} : { ...composer.settings, ...carried }));
   };
-  const modes = composer.kitModes.map((item) => (item.id === "ask" ? { ...item, placeholder } : item));
+  const pickInto = (refId: string, kind: "picture" | "character" | "place" | "audio" | "video") => {
+    if (!mediaHost?.pickMedia) return;
+    void mediaHost.pickMedia(kind).then((got) => { if (got) setPicked((all) => ({ ...all, [refId]: got })); }, () => {});
+  };
+  const first = composer.current.references[0];
+  const modes = composer.kitModes.map((item) => {
+    if (item.id === "ask") return { ...item, placeholder };
+    if (item.id !== composer.mode || !first || !mediaHost?.pickMedia) return item;
+    return {
+      ...item,
+      onAdd: () => pickInto(first.id, first.kind),
+      references: composer.current.references.map((ref) => ({
+        id: ref.id, label: ref.label, kind: ref.kind, ...(ref.max ? { max: ref.max } : {}),
+        value: picked[ref.id]?.id ?? null, ...(picked[ref.id]?.thumb ? { thumb: picked[ref.id]!.thumb } : {}),
+        onPick: () => pickInto(ref.id, ref.kind),
+        onRemove: () => setPicked((all) => { const next = { ...all }; delete next[ref.id]; return next; }),
+      })),
+    };
+  });
 
   return (
     <>

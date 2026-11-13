@@ -38,7 +38,7 @@ registerAppPageFill("image", "create", (person, page) => {
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   for (const item of existing) if (item && typeof item === "object") {
     const chip = item as Record<string, unknown>;
-    if (chip.state === "shape") chip.icon = "crop";
+    if (chip.state === "shape") chip.icon = "rectangle-horizontal";
   }
   bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   const ask = (bar.submit as { ask?: { prompt?: string } } | undefined)?.ask;
