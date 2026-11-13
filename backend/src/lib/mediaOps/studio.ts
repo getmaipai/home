@@ -4,9 +4,11 @@
 // and answers once with the preview. Every gate is the one the generic routes use (registry gates in runMediaOp, source rules in loadSource); nothing here
 // decides who may edit.
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
-import { ImageEditError, LIBRARY_SOURCE, applyPreview, cancelEdit, editErrorFrom, listVersions, loadSource, pollEdit, saveUploadedVersion, type EditProgress, type PictureVersion } from "@/lib/imageEdit";
+import { fileLockState } from "@/lib/adultLock";
+import { ImageEditError, LIBRARY_SOURCE, applyPreview, cancelEdit, editErrorFrom, listVersions, loadSource, readPicture, pollEdit, saveUploadedVersion, type EditProgress, type PictureVersion } from "@/lib/imageEdit";
 import { listLibrary } from "@/lib/library";
 import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
 import { listMediaOps } from "@/lib/mediaOps/registry";
@@ -18,25 +20,52 @@ const WAIT_MS = 10 * 60 * 1000;
 const POLL_MS = 700;
 const MAX_MARKUP_BYTES = 40 * 1024 * 1024;
 
-const nameOf = (id: string): string => db.select({ name: attachments.name }).from(attachments).where(eq(attachments.id, id)).get()?.name?.trim() || "Picture";
+const nameRow = (id: string): string | undefined => db.select({ name: attachments.name }).from(attachments).where(eq(attachments.id, id)).get()?.name?.trim() || undefined;
+/** The name of the picture the person opened: an edited version has no name of its own, so the name is the root picture's, then the opened one's. */
+const nameOf = (rootId: string, id: string): string => nameRow(rootId) ?? nameRow(id) ?? "Picture";
 const missing = (id: unknown) => typeof id !== "string" || id === "" || id.startsWith("$");
 
 function fail(error: unknown): never {
   throw error instanceof ImageEditError ? error : editErrorFrom(error);
 }
 
-/** The opened picture as the `image_editor` node reads it: one row with its versions. A locked picture is a locked row (the node draws a lock tile and reads nothing else). */
-export function studioRows(person: PersonRow, input: { id?: unknown }): Array<Record<string, unknown>> {
-  if (missing(input.id)) return [];
+/** What the person is told when an edit was saved behind their Adult lock: the new version cannot be shown to them until they unlock it in the Library. */
+export const STUDIO_SAVED_LOCKED_NOTE = "Saved to your Library behind your Adult lock. Unlock it there to keep editing it.";
+
+/** The reply of Apply or Markup: the new version, and when it was saved locked for this person (so its picture cannot load here) `locked` and the plain line. */
+function versionReply(person: PersonRow, version: PictureVersion) {
+  const base = { id: version.id, url: version.url, label: version.label, width: version.width, height: version.height, created_at: version.created_at };
+  return fileLockState(person, version.id) === "open" ? base : { ...base, locked: true, note: STUDIO_SAVED_LOCKED_NOTE };
+}
+
+/**
+ * The opened picture as the `image_editor` node reads it: one row with its versions. A locked picture is a locked row (the node draws a lock tile and reads nothing else).
+ * With no picture chosen the answer is no row when the person has pictures to pick from (the page's picker shows), and one placeholder row (`empty`) when they have none
+ * (the page draws its own empty state with what to do next).
+ */
+export async function studioRows(person: PersonRow, input: { id?: unknown }): Promise<Array<Record<string, unknown>>> {
+  if (missing(input.id)) return studioPickerRows(person, {}).length === 0 ? [{ id: "", empty: true }] : [];
   const id = String(input.id);
   try {
     const source = loadSource(person, LIBRARY_SOURCE, id, false);
-    const versions = listVersions(person, LIBRARY_SOURCE, id);
-    return [{ id, title: nameOf(id), url: `/api/media-ops/files/${encodeURIComponent(id)}/content`, width: null, height: null, locked: false, root: source.rootId, versions: versions.map(versionRow) }];
+    const versions = await Promise.all(listVersions(person, LIBRARY_SOURCE, id).map((v) => sized(person, v)));
+    const shown = versions.find((v) => v.id === id);
+    return [{ id, title: nameOf(source.rootId, id), url: `/api/media-ops/files/${encodeURIComponent(id)}/content`, width: shown?.width ?? null, height: shown?.height ?? null, locked: false, root: source.rootId, versions: versions.map(versionRow) }];
   } catch (error) {
     const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
     if (mapped.status === 423) return [{ id, title: "Locked picture", locked: true }];
     throw mapped;
+  }
+}
+
+/** The first picture of a chain (an upload, a made picture) carries no size in its note, and the editor's Compare must know every size to pair like with like: read it from the file. */
+async function sized(person: PersonRow, v: PictureVersion): Promise<PictureVersion> {
+  if (v.width && v.height) return v;
+  try {
+    const meta = await sharp(readPicture(person, LIBRARY_SOURCE, v.id).bytes).metadata();
+    return meta.width && meta.height ? { ...v, width: meta.width, height: meta.height } : v;
+  } catch {
+    return v;
   }
 }
 
@@ -144,8 +173,7 @@ export async function studioComment(person: PersonRow, body: Record<string, unkn
 export async function studioApply(person: PersonRow, body: Record<string, unknown>) {
   if (typeof body.token !== "string" || body.token === "") throw new ImageEditError(422, "That result expired. Run the tool again.", "expired");
   try {
-    const version = await applyPreview(person, body.token, typeof body.label === "string" ? body.label : undefined);
-    return { id: version.id, url: version.url, label: version.label, width: version.width, height: version.height, created_at: version.created_at };
+    return versionReply(person, await applyPreview(person, body.token, typeof body.label === "string" ? body.label : undefined));
   } catch (error) { return fail(error); }
 }
 
@@ -158,7 +186,6 @@ export async function studioMarkup(person: PersonRow, body: Record<string, unkno
   if (bytes.byteLength === 0) throw new ImageEditError(422, "The markup could not be read. Try again.", "bad_mask");
   if (bytes.byteLength > MAX_MARKUP_BYTES) throw new ImageEditError(413, "The markup is too big. Try a smaller picture.", "too_large");
   try {
-    const version = await saveUploadedVersion(person, LIBRARY_SOURCE, body.file, bytes, "Markup");
-    return { id: version.id, url: version.url, label: version.label, width: version.width, height: version.height, created_at: version.created_at };
+    return versionReply(person, await saveUploadedVersion(person, LIBRARY_SOURCE, body.file, bytes, "Markup"));
   } catch (error) { return fail(error); }
 }

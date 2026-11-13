@@ -11,7 +11,7 @@ The Studio is where you change a picture you already have. Everything happens on
 - In the **Library**, open a picture and press **Edit**.
 - In the **Image** app, tap a picture in **All images** or **Recently made**.
 
-You only see your own pictures. A locked picture shows a lock until you unlock it.
+You only see your own pictures. A locked picture shows a lock until you unlock it. If you have no pictures yet, the Studio offers **Make a picture** and tells you to add one in your Library.
 
 ## The tools
 
@@ -30,9 +30,10 @@ If a tool needs the picture model and it is not ready, the tool tells you in one
 
 Each tool shows a preview first. Press **Apply** to keep it as a new version, or discard it. The original is never changed.
 
-- **Compare.** Press **Compare** to slide between the first picture and the one you have now.
+- **Compare.** Press **Compare** to slide between an earlier picture of the same shape and the one you have now. After a crop or a turn, the newest earlier picture with the same shape is used. If there is none, Compare is off and says so.
 - **Undo.** Open the **Versions** menu and choose the version before. Nothing is deleted.
 - Each version is also a picture in your [Library](library.md).
+- A picture you uploaded yourself has no age label, so an edit of it is saved behind your Adult lock. The Studio then says so and keeps showing the picture you were editing. Unlock it in the Library to open the new version.
 
 ## Make a video from it
 

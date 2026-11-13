@@ -95,6 +95,9 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ id: source.id, locked: false });
     expect(rows[0]!.versions.map((v) => v.id)).toEqual([source.id]);
+    // The first picture of a chain has no size in a note: the row carries the real one, so Compare can pair like with like (IMG-STUDIO-03).
+    expect(rows[0]).toMatchObject({ width: 40, height: 30 });
+    expect((rows[0]!.versions as unknown as Array<{ width: number; height: number }>)[0]).toMatchObject({ width: 40, height: 30 });
     expect((await sage.get(rows[0]!.url)).status).toBe(200);
   });
 
@@ -182,5 +185,47 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     const tools = await nova.post("/api/plugins/image/data/studio-tools", { id: mine.id });
     expect(tools.status).toBe(200);
     expect((await studioCall(marlow, "studio-run", { file: mine.id, operation: "adjust", args: { brightness: 10 } })).status).toBe(404);
+  });
+
+  test("an edit of a plain upload is saved locked and Apply says so; the lock rule itself is unchanged (IMG-STUDIO-03)", async () => {
+    const upload = await libraryPicture(sageActor, "library:upload");
+    const run1 = await studioCall(sage, "studio-run", { file: upload.id, operation: "crop", args: { x: 0, y: 0, width: 0.5, height: 1 } });
+    expect(run1.status).toBe(200);
+    const made = (await run1.json()) as { token: string };
+    const applied = await studioCall(sage, "studio-apply", { file: upload.id, token: made.token, label: "Cropped" });
+    expect(applied.status).toBe(200);
+    const reply = (await applied.json()) as { id: string; locked?: boolean; note?: string };
+    expect(reply.locked).toBe(true);
+    expect(reply.note).toBe("Saved to your Library behind your Adult lock. Unlock it there to keep editing it.");
+    // Still stored the way it always was: adult-only, Adult lock on; and its picture cannot be fetched without the unlock.
+    expect(note(reply.id)).toMatchObject({ made_audience: "adult-only", lock: "on" });
+    expect((await sage.get(`/api/media-ops/files/${encodeURIComponent(reply.id)}/content`)).status).toBe(423);
+    expect(((await (await studioRows(sage, reply.id)).json()) as Array<{ locked: boolean }>)[0]).toMatchObject({ locked: true });
+    // The same for Markup, and an open edit carries no lock flag.
+    const marked = (await (await studioCall(sage, "studio-markup", { file: upload.id, png: await dataUrl(await twoColour()) })).json()) as { locked?: boolean };
+    expect(marked.locked).toBe(true);
+    const open = await libraryPicture(sageActor);
+    const openRun = (await (await studioCall(sage, "studio-run", { file: open.id, operation: "crop", args: { x: 0, y: 0, width: 0.5, height: 1 } })).json()) as { token: string };
+    const openApplied = (await (await studioCall(sage, "studio-apply", { file: open.id, token: openRun.token })).json()) as { locked?: boolean };
+    expect(openApplied.locked).toBeUndefined();
+  });
+
+  test("the opened version is named for the picture it came from, not Picture (IMG-STUDIO-03)", async () => {
+    const source = await libraryPicture(sageActor);
+    db.update(attachments).set({ name: "meadow.png" }).where(eq(attachments.id, source.id)).run();
+    const made = (await (await studioCall(sage, "studio-run", { file: source.id, operation: "adjust", args: { brightness: 20, contrast: 0, saturation: 0, warmth: 0, auto: false } })).json()) as { token: string };
+    const version = (await (await studioCall(sage, "studio-apply", { file: source.id, token: made.token })).json()) as { id: string };
+    for (const id of [source.id, version.id]) {
+      const rows = (await (await studioRows(sage, id)).json()) as Array<{ title: string }>;
+      expect(rows[0]!.title).toBe("meadow.png");
+    }
+  });
+
+  test("an empty Library is one placeholder row; a Library with pictures is no row until one is picked (IMG-STUDIO-03)", async () => {
+    expect(await (await studioRows(sage, "$state.file")).json()).toEqual([{ id: "", empty: true }]);
+    await libraryPicture(sageActor);
+    expect(await (await studioRows(sage, "$state.file")).json()).toEqual([]);
+    // Nobody else's pictures count.
+    expect(await (await studioRows(lucia, "")).json()).toEqual([{ id: "", empty: true }]);
   });
 });
