@@ -14,6 +14,7 @@ import { db, sqlite } from "@/db";
 import { adultMarkLog, attachments, musicJobs } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { syncCreationMarkForFile } from "@/lib/creations/store";
 import { LOCKED_WRITERS, consumeTicket, lockItemOfProvenance, withMark, type LockItem } from "@/lib/adultLock";
 import { nextHlc } from "@/lib/hlc";
 import { newAdultMarkLogId } from "@/lib/id";
@@ -92,7 +93,7 @@ export type SetLockResult = { ok: true; made_audience: "all-ages" | "adult-only"
 function writeLock(row: ItemRow, lock: "on" | "off", raise: boolean): void {
   const meta = libraryProvenance(row.provenance);
   const jobId = typeof meta.job === "string" ? meta.job : null;
-  const apply = (id: string, provenance: string) => { const next = withMark(provenance, { lock, raiseToAdult: raise }); if (next) db.update(attachments).set({ provenance: next }).where(eq(attachments.id, id)).run(); };
+  const apply = (id: string, provenance: string) => { const next = withMark(provenance, { lock, raiseToAdult: raise }); if (next) { db.update(attachments).set({ provenance: next }).where(eq(attachments.id, id)).run(); syncCreationMarkForFile(id); } };
   apply(row.id, row.provenance);
   if (meta.writer === "picture-gen") {
     const descendants = db.select({ id: attachments.id, provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.ownerPersonId, row.ownerPersonId), like(attachments.provenance, `image-edit:%"root":"${row.id}"%`))).all();

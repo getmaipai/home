@@ -6,7 +6,8 @@ import sharp from "sharp";
 import { db } from "@/db";
 import { attachments, conversationTurns, people } from "@/db/schema";
 import { createAttachment, purgeFileRecord, removeFileBlobs, storeFile, storeTemporaryChatImage } from "@/lib/attachments";
-import { newFileId, newPictureJobId } from "@/lib/id";
+import { newCreationId, newFileId, newPictureJobId } from "@/lib/id";
+import { recordPictureCreation } from "@/lib/creations/writers";
 import { loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
@@ -282,6 +283,8 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   const view = viewOfJob(job, actor);
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
+  /** CREATOR-02: the creation id each stored picture's note points to; the records are written once the whole job has finished. */
+  const creationIds = new Map<string, string>();
   const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; generatedPictureCallbacks.delete(job.id); savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
   try {
     // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
@@ -332,13 +335,15 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       }
       const turnExists = !!job.turnId && await waitForTurnRow(job.turnId, job);
       if (stopped(job)) { discardStored(storedIds); return; }
-      const provenance = `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), job: job.id, index, ...meta, width, height, ...(!turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`;
+      const creationId = newCreationId();
+      const provenance = `picture-gen:${JSON.stringify({ v: 1, ...markFields(mark), creation: creationId, job: job.id, index, ...meta, width, height, ...(!turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.subject_ids?.length ? { subjects: job.request.subject_ids } : {}) })}`;
       const created = turnExists ? createAttachment(actor, { conversationId, turnId: job.turnId!, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "conversation" }) : storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: raw, provenance, deduplicate: false, retention: "kept" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;
       }
       storedIds.push(created.value.id);
+      creationIds.set(created.value.id, creationId);
       if (mark.lock === "on") logAutoMark(created.value.id, actor.id);
       files.push({ id: created.value.id, width, height, ...meta });
     }
@@ -354,6 +359,8 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.error = null;
   queuedPictureSubmits.delete(job.id);
   savePictureJob(job);
+  // CREATOR-02: the record of how each stored picture was made, written only now that the job has finished (never for a temporary chat, which stores no file).
+  for (const file of files) { const creationId = creationIds.get(file.id); if (creationId) recordPictureCreation(actor, job, file, creationId); }
   const callback = generatedPictureCallbacks.get(job.id);
   generatedPictureCallbacks.delete(job.id);
   if (callback) for (const file of files) void callback(file.id).catch(() => undefined);

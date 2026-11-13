@@ -548,6 +548,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
 | `backend/src/lib/conversationOpening.ts` | THREAD_WINDOW_DAYS, MOOD_WINDOW_DAYS, dayPartAt, sinceLastAt, conversationOpening, renderConversationOpening |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
+| `backend/src/lib/creations/backfill.ts` | backfillCreationForFile |
+| `backend/src/lib/creations/purge.ts` | dropCreationsForFile |
+| `backend/src/lib/creations/store.ts` | FILE_ID, creationIdOfFile, creationIdOfJob, recordCreation, syncCreationMarkForFile, creationOfFile |
+| `backend/src/lib/creations/writers.ts` | generationBlock, recordPictureCreation, recordEditedPicture, recordClipCreation, recordFilmCreation, recordLongTakeCreation |
 | `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, PROFILE_SIGNIN_LOCKOUT_THRESHOLD, checkSigninAddress, failSigninAddress, resetSigninAddress, __resetSigninAddressForTests |
 | `backend/src/lib/dashboard.ts` | getDashboard |
 | `backend/src/lib/dataClasses.ts` | DATA_CLASSES, dataClassById |
@@ -1277,7 +1281,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
 | `backend/src/lib/videos/ingredientsAdapter.ts` | INGREDIENTS_NAME, INGREDIENTS_LIBRARY_NAME, INGREDIENTS_FILE, INGREDIENTS_BYTES, INGREDIENTS_REPO, INGREDIENTS_URL |
-| `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, getVideoJobFor, doneVideoJobsFor |
+| `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, markAnotherTake, getVideoJobFor |
 | `backend/src/lib/videos/librarySort.ts` | LIBRARY_SORT_KEY, savedLibrarySort, librarySortFor |
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MAX_TAKE_SECONDS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE |

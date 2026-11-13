@@ -3,7 +3,7 @@
 // `runGenerateVideo`, the one definition the chat tool also runs, as the person's own screen with no chat behind it.
 import type { PersonRow } from "@/types";
 import { runGenerateVideo, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
-import { getVideoJobFor, type VideoJob } from "./jobs";
+import { getVideoJobFor, markAnotherTake, type VideoJob } from "./jobs";
 import { videoLookFor, videoRecipeFor, videoVoicesFor } from "./recipes";
 import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -169,5 +169,8 @@ export function bodyOfVideoJob(source: VideoJob): MakeVideoBody {
 export async function anotherTakeFor(actor: PersonRow, source: VideoJob, context: MakeVideoContext = {}): Promise<MakeVideoResult> {
   // A Create-page clip that started from a Library picture keeps it (chat clips keep theirs through `prepareVideoRerun`).
   const start = !source.conversationId && source.kind === "animate" && source.request.source_file_id ? { start_frame: source.request.source_file_id } : {};
-  return makeVideoFor(actor, { ...bodyOfVideoJob(source), ...start }, context);
+  const made = await makeVideoFor(actor, { ...bodyOfVideoJob(source), ...start }, context);
+  // CREATOR-02: the new clip's creation record names this clip's record as its parent.
+  if (made.ok) markAnotherTake(made.job, source);
+  return made;
 }

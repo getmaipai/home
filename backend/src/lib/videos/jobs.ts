@@ -8,7 +8,8 @@ import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachment, readAttachmentForConversation, registerTemporaryMedia, storeFile, purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
 import { notifyClipReady } from "./clipNotice";
-import { newFileId, newVideoJobId } from "@/lib/id";
+import { newCreationId, newFileId, newVideoJobId } from "@/lib/id";
+import { recordClipCreation } from "@/lib/creations/writers";
 import { nextHlc } from "@/lib/hlc";
 import { setShotClip } from "@/lib/mediaProductions";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
@@ -128,6 +129,8 @@ export interface VideoRequest {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: whether the Adult lock applies while the clip is made. Absent with `adultOnly` means on (a job stored before the lock was split from the audience). */
   adultLock?: "on" | "off";
+  /** CREATOR-02: set on an Another take: the job it repeats. The finished clip's creation record takes that job's record as its parent. */
+  anotherOf?: string;
   /** REFVIDEO-01: set on a clip made from reference sheets (see `ReferenceRecipe`). */
   reference?: ReferenceRecipe;
   /** REFVIDEO-STEPS-01: the two-step progress of a video made from pictures (set from the start, before the recipe exists). */
@@ -268,6 +271,12 @@ async function releaseVideo(job: VideoJob): Promise<void> {
 }
 
 /** A job by id for its owner only: nobody sees another person's videos, a parent included. */
+/** CREATOR-02: an Another take names the job it repeats, so the new clip's creation record points back at that job's record (`parent_id`). Called right after the new job is started, before it finishes. */
+export function markAnotherTake(job: VideoJob, source: VideoJob): void {
+  job.request.anotherOf = source.id;
+  saveVideoJob(job);
+}
+
 export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
   const live = memory.get(id) ?? liveJobs.get(id);
   if (live) return live.personId === actor.id ? live : null;
@@ -672,6 +681,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
   let file: VideoFile;
   let sibling: VideoFile | null = null;
+  /** CREATOR-02: the id the stored files' notes point to; the record itself is written once the job is done. */
+  const creationId = newCreationId();
   if (job.temporary) {
     const id = newFileId();
     const posterId = newFileId();
@@ -687,8 +698,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     const own = conversationId === null;
     const turnExists = !own && !!job.turnId && await waitForTurnRow(job.turnId);
     if (signal.aborted) return;
-    const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markNote, job: job.id, width, height,  })}`;
-    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, ...(!own && !turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+    const posterProvenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markNote, creation: creationId, job: job.id, width, height,  })}`;
+    const clipProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, creation: creationId, job: job.id, ...meta, ...(!own && !turnExists && job.turnId ? { pendingTurnId: job.turnId } : {}), ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
     const made = own || !turnExists
       ? storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "kept", name: mediaType === "video/webm" ? "Edited video.webm" : undefined })
       : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType, bytes: video, provenance: clipProvenance, deduplicate: false, retention: "conversation", name: mediaType === "video/webm" ? "Edited video.webm" : undefined });
@@ -706,7 +717,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
     file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     if (surround) {
       // SPATIAL-04: the 5.1 file is its own Library file, marked exactly like the stereo clip (same provenance flags), named so it can be told apart.
-      const siblingProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, job: job.id, ...meta, role: "surround_5_1", ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
+      const siblingProvenance = `${writer}:${JSON.stringify({ v: 1, ...markNote, creation: creationId, job: job.id, ...meta, role: "surround_5_1", ...(job.request.edit ? { from: job.request.edit.from, change: job.request.edit.change } : {}) })}`;
       const siblingMade = own
         ? storeFile(actor, { conversationId: null, turnId: null, mediaType, bytes: surround, provenance: siblingProvenance, deduplicate: false, retention: "kept", name: SURROUND_FILE_NAME })
         : createAttachment(actor, { conversationId: conversationId!, turnId: job.turnId!, mediaType, bytes: surround, provenance: siblingProvenance, deduplicate: false, retention: "conversation", name: SURROUND_FILE_NAME });
@@ -721,6 +732,8 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.phase = "ready";
   job.error = null;
   saveVideoJob(job);
+  // CREATOR-02: the record of how this clip was made, written only now that the job has finished (a temporary chat stores no file, so it keeps no record).
+  if (!job.temporary) recordClipCreation(actor, job, job.files, writer, creationId);
   void notifyClipReady(job, actor);
   if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
 }

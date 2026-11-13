@@ -22,7 +22,7 @@ import { householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./
 import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, videoSizeFor } from "./quality";
 import { videoEngineStatus, videoMaxNotReadyReason, videoNotReadyReason, videoStatusReady } from "./ready";
 import { videoAudienceOf, type GenerateVideoState } from "./tool";
-import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, type EditRun, type ReferenceProgress, type ReferenceRecipe, type VideoJob } from "./jobs";
+import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, markAnotherTake, type EditRun, type ReferenceProgress, type ReferenceRecipe, type VideoJob } from "./jobs";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { videoWaitLine } from "./waitLine";
 import { fullViewForJob } from "@/lib/stack/fullView";
@@ -450,6 +450,7 @@ export function anotherReferenceTake(actor: PersonRow, source: VideoJob): { ok: 
   if (!recipe || !source.conversationId) return { ok: false, line: REFERENCE_NO_SHEET_LINE, status: 404 };
   if (activeVideoJobsFor(actor) > 0) return { ok: false, line: REFERENCE_BUSY_LINE, status: 409 };
   const started = startFromRecipe(actor, { conversationId: source.conversationId, turnId: source.turnId }, { ...recipe, seed: newSeed() }, source.id);
+  if (started.ok) markAnotherTake(started.job, source);
   return started.ok ? started : { ok: false, line: started.line, status: started.line === REFERENCE_NO_SHEET_LINE ? 404 : 409 };
 }
 

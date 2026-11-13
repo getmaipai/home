@@ -3,6 +3,7 @@
 // (so the age and surface gates, the Adult-only mark and the finished-video check are each part's own); a part with a serious finding
 // from the frame check is made once more with a new seed; the parts are joined with a cut and the joined file is checked again and kept
 // as one normal clip. The run record is a media production with provenance `long-take`; its parameters are in its `summary`.
+import { recordLongTakeCreation } from "@/lib/creations/writers";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { videoJobs } from "@/db/schema";
@@ -219,5 +220,6 @@ async function runTake(actor: PersonRow, id: string, signal: AbortSignal): Promi
   if (decision.action === "withhold") throw new Error(decision.line);
   const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: joined.bytes, provenance: `video-edit:${JSON.stringify({ v: 1, kind: "long-take", production: id, parts: params.parts, seconds: joined.seconds })}`, retention: "kept", name: "Long take", deduplicate: false });
   if (!saved.ok) throw new Error(saved.error);
+  recordLongTakeCreation(actor, { fileId: saved.value.id, productionId: id, partFileIds: ids.filter((x): x is string => !!x), seconds: joined.seconds ?? null, prompt: params.prompt });
   updateMediaProduction(actor, id, { finished_cut_file_ids: [...finished.production.finished_cut_file_ids, saved.value.id] });
 }

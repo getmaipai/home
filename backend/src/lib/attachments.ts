@@ -24,6 +24,7 @@ import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFileReferences } from "@/lib/fileContent";
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
+import { dropCreationsForFile } from "@/lib/creations/purge";
 import type { PersonRow } from "@/types";
 import { refusal, type Result } from "@/lib/result";
 
@@ -350,6 +351,7 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
  * so today no two records share one. */
 export function purgeFileRecord(row: typeof attachments.$inferSelect): string | null {
   db.delete(shares).where(eq(shares.fileId, row.id)).run();
+  dropCreationsForFile(row.id); // CREATOR-02: a purged item takes its creation record with it
   dropFileReferences(row.id);
   db.delete(attachments).where(eq(attachments.id, row.id)).run();
   return releaseContent(row.sha256, row.storagePath);

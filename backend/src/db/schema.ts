@@ -2006,6 +2006,45 @@ export const podcastShowRates = sqliteTable(
   (table) => [uniqueIndex("podcast_show_rates_person_source_idx").on(table.personId, table.sourceId)],
 );
 
+// CREATOR-02 (docs/design/creatoros-port-2026-11-13.md section 7): one row per made item, the spec `creation-record` as JSON in `body`. Written only by
+// lib/creations/store.ts `recordCreation`, from a finished job's writer; read only by the person who made it. `file_ids` is the JSON list of the made
+// files (looked up with json_each), `made_audience` and `lock` are the copy of the item's mark (lib/adultLock.ts), `parent_id` the record it was made from.
+export const creations = sqliteTable(
+  "creations",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    kind: text("kind").notNull(),
+    parentId: text("parent_id"),
+    review: text("review").notNull().default("pending"),
+    madeAudience: text("made_audience").notNull().default("all-ages"),
+    lock: text("lock").notNull().default("off"),
+    fileIds: text("file_ids").notNull().default("[]"),
+    jobIds: text("job_ids").notNull().default("[]"),
+    body: text("body").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("creations_person_id_idx").on(table.personId), index("creations_parent_id_idx").on(table.parentId)],
+);
+
+// CREATOR-02: the derived index of who is cast in a creation, written in the same transaction as the record and rebuildable from the records. CREATOR-03 reads it.
+export const creationCast = sqliteTable(
+  "creation_cast",
+  {
+    creationId: text("creation_id")
+      .notNull()
+      .references(() => creations.id, { onDelete: "cascade" }),
+    subjectId: text("subject_id").notNull(),
+    synthId: text("synth_id"),
+  },
+  (table) => [primaryKey({ columns: [table.creationId, table.subjectId] }), index("creation_cast_synth_id_idx").on(table.synthId)],
+);
+
 // ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the record of every change to an item's Adult lock: who, when, which item, and how. It holds no
 // content (no title, prompt, words or file name). It is a record, not a log: no admin page or Status page shows it, and only the creator sees their own
 // rows, in the item's menu. `item_id` is the Library file (attachments.id). `action` is `clear` or `mark`; `via` is `creator_passcode`, `creator`, `admin` or `auto`.

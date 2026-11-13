@@ -1,4 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { syncCreationMarkForFile } from "@/lib/creations/store";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { fileAudience } from "@/lib/access";
@@ -39,6 +40,7 @@ export async function recheckFileAudience(actor: PersonRow, id: string) {
     const provenance = row.provenance.slice(0, colon + 1) + JSON.stringify({ ...JSON.parse(row.provenance.slice(colon + 1)), audience: "all-ages" });
     changed = db.update(attachments).set({ provenance, hlc: nextHlc() }).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, actor.id), eq(attachments.provenance, row.provenance), isNull(attachments.deletedAt))).returning({ id: attachments.id }).all().length === 1;
   }
+  if (changed) syncCreationMarkForFile(id);
   appendLogLine(JSON.stringify({ event: "library.recheck-audience", personId: actor.id, fileId: id, before: "adult-only", after: changed ? "all-ages" : "adult-only", result }));
   return changed
     ? { ok: true as const, value: { audience: "all-ages" as const } }

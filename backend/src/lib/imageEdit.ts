@@ -31,7 +31,8 @@ import { fileTypeFromBuffer } from "file-type";
 import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversations, jobs as jobsTable } from "@/db/schema";
-import { newFileId } from "@/lib/id";
+import { newCreationId, newFileId } from "@/lib/id";
+import { recordEditedPicture } from "@/lib/creations/writers";
 import { createJob, updateJob } from "@/lib/jobs";
 import { createAttachment, readAttachment, storeFile, getTemporaryChatImage, getTemporaryChatImageForReader, listTemporaryChatImageVersions, readAttachmentForConversation, storeTemporaryChatImage } from "@/lib/attachments";
 import { isTemporaryConversation } from "@/lib/conversationHistory";
@@ -191,7 +192,7 @@ export const LIBRARY_PICTURE_GONE = "That picture isn't in your Library any more
 /** The fixed answer when a picture is locked (the same line Videos gives): nothing starts and nothing is named. */
 export const LIBRARY_PICTURE_LOCKED = "That is locked. Unlock it with your passcode first, then try again.";
 const EDIT_NOTE = "image-edit:";
-export interface EditProvenance { v: 1; audience?: "all-ages" | "adult-only"; op: EditProvenanceOp; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number }
+export interface EditProvenance { v: 1; /** CREATOR-02: the creation record this version's note points to. */ creation?: string; audience?: "all-ages" | "adult-only"; op: EditProvenanceOp; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number }
 
 function parseProvenance(note: string): EditProvenance | null {
   if (!note.startsWith(EDIT_NOTE)) return null;
@@ -331,7 +332,8 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
   const carries = SIMPLE_LOCAL_OPS.has(meta.op) && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
   const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
-  const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, ...(carries ? { lock: "off" as const } : markFields(mark)), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const creationId = newCreationId();
+  const provenance: EditProvenance & Partial<ReturnType<typeof markFields>> = { v: 1, creation: creationId, ...(carries ? { lock: "off" as const } : markFields(mark)), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
     storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: { ...provenance, audience, made_audience: audience } });
@@ -342,12 +344,14 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "kept", name: null });
     if (!stored.ok) throw new ImageEditError(stored.status === 403 ? 403 : 500, stored.status === 403 ? stored.error : "The edited picture could not be saved. Try again.", stored.status === 403 ? "storage_full" : "save_failed");
     if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(stored.value.id, actor.id); }
+    recordEditedPicture(actor, { fileId: stored.value.id, sourceId: source.id, width: info.width, height: info.height, op: meta.op, label: provenance.label, model: meta.model, ms: meta.ms, creationId });
     return { id: stored.value.id, url: pictureUrl(LIBRARY_SOURCE, stored.value.id), label: provenance.label, created_at: stored.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "conversation" });
   if (!created.ok) throw new ImageEditError(created.status === 403 ? 403 : created.status === 404 ? 404 : 500, created.status === 403 ? created.error : "The edited picture could not be saved. Try again.", created.status === 403 ? "storage_full" : "save_failed");
   if (!carries && mark.lock === "on") { const { logAutoMark } = await import("@/lib/adultMarks"); logAutoMark(created.value.id, actor.id); }
+  recordEditedPicture(actor, { fileId: created.value.id, sourceId: source.id, width: info.width, height: info.height, op: meta.op, label: provenance.label, model: meta.model, ms: meta.ms, creationId });
   return { id: created.value.id, url: pictureUrl(source.conversationId, created.value.id), label: provenance.label, created_at: created.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
 }
 

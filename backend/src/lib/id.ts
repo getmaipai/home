@@ -307,3 +307,8 @@ export function newAdultMarkLogId(): string {
 export function newLoraId(): string {
   return `lora-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/creation-record.schema.json's `^crt-[a-z0-9]{6,}$`. */
+export function newCreationId(): string {
+  return `crt-${randomSuffix(10)}`;
+}
