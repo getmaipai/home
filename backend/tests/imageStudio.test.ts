@@ -172,7 +172,7 @@ describe("the Studio page's data and calls (IMG-STUDIO-02)", () => {
     __setRoleHealthForTests({ image: { availability: "unavailable", reason: "off" } });
     const source = await libraryPicture(sageActor);
     const tools = (await (await sage.post("/api/plugins/image/data/studio-tools", { id: source.id })).json()) as Array<{ id: string; enabled: boolean; reason?: string }>;
-    expect(tools.filter((t) => !("tool" in t)).map((t) => t.id)).toEqual(["picture.blur_background", "picture.make_clearer"]);
+    expect(tools.filter((t) => !("tool" in t)).map((t) => t.id)).toEqual(["picture.depth", "picture.blur_background", "picture.make_clearer"]);
     const res = await studioCall(sage, "studio-comment", { file: source.id, prompt: "make it sunny", region: null, mask: null, reference: null });
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(((await res.json()) as { error: string }).error.length).toBeGreaterThan(10);
@@ -423,7 +423,7 @@ describe("the Studio's reference picture and tool readiness (STUDIO-GAPS-02, STU
     expect(comment.reason).toBe(PICTURES_NOT_READY_LINE);
     expect(off.find((row) => row.tool === "crop")).toMatchObject({ enabled: true });
     // The registry's own list stays in step with the rows: a tool row is never also an extra operation.
-    expect(off.filter((row) => !row.tool).map((row) => row.id)).toEqual(["picture.blur_background", "picture.make_clearer"]);
+    expect(off.filter((row) => !row.tool).map((row) => row.id)).toEqual(["picture.depth", "picture.blur_background", "picture.make_clearer"]);
   });
 
   test("a tool whose engine part is not installed is disabled up front with the engine's reason", async () => {
