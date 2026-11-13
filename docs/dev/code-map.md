@@ -1159,7 +1159,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/trustProxy.ts` | TRUST_PROXY |
 | `backend/src/lib/tts.ts` | plannedRecordedEngine, synthesizeSpeech, synthesizeRecordedSpeech |
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
-| `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
+| `backend/src/lib/turnActivity.ts` | LISTENING_ACTIVE_WINDOW_MS, noteListeningActivity, DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
 | `backend/src/lib/turnEnd.ts` | GENTLE_THRESHOLD, NATURAL_THRESHOLD, UNFINISHED_BELOW, predictTurnEnd, firesAt, stepDown |
 | `backend/src/lib/turnErrorDetail.ts` | canReadErrorDetail, turnOwnerId, turnErrorDetail, turnErrorDetailFrom, missingTurnErrorDetail, statsForViewer |
