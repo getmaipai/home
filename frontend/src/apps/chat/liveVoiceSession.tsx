@@ -568,7 +568,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               onFrame: (frame) => {
                 if (mutedRef.current) return;
                 // ECHO-GATE-01: while she plays, her own echo is dropped here; a voice well above it passes (a cut-in).
-                socket.sendAudio(echoGateRef.current?.pass(frame, isReplySpeaking()) !== false ? frame : silentFrame(frame.length));
+                socket.sendAudio(echoGateRef.current?.pass(frame, isReplySpeaking(), undefined, turnSchedulerRef.current?.readLevel() ?? 0) !== false ? frame : silentFrame(frame.length));
               },
               onSource: (context, source) => {
                 levelMeter?.stop();
@@ -912,7 +912,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     }
     lastSpeakingEndedAtRef.current = Date.now();
     // The reply ended: what the microphone heard of it, as numbers (the echo's level over the room's silence, frames dropped and passed).
-    if (echoGateRef.current && traceRef.current) { const report = echoGateRef.current.report(); trace("mic_echo", { ratio_db: report.ratio_db ?? -1, echo_rms: report.echo_rms ?? 0, silence_rms: report.silence_rms ?? 0 }); trace("mic_gate", { blocked: report.blocked, passed: report.passed }); }
+    if (echoGateRef.current && traceRef.current) { const report = echoGateRef.current.report(); trace("mic_echo", { ratio_db: report.ratio_db ?? -1, echo_rms: report.echo_rms ?? 0, silence_rms: report.silence_rms ?? 0, coupling: report.coupling ?? -1, threshold_rms: report.threshold_rms ?? 0 }); trace("mic_gate", { blocked: report.blocked, passed: report.passed }); }
     setMode((current) => {
       if (current !== "speaking" && current !== "thinking") return current;
       setAmplitude(0);

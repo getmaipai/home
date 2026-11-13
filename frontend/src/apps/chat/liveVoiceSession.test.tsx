@@ -760,7 +760,9 @@ describe("live voice session", () => {
     function GateHarness({ isSpeaking }: { isSpeaking: boolean }) {
       const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
       const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
-      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef: useRef(null), liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never });
+      const turnSchedulerRef = useRef<never>(null);
+      turnSchedulerRef.current = { readLevel: () => isSpeaking ? 0.5 : 0 } as never;
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never });
       return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
     }
     const level = (rms: number) => { const f = new Float32Array(320); for (let i = 0; i < f.length; i++) f[i] = rms * Math.SQRT2 * Math.sin(i / 3); return f; };

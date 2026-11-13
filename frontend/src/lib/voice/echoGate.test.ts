@@ -5,6 +5,89 @@ import { BARGE_IN_RATIO, browserFamily, CALIBRATION_MS, createEchoGate, OPEN_AFT
 function frame(rms: number): Float32Array { const f = new Float32Array(320); for (let i = 0; i < f.length; i++) f[i] = rms * Math.SQRT2 * Math.sin(i / 3); return f; }
 
 describe("ECHO-GATE-01", () => {
+  test("playback envelope tracks changing loudness so a person can cut in on a quiet syllable", () => {
+    let now = 0;
+    const gate = createEchoGate({ now: () => now });
+    gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) {
+      const loud = Math.floor(now / 200) % 2 === 0;
+      gate.pass(frame(loud ? 0.1 : 0.01), true, now, loud ? 0.5 : 0.05);
+      now += 20;
+    }
+    for (let i = 0; i < 12; i++) {
+      const loud = Math.floor(now / 200) % 2 === 0;
+      expect(gate.pass(frame(loud ? 0.1 : 0.01), true, now, loud ? 0.5 : 0.05)).toBe(false);
+      now += 20;
+    }
+    while (Math.floor(now / 200) % 2 !== 0) { gate.pass(frame(0.01), true, now, 0.05); now += 20; }
+    const results: boolean[] = [];
+    for (let i = 0; i < OPEN_AFTER_FRAMES; i++) {
+      results.push(gate.pass(frame(0.06), true, now, 0.05));
+      now += 20;
+    }
+    expect(results.slice(0, OPEN_AFTER_FRAMES - 1).every((result) => !result)).toBe(true);
+    expect(results[OPEN_AFTER_FRAMES - 1]).toBe(true);
+  });
+
+  test("a person at 0.3 cuts in over loud playback", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20 + 5; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    const results = Array.from({ length: OPEN_AFTER_FRAMES }, () => { const result = gate.pass(frame(0.3), true, now, 0.5); now += 20; return result; });
+    expect(results.at(-1)).toBe(true);
+  });
+
+  test("steady echo remains blocked for a person below the barge-in ratio", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20 + 20; i++) { expect(gate.pass(frame(i < CALIBRATION_MS / 20 ? 0.1 : 0.12), true, now, 0.5)).toBe(false); now += 20; }
+  });
+
+  test("coupling and threshold are null before calibration and populated after", () => {
+    const gate = createEchoGate({ now: () => 0 });
+    expect(gate.report().coupling).toBeNull();
+    expect(gate.report().threshold_rms).toBeNull();
+    gate.replyStarted(0);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) gate.pass(frame(0.05), true, i * 20, 0.5);
+    gate.pass(frame(0.05), true, CALIBRATION_MS, 0.5);
+    expect(gate.report().coupling).toBeGreaterThan(0);
+    expect(gate.report().threshold_rms).toBeGreaterThan(0);
+  });
+
+  test("a talk-over does not teach coupling or raise the threshold", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    for (let i = 0; i < 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    const before = gate.report();
+    for (let i = 0; i < 150; i++) { gate.pass(frame(0.3), true, now, 0.5); now += 20; }
+    const after = gate.report();
+    expect(Math.abs(after.coupling! - before.coupling!) / before.coupling!).toBeLessThanOrEqual(0.05);
+    expect(Math.abs(after.threshold_rms! - before.threshold_rms!) / before.threshold_rms!).toBeLessThanOrEqual(0.05);
+  });
+
+  test("blocked echo stays blocked after a talk-over and a second talk-over still opens", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    for (let i = 0; i < 150; i++) { gate.pass(frame(0.3), true, now, 0.5); now += 20; }
+    now += 500;
+    for (let i = 0; i < 40; i++) { expect(gate.pass(frame(0.1), true, now, 0.5)).toBe(false); now += 20; }
+    const results = Array.from({ length: OPEN_AFTER_FRAMES }, () => { const result = gate.pass(frame(0.3), true, now, 0.5); now += 20; return result; });
+    expect(results.at(-1)).toBe(true);
+  });
+
+  test("a genuinely doubled steady echo is learned while blocked", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    const initial = gate.report().coupling!;
+    for (let i = 0; i < 250; i++) { expect(gate.pass(frame(0.2), true, now, 0.5)).toBe(false); now += 20; }
+    expect(gate.report().coupling!).toBeGreaterThanOrEqual(initial * 1.9);
+  });
+
+  test("legacy calibration caps its flat reference at 0.06", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20 + 2; i++) { gate.pass(frame(0.1), true, now); now += 20; }
+    const results = Array.from({ length: OPEN_AFTER_FRAMES }, () => { const result = gate.pass(frame(0.25), true, now); now += 20; return result; });
+    expect(results.at(-1)).toBe(true);
+  });
+
   test("while she is silent every frame passes and the room noise is measured; while she plays, the echo calibrates and frames at its level are dropped", () => {
     let now = 0;
     const gate = createEchoGate({ now: () => now });
