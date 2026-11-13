@@ -271,6 +271,20 @@ describe("picture editor routes", () => {
     expect(await rows()).toHaveLength(1);
   });
 
+  test("at server start a queued or running picture_edit row is failed as interrupted; a done row is untouched", async () => {
+    const { actor } = await owner();
+    const { createJob } = await import("@/lib/jobs");
+    const { reconcileInterruptedEditJobs } = await import("@/lib/imageEdit");
+    const { jobs } = await import("@/db/schema");
+    const add = (id: string, state: string) => createJob({ id, kind: "picture_edit", startedBy: actor.id, forPerson: actor.id, title: "Changing a picture", state, progress: null, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "image_edit" } });
+    add("image-edit:a", "running"); add("image-edit:b", "queued"); add("image-edit:c", "done");
+    expect(reconcileInterruptedEditJobs()).toBe(2);
+    const row = (id: string) => db.select().from(jobs).where(eq(jobs.id, id)).get()!;
+    expect(row("image-edit:a")).toMatchObject({ state: "failed", errorKind: "interrupted" });
+    expect(row("image-edit:b")).toMatchObject({ state: "failed", errorKind: "interrupted" });
+    expect(row("image-edit:c")).toMatchObject({ state: "done", errorKind: null });
+  });
+
   test("a job the tool declines (no subject found) reads as a plain failure with the Stack's sentence", async () => {
     const { client, actor } = await owner();
     const stub = stubStack();

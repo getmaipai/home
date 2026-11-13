@@ -28,9 +28,9 @@ import { lockItemOfProvenance, lockState, markFields, newItemMark, type MarkSour
 import { createHash, randomBytes } from "node:crypto";
 import sharp, { type OutputInfo } from "sharp";
 import { fileTypeFromBuffer } from "file-type";
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversations } from "@/db/schema";
+import { attachments, conversations, jobs as jobsTable } from "@/db/schema";
 import { newFileId } from "@/lib/id";
 import { createJob, updateJob } from "@/lib/jobs";
 import { createAttachment, readAttachment, storeFile, getTemporaryChatImage, getTemporaryChatImageForReader, listTemporaryChatImageVersions, readAttachmentForConversation, storeTemporaryChatImage } from "@/lib/attachments";
@@ -626,6 +626,13 @@ async function stopEditJob(jobId: string): Promise<void> {
   trackEdit(jobId, { state: "cancelled" });
   if (job.generative) { await cancelOrDelete(jobId); return; }
   try { await getStackClient().cancelJob(jobId); } catch { /* it had already finished or the Stack is gone: either way nothing is running for this person */ }
+}
+
+/** At server start: the live edit jobs are in memory, so every `picture_edit` row still queued or running belongs to a job that is gone. Marked interrupted with a plain line. */
+export function reconcileInterruptedEditJobs(): number {
+  const dead = db.select({ id: jobsTable.id }).from(jobsTable).where(and(eq(jobsTable.kind, EDIT_JOB_KIND), inArray(jobsTable.state, ["queued", "running"]))).all();
+  for (const row of dead) updateJob(row.id, { state: "failed", errorKind: "interrupted", waitingReason: "The edit stopped when Home restarted. Start it again." });
+  return dead.length;
 }
 
 /** Stop from the Activity page (the jobs route has already checked who may stop it): the same cancel as the Studio's Stop. Returns false when this is not an edit row. */
