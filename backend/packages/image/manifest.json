@@ -52,7 +52,9 @@
             "library",
             "collections",
             "recent",
-            "shared"
+            "shared",
+            "creations",
+            "drafts"
           ]
         },
         {
@@ -80,16 +82,14 @@
         {
           "id": "create-edit",
           "mode": "create",
-          "title": "Edit and yours",
+          "title": "Edit",
           "pages": [
             "edit",
             "remove-object",
             "crop-adjust",
             "blur-background",
             "combine",
-            "upscale",
-            "creations",
-            "drafts"
+            "upscale"
           ]
         }
       ]

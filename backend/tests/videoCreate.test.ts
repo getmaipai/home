@@ -324,7 +324,9 @@ describe("Create is adult-only; Browse is unchanged", () => {
     const adultApp = await appRow(adult.client);
     expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover", "create-make", "create-edit"]);
     const adultCreatePages = adultApp.sidebar.groups.filter((g: { id: string }) => g.id.startsWith("create")).flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page));
-    for (const page of PAGES) expect(adultCreatePages).toContain(page);
+    for (const page of ["create", "studio"]) expect(adultCreatePages).toContain(page);
+    // My clips sits under Browse in the Library group, for adults.
+    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "play-library").pages.map((p: { page: string }) => p.page)).toContain("clips");
     expect(adultApp.header.modes.map((m: { id: string }) => m.id)).toEqual(["play", "create"]);
     for (const other of [teen, child]) {
       const row = await appRow(other.client);

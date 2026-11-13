@@ -21,7 +21,7 @@ test("Image is a valid bundled app with five groups and every page file", async 
   expect(loaded.ok).toBe(true);
   if (!loaded.ok) return;
   const contributes = loaded.value.contributes as { sidebar: { groups: Array<{ title?: string; pages: string[] }> }; pages: Array<{ id: string; module: string }> };
-  expect(contributes.sidebar.groups.map((group) => group.title ?? "")).toEqual(["", "Library", "Cast and places", "Make", "Edit and yours"]);
+  expect(contributes.sidebar.groups.map((group) => group.title ?? "")).toEqual(["", "Library", "Cast and places", "Make", "Edit"]);
   expect(contributes.sidebar.groups).toHaveLength(5);
   expect(appPackageProblems(loaded.value, join(PACKAGES_DIR, "image"))).toEqual([]);
   for (const page of contributes.pages) expect(readFileSync(join(PACKAGES_DIR, "image", "pages", `${page.module}.json`), "utf8")).toBeTruthy();
@@ -35,7 +35,7 @@ test("Image launcher, sidebar groups and template rows are available to the hous
   expect(apps.find((app) => app.package === "image")).toMatchObject({ package: "image", label: "Image", icon: "image" });
   const manifest = loadManifestOnly("image");
   if (!manifest.ok) throw new Error("Image manifest missing");
-  expect((sidebarFor(row, manifest.value, manifest.value.contributes as never)?.groups ?? []).map((group) => group.title ?? "")).toEqual(["", "Library", "Cast and places", "Make", "Edit and yours"]);
+  expect((sidebarFor(row, manifest.value, manifest.value.contributes as never)?.groups ?? []).map((group) => group.title ?? "")).toEqual(["", "Library", "Cast and places", "Make", "Edit"]);
   const templates = await client.post("/api/plugins/image/data/templates", {});
   expect(templates.status).toBe(200);
   expect((await templates.json() as Array<{ id: string; title: string }>).some((item) => item.id && item.title)).toBe(true);

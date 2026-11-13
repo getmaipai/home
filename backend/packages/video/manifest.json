@@ -77,7 +77,9 @@
             "watch-later",
             "liked",
             "history",
-            "playlists"
+            "playlists",
+            "clips",
+            "drafts"
           ]
         },
         {
@@ -106,14 +108,12 @@
         {
           "id": "create-edit",
           "mode": "create",
-          "title": "Edit and yours",
+          "title": "Edit",
           "pages": [
             "studio",
             "trim",
             "captions",
-            "voiceover",
-            "clips",
-            "drafts"
+            "voiceover"
           ]
         }
       ]

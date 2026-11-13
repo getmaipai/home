@@ -414,7 +414,10 @@ describe("the manifest of three pages", () => {
   test("Create, Studio and My clips are the whole Create group; the three old pages and their files are gone, the data list is still 16 ids", async () => {
     const manifest = JSON.parse(await Bun.file(join(PACKAGES_DIR, "video", "manifest.json")).text()) as { contributes: { sidebar: { groups: Array<{ id: string; pages: string[] }> }; pages: Array<{ id: string; module: string; min_role?: string }>; data: Array<{ id: string }>; header: { modes: Array<{ id: string; page: string }>; search: { label: string } } } };
     const createPages = (manifest.contributes.sidebar.groups as Array<{ mode?: string; pages: string[] }>).filter((group) => group.mode === "create").flatMap((group) => group.pages);
-    for (const id of ["create", "studio", "clips"]) expect(createPages).toContain(id);
+    for (const id of ["create", "studio"]) expect(createPages).toContain(id);
+    // My clips is under Browse (the Library group), still adult-only.
+    expect((manifest.contributes.sidebar.groups as Array<{ mode?: string; pages: string[] }>).filter((group) => group.mode === "play").some((group) => group.pages.includes("clips"))).toBe(true);
+    expect(manifest.contributes.pages.find((page) => page.id === "clips")).toMatchObject({ min_role: "adult" });
     // Every page in the Create group is adult-only on purpose (rule 0): a coming-soon row is no way around it.
     for (const id of createPages) expect(manifest.contributes.pages.find((page) => page.id === id)).toMatchObject({ min_role: "adult" });
     const ids = manifest.contributes.pages.map((page) => page.id);

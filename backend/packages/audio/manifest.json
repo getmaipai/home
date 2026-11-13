@@ -150,6 +150,15 @@
           ]
         },
         {
+          "id": "play-yours",
+          "mode": "play",
+          "title": "Library",
+          "pages": [
+            "creations",
+            "drafts"
+          ]
+        },
+        {
           "id": "create-make",
           "mode": "create",
           "title": "Make",
@@ -165,13 +174,11 @@
         {
           "id": "create-edit",
           "mode": "create",
-          "title": "Edit and yours",
+          "title": "Edit",
           "pages": [
             "studio",
             "stems",
-            "remix",
-            "creations",
-            "drafts"
+            "remix"
           ]
         }
       ]

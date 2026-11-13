@@ -17,7 +17,7 @@ export const RAIL_GROUP_BY_APP_ID: Readonly<Record<string, string>> = {
 
 export const RAIL_GROUPS: ReadonlyArray<{ id: string; label?: string }> = [
   { id: "main" },
-  { id: "create", label: "Create" },
+  { id: "create", label: "Media" },
   { id: "personal", label: "Personal" },
   { id: "household", label: "Household" },
   { id: "tools", label: "Tools" },
@@ -28,9 +28,12 @@ export const RAIL_GROUPS: ReadonlyArray<{ id: string; label?: string }> = [
 export function railGroupForApp(to: string): string {
   if (RAIL_GROUP_BY_APP_ID[to]) return RAIL_GROUP_BY_APP_ID[to]!;
   if (["/", "/chat", "/media", "/files", "/people"].includes(to)) return "main";
-  if (/^\/apps\/(audio|video|pictures|voice|songs)(\/|$)/.test(to)) return "create";
+  if (/^\/apps\/(audio|video|image|pictures|voice|songs)(\/|$)/.test(to)) return "create";
   return "tools";
 }
+
+/** Audio and Video are always in the menu: nobody has to pin them, and unpinning them changes nothing. */
+export const ALWAYS_IN_RAIL: ReadonlySet<string> = new Set(["/apps/audio", "/apps/video"]);
 
 export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly string[] = []) {
   const core = [
@@ -43,8 +46,9 @@ export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly 
   const pinnedSet = new Set(pinned);
   // Fixed shell destinations stay in the grouped list. Pinnable apps only
   // appear there when selected; defaults are supplied by usePinnedApps and
-  // an explicitly saved empty list therefore remains empty.
-  return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && pinnedSet.has(app.to)).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
+  // an explicitly saved empty list therefore remains empty. Audio and Video
+  // (ALWAYS_IN_RAIL) appear whatever the person pinned.
+  return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && (ALWAYS_IN_RAIL.has(app.to) || pinnedSet.has(app.to))).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
 export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video"] as const;
