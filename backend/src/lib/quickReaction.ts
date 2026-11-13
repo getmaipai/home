@@ -45,6 +45,14 @@ const SYSTEM = [
 
 /** A thinking sound is the only thing an ACK may be: the small model's acknowledgments of a question guessed answers and echoed numbers ("Maybe tomorrow.", "Eight seventeen."). */
 const THINKING_SOUND = /^(?:(?:hm+|mm+|mhm|um+|uh+|well|so|okay|ok|alright|right|yeah|let's see|let me see)[,.…]?\s*){1,2}$/i;
+const REACTION_OPENERS = new Set("oh ah aw ooh wow whoa hey yay ha hmm mm mhm okay ok right well so sure nice great awesome cool no yes yeah congrats sorry ugh damn man geez hold let that good um uh hm alright aha oops yikes congratulations".split(" "));
+const EMOTION_LABEL = /\b(?:feel(?:s|ing|ings)?|emotion(?:s)?|mood(?:s)?|mixed|sad|upset|angry|frustrat\w*|anxious|worried|happy|excited|stress\w*|conflicted|depress\w*|lonely)\b/i;
+
+function interjectionShaped(text: string): boolean {
+  if (EMOTION_LABEL.test(text)) return false;
+  const words = text.toLowerCase().match(/[\p{L}']+/gu) ?? [];
+  return words.length >= 1 && words.length <= 4 && REACTION_OPENERS.has(words[0]!);
+}
 
 export interface QuickCue {
   text: string;
@@ -71,6 +79,7 @@ export function parseQuickCue(raw: string, said: string, banned: readonly string
   }
   const sound = match[2]!.trim();
   if (!THINKING_SOUND.test(sound)) return null;
+  if (!interjectionShaped(sound)) return null;
   const lower = sound.toLowerCase();
   if (banned.some((phrase) => lower.includes(phrase.toLowerCase())) || lastFew.some((previous) => previous.toLowerCase() === lower)) return null;
   return { text: sound, immediate: false };
@@ -102,6 +111,7 @@ export function cleanReaction(raw: string, said: string, banned: readonly string
   if (!/^[\p{L}][\p{L}'’\-, .!?…]*$/u.test(text)) return null;
   const words = text.match(/[\p{L}']+/gu) ?? [];
   if (words.length === 0 || words.length > MAX_WORDS) return null;
+  if (!interjectionShaped(text)) return null;
   const lower = text.toLowerCase();
   if (banned.some((phrase) => lower.includes(phrase.toLowerCase()))) return null;
   if (lastFew.some((previous) => previous.toLowerCase() === lower)) return null;

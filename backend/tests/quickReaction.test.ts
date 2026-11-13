@@ -28,7 +28,7 @@ describe("cleanReaction", () => {
   });
 
   test("parseQuickCue: a reaction is immediate, a thinking sound is not, anything else is nothing", () => {
-    expect(parseQuickCue("REACT: I'm so sorry.", "my dog died", [], [], [])).toEqual({ text: "I'm so sorry.", immediate: true });
+    expect(parseQuickCue("REACT: I'm so sorry.", "my dog died", [], [], [])).toBeNull();
     expect(parseQuickCue("ACK: Hmm, well.", "why is the sky blue", [], [], [])).toEqual({ text: "Hmm, well.", immediate: false });
     expect(parseQuickCue("ACK: Maybe tomorrow.", "when is snow", [], [], [])).toBeNull();
     expect(parseQuickCue("ACK: Eight seventeen.", "alarm", [], [], [])).toBeNull();
@@ -38,5 +38,23 @@ describe("cleanReaction", () => {
     expect(parseQuickCue("NONE", "hello", [], [], [])).toBeNull();
     expect(parseQuickCue("Sure, here you go.", "x", [], [], [])).toBeNull();
     expect(parseQuickCue("ACK: Hmm.", "x", [], ["hmm."], [])).toBeNull();
+  });
+
+  test("emotion labels and non-interjection reactions are rejected; short openers still pass", () => {
+    for (const text of ["mixed feelings", "Sounds like you feel conflicted", "Frustration."]) {
+      expect(parseQuickCue(`REACT: ${text}`, "news", [], [], [])).toBeNull();
+    }
+    expect(parseQuickCue("REACT: Oh no.", "news", [], [], [])).toEqual({ text: "Oh no.", immediate: true });
+    expect(parseQuickCue("REACT: Oh nice!", "news", [], [], [])).toEqual({ text: "Oh nice!", immediate: true });
+    expect(parseQuickCue("REACT: Aw, that's rough.", "news", [], [], [])).toEqual({ text: "Aw, that's rough.", immediate: true });
+    expect(parseQuickCue("REACT: Ha, yeah.", "news", [], [], [])).toEqual({ text: "Ha, yeah.", immediate: true });
+  });
+
+  test("accepts common ACK thinking sounds and rejects depressed or lonely labels", () => {
+    for (const sound of ["Um.", "Uh.", "Hm."]) {
+      expect(parseQuickCue(`ACK: ${sound}`, "news", [], [], [])).toEqual({ text: sound, immediate: false });
+    }
+    expect(parseQuickCue("REACT: Feeling lonely.", "news", [], [], [])).toBeNull();
+    expect(parseQuickCue("REACT: So depressing.", "news", [], [], [])).toBeNull();
   });
 });
