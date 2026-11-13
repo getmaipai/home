@@ -21,6 +21,8 @@ function onProgress(actor: PersonRow, id: string) { return (p: {stage:FilmStage;
   const cast=row.plan?.cast.length ?? 0, shots=row.plan?.shots.length ?? 0, clipSteps=shots*(row.faceless?2:1); const stage=stageName[p.stage]; const prior={Cast:0,Stills:cast,Clips:cast+shots,Music:cast+shots+clipSteps,Assemble:cast+shots+clipSteps+1} as Record<string,number>;
   updateFilmRun(actor,id,{stage,done_steps:Math.min(row.total_steps,prior[stage ?? ""] ?? 0)+p.done,total_steps:row.total_steps});
 }; }
+/** MP-06: a song the person chose as the film's music (file id), by run; it becomes the production's first music line so the film does not make its own. */
+const ownMusic=new Map<string,string>();
 function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | "music" | "stills", shotId?: string, planInput?: PlanFilmInput): Promise<void> {
   const controller=new AbortController(); active.set(run.id,controller);
   return (async()=>{
@@ -32,7 +34,8 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
         if(controller.signal.aborted) return;
         if(!planned.ok){updateFilmRun(actor,run.id,{state:"failed",error_line:planned.line});return;}
         plan=planned.plan;
-        const production=createMediaProduction(actor,{title:plan.title,summary:plan.summary},"film");
+        const ownSong=ownMusic.get(run.id);
+        const production=createMediaProduction(actor,{title:plan.title,summary:plan.summary,...(ownSong?{music_line_ids:[ownSong]}:{})},"film");
         updateFilmRun(actor,run.id,{plan,faceless:planInput?.faceless ?? current.faceless,production_id:production.id,total_steps:total(plan,planInput?.faceless ?? current.faceless),stage:"Plan",done_steps:1});
         current=getFilmRun(actor,run.id)!;
         if(!current.go_ahead && mode==="plan") { updateFilmRun(actor,run.id,{state:"waiting_for_go"}); return; }
@@ -76,12 +79,13 @@ export function startPlannedFilm(input: {actor:PersonRow;idea:string;plan:FilmPl
   return {id:run.id,done};
 }
 export type StartFilmResult = {id:string} | {line:string};
-export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean;stillsFirst?:boolean}): StartFilmResult {
+export function startFilm(input: {actor:PersonRow;idea:string;shots?:number;seconds?:number;look?:string;castHints?:string[];faceless?:boolean;goAhead:boolean;stillsFirst?:boolean;musicFileId?:string}): StartFilmResult {
   const {actor}=input;
   if(!allowed(actor)) return {line:"Making a film is for adults on their own written screen."};
   if(listFilmRunsInStates(["planning","running"]).some((r)=>r.person_id===actor.id)) return {line:"A film is already running. Wait for it to finish or cancel it first."};
   const run=createFilmRun(actor,{idea:input.idea,goAhead:input.goAhead,faceless:input.faceless});
   if(input.stillsFirst) previewFirst.add(run.id);
+  if(input.musicFileId) ownMusic.set(run.id,input.musicFileId);
   launch(actor,run,"plan",undefined,{idea:input.idea,shots:input.shots,targetSeconds:input.seconds,look:input.look,castHints:input.castHints,faceless:input.faceless}); return {id:run.id};
 }
 function ownedAdult(actor:PersonRow,id:string): FilmRun | null { if(!allowed(actor)) return null; return getFilmRun(actor,id); }

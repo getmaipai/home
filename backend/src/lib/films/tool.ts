@@ -4,6 +4,7 @@ import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { startFilm } from "./background";
+import { checkTrack } from "@/lib/videos/editGate";
 import { prepareFilmPictures } from "./pictures";
 
 export const MAKE_FILM_TOOL_ID = "make_film";
@@ -15,12 +16,14 @@ export const makeFilmArgs = z.object({
   characters: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
   /** FILM-PICTURES-01: set by Home from the attached pictures (what each one is for); never by the model. */
   picture_notes: z.array(z.string().trim().min(1).max(700)).max(8).optional(),
+  /** MP-06: a song of the person's own to use as the film's music instead of making one: a song's job id or Library file id, or "latest" for the newest finished song. */
+  track: z.string().trim().min(1).max(80).optional(),
   go_ahead: z.boolean().optional(),
   stills_first: z.boolean().optional().describe("Make the pictures first and stop, so the person can play the animatic before any clip is rendered."),
   faceless: z.boolean().optional().default(false),
 });
 
-type FilmState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary">;
+type FilmState = Pick<TurnState, "actor" | "surface" | "planBasis" | "temporary"> & Partial<Pick<TurnState, "conversationId">>;
 type Starter = typeof startFilm;
 let starter: Starter = startFilm;
 export function __setStartFilmForTests(fn: Starter | null): void { starter = fn ?? startFilm; }
@@ -54,7 +57,15 @@ export function runMakeFilm(input: { state: FilmState; args: Record<string, unkn
   const idea = parsed.data.idea;
   const refusal = refuseVideoPrompt(idea, { lane: "adult" });
   if (refusal) return refused(callId, args, VIDEO_REFUSAL_LINE[refusal], refusal);
-  const result = starter({ actor: actor as PersonRow, idea, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castHints: [...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: parsed.data.stills_first === true });
+  // MP-06: the person's own song as the film's music; a song that is locked, unfinished or not theirs is refused with its own plain line.
+  let musicFileId: string | undefined;
+  if (parsed.data.track) {
+    const checked = checkTrack(actor as PersonRow, parsed.data.track, state.temporary === true, state.conversationId ?? null);
+    if (!checked.ok) return refused(callId, args, checked.line, checked.why);
+    if (!checked.found.fileId || state.temporary === true) return refused(callId, args, "I can't find that song. A film can only use one of your saved songs.", "no_track");
+    musicFileId = checked.found.fileId;
+  }
+  const result = starter({ actor: actor as PersonRow, idea, musicFileId, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castHints: [...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: parsed.data.stills_first === true });
   if ("line" in result) return refused(callId, args, result.line, "not_started");
   const awaitingGo = parsed.data.go_ahead !== true;
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,

@@ -24,7 +24,10 @@
       "Make a 3 minute video about a lighthouse keeper",
       "Write me a sitcom episode about two roommates",
       "I want a feature-length movie about a heist",
-      "Make a 30-second commercial for this coffee mug", "Use these photos to make an ad for my product", "Make a video from these pictures", "Yes, that is good, go on"
+      "Make a 30-second commercial for this coffee mug",
+      "Use these photos to make an ad for my product",
+      "Make a video from these pictures",
+      "Yes, that is good, go on"
     ],
     "patterns": []
   },
@@ -90,6 +93,12 @@
         "type": "boolean",
         "grounded": false,
         "description": "True, with production_id, only when the person said the last step is good and to go on."
+      },
+      "track": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional: one of the person's own saved songs to use as the film's music instead of making one: its music job id (musicJobId of an earlier generate_music result in this chat), a Library file id, or latest for the newest song finished in this chat. Set only when the person asks to use a song they made."
       }
     }
   },

@@ -34,7 +34,7 @@ import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEF
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { RESTYLE_FAILURE_COPY, SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
 import { newItemMark, type MarkSource } from "@/lib/adultLock";
-import { clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, ownTrackFile, speakLine, voiceChoice } from "./editGate";
+import { checkTrack, clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark, speakLine, voiceChoice } from "./editGate";
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { resolveStyles } from "./styleChoice";
@@ -620,8 +620,9 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     describe = `${sources.length} videos joined in order${transition !== "cut" ? `, with a ${duration} second ${transition} between them` : ""}${title ? ", with a title" : ""}${creditLines ? ", with rolling credits" : ""}`;
   } else if (value.change === "cut_to_beat") {
     if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
-    const track = ownTrackFile(actor, value.track, temporary, state.conversationId);
-    if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
+    const checked = checkTrack(actor, value.track, temporary, state.conversationId);
+    if (!checked.ok) return refused(callId, args, checked.line, checked.why);
+    const track = checked.found;
     if (!await beatsReady()) return refused(callId, args, BEATS_NOT_READY_LINE, "beats_not_ready");
     if (track.mark.madeAudience === "adult-only") marks.push(track.mark);
     inputs = clipFiles;
@@ -732,8 +733,9 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
       return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The music is being made first, then it goes under the video as a new version and the first one is kept. Tell the person it is on its way; do not say it is ready." }, data: { musicJobId: musicId }, actions: [] } });
     } else if (value.sound === "music") {
       if (!value.track) return refused(callId, args, MIX_SOUND_LINE, "nothing_to_mix");
-      const track = ownTrackFile(actor, value.track, temporary, state.conversationId);
-      if (!track) return refused(callId, args, NO_TRACK_LINE, "no_track");
+      const checked = checkTrack(actor, value.track, temporary, state.conversationId);
+      if (!checked.ok) return refused(callId, args, checked.line, checked.why);
+      const track = checked.found;
       if (track.mark.madeAudience === "adult-only") marks.push(track.mark);
       inputs = [clipFiles[0]!, track.file];
       ops = mixOps(value.level ?? DEFAULT_MUSIC_LEVEL, start, false);

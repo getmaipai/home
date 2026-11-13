@@ -7,7 +7,9 @@ import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { readAttachment } from "@/lib/attachments";
 import { fileAudience } from "@/lib/access";
-import { lockItemOfProvenance, type MarkSource } from "@/lib/adultLock";
+import { fileLockState, lockItemOfProvenance, type MarkSource } from "@/lib/adultLock";
+import { jobsForConversation, jobsForPerson } from "@/lib/music/store";
+import { LOCKED_MUSIC_START_LINE, musicJobLockState } from "@/lib/music/lock";
 import { getMusicJobFor, readMusicFile } from "@/lib/music/jobs";
 import { synthesizeRecordedSpeech } from "@/lib/tts";
 import { listClonedVoices } from "@/lib/clonedVoices";
@@ -88,6 +90,32 @@ export function ownTrackFile(actor: PersonRow, track: string, temporary: boolean
   const read = readAttachment(actor, fileId);
   return read.ok ? { file: { bytes: read.value.bytes, ext: EXTENSION_OF[row.mediaType] ?? "m4a" }, mark: trackMark(fileId), fileId } : null;
 }
+
+/** MP-06: how a person names "the song I just made": the words that mean the newest finished song (a job id or a Library file id is used as given). */
+const LATEST_SONG = /^(latest|last|newest|recent|current|most recent|the latest|the last|the newest|just made|the song|my song|that song|this song|the latest song|the last song|the song i just made)$/i;
+export const SONG_NOT_READY_LINE = "That song is still being made. Try again when it is finished.";
+
+/** The song a `track` names: a music job id or Library file id as given, or the newest finished song of this chat (then the newest of the person's own) for "latest". */
+export function resolveTrackRef(actor: PersonRow, track: string, temporary: boolean, conversationId: string | null): string {
+  if (!LATEST_SONG.test(track.trim())) return track;
+  const done = (jobs: ReturnType<typeof jobsForPerson>) => jobs.filter((job) => job.state === "done" && !!job.fileId && job.task === "text2music" && job.temporary === temporary).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const here = conversationId ? done(jobsForConversation(actor, conversationId, temporary)) : undefined;
+  const found = here ?? (temporary ? undefined : done(jobsForPerson(actor)));
+  return found?.id ?? track;
+}
+
+/** MP-06: the one check every song-as-music-bed use goes through (chat mix, the film, the Studio): resolves the name, refuses a song still being made or
+ * locked with its own plain line, and otherwise returns what `ownTrackFile` returns. */
+export function checkTrack(actor: PersonRow, track: string, temporary: boolean, conversationId: string | null): { ok: true; found: NonNullable<ReturnType<typeof ownTrackFile>> } | { ok: false; line: string; why: "no_track" | "locked_track" | "track_not_ready" } {
+  const ref = resolveTrackRef(actor, track, temporary, conversationId);
+  const job = getMusicJobFor(actor, ref);
+  if (job && (job.state === "queued" || job.state === "running")) return { ok: false, line: SONG_NOT_READY_LINE, why: "track_not_ready" };
+  if (job && musicJobLockState(job, actor) !== "open") return { ok: false, line: LOCKED_MUSIC_START_LINE, why: "locked_track" };
+  if (!job && !temporary && fileLockState(actor, ref) !== "open") return { ok: false, line: LOCKED_MUSIC_START_LINE, why: "locked_track" };
+  const found = ownTrackFile(actor, ref, temporary, conversationId);
+  return found ? { ok: true, found } : { ok: false, line: NO_TRACK_LINE_TEXT, why: "no_track" };
+}
+const NO_TRACK_LINE_TEXT = "I can't find that song. Pick one of your own songs or sound files, or ask for a voice line instead.";
 
 /** The flags a song carries: adult-only when its Library file says so (with the lock it has), else all-ages. */
 export function trackMark(fileId: string | null): MarkSource {

@@ -6,13 +6,15 @@ import { useNavigate } from "react-router-dom";
 import { i18n } from "@lingui/core";
 import { api, type Roster } from "@/lib/api";
 import { videosApi } from "@/lib/videosApi";
+import { bedSongFirst, bedSongId } from "./musicBed";
 
 export const NEW_MUSIC = "new";
 export type MusicLevel = "quiet" | "soft" | "balanced" | "loud" | "very_loud";
 
 export function useAddMusicDialog({ open, onOpenChange, me, clipId }: { open: boolean; onOpenChange: (open: boolean) => void; me: Roster; clipId: string }) {
   const navigate = useNavigate();
-  const [choice, setChoice] = useState(NEW_MUSIC);
+  // MP-06: a song chosen with "Use in a video" is already picked and listed first.
+  const [choice, setChoice] = useState(() => bedSongId() ?? NEW_MUSIC);
   const [description, setDescription] = useState("");
   const [level, setLevel] = useState<MusicLevel>("soft");
   const [busy, setBusy] = useState(false);
@@ -30,5 +32,5 @@ export function useAddMusicDialog({ open, onOpenChange, me, clipId }: { open: bo
     } catch (error) { console.error(error); setProblem(i18n._({ id: "The music could not be added. Try again in a minute.", message: "The music could not be added. Try again in a minute." })); }
     finally { setBusy(false); }
   }
-  return { songs: songs.data ?? [], problem, choice, setChoice, description, setDescription, level, setLevel, busy, ready, submit };
+  return { songs: bedSongFirst(songs.data ?? []), problem, choice, setChoice, description, setDescription, level, setLevel, busy, ready, submit };
 }

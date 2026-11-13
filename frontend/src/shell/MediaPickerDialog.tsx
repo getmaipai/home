@@ -9,6 +9,7 @@ import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { api, ApiError } from "@/lib/api";
+import { bedSongFirst } from "@/shell/library/musicBed";
 import { uploadLibraryFile } from "@/lib/libraryUpload";
 import { localizedApiMessage } from "@/lib/apiErrorLines";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
@@ -83,7 +84,7 @@ export function StudioPickerBody({ kind, start, personId, onDone }: { kind: Stud
     queryFn: async () => (await api.library(kind === "video" ? { type: "video", owner: "me", sort: "newest", limit: 60 } : { type: "audio", owner: "me", sort: "newest", limit: 60 })).items.filter((item) => item.owner.id === personId && (kind === "audio" || item.origin === "made")),
     enabled: kind === "video" || side === "music",
   });
-  const items = library.data ?? [];
+  const items = kind === "audio" ? bedSongFirst(library.data ?? []) : (library.data ?? []);
   const noun = kind === "video" ? "clips" : "songs";
   return (
     <div className="flex min-w-0 flex-col gap-3">

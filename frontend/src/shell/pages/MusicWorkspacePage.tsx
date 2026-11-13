@@ -28,7 +28,10 @@ import { Cover, GlassPill, MediaCarousel, MediaTile } from "@maipai/ui/src/ui/me
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { RemixSong } from "./MusicRemix";
 import { getIcon } from "@maipai/ui/src/icons";
-import { requestJson } from "@/lib/api";
+import { api, requestJson } from "@/lib/api";
+import { videosApi } from "@/lib/videosApi";
+import { StudioPickerBody } from "@/shell/MediaPickerDialog";
+import { rememberBedSong } from "@/shell/library/musicBed";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { BringSong } from "./BringSong";
 import { VoiceCreate } from "./MusicVoiceCreate";
@@ -177,6 +180,11 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const [remixing, setRemixing] = useState(remix);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // MP-06: "Use in a video": pick one of the person's own videos; the song goes under it through the same add-music edit the Library uses.
+  const [bedOpen, setBedOpen] = useState(false);
+  const [bedProblem, setBedProblem] = useState("");
+  const navigate = useNavigate();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => api.me(), staleTime: 60_000, enabled: bedOpen });
   const top = useRef<HTMLElement>(null);
   // The song opens above the tiles; bring it into view so a click on a tile's Remix or Stems is seen to do something.
   useEffect(() => { top.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }, [id]);
@@ -191,6 +199,15 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
   const again = (length: "quick" | "full") => { void musicApi.setLength(id, length).then(() => { push(length === "full" ? i18n._({ id: "Making the full version. It appears on this song.", message: "Making the full version. It appears on this song." }) : i18n._({ id: "Making the quick version. It appears on this song.", message: "Making the quick version. It appears on this song." })); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, i18n._({ id: "That could not start. Try again.", message: "That could not start. Try again." })))); };
   const removeSong = () => { setDeleting(true); void musicApi.remove(id).then(() => { push(i18n._({ id: "Moved to Trash. You can bring it back from the Library until the keep time ends.", message: "Moved to Trash. You can bring it back from the Library until the keep time ends." })); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); onClose(); }).catch((error: unknown) => { setConfirmingDelete(false); push(text(error, i18n._({ id: "That song could not be deleted. Try again.", message: "That song could not be deleted. Try again." }))); }).finally(() => setDeleting(false)); };
   const newCover = () => { void musicApi.newCover(id, `Album cover art for the song "${song?.title ?? "Untitled song"}"`).then(() => { push(i18n._({ id: "Making a new cover.", message: "Making a new cover." })); void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); }).catch((error: unknown) => push(text(error, i18n._({ id: "A new cover could not start. Try again.", message: "A new cover could not start. Try again." })))); };
+  const locked = (song as { locked?: boolean } | undefined)?.locked === true;
+  const bedReason = locked ? i18n._({ id: "This song is locked. Unlock it first.", message: "This song is locked. Unlock it first." }) : !ready || !version ? i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." }) : "";
+  const addToVideo = (clip: string | null) => {
+    if (!clip || !version) { setBedOpen(false); return; }
+    rememberBedSong(version.id); setBedProblem("");
+    void videosApi.addMusic({ clip, track: version.id, level: "soft" })
+      .then((result) => { setBedOpen(false); push(i18n._({ id: "Putting the song under your video. It shows in Activity and in the chat.", message: "Putting the song under your video. It shows in Activity and in the chat." })); navigate(`/chat?conversation=${encodeURIComponent(result.conversation_id)}`); })
+      .catch((error: unknown) => setBedProblem(error instanceof Error && error.message ? error.message : i18n._({ id: "The song could not be added to that video. Try again in a minute.", message: "The song could not be added to that video. Try again in a minute." })));
+  };
   const reasonOff = ready ? "" : i18n._({ id: "Available once the song is finished.", message: "Available once the song is finished." });
   return <section ref={top} className="flex shrink-0 flex-col gap-5 py-2" data-testid="music-song-result" aria-label={i18n._({ id: "Open song", message: "Open song" })}>
         <div className="flex items-start justify-between gap-3">
@@ -207,6 +224,7 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
       <div className="flex flex-wrap gap-2">
         <Button asChild disabled={!ready}><Link to={studioAddress(id)} aria-disabled={!ready}>{i18n._({ id: "Open in Studio", message: "Open in Studio" })}</Link></Button>
         <Button asChild variant="secondary" disabled={!ready}><Link to={stemsAddress(id)} aria-disabled={!ready}>{i18n._({ id: "Extract stems", message: "Extract stems" })}</Link></Button>
+        <Button type="button" variant="secondary" disabled={!!bedReason} title={bedReason || undefined} onClick={() => setBedOpen(true)}>{i18n._({ id: "Use in a video", message: "Use in a video" })}</Button>
         <Button type="button" variant="secondary" disabled={!ready} onClick={() => setRemixing(true)}>{i18n._({ id: "Remix", message: "Remix" })}</Button>
         {song?.length === "full" ? null : <Button type="button" variant="secondary" disabled={!ready} onClick={() => again("full")}>{i18n._({ id: "Extend to full", message: "Extend to full" })}</Button>}
         <Button type="button" variant="secondary" disabled={!ready} onClick={newCover}>{i18n._({ id: "New cover art", message: "New cover art" })}</Button>
@@ -215,6 +233,11 @@ function SongDetail({ id, onClose, remix }: { id: string; onClose: () => void; r
         <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(true)}>{i18n._({ id: "Delete song", message: "Delete song" })}</Button>
       </div>
       {confirmingDelete ? <DestructiveConfirm message={i18n._({ id: "{title, select, none {Delete this song?} other {Delete ‘{title}’?}}", message: "{title, select, none {Delete this song?} other {Delete ‘{title}’?}}", values: { title: song?.title || "none" } })} detail={i18n._({ id: "The song and all its versions move to Trash. You can bring them back from the Library for 30 days.", message: "The song and all its versions move to Trash. You can bring them back from the Library for 30 days." })} confirmLabel={i18n._({ id: "Delete song", message: "Delete song" })} busyLabel={i18n._({ id: "Deleting", message: "Deleting" })} busy={deleting} cancelLabel={i18n._({ id: "Keep it", message: "Keep it" })} onConfirm={removeSong} onCancel={() => setConfirmingDelete(false)} /> : null}
+      {bedOpen && !bedReason ? <Dialog open onOpenChange={(open) => { if (!open) setBedOpen(false); }}><DialogContent>
+        <DialogHeader><DialogTitle>{i18n._({ id: "Pick a video for this song", message: "Pick a video for this song" })}</DialogTitle><DialogDescription>{i18n._({ id: "The song goes under the video as a new version. Your first video is kept.", message: "The song goes under the video as a new version. Your first video is kept." })}</DialogDescription></DialogHeader>
+        <StudioPickerBody kind="video" start="music" personId={me.data?.id} onDone={(picked) => addToVideo(picked?.id ?? null)} />
+        {bedProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={bedProblem} /> : null}
+      </DialogContent></Dialog> : null}
       {remixing && song && ready ? <Dialog open onOpenChange={(open) => { if (!open) setRemixing(false); }}><DialogContent size="xl" scroll="viewport">
         <DialogHeader><DialogTitle>{i18n._({ id: "{title, select, none {Remix this song} other {Remix ‘{title}’}}", message: "{title, select, none {Remix this song} other {Remix ‘{title}’}}", values: { title: song.title || "none" } })}</DialogTitle><DialogDescription>{i18n._({ id: "Say what to change. You see the request before anything is made, and the earlier version is kept.", message: "Say what to change. You see the request before anything is made, and the earlier version is kept." })}</DialogDescription></DialogHeader>
         <RemixSong card={song} onClose={() => setRemixing(false)} onSent={() => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); }} />

@@ -179,7 +179,8 @@
       "track": {
         "type": "string",
         "maxLength": 80,
-        "grounded": false
+        "grounded": false,
+        "description": "mix music or cut_to_beat: one of the person's own songs: its music job id (musicJobId of an earlier generate_music result in this chat), a Library file id, or latest for the newest song finished in this chat. For 'use the song I just made as the music', pass latest. A locked or unfinished song is refused; say so plainly."
       },
       "make_music": {
         "type": "string",
