@@ -18217,6 +18217,171 @@
         }
       }
     },
+    "/api/voice/trace": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Keep one utterance's voice-client trace (owner or admin)",
+        "description": "Diagnostic: the voice client's timeline for one utterance, as event names from a fixed list and numbers (milliseconds, counts, booleans). No audio, no transcript, no words. The hub keeps the last 20 in local-app/voice-trace.json.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]{4,16}$"
+                  },
+                  "utterance": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "t": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "e": {
+                          "type": "string",
+                          "enum": [
+                            "session_open",
+                            "mic_settings",
+                            "mic_echo",
+                            "mic_gate",
+                            "output",
+                            "ready",
+                            "grant",
+                            "pool",
+                            "mode",
+                            "vad_on",
+                            "vad_resumed",
+                            "vad_off",
+                            "reply_pause",
+                            "reply_resume",
+                            "partial",
+                            "edge",
+                            "final",
+                            "timing",
+                            "no_speech",
+                            "echo_partial",
+                            "echo_final",
+                            "pause",
+                            "resume",
+                            "interrupt",
+                            "reaction",
+                            "speculate",
+                            "speculate_refused",
+                            "speculate_failed",
+                            "confirm",
+                            "discard",
+                            "clip_play",
+                            "clip_end",
+                            "window_decide",
+                            "turn_send",
+                            "audio_start",
+                            "audio_stop",
+                            "audio_suspend",
+                            "audio_resume",
+                            "audio_ended"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "t",
+                        "e"
+                      ],
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "string",
+                            "maxLength": 24,
+                            "pattern": "^[a-z0-9_.:-]*$/i"
+                          }
+                        ]
+                      }
+                    },
+                    "maxItems": 400
+                  }
+                },
+                "required": [
+                  "session",
+                  "utterance",
+                  "events"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kept": {
+                      "type": "boolean"
+                    },
+                    "events": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kept",
+                    "events"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid trace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/voices": {
       "get": {
         "tags": [
