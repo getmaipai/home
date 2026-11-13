@@ -1,0 +1,24 @@
+{
+  "id": "scene",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Scene",
+  "description": "Keep track of typed people and place in the current scene.",
+  "offer": { "mode": "conditional", "gate": "sceneAllowed", "bench_row": "SCENE-01c", "priority": 999 },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "args": {
+    "type": "object",
+    "oneOf": [
+      { "type": "object", "required": ["action", "relation"], "properties": { "action": { "const": "arrived" }, "label": { "type": "string", "maxLength": 60 }, "person_id": { "type": "string" }, "relation": { "type": "string", "enum": ["household", "guest", "pet", "unknown"] } }, "additionalProperties": false },
+      { "type": "object", "required": ["action"], "properties": { "action": { "const": "left" }, "label": { "type": "string", "maxLength": 60 }, "person_id": { "type": "string" } }, "additionalProperties": false },
+      { "type": "object", "required": ["action"], "properties": { "action": { "const": "place" }, "where": { "type": "string", "enum": ["home", "away"] }, "setting": { "type": "string", "enum": ["indoor", "outdoor", "vehicle"] }, "room": { "type": "string", "maxLength": 60 }, "label": { "type": "string", "maxLength": 60 } }, "additionalProperties": false }
+    ]
+  },
+  "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"],
+  "min_role": "child", "consequential": false, "offline": "full", "config": [], "data_sources": [],
+  "permissions": [], "notifications": [], "backup": "hot", "background": false, "contributes": {},
+  "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze"
+}

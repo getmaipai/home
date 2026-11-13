@@ -1,0 +1,5 @@
+{
+  "id": "scene",
+  "inputs": [{ "name": "action", "selector": "text" }],
+  "steps": [{ "op": "format", "as": "reply", "text": "Scene noted.", "speech": "Scene noted." }]
+}

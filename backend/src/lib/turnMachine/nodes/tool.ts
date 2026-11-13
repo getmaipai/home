@@ -196,6 +196,9 @@ async function retryEmptySearches(
 
 import { speculationConfirmed } from "@/lib/speculation";
 import { fillComposerDefaults } from "@/lib/composerHint";
+import { runSceneTool } from "@/lib/sceneTool";
+import { listActivePeople } from "@/lib/access";
+import { getScene, observeSceneClaims } from "@/lib/scene";
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
@@ -367,6 +370,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // one exists, with no further change at this call site.
     state.status?.emit({ type: "tool_start", package_id: tool });
     state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, toolStatusMoment(tool), state.persona), stage: "tool" });
+
+    if (tool === "scene") {
+      const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, observe: observeSceneClaims });
+      outcomes.push(outcome);
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
+      continue;
+    }
 
     // PROJECT-START-01: start_project never goes through runPlugin() -
     // tool.ts's own header explains why (no recipe op for "start a

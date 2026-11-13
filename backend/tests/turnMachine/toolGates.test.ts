@@ -8,7 +8,7 @@ import { __setImageToolsForTests } from "@/lib/imageEdit";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/ready";
-import { resolveTurnBudgetBase } from "@/lib/turnMachine/budget";
+import { resolveTurnBudgetBase, withTurnToolGates } from "@/lib/turnMachine/budget";
 import { __resetToolGateLatchForTests, budgetWithTurnToolGates } from "@/lib/turnMachine/toolGates";
 import { resetDb } from "../reset-db";
 import type { PersonRow } from "@/types";
@@ -67,6 +67,19 @@ afterEach(() => {
 });
 
 describe("conversation tool gate latch", () => {
+  test("SCENE-01c offers scene by surface structure, excludes guests and bare turns, preserves base set and cap", async () => {
+    const actor = makePerson("owner", "scene-gate-owner");
+    const base = resolveTurnBudgetBase(undefined, "adult");
+    const before = withTurnToolGates(base, true, false, false, false, false, false, false, false, null, true, false, true, false, false, false, true, false, false).tools_offered;
+    const after = withTurnToolGates(base, true, false, false, false, false, false, false, false, null, true, false, true, false, false, false, true, false, true).tools_offered;
+    expect(after).toContain("scene");
+    expect(after.length).toBeLessThanOrEqual(16);
+    expect(after.filter((id) => id !== "scene").sort()).toEqual(before.sort());
+    expect(await offered(makePerson("guest", "scene-gate-guest"))).not.toContain("scene");
+    expect(await offered(actor, { bare: true })).not.toContain("scene");
+    expect(await offered(actor, { surface: "robot", surfaceClass: "spoken", spoken: true })).toContain("scene");
+  });
+
   test("FILM-04: make_film is only offered to an adult on their own written chat with video ready", async () => {
     setReady(true);
     const adult = makePerson("owner", "film-adult");

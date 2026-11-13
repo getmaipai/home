@@ -109,7 +109,10 @@ export function setScene(scene: FusedScene, now = Date.now()): void { dropIdleSc
 export function dropScene(conversationId: string): void { store.delete(conversationId); }
 export function clearScenes(): void { store.clear(); }
 export function dropIdleScenes(now = Date.now()): void { for (const [id, scene] of store) if (now - scene.updated_at >= IDLE_TTL) store.delete(id); }
-onConversationFolded(dropScene);
+// conversationHistory and the scene runtime import one another through
+// shared memory/access helpers. Defer listener registration until the
+// module graph has finished evaluating so the listener set is initialized.
+queueMicrotask(() => onConversationFolded(dropScene));
 export function observeSceneClaims(conversationId: string, observations: readonly SceneObservation[], now = Date.now()): Scene | null {
   if (!observations.length) return getScene(conversationId, now);
   const scene = fuseScene(getScene(conversationId, now), observations, now, conversationId);

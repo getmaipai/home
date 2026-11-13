@@ -52,6 +52,17 @@ describe("the bundled remember package", () => {
   });
 });
 
+describe("the bundled scene package", () => {
+  test("is discoverable and its manifest and recipe validate", () => {
+    expect(listPackageIds()).toContain("scene");
+    const loaded = loadPackage("scene");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.offer).toMatchObject({ mode: "conditional", gate: "sceneAllowed" });
+    expect(loaded.value.recipe.steps[0]?.op).toBe("format");
+  });
+});
+
 describe("the bundled recall package", () => {
   test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
     expect(listPackageIds()).toContain("recall");

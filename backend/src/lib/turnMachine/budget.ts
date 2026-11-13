@@ -178,11 +178,11 @@ function musicObjectOffer(gate: string | undefined, object: MusicObjectGate): bo
   }
 }
 
-function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false, uptimeOk = false, inspiredVoiceOk = false, referenceVideoOk = false): boolean {
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false, uptimeOk = false, inspiredVoiceOk = false, referenceVideoOk = false, sceneOk = false): boolean {
   if (offer.mode === "base") return true;
   if (offer.mode !== "conditional" || !offer.bench_row) return false;
   // IMGGEN-HOME-01: `picturesAllowed` is decided once per turn (pictures/policy.ts and the Stack's picture engine being up).
-  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "pictureEditAllowed" && editPictureOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "filmAllowed" && filmOk) || (offer.gate === "referenceVideoAllowed" && referenceVideoOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "voiceoverAllowed" && voiceoverOk) || (offer.gate === "inspiredVoiceAllowed" && inspiredVoiceOk) || (offer.gate === "houseAllowed" && houseOk) || (offer.gate === "uptimeAllowed" && uptimeOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
+  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "pictureEditAllowed" && editPictureOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "videoEditAllowed" && videosOk && videoEditOk) || (offer.gate === "filmAllowed" && filmOk) || (offer.gate === "referenceVideoAllowed" && referenceVideoOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk) || (offer.gate === "itemReferenceAllowed" && itemRefOk) || (offer.gate === "writingFormatAllowed" && writingFormatOk) || (offer.gate === "voiceoverAllowed" && voiceoverOk) || (offer.gate === "inspiredVoiceAllowed" && inspiredVoiceOk) || (offer.gate === "houseAllowed" && houseOk) || (offer.gate === "uptimeAllowed" && uptimeOk) || (offer.gate === "sceneAllowed" && sceneOk) || (offer.gate === "musicBandAllowed" && musicOk && musicBandOk && !itemRefOk) || musicObjectOffer(offer.gate, musicOk && !itemRefOk ? musicObject : null);
 }
 
 export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
@@ -208,7 +208,7 @@ const MUSIC_SHRINK_ORDER = `writing_format show_images ${START_PROJECT_TOOL_ID} 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
 const STUDIO_SHRINK_ORDER = "house uptime writing_format make_song_style make_album make_sound edit_music".split(" ");
 
-export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false, uptimeOk = false, inspiredVoiceOk = false, referenceVideoOk = false): TurnBudget {
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false, uptimeOk = false, inspiredVoiceOk = false, referenceVideoOk = false, sceneOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;
   if (budget === NO_RECORD_BUDGET) return budget;
   if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
@@ -218,7 +218,7 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const manifest of listInstalledManifests()) {
     const offer = manifest.offer;
     const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
-    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk))) continue;
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk, sceneOk))) continue;
     const status = statuses.get(manifest.id);
     if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
@@ -226,8 +226,12 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
     // PROJECT-TOOL-REFUSAL-01: start_project's `type` enum is the registered project types; with none registered every call can only fail, so the tool is not offered (rule 6).
     if (tool.id === START_PROJECT_TOOL_ID && listProjectTypes().length === 0 && !offerOverridesForTests.has(tool.id)) continue;
-    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk, sceneOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
+
+  // SCENE-01c is newest and always gives way first; adding it must never
+  // perturb which established conditional tool survives an overloaded set.
+  if (candidates.size > cap) candidates.delete("scene");
 
   // AUDIO-PARITY-01 V1/V2: `change_voice` is the newest tool and gives way first, before any other set. TOOL-OFFER-VOICEOVER-01: `voiceover` keeps its
   // place whenever the gate offered it; the tools in VOICEOVER_SWAP_ORDER (independent of the music and video sets) give way after the other shrinks

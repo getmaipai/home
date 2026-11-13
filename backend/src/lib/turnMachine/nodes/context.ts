@@ -136,7 +136,7 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   lines.push(scene.alone_observed && scene.alone ? "Alone: positively observed." : scene.alone ? "Alone: not confirmed." : "Other people are present.");
   lines.push(scene.child_present ? "A child is in the room." : "No child is known to be in the room.");
   const place = scene.place;
-  if (place && place.where !== "unknown") lines.push(`Place: ${place.where === "home" ? "at home" : "away"}${place.setting !== "unknown" ? `, ${place.setting === "indoor" ? "indoors" : place.setting}` : ""}.`);
+  if (place && (place.where !== "unknown" || place.area)) lines.push(`Place: ${place.where === "home" ? "at home" : place.where === "away" ? "away" : ""}${place.setting !== "unknown" ? `${place.where !== "unknown" ? ", " : ""}${place.setting === "indoor" ? "indoors" : place.setting}` : ""}${place.area ? `${place.where !== "unknown" || place.setting !== "unknown" ? ", " : ""}${place.area}` : ""}.`);
   return lines.join(" ");
 }
 
@@ -582,13 +582,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
-  const sceneText = renderScene(currentScene, now.getTime(), state.actor, listActivePeople());
+  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople())} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
   const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
   const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
   const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
   const speakerLine = currentScene.speaker?.person === state.actor.id && (currentScene.speaker.level === "confirmed" || currentScene.speaker.basis === "signed_in") ? `With ${state.actor.displayName}:` : "With: someone the system has not identified.";
-  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine}`, sceneTokenCount);
+  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
   sceneItem.text = fittedScene.text;
   const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
   items.push(sceneItem);

@@ -697,7 +697,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   });
   // COMPOSER-04: a hint rides only a written chat turn, is read only when its mode's tool is already offered, and changes no offer.
   const composerHint = opts.composer !== undefined && composerHintAllowed({ surface, spoken: opts.spoken === true, deviceId: opts.deviceId, anonymous: speakerIsAnonymous(speaker), bare }) ? await resolveComposerHint(actor, opts.composer, gated.budget.tools_offered) : null;
-  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk } = gated;
+  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk, sceneOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -729,6 +729,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     ...(writingFormatOk ? { writingFormatAllowed: true } : {}),
     ...(voiceoverOk ? { voiceoverAllowed: true } : {}),
+    ...(sceneOk ? { sceneAllowed: true } : {}),
     ...(inspiredVoiceOk ? { inspiredVoiceAllowed: true } : {}),
     ...(houseOk ? { houseAllowed: true, houseContext } : {}),
     ...(uptimeOk ? { uptimeAllowed: true } : {}),

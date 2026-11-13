@@ -273,6 +273,7 @@ export interface TurnState {
   writingFormatAllowed?: boolean;
   /** V1/V2 voice tools are offered only for written adult turns while the Stack voice role is ready. */
   voiceoverAllowed?: boolean;
+  sceneAllowed?: boolean;
   /** VOICE-INSPIRED-02: a non-guest member may make an inspired voice on written chat. */
   inspiredVoiceAllowed?: boolean;
   houseAllowed?: boolean;

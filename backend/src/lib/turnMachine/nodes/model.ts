@@ -22,6 +22,7 @@ import { complete, startCompleteStreamPieces, envelopeToolCall, StackStreamError
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
+import { SCENE_TOOL_SPEC } from "@/lib/sceneTool";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID } from "@/lib/voiceTools";
@@ -174,6 +175,7 @@ export type ModelOutput =
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
 export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
+  if (id === "scene") return state?.sceneAllowed ? SCENE_TOOL_SPEC as unknown as ToolSpec : null;
   if ((id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID) && !state?.voiceoverAllowed) return null;
   if (id === MAKE_INSPIRED_VOICE_TOOL_ID && !state?.inspiredVoiceAllowed) return null;
   if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec({ ...state.houseContext, actor: { id: state.actor.id, role: state.actor.role as import("@/lib/house/access").HouseActor["role"], band: state.actor.role === "child" || state.actor.role === "teen" ? state.actor.role : "adult" } }) : null;
