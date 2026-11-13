@@ -107,6 +107,8 @@ export class SentenceSpeechScheduler implements SpeechSource {
    * has been called (no more sentences are coming). */
   onEnded?: () => void;
   onError?: () => void;
+  /** VOICE-TRACE-01: audio events as names and numbers (a buffer started with its length, stopped, the context suspended or resumed). */
+  onTrace?: (event: "audio_start" | "audio_stop" | "audio_suspend" | "audio_resume" | "audio_ended", extra?: Record<string, number | boolean>) => void;
 
   constructor(audioContext?: AudioContext, speechStream: typeof api.streamSpeech = api.streamSpeech) {
     // Created synchronously by the caller, in the same click/submit
@@ -206,12 +208,14 @@ export class SentenceSpeechScheduler implements SpeechSource {
   pause(): void {
     if (this.stopped || this.paused) return;
     this.paused = true;
+    this.onTrace?.("audio_suspend", { played_ms: Math.round(this.playedMs()) });
     void this.audioContext.suspend?.().catch(() => {});
   }
 
   resume(): void {
     if (this.stopped || !this.paused) return;
     this.paused = false;
+    this.onTrace?.("audio_resume", { played_ms: Math.round(this.playedMs()) });
     void this.audioContext.resume?.().catch(() => {});
   }
 
@@ -438,6 +442,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       publishSpeechTap({ type: "audio", source: this, sentence: track.id, samples: audioBuffer.getChannelData(0).slice(), rate: audioBuffer.sampleRate * speed, at: startTime - first.startTime });
     }
     this.scheduledCount++;
+    this.onTrace?.("audio_start", { ms: Math.round(audioBuffer.duration * 1000), cue: Boolean(track.cue), n: this.scheduledCount });
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     // The filler and the real answer are timed apart: first_playback_ms must mean the first REAL answer sound.
     if (track.cue) { if (!this.cuePlaybackSeen) { this.cuePlaybackSeen = true; this.onCuePlayback?.(performance.now()); } }
@@ -445,6 +450,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     source.onended = () => {
       this.sources.delete(source);
       this.finishedCount++;
+      this.onTrace?.("audio_ended", { n: this.finishedCount });
       if (this.streamDone && this.finishedCount === this.scheduledCount) {
         this.sessionHandle?.release();
         this.sessionHandle = null;
@@ -482,6 +488,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.cutOff = !this.endedNaturally;
     this.stopped = true;
     this.paused = false;
+    this.onTrace?.("audio_stop", { played_ms: Math.round(this.playedMs()), sources: this.sources.size, cut: this.cutOff });
     if (speechTapActive()) publishSpeechTap({ type: "stop", source: this });
     this.abortController.abort();
     for (const wake of this.waiters.splice(0)) wake();

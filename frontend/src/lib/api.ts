@@ -1933,6 +1933,8 @@ export const api = {
     request<{ turn_id: string; resume_token: string; conversation_id: string }>("/api/turn/stream", { method: "POST", body: JSON.stringify({ surface: "chat", text, spoken: true, speculative: true, conversation_id: conversationId }), ...(signal ? { signal } : {}) }),
   discardTurn: (turnId: string) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST", body: JSON.stringify({ discard: true }) }),
   prewarmTurn: () => request<{ warmed: boolean }>("/api/turn/prewarm", { method: "POST" }),
+  // VOICE-TRACE-01: one utterance's voice-client timeline (event names and numbers only), owner or admin.
+  postVoiceTrace: (upload: { session: string; utterance: number; events: Array<Record<string, number | boolean | string>> }) => request<{ kept: boolean; events: number }>("/api/voice/trace", { method: "POST", body: JSON.stringify(upload), timeoutMs: 10_000 }),
   cancelTurn: (turnId: string, heardChars?: number) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST", ...(heardChars === undefined ? {} : { body: JSON.stringify({ heard_chars: heardChars }) }) }),
   // A first preview can include the Stack's pinned voice download, so let
   // the Stack response complete without Home guessing a timeout.

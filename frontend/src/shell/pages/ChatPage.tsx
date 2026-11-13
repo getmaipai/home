@@ -79,6 +79,7 @@ import { assistantText, isListening, isSpeaking as speakingSignal, isThinking, t
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import type { SttSocket } from "@/lib/voice/sttSocket";
 import type { SttTimingExtras } from "@/lib/voice/sttContract";
+import { voiceTraceUtterancesFromSearch } from "@/lib/voice/voiceTrace";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -1573,6 +1574,8 @@ export function ChatPage({ person }: { person: Roster }) {
     speakingEndedAt,
     speechFailed,
     voiceTimingSocketRef: voiceTimingShared.socket,
+    // VOICE-TRACE-01: `?voicetrace=10` on the chat page, owner or admin only: the next 10 utterances' timelines (names and numbers) go to the hub's record folder.
+    traceUtterances: isOwnerOrAdminRole(person.role) ? voiceTraceUtterancesFromSearch(window.location.search) : 0,
     onVoiceTiming: ({ sttMs, phase, speculative, talkOver }) => { voiceTimingShared.sttMs.current = sttMs; if (phase === "final") { voiceTimingShared.finalAt.current = performance.now(); voiceTimingShared.turnId.current = undefined; voiceTimingShared.outcome.current = { ...(speculative ? { speculative } : {}), ...talkOver }; } },
   });
   const [pageSearchParams] = useSearchParams();

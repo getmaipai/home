@@ -30,7 +30,7 @@ export type TurnEndLevel = "none" | "gentle" | "natural";
 export interface TalkOverGrant { level: TalkOverLevel; window_ms: number; clips: readonly string[] }
 export type SttServerMessage =
   | import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent
-  | { t: "ready"; talk_over?: TalkOverGrant }
+  | { t: "ready"; talk_over?: TalkOverGrant; talk_over_reason?: "setting_off" | "speculative_off" | "robot" | "not_adult" }
   | { t: "partial"; v: string; edge: true; end?: { score: number; level: TurnEndLevel; unfinished: boolean } }
   | { t: "vad"; speaking: true; rms: number; resumed: true; voiced_ms: number }
   | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
@@ -57,6 +57,8 @@ export interface SttTimingExtras {
   edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean;
   /** ECHO-GUARD-01: final transcripts that were Home's own voice and were dropped before this turn. */
   echo_drops?: number;
+  /** Why the session got no talk-over grant (or `granted`), and how many clips were ready. */
+  talk_over_reason?: "granted" | "setting_off" | "speculative_off" | "robot" | "not_adult" | "unknown"; pool_size?: number;
 }
 
 /** Additive client timing report; all playback fields remain optional for older clients. */
@@ -70,4 +72,5 @@ export const SttTimingReportSchema = z.object({
   talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().optional(), overlap_ms: z.number().finite().nonnegative().optional(),
   decision: z.enum(["none", "confirmed", "continued"]).optional(), yield_ms: z.number().finite().nonnegative().optional(),
   edge_partials: z.number().int().nonnegative().optional(), clip_started_ms: z.number().finite().optional(), clip_ended_ms: z.number().finite().optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().optional(),
+  talk_over_reason: z.enum(["granted", "setting_off", "speculative_off", "robot", "not_adult", "unknown"]).optional(), pool_size: z.number().int().nonnegative().optional(),
 }).strict();

@@ -30,14 +30,22 @@ export function talkOverWindowMs(): number {
   return Math.min(TALK_OVER_WINDOW_MAX_MS, Math.max(TALK_OVER_WINDOW_MIN_MS, n));
 }
 
-/** The grant for one listening session, or null when the person gets nothing (and then no field is sent at all). */
-export function talkOverGrantFor(input: { actor: PersonRow; isRobot: boolean; now?: Date }): TalkOverGrant | null {
+export type TalkOverRefusal = "setting_off" | "speculative_off" | "robot" | "not_adult";
+
+/** The decision for one listening session: the grant, or the one reason there is none (sent on `ready` as `talk_over_reason` and kept
+ * on the voice timing record, so a live record says why no clip could play). */
+export function talkOverDecision(input: { actor: PersonRow; isRobot: boolean; now?: Date }): { grant: TalkOverGrant; reason?: undefined } | { grant?: undefined; reason: TalkOverRefusal } {
   const level = talkOverLevel();
-  if (level === "off") return null;
-  if (getHouseholdSettingValue(SPECULATIVE_START_KEY) !== true) return null;
-  if (input.isRobot) return null;
-  if (speakerAgeBand(input.actor, input.now ?? new Date()) !== "adult") return null;
-  return { level, window_ms: talkOverWindowMs(), clips: ACKNOWLEDGEMENT_CLIPS.map((clip) => normalizeForSpeech(clip)) };
+  if (level === "off") return { reason: "setting_off" };
+  if (getHouseholdSettingValue(SPECULATIVE_START_KEY) !== true) return { reason: "speculative_off" };
+  if (input.isRobot) return { reason: "robot" };
+  if (speakerAgeBand(input.actor, input.now ?? new Date()) !== "adult") return { reason: "not_adult" };
+  return { grant: { level, window_ms: talkOverWindowMs(), clips: ACKNOWLEDGEMENT_CLIPS.map((clip) => normalizeForSpeech(clip)) } };
+}
+
+/** The grant for one listening session, or null when the person gets nothing. */
+export function talkOverGrantFor(input: { actor: PersonRow; isRobot: boolean; now?: Date }): TalkOverGrant | null {
+  return talkOverDecision(input).grant ?? null;
 }
 
 /** The edge partial's score for the client, or `none` when the deterministic floor flags the words (a crisis disclosure gets no
