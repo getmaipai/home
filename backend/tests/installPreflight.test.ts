@@ -61,7 +61,7 @@ describe("checkInstallPreflight", () => {
   test.each([
     ["disk", { freeBytes: () => 100_000_000_000 }, null],
     ["disk", { freeBytes: () => 8_000_000_000 }, "error"],
-    ["disk", { freeBytes: () => 20_000_000_000 }, "warning"],
+    ["disk", { freeBytes: () => 55_000_000_000 }, "warning"],
     ["disk", { freeBytes: () => null }, "warning"],
     ["memory", { memoryBytes: () => ({ free: 4_000_000_000, total: 16_000_000_000 }) }, null],
     ["memory", { memoryBytes: () => ({ free: 4_000_000_000, total: 2_000_000_000 }) }, "error"],

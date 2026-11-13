@@ -42,8 +42,8 @@ describe("installer preflight: disk", () => {
   });
 
   test("a smaller plan level asks for less: minimal on the same computer", async () => {
-    const recommended = (await disk({ freeBytes: () => 40 * GIB }));
-    const minimal = (await disk({ freeBytes: () => 40 * GIB, level: "minimal" }));
+    const recommended = (await disk({ freeBytes: () => 100 * GIB }));
+    const minimal = (await disk({ freeBytes: () => 100 * GIB, level: "minimal" }));
     expect(recommended.severity).toBe("error");
     expect(minimal.severity).toBeNull();
   });

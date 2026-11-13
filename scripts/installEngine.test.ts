@@ -471,8 +471,8 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
   });
 
   test("the plan level sets the size: minimal passes where recommended stops, and a small computer is held to its own plan", () => {
-    expect(check("recommended", "full", 64, one(40 * GIB)).rc).toBe(1);
-    expect(check("minimal", "full", 64, one(40 * GIB)).rc).toBe(0);
+    expect(check("recommended", "full", 64, one(100 * GIB)).rc).toBe(1);
+    expect(check("minimal", "full", 64, one(100 * GIB)).rc).toBe(0);
     // A 32 GB Mac asking for Recommended is the p32 plan.
     expect(check("recommended", "full", 32, one(table.installer["p32.required_free_bytes"]! + 2 * GIB + table.headroom_warn_bytes)).out).toContain("(the p32 plan)");
   });
