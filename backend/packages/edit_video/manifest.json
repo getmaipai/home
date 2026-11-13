@@ -74,14 +74,14 @@
           "spatial_sound",
           "restyle"
         ],
-        "description": "remix: redo with changes. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows who talks. restyle: colorize adds colour (Max only, up to 10 s), words steer. grade: only if asked. Only claim a video if you called this tool."
+        "description": "remix: redo, changed. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows speaker. restyle: colorize (Max only, up to 10 s). grade: only if asked. Claim a video only if you called this."
       },
       "prompt": {
         "type": "string",
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "remix, continue, retake: full new description; quoted lines."
+        "description": "remix, continue, retake: full new description; quoted lines, one speaker at a time."
       },
       "look": {
         "type": "string",
@@ -156,7 +156,7 @@
           "type": "string",
           "maxLength": 80
         },
-        "description": "join: 2-6 video ids or latest, in order."
+        "description": "join: 2-6 ids or latest, in order."
       },
       "sound": {
         "type": "string",
@@ -180,7 +180,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "mix, cut_to_beat: a song's job id or Library file id, or latest."
+        "description": "mix, cut_to_beat: a song's job or Library file id, or latest. Locked or unfinished is refused; say so."
       },
       "make_music": {
         "type": "string",
@@ -279,7 +279,7 @@
           "minLength": 1,
           "maxLength": 60
         },
-        "description": "Saved style names, if named; [] removes."
+        "description": "Saved style names; [] removes."
       },
       "strength": {
         "oneOf": [
@@ -311,14 +311,14 @@
       "background": {
         "type": "string",
         "grounded": false,
-        "description": "black, white, green, blur, transparent or hex."
+        "description": "black, white, green, blur, transparent, hex."
       },
       "restyle": {
         "type": "string",
         "enum": [
           "colorize"
         ],
-        "description": "restyle: colorize adds colour to black and white."
+        "description": "restyle: colorize black and white."
       },
       "words": {
         "type": "string",

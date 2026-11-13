@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, settingsValues } from "@/db/schema";
 import { storeFile } from "@/lib/attachments";
-import { BEST_NEEDS_DOWNLOAD, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
+import { BEST_NEEDS_DOWNLOAD, LIBRARY_SOURCE, loadSource, saveVersion, __resetImageEditForTests, __setImageToolsForTests, processClearerQuick } from "@/lib/imageEdit";
 import { listMediaOps, runMediaOp } from "@/lib/mediaOps/registry";
 import { studioOperationRows } from "@/lib/mediaOps/studio";
 import { readFileSync } from "node:fs";
@@ -68,6 +68,21 @@ beforeEach(async () => {
 afterEach(() => { __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __resetImageEditForTests(); });
 
 describe("Make clearer in the operations table", () => {
+  test("there is one tool: the old Upscale is not listed, and an old caller still runs it as Make clearer at Better", async () => {
+    const ids = (await listMediaOps(sageActor, { input: "picture" })).map((op) => op.id);
+    expect(ids).toContain("picture.make_clearer");
+    expect(ids).not.toContain("picture.upscale");
+    expect((await studioOperationRows(sageActor, {})).some((row) => row.id === "picture.upscale")).toBe(false);
+    const source = await libraryPicture(await softPicture(0));
+    const asked: Array<[string, string | null]> = [];
+    const { __setStackClientForTests } = await import("@/lib/stackEngine");
+    __setStackClientForTests({ imageEdit: async (form: FormData) => { asked.push([String(form.get("operation")), form.get("scale") as string | null]); return { kind: "done", job: "j1", item: { b64_json: Buffer.from(await sharp(Buffer.from(await softPicture(0))).resize(W * 4, H * 4).png().toBuffer()).toString("base64"), width: W * 4, height: H * 4 } }; } } as never);
+    const result = await runMediaOp(sageActor, "picture.upscale", { source: { kind: "picture", via: "file", id: source.id }, args: { scale: 4 } });
+    expect((result as { file: { state: string } }).file.state).toBe("done");
+    expect(asked).toEqual([["upscale", "4"]]);
+    __setStackClientForTests(null);
+  });
+
   test("pictures and videos each list one Make clearer with Quick, Better and Best, a line and a time for each", async () => {
     const picture = (await listMediaOps(sageActor, { input: "picture" })).find((op) => op.id === "picture.make_clearer")!;
     expect(picture.label).toBe("Make clearer");
@@ -82,7 +97,7 @@ describe("Make clearer in the operations table", () => {
     expect(off.enabled).toBe(true);
     expect(off.levels!.map((level) => [level.id, level.enabled])).toEqual([["quick", true], ["better", true], ["best", false]]);
     expect(off.levels![2]!.reason).toBe(BEST_NEEDS_DOWNLOAD);
-    expect(BEST_NEEDS_DOWNLOAD).toBe("Best quality needs an extra download. An admin can add it in Settings, AI & models.");
+    expect(BEST_NEEDS_DOWNLOAD).toBe("Best is not available on this home yet.");
     __setImageToolsForTests({ ...READY, operations: [...READY.operations, "restore"] }, true);
     expect((await listMediaOps(sageActor, { input: "picture" })).find((op) => op.id === "picture.make_clearer")!.levels!.map((level) => level.enabled)).toEqual([true, true, true]);
     // The picture Studio's rows carry the levels, so the page draws Best off with its line rather than leaving it out.
@@ -162,6 +177,20 @@ describe("Quick on a picture", () => {
     const bigger = await apply({ level: "quick", size: "2" });
     expect([bigger.preview.width, bigger.preview.height]).toEqual([W * 2, H * 2]);
     expect(note(bigger.id.id).lock).not.toBe("off");
+  });
+
+  test("the lock record (SIMPLE_LOCAL_OPS): only Quick at the same size keeps an uncovered source open; enlarging Quick, Better and Best lock", async () => {
+    const original = await softPicture(0);
+    const source = await libraryPicture(original);
+    const bigger = new Uint8Array(await sharp(Buffer.from(original)).resize(W * 2, H * 2).png().toBuffer());
+    const saved = async (png: Uint8Array, level?: "quick" | "better" | "best") => note((await saveVersion(sageActor, loadSource(sageActor, LIBRARY_SOURCE, source.id, true), png, { op: "clearer", label: "Made clearer", ...(level ? { level } : {}) })).id);
+    expect((await saved(original, "quick")).lock).toBe("off");
+    expect((await saved(bigger, "quick")).lock).not.toBe("off");
+    expect((await saved(bigger, "better")).lock).not.toBe("off");
+    // A model level that happens to return the same size is still a model edit.
+    expect((await saved(original, "better")).lock).not.toBe("off");
+    expect((await saved(original, "best")).lock).not.toBe("off");
+    expect((await saved(original)).lock).not.toBe("off");
   });
 
   test("Better is an ordinary upscale at the Stack and never carries the lock state", async () => {

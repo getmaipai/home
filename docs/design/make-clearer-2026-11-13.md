@@ -14,8 +14,8 @@ change `upscale` with `clarity`). Three levels, one line and one time each, neve
 | Better | Smart enlarging that rebuilds fine detail. | about a minute (clip: a few minutes) | The existing Real-ESRGAN `upscale` (pictures 2x or 4x; clips 2x). |
 | Best | The most careful repair, for old or damaged pictures and faces. | a few minutes | The AI restore (SeedVR2 and face repair, CREATOR-52). Pictures: on when the Stack's image tools list `restore`. Clips: on when `STACK_HAS_VIDEO_RESTORE` is true. |
 
-Best is always shown. While the Stack lacks the restore it is off with one line: "Best quality needs an extra download. An admin can add it in Settings, AI & models."
-(`BEST_NEEDS_DOWNLOAD`). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.645). The video pages have no room: the Create feed menu is at the schema
+Best is always shown. While the Stack lacks the restore it is off with one line: "Best is not available on this home yet." (`BEST_NEEDS_DOWNLOAD`; it can name Settings, AI & models
+once that page actually lists the restore model). The picture Studio draws the three levels with the kit's `levels` on an operation row (ui 0.5.645). The video pages have no room: the Create feed menu is at the schema
 cap of 8 actions and the Studio's Make more at 3 (it had one), and a menu item cannot be drawn off with a reason. So the video Studio lists Quick and Better; Best for a clip is
 reached by chat and `POST /api/plugins/video/actions/clearer` (`level: best`), which answers with the same line. A levels picker on a video page needs a kit element and is open.
 
@@ -29,8 +29,21 @@ reached by chat and `POST /api/plugins/video/actions/clearer` (`level: best`), w
 
 ## Lock rule (owner decision, 2026-11-13, kept in sync with `SIMPLE_LOCAL_OPS` in `lib/imageEdit.ts`)
 
-Quick adds no content, so it is a simple local edit like Adjust, but only when the result has the same pixel size as the source. Quick with 1.5x or 2x, Better and
-Best are enlarging or model edits and lock as before (fail closed). Clip edits keep their existing lock handling.
+Quick adds no content, so it is a simple local edit like Adjust, but only when the result has the same pixel size as the source. `clearer` is on `SIMPLE_LOCAL_OPS`, and
+`saveVersion` makes the same-size check there (the preview carries its `level`; only `quick` can carry, a missing level fails closed). Quick with 1.5x or 2x, Better and
+Best are enlarging or model edits and lock as before, even when a model level returns the same size. Clip edits keep their existing lock handling.
+
+## One tool
+
+Make clearer is the only upscaling tool a person is offered. There is no separate Upscale entry: the registry's `picture.upscale` is not listed any more, and a caller that
+still runs it (the image-edit route, the editor's Resize bar, chat's picture upscale) is run as `picture.make_clearer` at the Better level (`scale` becomes `size`). Chat's
+picture upscale starts Make clearer Better at 2x.
+
+## Supersedes
+
+- The lock-list paragraph of `video-loras-2026-11-02.md` (line 235, "Simple edits of an unlabelled picture"): it now lists Make clearer at Quick, same size, among the simple local edits.
+- The separate `picture.upscale` Studio entry (`images-app-2026-11-03.md`): it is the Better level of `picture.make_clearer`.
+- CREATOR-17's planned `restore` operation (`creatoros-port-2026-11-13.md` section 2.1): it is the Best level of `picture.make_clearer`, not a new operation.
 
 ## Measured (Quick on a generated noisy, slightly soft 400 x 300 picture, grain sd 12)
 
@@ -41,4 +54,4 @@ Laplacian variance falls (1583 to 302) because grain, not edges, dominated it, s
 ## Not built
 
 SeedVR2 and GFPGAN themselves (CREATOR-52, benched elsewhere); the video Studio timeline (a per-piece Make clearer inside an export) and a clip level chooser with a disabled Best
-(menus have no disabled item and the Create feed menu is full). CREATOR-17's `restore` operation should be the Best level of this one operation, not a second operation.
+(menus have no disabled item and the Create feed menu is full). CREATOR-17's `restore` operation is the Best level of this one operation, not a second operation (see Supersedes).

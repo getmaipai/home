@@ -78,7 +78,7 @@ export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing
 
 /** MAKE-CLEARER-01: the three levels of Make clearer. Quick is local pixel work, Better the AI upscaler, Best the AI restore. */
 export type ClearerLevel = "quick" | "better" | "best";
-export const BEST_NEEDS_DOWNLOAD = "Best quality needs an extra download. An admin can add it in Settings, AI & models.";
+export const BEST_NEEDS_DOWNLOAD = "Best is not available on this home yet.";
 export interface EditToolState { enabled: boolean; reason?: string }
 export type EditToolKey = "markup" | "comment" | "clearer" | "remove_background" | "erase" | "resize" | "crop" | "adjust" | "blur_background" | "rotate" | "flip" | "find_people" | "find_subjects";
 export interface EditToolsStatus {
@@ -190,10 +190,18 @@ export interface SourcePicture {
  * label that the Adult lock does not cover (no lock item, for example an upload) is saved with that same state (no label, lock off), so it is visible to exactly who
  * can see the source. Every generative or model edit (comment, erase, remove_background, blur_background, upscale), resize (it runs on the engine, not here)
  * and any operation not listed here locks as before (fail closed). Make clearer at its Quick level (a median denoise and an unsharp mask in Home) joins the list only
- * when the result has the same pixel size as the source (`simpleLocal`); Quick with a larger size, Better and Best are model or enlarging edits and lock as before. Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
+ * when the result has the same pixel size as the source (checked in `saveVersion`); Quick with a larger size, Better and Best are model or enlarging edits and lock as before. Markup saves bytes the browser drew, so it carries only for a person who may upload photos:
  * otherwise it would be a way around that switch.
  */
-const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "markup"]);
+const SIMPLE_LOCAL_OPS: ReadonlySet<string> = new Set(["crop", "rotate", "flip", "adjust", "markup", "clearer"]);
+
+/** True when the saved result has the same upright pixel size as the source picture (Make clearer, Quick, without enlarging). An unreadable source counts as a different size (fail closed). */
+async function keepsSize(sourceBytes: Uint8Array, info: { width: number; height: number }): Promise<boolean> {
+  try {
+    const was = uprightSize(await sharp(sourceBytes, { limitInputPixels: MAX_SAVED_PIXELS }).metadata());
+    return was.width === info.width && was.height === info.height;
+  } catch { return false; }
+}
 
 /** A picture addressed by its Library file id rather than by a chat: the "conversation" of a Library source (IMG-OPS-02). Such an edit is owner-only and its result is a new Library picture. */
 export const LIBRARY_SOURCE = "library";
@@ -323,7 +331,7 @@ export function readPicture(actor: PersonRow, conversationId: string, id: string
 }
 
 /** Writes a PNG as the next version of `source`'s chain. The bytes are re-encoded here (metadata dropped), never trusted as sent. */
-export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; /** The edit ran in Home, added nothing and kept the picture size (Make clearer, Quick): it carries the source's state like the simple edits. */ simpleLocal?: boolean }): Promise<PictureVersion> {
+export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; /** Make clearer only: which level made this version. Only "quick" can carry the source's state (see SIMPLE_LOCAL_OPS); a missing level fails closed. */ level?: ClearerLevel }): Promise<PictureVersion> {
   let clean: Buffer;
   let info: OutputInfo;
   try {
@@ -338,7 +346,9 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
   // A simple local edit (no new content) of a picture with no audience label that the Adult lock does not cover (an upload, or an earlier such edit) carries the
   // source's own state: no audience label and lock off, so exactly the people who can see the source see the result. Nothing is raised or lowered. Everything else,
   // and any result the caller marks adult-only, goes through newItemMark as before.
-  const carries = (SIMPLE_LOCAL_OPS.has(meta.op) || meta.simpleLocal === true) && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
+  // Make clearer ("clearer") is on the list only at its Quick level and only when the result kept the source's pixel size; any enlarging, Better and Best lock as before.
+  const sameSize = meta.op !== "clearer" || (meta.level === "quick" && await keepsSize(source.bytes, info));
+  const carries = SIMPLE_LOCAL_OPS.has(meta.op) && sameSize && (meta.op !== "markup" || photoUploadsAllowed(actor)) && meta.audience !== "adult-only" && stored.madeAudience === null && (source.uncovered === true || stored.lock === "off");
   const mark = newItemMark([stored], meta.audience === "adult-only" && stored.madeAudience !== "adult-only");
   const audience = mark.madeAudience;
   const creationId = newCreationId();
@@ -366,7 +376,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 // ---------------------------------------------------------------- running a Stack edit
 
-interface Preview { simpleLocal?: boolean; token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
+interface Preview { level?: ClearerLevel; token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
 interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
 const jobs = new Map<string, EditJob>();
@@ -406,12 +416,12 @@ function sweep(now = Date.now()): void {
   for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) { jobs.delete(id); trackEdit(id, { state: "failed", errorKind: "expired", waitingReason: "This edit stopped waiting. Start it again." }); }
 }
 
-function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only"; simpleLocal?: boolean }): PreviewInfo {
+function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number; audience?: "all-ages" | "adult-only"; level?: ClearerLevel }): PreviewInfo {
   sweep();
   const mine = [...previews.values()].filter((value) => value.personId === actor.id).sort((a, b) => a.createdAt - b.createdAt);
   for (const old of mine.slice(0, Math.max(0, mine.length - (PREVIEWS_PER_PERSON - 1)))) previews.delete(old.token);
   const token = `prev-${randomBytes(12).toString("hex")}`;
-  previews.set(token, { token, ...(item.simpleLocal ? { simpleLocal: true } : {}), personId: actor.id, png, width: item.width, height: item.height, op, audience: item.audience, engine: item.engine, model: item.model, ms: item.ms, sourceId: source.id, conversationId: source.conversationId, createdAt: Date.now(),  });
+  previews.set(token, { token, ...(item.level ? { level: item.level } : {}), personId: actor.id, png, width: item.width, height: item.height, op, audience: item.audience, engine: item.engine, model: item.model, ms: item.ms, sourceId: source.id, conversationId: source.conversationId, createdAt: Date.now(),  });
   return { token, url: `/api/${source.conversationId === LIBRARY_SOURCE ? "media-ops" : "image-edit"}/previews/${token}`, width: item.width, height: item.height, operation: op, engine: item.engine ?? null, model: item.model ?? null, ms: item.ms ?? null, transparent: op === "remove_background" };
 }
 
@@ -572,9 +582,8 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
     if (!state.enabled) throw new ImageEditError(503, state.reason ?? status.note ?? "This level isn't available yet.", "unavailable");
     if (level === "quick") {
       const quick = await processClearerQuick(source.bytes, input.size ?? 1);
-      // Owner decision (Jesse, 2026-11-13): Quick makes no content, so it is a simple local edit like Adjust, but only while the size is unchanged; any enlarging is an engine-style edit and locks as before.
-      const was = uprightSize(await sharp(source.bytes, { limitInputPixels: MAX_SAVED_PIXELS }).metadata());
-      return { state: "done", preview: keepPreview(actor, source, "clearer", quick.png, { ...quick, simpleLocal: quick.width === was.width && quick.height === was.height }) };
+      // Owner decision (Jesse, 2026-11-13): see SIMPLE_LOCAL_OPS. The level travels with the preview; saveVersion decides.
+      return { state: "done", preview: keepPreview(actor, source, "clearer", quick.png, { ...quick, level: "quick" }) };
     }
     input = { ...input, scale: level === "better" ? (input.size === 4 ? 4 : 2) : undefined };
   }
@@ -707,7 +716,7 @@ export async function applyPreview(actor: PersonRow, token: string, label?: stri
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
   const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", clearer: "Made clearer", resize: "Resized", crop: "Cropped", adjust: "Adjusted", blur_background: "Background blurred", rotate: "Turned", flip: "Flipped", comment: "Changed as described" };
-  const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms, simpleLocal: preview.simpleLocal });
+  const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], audience: preview.audience, engine: preview.engine, model: preview.model, ms: preview.ms, level: preview.level });
   previews.delete(token);
   return version;
 }

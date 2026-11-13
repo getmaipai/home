@@ -127,7 +127,10 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   if (kind === "remove_background" || kind === "upscale") {
     // The Stack's non-generative tools: the same pixels, a cut-out or a bigger copy.
     try {
-      const result = await runPictureEdit(actor, kind, { source: { kind: "picture", via: "chat", id: base.id, conversationId: state.conversationId }, args: kind === "upscale" ? { scale: 2 } : {} });
+      // MAKE-CLEARER-2026-11-13: a chat upscale is Make clearer at the Better level (the same Stack upscaler, twice the size).
+      const result = kind === "upscale"
+        ? await runPictureEdit(actor, "make_clearer", { source: { kind: "picture", via: "chat", id: base.id, conversationId: state.conversationId }, args: { level: "better", size: "2" } })
+        : await runPictureEdit(actor, kind, { source: { kind: "picture", via: "chat", id: base.id, conversationId: state.conversationId }, args: {} });
       const payload = "job" in result ? result.job : result.file;
       const jobId = typeof payload === "object" && payload !== null && "job" in payload ? String((payload as { job: string }).job) : undefined;
       if (!jobId) return failed(callId, args, "bad_operation_result", "errored");

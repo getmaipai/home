@@ -196,8 +196,9 @@ describe("who may run what", () => {
     const source = await libraryPicture(sageActor);
     const listed = (await (await sage.get(`/api/media-ops?file_id=${source.id}`)).json()) as { operations: Array<{ id: string; label: string; params: Record<string, unknown>; controls: unknown[]; enabled: boolean; reason?: string }>; note: string | null };
     const byId = new Map(listed.operations.map((op) => [op.id, op]));
-    for (const id of ["picture.rotate", "picture.flip", "picture.crop", "picture.adjust", "picture.resize", "picture.upscale", "picture.erase", "picture.remove_background", "picture.blur_background", "picture.change"]) expect(byId.has(id)).toBe(true);
+    for (const id of ["picture.rotate", "picture.flip", "picture.crop", "picture.adjust", "picture.resize", "picture.make_clearer", "picture.erase", "picture.remove_background", "picture.blur_background", "picture.change"]) expect(byId.has(id)).toBe(true);
     expect(byId.has("picture.locate")).toBe(false);
+    expect(byId.has("picture.upscale")).toBe(false);
     expect(byId.get("picture.rotate")).toMatchObject({ enabled: true, label: "Rotate", params: { type: "object", required: ["degrees"] } });
     expect(byId.get("picture.flip")!.params.properties).toMatchObject({ direction: { enum: ["horizontal", "vertical"] } });
     expect(byId.get("picture.remove_background")).toMatchObject({ enabled: false, reason: expect.stringContaining("background remover") });

@@ -153,7 +153,7 @@ Layout (S2): the tool rail left, picture centred and prompt bar under it are `Im
 | 3 | Remove background (`picture.remove_background`) | Stack image tools | exists |
 | 4 | Crop, rotate, flip, aspect presets (`picture.crop`) | Home, `sharp` | EDITOR-03 |
 | 5 | Light and colour: brightness, contrast, warmth, saturation, Auto (`picture.adjust`) | Home, `sharp` | EDITOR-04 |
-| 6 | Upscale 2x or 4x, Resize (`picture.upscale`, `picture.resize`) | Stack image tools | exists |
+| 6 | Upscale 2x or 4x, Resize (`picture.upscale`, `picture.resize`) | Stack image tools | exists; amended 2026-11-13: `picture.upscale` is unlisted and runs as Make clearer Better |
 | 7 | Blur background (`picture.blur_background`) | Home, cutout then `sharp` | LOKI-PORT-01 |
 | 8 | Markup: pen, shapes, text (browser) | kit | exists |
 | 9 | Compare before and after | kit | EDITOR-05 |
