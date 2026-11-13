@@ -85,7 +85,6 @@ export function listCast(actor: PersonRow): CastEntry[] {
   const entries: CastEntry[] = [];
   for (const synth of listSynths(actor)) {
     const entry = synthEntry(synth);
-    if (minorViewer && entry.real) continue; // a real subject is refused to a minor downstream, so it is not offered
     if (synth.based_on.kind === "household_member" && synth.based_on.person_id !== actor.id && !householdLikenessAllowed()) continue; // rule 0: household_likeness alone
     entries.push(entry);
   }

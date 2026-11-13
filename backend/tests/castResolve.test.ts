@@ -77,15 +77,19 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     const ada = await makeSynth(sage, "Ada", real);
     expect(names(listCast(teenRow))).toEqual([]);
     setValue(sage, `person:${teenRow.id}`, "synths.real_people", "all");
-    expect(names(listCast(teenRow))).toEqual([]); // a real subject is refused to a minor downstream, so it is not offered either
+    expect(names(listCast(teenRow))).toEqual(["Ada"]); // the existing parent gate (maySeeSynth, synths.real_people) decides, exactly as on main
+    setValue(sage, `person:${teenRow.id}`, "synths.real_people", "ask");
+    expect(names(listCast(teenRow))).toEqual([]);
+    setValue(sage, `person:${teenRow.id}`, "synths.real_people_allowed", [ada.id]);
+    expect(names(listCast(teenRow))).toEqual(["Ada"]);
+    setValue(sage, `person:${teenRow.id}`, "synths.real_people_allowed", []);
     setValue(sage, `person:${teenRow.id}`, "synths.real_people", "off");
     expect(names(listCast(teenRow))).toEqual([]);
     expect(listCast(teenRow).some((e) => e.kind === "member")).toBe(false);
-    expect(mine(listCast(teenRow)).some((e) => e.real)).toBe(false);
     expect(ada.id).toBeTruthy();
   });
 
-  test("a synth based on a household member needs household_likeness on (or the viewer is that member); a minor never gets it", async () => {
+  test("a synth based on a household member needs household_likeness on (or the viewer is that member); a minor follows the existing synth gate", async () => {
     const { sage, kid, teenRow } = await world();
     const synth = await makeSynth(sage, "Poppy Fox", { kind: "household_member", person_id: kid.id, name: null, refresh: "7d", minor: true });
     const other = db.select().from(people).where(eq(people.displayName, "Sage")).get()! as PersonRow;
@@ -95,9 +99,9 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     expect((await resolveCast(sage, [synth.id])).members).toEqual([]);
     expect(names(listCast(teenRow))).not.toContain("Poppy Fox");
     expect((await resolveCast(teenRow, [synth.id, "Poppy Fox"])).members).toEqual([]);
-    expect(names(listCast(kid))).not.toContain("Poppy Fox");
+    expect(names(listCast(kid))).toContain("Poppy Fox"); // the viewer is that member
     setHouseholdSettingValue("generation.household_likeness", true);
-    expect(names(listCast(teenRow))).not.toContain("Poppy Fox");
+    expect(names(listCast(teenRow))).toContain("Poppy Fox"); // on: the existing synth gate alone decides for a minor
   });
 
   test("adult-only subjects are filtered out for a minor, not just labelled", async () => {
