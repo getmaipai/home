@@ -149,15 +149,15 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     default: "gentle",
     label: "Talk before I finish",
     copy: {
-      does: "Home gives a short \"mm-hm\" the moment your sentence sounds finished, then answers.",
+      does: "Home gives a short spoken cue the moment your sentence sounds finished, then answers.",
       options: {
         off: "Home waits until you have clearly stopped before it makes a sound.",
-        gentle: "A short \"mm-hm\" when a sentence clearly ends, such as a question.",
+        gentle: "A short spoken cue when a sentence clearly ends, such as a question.",
         natural: "Also on plain statements, so it happens more often and is wrong more often.",
       },
       option_labels: { off: "Off", gentle: "Gentle", natural: "Natural" },
     },
-    help: "Lets Home answer with a short \"mm-hm\" the moment your sentence sounds finished, the way a person does, with the answer right after. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on.",
+    help: "Home gives a short spoken cue the moment your sentence sounds finished, then answers. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on.",
     level: "advanced",
     lives_in: "household.ai_advanced",
     honoured_by: ["home"],

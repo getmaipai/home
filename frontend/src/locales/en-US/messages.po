@@ -1855,7 +1855,7 @@ msgstr "A sharper picture, a little slower."
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1537
 msgid "setting.voice.talk_over.option.gentle"
-msgstr "A short \"mm-hm\" when a sentence clearly ends, such as a question. If you keep talking, Home goes quiet and answers all of it."
+msgstr "A short spoken cue when a sentence clearly ends, such as a question. If you keep talking, Home goes quiet and answers all of it."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:522
@@ -11426,7 +11426,7 @@ msgstr "Home fetches downloads, updates, and searches you ask for the way you wo
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1535
 msgid "setting.voice.talk_over.does"
-msgstr "Home gives a short \"mm-hm\" the moment your sentence sounds finished, and the answer follows."
+msgstr "Home gives a short spoken cue the moment your sentence sounds finished, then answers."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:125
@@ -13551,7 +13551,7 @@ msgstr "Lets each person with full controls start with access."
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1534
 msgid "setting.voice.talk_over.help"
-msgstr "Lets Home answer with a short \"mm-hm\" the moment your sentence sounds finished, the way a person does, with the answer right after. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on."
+msgstr "Home gives a short spoken cue the moment your sentence sounds finished, then answers. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:877

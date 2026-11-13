@@ -128,12 +128,14 @@ export const THINKING_CUE_VARIANTS: readonly string[] = [
  * reply's voice by the client and played from memory, never written by a model, never stored, never shown. Content-free by
  * construction; a test runs the output floor over every entry for every band. DUPLEX-07 adds its continuer groups here, not in a
  * second list. */
-export const ACKNOWLEDGEMENT_CLIPS: readonly string[] = [
-  "Mm-hm.",
-  "Okay.",
-  "Hmm.",
-  "Right.",
-];
+export const ACKNOWLEDGEMENT_GROUPS = {
+  backchannel: ["Mm-hm.", "Okay.", "Hmm.", "Right."],
+  thinking: ["Hmm, let me think.", "Okay, so.", "Let's see."],
+  request: ["Sure.", "Alright.", "Got it."],
+  question: ["Good question.", "Hmm, good one."],
+  good_news: ["Oh nice!", "That's great!"],
+  bad_news: ["Oh no.", "Oh, I'm sorry."],
+} as const;
 
 /** VOICE-FILLER-02: a second bridge phrase for a wait that outlasts the first, so a long wait is not
  * silence after "One sec." Same rules as THINKING_CUE_VARIANTS: spoken only, never the answer. */

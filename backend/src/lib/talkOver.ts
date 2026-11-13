@@ -7,7 +7,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
-import { ACKNOWLEDGEMENT_CLIPS } from "@/lib/replyVariation";
+import { ACKNOWLEDGEMENT_GROUPS } from "@/lib/replyVariation";
 import { SPECULATIVE_START_KEY } from "@/lib/speculation";
 import { predictTurnEnd, type TalkOverLevel, type TurnEndScore } from "@/lib/turnEnd";
 
@@ -17,7 +17,9 @@ export const TALK_OVER_WINDOW_DEFAULT_MS = 800;
 export const TALK_OVER_WINDOW_MIN_MS = 500;
 export const TALK_OVER_WINDOW_MAX_MS = 1200;
 
-export interface TalkOverGrant { level: Exclude<TalkOverLevel, "off">; window_ms: number; clips: readonly string[] }
+export type TalkOverGroupId = keyof typeof ACKNOWLEDGEMENT_GROUPS;
+export type TalkOverGroups = Readonly<Record<TalkOverGroupId, readonly string[]>>;
+export interface TalkOverGrant { level: Exclude<TalkOverLevel, "off">; window_ms: number; clips: readonly string[]; groups: TalkOverGroups }
 
 export function talkOverLevel(): TalkOverLevel {
   const value = getHouseholdSettingValue(TALK_OVER_KEY);
@@ -40,7 +42,15 @@ export function talkOverDecision(input: { actor: PersonRow; isRobot: boolean; no
   if (getHouseholdSettingValue(SPECULATIVE_START_KEY) !== true) return { reason: "speculative_off" };
   if (input.isRobot) return { reason: "robot" };
   if (speakerAgeBand(input.actor, input.now ?? new Date()) !== "adult") return { reason: "not_adult" };
-  return { grant: { level, window_ms: talkOverWindowMs(), clips: ACKNOWLEDGEMENT_CLIPS.map((clip) => normalizeForSpeech(clip)) } };
+  const groups: TalkOverGroups = {
+    backchannel: ACKNOWLEDGEMENT_GROUPS.backchannel.map((clip) => normalizeForSpeech(clip)),
+    thinking: ACKNOWLEDGEMENT_GROUPS.thinking.map((clip) => normalizeForSpeech(clip)),
+    request: ACKNOWLEDGEMENT_GROUPS.request.map((clip) => normalizeForSpeech(clip)),
+    question: ACKNOWLEDGEMENT_GROUPS.question.map((clip) => normalizeForSpeech(clip)),
+    good_news: ACKNOWLEDGEMENT_GROUPS.good_news.map((clip) => normalizeForSpeech(clip)),
+    bad_news: ACKNOWLEDGEMENT_GROUPS.bad_news.map((clip) => normalizeForSpeech(clip)),
+  };
+  return { grant: { level, window_ms: talkOverWindowMs(), clips: groups.backchannel, groups } };
 }
 
 /** The grant for one listening session, or null when the person gets nothing. */

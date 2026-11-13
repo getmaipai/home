@@ -3,7 +3,7 @@
 // a pause (a period after any segment, a question mark on a question, no punctuation now and then).
 import { describe, expect, test } from "bun:test";
 import { firesAt, predictTurnEnd, stepDown, UNFINISHED_BELOW } from "@/lib/turnEnd";
-import { ACKNOWLEDGEMENT_CLIPS } from "@/lib/replyVariation";
+import { ACKNOWLEDGEMENT_GROUPS } from "@/lib/replyVariation";
 import { evaluateSafety } from "@/lib/safety";
 
 const LABELLED: ReadonlyArray<[text: string, level: "none" | "gentle" | "natural"]> = [
@@ -104,9 +104,13 @@ describe("TALK-OVER-01: the end-of-turn predictor", () => {
 
 describe("TALK-OVER-01: the acknowledgement clip pool (rule 10, section 3b item 4)", () => {
   test("every clip passes the output floor for every band, and the pool is short and content-free", () => {
-    expect(ACKNOWLEDGEMENT_CLIPS.length).toBeGreaterThanOrEqual(2);
-    for (const clip of ACKNOWLEDGEMENT_CLIPS) {
-      expect(clip.split(/\s+/).length).toBeLessThanOrEqual(2);
+    expect(Object.keys(ACKNOWLEDGEMENT_GROUPS)).toEqual(["backchannel", "thinking", "request", "question", "good_news", "bad_news"]);
+    const clips = Object.values(ACKNOWLEDGEMENT_GROUPS).flat();
+    expect(clips).toHaveLength(16);
+    for (const clip of clips) {
+      expect(clip.trim().split(/\s+/).length).toBeLessThanOrEqual(4);
+      expect(clip).not.toMatch(/[0-9?]/);
+      expect(clip).not.toMatch(/\b(?:Jesse|Sage|Marlow|Nova)\b/i);
       for (const band of ["child", "teen", "adult"] as const) {
         const result = evaluateSafety(clip, band, "reply");
         expect({ clip, band, action: result.action }).toEqual({ clip, band, action: "allow" });

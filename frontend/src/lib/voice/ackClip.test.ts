@@ -2,7 +2,7 @@
 // only the call closing stops one (Jesse's rule, 2026-11-12).
 import { describe, expect, spyOn, test } from "bun:test";
 import { api } from "@/lib/api";
-import { renderAckClips } from "@/lib/voice/ackClip";
+import { ackClipCacheKey, renderAckClips, startAckClipRendering } from "@/lib/voice/ackClip";
 
 class FakeGainParam { value = 1; ramps: Array<{ to: number; at: number }> = []; setValueAtTime(v: number) { this.value = v; } linearRampToValueAtTime(to: number, at: number) { this.ramps.push({ to, at }); } cancelScheduledValues() {} }
 class FakeContext {
@@ -34,6 +34,43 @@ function wav(): Response {
 }
 
 describe("TALK-OVER-01: acknowledgement clips", () => {
+  test("cache keys vary with voice, engine and normalized text", async () => {
+    const key = await ackClipCacheKey("  Okay.  ", { voice: "voice-1", engine: "engine-a" });
+    expect(await ackClipCacheKey("Okay.", { voice: "voice-1", engine: "engine-a" })).toBe(key);
+    expect(await ackClipCacheKey("Okay.", { voice: "voice-2", engine: "engine-a" })).not.toBe(key);
+    expect(await ackClipCacheKey("Okay.", { voice: "voice-1", engine: "engine-b" })).not.toBe(key);
+    expect(await ackClipCacheKey("Sure.", { voice: "voice-1", engine: "engine-a" })).not.toBe(key);
+  });
+
+  test("serial render order pauses at boundaries while busy and a partial group can play", async () => {
+    let calls = 0;
+    let releaseSecond: (() => void) | undefined;
+    const speech = spyOn(api, "streamSpeech").mockImplementation(async () => {
+      calls++;
+      if (calls === 2) await new Promise<void>((resolve) => { releaseSecond = resolve; });
+      return wav();
+    });
+    try {
+      const context = new FakeContext();
+      const queue = startAckClipRendering({ backchannel: ["Mm-hm."], request: ["Sure."], question: ["Good question."] }, "voice-1", { context: context as unknown as AudioContext, initiallyBusy: true });
+      await Promise.resolve(); await Promise.resolve();
+      expect(speech).not.toHaveBeenCalled();
+      queue.setBusy(false);
+      for (let i = 0; i < 30 && queue.pool.size < 1; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(speech.mock.calls[0]?.[0]).toBe("Mm-hm.");
+      expect(queue.pool.playGroup("question")?.group).toBe("backchannel");
+      queue.setBusy(true);
+      expect(speech).toHaveBeenCalledTimes(2);
+      releaseSecond?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(speech).toHaveBeenCalledTimes(2);
+      queue.setBusy(false);
+      await queue.done;
+      expect(speech.mock.calls.map((call) => call[0])).toEqual(["Mm-hm.", "Sure.", "Good question."]);
+      expect(queue.pool.readyGroups).toEqual(["backchannel", "request", "question"]);
+      queue.stop();
+    } finally { speech.mockRestore(); }
+  });
   test("the engine's silence padding is trimmed before the length check, so a padded 'Mm-hm.' is kept", async () => {
     const { trimSilence, MAX_ACK_CLIP_MS } = await import("@/lib/voice/ackClip");
     const rate = 16_000; const padded = new Float32Array(rate * 1.2); // 1.2 s with 0.4 s of sound in the middle
