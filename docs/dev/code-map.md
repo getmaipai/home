@@ -1294,7 +1294,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/estimate.ts` | ESTIMATE_MIN_SAMPLES, medianMinutes, estimateVideoMinutes |
 | `backend/src/lib/videos/favorites.ts` | favoriteFileIds, isFavoriteFile, setFavoriteFile |
 | `backend/src/lib/videos/feed.ts` | FEED_LIMIT, levelOfJob, feedRowOf, feedRows, feedRowById |
-| `backend/src/lib/videos/frameCheck.ts` | sharpness, checkClipFrames |
+| `backend/src/lib/videos/frameCheck.ts` | CLIP_RULES, evaluateClipSeries, clipWeight, keepBetter, shouldRetake, sharpness |
 | `backend/src/lib/videos/history.ts` | removeFromHistory |
 | `backend/src/lib/videos/ingredientsAdapter.ts` | INGREDIENTS_NAME, INGREDIENTS_LIBRARY_NAME, INGREDIENTS_FILE, INGREDIENTS_BYTES, INGREDIENTS_REPO, INGREDIENTS_URL |
 | `backend/src/lib/videos/jobs.ts` | referencePercent, VIDEO_FAILED_PREFIX, MEMORY_CANCELLED_CODE, plainVideoFailure, markAnotherTake, getVideoJobFor |
@@ -1322,6 +1322,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, START_PICTURE_MAX_SIDE, START_PICTURE_MAX_BYTES, pictureNeedsFit, fitPictureForStack |
+| `backend/src/lib/videos/stackClipCheck.ts` | checkClipFile |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
 | `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
 | `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, studioRun, startStudioExport |
