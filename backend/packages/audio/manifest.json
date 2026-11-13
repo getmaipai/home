@@ -150,17 +150,11 @@
           ]
         },
         {
-          "id": "create",
-          "mode": "create",
-          "pages": [
-            "create"
-          ]
-        },
-        {
           "id": "create-make",
           "mode": "create",
           "title": "Make",
           "pages": [
+            "create",
             "bands",
             "styles",
             "voices",
@@ -307,7 +301,7 @@
       },
       {
         "id": "create",
-        "label": "Create",
+        "label": "Song",
         "icon": "sparkles",
         "nav": true,
         "kind": "schema",
