@@ -82386,7 +82386,7 @@
                             "enum": [
                               "videos",
                               "shows",
-                              "music",
+                              "audio",
                               "podcasts",
                               "books"
                             ]
@@ -82445,7 +82445,7 @@
                             "enum": [
                               "videos",
                               "shows",
-                              "music",
+                              "audio",
                               "podcasts",
                               "books"
                             ]
@@ -82504,7 +82504,7 @@
                             "enum": [
                               "videos",
                               "shows",
-                              "music",
+                              "audio",
                               "podcasts",
                               "books"
                             ]
@@ -82563,7 +82563,7 @@
                             "enum": [
                               "videos",
                               "shows",
-                              "music",
+                              "audio",
                               "podcasts",
                               "books"
                             ]
@@ -93374,7 +93374,7 @@
                             "enum": [
                               "videos",
                               "shows",
-                              "music",
+                              "audio",
                               "podcasts",
                               "books"
                             ]
@@ -93395,7 +93395,7 @@
                                   "enum": [
                                     "videos",
                                     "shows",
-                                    "music",
+                                    "audio",
                                     "podcasts",
                                     "books"
                                   ]
@@ -105834,7 +105834,7 @@
                       "additionalProperties": {
                         "nullable": true
                       },
-                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                      "description": "The answer block the chat and the Audio app draw: its props are the card's props. Pictures and finished songs are filled in."
                     },
                     "cover_state": {
                       "type": "string",
@@ -108030,7 +108030,7 @@
                       "additionalProperties": {
                         "nullable": true
                       },
-                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                      "description": "The answer block the chat and the Audio app draw: its props are the card's props. Pictures and finished songs are filled in."
                     },
                     "cover_state": {
                       "type": "string",
@@ -110318,7 +110318,7 @@
                       "additionalProperties": {
                         "nullable": true
                       },
-                      "description": "The answer block the chat and the Music app draw: its props are the card's props. Pictures and finished songs are filled in."
+                      "description": "The answer block the chat and the Audio app draw: its props are the card's props. Pictures and finished songs are filled in."
                     },
                     "cover_state": {
                       "type": "string",

@@ -8,6 +8,41 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 
 | File | Package | Title |
 |---|---|---|
+| `backend/packages/audio/pages/album.json` | audio | Album |
+| `backend/packages/audio/pages/albums.json` | audio | Albums |
+| `backend/packages/audio/pages/artist.json` | audio | Artist |
+| `backend/packages/audio/pages/artists.json` | audio | Artists |
+| `backend/packages/audio/pages/bands.json` | audio | Bands |
+| `backend/packages/audio/pages/create.json` | audio | Create |
+| `backend/packages/audio/pages/creations.json` | audio | My creations |
+| `backend/packages/audio/pages/downloads.json` | audio | Downloads |
+| `backend/packages/audio/pages/drafts.json` | audio | Drafts |
+| `backend/packages/audio/pages/edit.json` | audio | Edit |
+| `backend/packages/audio/pages/genres.json` | audio | Genres and moods |
+| `backend/packages/audio/pages/history.json` | audio | Recently played |
+| `backend/packages/audio/pages/index.json` | audio | Listen now |
+| `backend/packages/audio/pages/library.json` | audio | Your Library |
+| `backend/packages/audio/pages/liked.json` | audio | Liked |
+| `backend/packages/audio/pages/lyrics.json` | audio | Lyrics |
+| `backend/packages/audio/pages/made-for-you.json` | audio | Made for you |
+| `backend/packages/audio/pages/make-album.json` | audio | Make an album |
+| `backend/packages/audio/pages/make-band.json` | audio | Make a band |
+| `backend/packages/audio/pages/make-song.json` | audio | Make a song |
+| `backend/packages/audio/pages/make-style.json` | audio | Make a song style |
+| `backend/packages/audio/pages/new-releases.json` | audio | New releases |
+| `backend/packages/audio/pages/play.json` | audio | Now playing |
+| `backend/packages/audio/pages/playlist.json` | audio | Playlist |
+| `backend/packages/audio/pages/playlists.json` | audio | Playlists |
+| `backend/packages/audio/pages/radio.json` | audio | Radio |
+| `backend/packages/audio/pages/remix.json` | audio | Remix and edit |
+| `backend/packages/audio/pages/search.json` | audio | Search |
+| `backend/packages/audio/pages/songs.json` | audio | Songs |
+| `backend/packages/audio/pages/sound-effects.json` | audio | Sound effects |
+| `backend/packages/audio/pages/station.json` | audio | Station |
+| `backend/packages/audio/pages/stems.json` | audio | Stems |
+| `backend/packages/audio/pages/studio.json` | audio | Studio |
+| `backend/packages/audio/pages/styles.json` | audio | Styles |
+| `backend/packages/audio/pages/voices.json` | audio | Voices |
 | `backend/packages/books/pages/audiobooks.json` | books | Audiobooks |
 | `backend/packages/books/pages/books.json` | books | Books |
 | `backend/packages/books/pages/detail.json` | books | Book detail |
@@ -16,41 +51,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/books/pages/read.json` | books | Reader |
 | `backend/packages/books/pages/series-detail.json` | books | Series |
 | `backend/packages/books/pages/series.json` | books | Series |
-| `backend/packages/music/pages/album.json` | music | Album |
-| `backend/packages/music/pages/albums.json` | music | Albums |
-| `backend/packages/music/pages/artist.json` | music | Artist |
-| `backend/packages/music/pages/artists.json` | music | Artists |
-| `backend/packages/music/pages/bands.json` | music | Bands |
-| `backend/packages/music/pages/create.json` | music | Create |
-| `backend/packages/music/pages/creations.json` | music | My creations |
-| `backend/packages/music/pages/downloads.json` | music | Downloads |
-| `backend/packages/music/pages/drafts.json` | music | Drafts |
-| `backend/packages/music/pages/edit.json` | music | Edit |
-| `backend/packages/music/pages/genres.json` | music | Genres and moods |
-| `backend/packages/music/pages/history.json` | music | Recently played |
-| `backend/packages/music/pages/index.json` | music | Listen now |
-| `backend/packages/music/pages/library.json` | music | Your Library |
-| `backend/packages/music/pages/liked.json` | music | Liked |
-| `backend/packages/music/pages/lyrics.json` | music | Lyrics |
-| `backend/packages/music/pages/made-for-you.json` | music | Made for you |
-| `backend/packages/music/pages/make-album.json` | music | Make an album |
-| `backend/packages/music/pages/make-band.json` | music | Make a band |
-| `backend/packages/music/pages/make-song.json` | music | Make a song |
-| `backend/packages/music/pages/make-style.json` | music | Make a song style |
-| `backend/packages/music/pages/new-releases.json` | music | New releases |
-| `backend/packages/music/pages/play.json` | music | Now playing |
-| `backend/packages/music/pages/playlist.json` | music | Playlist |
-| `backend/packages/music/pages/playlists.json` | music | Playlists |
-| `backend/packages/music/pages/radio.json` | music | Radio |
-| `backend/packages/music/pages/remix.json` | music | Remix and edit |
-| `backend/packages/music/pages/search.json` | music | Search |
-| `backend/packages/music/pages/songs.json` | music | Songs |
-| `backend/packages/music/pages/sound-effects.json` | music | Sound effects |
-| `backend/packages/music/pages/station.json` | music | Station |
-| `backend/packages/music/pages/stems.json` | music | Stems |
-| `backend/packages/music/pages/studio.json` | music | Studio |
-| `backend/packages/music/pages/styles.json` | music | Styles |
-| `backend/packages/music/pages/voices.json` | music | Voices |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
 | `backend/packages/news/pages/index.json` | news | Today |
