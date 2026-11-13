@@ -162,14 +162,14 @@ describe("the Status line for closed apps (TIER-PRIO-05)", () => {
 });
 
 describe("the cards", () => {
-  test("GET /api/ai/choices returns twelve cards with the current Quick picture model from the setting", async () => {
+  test("GET /api/ai/choices returns thirteen cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
     writeChoiceSetting("engines.image.tier.standard", "klein");
     const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
     const reading = (body as unknown as { memory_available_bytes: number | null }).memory_available_bytes;
     expect(reading === null || reading > 0).toBe(true);
-    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"]);
+    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
     expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
     expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);

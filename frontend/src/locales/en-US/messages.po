@@ -13820,6 +13820,16 @@ msgid "Licence: {name}"
 msgstr "Licence: {name}"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiModelDialog.tsx:56
+msgid "Licence: {name}, accepted"
+msgstr "Licence: {name}, accepted"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiModelDialog.tsx:57
+msgid "Licence: {name}. Accept it in Models and storage before installing."
+msgstr "Licence: {name}. Accept it in Models and storage before installing."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:151
 msgid "Licences"
 msgstr "Licences"

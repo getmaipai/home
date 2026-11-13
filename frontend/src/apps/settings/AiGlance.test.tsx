@@ -72,6 +72,33 @@ describe("AiGlance Apply", () => {
     expect(posts[0]).toContain("stems.standard");
   });
 
+  test("Sound effects is its own row and its choice dialog shows the 3.5 GB size and licence", async () => {
+    const posts: string[] = [];
+    const sound = { ...wakeChoice, id: "music.sound", job: "sounds", label: "Make better sound effects", description: "Make short sound effects and ambience, like rain or a door slam, from a sentence. Sounds are Powered by Stability AI.", kind: "switch", rowIds: ["sound-effects"], downloadBytes: 3_492_094_340, installedBytes: 3_492_094_340, licence: { id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/licence", summary: ["Personal use only."], accepted_at: null } };
+    const sounds = { id: "sounds", title: "Sound effects", summary: "Make short sound effects and ambience, like rain or a door slam. Stays on this computer.", chip: "", choices: [sound], notReady: false, unavailable: null };
+    const music = { id: "music", title: "Music", summary: "Make music", chip: "", choices: [{ ...wakeChoice, id: "music.make", job: "music", label: "Make music (ACE-Step 1.5)", description: "Make music (ACE-Step 1.5)", kind: "switch", current: true }], notReady: false, unavailable: null };
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return Promise.resolve(Response.json({ ok: true, started: [] })); }
+      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [music, sounds] }));
+      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as typeof fetch;
+    const copy = { dialog_title: "Choose a model", dialog_note: "Choose a model", recommended: "Recommended", fits: "Fits this computer", ram_estimate: "About {size} memory", disable_option: "Turn off {name}", save_choice: "Save choice", cancel: "Cancel", on: "On", off: "Off" };
+    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
+    expect(await view.findByText("Sound effects")).toBeTruthy();
+    expect(view.getByRole("switch", { name: /^Music:/ })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Choose a model: Sound effects" }));
+    expect(await view.findByText(/3\.5 GB/)).toBeTruthy();
+    expect(view.getByText(/Stability AI Community Licence; Gemma Terms of Use/)).toBeTruthy();
+    expect(view.getByText(/Accept it in Models and storage before installing/)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(view.getByRole("switch", { name: /Sound effects:/ }));
+    fireEvent.click(view.getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(posts.some((post) => post.includes("/api/ai/choices/sounds") && post.includes("music.sound"))).toBe(true));
+  });
+
   test("a refused Apply shows the cause in a status row and keeps the change staged", async () => {
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;

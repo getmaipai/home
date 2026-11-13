@@ -1,4 +1,4 @@
-// The seven job cards for the AI and models page, and the one
+// The job cards for the AI and models page, and the one
 // "set everything to recommended" plan. Pure and side-effect free: the tier's
 // disk plan, the Stack component list, three household settings and the free
 // disk bytes in, the cards, the Always on line and the recommended plan out.
@@ -7,8 +7,8 @@
 
 import { rowHasModel, sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "stems" | "voice" | "wakeword" | "vision" | "coding" | "faces" | "ingredients";
-export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
+export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "sounds" | "stems" | "voice" | "wakeword" | "vision" | "coding" | "faces" | "ingredients";
+export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[]; licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string|null; covered?: boolean } | null }
 export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
 export interface AiCopy {
@@ -49,6 +49,7 @@ export interface AiChoice {
   setting: { key: string; value: unknown } | null;
   chosenNotReady: boolean;
   details: Array<{ name: string; sizeBytes: number }>;
+  licence: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean } | null;
 }
 export interface AiCard { id: AiJobId; title: string; summary: string; chip: string; choices: AiChoice[]; notReady: boolean; unavailable: string | null }
 export interface AiAlwaysOn { bytes: number; rowIds: string[] }
@@ -69,7 +70,8 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "pictures", rows: ["pictures", "pictures-ernie", "image-tools", "tool-look"] },
   { id: "picturesdetailed", rows: ["pictures-zimage"] },
   { id: "videos", rows: ["video", "video-ltx25"] },
-  { id: "music", rows: ["music", "voice-convert", "sound-effects"] },
+  { id: "music", rows: ["music", "voice-convert"] },
+  { id: "sounds", rows: ["sound-effects"] },
   { id: "stems", rows: ["stems", "stems-ft", "stems-6s"] },
   { id: "voice", rows: ["voice", "voice-better", "recorded-speech"] },
   { id: "wakeword", rows: [] },
@@ -199,6 +201,7 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
     setting: spec.setting,
     chosenNotReady: spec.current && state.state !== "installed",
     details: partsLine(rows),
+    licence: matchingComponents(components, spec.row).find((component) => component.licence)?.licence ?? null,
   };
 }
 
@@ -241,6 +244,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
     case "vision":
     case "picturesdetailed":
     case "music":
+    case "sounds":
     case "stems":
     case "coding": {
       const toggle = choices.find((choice) => choice.kind === "switch");
@@ -336,7 +340,10 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
       case "music": {
         if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
         if (has("voice-convert")) specs.push({ id: "music.voice", job: "music", kind: "switch", row: rows.get("voice-convert")!, current: rowIsInstalled(rows.get("voice-convert")!, components), recommended: false, setting: null });
-        if (has("sound-effects")) specs.push({ id: "music.sound", job: "music", kind: "switch", row: rows.get("sound-effects")!, current: rowIsInstalled(rows.get("sound-effects")!, components), recommended: false, setting: null });
+        break;
+      }
+      case "sounds": {
+        if (has("sound-effects")) specs.push({ id: "music.sound", job: "sounds", kind: "switch", row: rows.get("sound-effects")!, current: rowIsInstalled(rows.get("sound-effects")!, components), recommended: false, setting: null });
         break;
       }
       case "stems": {

@@ -26,6 +26,17 @@ const cards = [
 const none = new Set<AiJobId>();
 
 describe("buildRows", () => {
+  test("shows the sound-effects switch as its own row after Music with its 3.5 GB licence detail", () => {
+    const licence = { id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/licence", summary: ["Personal use only."], accepted_at: null };
+    const sounds = card("sounds", [choice("music.sound", { job: "sounds", kind: "switch", downloadBytes: 3_492_094_340, installedBytes: 3_492_094_340, licence })]);
+    const rows = buildRows([card("music", [choice("music.make", { kind: "switch", current: true })]), sounds], none, {});
+    const row = rows.find((entry) => entry.job === "sounds")!;
+    expect(rows.map((entry) => entry.job)).toEqual(["music", "sounds"]);
+    expect(row.options).toHaveLength(1);
+    expect(row.options[0]!.downloadBytes).toBe(3_492_094_340);
+    expect(row.options[0]!.licence?.name).toBe(licence.name);
+  });
+
   test("orders the jobs and derives the badges", () => {
     const rows = buildRows(cards, none, {});
     expect(rows.map((row) => row.job)).toEqual(["chat", "pictures", "wakeword", "coding"]);

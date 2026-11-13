@@ -52,6 +52,9 @@ export function AiModelChoices({ row, copy, onClose, onSave, onAdded }: AiModelC
                       {" · "}{option.blockedReason ?? copy.fits}
                     </FieldDescription>
                     <FieldDescription>{option.details.map((part) => `${part.name} (${sizeGb(part.sizeBytes)})`).join(", ")}</FieldDescription>
+                    {option.licence ? <FieldDescription>{option.licence.accepted_at || option.licence.covered
+                      ? i18n._({ id: "Licence: {name}, accepted", message: "Licence: {name}, accepted", values: { name: option.licence.name } })
+                      : i18n._({ id: "Licence: {name}. Accept it in Models and storage before installing.", message: "Licence: {name}. Accept it in Models and storage before installing.", values: { name: option.licence.name } })}</FieldDescription> : null}
                   </FieldContent>
                   <RadioGroupItem value={option.id} id={id} disabled={blocked} />
                 </Field>

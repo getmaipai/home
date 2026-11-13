@@ -121,7 +121,7 @@ export function AiGlance({ card }: SettingsViewProps) {
             else await api.setSetting("household", single.setting.key, false, true);
           }
           else if (row.job === "stems") { /* Stems has no On/Off setting: the parts are installed or not, and nothing else to turn off. */ }
-          else if (HUB_PART_JOBS.has(row.job)) { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
+          else if (HUB_PART_JOBS.has(row.job) || row.job === "sounds") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
           else await api.setSetting("household", `engines.${role}.choice`, "off", true);
         } else if (row.shown && (staged[row.job]?.choiceId || single)) {
           await aiChoicesApi.choose(row.job, row.shown.id);

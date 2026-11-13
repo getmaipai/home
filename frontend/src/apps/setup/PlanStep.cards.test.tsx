@@ -156,6 +156,26 @@ describe("the plan step's job cards", () => {
     expect(call[3]).toMatchObject({ "generation.video_tier": "boost" });
   });
 
+  test("Sound effects is a separate licensed job in setup and its licence blocks install until accepted", async () => {
+    const soundLicence = { row_id: "sound-effects", component: "stable-audio-3-small-sfx", id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/sfx-licence", summary: ["Personal use only."], accepted_at: null };
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [soundLicence] })} start={start} onInstalled={() => {}} />);
+    await view.findByRole("group", { name: "What gets installed" });
+    const sounds = within(view.getByTestId("plan-job-sounds"));
+    expect(sounds.getByText("Sound effects")).toBeTruthy();
+    fireEvent.click(sw(view, "Sound effects"));
+    expect(sounds.getByText(/4\.2 GB/)).toBeTruthy();
+    expect(view.getByText(/Stability AI Community Licence/)).toBeTruthy();
+    expect((view.getByRole("button", { name: "Install and continue" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
+    const install = view.getByRole("button", { name: "Install and continue" });
+    await waitFor(() => expect((install as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(install);
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    expect((start.mock.calls[0] as unknown[])[1]).toContain("sound-effects");
+    expect((start.mock.calls[0] as unknown[])[2]).toEqual([soundLicence.id]);
+  });
+
   test("a covered licence is information: no accept is needed", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [{ ...licence, covered: true }] })} start={start} onInstalled={() => {}} />);

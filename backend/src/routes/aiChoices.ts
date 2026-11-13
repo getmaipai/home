@@ -1,5 +1,5 @@
 // AIMODELS-ROUTES-01: the five calls of the AI and models page (docs/design/ai-models-simple-2026-10-25.md,
-// sections 4 to 6). The seven job cards and the set-to-recommended plan are the pure shared/aiChoices.ts
+// sections 4 to 6). The job cards and the set-to-recommended plan are the pure shared/aiChoices.ts
 // functions over three inputs that already exist: the tier's disk plan, the Stack component list and the
 // household settings. Picking a choice downloads first and writes the setting second, so a choice is never
 // set to something missing. "Set everything to recommended" is safe to press twice and never removes
@@ -39,9 +39,9 @@ import { isOwnerOrAdmin } from "@/lib/access";
 
 export const aiChoicesRoutes = apiRouter();
 
-const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"] as const;
+const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Video", music: "Music", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding", faces: "Telling people apart", ingredients: "Video from pictures" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Standard pictures", picturesdetailed: "Boost pictures", videos: "Video", music: "Music", sounds: "Sound effects", stems: "Stems", voice: "Voice", wakeword: "Wake word", vision: "Describing pictures", coding: "Coding", faces: "Telling people apart", ingredients: "Video from pictures" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.
@@ -157,6 +157,7 @@ const ChoiceSchema = z.object({
   downloadBytes: z.number(), installedBytes: z.number(), ramBytes: z.number(), ramBasis: z.enum(["estimate", "measured"]), stateText: z.string(), blockedReason: z.string().nullable(),
   action: z.enum(["none", "use", "get", "remove"]), setting: SettingRefSchema, chosenNotReady: z.boolean(),
   details: z.array(z.object({ name: z.string(), sizeBytes: z.number() })),
+  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() }).nullable(),
 });
 const CardSchema = z.object({ id: z.enum(JOBS), title: z.string(), summary: z.string(), chip: z.string(), choices: z.array(ChoiceSchema), notReady: z.boolean(), unavailable: z.string().nullable() });
 const AlwaysOnSchema = z.object({ bytes: z.number(), rowIds: z.array(z.string()) });

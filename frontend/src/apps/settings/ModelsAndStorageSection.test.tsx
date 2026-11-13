@@ -128,6 +128,18 @@ describe("Models and storage", () => {
     v.restore();
   });
 
+  test("sound effects has a one-time licence dialog that names its 3.5 GB download", async () => {
+    const licence = { id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/sfx-licence", summary: ["Personal use only."], accepted_at: null };
+    const v = mount(overview([row({ id: "stable-audio-3-small-sfx", label: "Sound effects: Stable Audio 3 Small-SFX", summary: "Short sound effects and ambience.", group: "music", download_bytes: 3_492_094_340, full_bytes: 3_492_094_340, licence })]));
+    fireEvent.click(await v.findByLabelText("Install Sound effects: Stable Audio 3 Small-SFX"));
+    expect(await v.findByText(/3\.5 GB download/)).toBeTruthy();
+    expect(v.getByText(/Stability AI Community Licence; Gemma Terms of Use/)).toBeTruthy();
+    expect(componentsApi.install).not.toHaveBeenCalled();
+    fireEvent.click(v.getByRole("button", { name: "I accept, get it" }));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("stable-audio-3-small-sfx", "stability-community-gemma-2026-11-13"));
+    v.restore();
+  });
+
   test("a licence the household acknowledgement covers installs with one click and no dialog", async () => {
     const licence = { id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: true };
     const v = mount(overview([row({ id: "ltx-2-5-distilled-mlx", label: "Video: LTX-2.5", licence })]));

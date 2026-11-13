@@ -12,7 +12,7 @@ interface SpecKey { key: string; label: string; copy?: { does?: string; options?
 
 const GROUPS: Record<AiJobId, string> = {
   chat: "household.ai_chat", pictures: "household.ai_pictures", picturesdetailed: "household.ai_pictures", videos: "household.ai_videos",
-  music: "household.ai_music", stems: "household.ai_stems", voice: "household.ai_voice", wakeword: "household.ai_wakeword", vision: "household.ai_vision", coding: "household.ai_coding",
+  music: "household.ai_music", sounds: "household.ai_music", stems: "household.ai_stems", voice: "household.ai_voice", wakeword: "household.ai_wakeword", vision: "household.ai_vision", coding: "household.ai_coding",
   faces: "household.ai_faces", ingredients: "household.ai_ingredients",
 };
 // VIDEO-SETTINGS-04: the words come from the tier keys. The choice ids keep their old names (quick, detailed); the words say Standard and Boost.
@@ -22,6 +22,7 @@ const TIER_OF_CHOICE: Record<string, string> = { quick: "standard", detailed: "b
 // The hub's own parts (the face finder files, the video-from-pictures adapter) are not Stack components and the spec has no card for them yet, so their words live
 // beside the records that pin them (lib/visionAssets.ts, lib/videos/ingredientsAdapter.ts). Size, licence and source are read from those pins, never retyped.
 const HUB_CARDS: Partial<Record<AiJobId, { title: string; summary: string }>> = {
+  sounds: { title: "Sound effects", summary: "Make short sound effects and ambience, like rain or a door slam. Stays on this computer." },
   faces: { title: "Telling people apart", summary: "Lets Home give each person in a picture their own panel when it builds a reference sheet." },
   ingredients: { title: "Video from pictures", summary: "Lets Home make a short video from reference pictures you attach." },
 };

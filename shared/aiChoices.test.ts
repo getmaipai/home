@@ -42,11 +42,11 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the ten job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "stems", "voice", "wakeword", "vision", "coding"]);
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding"]);
     for (const card of result.cards) {
       if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
@@ -63,6 +63,26 @@ test("builds the ten job cards in order on every tier p16 to p128 from shared/di
     }
     expect(result.alwaysOn.rowIds.length).toBeGreaterThan(0);
   }
+});
+
+test("sound effects has its own licensed switch card and no longer belongs to Music", () => {
+  const license = { id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/licence", summary: ["Personal use only."], accepted_at: null };
+  const plan = planOf([
+    row("music", { model_ids: ["ace"] }),
+    row("sound-effects", { download_bytes: 3_492_094_340, installed_bytes: 3_492_094_340, model_ids: ["stable-audio-3-small-sfx"] }),
+  ]);
+  const { cards } = buildAiCards({ copy, plan, components: [component({ id: "stable-audio-3-small-sfx", licence: license })], settings: SETTINGS, freeBytes: null });
+  const music = cards.find((card) => card.id === "music")!;
+  const sounds = cards.find((card) => card.id === "sounds")!;
+  expect(music.choices.some((choice) => choice.id === "music.sound")).toBe(false);
+  const sound = sounds.choices.find((choice) => choice.id === "music.sound")!;
+  expect(sound.job).toBe("sounds");
+  expect(sound.kind).toBe("switch");
+  expect(sound.state).toBe("notInstalled");
+  expect(sound.downloadBytes).toBe(3_492_094_340);
+  expect(sound.licence).toEqual(license);
+  expect(sounds.title).toBe("Sound effects");
+  expect(sounds.summary).toBe("Make short sound effects and ambience, like rain or a door slam. Stays on this computer.");
 });
 
 test("exactly one recommended radio per radio card on every tier", () => {
