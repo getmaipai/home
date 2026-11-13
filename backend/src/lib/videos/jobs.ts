@@ -36,6 +36,7 @@ import { shouldRetake, keepBetter, type ClipCheck } from "./frameCheck";
 import { attachmentFilePath } from "@/lib/attachments";
 import { updateCreationReview, creationOfFile } from "@/lib/creations/store";
 import { randomInt } from "node:crypto";
+import { captionMadeClip } from "@/lib/transcripts/madeClipCaptions";
 
 export type VideoJobKind = "generate" | "animate" | "edit";
 export type VideoJobState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -751,7 +752,14 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   if (!job.temporary) safely(() => recordClipCreation(actor, job, job.files, writer, creationId));
   void notifyClipReady(job, actor);
   if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
-  if (!job.temporary && writer === "video-gen" && job.kind !== "edit" && job.files[0]) void runStoredClipCheck(job, actor);
+  if (!job.temporary && writer === "video-gen" && job.kind !== "edit" && job.files[0]) {
+    void runStoredClipCheck(job, actor).finally(() => {
+      const clip = job.files[0]!;
+      const creation = creationOfFile(actor.id, clip.id);
+      const stored = db.select({ storagePath: attachments.storagePath }).from(attachments).where(eq(attachments.id, clip.id)).get();
+      if (creation && stored) void captionMadeClip({ actor, creation, clipFilePath: attachmentFilePath(stored.storagePath) });
+    });
+  }
 }
 
 async function runStoredClipCheck(job: VideoJob, actor: PersonRow): Promise<void> {

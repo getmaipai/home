@@ -16,6 +16,10 @@ export type CueOptions = {
   readingSpeed?: number;
 };
 
+export const CAPTION_MIN_DURATION = 1;
+export const CAPTION_HOLD_AFTER_LAST_WORD = 0.35;
+export const CAPTION_LEAD_BEFORE_FIRST_WORD = 0.08;
+
 export function buildCues(segments: readonly Segment[], options: CueOptions = {}): Cue[] {
   const maxChars = options.maxCharsPerLine ?? 42;
   const maxLines = options.maxLines ?? 2;
