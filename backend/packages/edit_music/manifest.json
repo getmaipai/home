@@ -116,7 +116,8 @@
           "echo",
           "reverb",
           "eq",
-          "denoise"
+          "denoise",
+          "compress"
         ]
       },
       "parts": {
@@ -213,6 +214,16 @@
         },
         "minItems": 6,
         "maxItems": 6
+      },
+      "compressor": {
+        "type": "object",
+        "properties": {
+          "threshold_db": { "type": "number", "minimum": -60, "maximum": 0 },
+          "ratio": { "type": "number", "minimum": 1, "maximum": 20 },
+          "attack_ms": { "type": "number", "minimum": 1, "maximum": 200 },
+          "release_ms": { "type": "number", "minimum": 10, "maximum": 1000 },
+          "makeup_db": { "type": "number", "minimum": 0, "maximum": 24 }
+        }
       }
     }
   },

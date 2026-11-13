@@ -44,6 +44,7 @@ export const editMusicArgs = z.object({
   voice: z.string().min(1).max(80).optional(),
   /** MP-02 file effects: gain dB, speed times, pitch semitones. */ amount: z.number().finite().min(-24).max(24).optional(),
   preset: z.enum(EQ_PRESETS).optional(), bands: z.array(z.number().finite().min(-12).max(12)).length(6).optional(),
+  /** MP-04 `compress`: any field left out takes the Studio panel's default; bounds are checked by checkEffect. */ compressor: z.object({ threshold_db: z.number().finite().optional(), ratio: z.number().finite().optional(), attack_ms: z.number().finite().optional(), release_ms: z.number().finite().optional(), makeup_db: z.number().finite().optional() }).optional(),
 }).superRefine((value, ctx) => { if (value.change === "voice_swap" && !value.voice) ctx.addIssue({ code: "custom", path: ["voice"], message: "Choose a voice." }); });
 /** Shared attached-file edit preparation used by the tool and Music Create. */
 export function prepareOwnedMusicEdit(source: MusicJob, args: { change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; style?: string; parts?: { keep?: string[]; drop?: string[] } }, limits: { min_seconds: number; max_seconds: number }) {

@@ -52,7 +52,14 @@ export interface MusicCard {
   /** ISO time the song was asked for. */
   started_at: number;
 }
-export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits: { min_seconds: number; max_seconds: number } | null }
+/** MP-04: one Studio effect. `from_s` and `to_s` limit it to a range; left out, it acts on the whole song. */
+export interface EffectBody {
+  change: "gain" | "reverse" | "speed" | "pitch" | "remove_silence" | "limit" | "echo" | "reverb" | "eq" | "denoise" | "compress";
+  amount?: number; preset?: "bass_boost" | "treble_boost" | "vocal_clarity" | "warm"; bands?: number[];
+  compressor?: { threshold_db: number; ratio: number; attack_ms: number; release_ms: number; makeup_db: number };
+  from_s?: number; to_s?: number; file_id?: string;
+}
+export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 
 export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
 export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean; takes?: number }
@@ -89,6 +96,10 @@ export const musicApi = {
   editFromFile: (body: FileEditBody) => requestJson<MusicCard>("/api/music/from-file/edit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   newCover: (id: string, prompt: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/cover`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) }),
   useVersion: (id: string, fileId: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/use`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
+  /** MP-04: make a new version of the song with an effect (ffmpeg in Home). The earlier versions stay; Undo is `useVersion` on the one before. */
+  effect: (id: string, body: EffectBody) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/effect`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  /** MP-04: a download of one version as wav or flac (m4a is `fileUrl`). */
+  exportUrl: (fileId: string, format: "m4a" | "wav" | "flac") => (format === "m4a" ? `/api/music/files/${encodeURIComponent(fileId)}` : `/api/music/files/${encodeURIComponent(fileId)}/as/${format}`),
   /** A personal download of one version (never the commercial purpose). */
   fileUrl: (fileId: string) => `/api/music/files/${encodeURIComponent(fileId)}`,
 };

@@ -4,7 +4,9 @@ import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } 
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
-import { EFFECT_LABELS, isEffectChange } from "@/lib/music/effects";
+import { EFFECT_CHANGES, EFFECT_LABELS, EFFECT_UNAVAILABLE_LINE, EQ_PRESETS, checkEffect, isEffectChange, startMusicEffectJob } from "@/lib/music/effects";
+import { musicAudioTools } from "@/lib/music/mixParts";
+import { EXPORT_FAILED_LINE, EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, convertSong } from "@/lib/music/exportFormat";
 import { listVersions } from "@/lib/imageEdit";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -225,10 +227,10 @@ async function musicCardOrLocked(actor: PersonRow, job: MusicJob) {
   return lockedJob(actor, job) ? lockedMusicTile(job) : musicCardView(actor, job);
 }
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,
-  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable() }) } }, description: "Music capability." }, ...refusals } });
+  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), engine_ready: z.boolean(), limits: z.object({ min_seconds: z.number(), max_seconds: z.number() }).nullable(), file_effects: z.boolean().describe("Whether this computer has the audio tool (ffmpeg) the Studio effects and wav/flac downloads need.") }) } }, description: "Music capability." }, ...refusals } });
 musicRoutes.openapi(statusRoute, async (c) => {
   const engine = await musicEngineStatus(); const ready = musicStatusReady(engine);
-  return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null }, 200);
+  return c.json({ can_make: ready, engine_ready: ready, limits: engine?.limits ?? null, file_effects: musicAudioTools().ffmpeg !== null }, 200);
 });
 const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], summary: "The owner's songs, newest first", middleware: viewMiddleware,
   responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
@@ -553,6 +555,59 @@ musicRoutes.openapi(qualityRoute, async (c) => {
       return null;
     } });
   return result.ok ? c.json(await musicCardView(actor, result.root), 200) : refuseWith(c, result) as never;
+});
+// MP-04: a Studio effect (gain, reverse, speed, pitch, remove silence, limit, echo, reverb, eq, denoise, compress) on the whole shown version or a range of it.
+// ffmpeg runs in Home and the result is a NEW version on the same card; the earlier versions stay, so Undo is "use the version before" (the /use route).
+const effectRoute = createRoute({ method: "post", path: "/jobs/{id}/effect", tags: ["Music"], summary: "Make a new version of the song with a sound effect", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({
+    change: z.enum(EFFECT_CHANGES), amount: z.number().finite().optional(), preset: z.enum(EQ_PRESETS).optional(), bands: z.array(z.number().finite()).max(6).optional(),
+    compressor: z.object({ threshold_db: z.number().finite().optional(), ratio: z.number().finite().optional(), attack_ms: z.number().finite().optional(), release_ms: z.number().finite().optional(), makeup_db: z.number().finite().optional() }).optional(),
+    from_s: z.number().finite().optional(), to_s: z.number().finite().optional(), file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The change is out of range." }, ...refusals, ...errorResponses({ 423: "The song is locked", 503: "No audio tool on this computer" }) } });
+musicRoutes.openapi(effectRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id, ...input } = c.req.valid("json");
+  if (root && lockedJob(actor, root)) return c.json({ error: LOCKED_MUSIC_START_LINE, code: "locked", locked: true }, 423) as never;
+  const all = root ? musicVersions(actor, root) : [];
+  const versions = all.filter((j) => j.state === "done" && j.fileId && j.task !== "stems");
+  const source = (file_id ? versions.find((j) => j.fileId === file_id) : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const family = new Set(all.map((j) => j.fileId).filter((id): id is string => !!id));
+  if (jobsForConversation(actor, source.conversationId, source.temporary).some((j) => j.task === "effect" && (j.state === "queued" || j.state === "running") && !!j.parentFileId && family.has(j.parentFileId))) {
+    return c.json({ error: "Another change to this song is still being made. Wait for it to finish, then try again." }, 409) as never;
+  }
+  const checked = checkEffect(input, source.durationS ?? source.request.seconds);
+  if (!checked.ok) return c.json({ error: checked.line }, 422) as never;
+  // Like the stem split, the change is its own message in the chat, so the new version's job has a turn to belong to.
+  const turnId = source.temporary ? source.turnId : newConversationTurnId();
+  try {
+    const { job } = await startMusicEffectJob({ actor, source, spec: checked.spec, conversationId: source.conversationId, turnId, temporary: source.temporary });
+    if (!source.temporary) logTurn(actor, "chat", "Change the sound of a song", { reply: { text: "Changing the sound." }, source: "plugin", plugin_id: "edit_music", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: source.conversationId, turn_id: turnId });
+    return c.json(await musicCardView(actor, root), 200);
+  } catch (error) {
+    const code = error instanceof StackMusicError ? error.code : "failed";
+    if (code === "effect_unavailable") return c.json({ error: EFFECT_UNAVAILABLE_LINE, code }, 503) as never;
+    if (code === "storage_full") return c.json({ error: plainMusicFailure(code), code }, 403) as never;
+    if (code === "source_not_made_here") return c.json({ error: plainMusicFailure(code) }, 404) as never;
+    return c.json({ error: plainMusicFailure("failed") }, 503) as never;
+  }
+});
+// MP-04: download one version as wav or flac (m4a is the plain export above). Same owner index and Adult lock rule; the saved file is not changed.
+const exportAsRoute = createRoute({ method: "get", path: "/files/{fileId}/as/{format}", tags: ["Music"], summary: "Download a song as wav or flac", middleware: viewMiddleware,
+  request: { params: z.object({ fileId: z.string().min(1).max(80), format: z.enum(EXPORT_FORMATS) }) },
+  responses: { 200: { content: { "audio/wav": { schema: z.string() } }, description: "Audio bytes." }, ...refusals, ...errorResponses({ 503: "No audio tool on this computer" }) } });
+musicRoutes.openapi(exportAsRoute, async (c) => {
+  const actor = c.get("person"); const { fileId, format } = c.req.valid("param");
+  const job = findOwnedSong(actor, fileId);
+  if (job && lockedJob(actor, job)) return hiddenSong(c) as never;
+  const file = job ? readMusicFile(actor, job, fileId) : null;
+  if (!file) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  try {
+    const bytes = await convertSong(file.bytes, format);
+    if (job && lockedJob(actor, job)) return hiddenSong(c) as never;
+    return new Response(bytes, { headers: { "content-type": EXPORT_MEDIA_TYPE[format], "content-length": String(bytes.length), "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
+  } catch (error) {
+    return error instanceof Error && error.message === "export_unavailable" ? c.json({ error: EXPORT_UNAVAILABLE_LINE }, 503) as never : c.json({ error: EXPORT_FAILED_LINE }, 503) as never;
+  }
 });
 /** Audio seeking uses the one Range server (`serveBytes`); the slice is read from the file on demand. */
 function audioResponse(file: MusicFileHandle, rangeHeader?: string, allowed: () => boolean = () => true): Response {

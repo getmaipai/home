@@ -715,28 +715,6 @@ body {
   min-height: 0;
 }
 
-/* MUSIC-SURFACE-01: the one near-black surface of the Audio app. The kit's dark theme is navy; Music sits next to a black title bar and side nav,
-   so its panels, cards and borders are neutral near-black steps instead. Set as custom properties on the Music section, so every kit part inside
-   (cards, chips, sliders, buttons) picks them up through its own tokens and nothing carries a color of its own. The accent stays the kit's yellow hue. */
-@utility music-surface {
-  --background: oklch(0.17 0.003 285);
-  --card: oklch(0.21 0.003 285);
-  --popover: oklch(0.21 0.003 285);
-  --muted: oklch(0.26 0.003 285);
-  --secondary: oklch(0.26 0.003 285);
-  --accent: oklch(0.3 0.003 285);
-  --border: oklch(0.3 0.003 285);
-  --input: oklch(0.3 0.003 285);
-  --accent-lime: oklch(0.9 0.2 125);
-  --ring: oklch(0.9 0.2 125);
-  --primary: oklch(0.9 0.2 125);
-  --primary-foreground: oklch(0.17 0.003 285);
-  --lanes: 9rem 1fr;
-  @media (min-width: 40rem) {
-    --lanes: 14rem 1fr;
-  }
-}
-
 @utility companion-alpha-placeholder {
   aspect-ratio: 1 / 1;
 }

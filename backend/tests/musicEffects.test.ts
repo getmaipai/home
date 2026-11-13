@@ -26,9 +26,32 @@ describe("effect filters (pure)", () => {
     expect(effectFilter({ change: "echo" })).toContain("aecho=");
     expect(effectFilter({ change: "reverb" })).toContain("aecho=");
     expect(effectFilter({ change: "denoise" })).toContain("afftdn");
-    expect(effectFilter({ change: "eq", preset: "bass_boost" })).toBe("equalizer=f=60:t=q:w=1:g=6,equalizer=f=170:t=q:w=1:g=4,equalizer=f=400:t=q:w=1:g=1");
-    expect(effectFilter({ change: "eq", bands: [0, 0, 0, 0, 0, -3] })).toBe("equalizer=f=10000:t=q:w=1:g=-3");
+    expect(effectFilter({ change: "eq", preset: "bass_boost" })).toBe("equalizer=f=60:t=q:w=1:g=6,equalizer=f=170:t=q:w=1:g=4,equalizer=f=500:t=q:w=1:g=1");
+    expect(effectFilter({ change: "eq", bands: [0, 0, 0, 0, 0, -3] })).toBe("equalizer=f=12000:t=q:w=1:g=-3");
     expect(effectFilter({ change: "eq", bands: [0, 0, 0, 0, 0, 0] })).toBe("anull");
+  });
+  test("compress builds an acompressor filter from the five Studio settings, in ffmpeg's own units", () => {
+    expect(effectFilter({ change: "compress", compressor: { threshold_db: -20, ratio: 4, attack_ms: 10, release_ms: 250, makeup_db: 6 } }))
+      .toBe("acompressor=threshold=0.100000:ratio=4:attack=10:release=250:makeup=1.9953");
+    // The bounds of the panel (-60 dB, 24 dB make-up) stay inside what ffmpeg accepts (threshold at least 0.000976563, make-up at most 64).
+    const edge = effectFilter({ change: "compress", compressor: { threshold_db: -60, ratio: 20, attack_ms: 1, release_ms: 1000, makeup_db: 24 } });
+    expect(edge).toContain("threshold=0.001000"); expect(Number(/makeup=([\d.]+)/.exec(edge)![1])).toBeLessThanOrEqual(64);
+    expect(effectFilter({ change: "compress", compressor: { threshold_db: 0, ratio: 1, attack_ms: 10, release_ms: 100, makeup_db: 0 } })).toContain("threshold=1.000000");
+  });
+  test("compress bounds are checked, and a missing setting takes the panel default", () => {
+    const bad = (compressor: unknown, match: string) => { const r = checkEffect({ change: "compress", compressor }, 60); expect(r.ok).toBe(false); expect(!r.ok && r.line).toContain(match); };
+    bad({ threshold_db: 1 }, "-60 to 0");
+    bad({ threshold_db: -61 }, "-60 to 0");
+    bad({ ratio: 0.5 }, "1 to 20");
+    bad({ ratio: 21 }, "1 to 20");
+    bad({ attack_ms: 0 }, "1 to 200");
+    bad({ attack_ms: 201 }, "1 to 200");
+    bad({ release_ms: 5 }, "10 to 1000");
+    bad({ makeup_db: 25 }, "0 to 24");
+    bad({ makeup_db: -1 }, "0 to 24");
+    bad({ ratio: "4" }, "1 to 20");
+    expect(checkEffect({ change: "compress" }, 60)).toEqual({ ok: true, spec: { change: "compress", compressor: { threshold_db: -18, ratio: 3, attack_ms: 10, release_ms: 100, makeup_db: 0 } } });
+    expect(checkEffect({ change: "compress", compressor: { ratio: 8 }, from_s: 2, to_s: 9 }, 60)).toEqual({ ok: true, spec: { change: "compress", compressor: { threshold_db: -18, ratio: 8, attack_ms: 10, release_ms: 100, makeup_db: 0 }, from_s: 2, to_s: 9 } });
   });
   test("no normalize effect exists (loudness stays a Stack edit)", () => { expect(EFFECT_CHANGES as readonly string[]).not.toContain("normalize"); });
   test("a whole-file effect has no split; a region leaves the rest untouched", () => {

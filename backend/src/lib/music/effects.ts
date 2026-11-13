@@ -20,28 +20,32 @@ import { StackMusicError } from "./stack";
 import { getMusicJobFor, saveMusicJob, temporarySongs } from "./store";
 import { MUSIC_NOTE, type GenerationProvenance, type MusicJob, type MusicRequest } from "./types";
 
-export const EFFECT_CHANGES = ["gain", "reverse", "speed", "pitch", "remove_silence", "limit", "echo", "reverb", "eq", "denoise"] as const;
+export const EFFECT_CHANGES = ["gain", "reverse", "speed", "pitch", "remove_silence", "limit", "echo", "reverb", "eq", "denoise", "compress"] as const;
 export type EffectChange = typeof EFFECT_CHANGES[number];
 export const isEffectChange = (change: string): change is EffectChange => (EFFECT_CHANGES as readonly string[]).includes(change);
 export const EQ_PRESETS = ["bass_boost", "treble_boost", "vocal_clarity", "warm"] as const;
-/** Centre frequencies (Hz) of the six bands; a preset is a gain in dB for each. */
-export const EQ_BANDS_HZ = [60, 170, 400, 1000, 3500, 10000] as const;
+/** Centre frequencies (Hz) of the six bands; a preset is a gain in dB for each. The same six the Studio's EQ panel plays (the kit's `EQ_BANDS_HZ`), so what the person heard is what Apply makes. */
+export const EQ_BANDS_HZ = [60, 170, 500, 1500, 5000, 12000] as const;
 const PRESET_GAINS: Record<typeof EQ_PRESETS[number], readonly number[]> = {
   bass_boost: [6, 4, 1, 0, 0, 0], treble_boost: [0, 0, 0, 1, 4, 6], vocal_clarity: [-2, -2, -1, 2, 3, 1], warm: [3, 2, 1, 0, -2, -3],
 };
 /** What a person sees: the version label and the Activity words. */
 export const EFFECT_LABELS: Record<EffectChange, string> = {
   gain: "volume changed", reverse: "reversed", speed: "speed changed", pitch: "pitch changed", remove_silence: "silence removed",
-  limit: "limited", echo: "echo", reverb: "reverb", eq: "equalizer", denoise: "noise reduced",
+  limit: "limited", echo: "echo", reverb: "reverb", eq: "equalizer", denoise: "noise reduced", compress: "compressed",
 };
-export interface EffectSpec { change: EffectChange; amount?: number; preset?: typeof EQ_PRESETS[number]; bands?: number[]; from_s?: number; to_s?: number }
+/** The compressor's settings (MP-04): the same five the Studio's Compressor panel has. Bounds are the panel's. */
+export interface CompressorSpec { threshold_db: number; ratio: number; attack_ms: number; release_ms: number; makeup_db: number }
+export const COMPRESSOR_BOUNDS = { threshold_db: [-60, 0, "dB"], ratio: [1, 20, ":1"], attack_ms: [1, 200, "ms"], release_ms: [10, 1000, "ms"], makeup_db: [0, 24, "dB"] } as const;
+export const COMPRESSOR_DEFAULT: CompressorSpec = { threshold_db: -18, ratio: 3, attack_ms: 10, release_ms: 100, makeup_db: 0 };
+export interface EffectSpec { change: EffectChange; amount?: number; preset?: typeof EQ_PRESETS[number]; bands?: number[]; compressor?: CompressorSpec; from_s?: number; to_s?: number }
 export type EffectCheck = { ok: true; spec: EffectSpec } | { ok: false; line: string };
 export const EFFECT_UNAVAILABLE_LINE = "This computer has no audio tool to change the sound. Install ffmpeg, then try again.";
 export const EFFECT_FAILED_LINE = "The change could not be made. Try again, or try a different part of the song.";
 const num = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
 /** Check an effect request against its bounds and the song's length. Pure. */
-export function checkEffect(input: { change: string; amount?: unknown; preset?: unknown; bands?: unknown; from_s?: unknown; to_s?: unknown }, durationS: number): EffectCheck {
+export function checkEffect(input: { change: string; amount?: unknown; preset?: unknown; bands?: unknown; compressor?: unknown; from_s?: unknown; to_s?: unknown }, durationS: number): EffectCheck {
   if (!isEffectChange(input.change)) return { ok: false, line: "That change is not one I can make to a song file." };
   const spec: EffectSpec = { change: input.change };
   const bound = (what: string, min: number, max: number, unit: string): string | null => {
@@ -61,6 +65,17 @@ export function checkEffect(input: { change: string; amount?: unknown; preset?: 
       spec.bands = bands.map(Number);
     } else if (typeof input.preset === "string" && (EQ_PRESETS as readonly string[]).includes(input.preset)) spec.preset = input.preset as typeof EQ_PRESETS[number];
     else return { ok: false, line: `Choose an equalizer preset (${EQ_PRESETS.join(", ").replace(/_/g, " ")}) or give six band gains.` };
+  }
+  if (input.change === "compress") {
+    const given = input.compressor && typeof input.compressor === "object" ? input.compressor as Record<string, unknown> : {};
+    const made: Record<string, number> = {};
+    for (const key of Object.keys(COMPRESSOR_BOUNDS) as (keyof CompressorSpec)[]) {
+      const [min, max, unit] = COMPRESSOR_BOUNDS[key]; const value = given[key];
+      if (value === undefined) { made[key] = COMPRESSOR_DEFAULT[key]; continue; }
+      if (!num(value) || value < min || value > max) return { ok: false, line: `That is out of range. Choose ${key.replace(/_db$|_ms$/, "").replace("_", " ")} from ${min} to ${max} ${unit}.` };
+      made[key] = value;
+    }
+    spec.compressor = made as unknown as CompressorSpec;
   }
   const from = input.from_s, to = input.to_s;
   if (from !== undefined || to !== undefined) {
@@ -89,6 +104,12 @@ export function effectFilter(spec: EffectSpec): string {
     case "echo": return "aecho=0.8:0.88:250|500:0.4|0.25";
     case "reverb": return "aecho=0.8:0.7:35|60|95|140|190:0.45|0.35|0.28|0.2|0.14,lowpass=f=7000";
     case "denoise": return "afftdn=nr=12:nf=-40";
+    case "compress": {
+      // acompressor takes threshold and make-up as linear amplitudes (threshold 0.000976563 to 1, make-up 1 to 64), attack and release in ms.
+      const c = spec.compressor ?? COMPRESSOR_DEFAULT;
+      const threshold = Math.min(1, Math.max(0.000976563, 10 ** (c.threshold_db / 20))), makeup = Math.min(64, Math.max(1, 10 ** (c.makeup_db / 20)));
+      return `acompressor=threshold=${threshold.toFixed(6)}:ratio=${fixed(c.ratio)}:attack=${fixed(c.attack_ms)}:release=${fixed(c.release_ms)}:makeup=${makeup.toFixed(4)}`;
+    }
     case "eq": {
       const gains = spec.bands ?? PRESET_GAINS[spec.preset ?? "warm"];
       const parts = EQ_BANDS_HZ.flatMap((hz, i) => (gains[i] ?? 0) === 0 ? [] : [`equalizer=f=${hz}:t=q:w=1:g=${fixed(gains[i]!)}`]);
@@ -151,8 +172,8 @@ export async function startMusicEffectJob(input: EffectJobInput): Promise<{ job:
   const prior = jobsForConversation(actor, input.conversationId, input.temporary).reduce((at, j) => Math.max(at, Date.parse(j.chosenAt ?? j.createdAt)), 0);
   const now = new Date(Math.max(Date.now(), prior + 1)).toISOString();
   const { stackBody: _body, from_s: _f, to_s: _t, add_s: _a, at: _at, strength: _s, edit: _e, parts: _p, ...stored } = source.request as MusicRequest & { stackBody?: unknown };
-  const { change, amount, preset, bands, from_s, to_s } = spec;
-  const request: MusicRequest = { ...stored, seconds, ...(input.title ? { title: input.title } : {}), effect: { change, ...(amount !== undefined ? { amount } : {}), ...(preset ? { preset } : {}), ...(bands ? { bands } : {}), ...(from_s !== undefined ? { from_s } : {}), ...(to_s !== undefined ? { to_s } : {}) } };
+  const { change, amount, preset, bands, compressor, from_s, to_s } = spec;
+  const request: MusicRequest = { ...stored, seconds, ...(input.title ? { title: input.title } : {}), effect: { change, ...(amount !== undefined ? { amount } : {}), ...(preset ? { preset } : {}), ...(bands ? { bands } : {}), ...(compressor ? { compressor } : {}), ...(from_s !== undefined ? { from_s } : {}), ...(to_s !== undefined ? { to_s } : {}) } };
   const job: MusicJob = { id: newMusicJobId(), personId: actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, task: "effect", request,
     stackJob: null, state: "running", stage: "effect", progress: 0.2, etaSeconds: null, position: null, errorCode: null, errorLine: null, fileId: null, parentFileId: owned ? null : source.fileId,
     coverJobId: null, coverFileId: null, seed: source.seed ?? null, durationS: null, lrc: null, timedWords: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary };
