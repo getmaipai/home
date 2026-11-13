@@ -4,6 +4,7 @@ import { apiRouter, respond } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { createVideoPlaylist, deleteVideoPlaylist, removeFromVideoPlaylist, renameVideoPlaylist, reorderVideoPlaylist, saveToVideoPlaylist } from "@/lib/videos/playlists";
 import { removeFromHistory } from "@/lib/videos/history";
+import { addPick, togglePickVote } from "@/lib/media/familyPicks";
 
 export function videoPlaylistRoutes() {
   const routes = apiRouter();
@@ -14,5 +15,7 @@ export function videoPlaylistRoutes() {
   routes.post("/playlists/rename", requireAuth, async (c) => respond(c, renameVideoPlaylist(c.get("person"), await jsonBody(c))));
   routes.post("/playlists/delete", requireAuth, async (c) => respond(c, deleteVideoPlaylist(c.get("person"), await jsonBody(c))));
   routes.post("/history/remove", requireAuth, async (c) => respond(c, removeFromHistory(c.get("person"), await jsonBody(c))));
+  routes.post("/picks/add", requireAuth, async (c) => respond(c, addPick(c.get("person"), String((await jsonBody(c)).media_id ?? ""))));
+  routes.post("/picks/vote", requireAuth, async (c) => respond(c, togglePickVote(c.get("person"), String((await jsonBody(c)).media_id ?? ""))));
   return routes;
 }

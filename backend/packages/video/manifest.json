@@ -77,6 +77,7 @@
             "watch-later",
             "liked",
             "history",
+            "family-picks",
             "playlists",
             "clips",
             "drafts"
@@ -188,6 +189,14 @@
         "nav": true,
         "kind": "schema",
         "module": "playlists"
+      },
+      {
+        "id": "family-picks",
+        "label": "Family Picks",
+        "icon": "thumbs-up",
+        "nav": true,
+        "kind": "schema",
+        "module": "family-picks"
       },
       {
         "id": "playlist",

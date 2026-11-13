@@ -64,6 +64,19 @@
               }
             },
             {
+              "label": "Add to Family Picks",
+              "icon": "users",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/picks/add",
+                  "args": {
+                    "media_id": "{id}"
+                  },
+                  "success_label": "Added to Family Picks"
+                }
+              }
+            },
+            {
               "label": "Share",
               "icon": "share",
               "action": {

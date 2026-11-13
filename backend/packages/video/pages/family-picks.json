@@ -1,0 +1,39 @@
+{
+  "type": "page",
+  "id": "family-picks",
+  "title": "Family Picks",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Family Picks",
+      "bind": { "source": "package", "path": "library", "params": { "scope": "family-picks" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "layout": "grid",
+      "row_actions": [
+        {
+          "icon": "thumbs-up",
+          "label": "{vote_action_label}",
+          "action": { "call": { "target": "/api/plugins/video/picks/vote", "args": { "media_id": "{id}" }, "success_label": "Vote updated" } }
+        },
+        {
+          "icon": "play",
+          "label": "Play",
+          "action": { "play": { "media_id": "{id}" } }
+        }
+      ],
+      "item_subtitle_field": "{pick_details}",
+      "on_select": { "play": { "media_id": "{id}" } },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Add a clip from any video's menu to start Family Picks."
+      },
+      "look": "backdrop"
+    }
+  ]
+}

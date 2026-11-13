@@ -7,6 +7,7 @@ import { chaptersForMadeClip } from "@/lib/videos/chapters";
 import { videoScopedData, withChannelAvatars } from "@/lib/videos/playlistData";
 import { librarySortFor } from "@/lib/videos/librarySort";
 import { withVideoByline } from "./videoByline";
+import { listPicks } from "./familyPicks";
 import { videoRules, wantsVideoRules } from "./videoFilters";
 import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
@@ -547,6 +548,16 @@ const itemViewHooks = new Map<MediaAppId, ItemViewHook[]>();
 export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, [...(itemViewHooks.get(appId) ?? []), hook]); }
 
 export function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
+  if (appId === "video" && dataId === "library" && params.scope === "family-picks") {
+    const picks = listPicks(person).items;
+    const rows = mediaAppDataRaw(person, "video", "library", {}) as MediaRow[];
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return picks.flatMap((pick) => {
+      const row = byId.get(pick.media_id);
+      return row ? [{ ...row, id: pick.media_id, vote_count: pick.votes, voted: pick.voted, added_by_name: pick.added_by ?? "Someone", top: pick.top,
+        top_label: pick.top ? "Top pick" : "", pick_details: `${pick.top ? "Top pick · " : ""}${pick.votes} votes · Added by ${pick.added_by ?? "Someone"}`, vote_action_label: pick.voted ? "Remove vote" : "Vote" }] : [];
+    });
+  }
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
   if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
