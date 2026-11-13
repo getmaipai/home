@@ -996,7 +996,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/sourceModeMigration.ts` | RETIRED_WIKIPEDIA_FALLBACK_KEY, migrateWikipediaFallbackToSourceMode |
 | `backend/src/lib/retrieval/wayback.ts` | WAYBACK_FALLBACK_KEY, WAYBACK_AVAILABILITY_URL, WAYBACK_HOST, waybackAllowed, waybackCopy |
 | `backend/src/lib/retrieval/webSources.ts` | WEB_SOURCES_KEY, DEFAULT_WEB_SOURCES, webSourceBuilt, webSourceSearch, __setWebSourceForTests, WEB_SOURCE_IDS |
-| `backend/src/lib/robotAssets.ts` | ROBOT_ASSETS, robotAssetPath, verifyRobotAssetFile, isRobotAssetAvailable, ensureRobotAssets, readVerifiedRobotAsset |
+| `backend/src/lib/robotAssets.ts` | ROBOT_ASSETS, robotAssetPath, verifyRobotAssetFile, isRobotAssetAvailable, ensureRobotAssets, ensureRobotAssetIds |
 | `backend/src/lib/robotCheckin.ts` | ROBOT_CHECKIN_ONLINE_MS, recordRobotCheckin, getRobotCheckin, getRobotUnitOnlineAt, forgetRobotCheckin |
 | `backend/src/lib/robotClips.ts` | buildRobotClips, clipTextPassesFloor, robotClipBundlePath, robotClipBundleExists, readRobotClipBundle, robotClipAssetForDevice |
 | `backend/src/lib/robotCompanion.ts` | ROBOT_CONTROLS_KEY, ROBOT_COMPANION_KEY, companionAudienceOf, companionFloor, companionInfo, allCompanions |
@@ -1278,7 +1278,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
-| `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, isVisionAssetInstalled, areVisionAssetsInstalled, ensureVisionAssets |
+| `backend/src/lib/visionAssets.ts` | FACE_DETECTOR_ASSET_ID, FACE_EMBEDDER_ASSET_ID, VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, faceAssetPath |
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
