@@ -34747,7 +34747,7 @@ writes markers and a record and moves no file.
 | `wakeword-models` | `voice/wakewords/` | wake-word feature models and detectors | MB | written once, read at start |
 | `stt-models` | `voice/stt/` | Silero VAD for utterance endpointing | about 2 MB | written once, read at start |
 | `tts-models` | `voice/tts/` | the TTS engine's Python, packages and model weights, today in `~/.cache/uv` and `~/.cache/huggingface` | 1 to 3 GB | written once, read at engine start |
-| `vision-models` | `vision/models/` | face detection and embedding models served to browsers | tens of MB | written once, read on request |
+| `vision-models` | `vision/models/` | the image-framing model; older hubs may still hold the two face files here (read as a fallback; they now live once in `models/robot-assets`) | tens of MB | written once, read on request |
 | `logs` | `logs/` | the hub's structured logs, rotated | up to the rotation cap | appends |
 | `cache` | `cache/` | package fetch responses; knowledge.db (the reference reader's extracted-article cache) | MB | small random writes |
 | `favicons` | `favicons/` | source icons and their index | MB | small random writes |

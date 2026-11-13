@@ -15,7 +15,8 @@ import { shippedDiskPlan } from "@/lib/diskPlan";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { wakewordDir } from "@/lib/paths";
-import { VISION_ALL_ASSETS, visionAssetPath, areVisionAssetsInstalled } from "@/lib/visionAssets";
+import { VISION_ALL_ASSETS, areVisionAssetsInstalled } from "@/lib/visionAssets";
+import { robotAssetPath } from "@/lib/robotAssets";
 import { visionDir } from "@/lib/paths";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { __resetIngredientsForTests, INGREDIENTS_BYTES, INGREDIENTS_LIBRARY_NAME } from "@/lib/videos/ingredientsAdapter";
@@ -259,6 +260,7 @@ describe("choosing", () => {
   test("the face finder row lists the two pinned files with size, licence and source, and removing it deletes them", async () => {
     const { client } = await owner();
     rmSync(visionDir, { recursive: true, force: true });
+    for (const asset of VISION_ALL_ASSETS) rmSync(robotAssetPath(asset.id), { force: true });
     const read = async () => ((await (await client.get("/api/ai/choices")).json()) as { cards: Array<Card & { title: string; choices: Array<{ id: string; label: string; description: string; state: string; stateText: string; installedBytes: number }> }> }).cards.find((card) => card.id === "faces")!;
     const before = await read();
     expect(before.title).toBe("Telling people apart");
@@ -271,14 +273,13 @@ describe("choosing", () => {
     expect(before.choices[0]!.description).toContain("MIT");
     expect(before.choices[0]!.description).toContain("Apache-2.0");
     expect(before.choices[0]!.description).toContain("huggingface.co");
-    await mkdir(visionDir, { recursive: true });
-    for (const asset of VISION_ALL_ASSETS) await Bun.write(visionAssetPath(asset.file), "x");
+    for (const asset of VISION_ALL_ASSETS) await Bun.write(robotAssetPath(asset.id), "x");
     const during = await read();
     expect(during.choices[0]!.state).toBe("installed");
     expect(during.choices[0]!.action).toBe("remove");
     expect((await client.post("/api/ai/choices/faces", { choice: "faces.finder" })).status).toBe(200);
     expect(areVisionAssetsInstalled()).toBe(false);
-    rmSync(visionDir, { recursive: true, force: true });
+    for (const asset of VISION_ALL_ASSETS) expect(await Bun.file(robotAssetPath(asset.id)).exists()).toBe(false);
   });
 
   test("the video-from-pictures adapter row reads the Stack's video LoRA library and installs it by its exact name once the token and licence are in place", async () => {

@@ -5,8 +5,7 @@ import * as ort from "onnxruntime-web";
 import type { InferenceSession } from "onnxruntime-web";
 import { existsSync, readFileSync } from "node:fs";
 import sharp from "sharp";
-import { VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER } from "@/lib/visionAssets";
-import { visionAssetPath } from "@/lib/visionFocalAsset";
+import { VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, faceAssetPath } from "@/lib/visionAssets";
 import { decodeYunetOutputs, type DetectedFace } from "../../../../../shared/vision/faceDetect";
 import { alignCrop } from "../../../../../shared/vision/faceAlign";
 import { toEmbedBlob } from "../../../../../shared/vision/faceEmbed";
@@ -37,7 +36,7 @@ function releaseLater(which: "detector" | "embedder"): void {
 }
 async function getSession(which: "detector" | "embedder"): Promise<InferenceSession | null> {
   const asset = which === "detector" ? VISION_FACE_DETECTOR : VISION_FACE_EMBEDDER;
-  const path = visionAssetPath(asset.file);
+  const path = faceAssetPath(asset);
   if (!existsSync(path)) return null;
   let current = which === "detector" ? detector : embedder;
   if (!current) {

@@ -50,6 +50,7 @@ function setJob(id: string, status: string, phase: string, completedBytes: numbe
 }
 
 let downloadFlight: Promise<void> | null = null;
+const assetFlights = new Map<string, Promise<string | null>>();
 
 function registerRobotAssetRepairActions(): void {
   for (const asset of ROBOT_ASSETS) {
@@ -57,45 +58,76 @@ function registerRobotAssetRepairActions(): void {
   }
 }
 
+/** Makes one pinned file present and verified in the robot asset store through the hub's checksum-verifying downloader; resolves to null on success or the
+ * failure's message (the job row and the issue are updated either way). One download per file at a time, shared by the robot route and Home's face finder. */
+function ensureOneRobotAsset(asset: RobotAsset): Promise<string | null> {
+  const running = assetFlights.get(asset.id);
+  if (running) return running;
+  const flight = (async (): Promise<string | null> => {
+    const path = robotAssetPath(asset.id);
+    try {
+      mkdirSync(ASSET_DIR, { recursive: true });
+      if (await verifyRobotAssetFile(path, asset)) {
+        setJob(asset.id, "ready", "ready", asset.bytes, asset.bytes);
+        resolveIssue("robot-asset", `asset:${asset.id}`);
+        return null;
+      }
+      rmSync(path, { force: true });
+      setJob(asset.id, "downloading_model", "downloading robot asset", 0, asset.bytes);
+      await downloadUrl(asset.source_url, path, {
+        expectedSha256: asset.sha256,
+        expectedBytes: asset.bytes,
+        onProgress: (progress) => setJob(asset.id, "downloading_model", progress.status, progress.completedBytes, progress.totalBytes),
+      });
+      if (!(await verifyRobotAssetFile(path, asset))) throw new Error("downloaded asset failed its pinned integrity check");
+      setJob(asset.id, "ready", "ready", asset.bytes, asset.bytes);
+      resolveIssue("robot-asset", `asset:${asset.id}`);
+      return null;
+    } catch (error) {
+      const message = (error as Error).message;
+      setJob(asset.id, "failed", "failed", 0, asset.bytes, message);
+      await raiseIssue({
+        source: "robot-asset",
+        key: `asset:${asset.id}`,
+        severity: "error",
+        title: `MaiPai could not prepare a robot asset`,
+        detail: `${asset.file}: ${message}`,
+        fix: { label: "Retry asset download", action: `retry_robot_asset:${asset.id}` },
+      });
+      return message;
+    }
+  })().finally(() => { assetFlights.delete(asset.id); });
+  assetFlights.set(asset.id, flight);
+  return flight;
+}
+
 /** Fetch each base pin through the hub's shared checksum-verifying downloader. */
 export function ensureRobotAssets(): Promise<void> {
   if (downloadFlight) return downloadFlight;
   registerRobotAssetRepairActions();
   downloadFlight = (async () => {
-    mkdirSync(ASSET_DIR, { recursive: true });
-    for (const asset of ROBOT_ASSETS) {
-      const path = robotAssetPath(asset.id);
-      try {
-        if (await verifyRobotAssetFile(path, asset)) {
-          setJob(asset.id, "ready", "ready", asset.bytes, asset.bytes);
-          resolveIssue("robot-asset", `asset:${asset.id}`);
-          continue;
-        }
-        rmSync(path, { force: true });
-        setJob(asset.id, "downloading_model", "downloading robot asset", 0, asset.bytes);
-        await downloadUrl(asset.source_url, path, {
-          expectedSha256: asset.sha256,
-          expectedBytes: asset.bytes,
-          onProgress: (progress) => setJob(asset.id, "downloading_model", progress.status, progress.completedBytes, progress.totalBytes),
-        });
-        if (!(await verifyRobotAssetFile(path, asset))) throw new Error("downloaded asset failed its pinned integrity check");
-        setJob(asset.id, "ready", "ready", asset.bytes, asset.bytes);
-        resolveIssue("robot-asset", `asset:${asset.id}`);
-      } catch (error) {
-        const message = (error as Error).message;
-        setJob(asset.id, "failed", "failed", 0, asset.bytes, message);
-        await raiseIssue({
-          source: "robot-asset",
-          key: `asset:${asset.id}`,
-          severity: "error",
-          title: `MaiPai could not prepare a robot asset`,
-          detail: `${asset.file}: ${message}`,
-          fix: { label: "Retry asset download", action: `retry_robot_asset:${asset.id}` },
-        });
-      }
-    }
+    for (const asset of ROBOT_ASSETS) await ensureOneRobotAsset(asset);
   })().finally(() => { downloadFlight = null; });
   return downloadFlight;
+}
+
+/** Fetch only the named pins (Home's own face finder uses two of them) and throw the first failure. A robot's own fetch stays `ensureRobotAssets`. */
+export async function ensureRobotAssetIds(ids: readonly string[]): Promise<void> {
+  registerRobotAssetRepairActions();
+  for (const id of ids) {
+    const asset = assetForId(id);
+    if (!asset) throw new Error(`unknown robot asset: ${id}`);
+    const failure = await ensureOneRobotAsset(asset);
+    if (failure) throw new Error(failure);
+  }
+}
+
+/** Removes the named files from the robot asset store (an admin's explicit remove). A robot that asks for them later makes the hub fetch them again. */
+export function removeRobotAssetIds(ids: readonly string[]): void {
+  for (const id of ids) {
+    const asset = assetForId(id);
+    if (asset) rmSync(robotAssetPath(id), { force: true });
+  }
 }
 
 /** Read and verify one file before returning any bytes to a device. The

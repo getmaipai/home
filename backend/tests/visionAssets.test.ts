@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import {
@@ -7,14 +8,24 @@ import {
   VISION_FOCAL_CROP,
   areVisionAssetsInstalled,
   ensureVisionAssets,
+  faceAssetPath,
   isVisionAssetInstalled,
+  removeVisionAssets,
   visionAssetPath,
 } from "@/lib/visionAssets";
+import { robotAssetPath } from "@/lib/robotAssets";
 import { visionDir } from "@/lib/paths";
 
+// The face files live in the robot asset store (one store); the old vision folder is a read-only fallback.
 function installPlaceholderAssets() {
+  for (const asset of VISION_ALL_ASSETS) {
+    mkdirSync(dirname(robotAssetPath(asset.id)), { recursive: true });
+    writeFileSync(robotAssetPath(asset.id), "placeholder");
+  }
+}
+function installLegacyAssets() {
   mkdirSync(visionDir, { recursive: true });
-  for (const asset of VISION_ALL_ASSETS) writeFileSync(visionAssetPath(asset.file), "placeholder");
+  for (const asset of VISION_ALL_ASSETS) writeFileSync(visionAssetPath(asset.file), "legacy");
 }
 
 function installFocalAsset() {
@@ -26,11 +37,38 @@ beforeEach(() => resetDb());
 
 // Like wakewordAssets.test.ts, pre-place placeholder files so the real
 // download path's existsSync guard keeps this deterministic suite offline.
-afterEach(() => rmSync(visionDir, { recursive: true, force: true }));
+afterEach(() => {
+  rmSync(visionDir, { recursive: true, force: true });
+  for (const asset of VISION_ALL_ASSETS) rmSync(robotAssetPath(asset.id), { force: true });
+});
 
 describe("lib/visionAssets.ts", () => {
-  test("visionAssetPath resolves under the vision model directory", () => {
-    expect(visionAssetPath(VISION_ALL_ASSETS[0]!.file)).toBe(`${visionDir}/${VISION_ALL_ASSETS[0]!.file}`);
+  test("Home's face code and the robot asset store resolve each face file to the same path", () => {
+    for (const asset of VISION_ALL_ASSETS) {
+      expect(faceAssetPath(asset)).toBe(robotAssetPath(asset.id));
+      expect(robotAssetPath(asset.id)).not.toBe(visionAssetPath(asset.file));
+    }
+  });
+
+  test("the pins come from the robot manifest, not a second list", () => {
+    expect(VISION_ALL_ASSETS.map((asset) => asset.sha256)).toEqual(["ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0", "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"]);
+  });
+
+  test("an older hub with the files only in the vision folder keeps working, and the robot store wins once it has them", () => {
+    installLegacyAssets();
+    expect(areVisionAssetsInstalled()).toBe(true);
+    expect(faceAssetPath(VISION_ALL_ASSETS[0]!)).toBe(visionAssetPath(VISION_ALL_ASSETS[0]!.file));
+    installPlaceholderAssets();
+    expect(faceAssetPath(VISION_ALL_ASSETS[0]!)).toBe(robotAssetPath(VISION_ALL_ASSETS[0]!.id));
+    expect(existsSync(visionAssetPath(VISION_ALL_ASSETS[0]!.file))).toBe(true);
+  });
+
+  test("removing drops both copies", () => {
+    installLegacyAssets();
+    installPlaceholderAssets();
+    removeVisionAssets();
+    expect(areVisionAssetsInstalled()).toBe(false);
+    expect(existsSync(visionAssetPath(VISION_ALL_ASSETS[0]!.file))).toBe(false);
   });
 
   test("reports assets absent before download and installed once their paths exist", () => {
@@ -44,6 +82,7 @@ describe("lib/visionAssets.ts", () => {
     installPlaceholderAssets();
     await ensureVisionAssets();
     expect(areVisionAssetsInstalled()).toBe(true);
+    expect(readFileSync(robotAssetPath(VISION_ALL_ASSETS[0]!.id), "utf8")).toBe("placeholder");
   });
 });
 

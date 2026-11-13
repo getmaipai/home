@@ -8,6 +8,7 @@ import {
   areVisionAssetsInstalled,
   ensureFocalCropAsset,
   ensureVisionAssets,
+  faceAssetPath,
   visionAssetPath,
 } from "@/lib/visionAssets";
 import { apiRouter, errorResponses } from "@/lib/openapi";
@@ -81,6 +82,7 @@ visionRoutes.openapi(visionFileRoute, async (c) => {
     return c.json({ error: `vision asset unavailable: ${(err as Error).message}` }, 503);
   }
 
-  const bunFile = Bun.file(visionAssetPath(asset.file));
+  const face = VISION_ALL_ASSETS.find((candidate) => candidate.file === asset.file);
+  const bunFile = Bun.file(face ? faceAssetPath(face) : visionAssetPath(asset.file));
   return new Response(bunFile, { status: 200, headers: { "content-type": "application/octet-stream" } });
 });
