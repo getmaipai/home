@@ -84,7 +84,7 @@ describe("the film takes a song as its music", () => {
     const made = await song();
     let got: Record<string, unknown> | undefined;
     __setStartFilmForTests((input) => { got = input as unknown as Record<string, unknown>; return { id: "run-bed" }; });
-    const outcome = runMakeFilm({ state: { ...state(), conversationId: made.conversationId }, args: { idea: "A boat crosses a rainy street", track: "latest" }, callId: "c", spoken: false });
+    const outcome = runMakeFilm({ state: { ...(state() as unknown as Record<string, unknown>), conversationId: made.conversationId } as never, args: { idea: "A boat crosses a rainy street", track: "latest" }, callId: "c", spoken: false });
     expect(got?.musicFileId).toBe(made.job.fileId);
     expect(outcome.result?.data).toMatchObject({ filmRunId: "run-bed" });
   });
