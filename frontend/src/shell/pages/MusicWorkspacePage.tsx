@@ -73,30 +73,35 @@ function useSongs() {
  * as the tile it replaces: WAITING with its place in line, MAKING NOW with the ring and what it is doing (or how long it usually takes), COULD NOT
  * FINISH with the reason and Try again. The record has no preview, so the ring card is the form. */
 function songStatusCard({ card, onOpen }: { card: MusicCard; onOpen: () => void }) {
-  const failed = card.state === "failed";
+  const stopped = card.state === "cancelled";
+  const failed = card.state === "failed" || stopped;
   const waiting = card.state === "queued";
+  const askedAt = Number(card.started_at);
+  // A song that has sat at 0% for three minutes is offered a Stop, so a stuck one never needs anyone to dig.
+  const stalled = !failed && card.progress === 0 && Number.isFinite(askedAt) && Date.now() - (askedAt < 1e12 ? askedAt * 1000 : askedAt) > 180_000;
   const percent = Math.round(card.progress * 100);
   const minutes = card.eta_seconds ? Math.max(1, Math.round(card.eta_seconds / 60)) : null;
   const usually = minutes
     ? i18n._({ id: "About {minutes, plural, one {# minute} other {# minutes}} left.", message: "About {minutes, plural, one {# minute} other {# minutes}} left.", values: { minutes } })
     : i18n._({ id: "Usually about 2 minutes.", message: "Usually about 2 minutes." });
-  const line = failed ? songLine(card) : waiting ? songLine(card) : [card.stage_label || i18n._({ id: "Making your song", message: "Making your song" }), percent > 0 ? "" : usually].filter(Boolean).join(" ");
+  const line = stopped ? i18n._({ id: "Stopped. Try again to make it.", message: "Stopped. Try again to make it." }) : failed ? songLine(card) : stalled ? i18n._({ id: "Still waiting to start. You can stop it and try again.", message: "Still waiting to start. You can stop it and try again." }) : waiting ? songLine(card) : [card.stage_label || i18n._({ id: "Making your song", message: "Making your song" }), percent > 0 ? "" : usually].filter(Boolean).join(" ");
   const Icon = getIcon(failed ? "alert-triangle" : waiting ? "clock" : "loader");
   return <li key={card.id} className="w-full"><StatusCard
     kind={failed ? "problem" : waiting ? "waiting" : "progress"}
-    stateWord={failed ? i18n._({ id: "Could not finish", message: "Could not finish" }) : waiting ? i18n._({ id: "Waiting", message: "Waiting" }) : i18n._({ id: "Making now", message: "Making now" })}
+    stateWord={stopped ? i18n._({ id: "Stopped", message: "Stopped" }) : failed ? i18n._({ id: "Could not finish", message: "Could not finish" }) : waiting ? i18n._({ id: "Waiting", message: "Waiting" }) : i18n._({ id: "Making now", message: "Making now" })}
     title={card.title ?? i18n._({ id: "Making your song", message: "Making your song" })}
     line={line}
     icon={<Icon aria-hidden className="size-5" />}
     progress={!failed && !waiting && percent > 0 ? percent : undefined}
     accent="create"
+    {...(stalled ? { secondary: { label: i18n._({ id: "Stop", message: "Stop" }), onSelect: () => { void musicApi.stop(card.id).catch(() => {}); } } } : {})}
     action={{ label: failed ? i18n._({ id: "Try again", message: "Try again" }) : i18n._({ id: "Open", message: "Open" }), onSelect: onOpen, tone: failed ? "primary" : "quiet" }}
   /></li>;
 }
 
 /** One song as a tile: its cover, glass pills for length and state, and the quick actions as visible buttons. */
 function songTile({ card, selected, onOpen, actions }: { card: MusicCard; selected: boolean; onOpen: () => void; actions: Array<{ label: string; to: string }> }) {
-  if (active(card) || card.state === "failed") return songStatusCard({ card, onOpen });
+  if (active(card) || card.state === "failed" || card.state === "cancelled") return songStatusCard({ card, onOpen });
   const title = card.title ?? (active(card) ? i18n._({ id: "Making your song", message: "Making your song" }) : i18n._({ id: "Untitled song", message: "Untitled song" }));
   const length = card.state === "done" ? clock(card.duration_s) : "";
   return <MediaTile key={card.id} id={card.id} title={title} line={songLine(card)} coverUrl={card.cover_url} selected={selected} busy={active(card)} playable={card.state === "done"} onOpen={onOpen}
