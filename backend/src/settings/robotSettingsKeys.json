@@ -584,9 +584,9 @@
     "copy": {
       "does": "Sets how easily it decides a tune is playing.",
       "options": {
-        "low": "Needs a clear, strong beat.",
-        "medium": "Balanced for most rooms.",
-        "high": "Picks up softer music."
+        "low": "Low, wants a clear beat",
+        "medium": "Medium, fits most rooms",
+        "high": "High, catches soft music"
       },
       "option_labels": {
         "low": "Low",
