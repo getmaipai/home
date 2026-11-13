@@ -17,6 +17,7 @@ import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
+import { scoreEdgePartial, talkOverGrantFor } from "@/lib/talkOver";
 
 export const sttRoutes = apiRouter();
 
@@ -50,15 +51,22 @@ sttRoutes.get(
           robotSttSockets.add(trackedRobotSocket);
           if (!robotsEnabled()) trackedRobotSocket.close(4403, "robots_off");
         }
+        // TALK-OVER-01: the grant is decided once per session from the signed-in person (an adult, not a robot device, the settings on);
+        // a session with no grant gets no `talk_over` field and its edge partials carry no score, so an older or ungranted client has
+        // nothing to act on.
+        const grant = talkOverGrantFor({ actor: c.get("person"), isRobot });
         void getEndpointer().then((endpointer) => {
           if (ended) return;
+          // Every session's edge partial carries the end-of-turn score (the client starts no held run on an unfinished fragment); the
+          // acknowledgement clip itself needs the grant.
+          const base = { ...SESSION_CONFIG, turnEnd: scoreEdgePartial };
           const config = endpointer
-            ? { ...SESSION_CONFIG, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
-            : SESSION_CONFIG;
+            ? { ...base, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
+            : base;
           session = new SttSession(config, (msg) => ws.send(JSON.stringify(msg)));
           for (const frame of pendingPcm) session.pushPcm(frame);
           pendingPcm.length = 0;
-          ws.send(JSON.stringify({ t: "ready" }));
+          ws.send(JSON.stringify(grant ? { t: "ready", talk_over: grant } : { t: "ready" }));
         });
       },
       onMessage(evt, ws) {

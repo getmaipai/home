@@ -161,7 +161,7 @@ async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): 
     }), `recording a play of ${title} failed`);
   }
   for (const station of DEMO_STATIONS) {
-    await requireOk(await request(baseUrl, "/api/plugins/music/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) }), `saving station ${station.name} failed`);
+    await requireOk(await request(baseUrl, "/api/plugins/audio/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) }), `saving station ${station.name} failed`);
   }
 }
 

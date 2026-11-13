@@ -31,14 +31,18 @@ export interface TalkOverGrant { level: TalkOverLevel; window_ms: number; clips:
 export type SttServerMessage =
   | import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent
   | { t: "ready"; talk_over?: TalkOverGrant }
-  | { t: "partial"; v: string; edge: true; end?: { score: number; level: TurnEndLevel } }
+  | { t: "partial"; v: string; edge: true; end?: { score: number; level: TurnEndLevel; unfinished: boolean } }
   | { t: "vad"; speaking: true; rms: number; resumed: true; voiced_ms: number }
   | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 export type SttServerMessageWithTiming = SttServerMessage;
 import { z } from "zod";
 
 /** STT-SMARTTURN-01: what the speculative start did on a turn, for the voice timing record (counts only). */
-export type SpeculativeOutcome = "off" | "armed" | "started" | "confirmed" | "discarded";
+/** `armed`: the client could start one and the final came first (no edge partial reached it); `no_conversation`: the voice chat has no
+ * conversation id yet (a new chat's first turn); `too_long`: over 40 words; `refused`: the hub said no (400); `request_failed`: the start
+ * request itself failed; `started`: begun and unresolved; `confirmed` / `discarded`: the final's verdict; `off`: the setting is off. */
+export type SpeculativeOutcome = "off" | "armed" | "no_conversation" | "too_long" | "no_edge" | "refused" | "request_failed" | "started" | "confirmed" | "discarded";
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
 export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** The optional labels and counts a client adds to its timing report, beside the speech-path stamps. */
 export interface SttTimingExtras {
@@ -54,7 +58,7 @@ export const SttTimingReportSchema = z.object({
   cue_playback_ms: z.number().finite().nonnegative().optional(),
   head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(),
   ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
-  speculative: z.enum(["off", "armed", "started", "confirmed", "discarded"]).optional(),
+  speculative: z.enum(SPECULATIVE_OUTCOMES).optional(),
   talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().optional(), overlap_ms: z.number().finite().nonnegative().optional(),
   decision: z.enum(["none", "confirmed", "continued"]).optional(), yield_ms: z.number().finite().nonnegative().optional(),
 }).strict();

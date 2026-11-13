@@ -123,6 +123,18 @@ export const THINKING_CUE_VARIANTS: readonly string[] = [
   "Let me see.",
 ];
 
+/** TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 2 item 2; DUPLEX-07 section 3b item 1 names the pool): the
+ * acknowledgement a listener gives the moment the other person's sentence ends. One closed list, rendered once per session in the
+ * reply's voice by the client and played from memory, never written by a model, never stored, never shown. Content-free by
+ * construction; a test runs the output floor over every entry for every band. DUPLEX-07 adds its continuer groups here, not in a
+ * second list. */
+export const ACKNOWLEDGEMENT_CLIPS: readonly string[] = [
+  "Mm-hm.",
+  "Okay.",
+  "Hmm.",
+  "Right.",
+];
+
 /** VOICE-FILLER-02: a second bridge phrase for a wait that outlasts the first, so a long wait is not
  * silence after "One sec." Same rules as THINKING_CUE_VARIANTS: spoken only, never the answer. */
 export const STILL_CUE_VARIANTS: readonly string[] = [

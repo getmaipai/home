@@ -26,7 +26,20 @@ export interface SttSessionConfig {
   silenceTimeoutS: number;
   partialIntervalS: number;
   endpointing?: { endpointer: Endpointer; holdS: number };
+  /** TALK-OVER-01: scores the edge partial's text for completeness (lib/talkOver.ts); when set, the edge partial carries `end`. */
+  turnEnd?: (text: string) => TurnEndMark;
 }
+
+export type TurnEndLevel = "none" | "gentle" | "natural";
+/** The score, the lowest level it fires at, and whether the fragment is plainly mid-sentence (no held run is started on one). */
+export interface TurnEndMark { score: number; level: TurnEndLevel; unfinished: boolean }
+/** TALK-OVER-01 (design section 2 item 5): voice after an edge partial counts as the person speaking again only once it has lasted this long. */
+export const RESUME_CONFIRM_S = 0.2;
+/** STT-SMARTTURN-01 (2026-11-12, seen in a real browser on the dev hub): the recognizer's voice detector goes silent between words and phrases,
+ * so a partial transcribed at the first silent frame was marked `edge` ten times in a two-second question and each started a held run on
+ * a fragment. The transcription still starts at the first silent frame (so the text is ready early), but the partial is marked `edge`
+ * only once the silence has lasted this long with no voice in between; a shorter gap sends it as a plain partial. */
+export const EDGE_SILENCE_S = 0.2;
 
 export interface Endpointer {
   isComplete(audio: Float32Array, sampleRate: number): Promise<boolean>;
@@ -100,7 +113,12 @@ export function isLikelySpeech(text: string): boolean {
   return /\p{L}/u.test(speechContent(text));
 }
 
-export type SttSessionEvent = SttWireEvent | { t: "partial"; v: string; edge: true } | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
+export type SttSessionEvent =
+  | SttWireEvent
+  | { t: "partial"; v: string; edge: true; end?: TurnEndMark }
+  /** TALK-OVER-01: the voice came back after the edge partial and has lasted RESUME_CONFIRM_S (additive; sent once per resume). */
+  | { t: "vad"; speaking: true; rms: number; resumed: true; voiced_ms: number }
+  | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 
 export class SttSession {
   private cfg: SttSessionConfig;
@@ -145,6 +163,12 @@ export class SttSession {
   // server stopped managing (voice confirmed) still resumes if the utterance turns out to hold no speech.
   private replyPaused = false;
   private unconfirmedPauses: number[] = [];
+  // TALK-OVER-01: voiced frames after a silence inside the utterance (the person went on after the edge partial).
+  private resuming = false;
+  private resumeVoicedSamples = 0;
+  private resumedSent = false;
+  // An edge transcript whose silence has not yet lasted EDGE_SILENCE_S: sent as the edge partial when it does, as a plain partial if the voice comes back first.
+  private pendingEdge: string | null = null;
 
   constructor(cfg: SttSessionConfig, send: (msg: SttSessionEvent) => void, now: () => number = Date.now) {
     this.cfg = cfg;
@@ -205,6 +229,17 @@ export class SttSession {
         this.send({ t: "vad", speaking: true, rms });
         this.startReplyPause();
       }
+      if (this.silenceSamples > 0) {
+        this.resuming = true; this.resumeVoicedSamples = 0; this.resumedSent = false;
+        if (this.pendingEdge !== null) { const text = this.pendingEdge; this.pendingEdge = null; this.send({ t: "partial", v: text }); }
+      }
+      if (this.resuming) {
+        this.resumeVoicedSamples += samples.length;
+        if (!this.resumedSent && this.resumeVoicedSamples >= RESUME_CONFIRM_S * this.cfg.sampleRate) {
+          this.resumedSent = true;
+          this.send({ t: "vad", speaking: true, rms, resumed: true, voiced_ms: Math.round(this.resumeVoicedSamples / this.cfg.sampleRate * 1000) });
+        }
+      }
       this.silenceSamples = 0;
       this.endpointCheckScheduled = false;
       this.endpointGeneration++;
@@ -228,7 +263,7 @@ export class SttSession {
       this.checkReplyPause();
       if (this.speaking) {
       const firstSilenceFrame = this.silenceSamples === 0;
-      if (firstSilenceFrame) this.silenceStartedAtMs = this.now();
+      if (firstSilenceFrame) { this.silenceStartedAtMs = this.now(); this.resuming = false; this.resumeVoicedSamples = 0; this.resumedSent = false; }
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
       this.silenceSamples += samples.length;
@@ -239,6 +274,7 @@ export class SttSession {
         if (this.partialInFlight) this.redecodeAtEdge = true;
         else void this.emitPartial(true);
       }
+      if (this.pendingEdge !== null && this.silenceSamples >= EDGE_SILENCE_S * this.cfg.sampleRate) { const text = this.pendingEdge; this.pendingEdge = null; this.sendEdge(text); }
       const endpointing = this.cfg.endpointing;
       const baseSamples = this.cfg.silenceTimeoutS * this.cfg.sampleRate;
       if (endpointing && this.silenceSamples >= baseSamples) {
@@ -378,7 +414,12 @@ export class SttSession {
         const text = await transcribeUtterance(this.flatten(), this.cfg.sampleRate);
         if (text && isLikelySpeech(text)) {
           this.reusablePartial = { text, voicedLen: capturedVoicedLen };
-          if (!this.closed && !this.finalizing) this.send(edge ? { t: "partial", v: text, edge: true } : { t: "partial", v: text });
+          if (!this.closed && !this.finalizing) {
+            if (!edge) this.send({ t: "partial", v: text });
+            else if (!this.speaking || this.silenceSamples === 0) this.send({ t: "partial", v: text }); // the voice came back while it decoded
+            else if (this.silenceSamples >= EDGE_SILENCE_S * this.cfg.sampleRate) this.sendEdge(text);
+            else this.pendingEdge = text;
+          }
         }
       } catch {
         // model down: let finalize surface it; partials stay silent
@@ -397,9 +438,15 @@ export class SttSession {
     return this.partialPromise;
   }
 
+  private sendEdge(text: string): void {
+    this.send({ t: "partial", v: text, edge: true, ...(this.cfg.turnEnd ? { end: this.cfg.turnEnd(text) } : {}) });
+  }
+
   private async finalize(): Promise<void> {
     if (this.finalizing) return;
     this.finalizing = true;
+    // A pending edge whose silence ran out is the final's own text: the final event follows at once, so nothing is lost by dropping it.
+    this.pendingEdge = null;
     this.finalizeStartedAtMs = this.now();
     this.send({ t: "vad", speaking: false, rms: 0 });
 
@@ -504,6 +551,10 @@ export class SttSession {
     this.finalizeStartedAtMs = 0;
     this.reusablePartial = null;
     this.redecodeAtEdge = false;
+    this.resuming = false;
+    this.resumeVoicedSamples = 0;
+    this.resumedSent = false;
+    this.pendingEdge = null;
     this.endpointAsked = false;
     this.endpointPending = false;
     this.endpointDecision = null;

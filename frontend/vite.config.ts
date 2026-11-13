@@ -425,6 +425,9 @@ export default defineConfig({
         // default.
         target: process.env.VITE_SETUP_PREVIEW === "1" ? "http://127.0.0.1:1" : `http://localhost:${process.env.VITE_BACKEND_PORT ?? "8787"}`,
         changeOrigin: false,
+        // The live voice session's `WS /api/stt/stream` needs the upgrade proxied too; without this the dev hub's voice overlay sat on
+        // "Connecting" forever (found 2026-11-12 while chasing a speculative-start miss that only a real browser path could show).
+        ws: true,
       },
     },
   },

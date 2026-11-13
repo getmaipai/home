@@ -1189,7 +1189,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   if (body.speculative === true) {
     const refused = speculationRefusal({ actor, surface, spoken: body.spoken === true, wordCount: wordCount(body.text ?? ""), pendingAsk: typeof body.conversation_id === "string" && getPendingAsk(body.conversation_id) !== null, activeTurns: activeTurnCount() });
     if (refused || body.bare === true || body.temporary === true || body.ephemeral === true || body.continuation_text !== undefined || body.supersedes !== undefined) {
-      noteSpeculation("refused");
+      noteSpeculation("refused", refused ?? "turn shape");
       return c.json({ error: refused ?? "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
     }
     hold = newSpeculationHold();
@@ -1326,7 +1326,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     session.confirmation = hold;
     if (conversationInCrisis(result.conversationId) || result.cueSuppressed || result.signal.repair !== "none" || result.signal.target === "hub") {
       discardSpeculation(session, "aborted");
-      noteSpeculation("refused");
+      noteSpeculation("refused", "crisis, repair or hub-target turn");
       return c.json({ error: "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
     }
     session.holdTimer = setTimeout(() => { discardSpeculation(session, "aborted"); }, SPECULATION_HOLD_MS);

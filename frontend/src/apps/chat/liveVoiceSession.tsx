@@ -173,12 +173,34 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // What the speculative start did on the turn in progress, for the voice timing record (counts only): `armed` until a held run
   // starts, `off` when the hub refused it, then `confirmed` or `discarded` at the final.
   const speculativeOutcomeRef = useRef<SpeculativeOutcome>("armed");
-  const startSpeculation = (text: string) => {
-    if (!speculation || speculationRef.current || !text || text.split(/\s+/).length > 40) return;
+  const edgeSeenRef = useRef(false);
+  // The hub said "Speculative start is off." once: no more start requests this session (each would be a refused request, and a
+  // burst of them hit the turn budget: ten edge partials in two seconds gave 429s on the dev hub, 2026-11-12).
+  const speculationOffRef = useRef(false);
+  // One start request in flight at a time, carrying the text it was sent with; a newer edge partial with other words replaces it.
+  const speculationInFlightRef = useRef<string | null>(null);
+  const latestEdgeTextRef = useRef<string | null>(null);
+  const refusedThisUtteranceRef = useRef(false);
+  const startSpeculation = (text: string, unfinished = false) => {
+    if (!speculation || !text) return;
+    if (speculationOffRef.current) { speculativeOutcomeRef.current = "off"; return; }
+    if (refusedThisUtteranceRef.current) return;
+    // Every silent reason is labelled, so a live timing record names why no held run started (2026-11-12: eight live turns all read
+    // "armed" and nothing said which gate it was).
+    if (text.split(/\s+/).length > 40) { speculativeOutcomeRef.current = "too_long"; return; }
     const conversationId = speculation.getConversationId();
-    if (!conversationId) return;
+    if (!conversationId) { speculativeOutcomeRef.current = "no_conversation"; return; }
+    latestEdgeTextRef.current = text;
+    // A plainly unfinished fragment ("what is a", "I want to, uh") is not worth a model run; the next edge partial may be.
+    if (unfinished) return;
+    const held = speculationRef.current;
+    if (held && held.text === text) return;
+    if (held) { speculationRef.current = null; void api.discardTurn(held.turnId).catch(() => undefined); }
+    if (speculationInFlightRef.current !== null) return; // reconciled against latestEdgeTextRef when it lands
+    speculationInFlightRef.current = text;
     const epoch = reactionEpochRef.current;
     void api.speculateTurn(text, conversationId).then((ids) => {
+      speculationInFlightRef.current = null;
       // The final already went out, a new utterance began or the session changed meanwhile (the epoch moved), or another held run
       // took the slot: a run that no longer matches anything is dropped at once. The partial handler marks speech as active for
       // every partial, the edge partial included, so that flag must not be read here: it discarded every held run in the browser
@@ -186,7 +208,18 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       if (epoch !== reactionEpochRef.current || speculationRef.current) { void api.discardTurn(ids.turn_id).catch(() => undefined); return; }
       speculationRef.current = { turnId: ids.turn_id, resumeToken: ids.resume_token, conversationId: ids.conversation_id, text };
       speculativeOutcomeRef.current = "started";
-    }).catch(() => { if (epoch === reactionEpochRef.current) speculativeOutcomeRef.current = "off"; });
+      // A later edge partial with other words arrived while this one was in flight: it is the better guess.
+      const latest = latestEdgeTextRef.current;
+      if (latest !== null && latest !== text) startSpeculation(latest);
+    }).catch((error: unknown) => {
+      speculationInFlightRef.current = null;
+      if (epoch !== reactionEpochRef.current) return;
+      const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: unknown }).status : undefined;
+      const message = error instanceof Error ? error.message : "";
+      if (status === 400 && message.startsWith("Speculative start is off")) { speculationOffRef.current = true; speculativeOutcomeRef.current = "off"; return; }
+      refusedThisUtteranceRef.current = true;
+      speculativeOutcomeRef.current = status === 400 ? "refused" : "request_failed";
+    });
   };
   const yieldVoice = () => {
     const scheduler = turnSchedulerRef.current;
@@ -358,7 +391,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // STT-SMARTTURN-01: the edge partial (the hub marks the one it transcribed at its first silent frame with `edge: true`; the
             // `vad speaking: false` event only comes at finalize, after it) may begin a held run. The armed flag stays for a partial
             // that follows a vad-false from an older hub.
-            if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) { if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim()); }
+            if ("edge" in message && message.edge === true) edgeSeenRef.current = true;
+            if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) { if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(message.v.trim(), "end" in message && message.end?.unfinished === true); }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
             lastPartialRef.current = message.v;
@@ -385,8 +419,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             break;
           case "vad":
             if (message.speaking) {
+              if (!("resumed" in message && message.resumed === true)) { refusedThisUtteranceRef.current = false; latestEdgeTextRef.current = null; }
               cancelReaction();
-              discardSpeculation(); // STT-SMARTTURN-01: more speech means the held run's words were not the final ones
+              if (!("resumed" in message && message.resumed === true)) discardSpeculation(); // STT-SMARTTURN-01: a new utterance means the held run's words were not the final ones; a resume inside the utterance is judged at the next edge partial
               activeSpeechRef.current = true;
               setIdleActivity((value) => value + 1);
               const elapsed = Date.now() - speakingStartedAtRef.current;
@@ -490,8 +525,12 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (held && held.text === text) { speculation.pendingRef.current = { turnId: held.turnId, resumeToken: held.resumeToken, conversationId: held.conversationId }; speculative = "confirmed"; }
               else if (held) { void api.discardTurn(held.turnId).catch(() => undefined); speculative = "discarded"; }
               else if (speculative === "started") speculative = "discarded";
+              else if (speculative === "armed" && !edgeSeenRef.current) speculative = "no_edge";
             }
-            speculativeOutcomeRef.current = "armed";
+            edgeSeenRef.current = false;
+            speculativeOutcomeRef.current = speculationOffRef.current ? "off" : "armed";
+            latestEdgeTextRef.current = null;
+            refusedThisUtteranceRef.current = false;
             onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}) });
             pendingSpeechRef.current = true;
             composer.setText(text);

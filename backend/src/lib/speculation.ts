@@ -28,9 +28,10 @@ export function newSpeculationHold(): SpeculationHold {
 /** Counts only, never text (rule 6a): read by the voice latency report and the logs. */
 export const speculationCounters = { started: 0, confirmed: 0, discarded: 0, aborted: 0, refused: 0 };
 
-export function noteSpeculation(kind: keyof typeof speculationCounters): void {
+/** `reason` is one of the fixed refusal lines above or a fixed shape label, never the person's words (rule 6a). */
+export function noteSpeculation(kind: keyof typeof speculationCounters, reason?: string): void {
   speculationCounters[kind] += 1;
-  console.log(`[speculation] ${kind} started=${speculationCounters.started} confirmed=${speculationCounters.confirmed} discarded=${speculationCounters.discarded} aborted=${speculationCounters.aborted} refused=${speculationCounters.refused}`);
+  console.log(`[speculation] ${kind}${reason ? ` (${reason})` : ""} started=${speculationCounters.started} confirmed=${speculationCounters.confirmed} discarded=${speculationCounters.discarded} aborted=${speculationCounters.aborted} refused=${speculationCounters.refused}`);
 }
 
 export function __resetSpeculationForTests(): void { for (const key of Object.keys(speculationCounters) as Array<keyof typeof speculationCounters>) speculationCounters[key] = 0; }

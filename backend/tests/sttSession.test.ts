@@ -425,7 +425,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     session.close();
   });
 
-  test("STT-SMARTTURN-01: the partial transcribed at the first silent frame carries edge: true; a cadence partial does not", async () => {
+  test("STT-SMARTTURN-01: the partial transcribed at the first silent frame carries edge: true once the silence has lasted 0.2 s; a cadence partial does not", async () => {
     scriptTranscript("edge words");
     const events: SttTestEvent[] = [];
     // A 0.1 s partial cadence: the first partial comes while the voice is still going, the next at the first silent frame.
@@ -437,11 +437,59 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     expect(cadence.every((e) => !("edge" in e))).toBe(true);
     session.pushPcm(silenceFrame());
     await flush();
+    expect(transcriptionCalls()).toBe(cadence.length + 1); // decoded at the first silent frame, so the words are ready early
+    expect(events.filter((e) => e.t === "partial" && "edge" in e)).toEqual([]); // but not marked edge until the gap is a real pause
+    await pushPause(session, 200);
     const edge = events.filter((e) => e.t === "partial" && "edge" in e);
     expect(edge).toEqual([{ t: "partial", v: "edge words", edge: true }]);
-    await pushPause(session, 800);
+    await pushPause(session, 600);
     await flush();
     expect(finals(events)).toEqual([{ t: "final", v: "edge words" }]);
+    session.close();
+  });
+
+  test("STT-SMARTTURN-01: a gap shorter than 0.2 s between words sends its transcript as a plain partial, never as an edge (ten edge partials in one question, dev hub 2026-11-12)", async () => {
+    scriptTranscript("what is");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(config({ silenceTimeoutS: 0.5 }), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 100); // an inter-word gap
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame()); // the voice comes back
+    await flush();
+    expect(events.filter((e) => e.t === "partial")).toEqual([{ t: "partial", v: "what is" }]);
+    expect(events.some((e) => e.t === "partial" && "edge" in e)).toBe(false);
+    // The real pause: frames arrive in real time there, so the decode lands before the silence timer; here the pause is pushed in two parts.
+    await pushPause(session, 250);
+    await flush();
+    expect(events.filter((e) => e.t === "partial" && "edge" in e)).toHaveLength(1);
+    await pushPause(session, 450);
+    await flush();
+    expect(finals(events)).toHaveLength(1);
+    session.close();
+  });
+
+  test("TALK-OVER-01: with a scorer, the edge partial carries the end-of-turn score; voice that comes back after the edge and lasts 0.2 s is reported once as resumed", async () => {
+    scriptTranscript("what is a good name for a small grey cat?");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession({ ...config({ silenceTimeoutS: 0.6 }), turnEnd: (text) => ({ score: text.endsWith("?") ? 0.9 : 0.1, level: text.endsWith("?") ? "gentle" : "none", unfinished: !text.endsWith("?") }) }, (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 250);
+    const edge = events.filter((e) => e.t === "partial" && "edge" in e);
+    expect(edge).toEqual([{ t: "partial", v: "what is a good name for a small grey cat?", edge: true, end: { score: 0.9, level: "gentle", unfinished: false } }]);
+    // 150 ms of sound after the edge: not yet the person (a breath, a cough); 250 ms: reported once.
+    for (let i = 0; i < 15; i++) session.pushPcm(loudFrame());
+    await flush();
+    expect(events.some((e) => e.t === "vad" && "resumed" in e)).toBe(false);
+    for (let i = 0; i < 10; i++) session.pushPcm(loudFrame());
+    await flush();
+    const resumed = events.filter((e) => e.t === "vad" && "resumed" in e);
+    expect(resumed).toHaveLength(1);
+    expect((resumed[0] as { voiced_ms: number }).voiced_ms).toBeGreaterThanOrEqual(200);
+    for (let i = 0; i < 20; i++) session.pushPcm(loudFrame());
+    await flush();
+    expect(events.filter((e) => e.t === "vad" && "resumed" in e)).toHaveLength(1);
     session.close();
   });
 

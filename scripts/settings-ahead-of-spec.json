@@ -17,5 +17,7 @@
   "tools.house.mode",
   "tools.lists.mode",
   "tools.assist.widened",
-  "ui.rail_expanded"
+  "ui.rail_expanded",
+  "voice.talk_over",
+  "voice.talk_over_window_ms"
 ]

@@ -37,10 +37,8 @@ export interface VoiceTimingRecord {
   speech_emit_ms?: number | null;
   audio_state_enqueue?: string | null;
   audio_state_emit?: string | null;
-  /** STT-SMARTTURN-01: what the speculative start did on this turn. `off`: the setting or a gate refused it; `armed`: the client
-   * could have started one and did not (no conversation yet, Home was speaking, no edge partial); `started`: begun and never
-   * confirmed or discarded while this record was written; `confirmed`: the final matched and the held run became this turn;
-   * `discarded`: a held run was dropped before this turn (the final differed or the voice went on). */
+  /** STT-SMARTTURN-01: what the speculative start did on this turn (see SPECULATIVE_OUTCOMES): `started` and `confirmed` are the
+   * hub's own marks; the client labels every other case in its timing report, one per silent reason, so a live record names the cause. */
   speculative?: SpeculativeOutcome | null;
   /** TALK-OVER-01: the "Talk before I finish" level in force for the turn, and the acknowledgement clip's start relative to the end
    * of speech (negative is before), the protected window used, what was decided at its end, and the hard-stop latency. */
@@ -51,9 +49,12 @@ export interface VoiceTimingRecord {
   yield_ms?: number | null;
 }
 
-export type SpeculativeOutcome = "off" | "armed" | "started" | "confirmed" | "discarded";
+export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
 export type TalkOverDecision = "none" | "confirmed" | "continued";
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "started", "confirmed", "discarded"] as const;
+/** `armed`: the client could start one and the final came first (no edge partial reached it); `no_conversation`: the voice chat had no
+ * conversation id yet; `too_long`: over 40 words; `refused`: the hub said no; `request_failed`: the start request failed; `off`: the client
+ * had no speculation at all (the setting or surface). The hub itself marks `started` and `confirmed`. */
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
 export const TALK_OVER_DECISIONS = ["none", "confirmed", "continued"] as const;
 
 export interface PrewarmTimingRecord { actor_hash: string; outcome: "done" | "aborted" | "failed"; reason?: "engine_busy" | "engine_error" | "timeout" | "other"; prompt_n?: number; cache_n?: number; elapsed_ms: number }
@@ -194,7 +195,7 @@ export function voiceTimingReport(limit = 50): string {
   const stopReport = [`FIRST SOUND AFTER YOU STOP TALKING (real answer): median ${median([...stopToSound])} ms, p90 ${p90(stopToSound)} ms, ${stopToSound.length} turns (target 1300 ms)`, `first sound after you stop talking, filler cue only: median ${median([...stopToCue])} ms, ${stopToCue.length} turns`];
   // STT-SMARTTURN-01: whether the speculative start fired, per turn, so a record that looks like "the silence timer sits in series" can be read against it.
   const speculativeCount = (outcome: SpeculativeOutcome) => rows.filter((r) => r.speculative === outcome).length;
-  const speculativeReport = [`speculative start: confirmed ${speculativeCount("confirmed")}, discarded ${speculativeCount("discarded")}, started and unresolved ${speculativeCount("started")}, armed but never started ${speculativeCount("armed")}, off or refused ${speculativeCount("off")}, no mark ${rows.filter((r) => r.speculative == null).length}`, `first sound after you stop, speculative start confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative === "confirmed")))} ms; not confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative !== "confirmed")))} ms`];
+  const speculativeReport = [`speculative start: ${SPECULATIVE_OUTCOMES.map((outcome) => `${outcome} ${speculativeCount(outcome)}`).join(", ")}, no mark ${rows.filter((r) => r.speculative == null).length}`, `first sound after you stop, speculative start confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative === "confirmed")))} ms; not confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative !== "confirmed")))} ms`];
   // TALK-OVER-01: the acknowledgement clip's timing, the window decisions and the hard-stop latency.
   const talkRows = rows.filter((r) => typeof r.early_release_ms === "number");
   const talkReport = [`talk before I finish: clips played ${talkRows.length} (gentle ${talkRows.filter((r) => r.talk_over_level === "gentle").length}, natural ${talkRows.filter((r) => r.talk_over_level === "natural").length}), early release vs end of speech median ${median(talkRows.map((r) => r.early_release_ms as number))} ms, continued (wrong starts) ${rows.filter((r) => r.decision === "continued").length}, confirmed ${rows.filter((r) => r.decision === "confirmed").length}, overlap window median ${median(talkRows.flatMap((r) => r.overlap_ms == null ? [] : [r.overlap_ms]))} ms, hard stop median ${median(rows.flatMap((r) => r.yield_ms == null ? [] : [r.yield_ms]))} ms`];

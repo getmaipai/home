@@ -1767,7 +1767,7 @@ msgid "setting.home.access_token.help"
 msgstr "A long-lived access token from your Home Assistant profile page, used to control your smart-home devices."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:903
+#: src/shell/pages/ChatPage.tsx:904
 msgid "A new chat always uses one of your companions. Choose a companion to switch."
 msgstr "A new chat always uses one of your companions. Choose a companion to switch."
 
@@ -1810,6 +1810,11 @@ msgstr "A second source that is not available yet."
 #: src/lib/settingCopy.generated.ts:530
 msgid "setting.generation.video_tier.option.boost"
 msgstr "A sharper picture, a little slower."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1510
+msgid "setting.voice.talk_over.option.gentle"
+msgstr "A short \"mm-hm\" when a sentence clearly ends, such as a question. If you keep talking, Home goes quiet and answers all of it."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:522
@@ -1971,7 +1976,7 @@ msgid "Accept the licences for the AI models Home installs"
 msgstr "Accept the licences for the AI models Home installs"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1546
+#: src/lib/settingCopy.generated.ts:1557
 msgid "area.Access"
 msgstr "Access"
 
@@ -2401,7 +2406,7 @@ msgid "Adult. Only they can turn their own Coding keys on or off."
 msgstr "Adult. Only they can turn their own Coding keys on or off."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1547
+#: src/lib/settingCopy.generated.ts:1558
 msgid "area.Adults"
 msgstr "Adults"
 
@@ -2485,7 +2490,7 @@ msgid "Adults only."
 msgstr "Adults only."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1548
+#: src/lib/settingCopy.generated.ts:1559
 msgid "area.Advanced"
 msgstr "Advanced"
 
@@ -2515,12 +2520,12 @@ msgid "after: {text}"
 msgstr "after: {text}"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1541
+#: src/lib/settingCopy.generated.ts:1552
 msgid "area.AI & Models"
 msgstr "AI & Models"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1542
+#: src/lib/settingCopy.generated.ts:1553
 msgid "area.AI and models"
 msgstr "AI and models"
 
@@ -2535,7 +2540,7 @@ msgid "setting.companions.allowed.label"
 msgstr "AI companions"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1543
+#: src/lib/settingCopy.generated.ts:1554
 msgid "area.AI companions"
 msgstr "AI companions"
 
@@ -2545,7 +2550,7 @@ msgid "setting.companions.allowed.help"
 msgstr "AI companions are on for everyone unless an admin turns them off for the household or for one person. Turning this off hides companions and keeps their data."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1544
+#: src/lib/settingCopy.generated.ts:1555
 msgid "area.AI developer settings"
 msgstr "AI developer settings"
 
@@ -2560,7 +2565,7 @@ msgid "AI server"
 msgstr "AI server"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1545
+#: src/lib/settingCopy.generated.ts:1556
 msgid "area.AI settings"
 msgstr "AI settings"
 
@@ -2593,7 +2598,7 @@ msgid "Alarms"
 msgstr "Alarms"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1549
+#: src/lib/settingCopy.generated.ts:1560
 msgid "area.Alarms"
 msgstr "Alarms"
 
@@ -2618,7 +2623,7 @@ msgid "Albums"
 msgstr "Albums"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1550
+#: src/lib/settingCopy.generated.ts:1561
 msgid "area.Alerts"
 msgstr "Alerts"
 
@@ -2852,6 +2857,11 @@ msgid "Also on {join}."
 msgstr "Also on {join}."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1511
+msgid "setting.voice.talk_over.option.natural"
+msgstr "The same, also on plain statements, so it happens more often and is wrong more often. If you keep talking, Home goes quiet and answers all of it."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:49
 #: src/shell/pages/settings/HouseSettings.tsx:50
 msgid "Always allowed"
@@ -2888,7 +2898,7 @@ msgid "Always loaded"
 msgstr "Always loaded"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1551
+#: src/lib/settingCopy.generated.ts:1562
 msgid "area.Always on"
 msgstr "Always on"
 
@@ -3116,7 +3126,7 @@ msgid "setting.ui.appearance.label"
 msgstr "Appearance"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1552
+#: src/lib/settingCopy.generated.ts:1563
 msgid "area.Appearance"
 msgstr "Appearance"
 
@@ -3131,7 +3141,7 @@ msgid "Applied."
 msgstr "Applied."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1532
+#: src/lib/settingCopy.generated.ts:1543
 msgid "setting.reason.household_admin.admin.line"
 msgstr "Applies to everyone in the home."
 
@@ -3206,7 +3216,7 @@ msgid "Apps"
 msgstr "Apps"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1553
+#: src/lib/settingCopy.generated.ts:1564
 msgid "area.Apps and devices"
 msgstr "Apps and devices"
 
@@ -3366,7 +3376,7 @@ msgid "Asked {name} to {value}, waiting for it."
 msgstr "Asked {name} to {value}, waiting for it."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1650
+#: src/shell/pages/ChatPage.tsx:1654
 msgid "Asking the bare model…"
 msgstr "Asking the bare model…"
 
@@ -3557,7 +3567,7 @@ msgid "Back"
 msgstr "Back"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:197
+#: src/shell/media/NowPlayingStage.tsx:196
 msgid "Back 10 seconds"
 msgstr "Back 10 seconds"
 
@@ -3658,7 +3668,7 @@ msgid "Backups"
 msgstr "Backups"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1554
+#: src/lib/settingCopy.generated.ts:1565
 msgid "area.Backups"
 msgstr "Backups"
 
@@ -3668,7 +3678,7 @@ msgid "notification.backups.target_failing"
 msgstr "Backups to {target} have failed {count} times in a row: {message}"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1555
+#: src/lib/settingCopy.generated.ts:1566
 msgid "area.Backups, storage and updates"
 msgstr "Backups, storage and updates"
 
@@ -3706,13 +3716,13 @@ msgid "Bands could not be loaded. Open this page again."
 msgstr "Bands could not be loaded. Open this page again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1822
+#: src/shell/pages/ChatPage.tsx:1826
 msgid "Bare mode is on"
 msgstr "Bare mode is on"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:826
-#: src/shell/pages/ChatPage.tsx:1648
+#: src/shell/pages/ChatPage.tsx:1652
 msgid "Bare model"
 msgstr "Bare model"
 
@@ -3785,7 +3795,7 @@ msgid "Before you start"
 msgstr "Before you start"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1556
+#: src/lib/settingCopy.generated.ts:1567
 msgid "area.Behaviour"
 msgstr "Behaviour"
 
@@ -3815,17 +3825,17 @@ msgid "Belongs to {owner}"
 msgstr "Belongs to {owner}"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1557
+#: src/lib/settingCopy.generated.ts:1568
 msgid "area.Best songs"
 msgstr "Best songs"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1558
+#: src/lib/settingCopy.generated.ts:1569
 msgid "area.Best videos with sound"
 msgstr "Best videos with sound"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1559
+#: src/lib/settingCopy.generated.ts:1570
 msgid "area.Better voice"
 msgstr "Better voice"
 
@@ -3917,7 +3927,7 @@ msgid "Blocked"
 msgstr "Blocked"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1560
+#: src/lib/settingCopy.generated.ts:1571
 msgid "area.Blocked sites"
 msgstr "Blocked sites"
 
@@ -4360,8 +4370,8 @@ msgstr "Can someone reach into your house?"
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
 #: src/shell/pages/ActivityPage.tsx:156
-#: src/shell/pages/ChatPage.tsx:1701
-#: src/shell/pages/ChatPage.tsx:1717
+#: src/shell/pages/ChatPage.tsx:1705
+#: src/shell/pages/ChatPage.tsx:1721
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:181
 #: src/shell/pages/FilesPage.tsx:427
@@ -4530,7 +4540,7 @@ msgid "setting.generation.kids_daily_videos.label"
 msgstr "Cartoon videos a child can make each day"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1518
+#: src/lib/settingCopy.generated.ts:1529
 msgid "setting.weather.unit.option_label.celsius"
 msgstr "Celsius"
 
@@ -4623,7 +4633,7 @@ msgid "setting.music.eq_preset.does"
 msgstr "Changes the tone of the music you play."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1561
+#: src/lib/settingCopy.generated.ts:1572
 msgid "area.Changing pictures"
 msgstr "Changing pictures"
 
@@ -4669,7 +4679,7 @@ msgstr "Charles"
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/pages/ChatPage.tsx:1771
+#: src/shell/pages/ChatPage.tsx:1775
 #: src/shell/pages/CompanionsPage.tsx:162
 #: src/shell/pages/CompanionsPage.tsx:167
 #: src/shell/pages/settings/settingsBackLink.ts:52
@@ -4678,7 +4688,7 @@ msgid "Chat"
 msgstr "Chat"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1562
+#: src/lib/settingCopy.generated.ts:1573
 msgid "area.Chat"
 msgstr "Chat"
 
@@ -4693,7 +4703,7 @@ msgid "Chat always comes first. Coding waits or slows down, never chat. See what
 msgstr "Chat always comes first. Coding waits or slows down, never chat. See what is running on the"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1563
+#: src/lib/settingCopy.generated.ts:1574
 msgid "area.Chat and AI"
 msgstr "Chat and AI"
 
@@ -4728,7 +4738,7 @@ msgid "setting.engines.chat.tier.standard.label"
 msgstr "Chat at Standard"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1564
+#: src/lib/settingCopy.generated.ts:1575
 msgid "area.Chat can look at pictures"
 msgstr "Chat can look at pictures"
 
@@ -4836,7 +4846,7 @@ msgid "failure.composer.gpu.teen"
 msgstr "Chat needs a reboot. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1565
+#: src/lib/settingCopy.generated.ts:1576
 msgid "area.Chat pause"
 msgstr "Chat pause"
 
@@ -4851,11 +4861,11 @@ msgid "Chat runs through the MaiPai Stack."
 msgstr "Chat runs through the MaiPai Stack."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1140
-#: src/shell/pages/ChatPage.tsx:1521
-#: src/shell/pages/ChatPage.tsx:1521
-#: src/shell/pages/ChatPage.tsx:1939
-#: src/shell/pages/ChatPage.tsx:1939
+#: src/shell/pages/ChatPage.tsx:1141
+#: src/shell/pages/ChatPage.tsx:1525
+#: src/shell/pages/ChatPage.tsx:1525
+#: src/shell/pages/ChatPage.tsx:1943
+#: src/shell/pages/ChatPage.tsx:1943
 msgid "Chat settings"
 msgstr "Chat settings"
 
@@ -5101,7 +5111,7 @@ msgid "setting.safety.alarm.child_line.label"
 msgstr "Child safety alarm line"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1566
+#: src/lib/settingCopy.generated.ts:1577
 msgid "area.Children and teens"
 msgstr "Children and teens"
 
@@ -5499,7 +5509,7 @@ msgid "Choose which sections show on Home and the order they come in."
 msgstr "Choose which sections show on Home and the order they come in."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1514
+#: src/lib/settingCopy.generated.ts:1525
 msgid "setting.weather.unit.does"
 msgstr "Chooses degrees Fahrenheit or Celsius for weather answers and the Weather app."
 
@@ -5754,7 +5764,7 @@ msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size
 msgstr "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1567
+#: src/lib/settingCopy.generated.ts:1578
 msgid "area.Clearer songs"
 msgstr "Clearer songs"
 
@@ -5785,7 +5795,7 @@ msgid "Clock"
 msgstr "Clock"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1568
+#: src/lib/settingCopy.generated.ts:1579
 msgid "area.Clock"
 msgstr "Clock"
 
@@ -5811,7 +5821,7 @@ msgstr "Clone"
 #: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:271
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1743
+#: src/shell/pages/ChatPage.tsx:1747
 #: src/shell/pages/MusicWorkspacePage.tsx:193
 #: src/shell/pages/status/StatusBoard.tsx:114
 #: src/shell/pages/status/StatusBoard.tsx:133
@@ -5836,7 +5846,7 @@ msgid "Close apps for big jobs"
 msgstr "Close apps for big jobs"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:143
+#: src/shell/media/NowPlayingStage.tsx:142
 msgid "Close Now playing"
 msgstr "Close Now playing"
 
@@ -5861,7 +5871,7 @@ msgid "setting.coding.home_mode.option_label.coding"
 msgstr "Coding"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1569
+#: src/lib/settingCopy.generated.ts:1580
 msgid "area.Coding"
 msgstr "Coding"
 
@@ -5897,7 +5907,7 @@ msgid "Coding engine"
 msgstr "Coding engine"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1570
+#: src/lib/settingCopy.generated.ts:1581
 msgid "area.Coding helper"
 msgstr "Coding helper"
 
@@ -6009,7 +6019,7 @@ msgid "Commands"
 msgstr "Commands"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1571
+#: src/lib/settingCopy.generated.ts:1582
 msgid "area.Commands"
 msgstr "Commands"
 
@@ -6063,7 +6073,7 @@ msgid "Compare"
 msgstr "Compare"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1967
+#: src/shell/pages/ChatPage.tsx:1971
 msgid "Compare with the bare model"
 msgstr "Compare with the bare model"
 
@@ -6247,9 +6257,9 @@ msgstr "Conversation with {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:328
-#: src/shell/pages/ChatPage.tsx:1525
-#: src/shell/pages/ChatPage.tsx:1936
-#: src/shell/pages/ChatPage.tsx:1939
+#: src/shell/pages/ChatPage.tsx:1529
+#: src/shell/pages/ChatPage.tsx:1940
+#: src/shell/pages/ChatPage.tsx:1943
 msgid "Conversations"
 msgstr "Conversations"
 
@@ -6280,7 +6290,7 @@ msgid "Copy"
 msgstr "Copy"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1742
+#: src/shell/pages/ChatPage.tsx:1746
 #: src/shell/pages/TurnErrorDetails.tsx:94
 msgid "Copy details"
 msgstr "Copy details"
@@ -6472,7 +6482,7 @@ msgid "Could not copy. Select the text below instead."
 msgstr "Could not copy. Select the text below instead."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1551
+#: src/shell/pages/ChatPage.tsx:1555
 #: src/shell/pages/MicTestPage.tsx:50
 msgid "Could not copy. Select the text instead."
 msgstr "Could not copy. Select the text instead."
@@ -6495,7 +6505,7 @@ msgstr "Could not delete that command."
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:92
 #: src/apps/chat/chatProjects.tsx:150
-#: src/shell/pages/ChatPage.tsx:1257
+#: src/shell/pages/ChatPage.tsx:1261
 #: src/shell/pages/ProjectsPage.tsx:127
 msgid "Could not delete that project. Try again."
 msgstr "Could not delete that project. Try again."
@@ -6516,7 +6526,7 @@ msgid "Could not delete the voice sample."
 msgstr "Could not delete the voice sample."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:956
+#: src/shell/pages/ChatPage.tsx:957
 msgid "Could not delete this chat. Try again."
 msgstr "Could not delete this chat. Try again."
 
@@ -6531,7 +6541,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:388
+#: src/shell/Routes.tsx:393
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -6996,7 +7006,7 @@ msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:325
+#: src/shell/Routes.tsx:330
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -7048,7 +7058,7 @@ msgid "Could not remove those people."
 msgstr "Could not remove those people."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:948
+#: src/shell/pages/ChatPage.tsx:949
 msgid "Could not rename this chat. Try again."
 msgstr "Could not rename this chat. Try again."
 
@@ -7176,9 +7186,9 @@ msgid "Could not save the quick timer."
 msgstr "Could not save the quick timer."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:326
-#: src/shell/pages/ChatPage.tsx:366
-#: src/shell/pages/ChatPage.tsx:517
+#: src/shell/pages/ChatPage.tsx:327
+#: src/shell/pages/ChatPage.tsx:367
+#: src/shell/pages/ChatPage.tsx:518
 msgid "Could not save this chat's settings. Try again."
 msgstr "Could not save this chat's settings. Try again."
 
@@ -7340,8 +7350,8 @@ msgstr "Could not update reminders."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:103
-#: src/shell/pages/ChatPage.tsx:1238
-#: src/shell/pages/ChatPage.tsx:1248
+#: src/shell/pages/ChatPage.tsx:1242
+#: src/shell/pages/ChatPage.tsx:1252
 #: src/shell/pages/ProjectsPage.tsx:192
 msgid "Could not update that project. Try again."
 msgstr "Could not update that project. Try again."
@@ -7404,7 +7414,7 @@ msgid "Country"
 msgstr "Country"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:138
+#: src/shell/media/NowPlayingStage.tsx:137
 msgid "Cover"
 msgstr "Cover"
 
@@ -7421,7 +7431,7 @@ msgstr "Cover with a new voice"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:404
+#: src/shell/Routes.tsx:409
 msgid "Create"
 msgstr "Create"
 
@@ -7436,7 +7446,7 @@ msgid "Create a Coding key"
 msgstr "Create a Coding key"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1572
+#: src/lib/settingCopy.generated.ts:1583
 msgid "area.Create a command"
 msgstr "Create a command"
 
@@ -7699,7 +7709,7 @@ msgid "setting.ui.appearance.option_label.dark"
 msgstr "Dark"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1573
+#: src/lib/settingCopy.generated.ts:1584
 msgid "area.Data and privacy"
 msgstr "Data and privacy"
 
@@ -7812,12 +7822,12 @@ msgid "Degraded"
 msgstr "Degraded"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1516
+#: src/lib/settingCopy.generated.ts:1527
 msgid "setting.weather.unit.option.celsius"
 msgstr "Degrees Celsius, like 22 C."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1515
+#: src/lib/settingCopy.generated.ts:1526
 msgid "setting.weather.unit.option.fahrenheit"
 msgstr "Degrees Fahrenheit, like 72 F."
 
@@ -7869,7 +7879,7 @@ msgid "Delete all samples"
 msgstr "Delete all samples"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1703
+#: src/shell/pages/ChatPage.tsx:1707
 msgid "Delete chat and {media}"
 msgstr "Delete chat and {media}"
 
@@ -7908,7 +7918,7 @@ msgid "Delete this alarm?"
 msgstr "Delete this alarm?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1697
+#: src/shell/pages/ChatPage.tsx:1701
 msgid "Delete this chat?"
 msgstr "Delete this chat?"
 
@@ -7974,7 +7984,7 @@ msgid "Describe it, pick a sound, press Generate. Your songs, bands and albums s
 msgstr "Describe it, pick a sound, press Generate. Your songs, bands and albums stay on this Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1715
+#: src/shell/pages/ChatPage.tsx:1719
 msgid "Describe the changes to this {kind}"
 msgstr "Describe the changes to this {kind}"
 
@@ -8011,7 +8021,7 @@ msgid "Describe the sound in at least 3 characters to turn Generate on."
 msgstr "Describe the sound in at least 3 characters to turn Generate on."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1713
+#: src/shell/pages/ChatPage.tsx:1717
 msgid "Describe what you want changed. The original stays."
 msgstr "Describe what you want changed. The original stays."
 
@@ -8022,7 +8032,7 @@ msgid "Describe your song"
 msgstr "Describe your song"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1574
+#: src/lib/settingCopy.generated.ts:1585
 msgid "area.Describing pictures"
 msgstr "Describing pictures"
 
@@ -8062,7 +8072,7 @@ msgid "setting.generation.picture_detailed.enabled.label"
 msgstr "Detailed pictures"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1575
+#: src/lib/settingCopy.generated.ts:1586
 msgid "area.Detailed pictures"
 msgstr "Detailed pictures"
 
@@ -8077,7 +8087,7 @@ msgid "Details"
 msgstr "Details"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1551
+#: src/shell/pages/ChatPage.tsx:1555
 msgid "Details copied."
 msgstr "Details copied."
 
@@ -8087,7 +8097,7 @@ msgid "Detect speakers"
 msgstr "Detect speakers"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1576
+#: src/lib/settingCopy.generated.ts:1587
 msgid "area.Developer tools"
 msgstr "Developer tools"
 
@@ -8098,7 +8108,7 @@ msgid "Device schedules"
 msgstr "Device schedules"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1577
+#: src/lib/settingCopy.generated.ts:1588
 msgid "area.Devices"
 msgstr "Devices"
 
@@ -8321,7 +8331,7 @@ msgid "setting.tools.timer.mode.option_label.do"
 msgstr "Do"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1955
+#: src/shell/pages/ChatPage.tsx:1959
 #: src/shell/pages/FilesPage.tsx:165
 msgid "Document"
 msgstr "Document"
@@ -8465,7 +8475,7 @@ msgid "Download table as CSV"
 msgstr "Download table as CSV"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1578
+#: src/lib/settingCopy.generated.ts:1589
 msgid "area.Download Wikipedia, health and other offline books"
 msgstr "Download Wikipedia, health and other offline books"
 
@@ -8628,7 +8638,7 @@ msgid "Earlier"
 msgstr "Earlier"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1580
+#: src/lib/settingCopy.generated.ts:1591
 msgid "area.Ease of use"
 msgstr "Ease of use"
 
@@ -8838,7 +8848,7 @@ msgid "Engines"
 msgstr "Engines"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1581
+#: src/lib/settingCopy.generated.ts:1592
 msgid "area.Engines"
 msgstr "Engines"
 
@@ -8988,7 +8998,7 @@ msgid "setting.generation.picture_quick_model.option_label.ernie"
 msgstr "Ernie"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1579
+#: src/lib/settingCopy.generated.ts:1590
 msgid "area.ERNIE"
 msgstr "ERNIE"
 
@@ -9049,7 +9059,7 @@ msgid "setting.synths.real_people.option.all"
 msgstr "Every one is allowed."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1823
+#: src/shell/pages/ChatPage.tsx:1827
 msgid "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards."
 msgstr "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards."
 
@@ -9265,7 +9275,7 @@ msgid "setting.robot.face.color.label"
 msgstr "Face color"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1583
+#: src/lib/settingCopy.generated.ts:1594
 msgid "area.Face enrollment"
 msgstr "Face enrollment"
 
@@ -9285,7 +9295,7 @@ msgid "Faded ({count})"
 msgstr "Faded ({count})"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1517
+#: src/lib/settingCopy.generated.ts:1528
 msgid "setting.weather.unit.option_label.fahrenheit"
 msgstr "Fahrenheit"
 
@@ -9330,7 +9340,7 @@ msgid "Family"
 msgstr "Family"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1584
+#: src/lib/settingCopy.generated.ts:1595
 msgid "area.Family"
 msgstr "Family"
 
@@ -9365,7 +9375,7 @@ msgid "setting.generation.video_tier.option.standard"
 msgstr "Fast, with sound."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1585
+#: src/lib/settingCopy.generated.ts:1596
 msgid "area.Faster on Apple chips"
 msgstr "Faster on Apple chips"
 
@@ -9485,7 +9495,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:325
+#: src/shell/Routes.tsx:330
 msgid "Find me"
 msgstr "Find me"
 
@@ -9525,7 +9535,7 @@ msgid "setting.generation.picture_tier.option.boost"
 msgstr "Finer detail, and it takes longer."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1586
+#: src/lib/settingCopy.generated.ts:1597
 msgid "area.Finer stem splitter"
 msgstr "Finer stem splitter"
 
@@ -9603,7 +9613,7 @@ msgid "setting.music.eq_preset.option_label.flat"
 msgstr "Flat"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1582
+#: src/lib/settingCopy.generated.ts:1593
 msgid "area.FLUX.2 Klein"
 msgstr "FLUX.2 Klein"
 
@@ -9718,7 +9728,7 @@ msgid "For example: 96"
 msgstr "For example: 96"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1715
+#: src/shell/pages/ChatPage.tsx:1719
 msgid "For example: make it night time, add a red hat"
 msgstr "For example: make it night time, add a red hat"
 
@@ -9776,7 +9786,7 @@ msgid "Formality"
 msgstr "Formality"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:199
+#: src/shell/media/NowPlayingStage.tsx:198
 msgid "Forward 30 seconds"
 msgstr "Forward 30 seconds"
 
@@ -9988,7 +9998,7 @@ msgid "Gender"
 msgstr "Gender"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1587
+#: src/lib/settingCopy.generated.ts:1598
 msgid "area.General"
 msgstr "General"
 
@@ -10042,6 +10052,11 @@ msgstr "Generated storage warning (%)"
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:18
 msgid "setting.alarms.sound.option_label.gentle"
+msgstr "Gentle"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1513
+msgid "setting.voice.talk_over.option_label.gentle"
 msgstr "Gentle"
 
 #. js-lingui-explicit-id
@@ -10325,7 +10340,7 @@ msgid "setting.music.library_sort.option.creator"
 msgstr "Grouped by artist or creator."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1639
+#: src/shell/pages/ChatPage.tsx:1643
 msgid "Guard:"
 msgstr "Guard:"
 
@@ -10340,7 +10355,7 @@ msgid "setting.person.voice_print.enrollment.consent_guest"
 msgstr "Guests cannot enroll a voice print."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1588
+#: src/lib/settingCopy.generated.ts:1599
 msgid "area.Guitar and piano parts"
 msgstr "Guitar and piano parts"
 
@@ -10431,7 +10446,7 @@ msgid "Hero source"
 msgstr "Hero source"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1589
+#: src/lib/settingCopy.generated.ts:1600
 msgid "area.Hey Jarvis"
 msgstr "Hey Jarvis"
 
@@ -10518,8 +10533,8 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:402
-#: src/shell/Routes.tsx:454
+#: src/shell/Routes.tsx:407
+#: src/shell/Routes.tsx:459
 msgid "Home"
 msgstr "Home"
 
@@ -10554,7 +10569,7 @@ msgid "setting.engines.stack.where.option.this_computer"
 msgstr "Home and the engine share one computer."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1590
+#: src/lib/settingCopy.generated.ts:1601
 msgid "area.Home Assistant"
 msgstr "Home Assistant"
 
@@ -11112,6 +11127,11 @@ msgid "Home fetches downloads, updates, and searches you ask for the way you wou
 msgstr "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1508
+msgid "setting.voice.talk_over.does"
+msgstr "Home gives a short \"mm-hm\" the moment your sentence sounds finished, and the answer follows."
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:125
 msgid "Home goes online for you"
 msgstr "Home goes online for you"
@@ -11284,6 +11304,11 @@ msgid "Home uses its ready-to-use default folder."
 msgstr "Home uses its ready-to-use default folder."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1509
+msgid "setting.voice.talk_over.option.off"
+msgstr "Home waits until you have clearly stopped before it makes a sound."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsSectionContent.tsx:50
 msgid "Home will restart after this is saved. {reach} Continue?"
 msgstr "Home will restart after this is saved. {reach} Continue?"
@@ -11347,7 +11372,7 @@ msgid "House"
 msgstr "House"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1591
+#: src/lib/settingCopy.generated.ts:1602
 msgid "area.House"
 msgstr "House"
 
@@ -11357,7 +11382,7 @@ msgid "setting.person.locale.option_label.household"
 msgstr "Household"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1592
+#: src/lib/settingCopy.generated.ts:1603
 msgid "area.Household"
 msgstr "Household"
 
@@ -11367,7 +11392,7 @@ msgid "Household"
 msgstr "Household"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1593
+#: src/lib/settingCopy.generated.ts:1604
 msgid "area.Household and people"
 msgstr "Household and people"
 
@@ -11474,6 +11499,11 @@ msgstr "How it talks"
 #: src/lib/settingCopy.generated.ts:572
 msgid "setting.household.conversation_retention_days.help"
 msgstr "How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1516
+msgid "setting.voice.talk_over_window_ms.help"
+msgstr "How long Home keeps going while you both talk at once before it decides whether you are done. Shorter cuts in less; longer lets more of your sentence through. 500 to 1200 milliseconds, usually 800."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:750
@@ -12278,7 +12308,7 @@ msgid "Instrumental"
 msgstr "Instrumental"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1594
+#: src/lib/settingCopy.generated.ts:1605
 msgid "area.Integrations"
 msgstr "Integrations"
 
@@ -12293,7 +12323,7 @@ msgid "setting.news.default_topics.teen.option.world"
 msgstr "International news: events, governments and conflicts outside the reader's own region."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1595
+#: src/lib/settingCopy.generated.ts:1606
 msgid "area.Internet check"
 msgstr "Internet check"
 
@@ -12488,7 +12518,7 @@ msgid "Keep"
 msgstr "Keep"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1702
+#: src/shell/pages/ChatPage.tsx:1706
 msgid "Keep {media}"
 msgstr "Keep {media}"
 
@@ -12798,7 +12828,7 @@ msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1596
+#: src/lib/settingCopy.generated.ts:1607
 msgid "area.Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
@@ -12813,7 +12843,7 @@ msgid "setting.news.default_topics.child.option_label.kids"
 msgstr "Kids"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1597
+#: src/lib/settingCopy.generated.ts:1608
 msgid "area.Kids"
 msgstr "Kids"
 
@@ -13182,6 +13212,11 @@ msgid "setting.coding.adults_by_default.does"
 msgstr "Lets each person with full controls start with access."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1507
+msgid "setting.voice.talk_over.help"
+msgstr "Lets Home answer with a short \"mm-hm\" the moment your sentence sounds finished, the way a person does, with the answer right after. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:877
 msgid "setting.resources.close_apps.mode.does"
 msgstr "Lets Home quit chosen programs when a large task needs the room."
@@ -13371,7 +13406,7 @@ msgstr "Levels and models"
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:405
+#: src/shell/Routes.tsx:410
 msgid "Library"
 msgstr "Library"
 
@@ -13461,7 +13496,7 @@ msgid "Lights"
 msgstr "Lights"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:196
+#: src/shell/media/NowPlayingStage.tsx:195
 msgid "Like"
 msgstr "Like"
 
@@ -13476,7 +13511,7 @@ msgid "Limits"
 msgstr "Limits"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1598
+#: src/lib/settingCopy.generated.ts:1609
 msgid "area.Limits"
 msgstr "Limits"
 
@@ -14117,7 +14152,7 @@ msgid "setting.ui.look.label"
 msgstr "Look"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1599
+#: src/lib/settingCopy.generated.ts:1610
 msgid "area.Look and ease"
 msgstr "Look and ease"
 
@@ -14162,7 +14197,7 @@ msgid "Looking for parts nothing uses."
 msgstr "Looking for parts nothing uses."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1600
+#: src/lib/settingCopy.generated.ts:1611
 msgid "area.Looking up songs online"
 msgstr "Looking up songs online"
 
@@ -14281,8 +14316,8 @@ msgstr "LTX-2.5"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:85
-#: src/shell/media/NowPlayingStage.tsx:149
-#: src/shell/media/NowPlayingStage.tsx:200
+#: src/shell/media/NowPlayingStage.tsx:148
+#: src/shell/media/NowPlayingStage.tsx:199
 #: src/shell/pages/MusicWorkspacePage.tsx:246
 #: src/shell/pages/MusicWorkspacePage.tsx:256
 msgid "Lyrics"
@@ -14355,7 +14390,7 @@ msgid "Maintenance"
 msgstr "Maintenance"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1601
+#: src/lib/settingCopy.generated.ts:1612
 msgid "area.Maintenance"
 msgstr "Maintenance"
 
@@ -14591,7 +14626,7 @@ msgid "Make Inspired voice"
 msgstr "Make Inspired voice"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1718
+#: src/shell/pages/ChatPage.tsx:1722
 msgid "Make it"
 msgstr "Make it"
 
@@ -14872,7 +14907,7 @@ msgid "Man"
 msgstr "Man"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1602
+#: src/lib/settingCopy.generated.ts:1613
 msgid "area.Manage"
 msgstr "Manage"
 
@@ -15023,13 +15058,13 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:403
-#: src/shell/Routes.tsx:454
+#: src/shell/Routes.tsx:408
+#: src/shell/Routes.tsx:459
 msgid "Media"
 msgstr "Media"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1603
+#: src/lib/settingCopy.generated.ts:1614
 msgid "area.Media minutes"
 msgstr "Media minutes"
 
@@ -15169,7 +15204,7 @@ msgstr "Microphone access is unavailable. Check your browser permission and try 
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1730
+#: src/shell/pages/ChatPage.tsx:1734
 msgid "Microphone help"
 msgstr "Microphone help"
 
@@ -15285,12 +15320,12 @@ msgid "Model"
 msgstr "Model"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1604
+#: src/lib/settingCopy.generated.ts:1615
 msgid "area.Model per job"
 msgstr "Model per job"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1641
+#: src/shell/pages/ChatPage.tsx:1645
 msgid "Model:"
 msgstr "Model:"
 
@@ -15521,7 +15556,7 @@ msgid "Music"
 msgstr "Music"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1605
+#: src/lib/settingCopy.generated.ts:1616
 msgid "area.Music"
 msgstr "Music"
 
@@ -15662,7 +15697,7 @@ msgid "Name the album and say how it sounds. Home adds the cover and the songs i
 msgstr "Name the album and say how it sounds. Home adds the cover and the songs in chat."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1606
+#: src/lib/settingCopy.generated.ts:1617
 msgid "area.Name things in a picture"
 msgstr "Name things in a picture"
 
@@ -15684,6 +15719,11 @@ msgstr "Names of your own devices, separated by commas, that may use coding thro
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1501
 msgid "setting.voice.hesitations.option_label.natural"
+msgstr "Natural"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1514
+msgid "setting.voice.talk_over.option_label.natural"
 msgstr "Natural"
 
 #. js-lingui-explicit-id
@@ -15789,12 +15829,12 @@ msgid "Needs your choice"
 msgstr "Needs your choice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1607
+#: src/lib/settingCopy.generated.ts:1618
 msgid "area.Network"
 msgstr "Network"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1608
+#: src/lib/settingCopy.generated.ts:1619
 msgid "area.Network and access"
 msgstr "Network and access"
 
@@ -15885,7 +15925,7 @@ msgid "New alarm"
 msgstr "New alarm"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1512
+#: src/shell/pages/ChatPage.tsx:1516
 msgid "New chat"
 msgstr "New chat"
 
@@ -16051,7 +16091,7 @@ msgid "Next"
 msgstr "Next"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:188
+#: src/shell/media/NowPlayingStage.tsx:187
 msgid "Next song"
 msgstr "Next song"
 
@@ -16891,7 +16931,7 @@ msgid "Nothing is loaded right now."
 msgstr "Nothing is loaded right now."
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:162
+#: src/shell/media/NowPlayingStage.tsx:161
 msgid "Nothing is queued after this song."
 msgstr "Nothing is queued after this song."
 
@@ -17001,7 +17041,7 @@ msgid "Notifications"
 msgstr "Notifications"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1609
+#: src/lib/settingCopy.generated.ts:1620
 msgid "area.Notifications"
 msgstr "Notifications"
 
@@ -17183,6 +17223,11 @@ msgid "setting.voice.hesitations.option_label.off"
 msgstr "Off"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1512
+msgid "setting.voice.talk_over.option_label.off"
+msgstr "Off"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1216
 msgid "setting.stack.engines.stt.smart_turn.help"
 msgstr "Off by default until measured. When on, Home asks the MaiPai Stack's end-of-turn model whether a pause is the end of the sentence before it answers. If the Stack cannot answer in a quarter of a second, Home answers after the usual short silence."
@@ -17208,7 +17253,7 @@ msgid "setting.install.recommended_auto_on_upgrade.help"
 msgstr "Off by default. When on, the extras Home recommends for this computer (the Detailed video model among them, about 74 GB) download as soon as an admin accepts the licences, with no extra click. Off means an admin presses one button."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1524
+#: src/lib/settingCopy.generated.ts:1535
 msgid "setting.reason.off_until_guardian.admin.off"
 msgstr "Off for {person} until you turn it on."
 
@@ -17218,7 +17263,7 @@ msgid "setting.synths.real_people.help"
 msgstr "Off hides every synth based on a real person. Ask means each one needs a parent to say yes first, and a yes lasts for that synth. All means every one is allowed. A parent or admin sets this for a child or teen."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1523
+#: src/lib/settingCopy.generated.ts:1534
 msgid "setting.reason.off_until_guardian.child.off"
 msgstr "Off until {admin} turns it on."
 
@@ -17276,7 +17321,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.offline"
 msgstr "Offline"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1610
+#: src/lib/settingCopy.generated.ts:1621
 msgid "area.Offline books"
 msgstr "Offline books"
 
@@ -17296,7 +17341,7 @@ msgid "Offline copies could not be removed. Try again in this browser."
 msgstr "Offline copies could not be removed. Try again in this browser."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1611
+#: src/lib/settingCopy.generated.ts:1622
 msgid "area.Offline data"
 msgstr "Offline data"
 
@@ -17609,7 +17654,7 @@ msgid "Online"
 msgstr "Online"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1612
+#: src/lib/settingCopy.generated.ts:1623
 msgid "area.Online radio and podcasts"
 msgstr "Online radio and podcasts"
 
@@ -17989,12 +18034,12 @@ msgid "Other running timers"
 msgstr "Other running timers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1968
+#: src/shell/pages/ChatPage.tsx:1972
 msgid "Our reply beside the same model with no routing, packages, persona or guards"
 msgstr "Our reply beside the same model with no routing, packages, persona or guards"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1627
+#: src/shell/pages/ChatPage.tsx:1631
 msgid "Ours"
 msgstr "Ours"
 
@@ -18009,6 +18054,11 @@ msgid "Outbound connections"
 msgstr "Outbound connections"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1515
+msgid "setting.voice.talk_over_window_ms.label"
+msgstr "Overlap time (ms)"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1284
 msgid "setting.storage.person.cap_bytes.help"
 msgstr "Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin."
@@ -18019,7 +18069,7 @@ msgid "Overview"
 msgstr "Overview"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1613
+#: src/lib/settingCopy.generated.ts:1624
 msgid "area.Overview"
 msgstr "Overview"
 
@@ -18186,7 +18236,7 @@ msgid "Password"
 msgstr "Password"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1937
+#: src/shell/pages/ChatPage.tsx:1941
 msgid "Past conversations"
 msgstr "Past conversations"
 
@@ -18260,7 +18310,7 @@ msgid "People"
 msgstr "People"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1614
+#: src/lib/settingCopy.generated.ts:1625
 msgid "area.People"
 msgstr "People"
 
@@ -18297,7 +18347,7 @@ msgid "Performance"
 msgstr "Performance"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1615
+#: src/lib/settingCopy.generated.ts:1626
 msgid "area.Performance"
 msgstr "Performance"
 
@@ -18308,7 +18358,7 @@ msgid "Person"
 msgstr "Person"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1642
+#: src/shell/pages/ChatPage.tsx:1646
 msgid "Persona in effect:"
 msgstr "Persona in effect:"
 
@@ -18334,7 +18384,7 @@ msgid "setting.persona.active_id.label"
 msgstr "Personality"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1616
+#: src/lib/settingCopy.generated.ts:1627
 msgid "area.Personality"
 msgstr "Personality"
 
@@ -18344,7 +18394,7 @@ msgid "Personality notes"
 msgstr "Personality notes"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1617
+#: src/lib/settingCopy.generated.ts:1628
 msgid "area.Personalization"
 msgstr "Personalization"
 
@@ -18606,12 +18656,12 @@ msgid "setting.generation.picture_quality.label"
 msgstr "Picture quality"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1618
+#: src/lib/settingCopy.generated.ts:1629
 msgid "area.Picture reader"
 msgstr "Picture reader"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1619
+#: src/lib/settingCopy.generated.ts:1630
 msgid "area.Picture tools"
 msgstr "Picture tools"
 
@@ -18635,7 +18685,7 @@ msgid "Pictures"
 msgstr "Pictures"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1620
+#: src/lib/settingCopy.generated.ts:1631
 msgid "area.Pictures"
 msgstr "Pictures"
 
@@ -18695,7 +18745,7 @@ msgid "setting.storage.library.pictures.threshold_percent.label"
 msgstr "Pictures storage warning (%)"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1621
+#: src/lib/settingCopy.generated.ts:1632
 msgid "area.Pictures, videos and music"
 msgstr "Pictures, videos and music"
 
@@ -18772,7 +18822,7 @@ msgid "setting.maps.places.help"
 msgstr "Places saved for this surface."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1511
+#: src/lib/settingCopy.generated.ts:1522
 msgid "setting.weather.places.help"
 msgstr "Places saved for weather answers."
 
@@ -18905,7 +18955,7 @@ msgid "setting.topics.teen.risk.option_label.redirect"
 msgstr "Point to a trusted adult or doctor"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1622
+#: src/lib/settingCopy.generated.ts:1633
 msgid "area.Port"
 msgstr "Port"
 
@@ -19064,7 +19114,7 @@ msgid "Previous"
 msgstr "Previous"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:186
+#: src/shell/media/NowPlayingStage.tsx:185
 msgid "Previous song"
 msgstr "Previous song"
 
@@ -19081,12 +19131,12 @@ msgid "Privacy"
 msgstr "Privacy"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1623
+#: src/lib/settingCopy.generated.ts:1634
 msgid "area.Privacy"
 msgstr "Privacy"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1624
+#: src/lib/settingCopy.generated.ts:1635
 msgid "area.Privacy and safety"
 msgstr "Privacy and safety"
 
@@ -19112,12 +19162,12 @@ msgid "Profile"
 msgstr "Profile"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1625
+#: src/lib/settingCopy.generated.ts:1636
 msgid "area.Profile"
 msgstr "Profile"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1626
+#: src/lib/settingCopy.generated.ts:1637
 msgid "area.Profile and sign-in"
 msgstr "Profile and sign-in"
 
@@ -19260,7 +19310,7 @@ msgid "setting.generation.picture_quick_model.label"
 msgstr "Quick picture model"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1627
+#: src/lib/settingCopy.generated.ts:1638
 msgid "area.Quick pictures"
 msgstr "Quick pictures"
 
@@ -19305,7 +19355,7 @@ msgid "setting.resources.quiet_seconds.label"
 msgstr "Quiet time before chat is simplified"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1628
+#: src/lib/settingCopy.generated.ts:1639
 msgid "area.Qwen-Image (best pictures)"
 msgstr "Qwen-Image (best pictures)"
 
@@ -19554,7 +19604,7 @@ msgid "setting.reference.download.when.label"
 msgstr "Reference download time"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1629
+#: src/lib/settingCopy.generated.ts:1640
 msgid "area.Reference library"
 msgstr "Reference library"
 
@@ -19655,7 +19705,7 @@ msgid "Remix and edit"
 msgstr "Remix and edit"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1712
+#: src/shell/pages/ChatPage.tsx:1716
 msgid "Remix this {kind}"
 msgstr "Remix this {kind}"
 
@@ -19924,7 +19974,7 @@ msgid "Repairs"
 msgstr "Repairs"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1630
+#: src/lib/settingCopy.generated.ts:1641
 msgid "area.Repairs"
 msgstr "Repairs"
 
@@ -19940,7 +19990,7 @@ msgid "Repeat"
 msgstr "Repeat"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:126
+#: src/shell/media/NowPlayingStage.tsx:125
 msgid "Repeat all songs"
 msgstr "Repeat all songs"
 
@@ -19955,7 +20005,7 @@ msgid "Repeat ends"
 msgstr "Repeat ends"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:126
+#: src/shell/media/NowPlayingStage.tsx:125
 msgid "Repeat off"
 msgstr "Repeat off"
 
@@ -19965,7 +20015,7 @@ msgid "Repeat on"
 msgstr "Repeat on"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:126
+#: src/shell/media/NowPlayingStage.tsx:125
 msgid "Repeat one song"
 msgstr "Repeat one song"
 
@@ -20419,7 +20469,7 @@ msgid "Robot"
 msgstr "Robot"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1631
+#: src/lib/settingCopy.generated.ts:1642
 msgid "area.Robot"
 msgstr "Robot"
 
@@ -20571,7 +20621,7 @@ msgid "setting.home.robots.enabled.label"
 msgstr "Robots"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1632
+#: src/lib/settingCopy.generated.ts:1643
 msgid "area.Robots"
 msgstr "Robots"
 
@@ -20644,7 +20694,7 @@ msgid "Route taken"
 msgstr "Route taken"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1635
+#: src/shell/pages/ChatPage.tsx:1639
 msgid "Route:"
 msgstr "Route:"
 
@@ -20665,7 +20715,7 @@ msgid "Rows per page:"
 msgstr "Rows per page:"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1638
+#: src/shell/pages/ChatPage.tsx:1642
 msgid "Rules fired:"
 msgstr "Rules fired:"
 
@@ -20696,7 +20746,7 @@ msgid "Run the test"
 msgstr "Run the test"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1633
+#: src/shell/pages/ChatPage.tsx:1637
 msgid "Rung:"
 msgstr "Rung:"
 
@@ -21169,7 +21219,7 @@ msgid "Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1633
+#: src/lib/settingCopy.generated.ts:1644
 msgid "area.Search"
 msgstr "Search"
 
@@ -21185,12 +21235,12 @@ msgid "Search again"
 msgstr "Search again"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1634
+#: src/lib/settingCopy.generated.ts:1645
 msgid "area.Search and memory"
 msgstr "Search and memory"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1635
+#: src/lib/settingCopy.generated.ts:1646
 msgid "area.Search and web"
 msgstr "Search and web"
 
@@ -21206,8 +21256,8 @@ msgid "Search articles"
 msgstr "Search articles"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1522
-#: src/shell/pages/ChatPage.tsx:1939
+#: src/shell/pages/ChatPage.tsx:1526
+#: src/shell/pages/ChatPage.tsx:1943
 msgid "Search chats"
 msgstr "Search chats"
 
@@ -21476,7 +21526,7 @@ msgstr "see the live roster"
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
-#: src/shell/media/NowPlayingStage.tsx:180
+#: src/shell/media/NowPlayingStage.tsx:179
 msgid "Seek"
 msgstr "Seek"
 
@@ -21572,7 +21622,7 @@ msgid "setting.health.keep_warm.does"
 msgstr "Sends a tiny test message every few minutes so replies start fast."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1636
+#: src/lib/settingCopy.generated.ts:1647
 msgid "area.Sensitive subjects with teen controls"
 msgstr "Sensitive subjects with teen controls"
 
@@ -21582,7 +21632,7 @@ msgid "Service, e.g. turn_off"
 msgstr "Service, e.g. turn_off"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1637
+#: src/lib/settingCopy.generated.ts:1648
 msgid "area.Session lock"
 msgstr "Session lock"
 
@@ -21626,17 +21676,17 @@ msgid "Set as default"
 msgstr "Set as default"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1529
+#: src/lib/settingCopy.generated.ts:1540
 msgid "setting.reason.household_admin.child.line"
 msgstr "Set for the whole home by {admin}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1530
+#: src/lib/settingCopy.generated.ts:1541
 msgid "setting.reason.household_admin.teen.line"
 msgstr "Set for the whole home by {admin}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1531
+#: src/lib/settingCopy.generated.ts:1542
 msgid "setting.reason.household_admin.adult.line"
 msgstr "Set for the whole home by {admin}."
 
@@ -21828,12 +21878,12 @@ msgstr "Setting up your AI"
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:454
+#: src/shell/Routes.tsx:459
 msgid "Settings"
 msgstr "Settings"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1638
+#: src/lib/settingCopy.generated.ts:1649
 msgid "area.Settings"
 msgstr "Settings"
 
@@ -21926,7 +21976,7 @@ msgid "api.minor.share_children_off"
 msgstr "Sharing is turned off for children. Ask a grown-up to share this for you."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1639
+#: src/lib/settingCopy.generated.ts:1650
 msgid "area.Sharing the computer"
 msgstr "Sharing the computer"
 
@@ -22003,7 +22053,7 @@ msgid "Show all files"
 msgstr "Show all files"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1810
+#: src/shell/pages/ChatPage.tsx:1814
 msgid "Show conversations"
 msgstr "Show conversations"
 
@@ -22046,7 +22096,7 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:364
+#: src/shell/Routes.tsx:369
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -22081,7 +22131,7 @@ msgid "setting.news.images.help"
 msgstr "Show the picture each news story came with. Home asks the publisher for a picture once, the first time a screen shows that story, and keeps a copy; it never fetches pictures in the background. Turn this off and News shows text only."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1506
+#: src/lib/settingCopy.generated.ts:1517
 msgid "setting.weather.alerts.label"
 msgstr "Show weather alerts"
 
@@ -22186,7 +22236,7 @@ msgid "setting.companions.dock.help"
 msgstr "Shows your companion at the top right of every page. Hover or tap it to open the companion pane. Turn it off to hide the companion everywhere."
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:185
+#: src/shell/media/NowPlayingStage.tsx:184
 msgid "Shuffle"
 msgstr "Shuffle"
 
@@ -22249,7 +22299,7 @@ msgid "Signed in away from home"
 msgstr "Signed in away from home"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1640
+#: src/lib/settingCopy.generated.ts:1651
 msgid "area.Signed-in devices"
 msgstr "Signed-in devices"
 
@@ -22388,7 +22438,7 @@ msgid "Skill"
 msgstr "Skill"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1641
+#: src/lib/settingCopy.generated.ts:1652
 msgid "area.Skills"
 msgstr "Skills"
 
@@ -22705,7 +22755,7 @@ msgid "Song"
 msgstr "Song"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:184
+#: src/shell/media/NowPlayingStage.tsx:183
 msgid "Song controls"
 msgstr "Song controls"
 
@@ -22901,7 +22951,7 @@ msgid "Split into stems (done)"
 msgstr "Split into stems (done)"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1642
+#: src/lib/settingCopy.generated.ts:1653
 msgid "area.Split songs into stems"
 msgstr "Split songs into stems"
 
@@ -23064,7 +23114,7 @@ msgid "Standard"
 msgstr "Standard"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1643
+#: src/lib/settingCopy.generated.ts:1654
 msgid "area.Standard chat AI"
 msgstr "Standard chat AI"
 
@@ -23079,7 +23129,7 @@ msgid "setting.generation.picture_tier.help"
 msgstr "Standard is fast. Boost has finer detail and takes longer. Anyone can pick a level for one picture."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1644
+#: src/lib/settingCopy.generated.ts:1655
 msgid "area.Standard voice"
 msgstr "Standard voice"
 
@@ -23273,7 +23323,7 @@ msgid "Status"
 msgstr "Status"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1645
+#: src/lib/settingCopy.generated.ts:1656
 msgid "area.Status"
 msgstr "Status"
 
@@ -23291,7 +23341,7 @@ msgid "Stems"
 msgstr "Stems"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1646
+#: src/lib/settingCopy.generated.ts:1657
 msgid "area.Stems"
 msgstr "Stems"
 
@@ -23477,7 +23527,7 @@ msgid "Storage"
 msgstr "Storage"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1647
+#: src/lib/settingCopy.generated.ts:1658
 msgid "area.Storage"
 msgstr "Storage"
 
@@ -23487,7 +23537,7 @@ msgid "Storage & hardware"
 msgstr "Storage & hardware"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1648
+#: src/lib/settingCopy.generated.ts:1659
 msgid "area.Storage and backups"
 msgstr "Storage and backups"
 
@@ -23571,7 +23621,7 @@ msgid "Styles"
 msgstr "Styles"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1649
+#: src/lib/settingCopy.generated.ts:1660
 msgid "area.Styles"
 msgstr "Styles"
 
@@ -23657,7 +23707,7 @@ msgid "Synth actions"
 msgstr "Synth actions"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1650
+#: src/lib/settingCopy.generated.ts:1661
 msgid "area.Synth controls"
 msgstr "Synth controls"
 
@@ -23679,7 +23729,7 @@ msgid "Synths"
 msgstr "Synths"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1651
+#: src/lib/settingCopy.generated.ts:1662
 msgid "area.Synths"
 msgstr "Synths"
 
@@ -23733,6 +23783,11 @@ msgstr "Takes"
 #: src/shell/AmbientCompanionPane.tsx:341
 msgid "Talk"
 msgstr "Talk"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1506
+msgid "setting.voice.talk_over.label"
+msgstr "Talk before I finish"
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:271
@@ -23807,7 +23862,7 @@ msgid "Teen protections apply, whichever companion is chosen. Still no adult con
 msgstr "Teen protections apply, whichever companion is chosen. Still no adult content."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1652
+#: src/lib/settingCopy.generated.ts:1663
 msgid "area.Teens"
 msgstr "Teens"
 
@@ -23823,7 +23878,7 @@ msgid "Teens and children"
 msgstr "Teens and children"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1653
+#: src/lib/settingCopy.generated.ts:1664
 msgid "area.Telegram"
 msgstr "Telegram"
 
@@ -23933,7 +23988,7 @@ msgid "setting.engines.stack.remote.host.does"
 msgstr "Tells Home which machine to reach for the engine."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1512
+#: src/lib/settingCopy.generated.ts:1523
 msgid "setting.weather.unit.label"
 msgstr "Temperature unit"
 
@@ -24181,7 +24236,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:325
+#: src/shell/Routes.tsx:330
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
@@ -24531,7 +24586,7 @@ msgid "The backup from {backupDate} will replace everything in MaiPai Home the n
 msgstr "The backup from {backupDate} will replace everything in MaiPai Home the next time it starts. Nothing has changed yet. Restart MaiPai Home to finish{value}."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1653
+#: src/shell/pages/ChatPage.tsx:1657
 msgid "The bare reply was refused by the same safety pass a real turn uses."
 msgstr "The bare reply was refused by the same safety pass a real turn uses."
 
@@ -24656,7 +24711,7 @@ msgid "setting.music.dj.does"
 msgstr "The DJ talks between songs."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1956
+#: src/shell/pages/ChatPage.tsx:1960
 msgid "The document from this reply"
 msgstr "The document from this reply"
 
@@ -24752,7 +24807,7 @@ msgid "The helper works only when Home runs on a Mac, so Close apps stays Off on
 msgstr "The helper works only when Home runs on a Mac, so Close apps stays Off on this computer."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1654
+#: src/lib/settingCopy.generated.ts:1665
 msgid "area.The home"
 msgstr "The home"
 
@@ -25066,7 +25121,7 @@ msgid "setting.maps.default_place.help"
 msgstr "The place used by default on this surface."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1509
+#: src/lib/settingCopy.generated.ts:1520
 msgid "setting.weather.default_place.help"
 msgstr "The place weather uses when you do not name one."
 
@@ -25151,22 +25206,22 @@ msgid "setting.robot.vision.option.on_demand"
 msgstr "The robot looks only when someone asks it to, for example 'what do you see?'."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1533
+#: src/lib/settingCopy.generated.ts:1544
 msgid "setting.reason.stricter_robot.child.line"
 msgstr "The robot's own setting is stricter."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1534
+#: src/lib/settingCopy.generated.ts:1545
 msgid "setting.reason.stricter_robot.teen.line"
 msgstr "The robot's own setting is stricter."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1535
+#: src/lib/settingCopy.generated.ts:1546
 msgid "setting.reason.stricter_robot.adult.line"
 msgstr "The robot's own setting is stricter."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1536
+#: src/lib/settingCopy.generated.ts:1547
 msgid "setting.reason.stricter_robot.admin.line"
 msgstr "The robot's setting is stricter here."
 
@@ -25520,7 +25575,7 @@ msgid "setting.coding.thinking_budget.label"
 msgstr "Thinking tokens per request"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1640
+#: src/shell/pages/ChatPage.tsx:1644
 msgid "Thinking:"
 msgstr "Thinking:"
 
@@ -25585,7 +25640,7 @@ msgid "failure.prompt_limit.carry_offer.minor"
 msgstr "This chat is really long now. Tap New chat and I'll bring along what we talked about."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1698
+#: src/shell/pages/ChatPage.tsx:1702
 msgid "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 msgstr "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 
@@ -25666,7 +25721,7 @@ msgid "This counts only what the Stack has loaded. Home's own engines still run:
 msgstr "This counts only what the Stack has loaded. Home's own engines still run: {describeHomeOwnedRoles}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1655
+#: src/lib/settingCopy.generated.ts:1666
 msgid "area.This device"
 msgstr "This device"
 
@@ -26142,7 +26197,7 @@ msgid "Tour targets not found"
 msgstr "Tour targets not found"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1632
+#: src/shell/pages/ChatPage.tsx:1636
 msgid "Trace"
 msgstr "Trace"
 
@@ -26460,17 +26515,17 @@ msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:385
-#: src/shell/Routes.tsx:178
+#: src/shell/Routes.tsx:183
 msgid "Turn trace"
 msgstr "Turn trace"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1525
+#: src/lib/settingCopy.generated.ts:1536
 msgid "setting.reason.set_by_guardian.child.off"
 msgstr "Turned off by {admin}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1526
+#: src/lib/settingCopy.generated.ts:1537
 msgid "setting.reason.set_by_guardian.child.on"
 msgstr "Turned on by {admin}."
 
@@ -26647,7 +26702,7 @@ msgid "Uncensored"
 msgstr "Uncensored"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1656
+#: src/lib/settingCopy.generated.ts:1667
 msgid "area.Uncensored chat AI"
 msgstr "Uncensored chat AI"
 
@@ -26727,7 +26782,7 @@ msgid "Unknown browser"
 msgstr "Unknown browser"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:196
+#: src/shell/media/NowPlayingStage.tsx:195
 msgid "Unlike"
 msgstr "Unlike"
 
@@ -26840,8 +26895,8 @@ msgid "Up"
 msgstr "Up"
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:154
-#: src/shell/media/NowPlayingStage.tsx:202
+#: src/shell/media/NowPlayingStage.tsx:153
+#: src/shell/media/NowPlayingStage.tsx:201
 msgid "Up next"
 msgstr "Up next"
 
@@ -26913,7 +26968,7 @@ msgid "Updates"
 msgstr "Updates"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1657
+#: src/lib/settingCopy.generated.ts:1668
 msgid "area.Updates"
 msgstr "Updates"
 
@@ -27183,7 +27238,7 @@ msgid "Users"
 msgstr "Users"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1658
+#: src/lib/settingCopy.generated.ts:1669
 msgid "area.Users"
 msgstr "Users"
 
@@ -27369,7 +27424,7 @@ msgid "Videos"
 msgstr "Videos"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1659
+#: src/lib/settingCopy.generated.ts:1670
 msgid "area.Videos"
 msgstr "Videos"
 
@@ -27394,7 +27449,7 @@ msgid "setting.storage.library.videos.threshold_percent.label"
 msgstr "Videos storage warning (%)"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1660
+#: src/lib/settingCopy.generated.ts:1671
 msgid "area.Videos with sound"
 msgstr "Videos with sound"
 
@@ -27474,17 +27529,17 @@ msgid "setting.robot.voice.id.label"
 msgstr "Voice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1661
+#: src/lib/settingCopy.generated.ts:1672
 msgid "area.Voice"
 msgstr "Voice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1662
+#: src/lib/settingCopy.generated.ts:1673
 msgid "area.Voice & speaking"
 msgstr "Voice & speaking"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1663
+#: src/lib/settingCopy.generated.ts:1674
 msgid "area.Voice and robot"
 msgstr "Voice and robot"
 
@@ -27514,7 +27569,7 @@ msgid "Voice cloning will no longer be able to use this token."
 msgstr "Voice cloning will no longer be able to use this token."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1752
+#: src/shell/pages/ChatPage.tsx:1756
 msgid "Voice conversation"
 msgstr "Voice conversation"
 
@@ -27529,7 +27584,7 @@ msgid "Voice for this synth"
 msgstr "Voice for this synth"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:478
+#: src/shell/pages/ChatPage.tsx:479
 #: src/shell/useSideChat.tsx:57
 msgid "Voice input needs a one-time download that hasn't finished on this hub yet."
 msgstr "Voice input needs a one-time download that hasn't finished on this hub yet."
@@ -27555,7 +27610,7 @@ msgid "setting.person.voice_print.enrollment.title"
 msgstr "Voice print enrollment"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1664
+#: src/lib/settingCopy.generated.ts:1675
 msgid "area.Voice print enrollment"
 msgstr "Voice print enrollment"
 
@@ -27599,7 +27654,7 @@ msgid "Voices"
 msgstr "Voices"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1665
+#: src/lib/settingCopy.generated.ts:1676
 msgid "area.Voices"
 msgstr "Voices"
 
@@ -27733,12 +27788,12 @@ msgid "setting.reference.download.when.option.window"
 msgstr "Waits for the nightly window so downloads do not slow the home in the day."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1667
+#: src/lib/settingCopy.generated.ts:1678
 msgid "area.Wake word"
 msgstr "Wake word"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1666
+#: src/lib/settingCopy.generated.ts:1677
 msgid "area.Wake Word"
 msgstr "Wake Word"
 
@@ -27804,12 +27859,12 @@ msgid "We're looking into it."
 msgstr "We're looking into it."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1508
+#: src/lib/settingCopy.generated.ts:1519
 msgid "setting.weather.default_place.label"
 msgstr "Weather default place"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1510
+#: src/lib/settingCopy.generated.ts:1521
 msgid "setting.weather.places.label"
 msgstr "Weather places"
 
@@ -27821,12 +27876,12 @@ msgid "Web search"
 msgstr "Web search"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1668
+#: src/lib/settingCopy.generated.ts:1679
 msgid "area.Web search"
 msgstr "Web search"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1669
+#: src/lib/settingCopy.generated.ts:1680
 msgid "area.Web search and memory settings"
 msgstr "Web search and memory settings"
 
@@ -27897,7 +27952,7 @@ msgid "What Coding needs"
 msgstr "What Coding needs"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1670
+#: src/lib/settingCopy.generated.ts:1681
 msgid "area.What connects to the internet"
 msgstr "What connects to the internet"
 
@@ -27917,7 +27972,7 @@ msgid "What is being made, what finished and what needs a look."
 msgstr "What is being made, what finished and what needs a look."
 
 #. js-lingui-explicit-id
-#: src/shell/media/NowPlayingStage.tsx:137
+#: src/shell/media/NowPlayingStage.tsx:136
 msgid "What is on stage"
 msgstr "What is on stage"
 
@@ -28041,7 +28096,7 @@ msgid "setting.resources.strict.video.help"
 msgstr "When on, a waiting video job goes before every other kind of big job, however long the others have waited. Chat always goes first either way."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1507
+#: src/lib/settingCopy.generated.ts:1518
 msgid "setting.weather.alerts.help"
 msgstr "When on, Home checks active US weather alerts for the place being viewed. It sends coordinates rounded to the same precision as Weather, no more than once every five minutes. No request is made when this is off."
 
@@ -28183,7 +28238,7 @@ msgid "setting.topics.family_stories.help"
 msgstr "Whether MaiPai keeps stories like Santa Claus, the Tooth Fairy and the Easter Bunny for a child: it never says whether they are real, plays along, and points the child to the family. Turn it off if you would rather MaiPai answered plainly. Only a parent or admin can change a child's. It applies only while the person is on child controls."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1513
+#: src/lib/settingCopy.generated.ts:1524
 msgid "setting.weather.unit.help"
 msgstr "Whether weather shows degrees Fahrenheit or Celsius."
 
@@ -28243,7 +28298,7 @@ msgid "setting.voice.speculative_start.help"
 msgstr "While you are still finishing a sentence, Home begins working out its answer from what it has heard so far. If the words change, the early start is thrown away and nothing is kept. Adults only. Off until it is measured."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1671
+#: src/lib/settingCopy.generated.ts:1682
 msgid "area.Who can code"
 msgstr "Who can code"
 
@@ -28746,8 +28801,8 @@ msgstr "You have no PIN or password yet."
 
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:104
-msgid "You have no songs in your Library yet. Make one in Music."
-msgstr "You have no songs in your Library yet. Make one in Music."
+msgid "You have no songs in your Library yet. Make one in Audio."
+msgstr "You have no songs in your Library yet. Make one in Audio."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:127
@@ -28775,12 +28830,12 @@ msgid "You sign in with a password."
 msgstr "You sign in with a password."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1527
+#: src/lib/settingCopy.generated.ts:1538
 msgid "setting.reason.set_by_guardian.admin.off"
 msgstr "You turned this off for {person}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1528
+#: src/lib/settingCopy.generated.ts:1539
 msgid "setting.reason.set_by_guardian.admin.on"
 msgstr "You turned this on for {person}."
 
@@ -28846,7 +28901,7 @@ msgid "Your character will appear here"
 msgstr "Your character will appear here"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1497
+#: src/shell/pages/ChatPage.tsx:1501
 msgid "Your chats will show up here."
 msgstr "Your chats will show up here."
 
@@ -28888,12 +28943,12 @@ msgid "Your current PIN or password is not right. Try again."
 msgstr "Your current PIN or password is not right. Try again."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1672
+#: src/lib/settingCopy.generated.ts:1683
 msgid "area.Your data"
 msgstr "Your data"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1673
+#: src/lib/settingCopy.generated.ts:1684
 msgid "area.Your data and apps"
 msgstr "Your data and apps"
 
@@ -29163,7 +29218,7 @@ msgid "Yours"
 msgstr "Yours"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1674
+#: src/lib/settingCopy.generated.ts:1685
 msgid "area.Yours"
 msgstr "Yours"
 
@@ -29173,7 +29228,7 @@ msgid "Yours, from {name}"
 msgstr "Yours, from {name}"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1675
+#: src/lib/settingCopy.generated.ts:1686
 msgid "area.Z-Image Turbo"
 msgstr "Z-Image Turbo"
 
