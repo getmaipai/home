@@ -93,7 +93,13 @@
         ]
       },
       "references": [
-        { "state": "reference", "label": "Image reference", "kind": "picture", "placement": "in_field" }
+        {
+          "state": "reference",
+          "label": "Image reference",
+          "kind": "picture",
+          "placement": "in_field",
+          "disabled_reason": "Starting a picture from a reference is coming next."
+        }
       ],
       "submit": {
         "ask": {
