@@ -29,7 +29,7 @@ function ltxStack(acceptedAt: string | null) {
   const fetchStub = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
     if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-5-q8-distilled-mlx" }, { status: 202 }); }
-    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: acceptedAt } }] });
+    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ffmpeg", state: "installed" }, { id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: acceptedAt } }] });
   }) as unknown as typeof fetch;
   return { fetch: fetchStub, installs };
 }
@@ -144,5 +144,19 @@ describe("install with a choice of components", () => {
     expect(chosen).toContain("video");
     expect(chosen).not.toContain("nonsense");
     expect(chosen).not.toContain("engine:video");
+  });
+
+  test("MP-09: a listed ffmpeg that is not installed is asked for once, an installed one never", async () => {
+    const pulls: string[] = [];
+    __setStackClientForTests(stackWith(10 ** 13, pulls));
+    const installs: string[] = [];
+    __setComponentsFetchForTests((async (url: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === "POST" && path.endsWith("/install")) { installs.push(path.split("/").slice(-2)[0]!); return Response.json({ job: "j1", component: "ffmpeg" }); }
+      return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ffmpeg", state: "notInstalled" }] });
+    }) as unknown as typeof fetch);
+    expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
+    await settle();
+    expect(installs).toEqual(["ffmpeg"]);
   });
 });
