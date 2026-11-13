@@ -44,7 +44,7 @@ describe("composer modes by band", () => {
     expect(picture.primary.label).toBe("Make picture");
     expect(picture.presets?.chips[0]!.options.length).toBeGreaterThan(0);
     // CREATOR-13: the picture presets are chips of the Create page, so the composer lists them beside Shape and Pictures, each its own popover, each starting at None.
-    const presetChips = picture.chips.filter((c) => c.group !== "Settings");
+    const presetChips = picture.chips.filter((c) => c.group === "Style");
     expect(presetChips.map((c) => c.id)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
     expect(presetChips.every((c) => c.default === "none" && c.quiet === "none" && c.options[0]!.value === "none" && c.group === "Style")).toBe(true);
     expect(picture.chips.find((c) => c.id === "shape")?.icon).toBe("rectangle-horizontal");

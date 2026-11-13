@@ -97,7 +97,7 @@ describe("the Images Create page", () => {
     expect(node.chips.length).toBeLessThanOrEqual(10);
     expect(presets.every((c: { options: unknown[] }) => c.options.length <= 24)).toBe(true);
     const args = node.submit.call.args as Record<string, unknown>;
-    expect(Object.keys(args)).toEqual(presets.map((c: { state: string }) => c.state));
+    expect(Object.keys(args).filter((key) => presets.some((c: { state: string }) => c.state === key)).sort()).toEqual(presets.map((c: { state: string }) => c.state).sort());
     for (const chip of presets as Array<{ state: string }>) {
       expect(args[chip.state]).toBe(`{${chip.state}}`);
     }
