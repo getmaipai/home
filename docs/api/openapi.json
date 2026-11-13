@@ -75436,6 +75436,223 @@
         }
       }
     },
+    "/api/videos/picks": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "List the household Family Picks vote queue",
+        "responses": {
+          "200": {
+            "description": "Visible picks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "collection_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "added_at": {
+                            "type": "string"
+                          },
+                          "votes": {
+                            "type": "number"
+                          },
+                          "voted": {
+                            "type": "boolean"
+                          },
+                          "added_by": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "top": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "votes",
+                          "voted",
+                          "added_by",
+                          "top"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "collection_id",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Add a video to Family Picks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "media_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "media_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "collection_id": {
+                      "type": "string"
+                    },
+                    "media_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "collection_id",
+                    "media_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/picks/{media_id}/vote": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Toggle your Family Picks vote",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "media_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vote changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "media_id": {
+                      "type": "string"
+                    },
+                    "voted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "media_id",
+                    "voted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
@@ -105214,7 +105431,8 @@
                     "enum": [
                       "playlist",
                       "watchlist",
-                      "pins"
+                      "pins",
+                      "family_picks"
                     ]
                   },
                   "title": {

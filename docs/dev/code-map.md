@@ -771,6 +771,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/band.ts` | trips, bandOkAtIngest, mediaBandOf, allowedBandsFor, bandAllows |
 | `backend/src/lib/media/collections.ts` | SINGLETON_KINDS, MADE_KINDS, ensureStandingCollections, listCollections, resolveCollection, createFilterCollection |
 | `backend/src/lib/media/duplicates.ts` | findDuplicates |
+| `backend/src/lib/media/familyPicks.ts` | listPicks, addPick, togglePickVote |
 | `backend/src/lib/media/fetchedFiles.ts` | createFetchedFile, createFetchedFileFromResponse, removeFetchedFile |
 | `backend/src/lib/media/heal.ts` | healMadeSources |
 | `backend/src/lib/media/ingest.ts` | fingerprintOf, isSpokenGenre, bookPathHints, draftsForDirectory, folderFingerprint |
