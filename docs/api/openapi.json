@@ -82384,7 +82384,7 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "videos",
+                              "video",
                               "shows",
                               "audio",
                               "podcasts",
@@ -82443,7 +82443,7 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "videos",
+                              "video",
                               "shows",
                               "audio",
                               "podcasts",
@@ -82502,7 +82502,7 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "videos",
+                              "video",
                               "shows",
                               "audio",
                               "podcasts",
@@ -82561,7 +82561,7 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "videos",
+                              "video",
                               "shows",
                               "audio",
                               "podcasts",
@@ -93372,7 +93372,7 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "videos",
+                              "video",
                               "shows",
                               "audio",
                               "podcasts",
@@ -93393,7 +93393,7 @@
                                 "app": {
                                   "type": "string",
                                   "enum": [
-                                    "videos",
+                                    "video",
                                     "shows",
                                     "audio",
                                     "podcasts",

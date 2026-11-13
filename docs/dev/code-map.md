@@ -96,27 +96,43 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/podcasts/pages/show.json` | podcasts | Podcast show |
 | `backend/packages/podcasts/pages/shows.json` | podcasts | Shows |
 | `backend/packages/podcasts/pages/stats.json` | podcasts | Stats |
+| `backend/packages/shows/pages/continue.json` | shows | Continue watching |
 | `backend/packages/shows/pages/film.json` | shows | Film |
 | `backend/packages/shows/pages/films.json` | shows | Films |
+| `backend/packages/shows/pages/genres.json` | shows | Genres |
+| `backend/packages/shows/pages/history.json` | shows | History |
 | `backend/packages/shows/pages/index.json` | shows | Shows and Films |
+| `backend/packages/shows/pages/recently-added.json` | shows | Recently added |
 | `backend/packages/shows/pages/show.json` | shows | Show |
 | `backend/packages/shows/pages/shows.json` | shows | Shows |
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
-| `backend/packages/videos/pages/channel.json` | videos | Channel |
-| `backend/packages/videos/pages/clips-feed.json` | videos | Clips |
-| `backend/packages/videos/pages/clips.json` | videos | My clips |
-| `backend/packages/videos/pages/create.json` | videos | Create |
-| `backend/packages/videos/pages/history.json` | videos | History |
-| `backend/packages/videos/pages/index.json` | videos | Videos |
-| `backend/packages/videos/pages/library.json` | videos | Library |
-| `backend/packages/videos/pages/liked.json` | videos | Liked videos |
-| `backend/packages/videos/pages/playlist.json` | videos | Playlist |
-| `backend/packages/videos/pages/playlists.json` | videos | Playlists |
-| `backend/packages/videos/pages/search.json` | videos | Search |
-| `backend/packages/videos/pages/studio.json` | videos | Studio |
-| `backend/packages/videos/pages/watch-later.json` | videos | Watch later |
-| `backend/packages/videos/pages/watch.json` | videos | Watch |
+| `backend/packages/video/pages/animate.json` | video | Animate a picture |
+| `backend/packages/video/pages/captions.json` | video | Captions |
+| `backend/packages/video/pages/categories.json` | video | Categories |
+| `backend/packages/video/pages/channel.json` | video | Channel |
+| `backend/packages/video/pages/channels.json` | video | Channels |
+| `backend/packages/video/pages/clips-feed.json` | video | Clips |
+| `backend/packages/video/pages/clips.json` | video | My clips |
+| `backend/packages/video/pages/create.json` | video | Create |
+| `backend/packages/video/pages/drafts.json` | video | Drafts |
+| `backend/packages/video/pages/film-maker.json` | video | Film maker |
+| `backend/packages/video/pages/from-picture.json` | video | From a picture |
+| `backend/packages/video/pages/history.json` | video | History |
+| `backend/packages/video/pages/index.json` | video | Video |
+| `backend/packages/video/pages/library.json` | video | Library |
+| `backend/packages/video/pages/liked.json` | video | Liked videos |
+| `backend/packages/video/pages/new-uploads.json` | video | New uploads |
+| `backend/packages/video/pages/playlist.json` | video | Playlist |
+| `backend/packages/video/pages/playlists.json` | video | Playlists |
+| `backend/packages/video/pages/search.json` | video | Search |
+| `backend/packages/video/pages/studio.json` | video | Studio |
+| `backend/packages/video/pages/talking-avatar.json` | video | Talking avatar |
+| `backend/packages/video/pages/templates.json` | video | Templates |
+| `backend/packages/video/pages/trim.json` | video | Trim and join |
+| `backend/packages/video/pages/voiceover.json` | video | Voiceover |
+| `backend/packages/video/pages/watch-later.json` | video | Watch later |
+| `backend/packages/video/pages/watch.json` | video | Watch |
 | `backend/packages/weather/pages/index.json` | weather | Weather |
 
 ## Frontend screens and components (frontend/src)
