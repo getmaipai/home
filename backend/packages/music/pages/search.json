@@ -6,8 +6,8 @@
     {
       "type": "search",
       "state": "q",
-      "label": "Search Music",
-      "placeholder": "Search Music",
+      "label": "Search Audio",
+      "placeholder": "Search Audio",
       "recents": {
         "source": "package",
         "path": "songs",
