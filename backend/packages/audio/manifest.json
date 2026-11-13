@@ -119,7 +119,10 @@
           "mode": "play",
           "pages": [
             "index",
-            "radio"
+            "radio",
+            "new-releases",
+            "genres",
+            "made-for-you"
           ]
         },
         {
@@ -131,6 +134,7 @@
             "albums",
             "artists",
             "playlists",
+            "lyrics-browse",
             "liked",
             "history",
             "downloads"
@@ -146,37 +150,33 @@
           ]
         },
         {
-          "id": "play-discover",
-          "mode": "play",
-          "title": "Discover",
+          "id": "create",
+          "mode": "create",
           "pages": [
-            "new-releases",
-            "genres",
-            "made-for-you"
+            "create"
           ]
         },
         {
-          "id": "create-tools",
+          "id": "create-make",
           "mode": "create",
           "title": "Make",
           "pages": [
-            "create",
-            "studio",
-            "stems",
-            "remix",
-            "lyrics",
+            "bands",
+            "styles",
             "voices",
-            "sound-effects"
+            "sound-effects",
+            "lyrics"
           ]
         },
         {
-          "id": "create-yours",
+          "id": "create-edit",
           "mode": "create",
-          "title": "Yours",
+          "title": "Edit and yours",
           "pages": [
+            "studio",
+            "stems",
+            "remix",
             "creations",
-            "bands",
-            "styles",
             "drafts"
           ]
         }
@@ -488,6 +488,14 @@
         "nav": false,
         "kind": "schema",
         "module": "sound-library"
+      },
+      {
+        "id": "lyrics-browse",
+        "label": "Lyrics",
+        "icon": "file-text",
+        "nav": false,
+        "kind": "schema",
+        "module": "lyrics-browse"
       }
     ],
     "data": [

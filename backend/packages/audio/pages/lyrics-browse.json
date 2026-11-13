@@ -1,0 +1,18 @@
+{
+  "type": "page",
+  "id": "audio-lyrics-browse",
+  "title": "Lyrics",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "file-text",
+      "text": "Read the words of your songs here, with the line that is playing lit up. This page is coming soon.",
+      "action": {
+        "navigate": {
+          "to": "/apps/audio/songs"
+        }
+      },
+      "action_label": "Open songs"
+    }
+  ]
+}
