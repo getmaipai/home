@@ -6,8 +6,8 @@ import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, submitEdit, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
 import { fullViewForJob } from "@/lib/stack/fullView";
-import { createMediaProduction } from "@/lib/mediaProductions";
-import { createMediaSubject, listMediaSubjects, subjectsForNames, subjectViewById } from "@/lib/mediaSubjects";
+import { createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
+import { createMediaSubject, listMediaSubjects, loadSubjectReferences, subjectsForNames, subjectViewById } from "@/lib/mediaSubjects";
 import { pickStarter } from "./pictures";
 import { filmCreditLines, storedFilmCredits } from "@/lib/creations/credits";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
@@ -80,6 +80,13 @@ export async function submitComposition(pictured: ReadonlyArray<{ subject: { nam
 export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string; faceless?: boolean }): FilmEngines {
   const { actor, signal, productionId, faceless = false } = input;
   let turn: ReturnType<typeof backgroundTurn> | null = null;
+  // CREATOR-05: a plan name is turned into its subject through this film's own cast (role name to subject id, set when the run made or took each member), so a
+  // member picked from the `@` list (a household member included) is loaded by its id with its own pictures; only a name the cast does not hold is looked up by name.
+  const subjectOf = (name: string) => {
+    const role = getMediaProduction(actor, productionId)?.cast.find((entry) => entry.role === name);
+    const subject = role ? subjectViewById(role.subject_id) : null;
+    return subject ? loadSubjectReferences(actor, [subject])?.[0] : subjectsForNames(actor, [name])?.[0];
+  };
   const state = { actor, surface: "chat", planBasis: { surfaceClass: "written" }, conversationId: null, turnId: null, temporary: false, ephemeral: false } as never;
   const engines: FilmEngines = {
     async waitForIdle() {},
@@ -98,12 +105,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
     async makeStill({ shot, castLocked, exactReference }) {
       // A product that was held back and is shown now keeps its own picture: an image model redraws printed writing as nonsense (seen 2026-11-12:
       // "LITOKCUE RONHICSE"), and the writing is what the reveal is for. The picture is fitted to the film's frame on a soft copy of itself.
-      const aloneNames = castLocked.map((line) => line.split(":")[0]!.trim()).filter((name) => subjectsForNames(actor, [name])?.[0]?.references[0]);
+      const aloneNames = castLocked.map((line) => line.split(":")[0]!.trim()).filter((name) => subjectOf(name)?.references[0]);
       // Only when the product is the one supplied picture in the shot: with the actor and the place also there, the shot is composed from all three below.
       // FILM-REAL-04: a shot whose only supplied picture is a place or an object uses that photo itself as its first frame (no image model, so nothing
       // is redrawn): the film shows his factory floor, not a model's idea of one. A place fills the frame; an object keeps its shape on a soft copy of itself.
-      const single = aloneNames.length === 1 ? subjectsForNames(actor, [aloneNames[0]!])?.[0] : undefined;
-      const exactSubject = exactReference && aloneNames.length < 2 ? subjectsForNames(actor, [exactReference])?.[0] : single && single.subject.kind !== "character" ? single : undefined;
+      const single = aloneNames.length === 1 ? subjectOf(aloneNames[0]!) : undefined;
+      const exactSubject = exactReference && aloneNames.length < 2 ? subjectOf(exactReference) : single && single.subject.kind !== "character" ? single : undefined;
       if (exactSubject?.references[0]) {
         const picture = exactSubject.references[0];
         const base = sharp(Buffer.from(picture.bytes), { failOn: "error" }).rotate();
@@ -122,11 +129,11 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
       const view = fullViewForJob("adult", actor);
       // A character the person supplied pictures for starts the still from that picture, so the face carries through (retry from words alone if the Stack declines it).
-      const starter = pickStarter(shot.still, castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const picture = subjectsForNames(actor, [name])?.[0]?.references[0]; return picture ? [{ name, picture }] : []; }))?.picture;
+      const starter = pickStarter(shot.still, castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const picture = subjectOf(name)?.references[0]; return picture ? [{ name, picture }] : []; }))?.picture;
       const body = { prompt, size: "1024x576", n: 1, seed, audience: "adult" as const, timeout_ms: 1 };
       // A shot that shows several supplied pictures together (the actor holding the product outside the factory) is composed from them: the place is the
       // picture that is edited and the person and the object ride along as references (the image engine takes two), so each keeps its own look.
-      const pictured = castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const found = subjectsForNames(actor, [name])?.[0]; return found?.references[0] ? [{ subject: found.subject, picture: found.references[0] }] : []; });
+      const pictured = castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const found = subjectOf(name); return found?.references[0] ? [{ subject: found.subject, picture: found.references[0] }] : []; });
       const composed = pictured.length >= 2 ? await submitComposition(pictured, prompt).catch((error) => { if (isTransientStackError(error)) throw error; return null; }) : null;
       const submitted = composed ?? (starter
         ? await submitGeneration({ ...body, init_image: Buffer.from(starter.bytes).toString("base64"), image_source: "uploaded", strength: REFERENCE_STILL_STRENGTH }).catch(() => submitGeneration(body))

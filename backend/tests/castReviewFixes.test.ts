@@ -11,6 +11,9 @@ import { castForTool, castIsAdultOnly, castMentionIds, listCast, resolveCast } f
 import { bindCastSubjects } from "@/lib/films/plan";
 import { realFilmEngines } from "@/lib/films/engines";
 import { ensurePersonSubject, listMediaSubjects } from "@/lib/mediaSubjects";
+import { createMediaProduction, updateMediaProduction } from "@/lib/mediaProductions";
+import { storeFile } from "@/lib/attachments";
+import sharp from "sharp";
 import { withMentionedCast } from "@/lib/mentionedCastArgs";
 import { listSynthCreditItems } from "@/lib/creations/credits";
 import { runGenerateImage } from "@/lib/pictures/tool";
@@ -162,6 +165,28 @@ describe("5. film cast is found by id, never by name", () => {
     expect(await engines.ensureSubject({ name: teenRow.displayName, kind: "character", locked: "x", subjectId: memberSubject.id }, { signal: new AbortController().signal })).toBe(memberSubject.id);
     expect(subjectRows()).toBe(before);
     expect(listMediaSubjects(sage).some((s) => s.id === memberSubject.id)).toBe(false); // the old name lookup could never see it
+  });
+});
+
+describe("5b. the film still-maker loads a cast member's pictures by subject id", () => {
+  test("a household member's own reference starts their still, not a same-named stranger's picture", async () => {
+    const member = ensurePersonSubject(teenRow);
+    const png = async (r: number, g: number, b: number) => new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 3, background: { r, g, b } } }).png().toBuffer());
+    const note = `media-subject-reference:${JSON.stringify({ audience: "all-ages" })}`;
+    const memberBytes = await png(10, 200, 10), strangerBytes = await png(200, 10, 10);
+    const mine = storeFile(teenRow, { conversationId: null, turnId: null, mediaType: "image/png", bytes: memberBytes, provenance: note, deduplicate: false, retention: "kept" });
+    const theirs = storeFile(sage, { conversationId: null, turnId: null, mediaType: "image/png", bytes: strangerBytes, provenance: note, deduplicate: false, retention: "kept" });
+    if (!mine.ok || !theirs.ok) throw new Error("pictures not stored");
+    db.update(mediaSubjects).set({ referenceIds: JSON.stringify([mine.value.id]) }).where(eq(mediaSubjects.id, member.id)).run();
+    createMediaSubject(sage, { name: teenRow.displayName, kind: "character", look: "an unrelated stranger", referenceIds: [theirs.value.id] });
+    const production = createMediaProduction(sage, { title: "T", summary: "S" }, "film");
+    updateMediaProduction(sage, production.id, { cast: [{ subject_id: member.id, role: teenRow.displayName, wardrobe_variant_ids: [], voice_choice: null, notes: "x" }] as never });
+    const engines = realFilmEngines({ actor: sage, signal: new AbortController().signal, productionId: production.id });
+    const shot = { id: "shot-1", subject_ids: [], framing: "wide", still: `${teenRow.displayName} walks.`, motion: "walks", seconds: 5 } as never;
+    await engines.makeStill({ shot, castLocked: [`${teenRow.displayName}: a calm person`] }, { signal: new AbortController().signal }).catch(() => undefined);
+    const sent = image.submitted.map((body) => String((body as { init_image?: string }).init_image ?? "")).filter(Boolean);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent[0]).toBe(Buffer.from(memberBytes).toString("base64"));
   });
 });
 
