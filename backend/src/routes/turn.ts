@@ -8,7 +8,9 @@ import sharp from "sharp";
 import { desc, eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
-import { quickReaction, type QuickCue } from "@/lib/quickReaction";
+import { quickReaction, chooseFillerGroup, type QuickCue } from "@/lib/quickReaction";
+import { reportFillerEvent } from "@/lib/fillerEvents";
+import { talkOverDecision } from "@/lib/talkOver";
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
@@ -426,6 +428,26 @@ const askAnswer = z.union([z.object({ turn_id: z.string(), approved: z.boolean()
 // VOICE-QUICK-02: a short reaction to what the person has said so far, for a pause in the middle of their turn. The small model may say nothing (null).
 const lastReactAt = new Map<string, number>();
 const REACT_MIN_GAP_MS = 3000;
+turnRoutes.post("/filler", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const deviceId = c.get("deviceId");
+  const body = await c.req.json().catch(() => ({})) as { said?: unknown };
+  const said = typeof body.said === "string" ? body.said.trim().slice(0, 160) : "";
+  const started = performance.now();
+  if (!said || speakerAgeBand(actor, new Date()) !== "adult" || !!deviceId) {
+    reportFillerEvent({ group: null, source: null, ms: performance.now() - started });
+    return c.json({ group: null, source: null, ms: Math.round(performance.now() - started) }, 200);
+  }
+  const decision = talkOverDecision({ actor, isRobot: false });
+  if (!decision.grant) {
+    reportFillerEvent({ group: null, source: null, ms: performance.now() - started });
+    return c.json({ group: null, source: null, ms: Math.round(performance.now() - started) }, 200);
+  }
+  const result = await chooseFillerGroup(actor.id, said);
+  reportFillerEvent(result);
+  return c.json(result, 200);
+});
+
 turnRoutes.post("/react", requireAuth, async (c) => {
   const person = c.get("person");
   const body = await c.req.json().catch(() => ({})) as { said?: unknown };

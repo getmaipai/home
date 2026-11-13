@@ -5,8 +5,28 @@
 import { completeBackground, type LlmMessage } from "@/lib/llm";
 import { topicMessagesForId } from "@/lib/topicPrompt";
 import { KNOWN_CUE_TAGS, normalizeTagList } from "@/lib/voiceCues";
+import { ACKNOWLEDGEMENT_GROUPS } from "@/lib/replyVariation";
 
 export const QUICK_REACTION_DEADLINE_MS = 700;
+export const FILLER_GROUP_DEADLINE_MS = 350;
+export type FillerGroup = keyof typeof ACKNOWLEDGEMENT_GROUPS;
+export type FillerGroupResult = { group: FillerGroup; source: "model" | "rule"; ms: number };
+const FILLER_GROUPS = Object.keys(ACKNOWLEDGEMENT_GROUPS) as FillerGroup[];
+const FILLER_SCHEMA = { name: "filler_group", schema: { type: "object", properties: { group: { type: "string", enum: [...FILLER_GROUPS, "NONE"] } }, required: ["group"], additionalProperties: false } } as const;
+const FILLER_SYSTEM = `Choose the best audio acknowledgement group for what the person said. Valid groups: ${FILLER_GROUPS.join(", ")}. Use NONE when no acknowledgement fits. Return only the required JSON.`;
+const IMPERATIVES = new Set(["tell", "explain", "describe", "show", "give", "find", "look", "search", "help", "make", "write", "read", "open", "close", "play", "stop", "set", "turn", "translate", "summarize", "compare", "list", "name", "recommend", "remind", "remember", "calculate", "check", "please"]);
+
+export function ruleFillerGroup(said: string): FillerGroup {
+  const text = said.trim().toLowerCase();
+  if (text.includes("?") || /^(?:who|what|when|where|why|how|which|whose|whom|can|could|would|do|does|did|is|are|am|was|were|will|should|have|has)\b/.test(text)) return "question";
+  if (IMPERATIVES.has(text.match(/^[\p{L}']+/u)?.[0] ?? "")) return "request";
+  return "backchannel";
+}
+
+let fillerRunner: typeof completeBackground = completeBackground;
+export function __setFillerGroupRunnerForTests(fn: typeof completeBackground | null): void { fillerRunner = fn ?? completeBackground; }
+export function __resetFillerGroupForTests(): void { fillerRunner = completeBackground; }
+
 const MAX_WORDS = 6;
 const RECENT_KEPT = 4;
 const recent = new Map<string, string[]>();
@@ -112,4 +132,26 @@ export async function quickReaction(personId: string, said: string, banned: read
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Chooses only a pre-rendered acknowledgement group. The input is never logged or retained. */
+export async function chooseFillerGroup(actorId: string, said: string): Promise<FillerGroupResult> {
+  const started = performance.now();
+  const heard = said.trim().slice(0, 160);
+  const fallback = (): FillerGroup => ruleFillerGroup(heard);
+  if (!heard) return { group: "backchannel", source: "rule", ms: Math.round(performance.now() - started) };
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), FILLER_GROUP_DEADLINE_MS);
+  try {
+    const result = await fillerRunner(topicMessagesForId(actorId, [{ role: "system", content: FILLER_SYSTEM }, { role: "user", content: heard }]), {
+      model: "judge", max_tokens: 6, temperature: 0, thinking: false, dropReasoning: true, exactCeiling: true,
+      response_format: { type: "json_schema", json_schema: FILLER_SCHEMA }, signal: abort.signal, timeoutMs: FILLER_GROUP_DEADLINE_MS,
+    });
+    if (!result.ok) return { group: fallback(), source: "rule", ms: Math.round(performance.now() - started) };
+    const parsed = JSON.parse(result.text) as { group?: unknown };
+    const group = parsed.group === "NONE" ? "backchannel" : FILLER_GROUPS.find((candidate) => candidate === parsed.group);
+    return { group: group ?? fallback(), source: group ? "model" : "rule", ms: Math.round(performance.now() - started) };
+  } catch {
+    return { group: fallback(), source: "rule", ms: Math.round(performance.now() - started) };
+  } finally { clearTimeout(timer); }
 }
