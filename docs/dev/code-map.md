@@ -38,10 +38,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/audio/pages/search.json` | audio | Search |
 | `backend/packages/audio/pages/songs.json` | audio | Songs |
 | `backend/packages/audio/pages/sound-effects.json` | audio | Sound effects |
+| `backend/packages/audio/pages/sound-library.json` | audio | Sound effects |
 | `backend/packages/audio/pages/station.json` | audio | Station |
 | `backend/packages/audio/pages/stems.json` | audio | Stems |
 | `backend/packages/audio/pages/studio.json` | audio | Studio |
 | `backend/packages/audio/pages/styles.json` | audio | Styles |
+| `backend/packages/audio/pages/voice-library.json` | audio | Voices |
 | `backend/packages/audio/pages/voices.json` | audio | Voices |
 | `backend/packages/books/pages/audiobooks.json` | books | Audiobooks |
 | `backend/packages/books/pages/books.json` | books | Books |
