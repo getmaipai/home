@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL } from "@/lib/scene";
+import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn } from "@/lib/scene";
 import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import type { Scene } from "@maipai/spec/gen/ts/scene.js";
-import { renderScene } from "@/lib/turnMachine/nodes/context";
+import { renderScene, fitSceneBlock } from "@/lib/turnMachine/nodes/context";
 
 const person = (id: string | null, band: "child" | "teen" | "adult" | "unknown" = "adult", level: "confirmed" | "tentative" | "claimed" = "confirmed") => ({ person_id: id, label: null, relation: id ? "household" as const : "unknown" as const, band, level });
 const obs = (kind: SceneObservation["kind"], value: unknown, sensor: SceneObservation["source"]["sensor"], now: number, strength: SceneObservation["strength"] = "strong", expires = SCENE_TTL[sensor as keyof typeof SCENE_TTL]): SceneObservation => ({ id: `${sensor}-${now}-${kind}`, source: { surface: "robot", device_id: "device-1", sensor }, kind, value, confidence: strength === "strong" ? 0.9 : 0.5, strength, at: now, expires_at: now + expires });
@@ -55,6 +55,34 @@ describe("scene fusion", () => {
     expect(result.people).toHaveLength(3);
     expect(result.alone).toBe(false);
     expect(result.child_present).toBe(true);
+  });
+  test("alone observation requires strong current evidence and expires with its TTL", () => {
+    const one = obs("people_count", 1, "look", 10);
+    const scene = fuseScene(empty(), [one], 10);
+    expect(scene.alone_observed).toBe(true);
+    expect(fuseScene(scene, [], 10 + SCENE_TTL.look).alone_observed).toBe(false);
+    const weak = obs("people_count", 1, "look", 10, "weak");
+    expect(fuseScene(empty(), [weak], 10).alone_observed).toBe(false);
+  });
+  test("an unknown robot speaker remains unknown and absent evidence does not list the signed-in actor", () => {
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const observations = observationsForTurn({ surface: "robot", actorId: "person-sage", actorBand: "adult", present: [{ person: "person-sage", basis: "signed_in", level: "confirmed" }], now: 10 });
+    const scene = fuseScene(empty(), observations, 10, "robot-unknown", null);
+    expect(scene.speaker).toBeNull();
+    expect(scene.people).toHaveLength(0);
+  });
+  test("speaker names are shown only when the scene confirms the actor", () => {
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const scene: Scene = { ...empty(), speaker: { person: "person-other", basis: "voice", level: "confirmed" } };
+    const text = renderScene(scene, 10, sage, [sage]);
+    expect(text).not.toContain("With Sage:");
+    expect(text).toContain("With: someone the system has not identified.");
+  });
+  test("scene budget keeps speaker, alone, and child lines over cap and with a missing tokenizer", async () => {
+    const required = "With: someone the system has not identified. Alone: not confirmed. A child is in the room.";
+    const oversized = `Ambient events: ${"very loud event ".repeat(100)}. ${required}`;
+    expect(await fitSceneBlock(oversized, required, async (value) => value === required ? 30 : 400)).toBe(required);
+    expect(await fitSceneBlock(oversized, required, async () => null)).toBe(required);
   });
   test("GPS beats typed place and all supported source TTLs expire", () => {
     const t = 100;

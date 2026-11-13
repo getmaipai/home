@@ -877,7 +877,9 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // written this way too).
   const trace = (finalSnapshot.context as { trace: TraceRecorder }).trace;
   const currentScene = getScene(conversationId);
-  trace.setSceneCounts("context", { people: currentScene?.people.length ?? 0, strong: currentScene?.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length ?? 0, typed: currentScene?.people.filter((p) => p.basis.includes("typed")).length ?? 0, place_known: !!currentScene?.place && currentScene.place.where !== "unknown", child_present: currentScene?.child_present ?? false, events: currentScene?.ambient?.events.length ?? 0 });
+  const renderedScene = state.context.find((item) => item.id === "scene")?.text ?? "";
+  const sceneTokenCount = await countTokens([{ role: "system", content: renderedScene }]);
+  trace.setSceneCounts("context", { people: currentScene?.people.length ?? 0, strong: currentScene?.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length ?? 0, typed: currentScene?.people.filter((p) => p.basis.includes("typed")).length ?? 0, place_known: !!currentScene?.place && currentScene.place.where !== "unknown", child_present: currentScene?.child_present ?? false, events: currentScene?.ambient?.events.length ?? 0, scene_tokens: sceneTokenCount ?? 0 });
   const ranNodes = new Set(state.nodes.map((n) => n.node));
   if (!ranNodes.has("safety")) trace.skip("safety", "not reached this turn");
   if (!ranNodes.has("commands")) trace.skip("commands", "not reached this turn");

@@ -6,6 +6,8 @@ import { describe, expect, test } from "bun:test";
 import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, outcomeText, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { worryingConversation } from "@/lib/turnContext";
+import { fuseScene, observationsForTurn } from "@/lib/scene";
+import { sceneSpeakerForTurn } from "@/lib/turnMachine/nodes/context";
 
 // ACT-01: the intent and the guards' shape read the frozen signal; the
 // tests classify the utterance the way prepareTurn() does, with the
@@ -65,6 +67,23 @@ test("sensitiveAllowed(): retains the robot floor and tightens shared surfaces",
   }
   for (const surface of ["tv", "overlay", "pod"] as const) {
     expect(sensitiveAllowed(surface, null, null, owner, scene)).toBe(false);
+  }
+  const unknownRobotScene = fuseScene(null, observationsForTurn({ surface: "robot", actorId: owner, actorBand: "adult", now: 100 }), 100, "robot-turn", sceneSpeakerForTurn("robot", owner, null));
+  expect(unknownRobotScene.speaker).toBeNull();
+  for (const surface of ["tv", "overlay", "pod"] as const) {
+    expect(sensitiveAllowed(surface, null, null, owner, unknownRobotScene)).toBe(false);
+  }
+  for (const surface of ["tv", "overlay", "pod"] as const) {
+    const noObservationSharedScene = fuseScene(null, [], 100, `shared-${surface}`, sceneSpeakerForTurn(surface, owner, null));
+    expect(noObservationSharedScene.speaker).toBeNull();
+    expect(sensitiveAllowed(surface, null, null, owner, noObservationSharedScene)).toBe(false);
+  }
+  for (const surface of ["chat", "phone"] as const) {
+    expect(sceneSpeakerForTurn(surface, owner, null)).toEqual({ person: owner, basis: "signed_in", level: "confirmed" });
+  }
+  const seenAlone = fuseScene(null, [{ id: "look-one", source: { surface: "tv", device_id: null, sensor: "look" }, kind: "people_count", value: 1, confidence: 1, strength: "strong", at: 100, expires_at: 90_100 }], 100, "shared-seen-alone", confirmed);
+  for (const surface of ["tv", "overlay", "pod"] as const) {
+    expect(sensitiveAllowed(surface, confirmed, null, owner, seenAlone)).toBe(true);
   }
   // Exhaustive small domain: scene-aware decisions may only remove old allows.
   for (const surface of ["chat", "phone", "robot", "tv", "overlay", "pod"] as const) {

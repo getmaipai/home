@@ -66,6 +66,7 @@ import { fuseScene, getScene, setScene, observationsForTurn } from "@/lib/scene"
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
 import type { Scene } from "@maipai/spec/gen/ts/scene.js";
+import type { Surface, SpeakerEvidence } from "@/lib/turnShared";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -78,6 +79,35 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 export const TOOL_ROUND_SHARE = 0.25;
 const SCENE_RENDER_TOKEN_LIMIT = 320;
 const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
+export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): Scene["speaker"] {
+  if (evidence) return { ...evidence };
+  // A signed-in actor is the speaker only on private, non-robot sessions (chat and phone); robot and shared surfaces require speaker evidence.
+  return surface === "chat" || surface === "phone" ? { person: actorId, basis: "signed_in", level: "confirmed" } : null;
+}
+export async function fitSceneBlock(text: string, required: string, count: (value: string) => Promise<number | null>, limit = SCENE_RENDER_TOKEN_LIMIT): Promise<string> {
+  let candidate = text;
+  const optional = [/ Ambient events:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
+  for (const pattern of optional) {
+    const measured = await count(candidate);
+    if (measured === null) return required;
+    if (measured <= limit) return candidate;
+    candidate = candidate.replace(pattern, "");
+  }
+  while (true) {
+    const measured = await count(candidate);
+    if (measured === null) return required;
+    if (measured <= limit) return candidate;
+    const roster = candidate.match(/People here: ([^.]+)\./);
+    if (!roster) break;
+    const people = roster[1]!.split(", ");
+    const oldestTyped = people.findIndex((person) => person.includes("said so"));
+    if (oldestTyped < 0) break;
+    people.splice(oldestTyped, 1);
+    candidate = candidate.replace(roster[0], people.length ? `People here: ${people.join(", ")}.` : "");
+  }
+  const finalCount = await count(candidate);
+  return finalCount !== null && finalCount <= limit ? candidate : required;
+}
 export function renderScene(scene: Scene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
   const members = new Map(household.map((person) => [person.id, person]));
   const age = (at: number) => {
@@ -86,10 +116,8 @@ export function renderScene(scene: Scene, now: number, actor: PersonRow, househo
   };
   const basis = (p: Scene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
-  if (scene.speaker?.level === "confirmed" && scene.speaker.person) lines.push(`With ${actor.displayName}:`);
-  else if (scene.speaker?.basis === "signed_in") lines.push(`With ${actor.displayName}:`);
-  else if (scene.speaker?.level === "tentative") lines.push("With you: possibly recognized.");
-  else lines.push("With you: unknown speaker.");
+  if (scene.speaker?.person === actor.id && (scene.speaker.level === "confirmed" || scene.speaker.basis === "signed_in")) lines.push(`With ${actor.displayName}:`);
+  else lines.push("With: someone the system has not identified.");
   if (scene.people.length) {
     const people = scene.people.map((p) => {
       const member = p.person_id ? members.get(p.person_id) : null;
@@ -100,7 +128,8 @@ export function renderScene(scene: Scene, now: number, actor: PersonRow, househo
     });
     lines.push(`People here: ${people.join(", ")}.`);
   } else lines.push("No other person is known to be here.");
-  if (scene.child_present) lines.push("A child is in the room.");
+  lines.push((scene as Scene & { alone_observed?: boolean }).alone_observed && scene.alone ? "Alone: positively observed." : scene.alone ? "Alone: not confirmed." : "Other people are present.");
+  lines.push(scene.child_present ? "A child is in the room." : "No child is known to be in the room.");
   const place = scene.place;
   if (place && place.where !== "unknown") lines.push(`Place: ${place.where === "home" ? "at home" : "away"}${place.setting !== "unknown" ? `, ${place.setting === "indoor" ? "indoors" : place.setting}` : ""}.`);
   const text = lines.join(" ");
@@ -232,7 +261,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
   const sceneNow = Date.now();
   const lookCount = state.surface === "robot" && state.deviceId ? sceneFor(state.deviceId, sceneNow)?.people ?? null : null;
-  const speakerForScene: Scene["speaker"] = state.speakerEvidence ? { ...state.speakerEvidence } : { person: state.actor.id, basis: "signed_in", level: "confirmed" };
+  const speakerForScene = sceneSpeakerForTurn(state.surface, state.actor.id, state.speakerEvidence);
   const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
   setScene(currentScene, sceneNow);
 
@@ -551,11 +580,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const sceneText = renderScene(currentScene, now.getTime(), state.actor, listActivePeople());
   const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
   const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
-  let sceneTokens = await sceneTokenCount(sceneItem.text);
-  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Ambient events:")) { sceneItem.text = sceneItem.text.replace(/ Ambient events:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
-  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Light:")) { sceneItem.text = sceneItem.text.replace(/ Light:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
-  while (sceneTokens !== null && sceneTokens > SCENE_RENDER_TOKEN_LIMIT && sceneItem.text.includes("Temperature:")) { sceneItem.text = sceneItem.text.replace(/ Temperature:[^.]*\./, ""); sceneTokens = await sceneTokenCount(sceneItem.text); }
-  if (sceneTokens !== null && sceneTokens <= SCENE_RENDER_TOKEN_LIMIT) items.push(sceneItem);
+  const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
+  const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
+  const speakerLine = currentScene.speaker?.person === state.actor.id && (currentScene.speaker.level === "confirmed" || currentScene.speaker.basis === "signed_in") ? `With ${state.actor.displayName}:` : "With: someone the system has not identified.";
+  sceneItem.text = await fitSceneBlock(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine}`, sceneTokenCount);
+  items.push(sceneItem);
 
   // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries
   // no task. Volatile tail only (rule 4); never in a temporary conversation, on a shared surface or for an unconfirmed speaker.

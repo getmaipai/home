@@ -37,6 +37,6 @@ export class TraceRecorder {
 
   setSceneCounts(node: NodeName, counts: NonNullable<NodeExecution["scene"]>): void {
     const entry = [...this.entries].reverse().find((item) => item.node === node);
-    if (entry) entry.scene = counts;
+    if (entry) entry.scene = { ...counts, scene_tokens: Number.isFinite(counts.scene_tokens) ? counts.scene_tokens : 0 };
   }
 }

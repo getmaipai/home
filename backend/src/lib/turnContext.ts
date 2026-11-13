@@ -66,7 +66,7 @@ export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvide
   if ((surface === "chat" || surface === "phone") && otherPresent) return false;
   if (["tv", "overlay", "pod"].includes(surface)) {
     const actorIsSpeaker = scene?.speaker?.person === actorId && scene.speaker.level === "confirmed" && ["face", "voice", "voice_and_face", "signed_in"].includes(scene.speaker.basis);
-    if (!actorIsSpeaker || !scene?.alone || scenePeople.length > 0) return false;
+    if (!actorIsSpeaker || !scene?.alone || !(scene as (Scene & { alone_observed?: boolean }) | null)?.alone_observed || scenePeople.length > 0) return false;
   }
   if (surface !== "robot") return true;
   const confirmedSpeaker = speakerEvidence?.person === actorId && speakerEvidence.level === "confirmed";

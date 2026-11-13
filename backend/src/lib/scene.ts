@@ -10,28 +10,33 @@ const MAX_SCENES = 200;
 const IDLE_TTL = 30 * 60_000;
 const store = new Map<string, Scene>();
 type Person = Scene["people"][number];
+export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null };
 
 function personKey(p: Pick<Person, "person_id" | "label">): string { return p.person_id ? `id:${p.person_id}` : `label:${p.label ?? "unknown"}`; }
 function isExpired(expires: number, now: number): boolean { return expires <= now; }
 function clampExpires(o: SceneObservation): number { return Math.min(o.expires_at, o.at + (SCENE_TTL[o.source.sensor as keyof typeof SCENE_TTL] ?? IDLE_TTL)); }
 
-export function fuseScene(previous: Scene | null | undefined, observations: readonly SceneObservation[], now: number, conversationId = previous?.conversation_id ?? "", speaker: Scene["speaker"] = previous?.speaker ?? null): Scene {
+export function fuseScene(previous: Scene | null | undefined, observations: readonly SceneObservation[], now: number, conversationId = previous?.conversation_id ?? "", speaker: Scene["speaker"] = previous?.speaker ?? null): FusedScene {
   const live = (previous?.people ?? []).filter((p) => !isExpired(p.expires_at, now));
   let place = previous?.place && !isExpired(previous.place.expires_at, now) ? previous.place : null;
   let countFloor = 0;
+  let aloneObservedUntil = (previous as FusedScene | null | undefined)?.alone_observed_until ?? null;
+  if (aloneObservedUntil !== null && aloneObservedUntil <= now) aloneObservedUntil = null;
   const typedLeft = new Set<string>();
   const strongIds = new Set<string>();
   const incoming = [...observations].filter((o) => !isExpired(clampExpires(o), now));
 
   for (const o of incoming) {
     if (o.kind === "person_left") { if (o.strength === "weak") typedLeft.add(personKey(o.value as Person)); continue; }
-    if (o.kind === "people_count" && o.source.sensor === "look") { countFloor = Math.max(countFloor, Number(o.value) || 0); continue; }
+    if (o.kind === "people_count" && o.source.sensor === "look") { countFloor = Math.max(countFloor, Number(o.value) || 0); aloneObservedUntil = Number(o.value) === 1 && o.strength === "strong" ? clampExpires(o) : null; continue; }
     if (o.kind === "person_here") {
       const value = o.value as Omit<Person, "basis" | "last_seen_at" | "expires_at">;
+      if (value.person_id !== speaker?.person) aloneObservedUntil = null;
       const key = personKey(value);
       const index = live.findIndex((p) => personKey(p) === key);
       const next: Person = { ...value, basis: [o.source.sensor], last_seen_at: o.at, expires_at: clampExpires(o) };
       if (o.strength === "strong" && value.person_id) strongIds.add(value.person_id);
+      if (o.strength === "strong" && value.person_id && value.person_id === speaker?.person) { aloneObservedUntil = clampExpires(o); continue; }
       if (index < 0) live.push(next);
       else {
         const old = live[index]!;
@@ -63,9 +68,10 @@ export function fuseScene(previous: Scene | null | undefined, observations: read
     for (const p of sensed) live.splice(live.indexOf(p), 1);
     live.push({ person_id: null, label: null, relation: "unknown", band: "unknown", level: "tentative", basis: [...new Set(sensed.flatMap((p) => p.basis))], last_seen_at: now, expires_at: expiry });
   }
-  while (live.length < countFloor) live.push({ person_id: null, label: null, relation: "unknown", band: "unknown", level: "tentative", basis: ["look"], last_seen_at: now, expires_at: now + SCENE_TTL.look });
+  const otherCountFloor = Math.max(0, countFloor - (aloneObservedUntil !== null && aloneObservedUntil > now ? 1 : 0));
+  while (live.length < otherCountFloor) live.push({ person_id: null, label: null, relation: "unknown", band: "unknown", level: "tentative", basis: ["look"], last_seen_at: now, expires_at: now + SCENE_TTL.look });
   const people = live.filter((p) => !isExpired(p.expires_at, now));
-  return { conversation_id: conversationId, people, speaker, place, ambient: previous?.ambient ?? null, weather: previous?.weather ?? null, alone: people.length === 0, child_present: people.some((p) => p.band === "child"), updated_at: now };
+  return { conversation_id: conversationId, people, speaker, place, ambient: previous?.ambient ?? null, weather: previous?.weather ?? null, alone: people.length === 0, alone_observed: aloneObservedUntil !== null && aloneObservedUntil > now, alone_observed_until: aloneObservedUntil, child_present: people.some((p) => p.band === "child"), updated_at: now };
 }
 
 export function getScene(conversationId: string, now = Date.now()): Scene | null {
@@ -90,7 +96,7 @@ export function observeSceneClaims(conversationId: string, observations: readonl
 export function observationsForTurn(input: { surface: Surface; deviceId?: string; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; now: number }): SceneObservation[] {
   const result: SceneObservation[] = [];
   for (const p of input.present ?? []) {
-    if (input.speakerEvidence?.person && p.person === input.speakerEvidence.person) continue;
+    if (!input.speakerEvidence && p.person === input.actorId) continue;
     const sensor: SceneObservation["source"]["sensor"] = p.basis === "face" ? "face" : p.basis === "voice" || p.basis === "voice_and_face" ? "voice" : p.basis === "signed_in" ? "signed_in" : "typed";
     result.push({ id: `present-${sensor}-${input.now}-${p.person ?? "unknown"}`, source: { surface: input.surface, device_id: input.deviceId ?? null, sensor }, kind: "person_here", value: { person_id: p.person?.startsWith("person-") ? p.person : null, label: null, relation: "unknown", band: "unknown", level: p.level === "confirmed" ? "confirmed" : "tentative" }, confidence: p.level === "confirmed" ? 0.95 : 0.5, strength: p.level === "confirmed" ? "strong" : "weak", at: input.now, expires_at: input.now + SCENE_TTL[sensor as keyof typeof SCENE_TTL] });
   }
