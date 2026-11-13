@@ -140,13 +140,13 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
   }),
   // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 2 item 8): the end-of-turn acknowledgement and its protected overlap
   // window. Household, admin, advanced; adults only whatever it says (lib/talkOver.ts grants nothing to a minor or a robot, rule 0).
-  // Default off until the bench's wrong-start rate is 10 percent or under at gentle (section 5).
+  // Default gentle (owner decision 2026-11-12), the same default the shared spec carries since spec-v0.1.371.
   SettingsKey.parse({
     key: "voice.talk_over",
     scope: "household",
     selector: "select",
     range: { options: ["off", "gentle", "natural"] },
-    default: "off",
+    default: "gentle",
     label: "Talk before I finish",
     copy: {
       does: "Home gives a short \"mm-hm\" the moment your sentence sounds finished, then answers.",
