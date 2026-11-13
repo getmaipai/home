@@ -8,10 +8,10 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, hasWhisperTag, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnUtterance, voiceForTurn } from "@/routes/turn";
+import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnConversationId, turnUtterance, voiceForTurn } from "@/routes/turn";
 import { chooseDelivery } from "@/lib/deliveryChoice";
 import { abortConversationPrewarm } from "@/lib/prefixPrewarm";
-import { isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
+import { isWhisperMode, isWhisperTurn, noteWhisperTag } from "@/lib/whisperTurns";
 
 export const ttsRoutes = apiRouter();
 
@@ -69,8 +69,8 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   let spoken = body.text;
   // WHISPER-01: the model marked this reply as whispered. Only where voice cues are allowed (never a child or a teen), and no laugh or sigh is added to a whisper.
   // The tag comes with the first sentence, which can be spoken before the turn machine has finished the reply, so it is noted here too.
-  if (body.turn_id && hasWhisperTag(body.text)) markWhisperTurn(body.turn_id);
-  const whisper = Boolean(body.turn_id && isWhisperTurn(body.turn_id) && turnAllowsVoiceCues(body.turn_id, actor.id));
+  if (body.turn_id && hasWhisperTag(body.text)) noteWhisperTag("whisper", body.turn_id, actor.id, turnConversationId(body.turn_id, actor.id));
+  const whisper = Boolean(body.turn_id && (isWhisperTurn(body.turn_id) || isWhisperMode(actor.id, turnConversationId(body.turn_id, actor.id))) && turnAllowsVoiceCues(body.turn_id, actor.id));
   if (body.turn_id && !whisper) {
     const configured = getHouseholdSettingValue("voice.hesitations");
     const level = HESITATION_LEVELS.includes(configured as HesitationLevel) ? (configured as HesitationLevel) : DEFAULT_HESITATION_LEVEL;

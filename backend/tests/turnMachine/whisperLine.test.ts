@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { contextToMessages } from "@/lib/turnMachine/messages";
-import { WHISPER_LINE, whisperLineFor } from "@/lib/turnMachine/whisperLine";
+import { WHISPER_LINE, WHISPER_MODE_LINE, whisperLineFor } from "@/lib/turnMachine/whisperLine";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import { buildStablePrefix } from "@/lib/turnShared";
@@ -21,6 +21,13 @@ describe("WHISPER-01 whisper line", () => {
     expect(whisperLineFor("spoken", "adult")).toBe(WHISPER_LINE);
     expect(whisperLineFor(undefined, "adult")).toBe(WHISPER_LINE);
     for (const [surface, band] of [["written", "adult"], ["glance", "adult"], ["spoken", "teen"], ["spoken", "child"]] as const) expect(whisperLineFor(surface, band)).toBe("");
+  });
+  test("while the whisper is on, the mode line replaces it and says nothing about tags", () => {
+    expect(whisperLineFor("spoken", "adult", true)).toBe(WHISPER_MODE_LINE);
+    expect(WHISPER_MODE_LINE).toContain("[normal voice]");
+    expect(WHISPER_MODE_LINE).toContain("Do not write [whispering]");
+    expect(whisperLineFor("spoken", "teen", true)).toBe("");
+    expect(whisperLineFor("written", "adult", true)).toBe("");
   });
   test("the line follows the stable prefix, which stays what the warm-up primes", async () => {
     const text = system("adult", "spoken");

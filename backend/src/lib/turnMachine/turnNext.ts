@@ -27,8 +27,8 @@ import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamRe
 import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
-import { hasWhisperTag, stripCueTags, stripWhisperTags } from "@/lib/voiceCues";
-import { markWhisperTurn } from "@/lib/whisperTurns";
+import { hasNormalVoiceTag, hasWhisperTag, stripCueTags, stripWhisperTags } from "@/lib/voiceCues";
+import { isWhisperMode, noteWhisperTag } from "@/lib/whisperTurns";
 import { getDeviceById } from "@/lib/devices";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
@@ -733,7 +733,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     persona,
     answerVia,
     topicBlock: topicBlockForTurn(actor, band),
-    languageLine: [isWrittenAdultTurn(surfaceClass, band) ? languageLineFor(resolveLocale(actor), surfaceClass, band) : "", whisperLineFor(surfaceClass, band)].filter(Boolean).join("\n\n"),
+    languageLine: [isWrittenAdultTurn(surfaceClass, band) ? languageLineFor(resolveLocale(actor), surfaceClass, band) : "", whisperLineFor(surfaceClass, band, isWhisperMode(actor.id, conversation.id))].filter(Boolean).join("\n\n"),
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
@@ -1014,7 +1014,9 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
 async function finalizeNextReply(state: TurnState, rawValue: TurnValue): Promise<TurnValue> {
   // REG-02: the composer, never the model, adds nonverbal cues, and only to the spoken rendering; a tag the model wrote is dropped from the reply.
   // WHISPER-01: a whispered reply is noted for the speech route, and the tag is never shown or stored.
-  if (hasWhisperTag(rawValue.reply.text) || (rawValue.reply.speech !== undefined && hasWhisperTag(rawValue.reply.speech))) markWhisperTurn(state.turnId);
+  const seen = (check: (text: string) => boolean) => check(rawValue.reply.text) || (rawValue.reply.speech !== undefined && check(rawValue.reply.speech));
+  if (seen(hasNormalVoiceTag)) noteWhisperTag("normal", state.turnId, state.actor.id, state.conversationId);
+  else if (seen(hasWhisperTag)) noteWhisperTag("whisper", state.turnId, state.actor.id, state.conversationId);
   const taggedText = stripWhisperTags(stripCueTags(rawValue.reply.text));
   const cleanText = rawValue.source === "model" ? trimClosers(taggedText) : taggedText;
   const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripWhisperTags(stripCueTags(rawValue.reply.speech));

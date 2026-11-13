@@ -17,7 +17,7 @@ import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue, pickStillCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
-import { createWhisperDeltaFilter, markWhisperTurn } from "@/lib/whisperTurns";
+import { createWhisperDeltaFilter, noteWhisperTag } from "@/lib/whisperTurns";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safetyRefusalLine } from "@/lib/failureCopy";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
@@ -230,6 +230,12 @@ export function turnUtterance(turnId: string, ownerId: string): string | undefin
 export function voiceForTurn(turnId: string, ownerId: string): string | undefined {
   const session = inFlightTurns.get(turnId);
   return session && session.ownerId === ownerId ? voiceForSpeech({ actor: session.viewer, ...(session.deviceId ? { deviceId: session.deviceId } : {}) }) : undefined;
+}
+
+/** WHISPER-01: the conversation an in-flight turn belongs to (the speech route asks whether it is in whisper mode). */
+export function turnConversationId(turnId: string, ownerId: string): string | undefined {
+  const session = inFlightTurns.get(turnId);
+  return session && session.ownerId === ownerId ? session.conversationId : undefined;
 }
 
 export function turnAllowsVoiceCues(turnId: string, ownerId: string): boolean {
@@ -744,7 +750,7 @@ export async function* streamTurnEvents(
   // feedThinkSplit() (mid-stream) or flushThinkSplit() (once, at the
   // end) - the mapping itself doesn't care which.
   // WHISPER-01: a whisper tag is noted for the speech route and never streamed.
-  const whisperFilter = createWhisperDeltaFilter(() => markWhisperTurn(result.turnId));
+  const whisperFilter = createWhisperDeltaFilter((kind) => noteWhisperTag(kind, result.turnId, actorId, result.conversationId));
   function* spanEvents(spans: readonly ThinkSpan[]): Generator<TurnStreamEvent, void, void> {
     for (const span of spans) {
       if (span.reasoning) {

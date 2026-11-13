@@ -294,16 +294,24 @@ export function __resetVoiceCueStateForTests(): void {
   states.clear();
 }
 
-// WHISPER-01: "whisper" is a delivery for the whole reply, not a nonverbal sound. The turn machine notes it (lib/whisperTurns.ts) and hides it;
-// the speech path then speaks the reply from the voice's whisper sample. It is kept apart from KNOWN_CUE_TAGS on purpose: no engine advertises it.
+// WHISPER-01: "whisper" is a delivery for the reply (and, once the person asks for it, for the rest of the conversation), not a nonverbal sound.
+// The turn machine notes it (lib/whisperTurns.ts) and hides it; the speech path then speaks from the voice's whisper sample. It is kept apart
+// from KNOWN_CUE_TAGS on purpose: no engine advertises it. `[normal voice]` ends a whisper the person asked for.
 const WHISPER_TAG_PATTERN = /\s*\[\s*(?:whisper|whispers|whispering|whispered)\s*\](?!\()/gi;
+const NORMAL_VOICE_TAG_PATTERN = /\s*\[\s*(?:normal voice|speaking normally|stop whispering)\s*\](?!\()/gi;
 
 export function hasWhisperTag(text: string): boolean {
   WHISPER_TAG_PATTERN.lastIndex = 0;
   return text.includes("[") && WHISPER_TAG_PATTERN.test(text);
 }
 
+export function hasNormalVoiceTag(text: string): boolean {
+  NORMAL_VOICE_TAG_PATTERN.lastIndex = 0;
+  return text.includes("[") && NORMAL_VOICE_TAG_PATTERN.test(text);
+}
+
+/** Removes the whisper tag and the end-whisper tag: neither is ever shown or stored. */
 export function stripWhisperTags(text: string): string {
   if (!text.includes("[")) return text;
-  return tidy(text.replace(WHISPER_TAG_PATTERN, ""));
+  return tidy(text.replace(WHISPER_TAG_PATTERN, "").replace(NORMAL_VOICE_TAG_PATTERN, ""));
 }

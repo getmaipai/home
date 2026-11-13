@@ -13,8 +13,8 @@ import { clonedVoiceUrl, deleteClonedVoice, saveClonedVoice, whisperSamplePath, 
 import { __setClonedVoiceTranscriberForTests, transcribeClonedVoiceOnce } from "@/lib/clonedVoiceTranscript";
 import { clonedVoicesDir } from "@/lib/paths";
 import { __resetWhisperSamplesForTests, ensureWhisperSample, hasWhisperSample, makeMissingWhisperSamples, WHISPER_SAMPLE_TEXT } from "@/lib/whisperSample";
-import { hasWhisperTag, stripWhisperTags } from "@/lib/voiceCues";
-import { __resetWhisperTurnsForTests, createWhisperDeltaFilter, isWhisperTurn, markWhisperTurn } from "@/lib/whisperTurns";
+import { hasNormalVoiceTag, hasWhisperTag, stripWhisperTags } from "@/lib/voiceCues";
+import { __resetWhisperTurnsForTests, createWhisperDeltaFilter, isWhisperMode, isWhisperTurn, markWhisperTurn, noteWhisperTag, setWhisperMode } from "@/lib/whisperTurns";
 
 const whisperAudio = new Uint8Array(120_000);
 whisperAudio.set([82, 73, 70, 70]); // "RIFF"
@@ -50,6 +50,24 @@ describe("whisper tags and turns", () => {
     }
     expect(stripWhisperTags("Read [whispering](https://example.com) now")).toBe("Read [whispering](https://example.com) now");
     expect(hasWhisperTag("A plain reply [1].")).toBe(false);
+  });
+  test("the end-whisper tag is found and hidden", () => {
+    expect(hasNormalVoiceTag("[normal voice] Sure, back to normal.")).toBe(true);
+    expect(stripWhisperTags("[normal voice] Sure, back to normal.")).toBe("Sure, back to normal.");
+    expect(hasNormalVoiceTag("A normal voice [1].")).toBe(false);
+  });
+  test("whisper mode holds for the conversation until the end-whisper tag, and only for that person and conversation", () => {
+    __resetWhisperTurnsForTests();
+    expect(isWhisperMode("p1", "c1")).toBe(false);
+    noteWhisperTag("whisper", "t1", "p1", "c1");
+    expect(isWhisperMode("p1", "c1")).toBe(true);
+    expect(isWhisperTurn("t1")).toBe(true);
+    expect(isWhisperMode("p1", "c2")).toBe(false);
+    expect(isWhisperMode("p2", "c1")).toBe(false);
+    noteWhisperTag("normal", "t2", "p1", "c1");
+    expect(isWhisperMode("p1", "c1")).toBe(false);
+    setWhisperMode(undefined, "c1", true);
+    expect(isWhisperMode(undefined, "c1")).toBe(false);
   });
   test("a marked turn stays marked, an unmarked one does not", () => {
     __resetWhisperTurnsForTests();
@@ -153,6 +171,12 @@ describe("whisper tag in the streamed reply", () => {
   test("a whole tag is noted and never streamed", () => {
     expect(run(["[whispering] Come closer."])).toEqual({ out: "Come closer.", noted: 1 });
     expect(run(["Oh! [whispers] Come closer."])).toEqual({ out: "Oh! Come closer.", noted: 1 });
+  });
+  test("an end-whisper tag is reported as normal and hidden", () => {
+    const kinds: string[] = [];
+    const filter = createWhisperDeltaFilter((kind) => { kinds.push(kind); });
+    expect(filter.feed("[normal ") + filter.feed("voice] Sure.") + filter.flush()).toBe("Sure.");
+    expect(kinds).toEqual(["normal"]);
   });
   test("a tag split across chunks is held until it is whole", () => {
     expect(run(["[whi", "spering] Come", " closer."])).toEqual({ out: "Come closer.", noted: 1 });
