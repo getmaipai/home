@@ -39,4 +39,30 @@ describe("local picture operations", () => {
     expect([result.width, result.height]).toEqual([32, 32]);
     expect((await sharp(result.png).metadata()).hasAlpha).toBe(true);
   });
+
+  test("auto tone lifts a dark low-contrast picture without crushing its shadows, and leaves a well exposed one almost alone", async () => {
+    const make = async (dark: boolean) => {
+      const w = 64, h = 64; const raw = Buffer.alloc(w * h * 3);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const t = (x + y) / (w + h - 2); const i = (y * w + x) * 3;
+        const px = dark ? [20 + t * 30, 18 + t * 28, 25 + t * 30] : [20 + t * 215, 25 + t * 200, 30 + t * 190];
+        if (dark && x < 8 && y < 8) px.fill(0);
+        raw[i] = px[0]!; raw[i + 1] = px[1]!; raw[i + 2] = px[2]!;
+      }
+      return new Uint8Array(await sharp(raw, { raw: { width: w, height: h, channels: 3 } }).png().toBuffer());
+    };
+    const stats = async (png: Uint8Array) => {
+      const { data } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });
+      const sorted = Array.from(data).sort((a, b) => a - b);
+      return { mean: sorted.reduce((a, b) => a + b, 0) / sorted.length, black: sorted.filter((v) => v <= 2).length / sorted.length, p5: sorted[Math.floor(sorted.length * 0.05)]! };
+    };
+    const dark = await make(true); const good = await make(false);
+    const darkBefore = await stats(dark); const darkAfter = await stats((await processLocalPicture(dark, { operation: "adjust", auto: true })).png);
+    expect(darkAfter.mean).toBeGreaterThan(darkBefore.mean);
+    expect(darkAfter.p5).toBeGreaterThan(darkBefore.p5 - 1);
+    expect(darkAfter.black).toBeLessThanOrEqual(darkBefore.black);
+    const goodBefore = await stats(good); const goodAfter = await stats((await processLocalPicture(good, { operation: "adjust", auto: true })).png);
+    expect(Math.abs(goodAfter.mean - goodBefore.mean) / goodBefore.mean).toBeLessThan(0.05);
+    expect(goodAfter.black).toBeLessThan(0.02);
+  });
 });

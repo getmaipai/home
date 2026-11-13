@@ -225,6 +225,33 @@ describe("picture editor routes", () => {
     expect((await client.get("/api/image-edit/jobs/job-2")).status).toBe(404);
   });
 
+  test("Stop cancels the Stack job once, and a result that finishes later is dropped and never kept", async () => {
+    const { client, actor } = await owner();
+    const stub = stubStack();
+    stub.script.reply = async () => ({ kind: "running", job: "job-late" });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const png = new Uint8Array(Buffer.from(await pngBase64(), "base64"));
+    (stub.client as unknown as { imageEditResult: () => Promise<Uint8Array> }).imageEditResult = async () => { await gate; return png; };
+    __setStackClientForTests(stub.client);
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("no conversation");
+    const picture = await upload(client, conversation.value.id);
+    const mask = new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 3, background: "white" } }).png().toBuffer());
+    await client.postForm(`/api/image-edit/pictures/${picture.id}/edit`, editForm(conversation.value.id, { operation: "erase" }, mask));
+    stub.script.job = () => ({ id: "job-late", state: "done", percent: 100, position: null });
+    const poll = client.get("/api/image-edit/jobs/job-late");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await client.request("/api/image-edit/jobs/job-late", { method: "DELETE" })).status).toBe(200);
+    release();
+    const late = (await (await poll).json()) as { state: string; preview?: unknown };
+    expect(late.state).toBe("cancelled");
+    expect(late.preview).toBeUndefined();
+    expect(stub.calls.cancelled).toEqual(["job-late"]);
+    expect((await client.get("/api/image-edit/jobs/job-late")).status).toBe(404);
+    expect(db.select().from(attachments).all().filter((row) => row.provenance.startsWith("image-edit:"))).toHaveLength(0);
+  });
+
   test("a job the tool declines (no subject found) reads as a plain failure with the Stack's sentence", async () => {
     const { client, actor } = await owner();
     const stub = stubStack();
