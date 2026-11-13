@@ -58,7 +58,8 @@ describe("film engine entry", () => {
     expect("productionId" in result).toBe(true);
     if (!("productionId" in result)) return;
     const production = getMediaProduction(actor, result.productionId)!;
-    expect(image.submitted.filter((body) => body.size === "1024x576")).toHaveLength(4); // one optional subject sheet and three stills
+    expect(image.submitted.filter((body) => body.size === "1024x576")).toHaveLength(3); // the three stills
+    expect(image.submitted.filter((body) => body.size === "1024x1024" && String(body.prompt).startsWith("A clean picture of"))).toHaveLength(1); // the new character's portrait, which the one sheet builder (CREATOR-06) makes the look sheet from
     expect(video.submitted).toHaveLength(3);
     expect(music.submitted).toHaveLength(1);
     expect(edit.jobs).toHaveLength(2);

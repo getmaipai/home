@@ -179,5 +179,5 @@ async function doCapture(actor: PersonRow, ref: string, options: CaptureOptions)
   const kept = (JSON.parse(latest.referenceIds) as string[]).filter((id) => { const file = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, id)).get(); return !(file && sheetNote(file.provenance)); });
   db.update(mediaSubjects).set({ referenceIds: JSON.stringify([...kept, stored.value.id]), lockedDescription: locked, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, row.id)).run();
   const fresh = (await resolveCast(actor, [ref])).members[0] ?? member;
-  return { ok: true, member: fresh, sheet_file_id: stored.value.id, reused: false, description: made.description, locked_description: locked, notes: made.notes };
+  return { ok: true, member: fresh, sheet_file_id: stored.value.id, reused: false, description: made.description, locked_description: locked, notes: member.real ? made.notes : [] };
 }
