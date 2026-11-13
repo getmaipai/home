@@ -37,6 +37,15 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); globalThis.fetch = baseFetch; });
 
+const openMenu = (trigger: HTMLElement) => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" }); };
+const withJobs = (cards: unknown[]) => {
+  const before = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url === "/api/music/jobs" && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json(cards));
+    return before(input, init);
+  }) as typeof fetch;
+};
 const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
 
 describe("Create controls", () => {
@@ -142,27 +151,64 @@ describe("Create controls", () => {
     expect(view.getByRole("button", { name: "Generate" }).getAttribute("aria-disabled")).toBe("true");
   });
 
-  test("Your songs shows a tile with a Remix action that opens the panel, never chat", async () => {
+  test("Your songs shows a row whose More menu has Remix, and it opens the panel, never chat", async () => {
     const view = open();
-    const remix = await view.findByRole("link", { name: "Remix" });
+    openMenu(await view.findByRole("button", { name: "More about Neon Rain" }));
+    const remix = await view.findByRole("menuitem", { name: "Remix" });
     expect(remix.getAttribute("href")).toContain("remix=1");
     expect(remix.getAttribute("href")).not.toContain("/chat");
+    for (const label of ["Open in Studio", "Extract stems", "Use in a video", "Download", "Make another like this", "Delete song"]) expect(view.getByRole("menuitem", { name: label })).toBeTruthy();
+  });
+});
+
+describe("Your songs list", () => {
+  test("a row plays its song from the cover button and says Pause while it plays", async () => {
+    const view = open();
+    const play = await view.findByRole("button", { name: "Play Neon Rain" });
+    expect(play.closest('[data-testid="music-song-row"]')).toBeTruthy();
+    fireEvent.click(play);
+    await waitFor(() => expect(view.getByRole("button", { name: /Play Neon Rain|Pause Neon Rain/ })).toBeTruthy());
+  });
+  test("search and the Sounds chip narrow the list, and an empty result says so with a way back", async () => {
+    const view = open();
+    await view.findByRole("button", { name: "Open Neon Rain" });
+    fireEvent.change(view.getByLabelText("Search your songs"), { target: { value: "zzz" } });
+    expect(await view.findByText("No song matches that.")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Clear the search" }));
+    expect(await view.findByRole("button", { name: "Open Neon Rain" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Sounds" }));
+    await waitFor(() => expect(view.queryByRole("button", { name: "Open Neon Rain" })).toBeNull());
+  });
+  test("Delete from the More menu moves the song to Trash at once, with Undo and no question", async () => {
+    const view = open();
+    openMenu(await view.findByRole("button", { name: "More about Neon Rain" }));
+    fireEvent.click(await view.findByRole("menuitem", { name: "Delete song" }));
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/music/jobs/mus-1/delete" && call.method === "POST")).toBe(true));
+    expect(view.queryByRole("alertdialog")).toBeNull();
+  });
+  test("a song asked for as takes is one row with a take strip that plays each take", async () => {
+    withJobs([{ ...song, id: "mus-t", title: "Three Ways", takes: { group: "g", index: 0, total: 2 }, versions: [{ id: "t1", label: "Take 1", url: "/t/1", seed: 5 }, { id: "t2", label: "Take 2", url: "/t/2", seed: 6 }], current_id: "t1" }]);
+    const view = open();
+    expect(await view.findByText("2 takes")).toBeTruthy();
+    const strip = within(await view.findByRole("group", { name: "Takes of Three Ways" }));
+    expect(strip.getAllByRole("button").map((button) => button.textContent)).toEqual(["Take 1", "Take 2"]);
+    expect(view.getAllByTestId("music-song-row")).toHaveLength(1);
+  });
+  test("the hub's locked tile is one plain row and is never opened", async () => {
+    withJobs([{ locked: true, making: false }]);
+    const view = open();
+    expect(await view.findByTestId("music-locked-row")).toBeTruthy();
+    expect(view.queryByTestId("music-song-row")).toBeNull();
   });
 });
 
 describe("Delete song", () => {
-  test("asks in a modal dialog first, and only the confirm button deletes", async () => {
+  test("from the details it deletes at once and offers Undo instead of asking", async () => {
     const view = open("?song=mus-1");
-    fireEvent.click(await view.findByRole("button", { name: "Delete song" }));
-    const dialog = await view.findByRole("alertdialog");
-    expect(dialog.textContent).toContain("Neon Rain");
-    expect(calls.some((call) => call.url.endsWith("/delete"))).toBe(false);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
-    await waitFor(() => expect(view.queryByRole("alertdialog")).toBeNull());
-    expect(calls.some((call) => call.url.endsWith("/delete"))).toBe(false);
-    fireEvent.click(view.getByRole("button", { name: "Delete song" }));
-    fireEvent.click(within(await view.findByRole("alertdialog")).getByRole("button", { name: "Delete song" }));
+    openMenu(within(await view.findByTestId("music-song-details")).getByRole("button", { name: "More about Neon Rain" }));
+    fireEvent.click(await view.findByRole("menuitem", { name: "Delete song" }));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/music/jobs/mus-1/delete" && call.method === "POST")).toBe(true));
+    expect(view.queryByRole("alertdialog")).toBeNull();
   });
 });
 
@@ -188,14 +234,6 @@ describe("Remix panel", () => {
 });
 
 describe("Song cards that are stopped or stuck", () => {
-  const withJobs = (cards: unknown[]) => {
-    const before = globalThis.fetch;
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url === "/api/music/jobs" && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json(cards));
-      return before(input, init);
-    }) as typeof fetch;
-  };
   test("a stopped song says Stopped and offers Try again", async () => {
     withJobs([{ ...song, id: "mus-stopped", state: "cancelled", progress: 0, title: "Quiet Rain", versions: [] }]);
     const view = open();

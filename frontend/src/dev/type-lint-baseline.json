@@ -20,7 +20,7 @@
     "shell/InstallDock.tsx": 5,
     "shell/InstallStrip.tsx": 3,
     "shell/GlobalMiniPlayer.tsx": 3,
-    "shell/pages/MusicWorkspacePage.tsx": 15,
+    "shell/pages/MusicWorkspacePage.tsx": 10,
     "shell/pages/RepairsPage.tsx": 2,
     "shell/pages/settings/ChatSkillsSection.tsx": 2,
     "shell/pages/settings/SettingsAreaPage.tsx": 1,
