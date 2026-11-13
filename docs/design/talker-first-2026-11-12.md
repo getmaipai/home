@@ -197,7 +197,7 @@ cost and the A/B bounds it.
 **Failure modes.**
 1. A first sentence the 27B would not have said: "Ooh, good one." before bad news or a refusal. Measured in shadow
    (compatibility share) and the A/B (seam rate).
-2. Double speaking: "Okay, so. Sure! So..." when the 27B adds its own opener after the prefill. Measured (double-opener rate).
+2. Double speaking: "Okay, so. Sure! So..." when the 27B adds its own opener after the prefill. Measured (double-opener rate). <!-- prose-lint: allow -->
 3. Prosody seams: two utterances with a reset between them. Mitigated by the whole-sentence rule; judged by ear on 10 turns.
 4. History drift: every stored reply now starts with a short opener, and the 27B copies the pattern into written replies or
    repeats the same opener. Mitigated by the recent-openers list and `NONE`; measured by rule 3's repetition measure on spoken
