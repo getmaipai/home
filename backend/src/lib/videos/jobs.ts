@@ -31,6 +31,11 @@ import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
+import { checkClipFile } from "./stackClipCheck";
+import { shouldRetake, keepBetter, type ClipCheck } from "./frameCheck";
+import { attachmentFilePath } from "@/lib/attachments";
+import { updateCreationReview, creationOfFile } from "@/lib/creations/store";
+import { randomInt } from "node:crypto";
 
 export type VideoJobKind = "generate" | "animate" | "edit";
 export type VideoJobState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -133,6 +138,8 @@ export interface VideoRequest {
   adultLock?: "on" | "off";
   /** CREATOR-02: set on an Another take: the job it repeats. The finished clip's creation record takes that job's record as its parent. */
   anotherOf?: string;
+  /** CREATOR-10: this take was automatically made from a checked clip. */
+  retake_of?: string;
   /** REFVIDEO-01: set on a clip made from reference sheets (see `ReferenceRecipe`). */
   reference?: ReferenceRecipe;
   /** REFVIDEO-STEPS-01: the two-step progress of a video made from pictures (set from the start, before the recipe exists). */
@@ -142,6 +149,9 @@ export interface VideoRequest {
     note?: string };
   background?: string;
 }
+
+let clipCheck: typeof checkClipFile = checkClipFile;
+export function __setClipCheckForTests(fn: typeof checkClipFile | null): void { clipCheck = fn ?? checkClipFile; }
 
 export interface VideoJob {
   id: string;
@@ -508,6 +518,7 @@ export interface StartVideoInput {
   adultOnly?: boolean;
   /** ADULT-LOCK-06: the source's Adult lock (`on` or `off`) when `adultOnly` comes from a source clip; absent means on. */
   adultLock?: "on" | "off";
+  retakeOf?: string;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -530,7 +541,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.retakeOf ? { retake_of: input.retakeOf, anotherOf: input.retakeOf } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -740,6 +751,41 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   if (!job.temporary) safely(() => recordClipCreation(actor, job, job.files, writer, creationId));
   void notifyClipReady(job, actor);
   if (writer === "video-gen" && job.files[0] && job.request.production_id && job.request.shot_id) setShotClip(actor.id, job.request.production_id, job.request.shot_id, job.files[0].id);
+  if (!job.temporary && writer === "video-gen" && job.kind !== "edit" && job.files[0]) void runStoredClipCheck(job, actor);
+}
+
+async function runStoredClipCheck(job: VideoJob, actor: PersonRow): Promise<void> {
+  const file = job.files[0];
+  if (!file) return;
+  try {
+    const row = db.select({ storagePath: attachments.storagePath }).from(attachments).where(eq(attachments.id, file.id)).get();
+    if (!row) return;
+    const result: ClipCheck = await clipCheck(attachmentFilePath(row.storagePath), {});
+    if (!result.checked) return;
+    updateCreationReview(actor.id, file.id, { checks: { clip: { findings: result.findings, frames: result.frames, checked_at: new Date().toISOString() } } });
+    if (result.findings.length) job.request.create = { ...(job.request.create ?? {}), note: [...new Set([job.request.create?.note, ...result.findings.map((f) => f.message)].filter(Boolean))].join(" ") };
+    saveVideoJob(job);
+    if (job.request.retake_of) {
+      const firstJob = getVideoJobFor(actor, job.request.retake_of);
+      const first = firstJob?.files[0] ? creationOfFile(actor.id, firstJob.files[0].id) : null;
+      const prior = (first?.checks as { clip?: { findings?: ClipCheck["findings"] } } | null)?.clip?.findings ?? [];
+      const winner = keepBetter(prior, result.findings);
+      if (firstJob?.files[0]) updateCreationReview(actor.id, firstJob.files[0].id, { review: winner === "first" ? "kept" : "rejected" });
+      updateCreationReview(actor.id, file.id, { review: winner === "second" ? "kept" : "rejected" });
+      return;
+    }
+    if (!shouldRetake({ findings: result.findings, isRetake: false })) return;
+    const savedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
+    if (!savedBody) return;
+    const body = { ...savedBody, seed: randomInt(1, 2_147_483_647) };
+    const retake = await startVideoJob({ actor, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId, temporary: false, kind: "generate", prompt: job.prompt, body, sourceFileId: job.request.source_file_id, endFileId: job.request.end_file_id, productionId: job.request.production_id, shotId: job.request.shot_id, subjectIds: job.request.subject_ids, tier: job.request.tier ?? "standard", create: job.request.create, adultOnly: job.request.adultOnly, adultLock: job.request.adultLock, retakeOf: job.id });
+    retake.request.adultOnly = job.request.adultOnly;
+    retake.request.adultLock = job.request.adultLock;
+    retake.request.reference = job.request.reference;
+    retake.request.refProgress = job.request.refProgress;
+    saveVideoJob(retake);
+    markAnotherTake(retake, job);
+  } catch { /* a quality check never affects a finished clip */ }
 }
 
 async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signal: AbortSignal): Promise<void> {

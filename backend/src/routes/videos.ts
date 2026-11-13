@@ -137,7 +137,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.request.reference?.request ?? job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
-    note: job.state === "done" ? job.request.edit?.note ?? null : null,
+    note: job.state === "done" ? job.request.edit?.note ?? job.request.create?.note ?? null : null,
     ...(job.request.refProgress && (job.state === "queued" || job.state === "running") ? { phases: referenceSteps(job.request.refProgress) } : {}),
     ...(job.request.reference?.sheetFileIds.length ? { sheets: job.request.reference.sheetFileIds.map((id) => `/api/files/${encodeURIComponent(id)}/content`) } : {}),
     ...qualityFields(job, ready),
@@ -334,7 +334,7 @@ videosRoutes.openapi(animatedRoute, async (c) => {
 const checkClipRoute = createRoute({
   method: "get", path: "/jobs/{id}/check", tags: ["Videos"], summary: "A quick measured check of a finished clip", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: z.object({ checked: z.boolean().describe("False when the frames could not be read on this computer; then there are no findings and nothing is claimed."), frames: z.number(), findings: z.array(z.object({ code: z.enum(["black", "frozen", "soft"]), level: z.enum(["serious", "warning"]), message: z.string() })) }) } }, description: "The check" }, ...errorResponses({ 401: "Not signed in", 404: "No such finished video" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ checked: z.boolean().describe("False when the frames could not be read on this computer; then there are no findings and nothing is claimed."), frames: z.number(), findings: z.array(z.object({ code: z.enum(["black", "frozen", "soft", "jump", "camera_not_seen", "loop_seam"]), level: z.enum(["serious", "warning"]), message: z.string() })) }) } }, description: "The check" }, ...errorResponses({ 401: "Not signed in", 404: "No such finished video" }) },
 });
 videosRoutes.openapi(checkClipRoute, async (c) => {
   const actor = c.get("person");

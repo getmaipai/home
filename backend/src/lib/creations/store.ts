@@ -191,6 +191,19 @@ export function creationOfFile(personId: string, fileId: string): Creation | nul
   return row ? (JSON.parse(row.body) as Creation) : null;
 }
 
+/** Update advisory clip-check fields and take review without rewriting provenance. */
+export function updateCreationReview(personId: string, fileId: string, patch: { checks?: Record<string, unknown>; review?: Creation["review"] }): Creation | null {
+  try {
+    const row = rowOfFile(personId, fileId);
+    if (!row) return null;
+    const body = CreationRecord.parse(JSON.parse(row.body));
+    const record = CreationRecord.parse({ ...body, ...(patch.checks ? { checks: { ...(body.checks ?? {}), ...patch.checks } } : {}), ...(patch.review ? { review: patch.review } : {}), updated_at: new Date().toISOString(), hlc: nextHlc() });
+    if (validateCreationRecord(record).length) return null;
+    db.update(creations).set({ review: record.review, body: JSON.stringify(record), updatedAt: record.updated_at, hlc: record.hlc }).where(eq(creations.id, row.id)).run();
+    return record;
+  } catch { return null; }
+}
+
 export type CreationRead = { state: "ok"; creation: Creation } | { state: "locked" } | { state: "none" };
 
 /**
