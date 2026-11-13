@@ -84,18 +84,30 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/news/pages/saved.json` | news | Saved |
 | `backend/packages/news/pages/search.json` | news | Search |
 | `backend/packages/news/pages/story.json` | news | Story |
+| `backend/packages/podcasts/pages/categories.json` | podcasts | Categories |
+| `backend/packages/podcasts/pages/chapters.json` | podcasts | Chapters |
+| `backend/packages/podcasts/pages/cover-art.json` | podcasts | Cover art |
+| `backend/packages/podcasts/pages/downloads.json` | podcasts | Downloads |
 | `backend/packages/podcasts/pages/episode.json` | podcasts | Episode |
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
 | `backend/packages/podcasts/pages/filters.json` | podcasts | Filters |
+| `backend/packages/podcasts/pages/history.json` | podcasts | History |
 | `backend/packages/podcasts/pages/index.json` | podcasts | Podcasts |
+| `backend/packages/podcasts/pages/make-podcast.json` | podcasts | Make a podcast |
+| `backend/packages/podcasts/pages/new-episodes.json` | podcasts | New episodes |
 | `backend/packages/podcasts/pages/new-show.json` | podcasts | New show |
 | `backend/packages/podcasts/pages/play.json` | podcasts | Listen |
+| `backend/packages/podcasts/pages/podcast-voices.json` | podcasts | Voices |
 | `backend/packages/podcasts/pages/queue.json` | podcasts | Queue |
+| `backend/packages/podcasts/pages/recommended.json` | podcasts | Recommended |
+| `backend/packages/podcasts/pages/record.json` | podcasts | Record an episode |
 | `backend/packages/podcasts/pages/saved.json` | podcasts | Saved |
 | `backend/packages/podcasts/pages/search.json` | podcasts | Search podcasts |
 | `backend/packages/podcasts/pages/show.json` | podcasts | Podcast show |
 | `backend/packages/podcasts/pages/shows.json` | podcasts | Shows |
 | `backend/packages/podcasts/pages/stats.json` | podcasts | Stats |
+| `backend/packages/podcasts/pages/transcripts.json` | podcasts | Transcripts |
+| `backend/packages/podcasts/pages/trending.json` | podcasts | Trending |
 | `backend/packages/shows/pages/continue.json` | shows | Continue watching |
 | `backend/packages/shows/pages/film.json` | shows | Film |
 | `backend/packages/shows/pages/films.json` | shows | Films |
