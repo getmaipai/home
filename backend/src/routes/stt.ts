@@ -17,7 +17,7 @@ import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
-import { scoreEdgePartial, talkOverGrantFor } from "@/lib/talkOver";
+import { scoreEdgePartial, talkOverDecision } from "@/lib/talkOver";
 import { noteListeningActivity } from "@/lib/turnActivity";
 
 export const sttRoutes = apiRouter();
@@ -55,7 +55,8 @@ sttRoutes.get(
         // TALK-OVER-01: the grant is decided once per session from the signed-in person (an adult, not a robot device, the settings on);
         // a session with no grant gets no `talk_over` field and its edge partials carry no score, so an older or ungranted client has
         // nothing to act on.
-        const grant = talkOverGrantFor({ actor: c.get("person"), isRobot });
+        const decision = talkOverDecision({ actor: c.get("person"), isRobot });
+        const grant = decision.grant;
         void getEndpointer().then((endpointer) => {
           if (ended) return;
           // Every session's edge partial carries the end-of-turn score (the client starts no held run on an unfinished fragment); the
@@ -71,7 +72,7 @@ sttRoutes.get(
           });
           for (const frame of pendingPcm) session.pushPcm(frame);
           pendingPcm.length = 0;
-          ws.send(JSON.stringify(grant ? { t: "ready", talk_over: grant } : { t: "ready" }));
+          ws.send(JSON.stringify(grant ? { t: "ready", talk_over: grant } : { t: "ready", talk_over_reason: decision.reason }));
         });
       },
       onMessage(evt, ws) {
@@ -100,7 +101,7 @@ sttRoutes.get(
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
                 // STT-SMARTTURN-01 and TALK-OVER-01: the client's labels and counts for the speculative start and the acknowledgement clip.
-                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms, edge_partials: value.edge_partials, clip_started_ms: value.clip_started_ms, clip_ended_ms: value.clip_ended_ms, clip_completed: value.clip_completed, echo_drops: value.echo_drops });
+                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms, edge_partials: value.edge_partials, clip_started_ms: value.clip_started_ms, clip_ended_ms: value.clip_ended_ms, clip_completed: value.clip_completed, echo_drops: value.echo_drops, talk_over_reason: value.talk_over_reason, pool_size: value.pool_size });
               }
             }
           } catch {

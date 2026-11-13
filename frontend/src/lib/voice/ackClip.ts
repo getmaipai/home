@@ -62,7 +62,7 @@ export function trimSilence(buffer: AudioBuffer, context: Pick<AudioContext, "cr
 
 /** Render the pool in the given voice. Resolves when every clip that could be rendered is ready; a clip that fails is left out
  * (counts only, no text in the console). */
-export async function renderAckClips(clips: readonly string[], voice: string | undefined, options: { context?: AudioContext; signal?: AbortSignal; now?: () => number } = {}): Promise<AckClipPool> {
+export async function renderAckClips(clips: readonly string[], voice: string | undefined, options: { context?: AudioContext; signal?: AbortSignal; now?: () => number; onTrace?: (event: "clip_play" | "clip_end", extra?: Record<string, number | boolean>) => void } = {}): Promise<AckClipPool> {
   const context = options.context ?? sharedPlaybackContext();
   const now = options.now ?? (() => performance.now());
   const signal = options.signal ?? new AbortController().signal;
@@ -99,9 +99,10 @@ export async function renderAckClips(clips: readonly string[], voice: string | u
       const state = { ended: false, endedAt: null as number | null, completed: false };
       const handle: AckClipHandle = { durationMs, startedAt: at, get ended() { return state.ended; }, get endedAt() { return state.endedAt; }, get completed() { return state.completed; } };
       const release = () => { try { source.disconnect(); gain.disconnect(); } catch { /* fine */ } playing.delete(handle); };
-      source.onended = () => { if (state.ended) return; state.ended = true; state.completed = true; state.endedAt = now(); release(); };
+      options.onTrace?.("clip_play", { ms: durationMs });
+      source.onended = () => { if (state.ended) return; state.ended = true; state.completed = true; state.endedAt = now(); release(); options.onTrace?.("clip_end", { completed: true }); };
       // The call closing is the one early end: the source stops at once, and the handle says the clip did not complete.
-      closers.set(handle, () => { if (state.ended) return; state.ended = true; state.completed = false; state.endedAt = now(); try { source.stop(); } catch { /* already ended */ } release(); });
+      closers.set(handle, () => { if (state.ended) return; state.ended = true; state.completed = false; state.endedAt = now(); try { source.stop(); } catch { /* already ended */ } release(); options.onTrace?.("clip_end", { completed: false }); });
       playing.add(handle);
       return handle;
     },

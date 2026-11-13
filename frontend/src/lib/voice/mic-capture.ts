@@ -136,6 +136,8 @@ function releaseStream(stream: MediaStream, lease: MicLease | null) {
 export interface MicCaptureHandle {
   stop: () => void;
   sampleRate: number;
+  /** VOICE-TRACE-01: the processing the browser actually applied to the microphone track (from `getSettings()`), for the owner's trace. */
+  settings?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean; sampleRate?: number; channelCount?: number };
 }
 
 export interface MicCaptureOptions {
@@ -292,5 +294,11 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
     void ctx.close().catch(() => {});
   };
 
-  return { stop, sampleRate: TARGET_RATE };
+  let settings: MicCaptureHandle["settings"];
+  try {
+    const track = stream.getAudioTracks()[0];
+    const s = track?.getSettings?.() as (MediaTrackSettings & { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean }) | undefined;
+    if (s) settings = { echoCancellation: s.echoCancellation, noiseSuppression: s.noiseSuppression, autoGainControl: s.autoGainControl, sampleRate: s.sampleRate, channelCount: s.channelCount };
+  } catch { /* not every browser reports settings */ }
+  return { stop, sampleRate: TARGET_RATE, settings };
 }

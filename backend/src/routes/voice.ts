@@ -21,6 +21,8 @@ import { setPersonTtsVoiceUnchecked, resolveForResponse } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import { getStackUrl, getStackClient, stackFailureResult, isStackConfigured } from "@/lib/stackEngine";
 import { isOwnerOrAdmin, mayUseClipVoices } from "@/lib/access";
+import { requireRole } from "@/middleware/auth";
+import { storeVoiceTrace, VoiceTraceUploadSchema } from "@/lib/voiceTrace";
 import { ResolvedSettingSchema } from "@/routes/settings";
 import {
   listClonedVoices,
@@ -44,6 +46,26 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio, renderHouseholdVoice } from "@/lib/householdVoiceCheck";
 
 export const voiceRoutes = apiRouter();
+
+// VOICE-TRACE-01: an owner's live voice trace (event names and numbers only; see lib/voiceTrace.ts). Owner or admin only.
+const voiceTraceRoute = createRoute({
+  method: "post",
+  path: "/trace",
+  tags: ["Voice"],
+  summary: "Keep one utterance's voice-client trace (owner or admin)",
+  description: "Diagnostic: the voice client's timeline for one utterance, as event names from a fixed list and numbers (milliseconds, counts, booleans). No audio, no transcript, no words. The hub keeps the last 20 in local-app/voice-trace.json.",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: VoiceTraceUploadSchema } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ kept: z.boolean(), events: z.number() }) } }, description: "Kept." },
+    ...errorResponses({ 400: "Not a valid trace", 401: "Not signed in", 403: "Owner or admin only" }),
+  },
+});
+voiceRoutes.openapi(voiceTraceRoute, (c) => {
+  const upload = c.req.valid("json");
+  const row = storeVoiceTrace(upload, c.get("person").role);
+  return c.json({ kept: true, events: row.events.length }, 200);
+});
 
 const voiceSampleFlights = new Map<string, ReturnType<typeof singleflight<Response>>>();
 function fetchVoiceSample(url: string): Promise<Response> {

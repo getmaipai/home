@@ -51,7 +51,7 @@ function controlledSocket() {
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } } }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation, traceUtterances }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } }; traceUtterances?: number }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -89,6 +89,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
     installationNotice,
     idleCloseMs,
     speculation,
+    traceUtterances,
     createSocket: (handlers) => {
       if (socketFactory) return socketFactory(handlers);
       const connection = connectionCount.current++;
@@ -147,7 +148,7 @@ describe("live voice session", () => {
     const onVoiceTiming = mock();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }, { delayMs: 0, message: { t: "timing", speech_end_to_final_ms: 240, silence_wait_ms: 180 } }, { delayMs: 0, message: { t: "final", v: "hello" } }]} sentTexts={[]} onVoiceTiming={onVoiceTiming} />);
     await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
-    expect(onVoiceTiming).toHaveBeenCalledWith({ sttMs: 240, phase: "final", talkOver: { edge_partials: 0 } });
+    expect(onVoiceTiming).toHaveBeenCalledWith({ sttMs: 240, phase: "final", talkOver: { edge_partials: 0, talk_over_reason: "unknown", pool_size: 0 } });
   });
   test("a dropped listening connection reconnects once and the call goes back to Listening with no message", async () => {
     const onOpenChange = mock();
@@ -638,8 +639,9 @@ describe("live voice session", () => {
     const spoken = "a soft boiled egg takes about six minutes in boiling water".split(" ");
     expect(isOwnEcho("takes about six minutes", spoken)).toBe(true); // in order, every word
     expect(isOwnEcho("Boiled egg takes about six", spoken)).toBe(true);
-    expect(isOwnEcho("about six", spoken)).toBe(true); // two words as one exact run
-    expect(isOwnEcho("six about", spoken)).toBe(false); // two words out of order are not a run
+    expect(isOwnEcho("about six", spoken)).toBe(true); // two of her words
+    expect(isOwnEcho("six about", spoken)).toBe(true); // in any order: the recognizer reorders words of a reply heard back
+    expect(isOwnEcho("about please", spoken)).toBe(false); // one word she did not say
     expect(isOwnEcho("how long for a hard boiled one", spoken)).toBe(false); // the person's own question shares words but not enough in order
     expect(isOwnEcho("boiled", spoken)).toBe(true); // one of her own words, heard back as a fragment
     expect(isOwnEcho("no", [...spoken, "no"])).toBe(false); // a stop word is always the person, even right after she said it
@@ -699,6 +701,52 @@ describe("live voice session", () => {
       await waitFor(() => expect(sentTexts).toEqual(["wait what about poached eggs?"]));
       expect(timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ echo_drops: 2 });
     } finally { cancelTurn.mockRestore(); speculate.mockRestore(); }
+  });
+
+  test("VOICE-TRACE-01: with the trace on, an utterance's timeline (names and numbers only) is posted to the hub, with the grant's reason and the pool size on the timing report", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const posted: Array<{ session: string; utterance: number; events: Array<Record<string, unknown>> }> = [];
+    const post = spyOn(api, "postVoiceTrace").mockImplementation(async (upload) => { posted.push(upload as never); return { kept: true, events: upload.events.length }; });
+    try {
+      const socket = controlledSocket();
+      const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+      const timings: Array<{ phase?: string; talkOver?: Record<string, unknown> }> = [];
+      const renderClips = async () => ({ size: 2, play: () => null, stopAll: () => {} }) as never;
+      const createSocket = (handlers: SttSocketHandlers) => { const inner = socket.createSocket(handlers); setTimeout(() => handlers.onMessage({ t: "ready", talk_over: { level: "gentle", window_ms: 800, clips: ["Mm-hm."] } } as never), 1); return inner; };
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef, renderClips } as never} onVoiceTiming={(timing) => timings.push(timing as never)} traceUtterances={2} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "what is a good name for a small grey cat", edge: true, end: { score: 0.65, level: "natural", unfinished: false } } as never));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
+      await act(async () => { socket.send({ t: "final", v: "what is a good name for a small grey cat" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      await waitFor(() => expect(posted).toHaveLength(1));
+      const names = posted[0]!.events.map((event) => event.e);
+      expect(names).toEqual(expect.arrayContaining(["ready", "grant", "pool", "vad_on", "edge", "speculate", "timing", "final", "confirm", "turn_send"]));
+      expect(posted[0]!.events.find((event) => event.e === "edge")).toMatchObject({ words: 10, level: "natural", score: 0.7, speaking: false, mode: "listening" });
+      expect(posted[0]!.events.find((event) => event.e === "grant")).toMatchObject({ level: "gentle", window_ms: 800, clips: 1 });
+      expect(posted[0]!.events.find((event) => event.e === "pool")).toMatchObject({ size: 2 });
+      // Names and numbers only: the words never leave the page.
+      expect(JSON.stringify(posted[0])).not.toContain("grey");
+      expect(JSON.stringify(posted[0])).not.toContain("cat");
+      expect(timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ talk_over_reason: "granted", pool_size: 2 });
+    } finally { speculate.mockRestore(); post.mockRestore(); }
+  });
+
+  test("VOICE-TRACE-01: a session with no grant records the hub's reason, and the timing report carries it; without the flag nothing is posted", async () => {
+    const post = spyOn(api, "postVoiceTrace").mockResolvedValue({ kept: true, events: 0 });
+    try {
+      const socket = controlledSocket();
+      const timings: Array<{ phase?: string; talkOver?: Record<string, unknown> }> = [];
+      const createSocket = (handlers: SttSocketHandlers) => { const inner = socket.createSocket(handlers); setTimeout(() => handlers.onMessage({ t: "ready", talk_over_reason: "setting_off" } as never), 1); return inner; };
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef: { current: null } } as never} onVoiceTiming={(timing) => timings.push(timing as never)} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+      await act(async () => { socket.send({ t: "final", v: "what time is it?" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(timings.find((t) => t.phase === "final")?.talkOver).toMatchObject({ talk_over_reason: "setting_off", pool_size: 0 });
+      expect(post).not.toHaveBeenCalled();
+    } finally { post.mockRestore(); }
   });
 
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
