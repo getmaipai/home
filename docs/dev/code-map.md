@@ -545,7 +545,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn, emptyLookupLine |
-| `backend/src/lib/composer/modes.ts` | qualityFor, composerModesFor |
+| `backend/src/lib/composer/modes.ts` | qualityFor, composerModesFor, composerHintSpec |
+| `backend/src/lib/composerHint.ts` | composerHintAllowed, resolveComposerHint, composerHintItem, fillComposerDefaults |
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
 | `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
