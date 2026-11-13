@@ -621,6 +621,11 @@ msgid "{kind, select, band {That band was not saved. Try again.} album {That alb
 msgstr "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:125
+msgid "{kind} · {owner}"
+msgstr "{kind} · {owner}"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:70
 msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
@@ -965,7 +970,7 @@ msgid "{name} restarted."
 msgstr "{name} restarted."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:284
+#: src/shell/pages/PackageAppPage.tsx:285
 msgid "{name} sections"
 msgstr "{name} sections"
 
@@ -1118,17 +1123,17 @@ msgid "{pictures} and {videos}"
 msgstr "{pictures} and {videos}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:308
+#: src/shell/pages/PackageAppPage.tsx:309
 msgid "{place} is already in your list."
 msgstr "{place} is already in your list."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:319
+#: src/shell/pages/PackageAppPage.tsx:320
 msgid "{place} is your home place. Change it in Settings, Weather."
 msgstr "{place} is your home place. Change it in Settings, Weather."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:326
+#: src/shell/pages/PackageAppPage.tsx:327
 msgid "{place} removed from your list."
 msgstr "{place} removed from your list."
 
@@ -2686,6 +2691,7 @@ msgid "Album"
 msgstr "Album"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:33
 #: src/shell/pages/MusicStudioPages.tsx:144
 msgid "Albums"
 msgstr "Albums"
@@ -3181,7 +3187,7 @@ msgid "setting.coding.person.api_keys.label"
 msgstr "Api keys"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:284
+#: src/shell/pages/PackageAppPage.tsx:285
 msgid "App"
 msgstr "App"
 
@@ -3314,7 +3320,7 @@ msgstr "Approved. Waiting for the robot to finish pairing on its own end…"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
-#: src/shell/pages/PackageAppPage.tsx:198
+#: src/shell/pages/PackageAppPage.tsx:199
 #: src/shell/pages/status/StatusApps.tsx:114
 #: src/shell/phoneMenuLinks.tsx:31
 msgid "Apps"
@@ -3678,8 +3684,8 @@ msgstr "Azelma"
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:199
 #: src/shell/pages/packageAppHeaderBar.tsx:94
-#: src/shell/pages/PackageAppPage.tsx:283
 #: src/shell/pages/PackageAppPage.tsx:284
+#: src/shell/pages/PackageAppPage.tsx:285
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:188
@@ -3821,6 +3827,7 @@ msgstr "Band"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:340
+#: src/shell/pages/MusicLibraryColumn.tsx:34
 #: src/shell/pages/MusicStudioPages.tsx:143
 msgid "Bands"
 msgstr "Bands"
@@ -7172,7 +7179,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:291
+#: src/shell/pages/PackageAppPage.tsx:292
 msgid "Could not open this app. Check your connection and try again."
 msgstr "Could not open this app. Check your connection and try again."
 
@@ -7231,7 +7238,7 @@ msgid "Could not remove this piece."
 msgstr "Could not remove this piece."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:327
+#: src/shell/pages/PackageAppPage.tsx:328
 msgid "Could not remove this place."
 msgstr "Could not remove this place."
 
@@ -7717,6 +7724,11 @@ msgstr "Creating…"
 #: src/shell/pages/PersonProfilePage.tsx:173
 msgid "Creations"
 msgstr "Creations"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:42
+msgid "Creator"
+msgstr "Creator"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:636
@@ -9725,6 +9737,11 @@ msgid "Filter results by book"
 msgstr "Filter results by book"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:145
+msgid "Filter your music library"
+msgstr "Filter your music library"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:386
 msgid "Filters"
 msgstr "Filters"
@@ -10807,6 +10824,7 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
 #: src/shell/pages/DashboardPage.tsx:30
+#: src/shell/pages/MusicLibraryColumn.tsx:142
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:154
@@ -13767,6 +13785,7 @@ msgstr "Levels and models"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:87
+#: src/shell/pages/MusicLibraryColumn.tsx:154
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
@@ -14420,7 +14439,7 @@ msgid "Loading voices"
 msgstr "Loading voices"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:301
+#: src/shell/pages/PackageAppPage.tsx:302
 msgid "Loading weather"
 msgstr "Loading weather"
 
@@ -14454,6 +14473,11 @@ msgstr "Loading your keys"
 #: src/shell/pages/dashboard/HomeShelves.tsx:77
 msgid "Loading your library"
 msgstr "Loading your library"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:104
+msgid "Loading your music library"
+msgstr "Loading your music library"
 
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:59
@@ -15991,6 +16015,7 @@ msgstr "Much lower"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:113
 #: src/shell/pages/ActivityPage.tsx:43
+#: src/shell/pages/MusicLibraryColumn.tsx:141
 #: src/shell/pages/settings/MediaCardViews.tsx:79
 msgid "Music"
 msgstr "Music"
@@ -16036,9 +16061,19 @@ msgid "setting.music.dj.label"
 msgstr "Music DJ"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:109
+msgid "Music library items"
+msgstr "Music library items"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:628
 msgid "setting.music.library_sort.label"
 msgstr "Music library order (advanced)"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:154
+msgid "Music library sidebar"
+msgstr "Music library sidebar"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:347
@@ -16117,6 +16152,7 @@ msgstr "My styles"
 #: src/apps/settings/styles/StyleEditor.tsx:83
 #: src/shell/pages/FilesPage.tsx:425
 #: src/shell/pages/MusicComposer.tsx:173
+#: src/shell/pages/MusicLibraryColumn.tsx:41
 #: src/shell/pages/ProjectsPage.tsx:160
 #: src/shell/pages/UpdatesPage.tsx:49
 msgid "Name"
@@ -16785,6 +16821,11 @@ msgid "No matches for \"{q}\". Try another word."
 msgstr "No matches for \"{q}\". Try another word."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:108
+msgid "No matches in your library."
+msgstr "No matches in your library."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:335
 msgid "No matches. Try a different word or clear a filter."
 msgstr "No matches. Try a different word or clear a filter."
@@ -17411,6 +17452,11 @@ msgid "Nothing in the pictures or the personality would scare or confuse a young
 msgstr "Nothing in the pictures or the personality would scare or confuse a young child."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:108
+msgid "Nothing in your library yet."
+msgstr "Nothing in your library yet."
+
+#. js-lingui-explicit-id
 #: src/shell/ActivityBell.tsx:34
 msgid "Nothing is being made right now."
 msgstr "Nothing is being made right now."
@@ -17558,6 +17604,7 @@ msgstr "Now all ages."
 
 #. js-lingui-explicit-id
 #: src/shell/music/MusicPlayerBar.tsx:147
+#: src/shell/pages/MusicLibraryColumn.tsx:126
 msgid "Now playing"
 msgstr "Now playing"
 
@@ -18417,7 +18464,7 @@ msgid "OpenCode · same key"
 msgstr "OpenCode · same key"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:292
+#: src/shell/pages/PackageAppPage.tsx:293
 msgid "Opening the app"
 msgstr "Opening the app"
 
@@ -19287,6 +19334,11 @@ msgid "PIN"
 msgstr "PIN"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:128
+msgid "Pin {title}"
+msgstr "Pin {title}"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:169
 msgid "Pin dial: {dial}"
 msgstr "Pin dial: {dial}"
@@ -19339,7 +19391,7 @@ msgid "Pitch {value}"
 msgstr "Pitch {value}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:326
+#: src/shell/pages/PackageAppPage.tsx:327
 msgid "Place"
 msgstr "Place"
 
@@ -19426,6 +19478,16 @@ msgstr "Playful"
 #: src/apps/settings/AddVoiceForm.tsx:70
 msgid "Playing a sample"
 msgstr "Playing a sample"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:36
+msgid "Playlists"
+msgstr "Playlists"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:134
+msgid "Playlists open from a song's menu for now."
+msgstr "Playlists open from a song's menu for now."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:43
@@ -20070,6 +20132,7 @@ msgstr "Recent problems"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MediaHomePage.tsx:50
+#: src/shell/pages/MusicLibraryColumn.tsx:40
 msgid "Recently played"
 msgstr "Recently played"
 
@@ -21841,6 +21904,7 @@ msgstr "search"
 #. js-lingui-explicit-id
 #: src/i18n.test.tsx:40
 #: src/shell/library/TranscriptPanel.tsx:553
+#: src/shell/pages/MusicLibraryColumn.tsx:142
 #: src/shell/pages/ReferencePage.tsx:48
 #: src/shell/routeHeader.ts:24
 #: src/shell/statusSummary.ts:14
@@ -21855,7 +21919,7 @@ msgstr "Search"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/packageAppHeaderBar.tsx:107
-#: src/shell/pages/PackageAppPage.tsx:283
+#: src/shell/pages/PackageAppPage.tsx:284
 msgid "Search {name}"
 msgstr "Search {name}"
 
@@ -21910,6 +21974,12 @@ msgstr "Search for a title across your media apps."
 #: src/shell/pages/ReferencePage.tsx:54
 msgid "Search for an article in this book."
 msgstr "Search for an article in this book."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:151
+#: src/shell/pages/MusicLibraryColumn.tsx:151
+msgid "Search in your library"
+msgstr "Search in your library"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusIncident.tsx:23
@@ -22006,6 +22076,11 @@ msgstr "Search voices"
 #: src/shell/pages/WikipediaPage.tsx:176
 msgid "Search Wikipedia"
 msgstr "Search Wikipedia"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:133
+msgid "Search your library"
+msgstr "Search your library"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:313
@@ -22109,9 +22184,9 @@ msgid "seconds"
 msgstr "seconds"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:367
-#: src/shell/pages/PackageAppPage.tsx:385
-#: src/shell/pages/PackageAppPage.tsx:400
+#: src/shell/pages/PackageAppPage.tsx:373
+#: src/shell/pages/PackageAppPage.tsx:391
+#: src/shell/pages/PackageAppPage.tsx:406
 msgid "Sections"
 msgstr "Sections"
 
@@ -22730,6 +22805,16 @@ msgstr "Show alerts on this device"
 #: src/shell/pages/FilesPage.tsx:337
 msgid "Show all files"
 msgstr "Show all files"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:135
+msgid "Show as grid"
+msgstr "Show as grid"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:135
+msgid "Show as list"
+msgstr "Show as list"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1818
@@ -23438,6 +23523,7 @@ msgstr "Something went wrong. Try asking again."
 #: src/shell/pages/CompanionsPage.tsx:260
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/musicComposerMode.ts:18
+#: src/shell/pages/MusicLibraryColumn.tsx:125
 #: src/shell/pages/PersonProfilePage.tsx:176
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
@@ -23478,6 +23564,7 @@ msgstr "songs"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicLibrary.tsx:131
+#: src/shell/pages/MusicLibraryColumn.tsx:32
 #: src/shell/pages/MusicStudioPages.tsx:142
 msgid "Songs"
 msgstr "Songs"
@@ -23543,6 +23630,7 @@ msgstr "Sound preset"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicLibrary.tsx:131
+#: src/shell/pages/MusicLibraryColumn.tsx:37
 msgid "Sounds"
 msgstr "Sounds"
 
@@ -24345,6 +24433,7 @@ msgstr "Style and tags"
 #: src/shell/pages/MakeSongPage.tsx:145
 #: src/shell/pages/MusicComposer.tsx:202
 #: src/shell/pages/MusicComposer.tsx:203
+#: src/shell/pages/MusicLibraryColumn.tsx:35
 #: src/shell/pages/MusicStudioPages.tsx:145
 #: src/shell/pages/settings/MediaCardViews.tsx:86
 msgid "Styles"
@@ -24973,7 +25062,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/MusicStudioView.tsx:156
 #: src/shell/pages/MusicStudioView.tsx:157
 #: src/shell/pages/MusicStudioView.tsx:160
-#: src/shell/pages/PackageAppPage.tsx:300
+#: src/shell/pages/PackageAppPage.tsx:301
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:283
@@ -26385,7 +26474,7 @@ msgid "This app is also on the Never close list, so it stays open."
 msgstr "This app is also on the Never close list, so it stays open."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:121
+#: src/shell/pages/PackageAppPage.tsx:122
 msgid "This app's page is not valid."
 msgstr "This app's page is not valid."
 
@@ -26586,6 +26675,11 @@ msgid "This key is shown once."
 msgstr "This key is shown once."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:108
+msgid "This kind is not available in the Music library yet."
+msgstr "This kind is not available in the Music library yet."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:32
 msgid "This MaiPai Home itself."
 msgstr "This MaiPai Home itself."
@@ -26631,7 +26725,7 @@ msgid "setting.storage.person_quota_gb.label"
 msgstr "This person's storage quota (GB)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:319
+#: src/shell/pages/PackageAppPage.tsx:320
 msgid "This place"
 msgstr "This place"
 
@@ -27173,6 +27267,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FilesPage.tsx:320
 #: src/shell/pages/MusicLibrary.tsx:178
+#: src/shell/pages/MusicLibraryColumn.tsx:106
 #: src/shell/pages/musicSongStatus.tsx:43
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
 msgid "Try again"
@@ -27606,6 +27701,7 @@ msgstr "unknown"
 #: src/apps/settings/RobotBody.tsx:209
 #: src/apps/settings/RobotBody.tsx:225
 #: src/apps/settings/RobotBody.tsx:226
+#: src/shell/pages/MusicLibraryColumn.tsx:125
 #: src/shell/pages/UpdatesPage.tsx:70
 #: src/shell/pages/UpdatesPage.tsx:71
 msgid "Unknown"
@@ -27689,6 +27785,11 @@ msgid "Unpin"
 msgstr "Unpin"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:128
+msgid "Unpin {title}"
+msgstr "Unpin {title}"
+
+#. js-lingui-explicit-id
 #: src/apps/people/ProfileForm.tsx:165
 msgid "Unsaved changes."
 msgstr "Unsaved changes."
@@ -27710,6 +27811,8 @@ msgid "Until storage runs low"
 msgstr "Until storage runs low"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:124
+#: src/shell/pages/MusicLibraryColumn.tsx:125
 #: src/shell/pages/MusicStudioPages.tsx:111
 msgid "Untitled"
 msgstr "Untitled"
@@ -29917,6 +30020,11 @@ msgstr "Your message is saved. Back soon."
 #: ../backend/src/lib/failureCopy.ts:185
 msgid "failure.composer.paused.teen"
 msgstr "Your message is saved. Back soon."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/MusicLibraryColumn.tsx:106
+msgid "Your music library could not be loaded. Check your connection and try again."
+msgstr "Your music library could not be loaded. Check your connection and try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicSongDetails.tsx:140
