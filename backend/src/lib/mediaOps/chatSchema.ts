@@ -3,7 +3,7 @@
 // tool call, not rules about the person's words (the rule-budget lint scans the turn-path files).
 import { z } from "zod";
 import { listMediaSubjects } from "@/lib/mediaSubjects";
-import { listTemplates } from "@/lib/media/templates";
+import { listFragments, listTemplates } from "@/lib/media/templates";
 import type { TurnState } from "@/lib/turnMachine/contract";
 
 type ToolSpecLike = { id: string; description: string; args: Record<string, unknown> };
@@ -49,6 +49,14 @@ export function generateImageSchema(args: Record<string, unknown>, description: 
     schema.required = (Array.isArray(schema.required) ? schema.required : []).filter((key: string) => key !== "prompt");
     schema.properties.template = { type: "string", enum: templates.map((row) => row.id), description: `Optional picture template id. Available to this person: ${templates.map((row) => `${row.id} (${row.title}; ${[...row.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((m) => `${m[1]}: ${m[2]} (example: ${m[3]})`).join(", ") || "no blanks"})`).join("; ")}` };
     schema.properties.blanks = { type: "object", additionalProperties: { type: "string" }, description: "Values for the named blanks shown in the selected template." };
+    // CREATOR-13: one optional `presets` object, a key per family holding a record id (an enum of ids only, each id names its preset), so the schema stays
+    // small and, being an object, is never read as free words by the grounding check.
+    const presetProps: Record<string, unknown> = {};
+    for (const [key, group] of [["look", "picture_look"], ["light", "relight"], ["angle", "angle"], ["format", "format"]] as const) {
+      const ids = listFragments({ actor: state.actor, group }).map((row) => row.id);
+      if (ids.length) presetProps[key] = { type: "string", enum: ids };
+    }
+    if (Object.keys(presetProps).length) schema.properties.presets = { type: "object", properties: presetProps, additionalProperties: false, description: "Optional look, light, camera angle and frame format, only if asked for." };
     const subjects = listMediaSubjects(state.actor);
     schema.properties.subjects = { type: "array", items: { type: "string", enum: subjects.map((item) => item.name) }, maxItems: 3, uniqueItems: true, description: `Optional. Name only subjects the person chose. Available to this person: ${subjects.map((item) => item.name).join(", ") || "none"}.` };
     args = schema;

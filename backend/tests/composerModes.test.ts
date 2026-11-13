@@ -43,6 +43,11 @@ describe("composer modes by band", () => {
     expect(picture.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["shape", "count"]);
     expect(picture.primary.label).toBe("Make picture");
     expect(picture.presets?.chips[0]!.options.length).toBeGreaterThan(0);
+    // CREATOR-13: the Presets pill also carries the picture presets as settings (Look by family, Light, Angle, Format), each starting at None.
+    expect(picture.presets?.chips.map((c) => c.id)).toEqual(["template", "look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
+    expect(picture.presets?.chips.filter((c) => c.id !== "template").every((c) => c.target === "setting" && c.default === "none")).toBe(true);
+    expect(picture.presets?.chips[0]!.target).toBe("words");
+    expect(res.modes.find((m) => m.id === "video")!.presets?.chips.some((c) => c.target === "setting") ?? false).toBe(false);
     const video = res.modes.find((m) => m.id === "video")!;
     expect(video.route).toBe("/apps/video/create");
     expect(video.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["orientation", "seconds"]);

@@ -26,5 +26,7 @@ a retroactive audit of every backend package already in bun.lock/uv.lock.
 - compromise (MIT) - https://github.com/spencermountain/compromise (the natural-language tagger behind the turn's name resolver, `backend/src/lib/unknownNames.ts`: its proper-noun tags find the candidates, the engine's own frames decide what to do with them)
 - Appwrite FocalNet model (MIT) - https://huggingface.co/appwrite/focalnet (the on-device importance map used to frame News images; downloaded on demand and checksum-verified)
 
+- CreatorOS (Apache-2.0) - https://github.com/thePloggy/CreatorOS-Studio (the names and families of the picture presets: 56 looks, 10 lights, 5 formats and 8 angles, `backend/packages/generate_image/images/templates/fragments/`; the preset wording is our own)
+
 When another component lands, its attribution goes here, per
 docs/PACKAGES.md in getmaipai/.github.

@@ -180,6 +180,26 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     });
   });
 
+  test("chosen presets are composed into the prompt once, and a format with an aspect sets the shape (CREATOR-13)", async () => {
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a fox in the snow", presets: { look: "mtpl-lookwatercolour", light: "mtpl-lightgolden", format: "mtpl-formatwide169" } }) };
+    await withStub(script(call), async () => {
+      await streamValue(people.owner, "a fox in the snow as a watercolour");
+      const sent = String(fake.submitted[0]!.prompt);
+      expect(sent.startsWith("a fox in the snow")).toBe(true);
+      expect(sent).toContain("watercolour");
+      expect(sent).toContain("golden-hour");
+      expect(fake.submitted[0]!.size).toBe("1344x768");
+    });
+  });
+
+  test("a preset id that is not a record is refused and starts no job", async () => {
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a fox in the snow", presets: { look: "mtpl-looknothing" } }) };
+    await withStub(script(call), async () => {
+      await streamValue(people.owner, "a fox in the snow");
+      expect(fake.submitted).toHaveLength(0);
+    });
+  });
+
   test("a template with a missing blank asks for it and starts no job", async () => {
     const call = { id: "c", name: "generate_image", args: JSON.stringify({ template: "mtpl-productmarble", blanks: {} }) };
     await withStub(script(call), async (seen) => {

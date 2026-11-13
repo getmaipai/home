@@ -22,6 +22,7 @@ import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from 
 import { StackPicturesError } from "./stack";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { getTemplate } from "@/lib/media/templates";
+import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
 import { runMediaOp } from "@/lib/mediaOps/registry";
 import { subjectsForNames } from "@/lib/mediaSubjects";
 
@@ -112,6 +113,20 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => String(blanks[name]).trim());
     normalized.prompt = promptOverride;
   }
+  // CREATOR-13: the chosen look, light, angle and format are preset records; a name that is not one (or not this person's) is a bad argument.
+  const picks: PictureFragmentPicks = {};
+  const chosen = args.presets && typeof args.presets === "object" && !Array.isArray(args.presets) ? args.presets as Record<string, unknown> : {};
+  for (const key of PICTURE_PICK_KEYS) if (typeof chosen[key] === "string" && chosen[key]) picks[key] = chosen[key] as string;
+  let presetAspect: string | null = null;
+  if (Object.keys(picks).length) {
+    if (!resolvePicks(picks, state.actor as PersonRow)) return failed(callId, args, "bad_preset", "bad_arguments");
+    const edit = (typeof args.change === "string" && args.change.trim() !== "") || (Array.isArray(args.references) && args.references.length > 0);
+    const composed = composePicturePrompt(promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : ""), picks, { edit }, state.actor as PersonRow);
+    promptOverride = composed.prompt;
+    normalized.prompt = composed.prompt;
+    presetAspect = composed.aspect;
+  }
+  delete normalized.presets;
   // The household's likeness option (lib/likeness.ts) is checked here, after the policy gate: its refusal is not a minor-line reason.
   if (Array.isArray(args.references)) {
     const refs = (args.references as unknown[]).flatMap((entry) => {
@@ -168,7 +183,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const maxN = engine.limits?.max_n ?? 4;
   const count = clampCount(args.count, maxN);
   const aspectSize: Record<string, string> = { "1:1":"square", "3:2":"landscape", "2:3":"portrait", "16:9":"wide", "9:16":"tall" };
-  const size = PICTURE_SIZES[template?.aspect ? aspectSize[template.aspect] ?? "square" : typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
+  const chosenAspect = template?.aspect ?? presetAspect;
+  const size = PICTURE_SIZES[chosenAspect ? aspectSize[chosenAspect] ?? "square" : typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
 
   // Only an adapter this person may use right now can match; the model never sees the library.
   const available = await adaptersFor(adapterAudiencesFor(audience));

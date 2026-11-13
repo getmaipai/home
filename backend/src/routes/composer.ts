@@ -11,7 +11,7 @@ const mode = z.object({
   id: z.string(), label: z.string(), icon: z.string(), route: z.string().nullable(), engine: z.enum(["image", "video", "music", "voices"]).nullable(), placeholder: z.string(),
   references: z.array(z.object({ id: z.string(), label: z.string(), kind: z.enum(["picture", "character", "place", "audio", "video"]), max: z.number().optional() })),
   chips: z.array(z.object({ id: z.string(), label: z.string(), group: z.string().optional(), options: z.array(option), default: z.union([z.string(), z.number()]) })),
-  presets: z.object({ label: z.string(), chips: z.array(z.object({ id: z.string(), label: z.string(), default: z.string(), options: z.array(z.object({ value: z.string(), label: z.string(), text: z.string() })) })) }).nullable(),
+  presets: z.object({ label: z.string(), chips: z.array(z.object({ id: z.string(), label: z.string(), target: z.enum(["words", "setting"]), default: z.string(), options: z.array(z.object({ value: z.string(), label: z.string(), text: z.string() })) })) }).nullable(),
   tools: z.array(z.enum(["clear", "improve", "lyrics"])),
   primary: z.object({ label: z.string() }),
   quality: z.object({ default: z.string(), options: z.array(option) }).nullable(),

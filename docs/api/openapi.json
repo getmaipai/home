@@ -68850,6 +68850,13 @@
                                     "label": {
                                       "type": "string"
                                     },
+                                    "target": {
+                                      "type": "string",
+                                      "enum": [
+                                        "words",
+                                        "setting"
+                                      ]
+                                    },
                                     "default": {
                                       "type": "string"
                                     },
@@ -68879,6 +68886,7 @@
                                   "required": [
                                     "id",
                                     "label",
+                                    "target",
                                     "default",
                                     "options"
                                   ]
