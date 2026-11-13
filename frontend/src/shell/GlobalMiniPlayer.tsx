@@ -86,8 +86,8 @@ export function GlobalMiniPlayer() {
   const openPlayPage = () => navigate(listening ? `/apps/news/story?id=${encodeURIComponent(listenStory!)}` : `/apps/${held.appId}/${live ? "station" : playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, listening ? undefined : { state: { pageState: { id: held.id } } });
 
   return (
-    <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:start-14 print:hidden">
-      <div className="pointer-events-auto relative">
+    <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
+      <div className="pointer-events-auto relative overflow-hidden rounded-2xl border border-border shadow-lg">
         <Player
           key={held.id}
           media={el}
@@ -137,8 +137,7 @@ export function GlobalMiniPlayer() {
             </>
           }
         />
-        {isAudio ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-40 opacity-15 dark:opacity-20" style={{ background: `linear-gradient(90deg, ${palette.corners[0]}, ${palette.corners[1]} 35%, transparent 60%, ${palette.corners[3]})` }} /> : null}
-        {isAudio && vizOn ? <AudioVisualizer variant={variant} mode="strip" getAnalyser={getAnalyser} palette={palette} active={playing} opacity={0.6} fade className="pointer-events-none absolute inset-0 z-40 size-full" /> : null}
+        {isAudio && vizOn ? <AudioVisualizer variant={variant} mode="strip" getAnalyser={getAnalyser} palette={palette} active={playing} opacity={0.4} fade className="pointer-events-none absolute inset-0 z-40 size-full grayscale" /> : null}
       </div>
       {stage ? <NowPlayingStage media={held} onClose={closeStage} /> : null}
     </div>
