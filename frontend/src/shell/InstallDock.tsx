@@ -291,7 +291,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, rea
         style={side}
         className="pointer-events-none fixed bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
-        <div data-testid="install-dock-card" className="pointer-events-auto w-full max-w-md rounded-md border bg-background shadow-sm">
+        <div data-testid="install-dock-card" className="pointer-events-auto surface-float w-full max-w-md">
           {admin ? (
             <Collapsible open={open} onOpenChange={setOpen}>
               <CollapsibleContent>

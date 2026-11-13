@@ -87,7 +87,7 @@ export function GlobalMiniPlayer() {
 
   return (
     <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
-      <div className="pointer-events-auto relative overflow-hidden rounded-2xl border border-border shadow-lg">
+      <div className="pointer-events-auto surface-float relative overflow-hidden">
         <Player
           key={held.id}
           media={el}

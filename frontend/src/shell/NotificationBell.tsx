@@ -230,7 +230,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
           side={anchored ? "right" : "bottom"}
           align="end"
           sideOffset={8}
-          className="motion-reveal z-40 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-2 text-card-foreground shadow-lg"
+          className="motion-reveal z-40 w-80 max-w-[calc(100vw-2rem)] p-2 text-card-foreground"
         >
           {items.length === 0 ? (
             <p className="px-2 py-3 text-base text-muted-foreground">{i18n._({ id: "Nothing pending.", message: "Nothing pending." })}</p>
