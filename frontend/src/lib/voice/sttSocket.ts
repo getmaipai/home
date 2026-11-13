@@ -1,4 +1,4 @@
-import type { SttServerMessageWithTiming } from "@/lib/voice/sttContract";
+import type { SttServerMessageWithTiming, SttTimingExtras } from "@/lib/voice/sttContract";
 
 export interface SttSocketHandlers {
   onMessage: (message: SttServerMessageWithTiming) => void;
@@ -15,7 +15,7 @@ export interface SttSocket {
   /** Full-duplex: tells the server how much of the current reply has played, about every 250 ms while it plays (the server
    * treats a report under 700 ms old as "a reply is playing"). A no-op when the socket is not open. */
   sendPlayed?: (replyId: string, ms: number) => void;
-  sendTiming?: (turnId: string, sttMs: number, firstPlaybackMs?: number, firstSentenceMs?: number, speech?: { head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string }, cuePlaybackMs?: number) => void;
+  sendTiming?: (turnId: string, sttMs: number, firstPlaybackMs?: number, firstSentenceMs?: number, speech?: SttTimingExtras, cuePlaybackMs?: number) => void;
   close: () => void;
 }
 

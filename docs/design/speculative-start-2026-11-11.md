@@ -106,6 +106,16 @@ and the client starts the held run on it (`liveVoiceSession.tsx`); the armed fla
 `backend/tests/sttSession.test.ts` (the edge partial carries the flag, a cadence partial does not) and
 `frontend/src/apps/chat/liveVoiceSession.test.tsx` (a marked partial starts the held run, a cadence partial does not).
 
+**Second client gap, found the same day from the live record.** With the default on, the live turns still showed `stt_ms`
+in series (first sound 1.8 to 2.1 s). The client started the held run on the edge partial, but its partial handler marks speech
+as active for every partial, the edge partial included, and the start's own completion handler read that flag as "the voice
+resumed" and discarded the run at once, every time. The hub counted a start and a discard per turn; the browser never confirmed
+one. Fixed in `liveVoiceSession.tsx` (the completion handler keeps only the epoch check: a final or a new utterance moves the epoch),
+with a test that walks edge partial, hub reply, final and expects the confirmation (`liveVoiceSession.test.tsx`). The voice timing
+record now carries `speculative` (`off`, `armed`, `started`, `confirmed`, `discarded`: the hub marks `started` and `confirmed`
+itself, the client labels the rest in its timing report) and `bun run voice:latency` prints the counts and the first sound split by
+it, so this cannot hide again. Still to check with a microphone: a confirmed run on the live record after the ship.
+
 **Default.** `voice.speculative_start` stays off. Turning it on is one household setting (admin). Before that, the exit
 numbers above should be repeated through the browser (20 real turns, `bun run voice:latency`), since the client path has not
 yet been exercised with a microphone after the fix, and a wrong guess costs engine time: a discarded run leaves the next real

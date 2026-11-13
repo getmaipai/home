@@ -16,7 +16,7 @@ import { getDeviceById } from "@/lib/devices";
 import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
+import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
 
 export const sttRoutes = apiRouter();
 
@@ -86,6 +86,8 @@ sttRoutes.get(
                 if (value.first_playback_ms !== undefined) setVoiceTiming(record, "first_playback_ms", value.first_playback_ms);
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
+                // STT-SMARTTURN-01 and TALK-OVER-01: the client's labels and counts for the speculative start and the acknowledgement clip.
+                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms });
               }
             }
           } catch {

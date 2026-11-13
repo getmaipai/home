@@ -399,6 +399,50 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); }
   });
 
+  test("STT-SMARTTURN-01: the held run started on the edge partial survives until the final, which confirms it on an exact match (the live-hub miss of 2026-11-12)", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const socket = controlledSocket();
+      const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+      const timings: Array<{ sttMs: number; phase?: string; speculative?: string }> = [];
+      const sentTexts: string[] = [];
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sentTexts} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef }} onVoiceTiming={(timing) => timings.push(timing)} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "what is a good name for a" }));
+      act(() => socket.send({ t: "partial", v: "what is a good name for a small grey cat", edge: true }));
+      expect(speculate).toHaveBeenCalledTimes(1);
+      // The hub answers with the ids while the person is silent: the held run must stay, not be thrown away because the edge partial itself counted as speech.
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      expect(discard).not.toHaveBeenCalled();
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 760, silence_wait_ms: 750 }));
+      await act(async () => { socket.send({ t: "final", v: "what is a good name for a small grey cat" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(pendingRef.current).toEqual({ turnId: "turn-held", resumeToken: "token-held", conversationId: "conv-1" });
+      expect(discard).not.toHaveBeenCalled();
+      expect(timings.find((t) => t.phase === "final")?.speculative).toBe("confirmed");
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("STT-SMARTTURN-01: a final that differs from the held text discards the run and labels the turn discarded", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const socket = controlledSocket();
+      const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+      const timings: Array<{ sttMs: number; phase?: string; speculative?: string }> = [];
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef }} onVoiceTiming={(timing) => timings.push(timing)} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "what is a good name", edge: true }));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => { socket.send({ t: "final", v: "what is a good name for a small grey cat" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(pendingRef.current).toBeNull();
+      expect(discard).toHaveBeenCalledWith("turn-held");
+      expect(timings.find((t) => t.phase === "final")?.speculative).toBe("discarded");
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
     const random = spyOn(Math, "random").mockReturnValue(0);
     const react = spyOn(api, "reactTurn").mockResolvedValue({ text: null });

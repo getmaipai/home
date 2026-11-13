@@ -35,6 +35,7 @@ import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
 import type { SpeculationIds } from "@/apps/chat/useChatVoiceTurnState";
+import type { SpeculativeOutcome, SttTimingExtras } from "@/lib/voice/sttContract";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -80,7 +81,7 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
-  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback" }) => void;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; talkOver?: Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "yield_ms"> }) => void;
   voiceTimingSocketRef?: { current: SttSocket | null };
 }
 
@@ -169,16 +170,23 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     edgePartialPendingRef.current = false;
     if (held) void api.discardTurn(held.turnId).catch(() => undefined);
   };
+  // What the speculative start did on the turn in progress, for the voice timing record (counts only): `armed` until a held run
+  // starts, `off` when the hub refused it, then `confirmed` or `discarded` at the final.
+  const speculativeOutcomeRef = useRef<SpeculativeOutcome>("armed");
   const startSpeculation = (text: string) => {
     if (!speculation || speculationRef.current || !text || text.split(/\s+/).length > 40) return;
     const conversationId = speculation.getConversationId();
     if (!conversationId) return;
     const epoch = reactionEpochRef.current;
     void api.speculateTurn(text, conversationId).then((ids) => {
-      // The voice resumed or the session changed meanwhile: a run that no longer matches anything is dropped at once.
-      if (epoch !== reactionEpochRef.current || activeSpeechRef.current || speculationRef.current) { void api.discardTurn(ids.turn_id).catch(() => undefined); return; }
+      // The final already went out, a new utterance began or the session changed meanwhile (the epoch moved), or another held run
+      // took the slot: a run that no longer matches anything is dropped at once. The partial handler marks speech as active for
+      // every partial, the edge partial included, so that flag must not be read here: it discarded every held run in the browser
+      // (found 2026-11-12 on the live hub: every spoken turn still waited the whole silence timer).
+      if (epoch !== reactionEpochRef.current || speculationRef.current) { void api.discardTurn(ids.turn_id).catch(() => undefined); return; }
       speculationRef.current = { turnId: ids.turn_id, resumeToken: ids.resume_token, conversationId: ids.conversation_id, text };
-    }).catch(() => undefined);
+      speculativeOutcomeRef.current = "started";
+    }).catch(() => { if (epoch === reactionEpochRef.current) speculativeOutcomeRef.current = "off"; });
   };
   const yieldVoice = () => {
     const scheduler = turnSchedulerRef.current;
@@ -283,7 +291,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     let connectionFailureHandled = false;
     let terminalServerError = false;
     let sttMsForNextTurn: number | null = null;
-    let finalReceivedAt: number | null = null;
     if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("connecting");
     // Full-duplex: while a reply plays, report how much has played every 250 ms so the server knows to pause it on the first voiced frame.
     let playedTimer: ReturnType<typeof setInterval> | undefined;
@@ -427,7 +434,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             }
             break;
           case "final": {
-            finalReceivedAt = performance.now();
             if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
             cancelReaction();
             lastPartialRef.current = "";
@@ -474,20 +480,19 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             }
             setCurrentMode("thinking");
             const sttMs = sttMsForNextTurn;
-            const receivedAt = finalReceivedAt;
             sttMsForNextTurn = null;
-            finalReceivedAt = null;
-            if (sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 && receivedAt !== null) onVoiceTiming?.({ sttMs, phase: "final" });
-            else if (receivedAt !== null) onVoiceTiming?.({ sttMs: 0, phase: "final" });
-            onVoiceTiming?.({ sttMs: sttMs ?? 0, phase: "final" });
             // STT-SMARTTURN-01: an exact trimmed match confirms the held run through this one send; anything else discards it first.
+            let speculative: SpeculativeOutcome = speculativeOutcomeRef.current;
             if (speculation) {
               const held = speculationRef.current;
               speculationRef.current = null;
               edgePartialPendingRef.current = false;
-              if (held && held.text === text) speculation.pendingRef.current = { turnId: held.turnId, resumeToken: held.resumeToken, conversationId: held.conversationId };
-              else if (held) void api.discardTurn(held.turnId).catch(() => undefined);
+              if (held && held.text === text) { speculation.pendingRef.current = { turnId: held.turnId, resumeToken: held.resumeToken, conversationId: held.conversationId }; speculative = "confirmed"; }
+              else if (held) { void api.discardTurn(held.turnId).catch(() => undefined); speculative = "discarded"; }
+              else if (speculative === "started") speculative = "discarded";
             }
+            speculativeOutcomeRef.current = "armed";
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}) });
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());

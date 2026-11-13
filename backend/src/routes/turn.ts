@@ -37,7 +37,7 @@ import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { getDeviceById } from "@/lib/devices";
-import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, type VoiceTimingRecord } from "@/lib/voiceTiming";
+import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, setVoiceOutcome, type VoiceTimingRecord } from "@/lib/voiceTiming";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -156,6 +156,7 @@ function confirmSpeculation(session: ResumeSession, sttMs: number | null): void 
   session.holdTimer = undefined;
   session.held = false;
   if (sttMs !== null) { session.sttMs = sttMs; markVoiceTiming(session.timing, "stt_ms", sttMs); }
+  setVoiceOutcome(session.timing, { speculative: "confirmed" });
   session.confirmation.resolve(true);
   noteSpeculation("confirmed");
 }
@@ -1331,6 +1332,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     session.holdTimer = setTimeout(() => { discardSpeculation(session, "aborted"); }, SPECULATION_HOLD_MS);
     (session.holdTimer as { unref?: () => void }).unref?.();
     noteSpeculation("started");
+    setVoiceOutcome(session.timing, { speculative: "started" });
     return c.json({ turn_id: session.turnId, resume_token: session.token, conversation_id: session.conversationId }, 200);
   }
   const response = streamResponse(session, null, wireFor(c.req.header("accept")));

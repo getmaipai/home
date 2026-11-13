@@ -78,6 +78,7 @@ import { chatAmbientRing, useSetAmbientRing, useSetAmbientWake } from "@/shell/a
 import { assistantText, isListening, isSpeaking as speakingSignal, isThinking, type SignalMessage } from "@/apps/chat/useCompanionSignals";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import type { SttSocket } from "@/lib/voice/sttSocket";
+import type { SttTimingExtras } from "@/lib/voice/sttContract";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -214,7 +215,7 @@ function useBareCompareCanvas(target: CompareTarget | null) {
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
 
-function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, voiceTimingShared: { sttMs: { current: number | undefined }; finalAt: { current: number | undefined }; turnId: { current: string | undefined }; socket: { current: SttSocket | null } }, folderId?: string) {
+function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, voiceTimingShared: { sttMs: { current: number | undefined }; finalAt: { current: number | undefined }; turnId: { current: string | undefined }; socket: { current: SttSocket | null }; outcome: { current: SttTimingExtras | undefined } }, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const voiceTurn = useChatVoiceTurnState();
@@ -589,12 +590,12 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           },
           onFirstPlayback: (at) => {
             const finalAt = voiceFinalAtRef.current;
-            if (finalAt !== undefined && voiceTimingTurnIdRef.current) { voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt)); voiceFinalAtRef.current = undefined; }
+            if (finalAt !== undefined && voiceTimingTurnIdRef.current) { voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, Math.max(0, at - finalAt), undefined, voiceTimingShared.outcome.current); voiceFinalAtRef.current = undefined; }
           },
-          onFirstSentencePlaybackTiming: (timing) => { const turnId = voiceTimingTurnIdRef.current; if (turnId) voiceTimingSocketRef.current?.sendTiming?.(turnId, voiceSttMsRef.current ?? 0, undefined, undefined, { head_ms: timing.head_ms, offer_ms: timing.offer_ms, emit_ms: timing.emit_ms, ctx_enqueue: timing.ctx_enqueue, ctx_emit: timing.ctx_emit }); },
+          onFirstSentencePlaybackTiming: (timing) => { const turnId = voiceTimingTurnIdRef.current; if (turnId) voiceTimingSocketRef.current?.sendTiming?.(turnId, voiceSttMsRef.current ?? 0, undefined, undefined, { ...voiceTimingShared.outcome.current, head_ms: timing.head_ms, offer_ms: timing.offer_ms, emit_ms: timing.emit_ms, ctx_enqueue: timing.ctx_enqueue, ctx_emit: timing.ctx_emit }); },
           onTurnId: (turnId) => { voiceTimingTurnIdRef.current = turnId; },
-          onFirstSentence: () => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, Math.max(0, performance.now() - finalAt)); },
-          onCuePlayback: (at) => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, undefined, undefined, Math.max(0, at - finalAt)); },
+          onFirstSentence: () => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, Math.max(0, performance.now() - finalAt), voiceTimingShared.outcome.current); },
+          onCuePlayback: (at) => { const finalAt = voiceFinalAtRef.current; if (finalAt !== undefined && voiceTimingTurnIdRef.current) voiceTimingSocketRef.current?.sendTiming?.(voiceTimingTurnIdRef.current, voiceSttMsRef.current ?? 0, undefined, undefined, voiceTimingShared.outcome.current, Math.max(0, at - finalAt)); },
           // APPROVE-CARD-01: armed once, right before ConfirmTool's own
           // respondToApproval handler calls aui.composer.send() - the
           // same single-shot shape consumeSpoken() above already uses.
@@ -1146,6 +1147,9 @@ export function ChatPage({ person }: { person: Roster }) {
     finalAt: useRef<number | undefined>(undefined),
     turnId: useRef<string | undefined>(undefined),
     socket: useRef<SttSocket | null>(null),
+    // STT-SMARTTURN-01 and TALK-OVER-01: the labels the voice session knows at the final (did the speculative start fire, did the
+    // acknowledgement clip play), sent with every timing report of that turn.
+    outcome: useRef<SttTimingExtras | undefined>(undefined),
   };
   const ambient = useAmbientCompanion(person);
   const retryWithCurrentCompanionRef = useRef(false);
@@ -1568,7 +1572,7 @@ export function ChatPage({ person }: { person: Roster }) {
     speakingEndedAt,
     speechFailed,
     voiceTimingSocketRef: voiceTimingShared.socket,
-    onVoiceTiming: ({ sttMs, phase }) => { voiceTimingShared.sttMs.current = sttMs; if (phase === "final") { voiceTimingShared.finalAt.current = performance.now(); voiceTimingShared.turnId.current = undefined; } },
+    onVoiceTiming: ({ sttMs, phase, speculative, talkOver }) => { voiceTimingShared.sttMs.current = sttMs; if (phase === "final") { voiceTimingShared.finalAt.current = performance.now(); voiceTimingShared.turnId.current = undefined; voiceTimingShared.outcome.current = { ...(speculative ? { speculative } : {}), ...talkOver }; } },
   });
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;
