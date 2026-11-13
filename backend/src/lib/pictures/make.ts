@@ -55,7 +55,7 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
     body.blanks = Object.fromEntries(Object.entries(raw.blanks).map(([key, value]) => [key, notGiven(value) ? "" : String(value).trim()]));
   }
   for (const key of ["cast", "references"] as const) {
-    const value = raw[key];
+    const value = key === "references" && raw.reference !== undefined && raw.reference !== "" ? [raw.reference] : raw[key];
     if (value === undefined || value === "") continue;
     const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
     if (!list || list.some((item) => typeof item !== "string")) return { ok: false, error: key === "cast" ? "Choose people from the cast list." : "Choose pictures from your Library." };
@@ -64,6 +64,14 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
     if (key === "cast" && ids.length > 6) return { ok: false, error: "Choose up to 6 people from the cast list." };
     if (ids.length) body[key] = ids;
   }
+  const flatPresets: NonNullable<PictureMakeBody["presets"]> = {};
+  for (const key of ["light", "angle", "format"] as const) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim() && !notGiven(value)) flatPresets[key] = value.trim();
+  }
+  const look = Object.entries(raw).find(([key, value]) => key.startsWith("look_") && typeof value === "string" && value.trim() && !notGiven(value));
+  if (look) flatPresets.look = String(look[1]).trim();
+  if (Object.keys(flatPresets).length) body.presets = { ...body.presets, ...flatPresets };
   return { ok: true, body };
 }
 
@@ -73,7 +81,8 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
   const data = outcome.result?.data as { pictureJobId?: string; pictureJobIds?: string[]; refused?: string; locked?: boolean } | undefined;
   if (outcome.status === "succeeded" && (data?.pictureJobId || data?.pictureJobIds?.length)) {
     const ids = data.pictureJobIds ?? [data.pictureJobId!];
-    const notice = (outcome.result?.reply?.text ?? "").replace(/^.*?It appears below your reply when it is ready\.[^]*?Tell the person in one short sentence that it is on its way\./, "").trim() || null;
+    // The reply text is written for the chat model; the only line a person needs is that extra references were left out.
+    const notice = /Some extra reference pictures were not used\./.test(outcome.result?.reply?.text ?? "") ? "Some extra reference pictures were not used." : null;
     return { ok: true, ids, notice };
   }
   const rawLine = (outcome.result?.reply?.text ?? "").replace(/^No picture was (?:made|changed)\. Say this to the person in your own words(?: and keep its meaning)?:\s*/, "").trim();

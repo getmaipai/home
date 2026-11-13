@@ -7,7 +7,7 @@ import { PACKAGES_DIR } from "@/lib/paths";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { appPackageProblems, getAppData, getAppPage, sidebarFor } from "@/lib/apps";
+import { appPackageProblems, appRouteAllowed, getAppData, getAppPage, sidebarFor } from "@/lib/apps";
 import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
 import { listLibrary } from "@/lib/library";
 import { child, owner, teen } from "./support/testAuth";
@@ -54,18 +54,24 @@ test("Image library rows match Library visibility for owner, teen and child", as
   }
 });
 
-test("Image Create fills every preset under Style and keeps Shape and Pictures together in Settings", async () => {
+test("Image Create submits to make, fills presets, and shows what was made on a picture shelf", async () => {
   const { row } = await owner();
   const page = getAppPage(row, "image", "create");
   expect(page.ok).toBe(true);
   if (!page.ok) return;
-  const filledPage = page.value as { body: Array<{ type: string; chips: Array<{ state: string; group?: string; icon?: string }> }> };
+  const filledPage = page.value as { body: Array<{ type: string; chips?: Array<{ state: string; group?: string; icon?: string }>; submit?: unknown }> };
   const bar = filledPage.body[0]!;
-  expect(bar.chips.slice(0, 2).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Settings"], ["count", "Settings"]]);
-  expect(bar.chips.slice(2).every((chip) => chip.group === "Style")).toBe(true);
-  expect(bar.chips[0]?.icon).toBe("rectangle-horizontal");
-  expect(bar.chips[2]?.icon).toBe("palette");
-  // Until CREATOR-15 starts a picture from a reference, the slot is disabled with the plain line, never a control that does nothing.
-  const references = (bar as unknown as { references: Array<{ state: string; disabled_reason?: string }> }).references;
-  expect(references.map((ref) => [ref.state, ref.disabled_reason])).toEqual([["reference", "Starting a picture from a reference is coming next."]]);
+  expect(bar.chips!.slice(0, 2).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Settings"], ["count", "Settings"]]);
+  expect(bar.chips!.slice(2).every((chip) => chip.group === "Style")).toBe(true);
+  expect(bar.chips![0]?.icon).toBe("rectangle-horizontal");
+  expect(bar.chips![2]?.icon).toBe("palette");
+  expect(bar.submit).toMatchObject({ call: { target: "/api/plugins/image/actions/make", method: "POST", args: { prompt: "{prompt}", shape: "{shape}", count: "{count}", tier: "{tier}", reference: "{reference}" } } });
+  const args = (bar.submit as { call: { args: Record<string, unknown> } }).call.args;
+  expect(args.look_art).toBe("{look_art}");
+  expect(args.light).toBe("{light}");
+  expect(filledPage.body[1]).toMatchObject({ type: "media_shelf", bind: { source: "package", path: "recent" } });
+  const manifest = loadManifestOnly("image");
+  expect(manifest.ok && (manifest.value.contributes as { data: Array<{ id: string }> }).data.some((item) => item.id === "recent")).toBe(true);
+  expect(appRouteAllowed(row, "image", "data", "recent")).toBe(true);
+  expect(((bar as unknown as { references: Array<{ state: string; disabled_reason?: string }> }).references)[0]?.disabled_reason).toBeUndefined();
 });

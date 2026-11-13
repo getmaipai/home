@@ -66,6 +66,22 @@
             {
               "value": 4,
               "label": "4 pictures"
+            },
+            {
+              "value": 5,
+              "label": "5 pictures"
+            },
+            {
+              "value": 6,
+              "label": "6 pictures"
+            },
+            {
+              "value": 7,
+              "label": "7 pictures"
+            },
+            {
+              "value": 8,
+              "label": "8 pictures"
             }
           ]
         }
@@ -93,12 +109,45 @@
         ]
       },
       "references": [
-        { "state": "reference", "label": "Image reference", "kind": "picture", "placement": "in_field" }
+        {
+          "state": "reference",
+          "label": "Image reference",
+          "kind": "picture",
+          "placement": "in_field"
+        }
       ],
       "submit": {
-        "ask": {
-          "prompt": "{prompt}\n\nPlease make {count} {shape} picture(s) with the image generation tool. Quality: {tier}.",
-          "expects": "A picture made in this chat."
+        "call": {
+          "target": "/api/plugins/image/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "shape": "{shape}",
+            "count": "{count}",
+            "tier": "{tier}",
+            "reference": "{reference}"
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your pictures",
+      "bind": {
+        "source": "package",
+        "path": "recent"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/studio",
+          "state": {
+            "file": "{id}"
+          }
         }
       }
     }

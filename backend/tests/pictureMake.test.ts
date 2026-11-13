@@ -53,6 +53,10 @@ describe("Images Create make", () => {
     expect(readPictureMakeBody({ prompt: "a boat", references: ["a", "b", "c", "d"] }).ok).toBe(false);
   });
 
+  test("folds flat Create preset chip values and one reference into the make request", () => {
+    expect(readPictureMakeBody({ prompt: "a boat", shape: "wide", count: 8, tier: "boost", look_oil: "look-oil", light: "none", angle: "angle-high", format: "format-square", reference: "file-one" })).toMatchObject({ ok: true, body: { prompt: "a boat", count: 8, tier: "boost", presets: { look: "look-oil", angle: "angle-high", format: "format-square" }, references: ["file-one"] } });
+  });
+
   test("submits a prompt-only Create job without a conversation and stores the finished image in Library", async () => {
     const read = readPictureMakeBody({ prompt: "a blue boat" });
     expect(read.ok).toBe(true);
@@ -61,6 +65,8 @@ describe("Images Create make", () => {
     expect(made).toMatchObject({ ok: true });
     if (!made.ok) return;
     expect(made.ids).toHaveLength(1);
+    // The reply text is for the chat model; a person is never shown it (the notice is null unless extra references were left out).
+    expect(made.notice).toBeNull();
     const job = getPictureJob(owner, made.ids[0]!);
     expect(job).toMatchObject({ conversationId: null, turnId: null, temporary: false, kind: "generate" });
     await until(() => !!db.select().from(attachments).where(eq(attachments.ownerPersonId, owner.id)).all().find((item) => item.provenance.startsWith("picture-gen:")));

@@ -25,13 +25,11 @@ export function imageAppData(person: PersonRow, dataId: string, body: unknown): 
   if (dataId === "studio-picker") return studioPickerRows(person, input);
   return null;
 }
-registerAppData("image", imageAppData);
-/** The one plain line on a picture reference slot until CREATOR-15 lands. */
-export const REFERENCE_SOON = "Starting a picture from a reference is coming next.";
 
+registerAppData("image", imageAppData);
 /** CREATOR-13: the Create page's preset chips (Look by family, Light, Angle, Format), from the preset records. A Create page chip holds at most 24 options,
  * and each chip is its own popover (the kit's popover has no height limit, so one popover over all 79 options is 3,100 px tall and cannot be reached).
- * The composer's mode list reads this page's chips, so the Home ask box and every other composer show the same ones. The submit line names the chosen ones. */
+ * The composer's mode list reads this page's chips, so the Home ask box and every other composer show the same ones. */
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
@@ -43,10 +41,8 @@ registerAppPageFill("image", "create", (person, page) => {
     if (chip.state === "shape") chip.icon = "rectangle-horizontal";
   }
   bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
-  // CREATOR-15 is not built: the reference slot and the composer "+" draw disabled with one plain line until a route starts a picture from a reference (RULES S6). Set here, not in the page file, so the page schema is unchanged and the line leaves with this one statement.
-  for (const reference of Array.isArray(bar.references) ? bar.references as Array<Record<string, unknown>> : []) reference.disabled_reason = REFERENCE_SOON;
-  const ask = (bar.submit as { ask?: { prompt?: string } } | undefined)?.ask;
-  if (ask?.prompt) ask.prompt = `${ask.prompt}\nPresets, where none means not chosen: ${chips.map((chip) => `${chip.id.startsWith("look_") ? "look" : chip.id} {${chip.id}}`).join(", ")}. Pass any chosen ones in the presets argument.`;
+  const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
+  if (call?.args) for (const chip of chips) call.args[chip.id] = `{${chip.id}}`;
 });
 function findPromptBar(value: unknown): Record<string, unknown> | undefined {
   if (Array.isArray(value)) { for (const item of value) { const hit = findPromptBar(item); if (hit) return hit; } return undefined; }

@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { MediaHostContext, type MediaHost } from "@maipai/ui/src/schema/mediaHost";
 import { api } from "@/lib/api";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { COMPOSER_MODES_KEY, composerHref, type ComposerModesResponse } from "@/shell/composer/composerModes";
@@ -67,15 +68,19 @@ describe("the Home ask box reads its modes from the hub", () => {
     await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1"));
   });
 
-  test("the picture mode's Image reference and plus are disabled with the plain line until Create can start from a reference", async () => {
+  test("the picture mode's Image reference is picked in the ask box and its id travels to Create", async () => {
     const withReference: ComposerModesResponse = { band: "adult", modes: [ASK, mode({ ...PICTURE, references: [{ id: "reference", label: "Image reference", kind: "picture" }] })] };
-    const view = setup(withReference);
+    spies.push(spyOn(api, "composerModes").mockResolvedValue(withReference));
+    const host = { onPlay: () => {}, pickMedia: () => Promise.resolve({ id: "file-9", thumb: "/t/9.png" }) } as unknown as MediaHost;
+    const view = renderWithQueryClient(<MemoryRouter><MediaHostContext.Provider value={host}><AskBox /><Where /></MediaHostContext.Provider></MemoryRouter>);
+    view.queryClient.setQueryData(COMPOSER_MODES_KEY, withReference);
     fireEvent.click(await pill(view));
     fireEvent.click(await view.findByText("Picture"));
-    const add = await waitFor(() => { const el = view.container.querySelector('[data-slot="composer-add"]') as HTMLButtonElement | null; expect(el).toBeTruthy(); return el!; });
-    expect(add.disabled).toBe(true);
-    expect(add.getAttribute("title")).toBe("Starting a picture from a reference is coming next.");
-    expect(view.container.querySelector('[data-slot="composer-slots"] [aria-disabled="true"]')).not.toBeNull();
+    fireEvent.click(await waitFor(() => { const el = view.container.querySelector('[data-slot="composer-add"]'); expect(el).toBeTruthy(); return el!; }));
+    await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar"] img')).toBeTruthy());
+    fireEvent.change(view.getByLabelText("Ask") as HTMLTextAreaElement, { target: { value: "a red fox" } });
+    fireEvent.click(view.getByLabelText("Make picture"));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1&reference=file-9"));
   });
 
   test("a chip whose start value is quiet reads as its group name until a value is picked (CREATOR-13)", async () => {
