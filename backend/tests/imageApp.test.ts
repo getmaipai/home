@@ -65,4 +65,7 @@ test("Image Create fills every preset under Style and keeps Shape and Pictures t
   expect(bar.chips.slice(2).every((chip) => chip.group === "Style")).toBe(true);
   expect(bar.chips[0]?.icon).toBe("rectangle-horizontal");
   expect(bar.chips[2]?.icon).toBe("palette");
+  // Until CREATOR-15 starts a picture from a reference, the slot is disabled with the plain line, never a control that does nothing.
+  const references = (bar as unknown as { references: Array<{ state: string; disabled_reason?: string }> }).references;
+  expect(references.map((ref) => [ref.state, ref.disabled_reason])).toEqual([["reference", "Starting a picture from a reference is coming next."]]);
 });
