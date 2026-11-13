@@ -216,13 +216,16 @@ test("synth page shows show credits with newest episodes and films, omitting emp
       { item_id: "ep-old", title: "First Signal", aired_at: "2026-10-01T10:00:00Z", duration_s: 1600 },
     ] }],
     films: [{ production_id: "film-1", title: "Night Sky", part: "Navigator", file_id: "file-1", made_at: "2026-11-01T10:00:00Z" }], bands: [],
+    credits: [{ creation_id: "crt-1", kind: "picture", file_id: "file-2", thumb_file_id: "file-2", title: "Atlas at the pond", role: "Subject", made_at: "2026-11-10T10:00:00Z", production_id: null }],
   });
   api.synthLife = async () => ({ beats: [] });
   const view = open("/companions/atlas?tab=about");
   await view.findByRole("button", { name: "Chat with Atlas" });
   await view.findByText(/Moon Radio/);
   expect(view.getByRole("heading", { name: "Shows" })).toBeTruthy();
-  expect(view.getByRole("heading", { name: "Films" })).toBeTruthy();
+  expect(view.getByRole("heading", { name: "Filmography" })).toBeTruthy();
+  expect(view.getByText("Atlas at the pond")).toBeTruthy();
+  expect(view.getByText(/Subject · /)).toBeTruthy();
   expect(view.getByText("The Last Broadcast")).toBeTruthy();
   expect(view.getByText("First Signal")).toBeTruthy();
   expect(view.getByText("Night Sky")).toBeTruthy();
@@ -232,7 +235,7 @@ test("synth page shows show credits with newest episodes and films, omitting emp
 
 test("synth life lists beats and Forget calls the life API", async () => {
   api.companion = async () => detail({ id: "mine", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: true, shows: [] } });
-  api.synthCredits = async () => ({ shows: [], films: [], bands: [] });
+  api.synthCredits = async () => ({ shows: [], films: [], bands: [], credits: [] });
   api.synthLife = async () => ({ beats: [{ id: "beat-1", text: "Moved to the blue house", at: "2026-11-01T00:00:00Z", valid_from: "2026-11-01", valid_to: null, source: "talent.life" }] });
   const forgotten: string[] = [];
   api.forgetSynthLife = async (id, recordId) => { forgotten.push(`${id}:${recordId}`); return { deleted: true }; };
@@ -244,7 +247,7 @@ test("synth life lists beats and Forget calls the life API", async () => {
 
 test("synth page hides Credits and Life when both are empty", async () => {
   api.companion = async () => detail({ id: "quiet", synth: { based_on: { kind: "none", name: null }, forked_from: null, forked_from_name: null, yours: false, shows: [] } });
-  api.synthCredits = async () => ({ shows: [], films: [], bands: [] });
+  api.synthCredits = async () => ({ shows: [], films: [], bands: [], credits: [] });
   api.synthLife = async () => ({ beats: [] });
   const view = open("/companions/quiet?tab=about");
   await view.findByRole("heading", { name: "About" });

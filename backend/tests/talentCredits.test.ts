@@ -12,7 +12,7 @@ describe("TALENT-13 synth credits", () => {
     if (!made.ok) throw new Error("The synth fixture could not be created. Check the owner profile.");
     const response = await client.get(`/api/talent/synths/${made.value.id}/credits`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ shows: [], films: [], bands: [] });
+    expect(await response.json()).toEqual({ shows: [], films: [], bands: [], credits: [] });
   });
 
   test("a child receives 404 for credits of a synth above their audience", async () => {

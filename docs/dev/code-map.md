@@ -555,6 +555,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/conversationOpening.ts` | THREAD_WINDOW_DAYS, MOOD_WINDOW_DAYS, dayPartAt, sinceLastAt, conversationOpening, renderConversationOpening |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
 | `backend/src/lib/creations/backfill.ts` | backfillCreationForFile |
+| `backend/src/lib/creations/credits.ts` | listSynthCreditItems, storedFilmCredits, filmCreditLines |
 | `backend/src/lib/creations/purge.ts` | dropCreationsForFile |
 | `backend/src/lib/creations/store.ts` | FILE_ID, creationIdOfFile, creationIdOfJob, recordCreation, syncCreationMarkForFile, creationOfFile |
 | `backend/src/lib/creations/writers.ts` | __setWriterFaultForTests, safely, generationBlock, recordPictureCreation, recordEditedPicture, recordClipCreation |

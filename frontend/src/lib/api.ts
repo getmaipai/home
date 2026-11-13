@@ -377,7 +377,8 @@ export interface CompanionCard {
   synth?: { based_on: { kind: "none" | "household_member" | "real_person"; name: string | null }; forked_from: string | null; forked_from_name: string | null; yours: boolean; shows: Array<{ production_id: string; title: string; part: string }> } | null;
 }
 export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string; conversation_id?: string | null; placement?: "chat" | "side"; waiting_reason?: string | null; progress?: string | null; result_ref?: string | null; needs_you?: boolean }> }
-export interface SynthCredits { shows: Array<{ production_id: string; title: string; part: string; episodes: Array<{ item_id: string; title: string; aired_at: string; duration_s: number | null }> }>; films: Array<{ production_id: string; title: string; part: string; file_id: string; made_at: string }>; bands: Array<{ made_artist_id: string; name: string; role: string }> }
+export interface SynthCreditItem { creation_id: string; kind: "picture" | "video" | "film" | "reel" | "song" | "sound" | "show"; file_id: string; thumb_file_id: string; title: string; role: string; made_at: string; production_id: string | null }
+export interface SynthCredits { credits: SynthCreditItem[]; shows: Array<{ production_id: string; title: string; part: string; episodes: Array<{ item_id: string; title: string; aired_at: string; duration_s: number | null }> }>; films: Array<{ production_id: string; title: string; part: string; file_id: string; made_at: string }>; bands: Array<{ made_artist_id: string; name: string; role: string }> }
 export interface SynthLifeBeat { id: string; text: string; at: string; valid_from: string | null; valid_to: string | null; source: string }
 export interface SynthLife { beats: SynthLifeBeat[] }
 export interface CompanionDetail extends CompanionCard {

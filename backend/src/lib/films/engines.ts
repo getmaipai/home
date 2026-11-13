@@ -7,8 +7,9 @@ import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, submitEdit, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
 import { fullViewForJob } from "@/lib/stack/fullView";
 import { createMediaProduction } from "@/lib/mediaProductions";
-import { createMediaSubject, listMediaSubjects, subjectsForNames } from "@/lib/mediaSubjects";
+import { createMediaSubject, listMediaSubjects, subjectsForNames, subjectViewById } from "@/lib/mediaSubjects";
 import { pickStarter } from "./pictures";
+import { filmCreditLines, storedFilmCredits } from "@/lib/creations/credits";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { runGenerateMusic } from "@/lib/music/tool";
@@ -222,7 +223,9 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         const clipIds = clipFileIds;
         if (clipIds.length < 2) throw new Error("Make at least two shots first.");
         const transitions = plan.shots.slice(1, clipIds.length).map((shot) => (shot.transition ?? "fade") as JoinTransition);
-        const creditLines = plan.credits_card === false ? [] : [...plan.credits.filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd|(?:a )?real person'?s name)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
+        const castCredits = plan.credits_card === false ? [] : storedFilmCredits(productionId, production.cast, (id) => subjectViewById(id)?.name);
+        // CREATOR-03: the stored cast link first; the plan's names only for a film with nothing stored (made before the store).
+        const creditLines = plan.credits_card === false ? [] : [...filmCreditLines(castCredits, plan.credits, plan.cast.map((member) => member.name)).filter((entry) => !/^(unnamed|unknown|n\/a|none|tbd|(?:a )?real person'?s name)$/i.test(entry.name.trim()) && entry.name.trim().length > 0), { role: "Made with", name: "MaiPai" }];
         const showTitle = plan.title_card !== false, showCredits = plan.credits_card !== false;
         const rest = filmOps({ includeJoin: false, title: showTitle ? plan.title : undefined, summary: plan.summary, credits: showCredits ? creditLines : undefined, look: plan.look, letterbox: plan.letterbox });
         // The join may spend what the Stack's 12 steps leave after the look, letterbox, title, credits and the music step.

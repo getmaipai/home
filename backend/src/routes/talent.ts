@@ -13,6 +13,7 @@ import { formatById } from "@/lib/talent/formats";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getSynth } from "@/lib/synths";
 import { listMade } from "@/lib/music/madeRecords";
+import { listSynthCreditItems } from "@/lib/creations/credits";
 
 export const talentRoutes = new Hono<AppEnv>();
 talentRoutes.use("*", requireAuth);
@@ -24,7 +25,8 @@ talentRoutes.get("/formats", (c) => c.json([...loadFormats().values()], 200));
 talentRoutes.get("/shows", (c) => c.json({ shows: listShows(c.get("person")) }, 200));
 talentRoutes.get("/synths/:id/credits", (c) => {
   const actor = c.get("person"), synthId = c.req.param("id");
-  if (!getSynth(actor, synthId)) return c.json({ error: "That synth is not available. Choose a synth you can use and try again." }, 404);
+  const synth = getSynth(actor, synthId);
+  if (!synth) return c.json({ error: "That synth is not available. Choose a synth you can use and try again." }, 404);
   const productions = listMediaProductions(actor).filter((production) => production.cast.some((member) => member.synth_id === synthId));
   const shows = productions.filter((production) => production.show !== null).map((production) => {
     const sourceRow = db.select().from(mediaSources).where(eq(mediaSources.productionId, production.id)).get();
@@ -42,7 +44,11 @@ talentRoutes.get("/synths/:id/credits", (c) => {
   })).sort((a, b) => b.made_at.localeCompare(a.made_at));
   const made = listMade("made_artist", actor, { scope: "all" });
   const bands = made.ok ? made.value.filter((band) => Array.isArray(band.members) && band.members.some((member) => typeof member === "object" && member !== null && (member as { synth_id?: unknown }).synth_id === synthId)).map((band) => ({ made_artist_id: band.id, name: String(band.name ?? band.title ?? "Band"), role: String((band.members as Array<{ synth_id?: string; role?: string }>).find((member) => member.synth_id === synthId)?.role ?? "Member"), made_at: String(band.created_at ?? "") })).sort((a, b) => b.made_at.localeCompare(a.made_at)).map(({ made_at: _madeAt, ...band }) => band) : [];
-  return c.json({ shows, films, bands }, 200);
+  // CREATOR-03: the filmography is the stored cast link (every picture, video, film and reel the synth is cast in that this viewer may open). A film found by
+  // its production that is already in that list is shown once; a film made before the store stays here.
+  const credits = listSynthCreditItems(actor, synth);
+  const listed = new Set(credits.map((item) => item.file_id));
+  return c.json({ shows, films: films.filter((film) => !listed.has(film.file_id)), bands, credits }, 200);
 });
 talentRoutes.post("/shows", async (c) => {
   try { const input = createShowSchema.parse(await c.req.json()) as CreateShowInput; return c.json(await createShow(c.get("person"), input), 201); }

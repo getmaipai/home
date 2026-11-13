@@ -30,6 +30,7 @@ import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
+import { storedFilmCredits } from "@/lib/creations/credits";
 import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
 import { RESTYLE_FAILURE_COPY, SPATIAL_FAILURE_COPY } from "@/lib/failureCopy";
@@ -537,10 +538,8 @@ async function filmProduction(input: RunEditVideoInput, value: EditArgs, actor: 
     if (!job || !file) return refused(callId, args, `Shot ${item.number} is not a finished video you can edit.`, "shot_not_editable");
     sources.push(job); files.push(file);
   }
-  const credits = production.cast.flatMap((entry) => {
-    const subject = getMediaSubject(actor, entry.subject_id);
-    return subject ? [{ role: entry.role.slice(0, 40), name: subject.name.slice(0, 60) }] : [];
-  });
+  // CREATOR-03: the stored cast link (the creation records of this production) first, then the production's own cast; names through the maker's own subject gate.
+  const credits = storedFilmCredits(production.id, production.cast, (id) => getMediaSubject(actor, id)?.name).map((line) => ({ role: line.role.slice(0, 40), name: line.name.slice(0, 60) }));
   credits.push({ role: "Made with", name: "MaiPai" });
   return editFinishedClips(input, { ...value, change: "film" }, actor, temporary, { production, sources, files, credits });
 }

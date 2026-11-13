@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { companionVoiceKey } from "@/lib/companionVoice";
-import { api, ApiError, type CompanionActivity, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
+import { api, ApiError, type SynthCreditItem, type CompanionActivity, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -35,7 +35,8 @@ import { Card } from "@maipai/ui/src/primitives/Card";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDate, formatList } from "@/lib/format";
 import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
-import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
+import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
+import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -254,11 +255,25 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
   );
 }
 
+const CREDIT_KIND_LABELS: Record<SynthCreditItem["kind"], () => string> = {
+  picture: () => i18n._({ id: "Picture", message: "Picture" }), video: () => i18n._({ id: "Video", message: "Video" }), film: () => i18n._({ id: "Film", message: "Film" }),
+  reel: () => i18n._({ id: "Reel", message: "Reel" }), song: () => i18n._({ id: "Song", message: "Song" }), sound: () => i18n._({ id: "Sound", message: "Sound" }), show: () => i18n._({ id: "Show", message: "Show" }),
+};
+const creditKindLabel = (kind: SynthCreditItem["kind"]) => CREDIT_KIND_LABELS[kind]();
+/** The one filmography: what the stored cast link lists, plus a film found only through its production (made before the store), newest first. */
+function filmographyOf(credits: { credits?: SynthCreditItem[]; films?: Array<{ production_id: string; title: string; part: string; file_id: string; made_at: string }> } | undefined): SynthCreditItem[] {
+  if (!credits) return [];
+  const old = (credits.films ?? []).map((film): SynthCreditItem => ({ creation_id: film.production_id, kind: "film", file_id: film.file_id, thumb_file_id: film.file_id, title: film.title, role: film.part, made_at: film.made_at, production_id: film.production_id }));
+  return [...(credits.credits ?? []), ...old].sort((a, b) => b.made_at.localeCompare(a.made_at));
+}
+
 function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills: Record<string, string | undefined> }) {
   const [params, setParams] = useSearchParams();
   const mediaHost = useContext(MediaHostContext);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const creditsQuery = useQuery({ queryKey: ["synth-credits", companion.id], queryFn: () => api.synthCredits(companion.id), enabled: !!companion.synth, retry: false });
+  const filmography = filmographyOf(creditsQuery.data);
   const lifeQuery = useQuery({ queryKey: ["synth-life", companion.id], queryFn: () => api.synthLife(companion.id), enabled: !!companion.synth, retry: false });
   const [lifeText, setLifeText] = useState("");
   const [lifeDate, setLifeDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -319,10 +334,10 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
         {tab === "About" ? <section aria-label={i18n._({ id: "About", message: "About" })}>
       {creditsQuery.isError || lifeQuery.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(creditsQuery.error ?? lifeQuery.error, i18n._({ id: "Could not load synth credits or life. Check your connection and try again.", message: "Could not load synth credits or life. Check your connection and try again." }))}</AlertDescription></Alert> : null}
       {lifeError ? <Alert variant="destructive"><AlertDescription>{lifeError}</AlertDescription></Alert> : null}
-      {(creditsQuery.data?.shows.length || creditsQuery.data?.films.length || creditsQuery.data?.bands.length) ? <Section heading={i18n._({ id: "Credits", message: "Credits" })}>
-        {creditsQuery.data.shows.length ? <div><h3 className="font-semibold">{i18n._({ id: "Shows", message: "Shows" })}</h3><ul>{creditsQuery.data.shows.map((show) => <li key={show.production_id}><p className="font-medium">{show.title} · {show.part}</p><ul>{[...show.episodes].sort((a, b) => new Date(b.aired_at).getTime() - new Date(a.aired_at).getTime()).map((episode) => <li key={episode.item_id}><Button type="button" variant="link" onClick={() => { if (mediaHost) void mediaHost.onPlay(episode.item_id, {}); }}>{episode.title}</Button></li>)}</ul></li>)}</ul></div> : null}
-        {creditsQuery.data.films.length ? <div><h3 className="font-semibold">{i18n._({ id: "Films", message: "Films" })}</h3><ul>{creditsQuery.data.films.map((film) => <li key={film.production_id}><p>{film.title} · {film.part}</p><VideoPlayer status="ready" prompt={film.title} src={`/api/files/${encodeURIComponent(film.file_id)}/content`} /></li>)}</ul></div> : null}
-        {creditsQuery.data.bands.length ? <div><h3 className="font-semibold">{i18n._({ id: "Bands", message: "Bands" })}</h3><ul>{creditsQuery.data.bands.map((band) => <li key={band.made_artist_id}>{band.name} · {band.role}</li>)}</ul></div> : null}
+      {(creditsQuery.data?.shows.length || filmography.length || creditsQuery.data?.bands.length) ? <Section heading={i18n._({ id: "Credits", message: "Credits" })}>
+        {creditsQuery.data?.shows.length ? <div><h3 className="font-semibold">{i18n._({ id: "Shows", message: "Shows" })}</h3><ul>{creditsQuery.data?.shows.map((show) => <li key={show.production_id}><p className="font-medium">{show.title} · {show.part}</p><ul>{[...show.episodes].sort((a, b) => new Date(b.aired_at).getTime() - new Date(a.aired_at).getTime()).map((episode) => <li key={episode.item_id}><Button type="button" variant="link" onClick={() => { if (mediaHost) void mediaHost.onPlay(episode.item_id, {}); }}>{episode.title}</Button></li>)}</ul></li>)}</ul></div> : null}
+        {filmography.length ? <MediaShelf items={filmography} getKey={(item) => item.creation_id} getLabel={(item) => item.title} aspect="square" layout="grid" variant="plain" heading={i18n._({ id: "Filmography", message: "Filmography" })} headingStyle="eyebrow" renderItem={(item) => <SafeImage src={`/api/files/${encodeURIComponent(item.thumb_file_id)}/thumb?w=320`} alt="" kind={item.kind === "picture" ? "picture" : item.kind === "song" || item.kind === "sound" ? "music" : "video"} tintSeed={item.title} className="size-full object-cover" />} renderBadge={(item) => <Badge variant="secondary">{creditKindLabel(item.kind)}</Badge>} renderCaption={(item) => <><span className="block truncate font-medium">{item.title}</span><span className="block truncate text-supporting text-muted-foreground">{item.role} · {formatDate(item.made_at)}</span></>} onSelect={(item) => navigate(`/library?file=${encodeURIComponent(item.file_id)}`)} /> : null}
+        {creditsQuery.data?.bands.length ? <div><h3 className="font-semibold">{i18n._({ id: "Bands", message: "Bands" })}</h3><ul>{creditsQuery.data?.bands.map((band) => <li key={band.made_artist_id}>{band.name} · {band.role}</li>)}</ul></div> : null}
       </Section> : null}
       {(lifeQuery.data?.beats.length || mayEditLife) ? <Section heading={i18n._({ id: "Life", message: "Life" })}>
         <ul>{lifeQuery.data?.beats.map((beat) => <li key={beat.id}><time dateTime={beat.valid_from ?? beat.at}>{beat.valid_from ?? beat.at.slice(0, 10)}</time><p>{beat.text}</p>{mayEditLife ? <Button type="button" variant="outline" disabled={forgetLife.isPending} onClick={() => forgetLife.mutate(beat.id)}>{i18n._({ id: "Forget", message: "Forget" })}</Button> : null}</li>)}</ul>
