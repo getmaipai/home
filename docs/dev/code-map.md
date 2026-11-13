@@ -809,8 +809,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
+| `backend/src/lib/mediaOps/http.ts` | MediaOpRequest, withAttachments, startLibraryOp |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP |
-| `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob, runPictureEdit |
+| `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, getMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob |
+| `backend/src/lib/mediaOps/words.ts` | runPictureWords |
 | `backend/src/lib/mediaProductions.ts` | registerCastSynthGate, canSeeProduction, listMediaProductions, getMediaProduction, setShowState, createMediaProduction |
 | `backend/src/lib/mediaSubjectSheet.ts` | sheetPromptFor, makeSubjectSheet |
 | `backend/src/lib/mediaSubjects.ts` | isSheetReference, canUseSubject, listMediaSubjects, getMediaSubject, createMediaSubject, updateMediaSubject |
