@@ -98,7 +98,8 @@ function refused(callId: string, args: Record<string, unknown>, refusal: Picture
 }
 
 export async function runGenerateImage(input: RunGenerateImageInput): Promise<ToolExecutionOutcome> {
-  const { state, args, callId } = input;
+  const { state, callId } = input;
+  let args = input.args;
   const createPage = !state.conversationId && state.temporary !== true && state.ephemeral !== true;
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
@@ -113,7 +114,15 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     const required = [...template.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g)].map((match) => match[1]!);
     const missing = required.find((name) => typeof blanks[name] !== "string" || !(blanks[name] as string).trim());
     if (missing) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `Ask for ${missing.replaceAll("_", " ")} before making this picture.` }, actions: [] } });
-    promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => String(blanks[name]).trim());
+    // CREATOR-14: a blank named cast_* is a cast slot. Its value is a cast id or name, not text: it joins the cast argument and reads "this person" in the prompt.
+    const slotIds = [...new Set(required.filter((name) => name.startsWith("cast_")).map((name) => String(blanks[name]).trim()))];
+    if (slotIds.length) {
+      const earlier = Array.isArray(args.cast) ? args.cast : [];
+      const merged = [...slotIds, ...earlier.filter((entry) => typeof entry !== "string" || !slotIds.includes(entry.trim()))].slice(0, 6);
+      normalized.cast = merged;
+      args = { ...args, cast: merged };
+    }
+    promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => name.startsWith("cast_") ? "this person" : String(blanks[name]).trim());
     normalized.prompt = promptOverride;
   }
   // CREATOR-13: the chosen look, light, angle and format are preset records; a name that is not one (or not this person's) is a bad argument.

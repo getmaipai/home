@@ -53,6 +53,13 @@ describe("Images Create make", () => {
     expect(readPictureMakeBody({ prompt: "a boat", references: ["a", "b", "c", "d"] }).ok).toBe(false);
   });
 
+  test("an empty prompt is allowed with a template and refused without one", () => {
+    expect(readPictureMakeBody({ prompt: "", template: "mtpl-poster" })).toMatchObject({ ok: true, body: { prompt: "", template: "mtpl-poster" } });
+    expect(readPictureMakeBody({ template: "mtpl-poster" }).ok).toBe(true);
+    expect(readPictureMakeBody({ prompt: "x".repeat(1201), template: "mtpl-poster" }).ok).toBe(false);
+    expect(readPictureMakeBody({ prompt: "" }).ok).toBe(false);
+  });
+
   test("folds flat Create preset chip values and one reference into the make request", () => {
     expect(readPictureMakeBody({ prompt: "a boat", shape: "wide", count: 8, tier: "boost", look_oil: "look-oil", light: "none", angle: "angle-high", format: "format-square", reference: "file-one" })).toMatchObject({ ok: true, body: { prompt: "a boat", count: 8, tier: "boost", presets: { look: "look-oil", angle: "angle-high", format: "format-square" }, references: ["file-one"] } });
   });

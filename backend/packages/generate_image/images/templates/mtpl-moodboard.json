@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-moodboard",
+  "kind": "picture",
+  "title": "Mood board",
+  "summary": "A mood board of colours, textures and objects for an idea.",
+  "category": "art",
+  "audience": "all-ages",
+  "prompt": "A mood board for {{idea|Idea|a cozy autumn cabin}}: a tidy collage of colour swatches, textures, objects and small photos on a neutral background, soft even light, no readable text.",
+  "references": [],
+  "styles": [],
+  "aspect": "3:2",
+  "transparent": false,
+  "provenance": "MaiPai CreatorOS port template, authored 2026-11-13",
+  "created_at": "2026-11-13T00:00:00Z",
+  "updated_at": "2026-11-13T00:00:00Z",
+  "hlc": "1794700000000:3:maipai01"
+}

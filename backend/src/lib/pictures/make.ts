@@ -19,7 +19,9 @@ const notGiven = (value: unknown) => typeof value === "string" && (/^\{[a-z_]+\}
 export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; body: PictureMakeBody } | { ok: false; error: string } {
   raw = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, notGiven(value) ? "" : value]));
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
-  if (prompt.length < 3 || prompt.length > 1200) return { ok: false, error: "Describe the picture in 3 to 1200 characters, then try again." };
+  // A template builds its own prompt, so an empty one is fine beside a template id.
+  const hasTemplate = typeof raw.template === "string" && raw.template.trim() !== "";
+  if ((prompt.length < 3 && !(hasTemplate && prompt.length === 0)) || prompt.length > 1200) return { ok: false, error: "Describe the picture in 3 to 1200 characters, then try again." };
   const body: PictureMakeBody = { prompt };
   const shape = typeof raw.shape === "string" && !notGiven(raw.shape) ? raw.shape.trim().toLowerCase() : "";
   if (shape) {

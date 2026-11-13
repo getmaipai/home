@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-tryonoutfit",
+  "kind": "picture",
+  "title": "Try on an outfit",
+  "summary": "See someone from your cast in an outfit. Add a picture of the outfit as the reference.",
+  "category": "portrait",
+  "audience": "all-ages",
+  "prompt": "{{cast_person|Person|someone from your cast}} wearing {{garment|Outfit|a green linen jacket}}, full length, plain studio background, soft natural light, the outfit shown clearly.",
+  "references": [],
+  "styles": [],
+  "aspect": "2:3",
+  "transparent": false,
+  "provenance": "MaiPai CreatorOS port template, authored 2026-11-13",
+  "created_at": "2026-11-13T00:00:00Z",
+  "updated_at": "2026-11-13T00:00:00Z",
+  "hlc": "1794700000000:1:maipai01"
+}

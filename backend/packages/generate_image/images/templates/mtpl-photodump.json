@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-photodump",
+  "kind": "picture",
+  "title": "Photo dump",
+  "summary": "A casual photo dump of someone from your cast: four moments in one picture.",
+  "category": "social",
+  "audience": "all-ages",
+  "prompt": "A casual photo dump in a two by two grid: four candid moments of {{cast_person|Person|someone from your cast}} {{moments|Moments|at a weekend market, with a coffee, laughing with friends and walking a dog}}, warm natural light, phone camera look.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": false,
+  "provenance": "MaiPai CreatorOS port template, authored 2026-11-13",
+  "created_at": "2026-11-13T00:00:00Z",
+  "updated_at": "2026-11-13T00:00:00Z",
+  "hlc": "1794700000000:4:maipai01"
+}

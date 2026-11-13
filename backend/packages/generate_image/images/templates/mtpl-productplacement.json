@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-productplacement",
+  "kind": "picture",
+  "title": "Product in a scene",
+  "summary": "Place a product in a real-looking scene. Add a picture of the product as the reference.",
+  "category": "product",
+  "audience": "all-ages",
+  "prompt": "{{item|Product|a handmade ceramic cup}} placed in {{scene|Scene|a sunny kitchen counter}}, natural light, shallow depth of field, the product sharp and centred, no extra text.",
+  "references": [],
+  "styles": [],
+  "aspect": "1:1",
+  "transparent": false,
+  "provenance": "MaiPai CreatorOS port template, authored 2026-11-13",
+  "created_at": "2026-11-13T00:00:00Z",
+  "updated_at": "2026-11-13T00:00:00Z",
+  "hlc": "1794700000000:2:maipai01"
+}

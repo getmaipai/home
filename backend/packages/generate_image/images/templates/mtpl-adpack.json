@@ -1,0 +1,17 @@
+{
+  "id": "mtpl-adpack",
+  "kind": "picture",
+  "title": "Ad poster",
+  "summary": "A bold poster for a product with a short headline.",
+  "category": "social",
+  "audience": "all-ages",
+  "prompt": "A bold advertising poster for {{product|Product|a fresh lemon soda}} with the headline \"{{headline|Headline|Cool and bright}}\" in large clear lettering, clean layout, strong colour, plenty of space around the words.",
+  "references": [],
+  "styles": [],
+  "aspect": "2:3",
+  "transparent": false,
+  "provenance": "MaiPai CreatorOS port template, authored 2026-11-13",
+  "created_at": "2026-11-13T00:00:00Z",
+  "updated_at": "2026-11-13T00:00:00Z",
+  "hlc": "1794700000000:5:maipai01"
+}
