@@ -1,22 +1,22 @@
 {
   "_note": "A Home release bumps this pin.",
-  "version": "0.2.59",
+  "version": "0.2.60",
   "repo": "getmaipai/bot",
   "assets": {
     "darwin-arm64": {
       "name": "bot-darwin-arm64.tar.gz",
-      "sha256": "2ef7ad3001b6712a422a35db53cafceabf8d15c216690850a74afc39753b8a7e",
-      "size": 105878106
+      "sha256": "e56c0b6d951dc56f9b8d3e1a72d09fc4b4998f34393efc036a28eb11dc88f648",
+      "size": 105914158
     },
     "linux-x64": {
       "name": "bot-linux-x64.tar.gz",
-      "sha256": "27dd002ccfbe96bd3051171ef1d066dd4b971ca38ff7137193c1a12f8b02501d",
-      "size": 241585918
+      "sha256": "2a13faac46419860a12d9f3289733855f9b1e7a0d102baa364e0fd3c06a39813",
+      "size": 241619604
     },
     "linux-arm64": {
       "name": "bot-linux-arm64.tar.gz",
-      "sha256": "3a1bc3fffa64a4b5299ccb54ebd3c6e1ff6014f0b7a377b6a118aa359821bdf9",
-      "size": 207462254
+      "sha256": "bde8841d3f2b8e556683455d37a9bae3932938fec7426a9a299c55e87f4806b6",
+      "size": 207500646
     }
   },
   "firmware": {
