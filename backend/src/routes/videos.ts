@@ -57,8 +57,17 @@ import { refusalLineOf, runEditVideo } from "@/lib/videos/editTool";
 import { editRefusal } from "@/lib/videos/editGate";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { editVideoArgs, type RunEditVideoInput } from "@/lib/videos/editTool";
+import { addPick, listPicks, togglePickVote } from "@/lib/media/familyPicks";
 
 export const videosRoutes = apiRouter();
+const picksResult = z.object({ collection_id: z.string(), items: z.array(z.object({ media_id: z.string(), added_at: z.string(), votes: z.number(), voted: z.boolean(), added_by: z.string().nullable(), top: z.boolean() })) });
+const picksGetRoute = createRoute({ method: "get", path: "/picks", tags: ["Videos"], summary: "List the household Family Picks vote queue", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: picksResult } }, description: "Visible picks" }, ...errorResponses({ 401: "Not signed in" }) } });
+const picksPostRoute = createRoute({ method: "post", path: "/picks", tags: ["Videos"], summary: "Add a video to Family Picks", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: z.object({ media_id: z.string().min(1).max(80) }) } } } }, responses: { 201: { content: { "application/json": { schema: z.object({ collection_id: z.string(), media_id: z.string() }) } }, description: "Added" }, ...errorResponses({ 400: "Invalid request", 401: "Not signed in", 404: "Video unavailable" }) } });
+const picksVoteParams = z.object({ media_id: z.string().min(1).max(80).openapi({ param: { name: "media_id", in: "path" } }) });
+const picksVoteRoute = createRoute({ method: "post", path: "/picks/{media_id}/vote", tags: ["Videos"], summary: "Toggle your Family Picks vote", middleware: [requireAuth] as const, request: { params: picksVoteParams }, responses: { 200: { content: { "application/json": { schema: z.object({ media_id: z.string(), voted: z.boolean() }) } }, description: "Vote changed" }, ...errorResponses({ 401: "Not signed in", 404: "Video unavailable" }) } });
+videosRoutes.openapi(picksGetRoute, (c) => c.json(listPicks(c.get("person")), 200));
+videosRoutes.openapi(picksPostRoute, (c) => { const result = addPick(c.get("person"), c.req.valid("json").media_id); return result.ok ? c.json(result.value, 201) : c.json({ error: result.error }, 404) as never; });
+videosRoutes.openapi(picksVoteRoute, (c) => { const result = togglePickVote(c.get("person"), c.req.valid("param").media_id); return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, 404) as never; });
 /** A locked item's media routes never let a cache keep a 404 or a body (ADULT-LOCK-02). */
 const NO_STORE = { "cache-control": "private, no-store" } as const;
 

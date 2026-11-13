@@ -29,7 +29,7 @@ const decode = (id: string): string => Buffer.from(id.slice("media-".length), "h
 const keysOf = (person: PersonRow, title: string): string[] => (ownCollection(person, title, false)?.items ?? []).map((entry) => decode(entry.media_id));
 const saveKeys = (person: PersonRow, title: string, keys: string[]): void => {
   const now = new Date().toISOString();
-  setItems(ownCollection(person, title, true)!, keys.map((key, position) => ({ media_id: encode(key), added_at: now, position, status: null })));
+  setItems(ownCollection(person, title, true)!, keys.map((key, position) => ({ media_id: encode(key), added_at: now, position, status: null, votes: [] })));
 };
 
 const pinKeys = (person: PersonRow): string[] => keysOf(person, PINS_TITLE);
