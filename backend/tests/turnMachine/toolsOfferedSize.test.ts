@@ -12,8 +12,8 @@ const size = (id: string): number => {
 
 // The character budgets are the brief's targets. edit_video and edit_music cannot reach theirs without dropping an argument, an enum value or a bound
 // (their schema without a single description is already 4,649 and 1,432 characters), so their ceilings are the sizes reached by AUDIT-TOOLS-01: a later
-// edit may not grow them back.
-const CEILING: Record<string, number> = { edit_video: 6200, generate_video: 1500, generate_image: 1500, edit_music: 1700, generate_music: 1500, show_images: 1500, make_film: 2400 };
+// edit may not grow them back. edit_music grew from 1700 to 2100 for the ten MP-02 file effects (gain, reverse, speed, pitch, remove_silence, limit, echo, reverb, eq, denoise) and their three arguments.
+const CEILING: Record<string, number> = { edit_video: 6200, generate_video: 1500, generate_image: 1500, edit_music: 2100, generate_music: 1500, show_images: 1500, make_film: 2400 };
 
 describe("the media tool schemas stay at their size ceilings", () => {
   for (const [id, ceiling] of Object.entries(CEILING)) {

@@ -14,6 +14,7 @@ import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 import { resolveSound } from "./sound";
+import { EFFECT_CHANGES, EQ_PRESETS, EFFECT_UNAVAILABLE_LINE, checkEffect, isEffectChange, startMusicEffectJob } from "./effects";
 import { likenessCallRefusal } from "@/lib/likeness";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -35,12 +36,14 @@ export const generateMusicArgs = z.object({ ...common, description: common.descr
   /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
   song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional() });
 export const editMusicArgs = z.object({
-  ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "parts", "voice_swap"]),
+  ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "parts", "voice_swap", ...EFFECT_CHANGES]),
   parts: z.object({ keep: z.array(z.string()).min(1).optional(), drop: z.array(z.string()).min(1).optional() }).optional(),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
   voice: z.string().min(1).max(80).optional(),
+  /** MP-02 file effects: gain dB, speed times, pitch semitones. */ amount: z.number().finite().min(-24).max(24).optional(),
+  preset: z.enum(EQ_PRESETS).optional(), bands: z.array(z.number().finite().min(-12).max(12)).length(6).optional(),
 }).superRefine((value, ctx) => { if (value.change === "voice_swap" && !value.voice) ctx.addIssue({ code: "custom", path: ["voice"], message: "Choose a voice." }); });
 /** Shared attached-file edit preparation used by the tool and Music Create. */
 export function prepareOwnedMusicEdit(source: MusicJob, args: { change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; style?: string; parts?: { keep?: string[]; drop?: string[] } }, limits: { min_seconds: number; max_seconds: number }) {
@@ -208,6 +211,8 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
       task = "trim"; stackTask = "edit"; request.parts = parts;
       break;
     }
+    // MP-02 file effects run on the saved file in Home (effects.ts), never as a Stack job.
+    default: return { ok: false, line: "That change is made on the saved file, not as a new song." };
   }
   // New words (or none, for an instrumental) replace the person's kept words: Make it full must sing what this version sings.
   if (args.change !== "make_full" && args.change !== "make_quick" && (args.lyrics !== undefined || request.instrumental)) { delete request.written_lyrics; delete request.cut; }
@@ -247,6 +252,22 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
       const result = await startOwnedMusicPartsJob({ actor, source, parts: parsed.data.parts, title: parsed.data.title, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary });
       if (!result.ok) return "status" in result && result.status === 503 ? failed("stems_unavailable", "unavailable") : refused(result.line, "source_not_made_here");
       return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: partsDoneLine(result.parts) }, data: { musicJobId: result.job.id }, actions: [] } });
+    }
+    if (isEffectChange(parsed.data.change)) {
+      // MP-02: a file effect runs in Home (ffmpeg), makes a new version, and needs no music model.
+      const source = resolveSongSource(actor, parsed.data.track === "attached" ? state.audio?.[0]?.id ?? "" : parsed.data.track, state.conversationId, temporary);
+      if (!source?.fileId || (source.request.ownedFile && source.task === "stems")) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+      const checked = checkEffect(parsed.data, source.durationS ?? source.request.seconds);
+      if (!checked.ok) return refused(checked.line, "section_or_range");
+      try {
+        const { job } = await startMusicEffectJob({ actor, source, spec: checked.spec, title: parsed.data.title, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary });
+        return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The change is on the way and takes a few seconds. Reply in one short sentence; do not say it is done." }, data: { musicJobId: job.id }, actions: [] } });
+      } catch (error) {
+        const code = error instanceof StackMusicError ? error.code : "failed";
+        if (code === "effect_unavailable") return refused(EFFECT_UNAVAILABLE_LINE, code);
+        if (code === "source_not_made_here" || code === "storage_full") return refused(plainMusicFailure(code), code);
+        return failed(code, "errored");
+      }
     }
     if (parsed.data.track === "attached" && (state.audio?.length ?? 0) !== 1) return refused("Attach one audio file to your message.", "source_not_made_here");
     if (parsed.data.track === "attached" && parsed.data.change === "stems") {

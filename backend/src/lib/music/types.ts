@@ -3,7 +3,7 @@ import type { GenerationProvenance } from "@maipai/spec/gen/ts/generation-proven
 export type { GenerationProvenance };
 /** Quick sings the hook. Full sings every part. The length follows the words. */
 export type SongLength = "quick" | "full";
-export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "stems";
+export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "effect" | "stems";
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
@@ -14,6 +14,8 @@ export interface MusicRequest {
   edit?: import("./stack").MusicBody["edit"];
   /** A kept-part mix made from private intermediate stems. */
   parts?: { keep: Array<"vocals" | "drums" | "bass" | "other">; drop: Array<"vocals" | "drums" | "bass" | "other"> };
+  /** MP-02: a file effect (ffmpeg in Home, no model) applied to the parent version; see effects.ts. */
+  effect?: { change: string; amount?: number; preset?: string; bands?: number[]; from_s?: number; to_s?: number };
   /** A voice swap keeps the target's id only; the private reference clip is read from the voice manager at finish time. */
   voiceSwap?: { voiceId: string };
   /** MUSIC-LIKE-01: a made band's first single. The song saved from this job is filed under the band (artist text and made_artist_id). */

@@ -47,11 +47,13 @@ describe("ACTIVITY-PAGE-01: the list", () => {
     song("cov", ownerRow.id, { task: "cover" });
     song("stm", ownerRow.id, { task: "stems" });
     song("trm", ownerRow.id, { task: "trim" });
+    song("fx", ownerRow.id, { task: "effect" });
     const byId = new Map(activityForViewer(ownerRow).items.map((item) => [item.id, item]));
     expect(byId.get("song:snd")).toMatchObject({ state: "making", title: "rain on a tin roof", line: "Singing the verse" });
     expect(byId.get("song:cov")?.state).toBe("making");
     expect(byId.get("song:stm")?.state).toBe("making");
     expect(byId.has("song:trm")).toBe(false);
+    expect(byId.get("song:fx")).toMatchObject({ state: "making", source: "song" });
   });
 
   test("never lists another person's job, an admin's included", async () => {

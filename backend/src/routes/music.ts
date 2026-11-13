@@ -4,6 +4,7 @@ import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } 
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
+import { EFFECT_LABELS, isEffectChange } from "@/lib/music/effects";
 import { listVersions } from "@/lib/imageEdit";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -107,7 +108,7 @@ const lockedJob = (actor: PersonRow, job: MusicJob) => musicJobLockState(job, ac
 const hiddenSong = (c: any) => c.json({ error: "That song isn't available any more. Ask for it again." }, 404, NO_STORE);
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
-  loading: "Loading", starting: "Loading",
+  loading: "Loading", starting: "Loading", effect: "Changing the sound",
   splitting: "Making", voice_convert: "Making", "voice-convert": "Making", pitch: "Making", converting: "Making", mix: "Mixing",
   planning: "Planning", lm: "Planning",
   making: "Making", dit: "Making", music: "Making", generating: "Making",
@@ -115,7 +116,7 @@ const MUSIC_STAGE_LABELS: Record<string, string> = {
   paused: jobQueueCopy("paused_chat", "paused_chat", null, null, "adult"),
 };
 const MUSIC_STAGE_INDEX: Record<string, number> = {
-  loading: 1, starting: 1, planning: 2, lm: 2, splitting: 3, voice_convert: 3, "voice-convert": 3, pitch: 3, converting: 3, mix: 4,
+  loading: 1, starting: 1, effect: 3, planning: 2, lm: 2, splitting: 3, voice_convert: 3, "voice-convert": 3, pitch: 3, converting: 3, mix: 4,
   dit: 3, making: 3, music: 3, generating: 3,
   vae: 4, decoding: 4, mixing: 5, encoding: 5, saving: 5,
 };
@@ -170,7 +171,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   const versions = stemSet.length ? stemSet : musicVersions(actor, root);
   const current = stemSet.length ? stemSet[0] : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
   const shown = current ?? root;
-  const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : `Version ${index + 1}`;
+  const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : `Version ${index + 1}${job.request.effect && isEffectChange(job.request.effect.change) ? ` (${EFFECT_LABELS[job.request.effect.change]})` : ""}`;
   let covers: { id: string; url: string }[] = [];
   if (shown.coverFileId && shown.conversationId) {
     try { covers = listVersions(actor, shown.conversationId, shown.coverFileId).map(({ id, url }) => ({ id, url })); } catch { /* A deleted cover leaves the song playable. */ }

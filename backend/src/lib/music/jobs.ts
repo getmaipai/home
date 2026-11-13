@@ -37,8 +37,8 @@ const starting = new Set<string>();
 function saveMusicJob(job: MusicJob): void { persistMusicJob(job); refreshHouseholdQueue(); }
 registerQueueProvider(() => {
   const jobs = new Map<string, MusicJob>();
-  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state)) jobs.set(job.id, job);
-  for (const job of pendingMusicJobs()) if (!jobs.has(job.id)) jobs.set(job.id, job);
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state) && !job.request.effect) jobs.set(job.id, job);
+  for (const job of pendingMusicJobs()) if (!jobs.has(job.id) && !job.request.effect) jobs.set(job.id, job);
   return [...jobs.values()].map((job) => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
     const phaseHold = PERSISTED_HOLDS.find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
@@ -288,7 +288,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   }
   const stamp = modelStampFor(job.request.sound ? "sfx" : job.task, song.model, job.parentFileId ? provenanceFor(job.parentFileId) : null);
   const provenance: GenerationProvenance = {
-    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task, ...stamp, seed: song.seed, duration_s: soundSeconds,
+    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task === "effect" ? "trim" : job.task, ...stamp, seed: song.seed, duration_s: soundSeconds,
     bpm: song.bpm ?? job.request.bpm ?? null, key: song.key ?? job.request.key ?? null,
     parent_file_id: job.request.ownedFile ? null : job.parentFileId, source_kind: job.request.ownedFile ? "upload" : job.parentFileId ? "made_here" : "none",
     made_at: new Date().toISOString(),
@@ -477,6 +477,8 @@ export function resumeMusicJobs(): void {
   for (const job of pendingMusicJobs()) {
     const person = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (!person) { fail(job, "lost_job"); continue; }
+    // MP-02: an effect runs inside this process; after a restart it cannot be picked up, so it ends with a line that says to ask again.
+    if (job.request.effect) { job.state = "failed"; job.errorCode = "effect_failed"; job.errorLine = "The change was interrupted. Ask for it again."; saveMusicJob(job); continue; }
     liveJobs.set(job.id, job);
     if (job.stackJob) void watch(job, person);
   }

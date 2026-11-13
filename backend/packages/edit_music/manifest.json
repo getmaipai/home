@@ -31,7 +31,14 @@
       "make it karaoke",
       "mute the drums",
       "have the companion sing it",
-      "make this sound like Nova singing"
+      "make this sound like Nova singing",
+      "make it louder",
+      "play it backwards",
+      "slow it down to 80 percent",
+      "raise it two semitones",
+      "add some reverb",
+      "boost the bass",
+      "clean up the background noise"
     ],
     "patterns": []
   },
@@ -84,7 +91,7 @@
       },
       "change": {
         "type": "string",
-        "description": "parts: set one of keep or drop. voice_swap: set voice.",
+        "description": "parts: keep or drop. voice_swap: voice. gain/speed/pitch: amount (dB, x0.5-2, semitones). eq: preset or bands. Effects take from_s/to_s.",
         "enum": [
           "remake",
           "restyle",
@@ -99,7 +106,17 @@
           "make_quick",
           "stems",
           "parts",
-          "voice_swap"
+          "voice_swap",
+          "gain",
+          "reverse",
+          "speed",
+          "pitch",
+          "remove_silence",
+          "limit",
+          "echo",
+          "reverb",
+          "eq",
+          "denoise"
         ]
       },
       "parts": {
@@ -174,6 +191,28 @@
         "type": "number",
         "minimum": -70,
         "maximum": -5
+      },
+      "amount": {
+        "type": "number",
+        "minimum": -24,
+        "maximum": 24
+      },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "bass_boost",
+          "treble_boost",
+          "vocal_clarity",
+          "warm"
+        ]
+      },
+      "bands": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 6,
+        "maxItems": 6
       }
     }
   },

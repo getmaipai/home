@@ -134,7 +134,7 @@ function videoItems(actor: PersonRow): ActivityItem[] {
 
 function songItems(actor: PersonRow): ActivityItem[] {
   const audience = audienceOf(actor);
-  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), inArray(musicJobs.task, ["text2music", "cover", "repaint", "extend", "remake", "variation", "stems"]))).orderBy(desc(musicJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
+  const rows = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), inArray(musicJobs.task, ["text2music", "cover", "repaint", "extend", "remake", "variation", "effect", "stems"]))).orderBy(desc(musicJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
   const out: ActivityItem[] = [];
   for (const row of rows) {
     if (row.state === "cancelled" || !recent(row.updatedAt)) continue;
