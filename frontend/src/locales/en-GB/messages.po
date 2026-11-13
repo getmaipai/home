@@ -2111,7 +2111,7 @@ msgid "Add a phrase"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:56
+#: src/shell/MediaPickerDialog.tsx:85
 msgid "Add a picture"
 msgstr ""
 
@@ -2258,7 +2258,7 @@ msgid "Add the music"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:100
+#: src/shell/MediaPickerDialog.tsx:130
 msgid "Add this line"
 msgstr ""
 
@@ -2332,7 +2332,7 @@ msgid "Added. The song has a new version with the sound in it. The first version
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:56
+#: src/shell/MediaPickerDialog.tsx:85
 #: src/shell/pages/SoundExtras.tsx:83
 msgid "Adding"
 msgstr ""
@@ -5110,7 +5110,7 @@ msgid "Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:379
+#: ../backend/src/lib/failureCopy.ts:385
 msgid "failure.advice.unreachable.next_step"
 msgstr ""
 
@@ -5375,7 +5375,7 @@ msgid "Choose a person"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:40
+#: src/shell/MediaPickerDialog.tsx:55
 msgid "Choose a PNG, JPEG or WebP picture."
 msgstr ""
 
@@ -7210,7 +7210,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:396
 msgid "failure.tool.unavailable.verb"
 msgstr ""
 
@@ -9568,7 +9568,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:399
 msgid "failure.tool.errored.verb"
 msgstr ""
 
@@ -10058,7 +10058,7 @@ msgid "Forward 30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:398
 msgid "failure.tool.found_nothing.verb"
 msgstr ""
 
@@ -10073,7 +10073,7 @@ msgid "Free memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.advice.memory.next_step"
 msgstr ""
 
@@ -10588,7 +10588,7 @@ msgid "Good to know"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:400
 msgid "failure.tool.bad_arguments.verb"
 msgstr ""
 
@@ -11163,12 +11163,12 @@ msgid "Home could not make that voiceover. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:379
+#: ../backend/src/lib/failureCopy.ts:385
 msgid "failure.advice.unreachable.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:380
+#: ../backend/src/lib/failureCopy.ts:386
 msgid "failure.advice.engine_computer.cause"
 msgstr ""
 
@@ -12159,12 +12159,12 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:451
+#: ../backend/src/lib/failureCopy.ts:457
 msgid "failure.ask_form.unreachable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:452
+#: ../backend/src/lib/failureCopy.ts:458
 msgid "failure.ask_form.other"
 msgstr ""
 
@@ -12189,17 +12189,17 @@ msgid "failure.context_too_large.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:412
+#: ../backend/src/lib/failureCopy.ts:418
 msgid "failure.partial.slow"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:413
+#: ../backend/src/lib/failureCopy.ts:419
 msgid "failure.partial.other"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:411
+#: ../backend/src/lib/failureCopy.ts:417
 msgid "failure.partial.minor"
 msgstr ""
 
@@ -14441,7 +14441,7 @@ msgid "Loading weather"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:104
+#: src/shell/MediaPickerDialog.tsx:134
 msgid "Loading your {noun}"
 msgstr ""
 
@@ -14453,6 +14453,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:91
 msgid "Loading your cards"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:71
+msgid "Loading your cast"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14477,7 +14482,7 @@ msgid "Loading your music library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:59
+#: src/shell/MediaPickerDialog.tsx:88
 msgid "Loading your pictures"
 msgstr ""
 
@@ -18067,7 +18072,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:450
+#: ../backend/src/lib/failureCopy.ts:456
 msgid "failure.ask_form.invalid"
 msgstr ""
 
@@ -20949,12 +20954,12 @@ msgid "Retry"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:396
 msgid "failure.tool.unavailable.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:380
+#: ../backend/src/lib/failureCopy.ts:386
 msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
@@ -20964,32 +20969,32 @@ msgid "Retry with current companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:381
+#: ../backend/src/lib/failureCopy.ts:387
 msgid "failure.advice.context_too_large.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:400
 msgid "failure.tool.bad_arguments.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:397
 msgid "failure.tool.timed_out.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:378
+#: ../backend/src/lib/failureCopy.ts:384
 msgid "failure.advice.slow.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:382
+#: ../backend/src/lib/failureCopy.ts:388
 msgid "failure.advice.other.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:399
 msgid "failure.tool.errored.next_step"
 msgstr ""
 
@@ -21682,7 +21687,7 @@ msgid "Saving…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:93
+#: src/shell/MediaPickerDialog.tsx:123
 msgid "Say a line"
 msgstr ""
 
@@ -23974,7 +23979,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:383
 msgid "failure.advice.stopped.next_step"
 msgstr ""
 
@@ -25024,7 +25029,8 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:116
 #: src/shell/library/LibraryViewer.tsx:123
 #: src/shell/library/TranscriptCaptionTracks.tsx:183
-#: src/shell/MediaPickerDialog.tsx:57
+#: src/shell/MediaPickerDialog.tsx:70
+#: src/shell/MediaPickerDialog.tsx:86
 #: src/shell/pages/CompanionAudienceDialog.tsx:49
 #: src/shell/pages/CompanionAudienceDialog.tsx:62
 #: src/shell/pages/companionFlow/AnimateStep.tsx:132
@@ -25153,7 +25159,7 @@ msgid "api.error.list_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:435
+#: ../backend/src/lib/failureCopy.ts:441
 msgid "failure.prompt_limit.too_big.adult"
 msgstr ""
 
@@ -25163,7 +25169,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:436
+#: ../backend/src/lib/failureCopy.ts:442
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -25402,7 +25408,7 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:449
+#: ../backend/src/lib/failureCopy.ts:455
 msgid "failure.ask_form.field"
 msgstr ""
 
@@ -25467,17 +25473,17 @@ msgid "The character could not be made ready. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:378
+#: ../backend/src/lib/failureCopy.ts:384
 msgid "failure.advice.slow.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.advice.busy.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:383
 msgid "failure.advice.stopped.cause"
 msgstr ""
 
@@ -25512,7 +25518,7 @@ msgid "setting.companions.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.advice.memory.cause"
 msgstr ""
 
@@ -25723,7 +25729,7 @@ msgid "The last mode change did not finish: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:99
+#: src/shell/MediaPickerDialog.tsx:129
 msgid "The line to say"
 msgstr ""
 
@@ -26012,12 +26018,12 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:382
+#: ../backend/src/lib/failureCopy.ts:388
 msgid "failure.advice.other.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:381
+#: ../backend/src/lib/failureCopy.ts:387
 msgid "failure.advice.context_too_large.cause"
 msgstr ""
 
@@ -26491,12 +26497,12 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:431
+#: ../backend/src/lib/failureCopy.ts:437
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:432
+#: ../backend/src/lib/failureCopy.ts:438
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
@@ -26617,7 +26623,7 @@ msgid "api.error.file_belongs_to_item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:448
+#: ../backend/src/lib/failureCopy.ts:454
 msgid "failure.ask_form.stale"
 msgstr ""
 
@@ -26894,7 +26900,7 @@ msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:397
 msgid "failure.tool.timed_out.verb"
 msgstr ""
 
@@ -27291,7 +27297,7 @@ msgid "api.next.internal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:398
 msgid "failure.tool.found_nothing.next_step"
 msgstr ""
 
@@ -27602,7 +27608,7 @@ msgid "Type it again"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:99
+#: src/shell/MediaPickerDialog.tsx:129
 msgid "Type what the voice should say."
 msgstr ""
 
@@ -28644,7 +28650,7 @@ msgid "Volume"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.advice.busy.next_step"
 msgstr ""
 
@@ -29002,7 +29008,7 @@ msgid "What this computer can do"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:92
+#: src/shell/MediaPickerDialog.tsx:122
 msgid "What to add"
 msgstr ""
 
@@ -29755,7 +29761,7 @@ msgid "api.error.recheck_too_many"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:105
+#: src/shell/MediaPickerDialog.tsx:135
 msgid "You have no clips yet. Make one on the Create page."
 msgstr ""
 
@@ -29775,7 +29781,7 @@ msgid "You have no finished videos to cut yet. Make a video in chat first, then 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:60
+#: src/shell/MediaPickerDialog.tsx:89
 msgid "You have no pictures in your Library yet. Add one above."
 msgstr ""
 
@@ -29785,7 +29791,7 @@ msgid "You have no PIN or password yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:105
+#: src/shell/MediaPickerDialog.tsx:135
 msgid "You have no songs in your Library yet. Make one in Audio."
 msgstr ""
 
@@ -29840,12 +29846,12 @@ msgid "notification.timer.done"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:106
+#: src/shell/MediaPickerDialog.tsx:136
 msgid "Your {noun}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:104
+#: src/shell/MediaPickerDialog.tsx:134
 msgid "Your {noun} did not load. Close this and try again."
 msgstr ""
 
@@ -29867,6 +29873,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:92
 msgid "Your cards did not load"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/MediaPickerDialog.tsx:71
+msgid "Your cast did not load. Close this and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30075,12 +30086,12 @@ msgid "Your picture is ready."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:61
+#: src/shell/MediaPickerDialog.tsx:90
 msgid "Your pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:59
+#: src/shell/MediaPickerDialog.tsx:88
 msgid "Your pictures did not load. Close this and try again."
 msgstr ""
 
@@ -30131,7 +30142,7 @@ msgid "Your song. Press play, or open Edit to change it."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/MediaPickerDialog.tsx:94
+#: src/shell/MediaPickerDialog.tsx:124
 #: src/shell/pages/MusicLibrary.tsx:180
 #: src/shell/pages/MusicWorkspacePage.tsx:79
 #: src/shell/pages/MusicWorkspacePage.tsx:131
