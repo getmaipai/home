@@ -1059,6 +1059,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotSoftware.ts` | compareSemver, robotSoftwareStatus, getRobotSoftware |
 | `backend/src/lib/robotSsh.ts` | RobotPasswordRotationError, readRobotHostKey, rotateRobotPassword |
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, robotVisionMode, __setLookForTests |
+| `backend/src/lib/robotVoice/ids.ts` | ROBOT_TIMER_TOOL_ID, ROBOT_ANNOUNCE_TOOL_ID |
+| `backend/src/lib/robotVoice/tool.ts` | ROBOT_VOICE_MIN_BOT, ROBOT_ACK_WAIT_MS, ROBOT_TIMER_ACTIONS, safeTimerAction, capableStackChanBody, robotTimerAllowed |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
 | `backend/src/lib/roleHealth.ts` | __setRoleHealthForTests, cachedRoleHealth, sharedStackRoles, sharedCodingMode, __resetSharedStackReadsForTests, STACK_REFUSAL_KEY |

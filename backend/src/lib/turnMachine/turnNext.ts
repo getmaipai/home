@@ -675,6 +675,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     actor,
     band,
     surface,
+    ...(surface === "robot" && opts.deviceId ? { deviceId: opts.deviceId } : {}),
     surfaceClass,
     spoken: opts.spoken === true,
     temporary,
@@ -688,7 +689,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     referenceVideoAvailable: () => !temporary && opts.ephemeral !== true && conversationHasReferenceVideo(actor, conversation.id),
     musicObjectInThread: () => threadMusicObject(actor, conversation.id),
   });
-  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk } = gated;
+  const { budget, answerImagesOk, picturesOk, editPictureOk, editPictureOps, editPictureIds, videosOk, musicOk, musicEditOk, videoEditOk, filmOk, referenceVideoOk, itemRefOk, musicBandOk, musicObject, musicObjectRef, writingFormatOk, voiceoverOk, inspiredVoiceOk, houseOk, houseContext, uptimeOk, robotTimerOk, robotAnnounceOk } = gated;
 
   const state: TurnState = {
     turnId,
@@ -723,6 +724,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(inspiredVoiceOk ? { inspiredVoiceAllowed: true } : {}),
     ...(houseOk ? { houseAllowed: true, houseContext } : {}),
     ...(uptimeOk ? { uptimeAllowed: true } : {}),
+    ...(robotTimerOk ? { robotTimerAllowed: true } : {}),
+    ...(robotAnnounceOk ? { robotAnnounceAllowed: true } : {}),
     ...(musicBandOk ? { musicBandAllowed: true } : {}),
     ...(musicObject ? { musicObject: { kind: musicObject, ...(musicObjectRef ? { id: musicObjectRef.id } : {}) } } : {}),
     modelId: opts.model,

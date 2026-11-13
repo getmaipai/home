@@ -212,7 +212,35 @@ function isDeviceHeartbeat(value: unknown): value is { type: "heartbeat"; device
   return message.type === "heartbeat" && typeof message.device_time === "string" && Number.isFinite(Date.parse(message.device_time));
 }
 
-function isDeviceAck(value: unknown): value is { type: "ack"; id: string; state?: { muted?: boolean } } {
+// ROBOT-VOICE-01: a voice tool waits for the robot's own answer to one command. The answer rides in the ack state; it is held in memory
+// for the one waiter only (the hub does not store it, see the Dance button note), so nothing about it outlives the turn.
+const ackWaiters = new Map<string, (state: Record<string, unknown>) => void>();
+
+/** Whether the robot's command channel is open right now. */
+export function robotChannelConnected(deviceId: string): boolean {
+  return connections.get(deviceId)?.ws.readyState === 1;
+}
+
+/** Resolves with the ack state the robot sends for this command, or null when it does not answer within `timeoutMs`. Call it in the same
+ * tick as `issueDeviceCommand`, so an ack can never arrive before the waiter exists. */
+export function awaitDeviceCommandAck(commandId: string, timeoutMs: number): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { ackWaiters.delete(commandId); resolve(null); }, timeoutMs);
+    ackWaiters.set(commandId, (state) => { clearTimeout(timer); ackWaiters.delete(commandId); resolve(state); });
+  });
+}
+
+/** Withdraws a command the robot never received, so a later reconnect cannot replay it (a timer set an hour late is worse than none).
+ * Returns false when the robot already got it or answered it. */
+export function retractUndeliveredDeviceCommand(commandId: string): boolean {
+  const row = db.select({ id: deviceCommands.id }).from(deviceCommands)
+    .where(and(eq(deviceCommands.id, commandId), isNull(deviceCommands.deliveredAt), isNull(deviceCommands.ackedAt))).get();
+  if (!row) return false;
+  db.delete(deviceCommands).where(eq(deviceCommands.id, commandId)).run();
+  return true;
+}
+
+function isDeviceAck(value: unknown): value is { type: "ack"; id: string; state?: Record<string, unknown> & { muted?: boolean } } {
   if (typeof value !== "object" || value === null) return false;
   const message = value as Record<string, unknown>;
   if (message.type !== "ack" || typeof message.id !== "string") return false;
@@ -298,6 +326,7 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
           return;
         }
         connection.lastEventId = message.id;
+        ackWaiters.get(message.id)?.(message.state ?? {});
         return;
       }
       const alarmAction = parseAlarmAction(message);
@@ -359,6 +388,7 @@ export function closeRobotDeviceCommandChannels(): void {
 export function __resetDeviceCommandsForTests(): void {
   for (const connection of connections.values()) disposeConnection(connection, 4003, "test reset");
   connections.clear();
+  ackWaiters.clear();
   heartbeatIntervalMs = DEVICE_HEARTBEAT_MS;
 }
 

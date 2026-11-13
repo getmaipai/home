@@ -26,6 +26,7 @@ import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingForm
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, makeInspiredVoiceToolSpec } from "@/lib/voiceTools";
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
+import { ROBOT_ANNOUNCE_TOOL_ID, ROBOT_TIMER_TOOL_ID } from "@/lib/robotVoice/ids";
 
 export interface VirtualToolOffer {
   mode: "base" | "conditional" | "off";
@@ -53,6 +54,9 @@ export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
   { id: HOUSE_TOOL_ID, offer: { mode: "conditional", gate: "houseAllowed", bench_row: "house-tool", priority: 4 }, spec: () => ({ id: HOUSE_TOOL_ID, description: "Find or control permitted home devices.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
   // AGENT-SVC-01: read-only service status over the household's Uptime Kuma instances; adults only (lib/uptime/tool.ts).
   { id: UPTIME_TOOL_ID, offer: { mode: "conditional", gate: "uptimeAllowed", bench_row: "uptime-tool", priority: 4 }, spec: () => ({ id: UPTIME_TOOL_ID, description: "Check whether the household's services are up.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
+  // ROBOT-VOICE-01: the StackChan body's own timers and announcements (lib/robotVoice/tool.ts); offered by structure alone.
+  { id: ROBOT_TIMER_TOOL_ID, offer: { mode: "conditional", gate: "robotTimerAllowed", bench_row: "robot-timer-tool", priority: 2 }, spec: () => ({ id: ROBOT_TIMER_TOOL_ID, description: "Timers and alarms kept on the robot's own body.", args: { type: "object", required: ["action"], properties: { action: { type: "string" } } } }) },
+  { id: ROBOT_ANNOUNCE_TOOL_ID, offer: { mode: "conditional", gate: "robotAnnounceAllowed", bench_row: "robot-announce-tool", priority: 4 }, spec: () => ({ id: ROBOT_ANNOUNCE_TOOL_ID, description: "Have a household robot say a short message.", args: { type: "object", required: ["text"], properties: { text: { type: "string" } } } }) },
 ];
 export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 

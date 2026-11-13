@@ -27,6 +27,7 @@ import type { HouseArea, HouseEntity } from "@/lib/house/registry";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
 import { uptimeAllowed } from "@/lib/uptime/tool";
+import { robotAnnounceAllowed, robotTimerAllowed } from "@/lib/robotVoice/tool";
 import { mayUseClipVoices } from "@/lib/access";
 
 export interface TurnToolGateInput {
@@ -37,6 +38,8 @@ export interface TurnToolGateInput {
   actor: PersonRow;
   band: AgeBand;
   surface: Surface;
+  /** ROBOT-VOICE-01: the robot a robot-surface turn comes from. */
+  deviceId?: string;
   surfaceClass: SurfaceClass;
   spoken: boolean;
   temporary: boolean;
@@ -95,6 +98,8 @@ export interface TurnToolGateResult {
   inspiredVoiceOk: boolean;
   houseOk: boolean;
   uptimeOk: boolean;
+  robotTimerOk: boolean;
+  robotAnnounceOk: boolean;
   houseContext?: { visible: HouseEntity[]; areas: HouseArea[] };
 }
 
@@ -179,11 +184,13 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     } else { warmHouseRegistries(); houseOk = false; }
   } else houseOk = false;
   const uptimeOk = safeGate(() => uptimeAllowed({ actor: input.actor, band: input.band, surface: input.surface, surfaceClass: input.surfaceClass, spoken: input.spoken, bare: input.bare }));
+  const robotTimerOk = safeGate(() => robotTimerAllowed({ actor: input.actor, surface: input.surface, ...(input.deviceId ? { deviceId: input.deviceId } : {}), bare: input.bare }));
+  const robotAnnounceOk = safeGate(() => robotAnnounceAllowed({ actor: input.actor, band: input.band, bare: input.bare }));
   // TOOL-OFFER-VOICEOVER-01: `voiceover` is offered by structure alone (an adult, written, non-guest turn with the voice engine ready); the
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
   // REFVIDEO-01: a short video from the person's pictures: the film floor (adult, own written chat screen, video on) and pictures attached, or an earlier video of this chat made from sheets.
   const referenceVideoOk = filmOk && ((input.imageCount ?? 0) > 0 || safeGate(input.referenceVideoAvailable ?? (() => false)));
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk);
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk, robotTimerOk, robotAnnounceOk);
   // FILM-ROUTING-02: one clip starts from one picture and refuses several (found 2026-11-12: the model kept choosing it for a commercial from four
   // photos). With several pictures attached and the film tool on offer, the single-clip tool is not offered, so the film tool is the video tool.
   const severalPictures = (input.imageCount ?? 0) > 1 && filmOk;
@@ -195,6 +202,8 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     inspiredVoiceOk,
     houseOk,
     uptimeOk,
+    robotTimerOk,
+    robotAnnounceOk,
     ...(houseContext ? { houseContext } : {}),
     answerImagesOk,
     picturesOk,

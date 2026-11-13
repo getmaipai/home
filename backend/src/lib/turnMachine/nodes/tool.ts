@@ -21,6 +21,7 @@ import { blockEventsFor } from "../blockEvents";
 import { HOUSE_TOOL_ID, runHouseTool } from "@/lib/house/tool";
 import { isScheduleAction } from "@/lib/house/scheduleTool";
 import { UPTIME_TOOL_ID, runUptimeTool } from "@/lib/uptime/tool";
+import { ROBOT_ANNOUNCE_TOOL_ID, ROBOT_TIMER_TOOL_ID, runRobotAnnounceTool, runRobotTimerTool } from "@/lib/robotVoice/tool";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -416,6 +417,17 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     if (tool === UPTIME_TOOL_ID) {
       const outcome = await runUptimeTool({ actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), args: args as Record<string, unknown>, callId });
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    if (tool === ROBOT_TIMER_TOOL_ID || tool === ROBOT_ANNOUNCE_TOOL_ID) {
+      const robotBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+      const outcome = tool === ROBOT_TIMER_TOOL_ID
+        ? await runRobotTimerTool({ actor: state.actor, band: robotBand, args: args as Record<string, unknown>, callId, deviceId: state.surface === "robot" ? state.deviceId : undefined })
+        : await runRobotAnnounceTool({ actor: state.actor, band: robotBand, args: args as Record<string, unknown>, callId, ...(state.surface === "robot" && state.deviceId ? { turnDeviceId: state.deviceId } : {}) });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });

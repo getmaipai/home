@@ -10,7 +10,8 @@ import { storeRobotCredential } from "@/lib/robotCredentials";
 import { WAKEWORD_ALL_ASSETS, areWakewordAssetsInstalled, wakewordAssetPath } from "@/lib/wakewordAssets";
 import { wakewordDir } from "@/lib/paths";
 import { getRegistryKey } from "@/lib/settingsRegistry";
-import { __setDeviceHeartbeatIntervalForTests } from "@/lib/deviceCommands";
+import { __setDeviceHeartbeatIntervalForTests, robotChannelConnected } from "@/lib/deviceCommands";
+import { runRobotTimerTool } from "@/lib/robotVoice/tool";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -195,6 +196,37 @@ describe("GET /api/devices/me/events", () => {
       const reconnected = await connect(id);
       await expect(reconnected.next((message) => message.type === "device-command" && message.id === id, 150)).rejects.toThrow("timed out");
       reconnected.ws.close();
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("ROBOT-VOICE-01: a voice tool waits for the robot's own ack state, and an unanswered command is withdrawn", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot, deviceId } = await robotSession(personId);
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
+    const cookie = robot.getCookie();
+    if (!cookie) throw new Error("robot session cookie missing");
+    try {
+      const socket = new DeviceSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`, { cookie });
+      await socket.open();
+      expect(robotChannelConnected(deviceId)).toBe(true);
+      const answering = (async () => {
+        const command = await socket.next((message) => message.type === "device-command" && message.kind === "timer_set");
+        expect(command.payload).toEqual({ seconds: 600 });
+        socket.ws.send(JSON.stringify({ type: "ack", id: command.id, state: { ok: true, id: 1, kind: "timer", seconds: 600 } }));
+      })();
+      const outcome = await runRobotTimerTool({ actor: { id: personId, role: "owner" }, band: "adult", args: { action: "set", seconds: 600 }, callId: "c1", deviceId, deps: { capable: () => true } });
+      await answering;
+      expect(outcome.result?.reply?.text).toBe("Timer set for 10 minutes.");
+
+      // Nothing answers this one: the wait ends, and since the robot did get it the tool only says it asked.
+      const silent = await runRobotTimerTool({ actor: { id: personId, role: "owner" }, band: "adult", args: { action: "stop" }, callId: "c2", deviceId, deps: { capable: () => true, waitMs: 60 } });
+      expect(silent.result?.reply?.text).toContain("has not confirmed");
+      socket.ws.close();
+      await Bun.sleep(25);
+      expect(robotChannelConnected(deviceId)).toBe(false);
+      void owner;
     } finally {
       server.stop(true);
     }

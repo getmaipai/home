@@ -276,6 +276,9 @@ export interface TurnState {
   houseAllowed?: boolean;
   /** AGENT-SVC-01: an adult speaker and at least one enabled Uptime Kuma instance. */
   uptimeAllowed?: boolean;
+  /** ROBOT-VOICE-01: the turn comes from a StackChan body with timers on; an adult with a body to speak through. */
+  robotTimerAllowed?: boolean;
+  robotAnnounceAllowed?: boolean;
   houseContext?: { visible: import("@/lib/house/registry").HouseEntity[]; areas: import("@/lib/house/registry").HouseArea[] };
   /** MUSIC-LIKE-01: the message holds a maipai://audio/track reference on a turn that may make music; `make_band` is offered only then. */
   musicBandAllowed?: boolean;

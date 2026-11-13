@@ -62,3 +62,11 @@ A robot set to child or teen can use any voice in the list, including a voice ma
 To rename a voice you made, open **Settings**, **Voice**, **Voices**, find the voice, and choose **Rename**.
 
 For what the robot does, its lights, touch and voice commands, see the StackChan guide in the Bot repository.
+
+## Timers, alarms and announcements on a StackChan
+
+When you talk to a StackChan, you can ask it for a timer or an alarm. Say "set a timer for ten minutes", "wake me up at 7", "how long is left", "cancel my timer", "stop the timer" or "snooze five minutes". The timer lives on the robot itself, so it still rings if Home is off. The robot answers from what the body said back, so "Timer set for 10 minutes" means the body confirmed it. If it did not confirm, Home says it only asked.
+
+If the robot is not a StackChan, is not connected, or has **Timers and alarms on this robot** turned off, the ask goes to Home's own timers and reminders instead, and the alarm rings where Home rings it.
+
+Adults can also ask Home to speak through a robot: "tell the kitchen robot dinner is ready". The robot shows the card and says it. It holds a normal announcement back at night, in quiet hours, when muted, or when **Announcements from Home** is off, and Home tells you which. Say it is urgent to get it said at night. Children and teens cannot send announcements.

@@ -1,0 +1,18 @@
+{
+  "note": "ROBOT-VOICE-01: what a person says to a StackChan, the tool call a model should make, and the device command it becomes. Used by tests/robotVoice/tool.test.ts to prove the call-to-command mapping, and as the phrase list for a model bench (the model's choice is not scored here).",
+  "rows": [
+    { "say": "set a timer for ten minutes", "tool": "robot_timer", "args": { "action": "set", "seconds": 600 }, "command": "timer_set", "payload": { "seconds": 600 }, "reply": "Timer set for 10 minutes." },
+    { "say": "set a tea timer for four minutes", "tool": "robot_timer", "args": { "action": "set", "seconds": 240, "label": "tea" }, "command": "timer_set", "payload": { "seconds": 240, "label": "tea" }, "reply": "Timer set for 4 minutes called tea." },
+    { "say": "timer for an hour and a half", "tool": "robot_timer", "args": { "action": "set", "seconds": 5400 }, "command": "timer_set", "payload": { "seconds": 5400 }, "reply": "Timer set for 1 hour 30 minutes." },
+    { "say": "wake me up at 7", "tool": "robot_timer", "args": { "action": "alarm", "hour": 7, "minute": 0 }, "command": "alarm_set", "payload": { "hour": 7, "minute": 0 }, "reply": "Alarm set for 7:00 AM." },
+    { "say": "set an alarm for 6:45 tonight called laundry", "tool": "robot_timer", "args": { "action": "alarm", "hour": 18, "minute": 45, "label": "laundry" }, "command": "alarm_set", "payload": { "hour": 18, "minute": 45, "label": "laundry" }, "reply": "Alarm set for 6:45 PM called laundry." },
+    { "say": "how long is left", "tool": "robot_timer", "args": { "action": "list" }, "command": "timer_list", "payload": {}, "reply": "No timers or alarms are running on the robot." },
+    { "say": "cancel my timer", "tool": "robot_timer", "args": { "action": "cancel" }, "command": "timer_cancel", "payload": {}, "reply": "Cancelled all the timers on the robot." },
+    { "say": "cancel the tea timer (id 2 from the list)", "tool": "robot_timer", "args": { "action": "cancel", "id": 2 }, "command": "timer_cancel", "payload": { "id": 2 }, "reply": "Cancelled that timer." },
+    { "say": "stop the timer", "tool": "robot_timer", "args": { "action": "stop" }, "command": "timer_stop", "payload": {}, "reply": "Stopped the ringing." },
+    { "say": "snooze five minutes", "tool": "robot_timer", "args": { "action": "snooze", "seconds": 300 }, "command": "timer_snooze", "payload": { "seconds": 300 }, "reply": "Snoozed for 5 minutes." },
+    { "say": "snooze", "tool": "robot_timer", "args": { "action": "snooze" }, "command": "timer_snooze", "payload": {}, "reply": "Snoozed for 5 minutes." },
+    { "say": "tell the kitchen robot dinner is ready", "tool": "robot_announce", "args": { "text": "Dinner is ready.", "robot": "Kitchen" }, "command": "announce", "payload": { "text": "Dinner is ready." }, "reply": "Kitchen is showing the message and saying it now." },
+    { "say": "tell everyone to come downstairs right now, it is urgent", "tool": "robot_announce", "args": { "text": "Come downstairs right now.", "robot": "Kitchen", "urgent": true }, "command": "announce", "payload": { "text": "Come downstairs right now.", "urgent": true }, "reply": "Kitchen is showing the message and saying it now." }
+  ]
+}

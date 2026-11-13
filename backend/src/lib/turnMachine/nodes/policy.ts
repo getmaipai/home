@@ -39,6 +39,7 @@ import { LIST_ACTIONS } from "@/lib/listActions";
 import { isAlarmActionCall } from "@/lib/alarmCalls";
 import { HOUSE_TOOL_ID, planHouseCall, safeHouseAction } from "@/lib/house/tool";
 import { UPTIME_TOOL_ID } from "@/lib/uptime/ids";
+import { ROBOT_ANNOUNCE_TOOL_ID, ROBOT_TIMER_TOOL_ID } from "@/lib/robotVoice/ids";
 import { houseAnyConnected } from "@/lib/house/connection";
 import { loadHouseRegistries } from "@/lib/house/cache";
 import { effectivePermissions } from "@/lib/permissions";
@@ -460,6 +461,20 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const proposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
       const tainted = state.context.some((item) => item.source === "search_result" || item.source === "page");
       if (!state.uptimeAllowed || tainted) {
+        noteRefusal("format_not_here");
+        entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
+      } else entries.push({ proposal, decision: { allow: true } });
+      continue;
+    }
+
+    // ROBOT-VOICE-01: the robot's own timers act for the person talking to it; a tainted run (search results or a page in view) never reaches the robot's
+    // speaker, so an announcement is refused then.
+    if (call.tool === ROBOT_TIMER_TOOL_ID || call.tool === ROBOT_ANNOUNCE_TOOL_ID) {
+      const args = (call.args ?? {}) as Record<string, unknown>;
+      const announce = call.tool === ROBOT_ANNOUNCE_TOOL_ID;
+      const proposal: ActionProposal = { kind: announce ? "side_effecting" : "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
+      const tainted = state.context.some((item) => item.source === "search_result" || item.source === "page");
+      if (!(announce ? state.robotAnnounceAllowed && !tainted : state.robotTimerAllowed)) {
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
       } else entries.push({ proposal, decision: { allow: true } });
