@@ -36,7 +36,11 @@ registerAppPageFill("image", "create", (person, page) => {
   const chips = pictureFragmentChips(person);
   if (chips.length === 0) return;
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
-  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: chip.label, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
+  for (const item of existing) if (item && typeof item === "object") {
+    const chip = item as Record<string, unknown>;
+    if (chip.state === "shape") chip.icon = "crop";
+  }
+  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   const ask = (bar.submit as { ask?: { prompt?: string } } | undefined)?.ask;
   if (ask?.prompt) ask.prompt = `${ask.prompt}\nPresets, where none means not chosen: ${chips.map((chip) => `${chip.id.startsWith("look_") ? "look" : chip.id} {${chip.id}}`).join(", ")}. Pass any chosen ones in the presets argument.`;
 });

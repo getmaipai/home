@@ -27,7 +27,7 @@ import type { PersonRow } from "@/types";
 export type ComposerEngine = "image" | "video" | "music" | "voices";
 export type ComposerTool = "clear" | "improve" | "lyrics";
 
-export interface ComposerModeChip { id: string; label: string; group?: string; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerModeChip { id: string; label: string; group?: string; icon?: string; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string;
   label: string;
@@ -99,7 +99,8 @@ function chipsOf(bar: Node): ComposerModeChip[] {
     if (!id || !label || options.length === 0) return [];
     const group = text(chip.group);
     const quiet = typeof chip.quiet_value === "string" || typeof chip.quiet_value === "number" ? chip.quiet_value : undefined;
-    return [{ id, label, ...(group ? { group } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
+    const icon = text(chip.icon);
+    return [{ id, label, ...(group ? { group } : {}), ...(icon ? { icon } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
   });
 }
 
@@ -146,7 +147,7 @@ function buildModes(person: PersonRow, health: EngineHealth | null): { band: Age
       if (!page.ok) continue;
       const bar = findPromptBar(page.value) ?? {};
       const row = health?.[d.engine];
-      const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture" }] : []);
+      const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture", ...(ref.placement === "in_field" ? { max: 1 } : typeof ref.max === "number" ? { max: ref.max } : {}) }] : []);
       const notice = row?.notice;
       descriptors.set(d.id, d);
       modes.push({

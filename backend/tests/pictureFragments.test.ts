@@ -82,7 +82,7 @@ describe("chat's picture tool", () => {
 });
 
 describe("the Images Create page", () => {
-  test("a person's Create page has the preset chips, one popover each, and a submit line that names them", async () => {
+  test("a person's Create page groups preset chips under Style and keeps their ids in the submit line", async () => {
     const { getAppPage } = await import("@/lib/apps");
     await import("@/lib/imageApp");
     const { owner } = await import("./support/testAuth");
@@ -92,7 +92,7 @@ describe("the Images Create page", () => {
     const bar = JSON.stringify(page.ok ? page.value : {});
     const node = (JSON.parse(bar).body as Array<Record<string, any>>).find((n) => n.type === "prompt_bar")!;
     const presets = node.chips.filter((c: { state: string }) => !["shape", "count"].includes(c.state));
-    expect(new Set(presets.map((c: { group: string }) => c.group)).size).toBe(presets.length);
+    expect(presets.every((c: { group: string }) => c.group === "Style")).toBe(true);
     expect(presets.map((c: { state: string }) => c.state)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
     expect(node.chips.length).toBeLessThanOrEqual(10);
     expect(presets.every((c: { options: unknown[] }) => c.options.length <= 24)).toBe(true);

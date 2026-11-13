@@ -92,6 +92,9 @@
           }
         ]
       },
+      "references": [
+        { "state": "reference", "label": "Image reference", "kind": "picture", "placement": "in_field" }
+      ],
       "submit": {
         "ask": {
           "prompt": "{prompt}\n\nPlease make {count} {shape} picture(s) with the image generation tool. Quality: {tier}.",

@@ -11,7 +11,7 @@ import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 // composer's `modes`, used by the Home ask box and every Create page host. Hand-copied from backend lib/composer/modes.ts (that file
 // has "@/" imports of its own); the route's zod schema is the contract.
 
-export interface ComposerChipRecord { id: string; label: string; group?: string; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
+export interface ComposerChipRecord { id: string; label: string; group?: string; icon?: string; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string; label: string; icon: string; route: string | null; engine: MakingKind | null; placeholder: string;
   references: Array<{ id: string; label: string; kind: "picture" | "character" | "place" | "audio" | "video"; max?: number }>;
@@ -91,7 +91,7 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     placeholder: words(m.placeholder),
     references: m.references.map((r) => ({ id: r.id, label: r.label, kind: r.kind, ...(r.max ? { max: r.max } : {}) })),
     chips: m.chips.map((c) => ({
-      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
+      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.icon ? { icon: c.icon as never } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
       options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}) })),
       value: valueOf(m.id, c.id, c.default),
       onValueChange: (value: string | number) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value })),
@@ -125,7 +125,7 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
 /** The host's `composer` for a Create page (kit `MediaHost.composer`): the modes from the hub's list, the mode whose page this is, and the
  * hand-off to another mode's page with the words typed so far. Undefined away from a Create page, or when the person has one mode only,
  * so every other page keeps its bar unchanged. */
-export function composerHostFor(response: ComposerModesResponse, pathname: string, go: (to: string) => void) {
+export function composerHostFor(response: ComposerModesResponse, pathname: string, go: (to: string) => void, search = "") {
   const current = response.modes.find((m) => m.route !== null && m.route === pathname);
   if (!current || response.modes.length < 2) return undefined;
   return {
@@ -136,5 +136,6 @@ export function composerHostFor(response: ComposerModesResponse, pathname: strin
       if (next && id !== current.id) go(composerHref(next.route, draft.text));
     },
     ...(current.quality ? { quality: current.quality.options.map((o) => String(o.value)) } : {}),
+    ...(current.presets ? { presets: { label: words(current.presets.label), chips: current.presets.chips.map((c) => ({ id: c.id, label: words(c.label), options: c.options.map((o) => ({ value: o.value, label: words(o.label) })), value: c.default, onValueChange: (value: string | number) => { const option = c.options.find((o) => o.value === value); if (option) { const settings = Object.fromEntries(Array.from(new URLSearchParams(search)).filter(([key]) => key !== "prompt")); go(composerHref(current.route, option.text, settings)); } } })) } } : {}),
   };
 }

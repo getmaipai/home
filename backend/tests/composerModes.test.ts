@@ -46,7 +46,10 @@ describe("composer modes by band", () => {
     // CREATOR-13: the picture presets are chips of the Create page, so the composer lists them beside Shape and Pictures, each its own popover, each starting at None.
     const presetChips = picture.chips.filter((c) => c.group !== "Settings");
     expect(presetChips.map((c) => c.id)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
-    expect(presetChips.every((c) => c.default === "none" && c.quiet === "none" && c.options[0]!.value === "none" && c.group === c.label)).toBe(true);
+    expect(presetChips.every((c) => c.default === "none" && c.quiet === "none" && c.options[0]!.value === "none" && c.group === "Style")).toBe(true);
+    expect(picture.chips.find((c) => c.id === "shape")?.icon).toBe("crop");
+    expect(picture.chips.find((c) => c.id === "look_art")?.icon).toBe("palette");
+    expect(picture.references).toEqual([{ id: "reference", label: "Image reference", kind: "picture", max: 1 }]);
     const video = res.modes.find((m) => m.id === "video")!;
     expect(video.route).toBe("/apps/video/create");
     expect(video.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["orientation", "seconds"]);

@@ -232,7 +232,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
     return reading.disabled ? reading.reason ?? MAKING_NOT_READY_LINE[kind] : undefined;
   }, [health, ageBand, soonLine]);
   // ONE-COMPOSER-2026-11-13 (COMPOSER-03): a Create page's prompt bar draws the one composer with the hub's modes (read once, never polled).
-  const composer = useMemo(() => composerHostFor(composerModes, location.pathname, navigate), [composerModes, location.pathname, navigate]);
+  const composer = useMemo(() => composerHostFor(composerModes, location.pathname, navigate, location.search), [composerModes, location.pathname, location.search, navigate]);
   const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line), status), [store, status]);
   const speech = useSyncExternalStore(status.subscribe, status.get, status.get);
   const host = useMemo<MediaHost>(

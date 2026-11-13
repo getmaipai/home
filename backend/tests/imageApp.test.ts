@@ -7,7 +7,7 @@ import { PACKAGES_DIR } from "@/lib/paths";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { appPackageProblems, getAppData, sidebarFor } from "@/lib/apps";
+import { appPackageProblems, getAppData, getAppPage, sidebarFor } from "@/lib/apps";
 import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
 import { listLibrary } from "@/lib/library";
 import { child, owner, teen } from "./support/testAuth";
@@ -52,4 +52,17 @@ test("Image library rows match Library visibility for owner, teen and child", as
     const expected = listLibrary(person, { type: "image", sort: "newest", limit: 20 }).items.map((file) => file.id);
     expect(actual.map((file) => file.id)).toEqual(expected);
   }
+});
+
+test("Image Create fills every preset under Style and keeps Shape and Pictures together in Settings", async () => {
+  const { row } = await owner();
+  const page = getAppPage(row, "image", "create");
+  expect(page.ok).toBe(true);
+  if (!page.ok) return;
+  const filledPage = page.value as { body: Array<{ type: string; chips: Array<{ state: string; group?: string; icon?: string }> }> };
+  const bar = filledPage.body[0]!;
+  expect(bar.chips.slice(0, 2).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Settings"], ["count", "Settings"]]);
+  expect(bar.chips.slice(2).every((chip) => chip.group === "Style")).toBe(true);
+  expect(bar.chips[0]?.icon).toBe("crop");
+  expect(bar.chips[2]?.icon).toBe("palette");
 });
