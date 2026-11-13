@@ -30447,6 +30447,11 @@
                               "type": "string"
                             }
                           },
+                          "licence_name": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The licence a part ships under when it has no terms to accept (ffmpeg: GPL 3 or later); shown beside its size."
+                          },
                           "job": {
                             "type": "string",
                             "nullable": true

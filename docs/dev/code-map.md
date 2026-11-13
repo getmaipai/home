@@ -586,6 +586,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/failureCopy.ts` | formatMessage, VOICE_FAILURE_COPY, voiceFailureMessage, voiceFailureLine, SPATIAL_FAILURE_COPY, isSpatialFailureCode |
 | `backend/src/lib/familyActivity.ts` | familyActivityPath, trackFamilyTurn, __resetFamilyActivityForTests |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
+| `backend/src/lib/ffmpegPath.ts` | findFfmpeg |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
