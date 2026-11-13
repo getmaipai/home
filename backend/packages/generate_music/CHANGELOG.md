@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3] - 2026-11-13
+
+### Added
+
+- Optional `takes` (1 to 3 different takes, made one after another and shown as one song card) and `seed` arguments, the same as the Create panel's Advanced drawer.
+
 ## [0.1.2] - 2026-11-02
 
 ### Added

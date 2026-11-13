@@ -171,7 +171,7 @@ export async function startMusicEffectJob(input: EffectJobInput): Promise<{ job:
   if (!owned && !parent) throw new StackMusicError(404, "source_not_made_here");
   const prior = jobsForConversation(actor, input.conversationId, input.temporary).reduce((at, j) => Math.max(at, Date.parse(j.chosenAt ?? j.createdAt)), 0);
   const now = new Date(Math.max(Date.now(), prior + 1)).toISOString();
-  const { stackBody: _body, from_s: _f, to_s: _t, add_s: _a, at: _at, strength: _s, edit: _e, parts: _p, ...stored } = source.request as MusicRequest & { stackBody?: unknown };
+  const { stackBody: _body, from_s: _f, to_s: _t, add_s: _a, at: _at, strength: _s, edit: _e, parts: _p, takes: _takes, ...stored } = source.request as MusicRequest & { stackBody?: unknown };
   const { change, amount, preset, bands, compressor, from_s, to_s } = spec;
   const request: MusicRequest = { ...stored, seconds, ...(input.title ? { title: input.title } : {}), effect: { change, ...(amount !== undefined ? { amount } : {}), ...(preset ? { preset } : {}), ...(bands ? { bands } : {}), ...(compressor ? { compressor } : {}), ...(from_s !== undefined ? { from_s } : {}), ...(to_s !== undefined ? { to_s } : {}) } };
   const job: MusicJob = { id: newMusicJobId(), personId: actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, task: "effect", request,

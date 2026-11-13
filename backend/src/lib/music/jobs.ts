@@ -314,6 +314,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
   if (job.request.sound) void startNextSoundTake(job, actor).catch(() => {});
+  else if (job.request.takes) void startNextSongTake(job, actor).catch(() => {});
   if (!job.request.sound) {
     void startSongCover(actor, job).catch(() => {});
     // MUSIC-GEN-20b: word timing runs in the background and never blocks or fails the song.
@@ -327,6 +328,15 @@ async function startNextSoundTake(job: MusicJob, actor: PersonRow): Promise<void
   const request: MusicRequest = { description: job.request.description, instrumental: true, lyrics: job.request.lyrics, seconds: job.request.seconds, quality: "quick", max_seconds: job.request.max_seconds,
     sound: { loop: sound.loop, surprise: sound.surprise, ...(sound.trimTo ? { trimTo: sound.trimTo } : {}), takes: { ...takes, index: takes.index + 1 } } };
   const body = musicBody(request, "text2music"); body.quality = "quick";
+  await startMusicJob({ actor, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId ?? null, temporary: job.temporary, task: "text2music", request, body, parentFileId: null });
+}
+/** MP-05: the next take of a song request. Same words and sound, the next seed (so each take is a different song and the seed is shown in its details); each take is its own queue job. A take that fails or is stopped ends the run. */
+export async function startNextSongTake(job: MusicJob, actor: PersonRow): Promise<void> {
+  const takes = job.request.takes;
+  if (!takes || job.request.sound || takes.index + 1 >= takes.total || !job.conversationId || !job.turnId) return;
+  const { stackBody: _stackBody, ...base } = job.request as MusicRequest & { stackBody?: unknown };
+  const request: MusicRequest = { ...base, seed: ((job.seed ?? base.seed ?? 0) % 2_147_483_646) + 1, takes: { ...takes, index: takes.index + 1 } };
+  const body = musicBody(request, "text2music"); body.quality = request.quality ?? "quick";
   await startMusicJob({ actor, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId ?? null, temporary: job.temporary, task: "text2music", request, body, parentFileId: null });
 }
 /** SOUNDS-FOLLOW-01: save a finished job that was built outside the Stack (a sound laid into a song). */
@@ -558,6 +568,9 @@ export function musicVersions(actor: PersonRow, root: MusicJob): MusicJob[] {
   if (root.task === "stems") return root.fileId && ownsMusicAttachment(actor, root) ? [root] : [];
   const songs = jobsForConversation(actor, root.conversationId, root.temporary).filter((j) => j.fileId && j.task !== "stems" && ownsMusicAttachment(actor, j));
   const ids = new Set([root.fileId, root.parentFileId].filter((id): id is string => !!id));
+  // MP-05: the takes of one request are versions of one card, so the card's version stepper switches between them.
+  const group = root.request.takes?.group;
+  if (group) for (const j of songs) if (j.request.takes?.group === group && j.fileId) ids.add(j.fileId);
   let changed = true;
   while (changed) {
     changed = false;

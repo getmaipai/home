@@ -86,7 +86,7 @@ musicRoutes.openapi(djLineRoute, async (c) => {
 const djDeleteRoute = createRoute({ method: "delete", path: "/dj/line", tags: ["Music"], summary: "Delete a prepared DJ line", middleware: viewMiddleware, request: { query: z.object({ before: z.string().min(1).max(80), position: djPosition }) }, responses: { 204: { description: "Line deleted or absent." }, ...refusals } });
 musicRoutes.openapi(djDeleteRoute, (c) => { const actor = c.get("person"), query = c.req.valid("query"); deleteCachedDjLine(actor, query.before, query.position as DjPosition); return c.body(null, 204); });
 const params = z.object({ id: z.string().min(1).max(80) });
-const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
+const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string(), seed: z.number().nullable().describe("The seed this version was made with.") });
 const lockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() });
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
@@ -100,6 +100,8 @@ const musicCardSchema = z.object({
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
   making_version: z.object({ stage_label: z.string(), progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable() }).nullable(),
+  seed: z.number().nullable().describe("The seed of the take or version on show; the same seed with the same words makes a very similar song."),
+  takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().describe("Set when this song was asked for as several takes: the card's versions are the takes."),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), secondary: z.string().optional(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional().describe("Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing.") })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
@@ -173,7 +175,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   const versions = stemSet.length ? stemSet : musicVersions(actor, root);
   const current = stemSet.length ? stemSet[0] : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
   const shown = current ?? root;
-  const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : `Version ${index + 1}${job.request.effect && isEffectChange(job.request.effect.change) ? ` (${EFFECT_LABELS[job.request.effect.change]})` : ""}`;
+  const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : job.request.takes && !job.request.effect ? `Take ${job.request.takes.index + 1}` : `Version ${index + 1}${job.request.effect && isEffectChange(job.request.effect.change) ? ` (${EFFECT_LABELS[job.request.effect.change]})` : ""}`;
   let covers: { id: string; url: string }[] = [];
   if (shown.coverFileId && shown.conversationId) {
     try { covers = listVersions(actor, shown.conversationId, shown.coverFileId).map(({ id, url }) => ({ id, url })); } catch { /* A deleted cover leaves the song playable. */ }
@@ -188,7 +190,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   // A remix, extension or new length that is still being made is a job without a file yet, so it is in no version list: say so on the card.
   const familyFiles = new Set(versions.map((job) => job.fileId).filter((id): id is string => !!id));
   const pending = root.task === "stems" || !root.conversationId ? null
-    : jobsForConversation(actor, root.conversationId, root.temporary).find((job) => (job.state === "queued" || job.state === "running") && job.task !== "stems" && job.id !== root.id && !!job.parentFileId && familyFiles.has(job.parentFileId));
+    : jobsForConversation(actor, root.conversationId, root.temporary).find((job) => (job.state === "queued" || job.state === "running") && job.task !== "stems" && job.id !== root.id && ((!!job.parentFileId && familyFiles.has(job.parentFileId)) || (!!root.request.takes && job.request.takes?.group === root.request.takes.group)));
   const makingVersion = pending ? { stage_label: musicStageLabel(pending, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: pending.progress, eta_seconds: pending.etaSeconds, position: pending.position } : null;
   // TIER-HOME-03: the song card offers Boost when the engine has a Detailed maker and this person may use Boost (music has no Max maker yet).
   const engine = await musicEngineStatus();
@@ -204,10 +206,12 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     conversation_id: root.temporary ? null : root.conversationId, made_from_file: root.request.ownedFile === true,
     id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
     sound: root.request.sound ?? null,
+    // MP-05: the seed of the take on show and, for a request of several takes, which group it is (one card steps through the takes).
+    seed: (current ?? root).seed ?? null, takes: root.request.takes ?? null,
     fit_ask: root.state === "queued" && laneOf(musicRouteAudience(actor)) !== "child" ? answerableFitAsk(actor, root.id) : null,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
-    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job) })),
+    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job), seed: job.seed ?? null })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS),
     quality: (current ?? root).request.quality === "max" ? "max" as const : (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, max_offered: maxShown, max_installed: musicMaxInstalled(engine), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,
@@ -237,7 +241,7 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
   const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
-  const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && (!job.fileId || !trashed.has(job.fileId)));
+  const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && !(job.request.takes && job.request.takes.index > 0) && (!job.fileId || !trashed.has(job.fileId)));
   const visible = jobs.filter((job) => !lockedJob(actor, job));
   const locked = jobs.filter((job) => lockedJob(actor, job));
   return c.json([...(locked.length ? [lockedMusicTile(locked[0]!)] : []), ...await Promise.all(visible.map((job) => musicCardView(actor, job)))], 200);
@@ -285,6 +289,8 @@ const makeSongBody = z.object({
   instrumental: z.boolean().optional(), title: z.string().trim().min(1).max(200).optional(), length: z.enum(["quick", "full"]).optional(),
   language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(),
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).optional(),
+  takes: z.number().int().min(1).max(3).optional().describe("How many different takes to make, 1 to 3; they are made one after another and show as one song card."),
+  seed: z.number().int().min(1).max(2147483646).optional().describe("The seed of the first take; leave out for a fresh one."),
   song_style: z.string().optional().describe("A saved song style's id (starter or the person's own)."), band: z.string().optional().describe("A made band's id: make the song in that band's sound."),
 });
 const makeSongRoute = createRoute({ method: "post", path: "/songs", tags: ["Music"], summary: "Make a song from the Make a song page", middleware,
@@ -296,7 +302,7 @@ musicRoutes.openapi(makeSongRoute, async (c) => {
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
   const args: Record<string, unknown> = { description: body.idea, ...(body.lyrics?.trim() ? { lyrics: body.lyrics } : {}), ...(body.instrumental ? { instrumental: true } : {}),
     ...(body.title ? { title: body.title } : {}), ...(body.length ? { length: body.length } : {}), ...(body.language ? { language: body.language } : {}), ...(body.bpm !== undefined ? { bpm: body.bpm } : {}),
-    ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
+    ...(body.key?.trim() ? { key: body.key.trim() } : {}), ...(body.takes && body.takes > 1 ? { takes: body.takes } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.song_style ? { song_style: body.song_style } : {}), ...(body.band ? { band: body.band } : {}) };
   if (!generateMusicArgs.safeParse(args).success) return c.json({ error: "That song request is not valid. Check the tempo, the key and the style, then try again." }, 422) as never;
   const refusal = musicRefusalFor(musicRouteAudience(actor), args);
   if (refusal) return c.json({ error: refusal.line }, 403) as never;

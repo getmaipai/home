@@ -1,6 +1,6 @@
 {
   "id": "generate_music",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
@@ -112,6 +112,20 @@
         "type": "string",
         "grounded": false,
         "maxLength": 40
+      },
+      "takes": {
+        "type": "integer",
+        "grounded": false,
+        "description": "Optional number of different takes of the song to make, from 1 to 3, made one after another and shown as one song card. Make more than one only when the person asks for options.",
+        "minimum": 1,
+        "maximum": 3
+      },
+      "seed": {
+        "type": "integer",
+        "grounded": false,
+        "description": "Optional seed number. The same seed with the same words makes a very similar song; leave it out for a fresh one.",
+        "minimum": 1,
+        "maximum": 2147483646
       }
     }
   },

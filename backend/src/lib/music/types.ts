@@ -9,7 +9,7 @@ export interface MusicRequest {
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
   /** A sound effect. `takes` ties the up to three jobs one request made; `looped` is false when the host had no audio tool to make the loop seamless. */
   sound?: { loop: boolean; surprise: boolean; looped?: boolean; /** The length asked for when it is under the model's minimum: the sound is made at the minimum and cut to this. */ trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } };
-  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength;
+  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength; /** MP-05: up to three takes of one song request; `group` ties the jobs, `index` is this one (0 first). Each take is its own queue job and its own seed. */ takes?: { group: string; index: number; total: number };
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
   /** A kept-part mix made from private intermediate stems. */

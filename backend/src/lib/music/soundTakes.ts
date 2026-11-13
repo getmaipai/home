@@ -61,7 +61,7 @@ export async function addSoundToSong(actor: PersonRow, input: { soundJobId: stri
   if (!made.ok) return { ok: false, status: 422, line: made.status === 403 ? "There is no storage left for a new version. Free some space, then try again." : "The new version could not be saved. Try again." };
   const newest = Math.max(Date.now(), ...versions.map((job) => Date.parse(job.chosenAt ?? job.createdAt)));
   const now = new Date(newest + 1).toISOString();
-  const { stackBody: _stackBody, ...request } = source.request as typeof source.request & { stackBody?: unknown };
+  const { stackBody: _stackBody, takes: _takes, ...request } = source.request as typeof source.request & { stackBody?: unknown };
   const job: MusicJob = { id, personId: actor.id, conversationId: source.conversationId, turnId: source.turnId, companionId: source.companionId ?? null, task: "trim", request: { ...request, seconds },
     stackJob: null, state: "done", stage: "ready", progress: 1, etaSeconds: 0, position: null, errorCode: null, errorLine: null, fileId: made.value.id, parentFileId: source.fileId,
     coverJobId: null, coverFileId: null, seed: parent.seed ?? null, durationS: seconds, lrc: source.lrc, timedWords: null, chosenAt: now, createdAt: now, updatedAt: now, temporary: false };

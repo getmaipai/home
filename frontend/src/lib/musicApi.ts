@@ -3,7 +3,7 @@
 // again route yet, so the card offers neither.
 import { requestJson } from "@/lib/api";
 
-export interface MusicVersion { id: string; label: string; url: string }
+export interface MusicVersion { id: string; label: string; url: string; /** MP-05: the seed this version was made with. */ seed?: number | null }
 export interface MusicCard {
   /** The chat the card lives in; null for a temporary one. */ conversation_id?: string | null; /** A split of an audio file the person owns, not a song made here. */ made_from_file?: boolean;
   id: string;
@@ -26,6 +26,8 @@ export interface MusicCard {
   /** A remix, extension or new length still being made on this song; null when none is. */
   making_version?: { stage_label: string; progress: number; eta_seconds: number | null; position: number | null } | null;
   cover_pending: boolean;
+  /** MP-05: the seed of the take or version on show, and the take group when the song was asked for as several takes (its versions are the takes). */
+  seed?: number | null; takes?: { group: string; index: number; total: number } | null;
   /** Oldest first. Each url is the owner's own audio, with Range support. */
   versions: MusicVersion[];
   current_id: string | null;
@@ -61,7 +63,7 @@ export interface EffectBody {
 }
 export interface MusicStatus { can_make: boolean; engine_ready: boolean; /** False when this computer has no ffmpeg, so effects and wav/flac downloads are off. */ file_effects?: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 
-export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; bpm?: number; key?: string; song_style?: string; band?: string }
+export interface MakeSongBody { idea: string; lyrics?: string; instrumental?: boolean; title?: string; length?: "quick" | "full"; language?: string; bpm?: number; key?: string; /** MP-05: 1 to 3 takes (one card, one job each) and the seed of the first take. */ takes?: number; seed?: number; song_style?: string; band?: string }
 export interface MakeSoundBody { description: string; seconds?: number; loop?: boolean; stick_to_words?: boolean; takes?: number }
 export interface SavedSound { id: string; title: string; duration_s: number; src: string; loop: boolean; job_id?: string | null }
 export interface SoundTake { job_id: string; index: number; total: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; file_id: string | null; src: string | null; saved: boolean; loop: boolean; seconds: number | null }

@@ -34,7 +34,9 @@ const common = {
 };
 export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional(),
   /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
-  song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional() });
+  song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional(),
+  /** MP-05: 1 to 3 takes of one request (each its own queue job, shown as one card) and the seed of the first take. */
+  takes: z.number().int().min(1).max(3).optional(), seed: z.number().int().min(1).max(2_147_483_646).optional() });
 export const editMusicArgs = z.object({
   ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "parts", "voice_swap", ...EFFECT_CHANGES]),
   parts: z.object({ keep: z.array(z.string()).min(1).optional(), drop: z.array(z.string()).min(1).optional() }).optional(),
@@ -158,7 +160,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   if (source.request.ownedFile && ["remake", "variation", "make_full", "make_quick", "stems"].includes(args.change)) {
     return { ok: false, line: "That change needs a song made here. Try restyle, instrumental, trim, fade or loudness on this file." };
   }
-  const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
+  const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, takes: _takes, ...stored } = source.request;
   const request: MusicRequest = { ...stored, seconds: source.durationS ?? stored.seconds, seed: source.seed ?? stored.seed,
     ...(args.description !== undefined ? { description: args.description } : {}), ...(args.lyrics !== undefined ? { lyrics: args.lyrics } : {}),
     ...(args.title !== undefined ? { title: args.title } : {}),
@@ -327,7 +329,8 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const length: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= 150 ? "full" : householdSongLength());
     request = { description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
-      bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
+      bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: value.seed ?? newSeed(), length };
+    if ((value.takes ?? 1) > 1) request.takes = { group: `tks-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`, index: 0, total: value.takes! };
     const band = input.band ?? sound.value.band;
     if (band) request.band = band;
     if (sound.value.album) request.album = sound.value.album;
@@ -352,7 +355,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   try {
     const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
-      reply: { text: `${songOnItsWay(request)}${tierLine ? ` ${tierLine}` : ""}` },
+      reply: { text: `${songOnItsWay(request)}${request.takes ? ` ${request.takes.total} takes are being made one after another and show as one song card, with a way to switch between them.` : ""}${tierLine ? ` ${tierLine}` : ""}` },
       data: { musicJobId: job.id }, actions: [],
     } });
   } catch (error) {
