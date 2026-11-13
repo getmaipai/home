@@ -1233,7 +1233,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt, turnWarmupRequest |
-| `backend/src/lib/turnMachine/whisperLine.ts` | WHISPER_LINE, whisperLineFor |
+| `backend/src/lib/turnMachine/whisperLine.ts` | WHISPER_LINE, WHISPER_MODE_LINE, whisperLineFor |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, carriesNoTask, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal |
 | `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
@@ -1319,7 +1319,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | EMOJI_RE, visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit |
 | `backend/src/lib/whisperSample.ts` | WHISPER_SAMPLE_TEXT, hasWhisperSample, ensureWhisperSample, makeMissingWhisperSamples, __resetWhisperSamplesForTests |
-| `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests, createWhisperDeltaFilter |
+| `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests, setWhisperMode, isWhisperMode, noteWhisperTag |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, arrangeHomeSections |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
