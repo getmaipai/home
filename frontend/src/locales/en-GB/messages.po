@@ -3346,8 +3346,7 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:72
-#: src/shell/pages/dashboard/AskBox.tsx:81
+#: src/shell/pages/dashboard/AskBox.tsx:68
 msgid "Ask"
 msgstr ""
 
@@ -3414,7 +3413,7 @@ msgid "api.minor.guest_stay_ask_adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:15
+#: src/shell/pages/dashboard/AskBox.tsx:14
 msgid "Ask anything"
 msgstr ""
 
@@ -5059,7 +5058,7 @@ msgid "Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:379
 msgid "failure.advice.unreachable.next_step"
 msgstr ""
 
@@ -5259,7 +5258,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:480
+#: src/shell/mediaHost.tsx:485
 msgid "Choose a clip"
 msgstr ""
 
@@ -5487,7 +5486,7 @@ msgid "Choose one computer, or add a bigger one for the AI."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:481
+#: src/shell/mediaHost.tsx:486
 msgid "Choose one of your own pictures, or add a new one."
 msgstr ""
 
@@ -7150,7 +7149,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.tool.unavailable.verb"
 msgstr ""
 
@@ -9482,7 +9481,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.tool.errored.verb"
 msgstr ""
 
@@ -9973,7 +9972,7 @@ msgid "Forward 30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:392
 msgid "failure.tool.found_nothing.verb"
 msgstr ""
 
@@ -9988,7 +9987,7 @@ msgid "Free memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:374
+#: ../backend/src/lib/failureCopy.ts:376
 msgid "failure.advice.memory.next_step"
 msgstr ""
 
@@ -10497,7 +10496,7 @@ msgid "Good to know"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.tool.bad_arguments.verb"
 msgstr ""
 
@@ -11061,12 +11060,12 @@ msgid "Home could not make that voiceover. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:377
+#: ../backend/src/lib/failureCopy.ts:379
 msgid "failure.advice.unreachable.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:378
+#: ../backend/src/lib/failureCopy.ts:380
 msgid "failure.advice.engine_computer.cause"
 msgstr ""
 
@@ -12052,12 +12051,12 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:449
+#: ../backend/src/lib/failureCopy.ts:451
 msgid "failure.ask_form.unreachable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:450
+#: ../backend/src/lib/failureCopy.ts:452
 msgid "failure.ask_form.other"
 msgstr ""
 
@@ -12082,17 +12081,17 @@ msgid "failure.context_too_large.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:410
+#: ../backend/src/lib/failureCopy.ts:412
 msgid "failure.partial.slow"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:411
+#: ../backend/src/lib/failureCopy.ts:413
 msgid "failure.partial.other"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:409
+#: ../backend/src/lib/failureCopy.ts:411
 msgid "failure.partial.minor"
 msgstr ""
 
@@ -14921,13 +14920,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:94
-#: src/shell/pages/dashboard/AskBox.tsx:73
 msgid "Make picture"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:75
-msgid "Make song"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -14956,11 +14949,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:116
 msgid "Make transcript"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:74
-msgid "Make video"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17805,7 +17793,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:448
+#: ../backend/src/lib/failureCopy.ts:450
 msgid "failure.ask_form.invalid"
 msgstr ""
 
@@ -18783,7 +18771,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:481
+#: src/shell/mediaHost.tsx:486
 msgid "Pick one of your own clips to put after this one."
 msgstr ""
 
@@ -18939,7 +18927,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:259
-#: src/shell/pages/dashboard/AskBox.tsx:73
 #: src/shell/pages/FilesPage.tsx:165
 msgid "Picture"
 msgstr ""
@@ -20656,12 +20643,12 @@ msgid "Retry"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.tool.unavailable.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:378
+#: ../backend/src/lib/failureCopy.ts:380
 msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
@@ -20671,32 +20658,32 @@ msgid "Retry with current companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:379
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.advice.context_too_large.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.tool.bad_arguments.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:389
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.tool.timed_out.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:378
 msgid "failure.advice.slow.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:380
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.advice.other.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.tool.errored.next_step"
 msgstr ""
 
@@ -21992,7 +21979,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:168
 #: src/shell/library/LibraryViewer.tsx:168
-#: src/shell/pages/dashboard/AskBox.tsx:72
 msgid "Send"
 msgstr ""
 
@@ -23169,7 +23155,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:120
 #: src/shell/pages/CompanionsPage.tsx:260
-#: src/shell/pages/dashboard/AskBox.tsx:75
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/musicComposerMode.ts:15
 #: src/shell/pages/PersonProfilePage.tsx:176
@@ -23617,7 +23602,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:377
 msgid "failure.advice.stopped.next_step"
 msgstr ""
 
@@ -24785,7 +24770,7 @@ msgid "api.error.list_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:433
+#: ../backend/src/lib/failureCopy.ts:435
 msgid "failure.prompt_limit.too_big.adult"
 msgstr ""
 
@@ -24795,7 +24780,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:434
+#: ../backend/src/lib/failureCopy.ts:436
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -25034,7 +25019,7 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:447
+#: ../backend/src/lib/failureCopy.ts:449
 msgid "failure.ask_form.field"
 msgstr ""
 
@@ -25099,17 +25084,17 @@ msgid "The character could not be made ready. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:376
+#: ../backend/src/lib/failureCopy.ts:378
 msgid "failure.advice.slow.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:373
+#: ../backend/src/lib/failureCopy.ts:375
 msgid "failure.advice.busy.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:375
+#: ../backend/src/lib/failureCopy.ts:377
 msgid "failure.advice.stopped.cause"
 msgstr ""
 
@@ -25144,7 +25129,7 @@ msgid "setting.companions.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:374
+#: ../backend/src/lib/failureCopy.ts:376
 msgid "failure.advice.memory.cause"
 msgstr ""
 
@@ -25644,12 +25629,12 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:380
+#: ../backend/src/lib/failureCopy.ts:382
 msgid "failure.advice.other.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:379
+#: ../backend/src/lib/failureCopy.ts:381
 msgid "failure.advice.context_too_large.cause"
 msgstr ""
 
@@ -26123,12 +26108,12 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:429
+#: ../backend/src/lib/failureCopy.ts:431
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:430
+#: ../backend/src/lib/failureCopy.ts:432
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
@@ -26249,7 +26234,7 @@ msgid "api.error.file_belongs_to_item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:446
+#: ../backend/src/lib/failureCopy.ts:448
 msgid "failure.ask_form.stale"
 msgstr ""
 
@@ -26516,7 +26501,7 @@ msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:389
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.tool.timed_out.verb"
 msgstr ""
 
@@ -26902,7 +26887,7 @@ msgid "api.next.internal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:392
 msgid "failure.tool.found_nothing.next_step"
 msgstr ""
 
@@ -27909,7 +27894,6 @@ msgstr ""
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/CompanionsPage.tsx:259
-#: src/shell/pages/dashboard/AskBox.tsx:74
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/PersonProfilePage.tsx:176
 msgid "Video"
@@ -28247,7 +28231,7 @@ msgid "Volume"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:373
+#: ../backend/src/lib/failureCopy.ts:375
 msgid "failure.advice.busy.next_step"
 msgstr ""
 
