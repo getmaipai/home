@@ -601,6 +601,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
+| `backend/src/lib/fillerEvents.ts` | reportFillerEvent |
 | `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
@@ -999,7 +1000,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/promptPrefix.ts` | comparePrompt |
 | `backend/src/lib/promptSanitize.ts` | sanitizeForPrompt |
 | `backend/src/lib/quickConnect.ts` | createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode, __resetQuickConnectForTests |
-| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, __setQuickReactionRunnerForTests, __resetQuickReactionForTests, parseQuickCue, cleanReaction, quickReaction |
+| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, FILLER_GROUP_DEADLINE_MS, ruleFillerGroup, __setFillerGroupRunnerForTests, __resetFillerGroupForTests, __setQuickReactionRunnerForTests |
 | `backend/src/lib/quickTimers.ts` | listQuickTimers, createQuickTimer, updateQuickTimer, deleteQuickTimer |
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
