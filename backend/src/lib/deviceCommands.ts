@@ -25,6 +25,7 @@ type AlarmActionResult = { ok: true; state: string } | { ok: false; status?: num
 let alarmActionHandler: ((deviceId: string, alarmId: string, action: AlarmAction, evidence: unknown) => AlarmActionResult) | undefined;
 
 export function registerDeviceAlarmActionHandler(handler: typeof alarmActionHandler): void { alarmActionHandler = handler; }
+export function isDeviceConnected(deviceId: string): boolean { return connections.has(deviceId); }
 
 interface CommandRow {
   id: string;

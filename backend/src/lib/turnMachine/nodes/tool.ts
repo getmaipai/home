@@ -199,6 +199,7 @@ import { fillComposerDefaults } from "@/lib/composerHint";
 import { runSceneTool, sceneToolStreamArgs } from "@/lib/sceneTool";
 import { listActivePeople } from "@/lib/access";
 import { getScene, observeSceneClaims } from "@/lib/scene";
+import { runSongNameTool } from "@/lib/songNameTool";
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
@@ -373,6 +374,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     if (tool === "scene") {
       const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), observe: observeSceneClaims });
+      outcomes.push(outcome);
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
+      continue;
+    }
+
+    if (tool === "song_name") {
+      const outcome = await runSongNameTool({ callId, deviceId: state.deviceId, surface: state.surface });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
       continue;

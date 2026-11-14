@@ -25,6 +25,20 @@ The AcoustID key is the household secret `acoustid.client` (write-only, encrypte
 `identifyReadiness()` reads the key, `fpcalc`, the library fingerprint count and the setting; `healthSnapshot.ts` serves it as
 `engines.identify` in `/api/health`. No client recomputes it.
 
+## Robot chat tool (MUSIC-ID-02)
+
+On a connected, unmuted robot turn the model may call `song_name` when it needs to identify music playing now. The tool is offered
+under the same age and surface policy as the scene tool, but only on that robot. The model chooses when to call it. Home issues a
+`listen_song` device command with a random request id and a short expiry. The robot records a short clip and posts it to
+`POST /api/music/identify?request=<id>`; the route resolves only a waiter belonging to that robot. The tool waits up to 22 seconds,
+then returns a plain result to the model. Failures stay tool results so the model can answer from what it knows.
+
+On a successful match from a robot, Home keeps only title, artist, album, source and match time in process memory, one recent song
+per robot for at most 15 minutes. Robot turns receive a short labelled context line during that window, so follow-up questions can
+refer to the song without another recording. Home keeps no clip or fingerprint for this context. The robot can decline a listen when
+muted, at night or already capturing; in that case the tool reports its ordinary failure result. The waiting request is memory only
+and times out if the robot does not post its response.
+
 ## Tests
 
 `backend/tests/identifyCore.test.ts` (pure), `identifyService.test.ts` (fake `fpcalc`, injected decoder, fake AcoustID server),

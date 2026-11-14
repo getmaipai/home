@@ -678,6 +678,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // record keeps it out until ANSWER-IMG-05's bench passes.
   const gated = await budgetWithTurnToolGates({
     conversationId: conversation.id,
+    deviceId: surface === "robot" ? opts.deviceId : undefined,
     budget: thinkingBudget,
     actor,
     band,

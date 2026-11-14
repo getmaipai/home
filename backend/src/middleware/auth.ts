@@ -205,6 +205,7 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["POST", /^\/api\/turn\/stream\/?$/],
   ["POST", /^\/api\/turn\/[^/]+\/cancel\/?$/],
   ["POST", /^\/api\/stt\/transcribe\/?$/],
+  ["POST", /^\/api\/music\/identify\/?$/],
   ["GET", /^\/api\/stt\/stream\/?$/],
   ["GET", /^\/api\/devices\/me\/events\/?$/],
   ["POST", /^\/api\/tts\/?$/],

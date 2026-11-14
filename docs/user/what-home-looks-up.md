@@ -192,9 +192,9 @@ Open **Settings**, then **Privacy and safety**, and choose **What connects to th
 
 **What it is for:** Telling you what song is playing when you ask "what song is this?", from the app, the assistant or a robot.
 
-**When it happens:** Only when someone asks. Home listens to a short clip, turns it into a fingerprint on this computer and first compares it with the fingerprints of your own music library, with no internet at all. Only when your library has no match, and only while **Name songs online** is On (or Ask each time and the person said yes), Home asks the open AcoustID service. It needs an AcoustID key in **Settings > Music**. At most one lookup a minute for each device.
+**When it happens:** Only when someone asks. In chat, the model can ask a connected, unmuted robot to listen when it needs to identify music playing now. The robot records a short clip and sends it to Home. Home turns it into a fingerprint on this computer and first compares it with the fingerprints of your own music library, with no internet at all. Only when your library has no match, and only while **Name songs online** is On (or Ask each time and the person said yes), Home asks the open AcoustID service. It needs an AcoustID key in **Settings > Music**. At most one lookup a minute for each device.
 
-**What it sends:** An audio fingerprint and the length of the clip, never the audio. The recording is never stored or sent, and Home does not keep a list of what it heard. Nothing about the person who asked goes with it.
+**What it sends:** An audio fingerprint and the length of the clip, never the audio. The recording is never stored or sent. After a robot match, Home keeps the title, artist, album and source in memory for that robot for up to 15 minutes, so chat can answer follow-up questions without listening again. It keeps no clip or fingerprint for this context. Nothing about the person who asked goes with the lookup.
 
 **Who can use it:** Everyone. Set **Name songs online** to Off to match your own library only.
 

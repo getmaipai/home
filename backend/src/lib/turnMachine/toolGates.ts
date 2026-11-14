@@ -28,9 +28,12 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import type { HouseBand } from "@/lib/house/access";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { mayUseClipVoices } from "@/lib/access";
+import { isDeviceConnected } from "@/lib/deviceCommands";
+import { getDeviceState } from "@/lib/deviceStates";
 
 export interface TurnToolGateInput {
   conversationId?: string;
+  deviceId?: string;
   /** How many pictures came with this message. */
   imageCount?: number;
   budget: TurnBudget;
@@ -93,6 +96,7 @@ export interface TurnToolGateResult {
   writingFormatOk: boolean;
   voiceoverOk: boolean;
   sceneOk: boolean;
+  songNameOk: boolean;
   inspiredVoiceOk: boolean;
   houseOk: boolean;
   uptimeOk: boolean;
@@ -167,6 +171,8 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
   const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
   const sceneOk = !input.bare && input.actor.role !== "guest" && (input.spoken || input.surfaceClass !== "written" || input.budget.rounds > 0);
+  const robotState = input.surface === "robot" && input.deviceId ? getDeviceState(input.deviceId) : null;
+  const songNameOk = sceneOk && input.surface === "robot" && !!input.deviceId && isDeviceConnected(input.deviceId) && !!robotState?.reachable && !robotState.muted;
   const inspiredVoiceOk = !input.bare && !input.spoken && input.surface === "chat" && input.surfaceClass === "written" && mayUseClipVoices(input.actor);
   let houseContext: { visible: HouseEntity[]; areas: HouseArea[] } | undefined;
   const registry = peekHouseRegistries();
@@ -185,7 +191,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   // person's wording is never read (rule 1). budget.ts keeps it past the sixteen-tool cap.
   // REFVIDEO-01: a short video from the person's pictures: the film floor (adult, own written chat screen, video on) and pictures attached, or an earlier video of this chat made from sheets.
   const referenceVideoOk = filmOk && ((input.imageCount ?? 0) > 0 || safeGate(input.referenceVideoAvailable ?? (() => false)));
-  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk, sceneOk);
+  const gated = withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk, musicBandOk, videoEditOk, musicObject, writingFormatOk, editPictureOk, voiceoverOk, filmOk, houseOk, uptimeOk, inspiredVoiceOk, referenceVideoOk, sceneOk, songNameOk);
   // FILM-ROUTING-02: one clip starts from one picture and refuses several (found 2026-11-12: the model kept choosing it for a commercial from four
   // photos). With several pictures attached and the film tool on offer, the single-clip tool is not offered, so the film tool is the video tool.
   const severalPictures = (input.imageCount ?? 0) > 1 && filmOk;
@@ -195,6 +201,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     writingFormatOk,
     voiceoverOk,
     sceneOk,
+    songNameOk,
     inspiredVoiceOk,
     houseOk,
     uptimeOk,

@@ -60,6 +60,7 @@ import { resolvePageContext } from "@/lib/pageContext";
 import { getDeviceById } from "@/lib/devices";
 import { getRobotCheckin } from "@/lib/robotCheckin";
 import { getDeviceState } from "@/lib/deviceStates";
+import { heardSongFor, heardSongContextLine } from "@/lib/music/heardSong";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
 import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
@@ -645,6 +646,10 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   if (state.surface === "robot" && state.deviceId) {
     const scene = sceneContextLine(state.deviceId);
     if (scene) items.push({ id: "robot-scene", text: scene, source: "camera", subjects: [], disclosure: "child_ok" });
+    const song = heardSongFor(state.deviceId, now.getTime());
+    if (song) {
+      items.push({ id: "heard-song", text: heardSongContextLine(song, now.getTime()), source: "scene", subjects: [], disclosure: "child_ok" });
+    }
   }
 
   // DUPLEX-06: the part of the last spoken reply this person cut in on before hearing it, once, for the next turn only (memory only,

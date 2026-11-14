@@ -5,8 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetIdentifyForTests, MAX_CLIP_BYTES } from "@/lib/music/identify";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { storeRobotCredential } from "@/lib/robotCredentials";
+import { requestListen, __setListenCommandIssuerForTests, __resetListenRequestsForTests } from "@/lib/music/listenRequests";
 
 async function owner() {
   const client = new TestClient();
@@ -23,7 +28,7 @@ function withPath<T>(fpcalc: boolean, run: () => Promise<T>): Promise<T> {
   process.env.MAIPAI_FPCALC_PATH_ONLY = "1";
   return run().finally(() => { process.env.PATH = old; if (oldOnly === undefined) delete process.env.MAIPAI_FPCALC_PATH_ONLY; else process.env.MAIPAI_FPCALC_PATH_ONLY = oldOnly; });
 }
-beforeEach(() => { resetDb(); __resetIdentifyForTests(); });
+beforeEach(() => { resetDb(); __resetIdentifyForTests(); __resetListenRequestsForTests(); __setListenCommandIssuerForTests(null); });
 
 describe("POST /api/music/identify", () => {
   test("needs a signed-in person", async () => {
@@ -72,6 +77,42 @@ describe("POST /api/music/identify", () => {
       const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
       expect(await res.json()).toMatchObject({ status: "needs_confirm" });
     });
+  });
+
+  test("a robot identify request resolves only the waiter named by request", async () => {
+    await owner();
+    const personId = db.select({ id: people.id }).from(people).get()!.id;
+    setHouseholdSettingValue("home.robots.enabled", true);
+    const { token, deviceId } = issueDeviceToken(personId, "robot", "Test robot");
+    storeRobotCredential(deviceId, "192.0.2.10", "pollen", "test-password");
+    const robot = new TestClient();
+    expect((await robot.post("/api/auth/devices/redeem", { token })).status).toBe(200);
+    let requestId = "";
+    __setListenCommandIssuerForTests((_deviceId, _kind, payload) => { requestId = String(payload.request_id); return {} as never; });
+    const pending = requestListen(deviceId, { timeoutMs: 1000 });
+    await withPath(false, async () => {
+      const response = await robot.postBytes(`/api/music/identify?kind=pcm16&rate=16000&request=${requestId}`, new Uint8Array(32000), "application/octet-stream");
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+    });
+    expect(await pending).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+  });
+
+  test("without request the device route does not resolve a pending waiter", async () => {
+    await owner();
+    const personId = db.select({ id: people.id }).from(people).get()!.id;
+    setHouseholdSettingValue("home.robots.enabled", true);
+    const { token, deviceId } = issueDeviceToken(personId, "robot", "Test robot");
+    storeRobotCredential(deviceId, "192.0.2.10", "pollen", "test-password");
+    const robot = new TestClient();
+    expect((await robot.post("/api/auth/devices/redeem", { token })).status).toBe(200);
+    __setListenCommandIssuerForTests(() => ({} as never));
+    const pending = requestListen(deviceId, { timeoutMs: 25 });
+    await withPath(false, async () => {
+      const response = await robot.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(32000), "application/octet-stream");
+      expect(response.status).toBe(200);
+    });
+    expect(await pending).toEqual({ status: "timeout" });
   });
 });
 
