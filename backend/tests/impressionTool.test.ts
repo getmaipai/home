@@ -15,6 +15,8 @@ import { ROBOT_GUISE_KEY, robotCompanionOf } from "@/lib/robotCompanion";
 import { __reloadRegistryForTests } from "@/lib/settingsRegistry";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { remember, list as listMemory } from "@/lib/memory";
+import { createConversation } from "@/lib/conversationHistory";
+import { voiceForActiveChat } from "@/routes/turn";
 import { robotAssignments } from "@/lib/companionsApp";
 
 beforeEach(() => resetDb());
@@ -118,5 +120,13 @@ describe("held robot synth guise", () => {
     setHouseholdSettingValue(companionVoiceKey(id), "from-setting");
     expect(companionOwnVoice(id)).toBe("from-setting");
     expect(companionOwnVoice("not-a-synth")).toBeUndefined();
+  });
+  test("a sentence that names no turn (the filler and the reply) is spoken in the voice of the synth in the person's newest chat", async () => {
+    const owner = await household(), id = synth(owner);
+    setHouseholdSettingValue(companionVoiceKey(id), "synth-voice");
+    expect(voiceForActiveChat(owner)).toBeUndefined();
+    const made = createConversation(owner, { surface: "chat", companionId: id });
+    expect(made.ok).toBe(true);
+    expect(voiceForActiveChat(owner)).toBe("synth-voice");
   });
 });

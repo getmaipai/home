@@ -8,7 +8,7 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, hasWhisperTag, isProtectedSentence, planForPerson, sentenceIndexFor, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnConversationId, turnUtterance, voiceForTurn } from "@/routes/turn";
+import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues, turnConversationId, turnUtterance, voiceForActiveChat, voiceForTurn } from "@/routes/turn";
 import { chooseDelivery } from "@/lib/deliveryChoice";
 import { abortConversationPrewarm } from "@/lib/prefixPrewarm";
 import { isWhisperMode, isWhisperTurn, noteWhisperTag } from "@/lib/whisperTurns";
@@ -58,13 +58,30 @@ const ttsSynthesizeRoute = createRoute({
   },
 });
 
+const ttsVoiceRoute = createRoute({
+  method: "get",
+  path: "/voice",
+  tags: ["Voice"],
+  summary: "Read the voice the current chat speaks in",
+  description: "The voice id spoken replies and fillers use right now: the voice of the synth or companion in the person's chat, else their own voice (a robot session: the robot's chain).",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ voice: z.string() }) } }, description: "The voice id." },
+    401: { content: { "application/json": { schema: TTS_ERROR } }, description: "Not signed in." },
+  },
+});
+ttsRoutes.openapi(ttsVoiceRoute, (c) => {
+  const actor = c.get("person"), deviceId = c.get("deviceId");
+  return c.json({ voice: (deviceId ? undefined : voiceForActiveChat(actor)) ?? voiceForSpeech({ actor, deviceId }) }, 200);
+});
+
 ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const handlerStarted = performance.now();
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.turn_id) abortConversationPrewarm(actor.id);
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
-  const voiceId = body.voice ?? (body.turn_id ? voiceForTurn(body.turn_id, actor.id) : undefined) ?? voiceForSpeech({ actor, deviceId: c.get("deviceId") });
+  const voiceId = body.voice ?? (body.turn_id ? voiceForTurn(body.turn_id, actor.id) : undefined) ?? (c.get("deviceId") ? undefined : voiceForActiveChat(actor)) ?? voiceForSpeech({ actor, deviceId: c.get("deviceId") });
   const prepStarted = handlerStarted;
   // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
   let spoken = body.text;

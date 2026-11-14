@@ -555,7 +555,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               const render = new AbortController(); ackRenderRef.current = render;
               clipWordsRef.current = grant.clips.flatMap((clip) => normalizedTranscript(clip).split(" ").filter(Boolean));
               clipPhrasesRef.current = grant.clips.map((clip) => normalizedTranscript(clip)).filter(Boolean);
-              void (speculation.renderClips ?? renderAckClips)(grant.clips, speculation.getVoice?.(), { signal: render.signal, onTrace: (event, extra) => trace(event, extra) }).then((pool) => { if (!render.signal.aborted) { ackPoolRef.current = pool; poolSizeRef.current = pool.size; trace("pool", { size: pool.size }); } }).catch(() => { trace("pool", { size: 0, failed: true }); });
+              // The clips are rendered in the voice this chat speaks in (a synth or companion voice, else the persons own), so the filler and the reply match.
+              void Promise.resolve(speculation.getVoice?.() ?? api.activeChatVoice().then((found) => found.voice, () => undefined)).then((voice) => (speculation.renderClips ?? renderAckClips)(grant.clips, voice, { signal: render.signal, onTrace: (event, extra) => trace(event, extra) })).then((pool) => { if (!render.signal.aborted) { ackPoolRef.current = pool; poolSizeRef.current = pool.size; trace("pool", { size: pool.size }); } }).catch(() => { trace("pool", { size: 0, failed: true }); });
             } else { talkOverRef.current = null; ackPoolRef.current = null; talkOverReasonRef.current = "talk_over_reason" in message && message.talk_over_reason ? message.talk_over_reason : "unknown"; }
             if (voiceBargeIn && !playedTimer) {
               playedTimer = setInterval(() => {

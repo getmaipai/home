@@ -5,7 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
 import { quickReaction, chooseFillerGroup, type QuickCue } from "@/lib/quickReaction";
@@ -34,7 +34,7 @@ import { newSpeculationHold, noteSpeculation, speculationRefusal, wordCount, SPE
 import { abortConversationPrewarm, prewarmConversation, rewarmConversation } from "@/lib/prefixPrewarm";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
-import { attachments, conversationTurns } from "@/db/schema";
+import { attachments, conversationTurns, conversations as conversationsTable } from "@/db/schema";
 import { db } from "@/db";
 import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -226,6 +226,21 @@ function previousReply(conversationId: string): string | undefined {
 export function turnUtterance(turnId: string, ownerId: string): string | undefined {
   const session = inFlightTurns.get(turnId);
   return session && session.ownerId === ownerId ? session.utterance : undefined;
+}
+
+/**
+ * The voice for a spoken sentence that names no turn (the spoken cue, the acknowledgement clips and any sentence the client sends without a turn id):
+ * the voice of the synth or companion in the person's chat right now, else undefined (the caller's own chain). "Right now" is the newest in-flight
+ * turn of this person that is not a robot turn, else their most recently updated chat. Both the filler and the full reply then speak in the synth's voice.
+ */
+export function voiceForActiveChat(actor: PersonRow): string | undefined {
+  let newest: ResumeSession | undefined;
+  for (const session of inFlightTurns.values()) if (session.ownerId === actor.id && !session.deviceId && (!newest || session.startedAtMs > newest.startedAtMs)) newest = session;
+  const companionId = newest
+    ? (() => { const found = getConversation(actor, newest.conversationId); return found.ok ? found.value.companion_id : null; })()
+    : db.select({ companionId: conversationsTable.companionId }).from(conversationsTable).where(and(eq(conversationsTable.personId, actor.id), eq(conversationsTable.surface, "chat"))).orderBy(desc(conversationsTable.updatedAt)).limit(1).get()?.companionId ?? null;
+  const companionVoice = companionId ? companionOwnVoice(companionId) : undefined;
+  return companionVoice ? voiceForSpeech({ actor, companionVoice }) : undefined;
 }
 
 /** Voice selected for a turn, including a robot-bound ambient side chat. */
