@@ -658,12 +658,13 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1", isolate: body.isolate_voice === "1" };
   // VOICE-SAMPLES-01: up to three recordings (file, file2, file3) are cleaned and joined into one reference clip.
   let saveBytes: Uint8Array<ArrayBuffer> = bytes, saveType = file.type;
+  let voiceNotice: string | undefined;
   if (!inspiredLevel) {
     const extra = [body.file2, body.file3].filter((item): item is File => item instanceof File);
     const all = [file, ...extra];
     const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? (item.type.includes("mpeg") ? "mp3" : item.type.includes("flac") ? "flac" : "wav")).toLowerCase();
     const joined = await joinReferenceClips(await Promise.all(all.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))), cleanOptions);
-    if (joined.ok) { saveBytes = joined.wav as Uint8Array<ArrayBuffer>; saveType = "audio/wav"; }
+    if (joined.ok) { saveBytes = joined.wav as Uint8Array<ArrayBuffer>; saveType = "audio/wav"; voiceNotice = joined.notice; }
     else if (extra.length > 0) return c.json({ error: joined.error }, 400);
   }
   // VOICE-STYLES-01: an optional whisper and an optional angry recording, checked before anything is saved.
@@ -691,6 +692,7 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
     return c.json({ error: check.error }, 400);
   }
   if (check.audio && check.audio.byteLength > 44) cacheHouseholdPreview(result.value.id, check.audio);
+  if (voiceNotice) c.header("x-voice-notice", voiceNotice);
   return c.json(result.value, 201);
 });
 
@@ -823,18 +825,18 @@ voiceRoutes.openapi(clonedUpdateRoute, async (c) => {
   const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1", isolate: body.isolate_voice === "1" };
   const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? "wav").toLowerCase();
   const files = [body.file, body.file2, body.file3].filter((item): item is File => item instanceof File);
-  let clip: Uint8Array | undefined;
+  let clip: Uint8Array | undefined; let voiceNotice: string | undefined;
   if (files.length > 0) {
     const joined = await joinReferenceClips(await Promise.all(files.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))), cleanOptions);
     if (!joined.ok) return c.json({ error: joined.error }, 400);
-    clip = joined.wav;
+    clip = joined.wav; voiceNotice = joined.notice;
   } else if (cleanOptions.noise || cleanOptions.echo || cleanOptions.isolate) {
     const existing = readClonedVoiceClip(id);
     if (!existing) return c.json({ error: "cloned voice not found" }, 404);
     const ext = existing.mimeType.includes("mpeg") ? "mp3" : existing.mimeType.includes("flac") ? "flac" : "wav";
     const joined = await joinReferenceClips([{ bytes: existing.bytes, extension: ext }], cleanOptions);
     if (!joined.ok) return c.json({ error: joined.error }, 400);
-    clip = joined.wav;
+    clip = joined.wav; voiceNotice = joined.notice;
   }
   const styleClips: { style: "whisper" | "anger"; wav: Uint8Array }[] = [];
   for (const [field, style] of [["whisper_file", "whisper"], ["anger_file", "anger"]] as const) {
@@ -852,6 +854,7 @@ voiceRoutes.openapi(clonedUpdateRoute, async (c) => {
     if (check.audio && check.audio.byteLength > 44) cacheHouseholdPreview(id, check.audio);
   } else dropHouseholdPreview(id);
   for (const item of styleClips) saveStyleSample(id, item.style, item.wav);
+  if (voiceNotice) c.header("x-voice-notice", voiceNotice);
   return c.json(result.value.info, 200);
 });
 

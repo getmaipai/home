@@ -5934,8 +5934,8 @@ msgstr "Claude Code · same key"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:93
-msgid "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. Echo reduction is a light fix; a recording made in a quiet, soft room still works best."
-msgstr "Cleans every recording above before the voice is made. Echo reduction is a light fix; a recording made in a quiet, soft room still works best."
+msgid "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best."
+msgstr "Cleans every recording above before the voice is made. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceBox.tsx:61
@@ -20360,11 +20360,6 @@ msgid "Redo with the speech engine"
 msgstr "Redo with the speech engine"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:92
-msgid "Reduce echo and room sound"
-msgstr "Reduce echo and room sound"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:37
 msgid "Reduce noise"
 msgstr "Reduce noise"
@@ -20600,6 +20595,11 @@ msgstr "Remove and apply"
 #: src/apps/settings/AddVoiceForm.tsx:91
 msgid "Remove background noise"
 msgstr "Remove background noise"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:92
+msgid "Remove echo and room sound (uses the echo remover model)"
+msgstr "Remove echo and room sound (uses the echo remover model)"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:81

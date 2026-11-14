@@ -122,6 +122,14 @@ export async function getStemsJob(job: string): Promise<StackMusicJob> {
 export async function deleteStemsJob(job: string): Promise<void> {
   try { await (await request(`/v1/audio/stems/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
 }
+/** Removes room echo and noise from a speech WAV with the Stack's speech enhancer (MossFormer2 SE). Null when the model is not installed or the call fails. */
+export async function enhanceSpeech(wav: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const res = await request("/v1/audio/enhance", { method: "POST", headers: { "content-type": "audio/wav" }, body: wav as unknown as RequestInit["body"] }, 120_000);
+    if (res.status !== 200) { await res.arrayBuffer().catch(() => null); return null; }
+    return new Uint8Array(await res.arrayBuffer());
+  } catch { return null; }
+}
 export async function fetchStem(url: string): Promise<Uint8Array> {
   const base = stack.baseUrl();
   let parsed: URL;

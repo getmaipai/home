@@ -77,3 +77,19 @@ describe("isolate the voice", () => {
     __isolateForTests.run = null;
   });
 });
+
+describe("remove echo", () => {
+  test("uses the speech enhancer when it answers, and falls back to the ffmpeg gate with a plain notice when it does not", async () => {
+    const { __enhanceForTests, ECHO_FALLBACK_NOTICE } = await import("@/lib/voiceSamples");
+    let received = 0;
+    __enhanceForTests.run = async (wav) => { received = wav.length; return tone(8, 0.5, 24000); };
+    const ok = await joinReferenceClips([{ bytes: tone(8, 0.2), extension: "wav" }], { echo: true });
+    expect(ok.ok).toBe(true);
+    expect(received).toBeGreaterThan(1000);
+    if (ok.ok) expect(ok.notice).toBeUndefined();
+    __enhanceForTests.run = async () => null;
+    const fallback = await joinReferenceClips([{ bytes: tone(8, 0.2), extension: "wav" }], { echo: true });
+    if (fallback.ok) expect(fallback.notice).toBe(ECHO_FALLBACK_NOTICE);
+    __enhanceForTests.run = null;
+  });
+});

@@ -7,13 +7,20 @@ import { join } from "node:path";
 import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voiceShift";
 import { createHash } from "node:crypto";
 import { findFfmpeg } from "@/lib/ffmpegPath";
-import { deleteStemsJob, fetchStem, getStemsJob, stemsStatus, stemsStatusReady, submitStems, type StackStem } from "@/lib/music/stack";
+import { deleteStemsJob, enhanceSpeech, fetchStem, getStemsJob, stemsStatus, stemsStatusReady, submitStems, type StackStem } from "@/lib/music/stack";
 
 /** VOICE-CLEAN-01: what the person chose to clean from a recording before it is used as a voice sample. */
 export interface CleanOptions { noise?: boolean; echo?: boolean; isolate?: boolean }
 
 /** The ffmpeg filter chain for the chosen options (null when nothing is chosen). Noise: rumble cut, then spectral and non-local-means denoising.
- * Echo: a low cut plus a gate that closes between words, which shortens the room's tail; it reduces echo, it does not remove it. */
+ * Echo (fallback only): a low cut plus a gate that closes between words, which shortens the room's tail but does not remove it; the real
+ * removal is the Stack's speech enhancer (removeEcho), used first when it is installed. */
+export const __enhanceForTests: { run: ((wav: Uint8Array) => Promise<Uint8Array | null>) | null } = { run: null };
+export const ECHO_FALLBACK_NOTICE = "The echo remover is not installed, so a lighter echo fix was used. Install it in Settings, AI and models (Voice: echo and noise remover) for a drier voice.";
+/** Real echo removal: the Stack's speech enhancer. Null when it is not installed or fails; the caller falls back to the ffmpeg gate and says so. */
+export async function removeEcho(wav: Uint8Array): Promise<Uint8Array | null> {
+  return __enhanceForTests.run ? __enhanceForTests.run(wav) : enhanceSpeech(wav);
+}
 export const __isolateForTests: { run: ((wav: Uint8Array) => Promise<Uint8Array | null>) | null } = { run: null };
 const ISOLATE_WAIT_MS = 4 * 60_000;
 const ISOLATE_POLL_MS = 1_500;
@@ -119,7 +126,8 @@ export function normalizePeak(samples: Float32Array): Float32Array {
 }
 
 /** Cleans each recording and joins them into one WAV, or says why it could not. Each recording gets an equal share of the 29 seconds. */
-export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: string }[], clean: CleanOptions = {}): Promise<{ ok: true; wav: Uint8Array; seconds: number } | { ok: false; error: string }> {
+export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: string }[], clean: CleanOptions = {}): Promise<{ ok: true; wav: Uint8Array; seconds: number; notice?: string } | { ok: false; error: string }> {
+  let notice: string | undefined;
   if (clips.length === 0) return { ok: false, error: "Add at least one recording." };
   if (clips.length > MAX_SAMPLES) return { ok: false, error: `Use up to ${MAX_SAMPLES} recordings.` };
   const share = Math.floor((MAX_SECONDS - GAP_SECONDS * (clips.length - 1)) / clips.length * RATE);
@@ -130,7 +138,12 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
       raw = await isolateVoice(raw);
       if (!raw) return { ok: false, error: "Isolating the voice needs the Stack's stem splitter, which is not ready. Turn off Isolate the voice, or install it in Settings, AI and models, and try again." };
     }
-    const wav = raw && (clean.noise || clean.echo) ? await cleanWav(raw, clean) : raw;
+    let cleanNow = clean;
+    if (raw && clean.echo) {
+      const dry = await removeEcho(raw);
+      if (dry) { raw = dry; cleanNow = { ...clean, echo: false }; } else notice = ECHO_FALLBACK_NOTICE;
+    }
+    const wav = raw && (cleanNow.noise || cleanNow.echo) ? await cleanWav(raw, cleanNow) : raw;
     if (raw && !wav) return { ok: false, error: "Cleaning the recording needs ffmpeg, which is not installed on this computer. Turn off the cleaning options and try again." };
     const pcm = wav ? decodeWavClip(wav) : null;
     if (!pcm) return { ok: false, error: `A recording could not be read. Save it as a WAV, MP3 or FLAC file and choose it again.` };
@@ -146,7 +159,7 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
   const joined = new Float32Array(total + pad * 2);
   let offset = pad;
   for (const part of parts) { fade(part); joined.set(part, offset); offset += part.length + gap; }
-  return { ok: true, wav: encodeWavClip({ samples: joined, sampleRate: RATE }), seconds: joined.length / RATE };
+  return { ok: true, wav: encodeWavClip({ samples: joined, sampleRate: RATE }), seconds: joined.length / RATE, ...(notice ? { notice } : {}) };
 }
 
 export type StyleName = "whisper" | "anger";
