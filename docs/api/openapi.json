@@ -34060,6 +34060,60 @@
                                 ]
                               },
                               {
+                                "type": "string",
+                                "enum": [
+                                  "bumped"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "lifted"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "carried"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "set_down"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "shaken"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "tilted"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "tapped"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "falling"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rolling"
+                                ]
+                              },
+                              {
                                 "type": "object",
                                 "nullable": true,
                                 "enum": [
@@ -34070,7 +34124,7 @@
                                 "nullable": true
                               }
                             ],
-                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                            "description": "The robot's reported motion state. The list matches the scene motion states (scene-observation MotionValue) plus the older resting and held, and a test keeps the two in step. A consumer that meets a value it does not know treats it as unknown. Omission means the producer does not report motion. Null means the body cannot tell."
                           },
                           "put_down_count": {
                             "type": "integer",
@@ -34311,6 +34365,60 @@
                                 ]
                               },
                               {
+                                "type": "string",
+                                "enum": [
+                                  "bumped"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "lifted"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "carried"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "set_down"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "shaken"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "tilted"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "tapped"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "falling"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rolling"
+                                ]
+                              },
+                              {
                                 "type": "object",
                                 "nullable": true,
                                 "enum": [
@@ -34321,7 +34429,7 @@
                                 "nullable": true
                               }
                             ],
-                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                            "description": "The robot's reported motion state. The list matches the scene motion states (scene-observation MotionValue) plus the older resting and held, and a test keeps the two in step. A consumer that meets a value it does not know treats it as unknown. Omission means the producer does not report motion. Null means the body cannot tell."
                           },
                           "put_down_count": {
                             "type": "integer",
@@ -34538,6 +34646,60 @@
                         ]
                       },
                       {
+                        "type": "string",
+                        "enum": [
+                          "bumped"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "lifted"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "carried"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "set_down"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "shaken"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "tilted"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "tapped"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "falling"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "rolling"
+                        ]
+                      },
+                      {
                         "type": "object",
                         "nullable": true,
                         "enum": [
@@ -34548,7 +34710,58 @@
                         "nullable": true
                       }
                     ],
-                    "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                    "description": "The robot's reported motion state. The list matches the scene motion states (scene-observation MotionValue) plus the older resting and held, and a test keeps the two in step. A consumer that meets a value it does not know treats it as unknown. Omission means the producer does not report motion. Null means the body cannot tell."
+                  },
+                  "motion_pose": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "upright"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "left_side"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "right_side"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "upside_down"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "face_down"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "on_back"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "nullable": true,
+                        "enum": [
+                          null
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "The robot's reported pose when known. A consumer that meets a value it does not know treats it as unknown. Null means the pose cannot be determined; omission means the producer does not report it."
                   },
                   "put_down_count": {
                     "type": "integer",
@@ -35323,6 +35536,60 @@
                               ]
                             },
                             {
+                              "type": "string",
+                              "enum": [
+                                "bumped"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "lifted"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "carried"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "set_down"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "shaken"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "tilted"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "tapped"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "falling"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "rolling"
+                              ]
+                            },
+                            {
                               "type": "object",
                               "nullable": true,
                               "enum": [
@@ -35333,7 +35600,7 @@
                               "nullable": true
                             }
                           ],
-                          "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                          "description": "The robot's reported motion state. The list matches the scene motion states (scene-observation MotionValue) plus the older resting and held, and a test keeps the two in step. A consumer that meets a value it does not know treats it as unknown. Omission means the producer does not report motion. Null means the body cannot tell."
                         },
                         "put_down_count": {
                           "type": "integer",
