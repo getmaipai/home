@@ -26800,6 +26800,11 @@ msgid "This revokes its enrollment code and deletes its saved firmware backup."
 msgstr "This revokes its enrollment code and deletes its saved firmware backup."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:38
+msgid "This robot already holds 10 Wi-Fi networks. Forget one to add another."
+msgstr "This robot already holds 10 Wi-Fi networks. Forget one to add another."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:32
 msgid "api.error.robot_part_unreported"
 msgstr "This robot did not report that part."

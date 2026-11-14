@@ -33,3 +33,11 @@ test("clears the password field after submit", async () => {
   await waitFor(() => expect((view.getByLabelText("Wi-Fi password") as HTMLInputElement).value).toBe(""));
   expect(bodies[0]).toContain("PrivateFixture987");
 });
+
+test("a full list of 10 networks says so and shows no add form", () => {
+  const names = Array.from({ length: 10 }, (_, index) => `Network ${index}`);
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: names, link_encrypted: true }} />);
+  expect(view.getByText("This robot already holds 10 Wi-Fi networks. Forget one to add another.")).toBeTruthy();
+  expect(view.queryByLabelText("Wi-Fi password")).toBeNull();
+  expect(view.getAllByRole("button", { name: "Forget" }).length).toBe(10);
+});
