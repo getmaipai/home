@@ -1,6 +1,7 @@
 // Image app shelves read templates and files through their existing access boundaries.
 import { listLibrary } from "@/lib/library";
 import { listTemplates } from "@/lib/media/templates";
+import { templateCoverUrl } from "@/lib/templateCovers";
 import { registerAppData, registerAppPageFill } from "@/lib/apps";
 import { pictureFragmentChips } from "@/lib/media/pictureFragments";
 import { studioOperationRows, studioPickerRows, studioRows } from "@/lib/mediaOps/studio";
@@ -63,7 +64,7 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
 };
 
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
-  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: null }));
+  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: templateCoverUrl(template.id) }));
   if (dataId === "library") return rows(person, body);
   if (dataId === "recent") return rows(person, body, true);
   // IMG-STUDIO-02: the Studio page. `studio` is the opened picture (one row, empty until a picture is chosen), `studio-tools` the registry's extra operations
