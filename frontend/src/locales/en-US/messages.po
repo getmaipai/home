@@ -20305,7 +20305,7 @@ msgid "Reminder lists"
 msgstr "Reminder lists"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/notificationCopy.ts:24
+#: ../backend/src/lib/notificationCopy.ts:25
 msgid "notification.remind.due"
 msgstr "Reminder: {task}"
 
@@ -26043,6 +26043,11 @@ msgid "setting.reason.stricter_robot.admin.line"
 msgstr "The robot's setting is stricter here."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/notificationCopy.ts:24
+msgid "notification.safety.alarm_dismissed"
+msgstr "The safety alarm in {area} was held for 15 minutes."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:224
 msgid "The same seed with the same words makes a very similar song."
 msgstr "The same seed with the same words makes a very similar song."
@@ -29794,7 +29799,7 @@ msgid "You're all set"
 msgstr "You're all set"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/notificationCopy.ts:25
+#: ../backend/src/lib/notificationCopy.ts:26
 msgid "notification.timer.done"
 msgstr "Your {duration_text} timer is up."
 
