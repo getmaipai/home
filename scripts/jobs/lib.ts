@@ -115,3 +115,38 @@ export function treeActive(rootPid: number, minCpu = 1): boolean {
 /** Seconds a development lease may show no activity before the broker releases it (MAIPAI_LEASE_IDLE_S, else MAIPAI_LEASE_IDLE_MIN minutes, default 10). */
 export const leaseIdleS = (): number => { const s = Number(process.env.MAIPAI_LEASE_IDLE_S); if (Number.isFinite(s) && s > 0) return s; const m = Number(process.env.MAIPAI_LEASE_IDLE_MIN); return Number.isFinite(m) && m > 0 ? m * 60 : 600; };
 export const devLeaseFile = (): string => join(stateDir(), "dev-lease.json");
+
+// GUARD-STRAY-01 (2026-11-13): test runs that bypassed job.sh (raw `bun test` in a wt/ worktree) ran for hours and starved the lander's gate.
+/** ps etime ([[dd-]hh:]mm:ss) in seconds, or null when it does not parse. */
+export function etimeSeconds(v: string): number | null {
+  const m = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/.exec(v.trim());
+  return m ? Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3]) * 60 + Number(m[4]) : null;
+}
+export type PsRow = { pid: number; ppid: number; pgid: number; ageS: number; command: string };
+export function parsePs(out: string): PsRow[] {
+  return out.split("\n").flatMap((l) => {
+    const m = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(l); const age = m ? etimeSeconds(m[4]!) : null;
+    return m && age !== null ? [{ pid: Number(m[1]), ppid: Number(m[2]), pgid: Number(m[3]), ageS: age, command: m[5]! }] : [];
+  });
+}
+export const isTestCommand = (c: string): boolean => /(^|\/)bun\s+(test\b|run\s+test)/.test(c);
+/** Worktrees (wt/, .claude/worktrees) and the lander/watcher warm checkouts. */
+export const strayDir = (cwd: string): boolean => /\/(wt|\.claude\/worktrees)\/|\/home-(lander|watcher)(\/|$)/.test(cwd + "/") || /\/wt$/.test(cwd);
+export type Stray = { pid: number; ageS: number; cwd: string; command: string };
+/**
+ * Unmanaged test runs: a `bun test` or `bun run test*` process older than limitS whose cwd is under a worktree or warm checkout, that is
+ * not in a recorded job.sh process group, and has no lander.sh or watcher.sh ancestor (their own bounded runs are never strays).
+ */
+export function findStrays(rows: PsRow[], managedPgids: Set<number>, cwdOf: (pid: number) => string | undefined, limitS: number, selfPid = process.pid): Stray[] {
+  const byPid = new Map(rows.map((r) => [r.pid, r]));
+  const pipelineOwned = (r: PsRow): boolean => { for (let p: PsRow | undefined = r, n = 0; p && n < 40; p = byPid.get(p.ppid), n++) if (/(lander|watcher)\.sh/.test(p.command)) return true; return false; };
+  // Never the scanner itself or anything that launched it (a `bun test` run that calls the scan must not stop itself).
+  const lineage = new Set<number>(); for (let p = byPid.get(selfPid), n = 0; p && n < 40; p = byPid.get(p.ppid), n++) lineage.add(p.pid); lineage.add(selfPid);
+  const out: Stray[] = [];
+  for (const r of rows) {
+    if (lineage.has(r.pid) || !isTestCommand(r.command) || r.ageS < limitS || managedPgids.has(r.pgid) || pipelineOwned(r)) continue;
+    const cwd = cwdOf(r.pid);
+    if (cwd && strayDir(cwd)) out.push({ pid: r.pid, ageS: r.ageS, cwd, command: r.command });
+  }
+  return out;
+}

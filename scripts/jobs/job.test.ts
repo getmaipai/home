@@ -224,3 +224,62 @@ describe("wt.sh check runs inside the launcher (DEV-CHECKOUT-01)", () => {
     expect(off.stdout.toString()).toContain("shared:check:\n"); expect(actions(e)).toHaveLength(2);
   });
 });
+
+describe("stray test runs (GUARD-STRAY-01)", () => {
+  // A long-running process whose command line reads `bun test ...`, started in a given folder; the test owns and stops its pid.
+  const fake = (cwd: string, extra: string[] = []) => {
+    Bun.spawnSync(["mkdir", "-p", cwd]);
+    return spawn("bash", ["-c", "exec -a 'bun test fake-stray' sleep 120", ...extra], { cwd, detached: true, stdio: "ignore" });
+  };
+  const base = () => { const d = realpathSync(mkdtempSync(join(tmpdir(), "stray-"))); temps.push(d); return d; };
+  const stop = (p: ReturnType<typeof spawn>) => { try { process.kill(p.pid!, "SIGKILL"); } catch { /* gone */ } };
+  // Wait until the shell has exec'd and ps shows the `bun test` name (and lsof sees the cwd), up to 10 s.
+  const ready = async (p: ReturnType<typeof spawn>) => { for (let i = 0; i < 100; i++) { if (Bun.spawnSync(["/bin/ps", "-o", "command=", "-p", String(p.pid)]).stdout.toString().startsWith("bun test")) return; await Bun.sleep(100); } };
+
+  test("an old bun test in a wt/ folder is listed, and stopped only by --stop (audited)", async () => {
+    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "wt", "x"));
+    try {
+      await ready(p);
+      const listed = job(e, "orphans").stdout.toString();
+      expect(listed).toContain(String(p.pid)); expect(alive(p.pid!)).toBe(true);
+      const ended = new Promise<void>((res) => p.on("exit", () => res()));
+      job(e, "strays", "--stop"); await ended;
+      expect(p.signalCode).toBe("SIGTERM");
+      expect(actions(e).some((x) => x.action === "stray-stopped" && (x.detail ?? "").includes(String(p.pid)) && x.worktree.includes("/wt/x"))).toBe(true);
+    } finally { stop(p); }
+  }, 30_000);
+  test("a process outside wt/ and the warm checkouts is not listed", async () => {
+    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "elsewhere", "x"));
+    try { await ready(p); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
+  }, 30_000);
+  test("a young process is not listed", async () => {
+    const e = env(); const p = fake(join(base(), "wt", "y"));
+    try { await ready(p); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
+  }, 30_000);
+  test("a process inside a job.sh process group is not listed", async () => {
+    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "wt", "z"));
+    try {
+      await ready(p);
+      const dir = join(e.MAIPAI_JOBS_DIR, "jobs"); Bun.spawnSync(["mkdir", "-p", dir]);
+      const rec: JobRecord = { id: "m", type: "test", session: "s", worktree: tmpdir(), command: "bun test", pid: p.pid!, pgid: p.pid!, startedAt: 1, state: "running", log: "x" };
+      writeFileSync(join(dir, "m.json"), JSON.stringify(rec));
+      expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid));
+    } finally { stop(p); }
+  }, 30_000);
+  test("top-cpu prints busiest lines", () => {
+    expect(job(env(), "top-cpu", "2").stdout.toString()).toMatch(/^busiest: pid \d+/);
+  }, 30_000);
+});
+
+describe("stray scan lineage (GUARD-STRAY-01)", () => {
+  test("a test run that launched the scan is never reported as a stray", async () => {
+    const { findStrays } = await import("./lib");
+    const rows = [
+      { pid: 10, ppid: 1, pgid: 10, ageS: 9999, command: "bun test scripts/jobs" },
+      { pid: 11, ppid: 10, pgid: 10, ageS: 9999, command: "bun job.ts strays --stop" },
+      { pid: 20, ppid: 1, pgid: 20, ageS: 9999, command: "bun test tests/other.test.ts" },
+    ];
+    const cwd = () => "/x/wt/home-a/backend";
+    expect(findStrays(rows, new Set(), cwd, 60, 11).map((s) => s.pid)).toEqual([20]);
+  });
+});

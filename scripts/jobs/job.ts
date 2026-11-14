@@ -2,7 +2,7 @@
 // HOST-LAUNCH-01: the dev job launcher and watchdog. Every dev test, build and temporary server runs through it (bash scripts/jobs/job.sh).
 //
 //   job.sh run [--type test|build|server|other] [--timeout 15m] [--lifetime 8h] [--session name] [--max-rss-mb N] [--no-wait] -- <command...>
-//   job.sh list | audit [n] | orphans [--stop] | reap [--dry-run]
+//   job.sh list | audit [n] | orphans [--stop] | strays [--stop] | top-cpu [n] | reap [--dry-run]
 //
 // DEV-CHECKOUT-01: everything the launcher runs first takes the one dev checkout from the lease broker (lease.ts), waits in its FIFO queue
 // when another session holds it, and returns it when the job ends, the launcher dies, or it shows no activity for 10 minutes.
@@ -18,7 +18,7 @@ import { appendFileSync, createWriteStream, existsSync, mkdirSync, readdirSync, 
 import { cpus, loadavg } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { acquire, beat, release } from "./lease";
-import { DEFAULT_TIMEOUT_S, alive, audit, decideLaunch, ensureDirs, jobTypeOf, jobsDir, memoryAction, orphanVerdict, parseDuration, readAudit, readJobs, readPressure, stateDir, writeJob, type JobRecord } from "./lib";
+import { DEFAULT_TIMEOUT_S, alive, audit, decideLaunch, ensureDirs, etimeSeconds, jobTypeOf, jobsDir, memoryAction, findStrays, orphanVerdict, parseDuration, parsePs, readAudit, readJobs, readPressure, stateDir, writeJob, type JobRecord } from "./lib";
 
 const repoRoot = resolve(import.meta.dir, "..", "..");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -192,7 +192,7 @@ function orphans(stop: boolean): number {
     const cwd = spawnSync("/usr/sbin/lsof", ["-a", "-d", "cwd", "-p", m[1]!, "-Fn"], { encoding: "utf-8" }).stdout?.split("\n").find((l) => l.startsWith("n"))?.slice(1);
     if (cwd && /\/(\.claude\/worktrees|wt)\//.test(cwd) && !existsSync(cwd)) found.push({ pid: Number(m[1]), why: `unrecorded dev server, folder gone: ${cwd}` });
   }
-  if (!found.length) { console.log("no orphan dev servers"); return 0; }
+  if (!found.length) { console.log("no orphan dev servers"); return strays(stop); }
   for (const f of found) {
     console.log(`${f.pid}  ${f.why}${f.recorded ? "" : "  (not started by job.sh: listed only)"}`);
     if (stop && f.recorded) {
@@ -204,8 +204,48 @@ function orphans(stop: boolean): number {
       }
     }
   }
+  return strays(stop);
+}
+
+const cwdOfPid = (pid: number): string | undefined => spawnSync("/usr/sbin/lsof", ["-a", "-d", "cwd", "-p", String(pid), "-Fn"], { encoding: "utf-8" }).stdout?.split("\n").find((l) => l.startsWith("n"))?.slice(1);
+const psRows = () => parsePs(spawnSync("/bin/ps", ["-axo", "pid=,ppid=,pgid=,etime=,command="], { encoding: "utf-8" }).stdout ?? "");
+const fmtAge = (s: number): string => (s >= 3600 ? `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}m`);
+
+/**
+ * GUARD-STRAY-01: unmanaged test runs (`bun test` / `bun run test*` started outside job.sh) in a wt/ worktree or a warm checkout that have run
+ * longer than MAIPAI_STRAY_TEST_MINUTES (30). Listing is always safe; --stop signals only those exact pids (TERM, KILL after 5 s) and audits each.
+ */
+function strays(stop: boolean): number {
+  const limitS = num(process.env.MAIPAI_STRAY_TEST_MINUTES, 30) * 60;
+  const managed = new Set(readJobs().filter((j) => alive(j.pid)).map((j) => j.pgid));
+  const found = findStrays(psRows(), managed, cwdOfPid, limitS);
+  if (!found.length) { console.log("no stray test runs"); return 0; }
+  for (const s of found) {
+    console.log(`${s.pid}  stray test run, ${fmtAge(s.ageS)}  (${s.cwd})  ${s.command.slice(0, 100)}${stop ? "" : "  (listed only; --stop stops it)"}`);
+    if (!stop) continue;
+    const still = spawnSync("/bin/ps", ["-o", "command=", "-p", String(s.pid)], { encoding: "utf-8" }).stdout.trim();
+    if (still !== s.command.trim()) { console.log("  changed since the scan: left alone"); continue; }
+    try { process.kill(s.pid, "SIGTERM"); } catch { /* gone */ }
+    const until = Date.now() + 5000; while (alive(s.pid) && Date.now() < until) Bun.sleepSync(100);
+    const killed = alive(s.pid); if (killed) { try { process.kill(s.pid, "SIGKILL"); } catch { /* gone */ } }
+    audit({ session: "stray-guard", command: s.command, worktree: s.cwd, trigger: `unmanaged test run, ${fmtAge(s.ageS)} old (limit ${limitS / 60} min)`, action: "stray-stopped", detail: `pid ${s.pid}${killed ? " (KILL)" : ""}` });
+    console.log(`  stopped (pid ${s.pid}${killed ? ", KILL" : ""})`);
+  }
   return 0;
 }
+
+/** The busiest processes by CPU right now (pid, age, cwd, command), for the lander's timeout line. */
+function topCpu(n: number): number {
+  const out = spawnSync("/bin/ps", ["-axo", "pid=,pcpu=,etime=,command=", "-r"], { encoding: "utf-8" }).stdout ?? "";
+  let shown = 0;
+  for (const l of out.split("\n")) {
+    const m = /^\s*(\d+)\s+([\d.]+)\s+(\S+)\s+(.*)$/.exec(l); if (!m || Number(m[1]) === process.pid || /\bps -axo\b/.test(m[4]!)) continue;
+    console.log(`busiest: pid ${m[1]} ${m[2]}% cpu, ${fmtAge(etimeSeconds2(m[3]!))}, ${cwdOfPid(Number(m[1])) ?? "?"}, ${m[4]!.slice(0, 100)}`);
+    if (++shown >= n) break;
+  }
+  return 0;
+}
+const etimeSeconds2 = (v: string): number => etimeSeconds(v) ?? 0;
 
 /** The pid a dev pid file holds, or null when the file is missing or empty. */
 function pidIn(file: string): number | null { try { const v = Number(readFileSync(file, "utf-8").trim()); return Number.isInteger(v) && v > 1 ? v : null; } catch { return null; } }
@@ -262,6 +302,8 @@ if (sub === "run") process.exit(await run(rest));
 else if (sub === "list") { for (const j of readJobs().sort((a, b) => a.startedAt - b.startedAt)) console.log(`${j.id}  ${j.state.padEnd(10)} ${j.type.padEnd(6)} ${j.session}  ${j.command}${j.until ? `  until ${new Date(j.until * 1000).toISOString()}` : ""}`); }
 else if (sub === "audit") { for (const a of readAudit().slice(-(Number(rest[0]) || 30))) console.log(JSON.stringify(a)); }
 else if (sub === "orphans") process.exit(orphans(rest.includes("--stop")));
+else if (sub === "strays") process.exit(strays(rest.includes("--stop")));
+else if (sub === "top-cpu") process.exit(topCpu(Number(rest[0]) || 3));
 else if (sub === "reap") process.exit(reap(rest.includes("--dry-run")));
-else { console.error("usage: job.sh run [--type test|build|server|other] [--timeout D] [--lifetime D] [--session S] [--max-rss-mb N] -- <command...>\n       job.sh list | audit [n] | orphans [--stop] | reap [--dry-run]"); process.exit(2); }
+else { console.error("usage: job.sh run [--type test|build|server|other] [--timeout D] [--lifetime D] [--session S] [--max-rss-mb N] -- <command...>\n       job.sh list | audit [n] | orphans [--stop] | strays [--stop] | top-cpu [n] | reap [--dry-run]"); process.exit(2); }
 }

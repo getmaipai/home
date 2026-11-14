@@ -96,6 +96,21 @@ through the launcher, returns it. Also `take --manual`, `extend`, `acquire` / `r
   wait for it and held ones are told to yield. It never queues, caps or slows a turn, and a failed write is ignored. In direct mode it
   changes nothing.
 
+## Stray test runs (GUARD-STRAY-01, 2026-11-13)
+
+A raw `bun test` started outside `job.sh` has no timeout and no process group, so it can run for hours at full CPU and starve the
+lander's gate (2026-11-13: three such runs held the load above 8 and the safety-surface tests hit their 2400 s bound twice).
+
+- **What is scanned.** `bash scripts/jobs/job.sh orphans` (and `job.sh strays`) lists any process whose command is `bun test ...` or
+  `bun run test*`, whose working directory is under a `wt/` or `.claude/worktrees/` worktree or the `home-lander` / `home-watcher` warm
+  checkouts, that is not in a recorded `job.sh` process group, that has no `lander.sh` or `watcher.sh` ancestor, and that has run longer
+  than `MAIPAI_STRAY_TEST_MINUTES` (default 30).
+- **`--stop`.** Stops only those exact pids (TERM, then KILL after 5 s, only if the command still matches the scan), and writes one
+  `stray-stopped` audit line per pid with its cwd and age. It never matches by pattern and never touches a process outside those folders.
+- **The lander.** Before an entry's safety-surface tests start, the lander runs `job.sh strays --stop` and writes one line per pid into
+  the entry's output. When a bounded step times out, the three busiest processes (pid, cpu, age, cwd, command) sampled 10 s before the
+  limit are added to the bounce reason, so the cause is named.
+
 ## The end-user line: "Chat is unavailable while the system upgrades."
 
 Two writers, one path rule (`MAIPAI_MAINTENANCE_FLAG`, else `$MAIPAI_DATA_DIR/local-app/maintenance.json`, else the live install's

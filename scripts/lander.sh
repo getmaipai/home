@@ -353,12 +353,36 @@ safety_surface_files() {
 bounded_step() {
   local secs="$1" label="$2" out="$3" rc=0
   shift 3
+  # GUARD-STRAY-01: a sampler writes the three busiest processes just before the limit, so a timeout names its cause.
+  local sampler="" top="$out.top" jobsh="${main:-.}/scripts/jobs/job.sh"
+  [[ -f "$jobsh" ]] || jobsh="${checkout:-.}/scripts/jobs/job.sh"
+  rm -f "$top"
+  if (( secs > 20 )) && [[ -f "$jobsh" ]]; then
+    ( sleep $(( secs - 10 )); bash "$jobsh" top-cpu 3 >"$top" 2>/dev/null ) >/dev/null 2>&1 &
+    sampler=$!
+  fi
   bounded_run "$secs" "$label" "$@" >"$out" 2>&1 || rc=$?
-  if (( rc == 124 )); then echo "timed out after ${secs}s: $label" >>"$out"; fi
+  [[ -z "$sampler" ]] || { kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true; }
+  if (( rc == 124 )); then
+    [[ ! -s "$top" ]] || cat "$top" >>"$out"
+    echo "timed out after ${secs}s: $label" >>"$out"
+  fi
+  rm -f "$top"
   return "$rc"
 }
 
 timeout_note() { tail -n 1 "$1" 2>/dev/null | grep -E '^timed out after ' || true; }
+# The busiest-process lines bounded_step captured before a timeout, as one "; busiest: ..." tail for the bounce text (empty otherwise).
+culprit_note() { [[ -n "$(timeout_note "$1")" ]] || return 0; grep -E '^busiest: ' "$1" 2>/dev/null | sed 's/^busiest: //' | paste -sd '|' - | sed 's/|/ ; /g; s/^/; busiest at timeout: /' || true; }
+
+# GUARD-STRAY-01: unmanaged test runs (raw `bun test` in a wt/ worktree or warm checkout, older than MAIPAI_STRAY_TEST_MINUTES) are dev
+# leftovers; stop them before the safety tests start and write one line per pid into the entry's output.
+stop_stray_tests() {
+  local out="$1" jobsh="${main:-.}/scripts/jobs/job.sh"
+  [[ -f "$jobsh" ]] || jobsh="${checkout:-.}/scripts/jobs/job.sh"
+  [[ -f "$jobsh" ]] || return 0
+  bash "$jobsh" strays --stop 2>&1 | grep -v '^no stray test runs' | sed 's/^/stray test run: /' >>"$out" || true
+}
 
 run_t2_tests() {
   local output="$1" command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
@@ -422,7 +446,7 @@ express_refusal() {
 static_check_reason() {
   local output="$1" last_line note
   note="$(timeout_note "$output")"
-  if [[ -n "$note" ]]; then printf 'static check %s' "$note"; return; fi
+  if [[ -n "$note" ]]; then printf 'static check %s%s' "$note" "$(culprit_note "$output")"; return; fi
   last_line="$(sed -n '/^== /p' "$output" | tail -n 1 | sed 's/^== //')"
   printf 'static check failed%s' "${last_line:+ at $last_line}"
 }
@@ -959,12 +983,15 @@ PY
       fi
       t2_started="$(date +%s)"
       phase "safety-surface tests"
+      stop_stray_tests "$output.stray"
       run_t2_tests "$output" || t2_rc=$?
+      if [[ -s "$output.stray" ]]; then cat "$output" >>"$output.stray" && mv "$output.stray" "$output"; fi
+      rm -f "$output.stray"
       if (( t2_rc == 75 )); then
         hold_entry "$request" "$branch" "deferred (memory): $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')"; rm -f "$output"; return 0
       fi
       if (( t2_rc != 0 )); then
-        reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)"
+        reason="safety-surface tests failed$(timeout_note "$output" | sed 's/^/ (/; s/$/)/'): $(printf '%s' "$safety_files" | paste -sd ', ' -)$(culprit_note "$output")"
         bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
       fi
       t2_seconds=$(( $(date +%s) - t2_started ))
