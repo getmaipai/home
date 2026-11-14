@@ -63,6 +63,7 @@ import { getDeviceState } from "@/lib/deviceStates";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
 import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
+import { fetchSceneWeatherForContext } from "@/lib/sceneWeather";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
 import type { Surface, SpeakerEvidence } from "@/lib/turnShared";
@@ -91,7 +92,7 @@ export async function fitSceneBlock(text: string, required: string, count: (valu
 }
 async function fitSceneBlockMeasured(text: string, required: string, count: (value: string) => Promise<number | null>, limit = SCENE_RENDER_TOKEN_LIMIT): Promise<{ text: string; tokens: number }> {
   let candidate = text;
-  const optional = [/ Ambient events:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
+  const optional = [/ Ambient events:[^.]*\./, / Weather change:[^.]*\./, / Weather here:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
   for (const pattern of optional) {
     const measured = await count(candidate);
     if (measured === null) return { text: required, tokens: 0 };
@@ -135,6 +136,15 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   } else lines.push("No other person is known to be here.");
   lines.push(scene.alone_observed && scene.alone ? "Alone: positively observed." : scene.alone ? "Alone: not confirmed." : "Other people are present.");
   lines.push(scene.child_present ? "A child is in the room." : "No child is known to be in the room.");
+  const weather = scene.weather as import("@/lib/scene").WeatherCue | null;
+  if (weather && weather.expires_at > now) {
+    const elapsed = Math.max(0, now - weather.checked_at);
+    const checked = elapsed < 60_000 ? "just now" : elapsed < 5 * 60_000 ? "a few minutes ago" : "a while ago";
+    if (weather.change) lines.push(`Weather change: ${weather.change}.`);
+    const temperature = weather.temp_f !== undefined ? `${weather.temp_f} F` : `${weather.temp_c} C`;
+    lines.push(`Weather here: ${temperature}, ${weather.precipitation}, wind ${Math.round(weather.wind_mph)} mph (checked ${checked}).`);
+    if (scene.place?.setting === "outdoor") lines.push("Setting: outdoors.");
+  }
   const place = scene.place;
   if (place && (place.where !== "unknown" || place.area)) lines.push(`Place: ${place.where === "home" ? "at home" : place.where === "away" ? "away" : ""}${place.setting !== "unknown" ? `${place.where !== "unknown" ? ", " : ""}${place.setting === "indoor" ? "indoors" : place.setting}` : ""}${place.area ? `${place.where !== "unknown" || place.setting !== "unknown" ? ", " : ""}${place.area}` : ""}.`);
   return lines.join(" ");
@@ -269,6 +279,10 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const speakerForScene = sceneSpeakerForTurn(state.surface, state.actor.id, state.speakerEvidence);
   const roomDevice = state.deviceId ? getDeviceById(state.deviceId) : null;
   const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
+  currentScene.weather = null;
+  if (!state.bare) {
+    currentScene.weather = await fetchSceneWeatherForContext({ conversationId: conversation.id, actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, now: sceneNow });
+  }
   setScene(currentScene, sceneNow);
 
   const items: ContextItem[] = [];

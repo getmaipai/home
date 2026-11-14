@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, sceneForTests, type FusedScene } from "@/lib/scene";
+import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, sceneForTests, getWeatherCue, setWeatherCue, setWeatherFailure, type FusedScene } from "@/lib/scene";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
@@ -11,6 +11,35 @@ const obs = (kind: SceneObservation["kind"], value: unknown, sensor: SceneObserv
 const empty = (conversation_id = "conversation-1"): FusedScene => sceneForTests({ conversation_id });
 
 describe("scene fusion", () => {
+  test("weather cache reuses a rounded point within TTL and invalidates on movement, source, or expiry", () => {
+    clearScenes();
+    const cue = { temp_f: 41, sky: "rainy", precipitation: "rain", wind_mph: 12, change: null, checked_at: 100, expires_at: 1_800_100, source: "current" as const };
+    setWeatherCue("weather-convo", cue, { lat: 40.71, lon: -74.01 });
+    expect(getWeatherCue("weather-convo", { lat: 40.72, lon: -74 }, "current", 200)).toEqual(cue);
+    expect(getWeatherCue("weather-convo", { lat: 40.74, lon: -74.01 }, "current", 200)).toBeNull();
+    setWeatherCue("weather-convo", cue, { lat: 40.71, lon: -74.01 });
+    expect(getWeatherCue("weather-convo", { lat: 40.71, lon: -74.01 }, "home", 200)).toBeNull();
+    setWeatherCue("weather-convo", cue, { lat: 40.71, lon: -74.01 });
+    expect(getWeatherCue("weather-convo", { lat: 40.71, lon: -74.01 }, "current", cue.expires_at)).toBeNull();
+  });
+  test("a failed weather fetch is held silent until its retry TTL", () => {
+    clearScenes();
+    const point = { lat: 40.71, lon: -74.01 };
+    setWeatherFailure("failed-weather", point, "current", 100);
+    expect(getWeatherCue("failed-weather", point, "current", 101)).toBe(false);
+    expect(getWeatherCue("failed-weather", point, "current", 30 * 60_000 + 100)).toBeNull();
+  });
+  test("weather renders facts only, never coordinates, and outside adds the stated setting", () => {
+    const at = 1_000_000;
+    const actor = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const scene = sceneForTests({ ...empty(), place: { where: "away", setting: "outdoor", area: null, precision: "area", basis: "typed", expires_at: at + 1 }, weather: { temp_f: 41, sky: "rainy", precipitation: "rain", wind_mph: 12, change: null, checked_at: at - 4 * 60_000, expires_at: at + 1, source: "current" } });
+    const rendered = renderScene(scene, at, actor, [actor]);
+    expect(rendered).toContain("Weather here: 41 F, rain, wind 12 mph (checked a few minutes ago)");
+    expect(rendered).toContain("Setting: outdoors.");
+    expect(rendered).not.toMatch(/40\.71|-74\.01/);
+    expect(renderScene({ ...scene, place: { ...scene.place!, setting: "indoor" } }, at, actor, [actor])).not.toContain("said they are outside");
+    expect(renderScene({ ...scene, weather: { ...scene.weather as object, expires_at: at } }, at, actor, [actor])).not.toContain("Weather here:");
+  });
   test("context trace scene counts contain the measured token count and no identity fields", () => {
     const trace = new TraceRecorder();
     trace.record("context", "context", "v1", 1, 2, { ok: true });

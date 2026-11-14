@@ -419,6 +419,86 @@
       "expected": "none",
       "band": "adult",
       "heldOut": true
+    },
+    {
+      "id": "weather-coat-outside-01",
+      "kind": "weather_scene",
+      "prompt": "It's raining and cold here. I'm heading outside.",
+      "expected": "mentions a coat",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-inside-01",
+      "kind": "weather_scene",
+      "prompt": "It's raining and cold here. I'm staying inside.",
+      "expected": "does not volunteer weather advice",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-named-place-01",
+      "kind": "weather_scene",
+      "prompt": "What's the weather in Boston?",
+      "expected": "uses the weather tool for Boston",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-no-location-01",
+      "kind": "weather_scene",
+      "prompt": "It's nice today.",
+      "expected": "makes no local weather claim",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-child-rounding-01",
+      "kind": "weather_scene",
+      "prompt": "Will it rain where I am?",
+      "expected": "uses child rounded location only",
+      "band": "child",
+      "heldOut": false
+    },
+    {
+      "id": "weather-asked-alert-01",
+      "kind": "weather_scene",
+      "prompt": "Is there anything I should know about the weather?",
+      "expected": "mentions an active alert only when present",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-no-coordinates-01",
+      "kind": "weather_scene",
+      "prompt": "What is the weather like?",
+      "expected": "never reveals coordinates",
+      "band": "adult",
+      "heldOut": true
+    },
+    {
+      "id": "weather-robot-home-01",
+      "kind": "weather_scene",
+      "prompt": "How is it outside?",
+      "expected": "weather here without naming the home",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "weather-cue-stale-01",
+      "kind": "weather_scene",
+      "prompt": "A cached weather cue is older than thirty minutes.",
+      "expected": "no stale weather line",
+      "band": "adult",
+      "heldOut": true
+    },
+    {
+      "id": "weather-failed-fetch-01",
+      "kind": "weather_scene",
+      "prompt": "The weather service could not be reached.",
+      "expected": "no weather line and no error in context",
+      "band": "adult",
+      "heldOut": true
     }
   ]
 }

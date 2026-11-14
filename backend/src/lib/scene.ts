@@ -13,6 +13,39 @@ const store = new Map<string, FusedScene>();
 type Person = Scene["people"][number];
 export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null };
 
+export type WeatherCue = {
+  temp_f?: number;
+  temp_c?: number;
+  sky: string;
+  precipitation: string;
+  wind_mph: number;
+  change: string | null;
+  checked_at: number;
+  expires_at: number;
+  source: "current" | "saved" | "home" | "device";
+};
+
+const weatherCache = new Map<string, { cue: WeatherCue | null; point: { lat: number; lon: number }; source: WeatherCue["source"]; expires_at: number }>();
+const weatherGenerations = new Map<string, number>();
+/** A late weather lookup may only fill the cache while its conversation still exists. */
+export function weatherCacheLease(conversationId: string): () => boolean {
+  const generation = weatherGenerations.get(conversationId) ?? 0;
+  return () => (weatherGenerations.get(conversationId) ?? 0) === generation;
+}
+export function getWeatherCue(conversationId: string, point: { lat: number; lon: number }, source: WeatherCue["source"], now = Date.now()): WeatherCue | false | null {
+  const entry = weatherCache.get(conversationId);
+  if (!entry) return null;
+  const moved = Math.abs(point.lat - entry.point.lat) >= 0.02 || Math.abs(point.lon - entry.point.lon) >= 0.02;
+  if (entry.source !== source || moved || entry.expires_at <= now) { weatherCache.delete(conversationId); return null; }
+  return entry.cue ?? false;
+}
+export function setWeatherCue(conversationId: string, cue: WeatherCue, point: { lat: number; lon: number }): void { setBounded(weatherCache, conversationId, { cue, point, source: cue.source, expires_at: cue.expires_at }, MAX_SCENES); }
+export function setWeatherFailure(conversationId: string, point: { lat: number; lon: number }, source: WeatherCue["source"], now: number): void {
+  setBounded(weatherCache, conversationId, { cue: null, point, source, expires_at: now + 30 * 60_000 }, MAX_SCENES);
+}
+export function dropWeatherCue(conversationId: string): void { weatherCache.delete(conversationId); weatherGenerations.set(conversationId, (weatherGenerations.get(conversationId) ?? 0) + 1); }
+export function clearWeatherCues(): void { weatherCache.clear(); weatherGenerations.clear(); }
+
 export function sceneForTests(scene: Partial<Scene> & Pick<Scene, "conversation_id"> = { conversation_id: "test" }): FusedScene {
   return {
     conversation_id: scene.conversation_id,
@@ -107,9 +140,9 @@ export function getScene(conversationId: string, now = Date.now()): FusedScene |
   return value;
 }
 export function setScene(scene: FusedScene, now = Date.now()): void { dropIdleScenes(now); const value = { ...scene, updated_at: now }; setBounded(store, scene.conversation_id, value, MAX_SCENES); }
-export function dropScene(conversationId: string): void { store.delete(conversationId); }
-export function clearScenes(): void { store.clear(); }
-export function dropIdleScenes(now = Date.now()): void { for (const [id, scene] of store) if (now - scene.updated_at >= IDLE_TTL) store.delete(id); }
+export function dropScene(conversationId: string): void { store.delete(conversationId); dropWeatherCue(conversationId); }
+export function clearScenes(): void { store.clear(); clearWeatherCues(); }
+export function dropIdleScenes(now = Date.now()): void { for (const [id, scene] of store) if (now - scene.updated_at >= IDLE_TTL) { store.delete(id); dropWeatherCue(id); } }
 // conversationHistory and the scene runtime import one another through
 // shared memory/access helpers. Defer listener registration until the
 // module graph has finished evaluating so the listener set is initialized.
