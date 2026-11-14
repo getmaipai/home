@@ -1318,6 +1318,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
 | `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, animatedFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
+| `backend/src/lib/videos/moments.ts` | MOMENT_PREFIX, MOMENT_GONE_PREFIX, MOMENT_CAP, momentsOf, addMoment, removeMoment |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
 | `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, FIRST_FRAME_PHASE, phaseLabel |
 | `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
