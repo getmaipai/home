@@ -373,7 +373,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, toolStatusMoment(tool), state.persona), stage: "tool" });
 
     if (tool === "scene") {
-      const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), observe: observeSceneClaims });
+      const outcome = runSceneTool({ actor: state.actor, args: args as Record<string, unknown>, callId, conversationId: state.conversationId, speakerId: state.speakerEvidence?.person, roster: listActivePeople(), scene: getScene(state.conversationId), surface: state.surface, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), deviceId: state.deviceId, speakerEvidence: state.speakerEvidence, observe: observeSceneClaims });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
       continue;

@@ -3,6 +3,7 @@ import type { PersonRow } from "@/types";
 import { cleanSceneLabel, runSceneTool, sceneObservations, sceneToolStreamArgs } from "@/lib/sceneTool";
 import { fuseScene, sceneForTests } from "@/lib/scene";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
+import { isSuppressed, resume as resumeHold, __resetForTests } from "@/lib/sceneSuppression";
 
 const person = (id: string, displayName: string, role: string, birthdate?: string) => ({ id, displayName, role, birthdate, createdAt: 1, updatedAt: 1 } as unknown as PersonRow);
 const owner = person("person-owner123", "Sage", "owner");
@@ -98,5 +99,28 @@ describe("SCENE-01c typed guest and pet leaving", () => {
     const seen = fuseScene(withGuest, [{ id: "f", source: { surface: "robot", device_id: null, sensor: "face" }, kind: "person_here", value: { person_id: null, label: "Juniper", relation: "guest", band: "unknown", level: "confirmed" }, confidence: 0.9, strength: "strong", at: 102, expires_at: 102 + 90_000 }], 102);
     const refused = sceneObservations({ action: "left", label: "Juniper" }, owner, "g", null, 103, [owner, adult], seen);
     expect(refused.observations).toHaveLength(0);
+  });
+});
+
+describe("DISMISS-01 model scene actions", () => {
+  test("dismiss is performed only by the tool call and stores only generic result text", () => {
+    __resetForTests();
+    const result = runSceneTool({ actor: child, args: { action: "dismiss", reason: "handled", kind: "dog_bark", scope: "room" }, callId: "d1", conversationId: "d", speakerId: null, roster: [child], surface: "chat", actorBand: "child", observe: () => undefined });
+    expect(isSuppressed({ kind: "dog_bark", personId: child.id, now: Date.now() })).toBe(true);
+    expect(result.result.reply.text).toContain("for you only");
+    expect(JSON.stringify(result)).not.toMatch(/dog_bark|handled|person-child123|room/i);
+  });
+
+  test("party is adult only and resume clears the actor self hold without affecting another person", () => {
+    __resetForTests();
+    runSceneTool({ actor: child, args: { action: "dismiss", reason: "handled", kind: "doorbell" }, callId: "d2", conversationId: "d", roster: [child], surface: "chat", actorBand: "child", observe: () => undefined });
+    const refused = runSceneTool({ actor: child, args: { action: "party" }, callId: "d3", conversationId: "d", roster: [child], surface: "chat", actorBand: "child", observe: () => undefined });
+    expect(refused.result.reply.text).toContain("Only a confirmed adult");
+    runSceneTool({ actor: owner, args: { action: "dismiss", reason: "other", kind: "doorbell", scope: "self" }, callId: "d4", conversationId: "d", roster: [owner], surface: "chat", actorBand: "adult", observe: () => undefined });
+    const resumed = runSceneTool({ actor: child, args: { action: "resume" }, callId: "d5", conversationId: "d", roster: [child], surface: "chat", actorBand: "child", observe: () => undefined });
+    expect(resumed.result.reply.text).toBe("Done: listening again.");
+    expect(isSuppressed({ kind: "doorbell", personId: child.id, now: Date.now() })).toBe(false);
+    expect(isSuppressed({ kind: "doorbell", personId: owner.id, now: Date.now() })).toBe(true);
+    resumeHold({ byConfirmedAdult: false });
   });
 });

@@ -1,7 +1,10 @@
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import type { FusedScene } from "@/lib/scene";
-import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
+import { dismiss as suppressScene, resume as resumeScene, type SuppressionKind, type SuppressionScope } from "@/lib/sceneSuppression";
+import { applyAlarmAction, listActiveSafetyAlarms } from "@/lib/safetyAlarm";
+import { getDeviceById } from "@/lib/devices";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 export const SCENE_TOOL_ID = "scene";
 
@@ -44,7 +47,51 @@ export function sceneObservations(args: Record<string, unknown>, actor: PersonRo
   return { observations };
 }
 
-export function runSceneTool(input: { actor: PersonRow; args: Record<string, unknown>; callId: string; conversationId: string; speakerId?: string | null; roster: readonly PersonRow[]; scene?: FusedScene | null; surface: SceneObservation["source"]["surface"]; actorBand: "child" | "teen" | "adult"; observe: (conversationId: string, observations: readonly SceneObservation[]) => unknown }) {
+export function runSceneTool(input: { actor: PersonRow; args: Record<string, unknown>; callId: string; conversationId: string; speakerId?: string | null; roster: readonly PersonRow[]; scene?: FusedScene | null; surface: SceneObservation["source"]["surface"]; actorBand: "child" | "teen" | "adult"; deviceId?: string; speakerEvidence?: { person: string | null; basis: string; level: string } | null; observe: (conversationId: string, observations: readonly SceneObservation[]) => unknown }) {
+  const { action } = input.args;
+  if (action === "dismiss" || action === "resume" || action === "party") {
+    const evidence = input.speakerEvidence;
+    const confirmedAdult = input.actorBand === "adult" && ((!evidence && (input.surface === "chat" || input.surface === "phone")) ||
+      (!!evidence && evidence.person === input.actor.id && evidence.level === "confirmed" && ["signed_in", "voice", "face", "voice_and_face"].includes(evidence.basis)));
+    const device = input.deviceId ? getDeviceById(input.deviceId) : null;
+    const room = device?.area ?? null;
+    const now = Date.now();
+    let line = "I couldn't change that.";
+    if (action === "resume") {
+      resumeScene({ personId: input.actor.id, deviceId: input.deviceId, room, byConfirmedAdult: confirmedAdult, byPersonId: input.actor.id });
+      line = "Done: listening again.";
+    } else if (action === "party") {
+      if (!confirmedAdult) line = "Only a confirmed adult can set that household context.";
+      else {
+        for (const kind of ["music_or_tv", "shouting"] as const) suppressScene({ kind, scope: "household", reason: "party", personId: input.actor.id, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: true });
+        line = "Done: I will ignore those sounds for everyone here for four hours.";
+      }
+    } else {
+      // A sounding hardware alarm takes precedence over every model supplied selector.
+      const active = listActiveSafetyAlarms();
+      const matching = room ? active.filter((alarm) => alarm.area === room) : [];
+      const alarm = matching.length === 1 ? matching[0] : active.length === 1 ? active[0] : undefined;
+      // A heard-sound dismissal (a kind is given) never acknowledges a sounding hardware alarm: only a dismissal with no kind is about the alarm.
+      const aboutSound = typeof input.args.kind === "string" && input.args.kind.length > 0;
+      if (alarm && !aboutSound) {
+        if (input.args.reason === "false_alarm") line = "I can't mark a sensor alarm as a false alarm here.";
+        else if (confirmedAdult) {
+          const result = applyAlarmAction(input.actor.id, alarm.id, "acknowledge");
+          line = result.ok ? "Done: the alarm is acknowledged." : "I couldn't dismiss that alarm.";
+        } else if (input.surface === "robot" && input.deviceId && device?.kind === "robot") {
+          const result = applyAlarmAction(input.actor.id, alarm.id, "quiet_here", input.deviceId);
+          line = result.ok ? "Done: the alarm is quiet on this robot for you only." : "I couldn't dismiss that alarm.";
+        } else line = "I couldn't dismiss that alarm for this speaker.";
+      } else if (input.args.kind && typeof input.args.kind === "string") {
+      const requested = input.args.scope as SuppressionScope | undefined;
+      const scope: SuppressionScope = !confirmedAdult ? "self" : requested ?? (room ? "room" : "device");
+      const result = suppressScene({ kind: input.args.kind as SuppressionKind, reason: input.args.reason as "media" | "handled" | "false_alarm" | "party" | "other", scope, personId: input.actor.id, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult });
+      if (result.ok && result.until) line = `Done: I will ignore that until ${new Date(result.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${scope === "self" ? "for you only" : scope === "household" ? "for everyone here" : scope === "room" ? "in this room" : "on this device"}.`;
+      else line = "I can't set that dismissal for this speaker.";
+      } else line = "There isn't one active alarm here that I can dismiss.";
+    }
+    return { callId: input.callId, packageId: SCENE_TOOL_ID, status: "succeeded" as const, via: "tool_call" as const, args: {}, result: { reply: { text: line }, actions: [] }, durationMs: 0 };
+  }
   const { observations, line } = sceneObservations(input.args, input.actor, input.conversationId, input.speakerId, Date.now(), input.roster, input.scene, input.surface, input.actorBand);
   if (observations.length) input.observe(input.conversationId, observations);
   return { callId: input.callId, packageId: SCENE_TOOL_ID, status: "succeeded" as const, via: "tool_call" as const, args: {}, result: { reply: { text: line ?? "Scene noted." }, actions: [] }, durationMs: 0 };

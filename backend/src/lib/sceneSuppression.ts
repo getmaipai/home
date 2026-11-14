@@ -94,13 +94,16 @@ export function shouldReAlert(input: { kind: SuppressionKind; deviceId?: string 
   return true;
 }
 
-export function resume(input: { kind?: SuppressionKind; deviceId?: string | null; personId?: string | null; byConfirmedAdult: boolean; byPersonId?: string | null }): number {
+export function resume(input: { kind?: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; byConfirmedAdult: boolean; byPersonId?: string | null }): number {
   let cleared = 0;
   for (const [id, h] of holds) {
     if (input.kind && h.kind !== input.kind) continue;
-    const allowed = input.byConfirmedAdult || (!!input.byPersonId && input.byPersonId === h.personId);
+    const constrainedAdult = input.deviceId || input.room;
+    const allowed = (!!input.byPersonId && input.byPersonId === h.personId) || (input.byConfirmedAdult && (!constrainedAdult ||
+      ((h.scope === "device" && !!input.deviceId && h.deviceId === input.deviceId) || (h.scope === "room" && !!input.room && h.room === input.room))));
     if (!allowed) continue;
     if (input.deviceId && h.scope === "device" && h.deviceId !== input.deviceId) continue;
+    if (input.room && h.scope === "room" && h.room !== input.room) continue;
     if (input.personId && h.scope === "self" && h.personId !== input.personId) continue;
     holds.delete(id); cleared++;
   }
