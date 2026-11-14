@@ -199,4 +199,16 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
+  // VOICE-MATCH-01: a person's own opt-in to compare their voice with their own recorded samples (spec 0.1.400).
+  SettingsKey.parse({
+    key: "person.voice.match",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Match my voice when I talk to Home",
+    help: "When this is on, Home compares your voice with the voice samples you recorded for yourself, only to check it is really you. It never searches other people's voices, and nothing about the comparison is kept. You also need to record a few samples first.",
+    level: "advanced",
+    lives_in: "person.privacy",
+    honoured_by: ["home"],
+  }),
 ];
