@@ -70,7 +70,7 @@ function madeForYou(person: PersonRow) {
   return order.slice(0, MAX_MIXES).map((entry) => {
     const top = [...entry.items].sort((a, b) => plays.get(b.id)! - plays.get(a.id)! || a.id.localeCompare(b.id));
     const cover = top.find((item) => item.artwork) ?? top[0]!;
-    return { ...rowsOf(person, [cover])[0]!, id: `radio:${entry.seed}:${entry.key}`, title: `${entry.label} mix`, channel: null, kind: "track" as const, queue_mode: "radio" };
+    return { ...rowsOf(person, [cover])[0]!, id: `radio:${entry.seed}:${entry.key}`, title: `${entry.label} mix`, channel: entry.seed === "genre" ? `The ${entry.label} songs you play most, with more like them.` : `${entry.label} and more music like it, picked from what you play.`, kind: "track" as const, queue_mode: "radio" };
   });
 }
 

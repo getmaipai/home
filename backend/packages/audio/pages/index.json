@@ -72,7 +72,6 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "density": "compact",
       "on_select": {
         "navigate": {
           "to": "/apps/audio/album",
