@@ -21,6 +21,8 @@ import { studioAddress } from "@/shell/pages/musicAddresses";
 import { musicPlayer, useMusicClock, useMusicPlayer, useMusicVolume } from "./musicPlayer";
 import type { Track } from "./musicQueue";
 import { WaveformSeek, usePeaks } from "./WaveformSeek";
+import { MusicQueueDrawer } from "./MusicQueuePane";
+import { isMusicTab, musicPane, QUEUE_TAB, useMusicPane, type MusicPaneTab } from "./musicPane";
 
 const icon = (name: string, className?: string) => { const One = getIcon(name); return <One aria-hidden="true" {...(className ? { className } : {})} />; };
 
@@ -78,6 +80,12 @@ function PlayModeButtons() {
   </>;
 }
 
+/** SF-08c: the queue button. It asks the shell's one right pane for the Queue tab; with no pane to give, the bar opens a drawer (see MusicPlayerBar). */
+function QueueButton({ open, onPress }: { open: boolean; onPress: () => void }) {
+  const label = i18n._({ id: "Queue", message: "Queue" });
+  return <Button type="button" variant="ghost" size="icon" aria-label={label} title={label} aria-pressed={open} className={open ? "text-primary" : undefined} data-testid="music-bar-queue" onClick={onPress}>{icon("list-music")}</Button>;
+}
+
 function VolumeControl() {
   const { volume, muted } = useMusicVolume();
   const level = muted ? 0 : volume;
@@ -109,6 +117,8 @@ export function MusicPlayerBar() {
   const snap = useMusicPlayer();
   const mode = usePlayMode();
   const [expanded, setExpanded] = useState(false);
+  const pane = useMusicPane();
+  const [drawer, setDrawer] = useState<MusicPaneTab | null>(null);
   const held = dock.current;
   const track = snap.track;
 
@@ -118,6 +128,13 @@ export function MusicPlayerBar() {
   const heldStarted = !!held?.started;
   useEffect(() => { if (heldStarted && !musicPlayer.get().playing) musicPlayer.stop(); }, [heldStarted]);
   useEffect(() => { if (!track) setExpanded(false); }, [track]);
+  // Closing the player closes its queue drawer too; the shell pane keeps its own state.
+  useEffect(() => { if (!track) setDrawer(null); }, [track]);
+  const pressQueue = () => {
+    if (pane.hosted && !phone) { musicPane.request(QUEUE_TAB); return; }
+    setDrawer((open) => (open ? null : QUEUE_TAB));
+  };
+  const queueOpen = drawer !== null || (pane.hosted && !phone && pane.tab !== null);
   useEffect(() => {
     if (snap.notice) push(i18n._({ id: "This song could not be played. Check the file and try again.", message: "This song could not be played. Check the file and try again." }));
   }, [snap.notice, push]);
@@ -143,6 +160,7 @@ export function MusicPlayerBar() {
           actionsSlot: <>
             <SeekRow track={track} wide="w-24 lg:w-48 xl:w-72" />
             <PlayModeButtons />
+            <QueueButton open={queueOpen} onPress={pressQueue} />
             <VolumeControl />
             {studioButton(track)}
           </> })} />
@@ -154,6 +172,7 @@ export function MusicPlayerBar() {
       {expanded ? null : <div data-slot="global-mini-player" data-testid="music-player-bar" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
         <div className="pointer-events-auto surface-float relative overflow-hidden">{body}</div>
       </div>}
+      <MusicQueueDrawer open={drawer !== null} onOpenChange={(open) => { if (!open) setDrawer(null); }} tab={drawer ?? QUEUE_TAB} onTabChange={(next) => { if (isMusicTab(next)) setDrawer(next); }} />
       {expanded && phone ? <Drawer open onOpenChange={(open) => { if (!open) setExpanded(false); }}>
         <DrawerContent data-testid="music-player-expanded" data-music-expanded>
           <DrawerHeader><DrawerTitle>{title}</DrawerTitle><DrawerDescription className="sr-only">{lead}</DrawerDescription></DrawerHeader>

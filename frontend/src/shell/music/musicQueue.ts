@@ -82,3 +82,107 @@ export function pickPrevious({ queue, index, mode, time, history }: PreviousArgs
   if (index > 0) return index - 1;
   return mode.repeat !== "off" && queue.length > 1 ? queue.length - 1 : "restart";
 }
+
+// SF-08c: the Queue pane's model. Pure functions over the one in-browser queue (never a third queue): the player store applies them, the pane draws them.
+
+/** Where the queue came from: the list, album, band or playlist a play press started in. Absent means the person's own songs. */
+export interface QueueSource { name: string }
+
+/** The line after "Playing from": the source's name, else "Your songs". */
+export function sourceLabelOf(source: QueueSource | null | undefined, fallback = "Your songs"): string {
+  const name = source?.name?.trim();
+  return name ? name : fallback;
+}
+
+export interface QueuePaneModel {
+  nowPlaying: Track | null;
+  /** The songs the person placed by hand (Play next, Add to queue), in queue order. */
+  playNext: Track[];
+  /** The rest of the list that comes after the song playing. */
+  nextUp: Track[];
+}
+
+/** Splits the songs after the playing one into the two tiers. `manual` is the keys placed by hand. */
+export function paneModel(queue: readonly Track[], index: number, manual: readonly string[]): QueuePaneModel {
+  const nowPlaying = queue[index] ?? null;
+  const after = nowPlaying ? queue.slice(index + 1) : [];
+  const hand = new Set(manual);
+  return { nowPlaying, playNext: after.filter((one) => hand.has(one.key)), nextUp: after.filter((one) => !hand.has(one.key)) };
+}
+
+export interface QueueEdit { queue: Track[]; index: number; manual: string[] }
+
+// The Play next tier is always the first songs after the one playing, so a tier is a count: `manual` names those songs in order.
+
+/** Puts `track` right after the song playing, after the songs already placed by hand. A song already queued moves. */
+export function insertNext(queue: readonly Track[], index: number, manual: readonly string[], track: Track): QueueEdit {
+  const playing = queue[index];
+  if (playing?.key === track.key) return { queue: [...queue], index, manual: [...manual] };
+  const without = queue.filter((one) => one.key !== track.key);
+  const at = playing ? without.findIndex((one) => one.key === playing.key) : -1;
+  const keep = manual.filter((key) => key !== track.key && without.findIndex((one) => one.key === key) > at);
+  without.splice(at + keep.length + 1, 0, track);
+  return { queue: without, index: at, manual: [...keep, track.key] };
+}
+
+/** Puts `track` at the end of the queue, in the Next up tier. */
+export function appendToQueue(queue: readonly Track[], index: number, manual: readonly string[], track: Track): QueueEdit {
+  const playing = queue[index];
+  if (playing?.key === track.key) return { queue: [...queue], index, manual: [...manual] };
+  const without = queue.filter((one) => one.key !== track.key);
+  return { queue: [...without, track], index: playing ? without.findIndex((one) => one.key === playing.key) : -1, manual: manual.filter((key) => key !== track.key) };
+}
+
+/** Takes an upcoming song out. The song playing and the ones already played cannot be removed this way. */
+export function removeUpcoming(queue: readonly Track[], index: number, manual: readonly string[], key: string): QueueEdit {
+  const at = queue.findIndex((one) => one.key === key);
+  if (at <= index) return { queue: [...queue], index, manual: [...manual] };
+  return { queue: queue.filter((_, i) => i !== at), index, manual: manual.filter((one) => one !== key) };
+}
+
+/** Drops every upcoming song: the song playing and the ones already played stay. */
+export function clearUpcoming(queue: readonly Track[], index: number, manual: readonly string[]): QueueEdit {
+  const keep = queue.slice(0, Math.max(index + 1, 0));
+  return { queue: keep, index, manual: manual.filter((key) => keep.some((one) => one.key === key)) };
+}
+
+/** Drops only the Play next tier. */
+export function clearPlayNext(queue: readonly Track[], index: number, manual: readonly string[]): QueueEdit {
+  const hand = new Set(manual);
+  return { queue: queue.filter((one, at) => at <= index || !hand.has(one.key)), index, manual: [] };
+}
+
+/**
+ * Moves the upcoming song `key` to sit before the upcoming song `beforeKey` (null: the end). The song playing and the played songs never
+ * move. Dropped inside the Play next tier the song joins it; dropped below it the song leaves it; dropped on the line between the two
+ * tiers it stays in the tier it came from.
+ */
+export function moveUpcoming(queue: readonly Track[], index: number, manual: readonly string[], key: string, beforeKey: string | null): QueueEdit {
+  const same = { queue: [...queue], index, manual: [...manual] };
+  const upcoming = queue.slice(index + 1);
+  const from = upcoming.findIndex((one) => one.key === key);
+  if (from < 0 || key === beforeKey) return same;
+  const m = manual.filter((one) => upcoming.some((song) => song.key === one)).length;
+  const fromHand = from < m;
+  const rest = upcoming.filter((one) => one.key !== key);
+  const to = beforeKey === null ? rest.length : rest.findIndex((one) => one.key === beforeKey);
+  if (to < 0) return same;
+  const handLeft = m - (fromHand ? 1 : 0);
+  const handNow = to < handLeft ? handLeft + 1 : to > handLeft ? handLeft : fromHand ? handLeft + 1 : handLeft;
+  rest.splice(to, 0, upcoming[from]!);
+  return { queue: [...queue.slice(0, index + 1), ...rest], index, manual: rest.slice(0, handNow).map((one) => one.key) };
+}
+
+/** The name a saved queue gets: its source when it has one, else "Your songs", then the date. */
+export function queuePlaylistName(source: QueueSource | null | undefined, today: Date, fallback = "Your songs"): string {
+  const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return `${sourceLabelOf(source, fallback)} ${day}`.slice(0, 100);
+}
+
+/** The songs a "Save as playlist" writes: the song playing, then what comes after, once each (the played ones are history, not the list). */
+export function playlistSongs(queue: readonly Track[], index: number): Track[] {
+  return queue.slice(Math.max(index, 0)).filter((one, at, all) => all.findIndex((other) => other.key === one.key) === at);
+}
+
+/** The id the hub knows a song by in a playlist: the song, else the file. A sound has none and is left out. */
+export const playlistIdOf = (track: Track): string | null => (track.key.startsWith("sound-") ? null : track.songId ?? track.key);
