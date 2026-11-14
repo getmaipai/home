@@ -21,9 +21,9 @@
   },
   "firmware": {
     "stackchan": {
-      "name": "stackchan-firmware-0.2.57.tar.gz",
-      "sha256": "e24a0d33e74490e189f7e80d9647d646e1d54e58f1a319c60e6442ec3195e29c",
-      "size": 4686435
+      "name": "stackchan-firmware-0.2.94.tar.gz",
+      "sha256": "0b0badde8851d19a1ee0a789d3dac1e0641cd59e0a121a9c8cb8c3d4214350e1",
+      "size": 3784371
     }
   },
   "signing_keys": [
