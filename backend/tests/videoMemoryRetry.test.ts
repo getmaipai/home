@@ -159,4 +159,11 @@ describe("the words", () => {
     expect(phaseLabel(current, "child")).toBe(JOB_QUEUE_COPY.requeued_memory.child);
     expect(videoCardView(who.actor, current, true).items[0]).toMatchObject({ state: "queued", label: WAITING, error: null });
   });
+  test("a running card stays running while held cards use queued copy", async () => {
+    fake.pollsToFinish = 1000;
+    const who = await owner();
+    const running = await start(who);
+    await until(() => getVideoJobFor(who.actor, running.id)?.state === "running");
+    expect(videoCardView(who.actor, getVideoJobFor(who.actor, running.id)!, true).items[0]!.state).toBe("running");
+  });
 });

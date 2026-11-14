@@ -213,6 +213,7 @@ function trimSentence(text: string): string {
 
 const memory = new Map<string, VideoJob>();
 const watching = new Map<string, AbortController>();
+const explicitlyStopped = new Set<string>();
 // The one object a watcher and a Stop both act on, so neither saves a stale copy over the other.
 const liveJobs = new Map<string, VideoJob>();
 const videoReservations = new Set<string>();
@@ -246,16 +247,16 @@ function saveVideoJob(job: VideoJob): void {
 registerQueueProvider(() => {
   const jobs = new Map<string, VideoJob>();
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
-  for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
+  for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id) && !liveJobs.has(row.id)) jobs.set(row.id, fromRow(row));
   return [...jobs.values()].map((job) => {
     const phaseHold = PERSISTED_HOLDS.find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt,
-      position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : job.riseReason ?? phaseHold, typicalSeconds: 140,
+      position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : phaseHold ?? job.riseReason, typicalSeconds: 140,
       headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveVideoJob(job); },
-      stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelVideoJob(owner as PersonRow, job.id); } : undefined,
-      release: job.state === "queued" && !job.stackJob ? () => {
+      stop: job.state === "running" || (job.state === "queued" && ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0) ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelVideoJob(owner as PersonRow, job.id); } : undefined,
+      release: job.state === "queued" && !job.stackJob && !explicitlyStopped.has(job.id) ? () => {
         const edit = editRuns.get(job.id);
         if (edit) {
           // The queue pass waits for release() to return: the edit runs on its own (like a clip the Stack is making), never inside the pass.
@@ -269,7 +270,7 @@ registerQueueProvider(() => {
 });
 
 async function releaseVideo(job: VideoJob): Promise<void> {
-  if (job.state !== "queued" || job.stackJob || job.kind === "edit") return;
+  if (explicitlyStopped.has(job.id) || job.state !== "queued" || job.stackJob || job.kind === "edit") return;
   try {
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     // TIER-HOME-04: the level's saved slot is read now, so the pick made in the dialog is what this job runs with.
@@ -288,7 +289,17 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (actor) void watch(job, actor as PersonRow, submitted.done);
   } catch (error) {
-    if (error instanceof StackVideoError && ((error.code === "queue_full") || ((error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)))) { job.state = "queued"; job.phase = "queued"; persistVideoJob(job); void releaseHouseholdQueue(); return; }
+    // A Stop can land while submitVideo is in flight. Do not let a late
+    // refusal overwrite the cancelled state or schedule another queue pass.
+    if (explicitlyStopped.has(job.id)) return;
+    if (error instanceof StackVideoError && error.code === "queue_full") {
+      const request = job.request as VideoRequest & { submitQueueFullHolds?: number };
+      request.submitQueueFullHolds = (request.submitQueueFullHolds ?? 0) + 1;
+      if (request.submitQueueFullHolds <= 60) { job.state = "queued"; job.phase = "queued"; persistVideoJob(job); void releaseHouseholdQueue(); return; }
+    }
+    if (error instanceof StackVideoError && (error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)) {
+      job.state = "queued"; job.phase = "requeued_memory"; job.error = null; persistVideoJob(job); scheduleNoRoomRecheck(); return;
+    }
     job.state = "failed"; job.error = plainVideoFailure(error); persistVideoJob(job); refreshHouseholdQueue();
   }
 }
@@ -394,6 +405,7 @@ export function readVideoFile(actor: PersonRow, job: VideoJob, fileId: string): 
 export function __resetVideoJobsForTests(): void {
   for (const controller of watching.values()) controller.abort();
   watching.clear();
+  explicitlyStopped.clear();
   liveJobs.clear();
   memory.clear();
   temporaryClips.clear();
@@ -604,16 +616,19 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
         continue;
       }
       if (controller.signal.aborted) return;
+      if (explicitlyStopped.has(job.id)) return;
       if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
       // MEM-RETRY-01: the Stack's memory watchdog stopped the clip (a Max clip ends `failed` with the same code; an older Stack said `no_memory` on a `cancelled` clip). Never a person's Stop: that is code `cancelled` and ends the clip.
-      if ((status.state === "cancelled" || status.state === "failed") && (status.code === MEMORY_CANCELLED_CODE || (status.state === "cancelled" && status.code === "no_memory"))) {
-        if (controller.signal.aborted || job.state === "cancelled") return;
+      const memoryWatchdogStop = status.state === "cancelled" && (status.code === MEMORY_CANCELLED_CODE || status.code === "no_memory")
+        || status.state === "failed" && !job.request.reference && status.code === MEMORY_CANCELLED_CODE;
+      if (memoryWatchdogStop) {
+        if (controller.signal.aborted || explicitlyStopped.has(job.id)) return;
         const request = job.request as VideoRequest & { memoryRequeues?: number };
         const retries = request.memoryRequeues ?? 0;
-        if (requeueAfterCritical({ requeues: retries }) === "requeue_head") { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; saveVideoJob(job); return; }
+        if (requeueAfterCritical({ requeues: retries }) === "requeue_head") { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; liveJobs.set(job.id, job); saveVideoJob(job); return; }
         job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "memory_stopped_failure", null, null, laneOfPerson(actor) === "child" ? "child" : "adult")}`; saveVideoJob(job); return;
       }
-      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
+      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); explicitlyStopped.delete(job.id); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveVideoJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
@@ -624,13 +639,14 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
     }
     if (!controller.signal.aborted) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; saveVideoJob(job); void cancelOrDeleteVideo(job.stackJob); }
   } catch {
+    if (job.state === "cancelled" || explicitlyStopped.has(job.id)) return;
     job.state = "failed";
     job.error = plainVideoFailure(null);
     try { saveVideoJob(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
     clearLive(job.id);
-    liveJobs.delete(job.id);
+    if (job.state !== "running" && job.state !== "queued") { liveJobs.delete(job.id); explicitlyStopped.delete(job.id); }
     refreshHouseholdQueue();
   }
 }
@@ -862,6 +878,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
 const editRuns = new Map<string, { actor: PersonRow; run: EditRun; source: VideoJob; onSaved?: (fileId: string) => void; phase: string }>();
 
 async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob, onSaved?: (fileId: string) => void): Promise<void> {
+  if (explicitlyStopped.has(job.id)) return;
   job.state = "running";
   job.percent = Math.max(5, job.percent);
   job.phase = editRuns.get(job.id)?.phase ?? job.phase ?? "editing";
@@ -880,16 +897,19 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
       request: (patch) => { Object.assign(job.request, patch); saveVideoJob(job); },
     };
     const made = await run(controller.signal, (percent) => { job.percent = Math.max(0, Math.min(99, Math.round(percent))); saveVideoJob(job); }, hooks);
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted || explicitlyStopped.has(job.id)) return;
     if (!made.ok) {
       const code = made.refusalCode;
       // A Stack refusal of an edit is the same wait a clip made from words has: back to the queue with the matching hold, never failed.
       const neverFits = code === "never_fits";
-      const holdsSoFar = (job.request as { neverFitsHolds?: number }).neverFitsHolds ?? 0;
-      if (neverFits && (requestTier(job.request) === "max" || holdsSoFar >= 3)) { job.state = "failed"; job.error = plainMakingLine("video", "never_fits", made.line); saveVideoJob(job); return; }
-      const hold = code === "queue_full" || neverFits || ((code === "no_memory" || code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request));
+      const request = job.request as { neverFitsHolds?: number; submitQueueFullHolds?: number };
+      const neverFitsHolds = request.neverFitsHolds ?? 0;
+      const queueFullHolds = request.submitQueueFullHolds ?? 0;
+      if (neverFits && (requestTier(job.request) === "max" || neverFitsHolds >= 3)) { job.state = "failed"; job.error = plainMakingLine("video", "never_fits", made.line); saveVideoJob(job); return; }
+      const hold = (code === "queue_full" && queueFullHolds < 60) || (neverFits && requestTier(job.request) !== "max" && neverFitsHolds < 3) || ((code === "no_memory" || code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request));
       if (hold) {
-        if (neverFits) (job.request as { neverFitsHolds?: number }).neverFitsHolds = holdsSoFar + 1;
+        if (code === "queue_full") request.submitQueueFullHolds = queueFullHolds + 1;
+        if (neverFits) request.neverFitsHolds = neverFitsHolds + 1;
         job.state = "queued";
         job.error = null;
         job.percent = 0;
@@ -913,13 +933,15 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     await settleClip(job, actor, clip.video, null, { seconds: seconds ?? undefined, width: clip.width ?? undefined, height: clip.height ?? undefined, seed: source.request.seed ?? undefined, model: source.files[0]?.model ?? undefined, ms: clip.ms, quality, audio: clip.audio }, controller.signal, "video-edit", webm ? "video/webm" : "video/mp4", clip.surround ?? null);
     if ((job as VideoJob).state === "done" && job.files[0]) { try { onSaved?.(job.files[0].id); } catch { /* the saved film remains delivered */ } }
   } catch {
+    if (explicitlyStopped.has(job.id)) return;
     job.state = "failed";
     job.error = `${EDIT_FAILED_PREFIX} Something went wrong while making it. Try again.`;
     try { saveVideoJob(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
-    liveJobs.delete(job.id);
-    if (job.state === "queued") persistVideoJob(job); else { editRuns.delete(job.id); refreshHouseholdQueue(); }
+    if (job.state !== "queued") liveJobs.delete(job.id);
+    if (job.state !== "queued") editRuns.delete(job.id);
+    if (job.state === "queued") persistVideoJob(job); else refreshHouseholdQueue();
   }
 }
 
@@ -928,8 +950,23 @@ export async function cancelVideoJob(actor: PersonRow, id: string): Promise<Vide
   const job = getVideoJobFor(actor, id);
   if (!job) return null;
   if (job.state === "done" || job.state === "failed" || job.state === "cancelled") return job;
+  explicitlyStopped.add(job.id);
+  if (job.state === "queued" && job.stackJob === null) {
+    editRuns.delete(job.id);
+    // A queued memory retry has no Stack job to cancel. Remove the retry
+    // marker as well so persisted/late queue work cannot treat it as live.
+    const request = job.request as VideoRequest & { memoryRequeues?: number; submitMemoryHolds?: number };
+    delete request.memoryRequeues;
+    delete request.submitMemoryHolds;
+    job.state = "cancelled"; job.error = null; job.phase = null; job.riseReason = null;
+    liveJobs.delete(job.id); explicitlyStopped.delete(job.id);
+    saveVideoJob(job);
+    refreshHouseholdQueue();
+    return job;
+  }
   watching.get(job.id)?.abort();
   watching.delete(job.id);
+  editRuns.delete(job.id);
   if (job.stackJob) await cancelOrDeleteVideo(job.stackJob);
   job.state = "cancelled";
   job.error = null;
