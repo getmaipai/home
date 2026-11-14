@@ -90,7 +90,11 @@ prequeue_checks() {
     for d in backend frontend; do
       path="$root/$d"
       [[ -d "$path" && -f "$path/package.json" ]] || continue
-      deps_current "$path" || die "dependencies in $path are stale; run bun install --force in $path first"
+      deps_current "$path" || {
+        # The check needs the install stamp, which only install_deps writes (a bare bun install never clears it): install here, once.
+        echo "land.sh: dependencies in $path are stale; installing them now (writes the install stamp)..." >&2
+        deps_ensure "$path" || die "dependencies in $path could not be installed: ${DEPS_ERROR:-see the lines above}; fix the install and run land.sh again"
+      }
     done
   fi
   if git diff --name-only "$base"...HEAD -- frontend/ backend/src/settings | grep -q .; then

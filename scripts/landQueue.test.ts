@@ -41,13 +41,13 @@ describe("land queue", () => {
     commit(wt, "stale frontend install");
     const depsPath = join(main, "scripts", "lib", "deps.sh");
     const depsSource = readFileSync(depsPath, "utf8");
-    writeFileSync(depsPath, "deps_current() { return 1; }\n");
+    writeFileSync(depsPath, "deps_current() { return 1; }\ndeps_ensure() { DEPS_ERROR=\"stub install failed\"; return 1; }\n");
     const priorSkip = env.MAIPAI_LAND_SKIP_DEPS; env.MAIPAI_LAND_SKIP_DEPS = "0"; // the fixtures skip the check elsewhere
     const result = run("land.sh", ["--detach"], wt);
     if (priorSkip === undefined) delete env.MAIPAI_LAND_SKIP_DEPS; else env.MAIPAI_LAND_SKIP_DEPS = priorSkip;
     writeFileSync(depsPath, depsSource);
     expect(result.status).not.toBe(0);
-    expect(result.stderr.toString()).toContain("run bun install --force in");
+    expect(result.stderr.toString()).toContain("could not be installed: stub install failed");
     expect(queueFiles()).toHaveLength(0);
   });
 
