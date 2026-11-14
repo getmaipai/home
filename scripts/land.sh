@@ -53,7 +53,16 @@ if (( express )) && [[ "$mode" == detach ]]; then die "--express waits for its v
 if [[ -f "$here/lib/mode.sh" ]]; then
   source "$here/lib/mode.sh"
   case "$(mode_get)" in
-    direct) if (( checked )); then echo "$(mode_line): this landing is --checked, so it takes the normal lane with every check"; elif (( ! express )) && [[ "$mode" != wait ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
+    direct) if (( checked )); then
+        # CHECKED-GUARD-01 (2026-11-14): a --checked entry holds the lander for its whole safety suite (30 to 45 min under engine memory pressure)
+        # and every express landing queued behind it waits that long. In DIRECT mode refuse it while other work is queued, unless the caller
+        # says it is worth the wait (MAIPAI_CHECKED_ANYWAY=1) or the change is a safety file with the owner's word (MAIPAI_RUSH_SAFETY_OK=1 + express).
+        _slug_self="$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')"
+        _others="$(find "${MAIPAI_LAND_DATA:-$(mode_main "$here")/data-scratch/land}/queue" -maxdepth 1 -type f -name '*.json' ! -name "*-$_slug_self.json" 2>/dev/null | wc -l | tr -d ' ')"
+        if [[ "${_others:-0}" -gt 0 && "${MAIPAI_CHECKED_ANYWAY:-0}" != 1 && "$mode" != wait ]]; then
+          die "--checked would hold the lander for 30 to 45 minutes while $_others other landing(s) wait (DIRECT mode lands plain changes in seconds and tests them after). Use plain bash scripts/land.sh. A safety or auth file needs the owner's word in that turn: MAIPAI_RUSH_SAFETY_OK=1 bash scripts/land.sh. If this change truly must be tested first, wait for an empty queue or set MAIPAI_CHECKED_ANYWAY=1." 2
+        fi
+        echo "$(mode_line): this landing is --checked, so it takes the normal lane with every check"; elif (( ! express )) && [[ "$mode" != wait ]]; then express=1; echo "$(mode_line): landing through the express lane"; fi ;;
     gated) (( ! express )) || die "GATED: checked first, then run. The express lane is off in gated mode; use bash scripts/land.sh, or bash scripts/mode.sh direct." 2 ;;
   esac
 fi
