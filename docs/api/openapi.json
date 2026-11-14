@@ -9585,6 +9585,57 @@
         }
       }
     },
+    "/api/tts/voice": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Read the voice the current chat speaks in",
+        "description": "The voice id spoken replies and fillers use right now: the voice of the synth or companion in the person's chat, else their own voice (a robot session: the robot's chain).",
+        "responses": {
+          "200": {
+            "description": "The voice id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "voice"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tts": {
       "post": {
         "tags": [
