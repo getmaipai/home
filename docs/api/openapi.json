@@ -41458,6 +41458,132 @@
         }
       }
     },
+    "/api/scene/alerts": {
+      "get": {
+        "tags": [
+          "Scene"
+        ],
+        "summary": "List the signed-in person's active weather alerts",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "current_location",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active weather alerts without coordinates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "event": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string"
+                      },
+                      "headline": {
+                        "type": "string"
+                      },
+                      "ends": {
+                        "type": "string"
+                      },
+                      "dismissed": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "you",
+                          "household"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "event",
+                      "severity",
+                      "headline",
+                      "ends",
+                      "dismissed"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scene/alerts/{id}/resume": {
+      "post": {
+        "tags": [
+          "Scene"
+        ],
+        "summary": "Resume an alert dismissed by the signed-in person",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether a matching hold was cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resumed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "resumed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lists": {
       "get": {
         "tags": [
