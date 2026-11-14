@@ -10,6 +10,8 @@ import { setValue } from "@/lib/settings";
 import { __resetDeviceCommandsForTests } from "@/lib/deviceCommands";
 import { resetDb } from "../../tests/reset-db";
 
+const SAMPLE_PW = "sample-wifi-pw";
+
 const app = new OpenAPIHono();
 app.route("/api/devices", devicesRoutes);
 const now = new Date().toISOString();
@@ -43,7 +45,7 @@ const originalError = console.error;
 test("refuses non-admin roles", async () => {
   for (const role of ["child", "teen", "guest", "adult"]) {
     const token = person(`wifi-${role}`, role);
-    const response = await send(token, { action: "add", ssid: "Home", password: "FixturePass123" });
+    const response = await send(token, { action: "add", ssid: "Home", password: SAMPLE_PW });
     expect(response.status).toBe(403);
     expect((await response.json() as { error: string }).error).toBe("Only an admin can change a robot's Wi-Fi.");
   }
@@ -59,14 +61,14 @@ test("forget sends a durable command containing only the SSID and unknown names 
 });
 test("add refuses an unencrypted link, a full list, and an offline robot", async () => {
   checkin({ wifi_saved: [], link_encrypted: false });
-  expect((await send(ownerToken, { action: "add", ssid: "Home", password: "FixturePass123" })).status).toBe(409);
+  expect((await send(ownerToken, { action: "add", ssid: "Home", password: SAMPLE_PW })).status).toBe(409);
   checkin({ wifi_saved: Array.from({ length: 10 }, (_, i) => `Net${i}`), link_encrypted: true });
-  expect((await send(ownerToken, { action: "add", ssid: "New", password: "FixturePass123" })).status).toBe(409);
+  expect((await send(ownerToken, { action: "add", ssid: "New", password: SAMPLE_PW })).status).toBe(409);
   checkin({ wifi_saved: [], link_encrypted: true, online: false });
-  expect((await send(ownerToken, { action: "add", ssid: "New", password: "FixturePass123" })).status).toBe(409);
+  expect((await send(ownerToken, { action: "add", ssid: "New", password: SAMPLE_PW })).status).toBe(409);
 });
 test("encrypted add sends without a row, response or log containing the password", async () => {
-  const distinctiveTestSecret = "SecretFixture-9Qx-no-log";
+  const distinctiveTestSecret = "sample-no-log-needle";
   checkin({ wifi_saved: [], link_encrypted: true, online: true });
   const logs: string[] = [];
   console.log = (...values: unknown[]) => logs.push(values.join(" "));
