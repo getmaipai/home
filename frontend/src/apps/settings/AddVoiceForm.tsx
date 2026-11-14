@@ -20,6 +20,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
   const [name, setName] = useState(edit?.label ?? "");
   const [clip, setClip] = useState<File | undefined>();
   const [reduceNoise, setReduceNoise] = useState(!edit);
+  const [isolateVoice, setIsolateVoice] = useState(false);
   const [reduceEcho, setReduceEcho] = useState(false);
   const [whisperClip, setWhisperClip] = useState<File | undefined>();
   const [angerClip, setAngerClip] = useState<File | undefined>();
@@ -58,14 +59,14 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     try {
       if (edit) {
         const tuned = canTune && !inspired;
-        await householdVoicesApi.update(edit.id, { clip, extraClips: extraClips.filter((item): item is File => item !== undefined), whisperClip, angerClip, reduceNoise, reduceEcho, temperature: tuned && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: tuned && pitch !== "" ? Number(pitch) : undefined });
+        await householdVoicesApi.update(edit.id, { clip, extraClips: extraClips.filter((item): item is File => item !== undefined), whisperClip, angerClip, reduceNoise, reduceEcho, isolateVoice, temperature: tuned && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: tuned && pitch !== "" ? Number(pitch) : undefined });
         await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
         setBusy(false);
         onMade(voiceName);
         return;
       }
       if (!clip) return;
-      await householdVoicesApi.make({ name: voiceName, clip, reduceNoise: inspired ? undefined : reduceNoise, reduceEcho: inspired ? undefined : reduceEcho, whisperClip: inspired ? undefined : whisperClip, angerClip: inspired ? undefined : angerClip, extraClips: inspired ? undefined : extraClips.filter((item): item is File => item !== undefined), temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
+      await householdVoicesApi.make({ name: voiceName, clip, isolateVoice: inspired ? undefined : isolateVoice, reduceNoise: inspired ? undefined : reduceNoise, reduceEcho: inspired ? undefined : reduceEcho, whisperClip: inspired ? undefined : whisperClip, angerClip: inspired ? undefined : angerClip, extraClips: inspired ? undefined : extraClips.filter((item): item is File => item !== undefined), temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
       setBusy(false);
       onMade(voiceName);
@@ -86,6 +87,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
       <p className={HELP}>{i18n._({ id: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you.", message: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you." })}</p>
     </> : null}
     {!inspired ? <div className={FIELD}>
+      <label className="flex items-center gap-2 text-base"><Checkbox checked={isolateVoice} onCheckedChange={(value) => setIsolateVoice(value === true)} disabled={busy} />{i18n._({ id: "Isolate the voice (remove music and other sounds)", message: "Isolate the voice (remove music and other sounds)" })}</label>
       <label className="flex items-center gap-2 text-base"><Checkbox checked={reduceNoise} onCheckedChange={(value) => setReduceNoise(value === true)} disabled={busy} />{i18n._({ id: "Remove background noise", message: "Remove background noise" })}</label>
       <label className="flex items-center gap-2 text-base"><Checkbox checked={reduceEcho} onCheckedChange={(value) => setReduceEcho(value === true)} disabled={busy} />{i18n._({ id: "Reduce echo and room sound", message: "Reduce echo and room sound" })}</label>
       <p className={HELP}>{i18n._({ id: "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. Echo reduction is a light fix; a recording made in a quiet, soft room still works best.", message: "Cleans every recording above before the voice is made. Echo reduction is a light fix; a recording made in a quiet, soft room still works best." })}</p>

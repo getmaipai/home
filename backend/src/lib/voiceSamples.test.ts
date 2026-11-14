@@ -61,3 +61,19 @@ describe("cleaning options", () => {
     expect(decodeWavClip(out!)).not.toBeNull();
   });
 });
+
+describe("isolate the voice", () => {
+  test("uses the isolated voice track, and says what to do when the splitter is not ready", async () => {
+    const { __isolateForTests } = await import("@/lib/voiceSamples");
+    let received = 0;
+    __isolateForTests.run = async (wav) => { received = wav.length; return tone(8, 0.5, 24000); };
+    const ok = await joinReferenceClips([{ bytes: tone(8, 0.2), extension: "wav" }], { isolate: true });
+    expect(ok.ok).toBe(true);
+    expect(received).toBeGreaterThan(1000);
+    __isolateForTests.run = async () => null;
+    const bad = await joinReferenceClips([{ bytes: tone(8, 0.2), extension: "wav" }], { isolate: true });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error).toContain("stem splitter");
+    __isolateForTests.run = null;
+  });
+});

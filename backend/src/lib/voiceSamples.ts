@@ -5,13 +5,43 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voiceShift";
+import { createHash } from "node:crypto";
 import { findFfmpeg } from "@/lib/ffmpegPath";
+import { deleteStemsJob, fetchStem, getStemsJob, stemsStatus, stemsStatusReady, submitStems, type StackStem } from "@/lib/music/stack";
 
 /** VOICE-CLEAN-01: what the person chose to clean from a recording before it is used as a voice sample. */
-export interface CleanOptions { noise?: boolean; echo?: boolean }
+export interface CleanOptions { noise?: boolean; echo?: boolean; isolate?: boolean }
 
 /** The ffmpeg filter chain for the chosen options (null when nothing is chosen). Noise: rumble cut, then spectral and non-local-means denoising.
  * Echo: a low cut plus a gate that closes between words, which shortens the room's tail; it reduces echo, it does not remove it. */
+export const __isolateForTests: { run: ((wav: Uint8Array) => Promise<Uint8Array | null>) | null } = { run: null };
+const ISOLATE_WAIT_MS = 4 * 60_000;
+const ISOLATE_POLL_MS = 1_500;
+
+/** Keeps only the voice: the Stack's stem splitter (the same one that splits a song) separates it from music and other sounds, and its vocals
+ * track is the clip. Null when the splitter is not installed or ready, or gives nothing; the caller says so. */
+export async function isolateVoice(wav: Uint8Array): Promise<Uint8Array | null> {
+  if (__isolateForTests.run) return __isolateForTests.run(wav);
+  if (!stemsStatusReady(await stemsStatus())) return null;
+  let job: string | null = null;
+  try {
+    job = await submitStems(Buffer.from(wav).toString("base64"), createHash("sha256").update(wav).digest("hex"), "owned_file");
+    const deadline = Date.now() + ISOLATE_WAIT_MS;
+    while (Date.now() < deadline) {
+      const status = await getStemsJob(job);
+      if (status.state === "failed" || status.state === "cancelled") return null;
+      if (status.state === "done") {
+        const vocals = ((status.data ?? []) as unknown as StackStem[]).find((entry) => entry.stem === "vocals");
+        if (!vocals) return null;
+        return await clipToWav(await fetchStem(vocals.url), "m4a");
+      }
+      await new Promise((resolve) => setTimeout(resolve, ISOLATE_POLL_MS));
+    }
+    return null;
+  } catch { return null; }
+  finally { if (job) void deleteStemsJob(job); }
+}
+
 export function cleanFilter(options: CleanOptions): string | null {
   const chain: string[] = [];
   if (options.noise || options.echo) chain.push(`highpass=f=${options.echo ? 110 : 80}`);
@@ -95,7 +125,11 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
   const share = Math.floor((MAX_SECONDS - GAP_SECONDS * (clips.length - 1)) / clips.length * RATE);
   const parts: Float32Array[] = [];
   for (const clip of clips) {
-    const raw = await clipToWav(clip.bytes, clip.extension);
+    let raw = await clipToWav(clip.bytes, clip.extension);
+    if (raw && clean.isolate) {
+      raw = await isolateVoice(raw);
+      if (!raw) return { ok: false, error: "Isolating the voice needs the Stack's stem splitter, which is not ready. Turn off Isolate the voice, or install it in Settings, AI and models, and try again." };
+    }
     const wav = raw && (clean.noise || clean.echo) ? await cleanWav(raw, clean) : raw;
     if (raw && !wav) return { ok: false, error: "Cleaning the recording needs ffmpeg, which is not installed on this computer. Turn off the cleaning options and try again." };
     const pcm = wav ? decodeWavClip(wav) : null;

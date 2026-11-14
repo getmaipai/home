@@ -655,7 +655,7 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   // V5 "Inspired voice": an inspired_level field (much_lower, lower, different or very_different) makes a new voice based on the clip instead of a copy.
   const inspiredLevel = typeof body.inspired_level === "string" && body.inspired_level ? body.inspired_level : null;
   if (inspiredLevel && (options.temperature !== null || options.pitchSemitones !== null)) return c.json({ error: "An Inspired voice has no liveliness or pitch setting. Make it without them." }, 400);
-  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1" };
+  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1", isolate: body.isolate_voice === "1" };
   // VOICE-SAMPLES-01: up to three recordings (file, file2, file3) are cleaned and joined into one reference clip.
   let saveBytes: Uint8Array<ArrayBuffer> = bytes, saveType = file.type;
   if (!inspiredLevel) {
@@ -820,7 +820,7 @@ voiceRoutes.openapi(clonedUpdateRoute, async (c) => {
   const actor = c.get("person");
   const id = c.req.valid("param").id;
   const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
-  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1" };
+  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1", isolate: body.isolate_voice === "1" };
   const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? "wav").toLowerCase();
   const files = [body.file, body.file2, body.file3].filter((item): item is File => item instanceof File);
   let clip: Uint8Array | undefined;
@@ -828,7 +828,7 @@ voiceRoutes.openapi(clonedUpdateRoute, async (c) => {
     const joined = await joinReferenceClips(await Promise.all(files.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))), cleanOptions);
     if (!joined.ok) return c.json({ error: joined.error }, 400);
     clip = joined.wav;
-  } else if (cleanOptions.noise || cleanOptions.echo) {
+  } else if (cleanOptions.noise || cleanOptions.echo || cleanOptions.isolate) {
     const existing = readClonedVoiceClip(id);
     if (!existing) return c.json({ error: "cloned voice not found" }, 404);
     const ext = existing.mimeType.includes("mpeg") ? "mp3" : existing.mimeType.includes("flac") ? "flac" : "wav";

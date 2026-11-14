@@ -1680,7 +1680,7 @@ msgid "setting.generation.kids_daily_videos.help"
 msgstr "0 significa ninguno."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:105
+#: src/apps/settings/AddVoiceForm.tsx:107
 #, needs-review
 msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "De 0.1 a 2. Más alto da más vida y sube el tono."
@@ -3073,7 +3073,7 @@ msgid "area.AI settings"
 msgstr "Ajustes de IA"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:82
+#: src/apps/settings/AddVoiceForm.tsx:83
 msgid "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one."
 msgstr ""
 
@@ -3532,7 +3532,7 @@ msgid "An update is ready"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:85
+#: src/apps/settings/AddVoiceForm.tsx:86
 msgid "Angry recording (optional)"
 msgstr ""
 
@@ -4700,8 +4700,8 @@ msgid "Bio must be 160 characters or less."
 msgstr "La biografía debe tener 160 caracteres o menos."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:100
-#: src/apps/settings/AddVoiceForm.tsx:101
+#: src/apps/settings/AddVoiceForm.tsx:102
+#: src/apps/settings/AddVoiceForm.tsx:103
 msgid "Blend with (optional)"
 msgstr ""
 
@@ -5205,7 +5205,7 @@ msgstr "¿Puede alguien entrar a tu casa?"
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
-#: src/apps/settings/AddVoiceForm.tsx:113
+#: src/apps/settings/AddVoiceForm.tsx:115
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/CodingSettings.tsx:173
@@ -6811,7 +6811,7 @@ msgid "Claude Code · same key"
 msgstr "Claude Code · misma clave"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:91
+#: src/apps/settings/AddVoiceForm.tsx:93
 msgid "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. Echo reduction is a light fix; a recording made in a quiet, soft room still works best."
 msgstr ""
 
@@ -8303,7 +8303,7 @@ msgid "Could not make this key. Try again."
 msgstr "No se pudo crear esta clave. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:73
+#: src/apps/settings/AddVoiceForm.tsx:74
 #, needs-review
 msgid "Could not make this voice. Try again."
 msgstr "No se pudo crear esta voz. Inténtalo de nuevo."
@@ -8350,8 +8350,8 @@ msgid "Could not open your library. Check that Home is running, then try again."
 msgstr "No se pudo abrir tu Biblioteca. Comprueba que Home está en marcha e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:49
-#: src/lib/householdVoicesApi.ts:55
+#: src/apps/settings/AddVoiceForm.tsx:50
+#: src/lib/householdVoicesApi.ts:56
 msgid "Could not play a sample. Try again."
 msgstr ""
 
@@ -9731,7 +9731,7 @@ msgid "Different"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:96
+#: src/apps/settings/AddVoiceForm.tsx:98
 msgid "Different sounds like a relative of the voice. Very different sounds like someone else with a similar feel. Lower and Much lower make the voice deeper."
 msgstr ""
 
@@ -10549,7 +10549,7 @@ msgid "Engine computer: {state}"
 msgstr "Ordenador del motor: {state}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:105
+#: src/apps/settings/AddVoiceForm.tsx:107
 #, needs-review
 msgid "Engine default"
 msgstr "Predeterminado del motor"
@@ -13698,8 +13698,8 @@ msgid "setting.robot.brightness.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:94
-#: src/apps/settings/AddVoiceForm.tsx:95
+#: src/apps/settings/AddVoiceForm.tsx:96
+#: src/apps/settings/AddVoiceForm.tsx:97
 msgid "How different from the original"
 msgstr ""
 
@@ -14757,6 +14757,11 @@ msgstr ""
 #, needs-review
 msgid "Is this style for adults only?"
 msgstr "¿Este estilo es solo para adultos?"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:90
+msgid "Isolate the voice (remove music and other sounds)"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:91
@@ -16376,7 +16381,7 @@ msgid "Live view stops by itself after 10 minutes. Nothing is recorded."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:105
+#: src/apps/settings/AddVoiceForm.tsx:107
 #, needs-review
 msgid "Liveliness (optional)"
 msgstr "Vitalidad (opcional)"
@@ -17494,7 +17499,7 @@ msgid "Make caption track"
 msgstr "Crear pista de subtítulos"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:114
+#: src/apps/settings/AddVoiceForm.tsx:116
 msgid "Make Inspired voice"
 msgstr ""
 
@@ -17597,7 +17602,7 @@ msgid "Make transcript"
 msgstr "Crear transcripción"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:114
+#: src/apps/settings/AddVoiceForm.tsx:116
 #, needs-review
 msgid "Make voice"
 msgstr "Crear voz"
@@ -17706,13 +17711,13 @@ msgid "Making the sound"
 msgstr "Creando el sonido"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:111
+#: src/apps/settings/AddVoiceForm.tsx:113
 #, needs-review
 msgid "Making the voice"
 msgstr "Creando la voz"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:111
+#: src/apps/settings/AddVoiceForm.tsx:113
 #, needs-review
 msgid "Making the voice. This can take up to a minute the first time."
 msgstr "Creando la voz. La primera vez puede tardar hasta un minuto."
@@ -18304,7 +18309,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.mix"
 msgstr "Mezcla"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:102
+#: src/apps/settings/AddVoiceForm.tsx:104
 msgid "Mixes the new voice with a voice already made at home."
 msgstr ""
 
@@ -18720,7 +18725,7 @@ msgstr ""
 #: src/apps/people/ProfileForm.tsx:168
 #: src/apps/reminders/CreateListSheet.tsx:33
 #: src/apps/reminders/ListMenu.tsx:45
-#: src/apps/settings/AddVoiceForm.tsx:79
+#: src/apps/settings/AddVoiceForm.tsx:80
 #: src/apps/settings/AssistantKeysSettings.tsx:83
 #: src/apps/settings/CodingSettings.tsx:226
 #: src/apps/settings/CodingSettings.tsx:232
@@ -19567,7 +19572,7 @@ msgid "No one to enroll"
 msgstr "Nadie para registrar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:36
+#: src/apps/settings/AddVoiceForm.tsx:37
 msgid "No other voice"
 msgstr ""
 
@@ -21187,7 +21192,7 @@ msgid "Only this computer will be able to reach Home."
 msgstr "Solo este ordenador podrá acceder a Home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:109
+#: src/apps/settings/AddVoiceForm.tsx:111
 #, needs-review
 msgid "Only use your own voice, or the voice of someone who said yes."
 msgstr "Usa solo tu voz o la de alguien que haya dicho que sí."
@@ -22479,7 +22484,7 @@ msgid "Pitch"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:106
+#: src/apps/settings/AddVoiceForm.tsx:108
 #, needs-review
 msgid "Pitch (optional)"
 msgstr "Tono (opcional)"
@@ -22588,7 +22593,7 @@ msgid "Playful"
 msgstr "Juguetón"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:97
+#: src/apps/settings/AddVoiceForm.tsx:99
 msgid "Playing a sample"
 msgstr ""
 
@@ -22843,7 +22848,7 @@ msgid "Pretend the next Tailscale step is done"
 msgstr "Simular que el siguiente paso de Tailscale está hecho"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:97
+#: src/apps/settings/AddVoiceForm.tsx:99
 #: src/shell/library/TranscriptFindReplace.tsx:107
 #: src/shell/pages/companionFlow/AnimateStep.tsx:115
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
@@ -23433,7 +23438,7 @@ msgid "Redo with the speech engine"
 msgstr "Rehacer con el motor de voz"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:90
+#: src/apps/settings/AddVoiceForm.tsx:92
 msgid "Reduce echo and room sound"
 msgstr ""
 
@@ -23702,7 +23707,7 @@ msgid "Remove and apply"
 msgstr "Eliminar y aplicar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:89
+#: src/apps/settings/AddVoiceForm.tsx:91
 msgid "Remove background noise"
 msgstr ""
 
@@ -24952,7 +24957,7 @@ msgid "Save audience"
 msgstr "Guardar audiencia"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:114
+#: src/apps/settings/AddVoiceForm.tsx:116
 msgid "Save changes"
 msgstr ""
 
@@ -25681,7 +25686,7 @@ msgid "SearXNG is a search service you run yourself. It searches many sites at o
 msgstr "SearXNG es un servicio de búsqueda que tú mismo ejecutas. Busca en muchos sitios a la vez y no guarda registro de quién buscó."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:81
+#: src/apps/settings/AddVoiceForm.tsx:82
 msgid "Second recording (optional)"
 msgstr ""
 
@@ -25839,7 +25844,7 @@ msgid "setting.chat.model_id.label"
 msgstr "Modelo de chat seleccionado"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:106
+#: src/apps/settings/AddVoiceForm.tsx:108
 #, needs-review
 msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr "Semitonos, de -12 a 12. Un número negativo baja la voz."
@@ -28903,7 +28908,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/people/ProfileForm.tsx:187
 #: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
-#: src/apps/settings/AddVoiceForm.tsx:110
+#: src/apps/settings/AddVoiceForm.tsx:112
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
 #: src/apps/settings/AssistantKeysSettings.tsx:74
@@ -30628,7 +30633,7 @@ msgid "Thinking:"
 msgstr "Pensando:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:81
+#: src/apps/settings/AddVoiceForm.tsx:82
 msgid "Third recording (optional)"
 msgstr ""
 
@@ -30893,7 +30898,7 @@ msgid "This MaiPai Home itself."
 msgstr "Este propio MaiPai Home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:108
+#: src/apps/settings/AddVoiceForm.tsx:110
 msgid "This makes a new voice based on the recording. It is not a copy of the voice."
 msgstr ""
 
@@ -33917,12 +33922,12 @@ msgid "setting.voice.speculative_start.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:86
+#: src/apps/settings/AddVoiceForm.tsx:87
 msgid "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:84
+#: src/apps/settings/AddVoiceForm.tsx:85
 msgid "Whisper recording (optional)"
 msgstr ""
 
@@ -34399,7 +34404,7 @@ msgid "You also accept the licences of the AI models and tools Home installs for
 msgstr "También aceptas las licencias de los modelos de IA y herramientas que Home instala para ti. Cada una está listada con sus términos en la página Plan y en Modelos y almacenamiento."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:109
+#: src/apps/settings/AddVoiceForm.tsx:111
 #, needs-review
 msgid "You are responsible for having the right to use this voice."
 msgstr "Tú eres responsable de tener el derecho de usar esta voz."

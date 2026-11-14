@@ -28,11 +28,12 @@ export const inspiredLevelLabel = (level: InspiredLevel): string => level === "m
 export const householdVoicesApi = {
   list: () => requestJson<{ voices: HouseholdVoice[] }>("/api/voice/cloned"),
   /** `temperature` and `pitchSemitones` are sent only when given (a blank field means the default). */
-  make: (input: { name: string; clip: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
+  make: (input: { name: string; clip: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; isolateVoice?: boolean; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
     const form = new FormData();
     form.append("label", input.name);
     form.append("file", input.clip);
     (input.extraClips ?? []).slice(0, 2).forEach((extra, index) => form.append(`file${index + 2}`, extra));
+    if (input.isolateVoice) form.append("isolate_voice", "1");
     if (input.reduceNoise) form.append("reduce_noise", "1");
     if (input.reduceEcho) form.append("reduce_echo", "1");
     if (input.whisperClip) form.append("whisper_file", input.whisperClip);
@@ -57,12 +58,13 @@ export const householdVoicesApi = {
     return res.blob();
   },
   /** VOICE-EDIT-01: changes a voice in place (same id). Every field is optional; with no new recording the cleaning options clean the existing one. */
-  update: (id: string, input: { clip?: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; temperature?: number; pitchSemitones?: number }) => {
+  update: (id: string, input: { clip?: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; isolateVoice?: boolean; temperature?: number; pitchSemitones?: number }) => {
     const form = new FormData();
     if (input.clip) form.append("file", input.clip);
     (input.extraClips ?? []).slice(0, 2).forEach((extra, index) => form.append(`file${index + 2}`, extra));
     if (input.whisperClip) form.append("whisper_file", input.whisperClip);
     if (input.angerClip) form.append("anger_file", input.angerClip);
+    if (input.isolateVoice) form.append("isolate_voice", "1");
     if (input.reduceNoise) form.append("reduce_noise", "1");
     if (input.reduceEcho) form.append("reduce_echo", "1");
     if (input.temperature !== undefined) form.append("temperature", String(input.temperature));
