@@ -148,4 +148,19 @@ describe("the Quality chip", () => {
     musicQuality({ form: EMPTY_FORM, tiers: ["standard", "boost"], setForm: (patch) => patches.push(patch) }).onValueChange("boost");
     expect(patches).toEqual([{ tier: "boost" }]);
   });
+  test("every chip except the mode pill and the button is icon-only with an icon, in every mode and state", () => {
+    const states: Array<Partial<MusicComposerInput>> = [
+      {}, { reference: { id: "f1", name: "x.mp3" } }, { reference: { id: "f1", name: "x.mp3" }, change: "voice_swap", householdVoices: [{ id: "v1", label: "Nova" }] },
+      { styles: [{ id: "s1", title: "Rainy" }], bands: [{ id: "b1", name: "Owls" }] }, { voice: voiceState({ operation: "change" }) },
+    ];
+    const modes = [...states.flatMap((state) => musicModes(base(state))), ...MAKES().map((one) => musicMode(base({ make: one.id })))];
+    let seen = 0;
+    for (const mode of modes) for (const chip of [...(mode.chips ?? []), ...(mode.presets?.chips ?? [])]) {
+      seen += 1;
+      expect(chip.iconOnly).toBe(true);
+      expect(typeof chip.icon).toBe("string");
+      expect(chip.options.length).toBeGreaterThan(0);
+    }
+    expect(seen).toBeGreaterThan(15);
+  });
 });

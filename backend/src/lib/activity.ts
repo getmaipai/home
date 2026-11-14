@@ -37,6 +37,8 @@ export interface ActivityItem {
   typicalMinutes: number | null;
   /** Where Open goes: the result, or the app's own page. */
   href: string | null;
+  /** True for a song row that is a sound effect (request.sound), so the progress strip says sound, not song. */
+  isSound?: boolean;
   /** Epoch-ish ISO time of the last change (what the list sorts and groups by). */
   at: string;
 }
@@ -146,7 +148,7 @@ function songItems(actor: PersonRow): ActivityItem[] {
     // A sound is a text2music job with `request.sound`; an edit or stem split is its own row. Each says what it is (MUSIC-PORT-01 MP-01).
     const noun = request.sound ? "sound" : row.task === "stems" ? "stems" : row.task === "text2music" ? "song" : "song edit";
     const title = titleFor(actor, "song", request.title ?? request.description ?? "", noun === "sound" ? "A sound" : noun === "stems" ? "Song stems" : noun === "song edit" ? "A song edit" : "A song");
-    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/audio/create?song=${encodeURIComponent(row.id)}` };
+    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/audio/create?song=${encodeURIComponent(row.id)}`, ...(noun === "sound" ? { isSound: true } : {}) };
     if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
     else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? `Making your ${noun}.`, percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
     else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? `The ${noun} did not finish. Open it to try again.`, percent: null, typicalMinutes: null });
@@ -255,6 +257,6 @@ export function activeGenerationRows(actor: PersonRow): Record<string, unknown>[
   const items = [...pictureItems(actor), ...videoItems(actor), ...songItems(actor)].filter((item) => !ownCard(item));
   return items.filter((item) => item.state === "waiting" || item.state === "making").map((item) => ({
     id: item.id, kind: item.source, startedBy: actor.id, forPerson: actor.id, title: item.title, state: item.state === "waiting" ? "queued" : "running",
-    progress: { percent: item.percent ?? 0, ...(item.line ? { line: item.line } : {}) }, createdAt: item.at, updatedAt: item.at, actions: [],
+    progress: { percent: item.percent ?? 0, ...(item.line ? { line: item.line } : {}) }, createdAt: item.at, updatedAt: item.at, actions: [], ...(item.isSound ? { provenance: { sound: true } } : {}),
   }));
 }

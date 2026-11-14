@@ -42,6 +42,8 @@ export function claimsMedia(reply: string): boolean {
 /** The reply that stands in for a claim when no tool ran, even after the re-ask. Says what happened and what to do. */
 export const MEDIA_NOT_STARTED_LINE = "I didn't start that picture, video or song, so nothing is being made. Send the request once more and I'll try again.";
 export const MUSIC_STARTED_LINE = "I've started your song. It will show below when it's finished.";
+/** The same line for a sound effect (a make_sound call, or generate_music with kind sound). Chosen by the tool call, never by the person's words. */
+export const SOUND_STARTED_LINE = "I've started your sound. It will show below when it's finished.";
 
 /** The one re-ask: the held reply claimed a result and no tool ran. */
 export const MEDIA_REASK_INSTRUCTION = "You wrote that a picture, video or song is made or on its way, but you did not call the Make a Picture, Make a Video or Make a Song tool, so nothing was made. If the person asked for one, call the tool now with their request. If you cannot make it, say so plainly in one sentence. Do not say anything is being made unless you call the tool in this reply.";

@@ -80,8 +80,10 @@ const EDIT_LABEL: () => Record<EditChange, string> = () => ({
   stems: i18n._({ id: "Split into stems", message: "Split into stems" }), voice_swap: i18n._({ id: "Sing it in another voice", message: "Sing it in another voice" }),
 });
 
+const EDIT_ICON: Record<EditChange, "palette" | "scissors" | "layers" | "mic-vocal"> = { restyle: "palette", parts: "scissors", stems: "layers", voice_swap: "mic-vocal" };
+
 const takesChip = (takes: number, set: (next: Takes) => void, label: string, group: string): ComposerChipData => ({
-  id: "takes", label, group, value: String(takes), quietValue: "1", onValueChange: (next) => set(Number(next) as Takes),
+  id: "takes", label, group, icon: "layers", iconOnly: true, value: String(takes), quietValue: "1", onValueChange: (next) => set(Number(next) as Takes),
   options: [1, 2, 3].map((count) => ({ value: String(count), label: i18n._({ id: "{count, plural, one {# take} other {# takes}}", message: "{count, plural, one {# take} other {# takes}}", values: { count } }) })),
 });
 
@@ -101,15 +103,15 @@ const songChips = (input: MusicComposerInput): ComposerChipData[] => {
   const details = i18n._({ id: "Song details", message: "Song details" });
   const style = i18n._({ id: "Style", message: "Style" });
   return [
-    { id: "vocals", label: i18n._({ id: "Singing", message: "Singing" }), group: details, value: form.instrumental ? "instrumental" : "vocals", onValueChange: (next) => setForm({ instrumental: next === "instrumental" }),
-      options: [{ value: "vocals", label: i18n._({ id: "With vocals", message: "With vocals" }) }, { value: "instrumental", label: i18n._({ id: "Instrumental", message: "Instrumental" }), detail: i18n._({ id: "No singing, just the music.", message: "No singing, just the music." }) }] },
-    { id: "language", label: i18n._({ id: "Vocal language", message: "Vocal language" }), group: details, value: form.language, quietValue: NONE, onValueChange: (next) => setForm({ language: String(next) }),
+    { id: "vocals", label: i18n._({ id: "Singing", message: "Singing" }), group: details, icon: "mic-vocal", iconOnly: true, value: form.instrumental ? "instrumental" : "vocals", onValueChange: (next) => setForm({ instrumental: next === "instrumental" }),
+      options: [{ value: "vocals", icon: "mic-vocal", label: i18n._({ id: "With vocals", message: "With vocals" }) }, { value: "instrumental", icon: "music-2", label: i18n._({ id: "Instrumental", message: "Instrumental" }), detail: i18n._({ id: "No singing, just the music.", message: "No singing, just the music." }) }] },
+    { id: "language", label: i18n._({ id: "Vocal language", message: "Vocal language" }), group: details, icon: "captions", iconOnly: true, value: form.language, quietValue: NONE, onValueChange: (next) => setForm({ language: String(next) }),
       disabledReason: form.instrumental ? i18n._({ id: "Instrumental is on, so there are no words to sing.", message: "Instrumental is on, so there are no words to sing." }) : undefined,
       options: LANGUAGES.map((one) => ({ value: one.id, label: one.label() })) },
-    { id: "length", label: i18n._({ id: "Length", message: "Length" }), group: details, value: form.length, quietValue: NONE, onValueChange: (next) => setForm({ length: next === "quick" || next === "full" ? next : "" }),
-      options: [{ value: NONE, label: i18n._({ id: "Auto", message: "Auto" }) }, { value: "quick", label: i18n._({ id: "Quick", message: "Quick" }), detail: i18n._({ id: "About 45 seconds", message: "About 45 seconds" }) }, { value: "full", label: i18n._({ id: "Full", message: "Full" }), detail: i18n._({ id: "A whole song", message: "A whole song" }) }] },
+    { id: "length", label: i18n._({ id: "Length", message: "Length" }), group: details, icon: "clock", iconOnly: true, value: form.length, quietValue: NONE, onValueChange: (next) => setForm({ length: next === "quick" || next === "full" ? next : "" }),
+      options: [{ value: NONE, icon: "sparkles", label: i18n._({ id: "Auto", message: "Auto" }) }, { value: "quick", icon: "zap", label: i18n._({ id: "Quick", message: "Quick" }), detail: i18n._({ id: "About 45 seconds", message: "About 45 seconds" }) }, { value: "full", icon: "music", label: i18n._({ id: "Full", message: "Full" }), detail: i18n._({ id: "A whole song", message: "A whole song" }) }] },
     // The built-in starters are a chip of their own (a popover of sixteen), so the Presets popover stays short.
-    { id: "starter", label: style, group: style, value: starterOf(form.tags), quietValue: NONE, onValueChange: (next) => input.onTags(setStarter(form.tags, String(next))),
+    { id: "starter", label: style, group: style, icon: "palette", iconOnly: true, value: starterOf(form.tags), quietValue: NONE, onValueChange: (next) => input.onTags(setStarter(form.tags, String(next))),
       options: [{ value: NONE, label: i18n._({ id: "No style", message: "No style" }) }, ...STARTER_STYLE_CHIPS.map((name) => ({ value: name, label: name }))] },
   ];
 };
@@ -119,11 +121,11 @@ const editChips = (input: MusicComposerInput): ComposerChipData[] => {
   const group = i18n._({ id: "Change", message: "Change" });
   const noVoices = input.householdVoices.length === 0 ? i18n._({ id: "Household voices are made on the Voices page. Make one first.", message: "Household voices are made on the Voices page. Make one first." }) : undefined;
   const chips: ComposerChipData[] = [{
-    id: "change", label: group, group, value: input.change, quietValue: "restyle", onValueChange: (next) => input.setChange(String(next) as EditChange),
-    options: EDIT_CHANGES.map((one) => ({ value: one, label: EDIT_LABEL()[one] })),
+    id: "change", label: group, group, icon: "wand-sparkles", iconOnly: true, value: input.change, quietValue: "restyle", onValueChange: (next) => input.setChange(String(next) as EditChange),
+    options: EDIT_CHANGES.map((one) => ({ value: one, icon: EDIT_ICON[one], label: EDIT_LABEL()[one] })),
   }];
   if (input.change === "voice_swap") chips.push({
-    id: "household-voice", label: i18n._({ id: "Household voice", message: "Household voice" }), group, value: input.householdVoice, quietValue: NONE, onValueChange: (next) => input.setHouseholdVoice(String(next)), disabledReason: noVoices,
+    id: "household-voice", label: i18n._({ id: "Household voice", message: "Household voice" }), group, icon: "user", iconOnly: true, value: input.householdVoice, quietValue: NONE, onValueChange: (next) => input.setHouseholdVoice(String(next)), disabledReason: noVoices,
     options: [{ value: NONE, label: i18n._({ id: "Choose a voice", message: "Choose a voice" }) }, ...input.householdVoices.map((one) => ({ value: one.id, label: one.label }))],
   });
   return chips;
@@ -134,12 +136,12 @@ const voiceChips = (voice: VoiceMode): ComposerChipData[] => {
   const options = voice.voices.map((item: VoiceOption) => ({ value: item.id, label: item.label }));
   const tags = voice.operation === "voiceover" ? tagsOf(voice.voices, voice.selectedId) : [];
   const chips: ComposerChipData[] = [
-    { id: "operation", label: i18n._({ id: "What to do", message: "What to do" }), group, value: voice.operation, quietValue: "voiceover", onValueChange: (next) => voice.setOperation(next === "change" ? "change" : "voiceover"),
-      options: [{ value: "voiceover", label: i18n._({ id: "Speak my words", message: "Speak my words" }) }, { value: "change", label: i18n._({ id: "Change a voice", message: "Change a voice" }), detail: i18n._({ id: "The video's own sound is replaced. The original file is not changed.", message: "The video's own sound is replaced. The original file is not changed." }) }] },
-    { id: "voice", label: group, group, value: voice.selectedId, onValueChange: (next) => voice.setVoice(String(next)), options,
+    { id: "operation", label: i18n._({ id: "What to do", message: "What to do" }), group, icon: "sliders-horizontal", iconOnly: true, value: voice.operation, quietValue: "voiceover", onValueChange: (next) => voice.setOperation(next === "change" ? "change" : "voiceover"),
+      options: [{ value: "voiceover", icon: "mic", label: i18n._({ id: "Speak my words", message: "Speak my words" }) }, { value: "change", icon: "refresh-cw", label: i18n._({ id: "Change a voice", message: "Change a voice" }), detail: i18n._({ id: "The video's own sound is replaced. The original file is not changed.", message: "The video's own sound is replaced. The original file is not changed." }) }] },
+    { id: "voice", label: group, group, icon: "mic-vocal", iconOnly: true, value: voice.selectedId, onValueChange: (next) => voice.setVoice(String(next)), options,
       disabledReason: options.length === 0 ? i18n._({ id: "No voices are ready yet.", message: "No voices are ready yet." }) : undefined },
   ];
-  if (tags.length) chips.push({ id: "tag", label: i18n._({ id: "Add a tag", message: "Add a tag" }), group: i18n._({ id: "Tags", message: "Tags" }), value: NONE, onValueChange: (next) => { if (next) voice.setScript(withTag(voice.script, String(next))); }, options: tags.map((tag) => ({ value: tag, label: `[${tag}]` })) });
+  if (tags.length) chips.push({ id: "tag", label: i18n._({ id: "Add a tag", message: "Add a tag" }), group: i18n._({ id: "Tags", message: "Tags" }), icon: "hash", iconOnly: true, value: NONE, onValueChange: (next) => { if (next) voice.setScript(withTag(voice.script, String(next))); }, options: tags.map((tag) => ({ value: tag, label: `[${tag}]` })) });
   return chips;
 };
 
@@ -152,16 +154,16 @@ export function musicMode(input: MusicComposerInput): PromptBarMode {
   else if (make === "sound") {
     const group = i18n._({ id: "Sound", message: "Sound" });
     chips = [
-      { id: "seconds", label: i18n._({ id: "Length", message: "Length" }), group, value: sound.seconds, onValueChange: (next) => setSound({ seconds: String(next) }), options: SOUND_SECONDS.map((one) => ({ value: one, label: i18n._({ id: "{count} seconds", message: "{count} seconds", values: { count: one } }) })) },
-      { id: "loop", label: i18n._({ id: "Loop it", message: "Loop it" }), group, value: sound.loop ? "on" : "off", quietValue: "off", onValueChange: (next) => setSound({ loop: next === "on" }), options: [{ value: "off", label: i18n._({ id: "Once", message: "Once" }) }, { value: "on", label: i18n._({ id: "Loop it", message: "Loop it" }) }] },
-      { id: "stick", label: i18n._({ id: "Words", message: "Words" }), group, value: sound.stick, quietValue: "words", onValueChange: (next) => setSound({ stick: next === "surprise" ? "surprise" : "words" }), options: [{ value: "words", label: i18n._({ id: "Stick to my words", message: "Stick to my words" }) }, { value: "surprise", label: i18n._({ id: "Surprise me", message: "Surprise me" }) }] },
+      { id: "seconds", label: i18n._({ id: "Length", message: "Length" }), group, icon: "clock", iconOnly: true, value: sound.seconds, onValueChange: (next) => setSound({ seconds: String(next) }), options: SOUND_SECONDS.map((one) => ({ value: one, label: i18n._({ id: "{count} seconds", message: "{count} seconds", values: { count: one } }) })) },
+      { id: "loop", label: i18n._({ id: "Loop it", message: "Loop it" }), group, icon: "refresh-cw", iconOnly: true, value: sound.loop ? "on" : "off", quietValue: "off", onValueChange: (next) => setSound({ loop: next === "on" }), options: [{ value: "off", icon: "play", label: i18n._({ id: "Once", message: "Once" }) }, { value: "on", icon: "refresh-cw", label: i18n._({ id: "Loop it", message: "Loop it" }) }] },
+      { id: "stick", label: i18n._({ id: "Words", message: "Words" }), group, icon: "pencil", iconOnly: true, value: sound.stick, quietValue: "words", onValueChange: (next) => setSound({ stick: next === "surprise" ? "surprise" : "words" }), options: [{ value: "words", icon: "pencil", label: i18n._({ id: "Stick to my words", message: "Stick to my words" }) }, { value: "surprise", icon: "shuffle", label: i18n._({ id: "Surprise me", message: "Surprise me" }) }] },
       takesChip(form.takes, (next) => setForm({ takes: next }), i18n._({ id: "Takes", message: "Takes" }), group)];
   } else if (make === "voice" && input.voice) chips = voiceChips(input.voice);
   // Presets: the person's saved styles and bands (a short list each). The built-in starters are the Style chip.
   const presets: ComposerChipData[] = make === "song" && !restyle ? [
-    ...(input.styles.length ? [{ id: "song-style", label: i18n._({ id: "My styles", message: "My styles" }), value: form.styleId ?? NONE, onValueChange: (next: string | number) => setForm({ styleId: next === NONE ? null : String(next) }),
+    ...(input.styles.length ? [{ id: "song-style", label: i18n._({ id: "My styles", message: "My styles" }), icon: "palette" as const, iconOnly: true, value: form.styleId ?? NONE, onValueChange: (next: string | number) => setForm({ styleId: next === NONE ? null : String(next) }),
       options: [{ value: NONE, label: i18n._({ id: "None", message: "None" }) }, ...input.styles.slice(0, PRESET_LIMIT).map((row) => ({ value: row.id, label: row.title ?? i18n._({ id: "Untitled style", message: "Untitled style" }) }))] }] : []),
-    ...(input.bands.length ? [{ id: "band", label: i18n._({ id: "My bands", message: "My bands" }), value: form.bandId ?? NONE, onValueChange: (next: string | number) => setForm({ bandId: next === NONE ? null : String(next) }),
+    ...(input.bands.length ? [{ id: "band", label: i18n._({ id: "My bands", message: "My bands" }), icon: "users" as const, iconOnly: true, value: form.bandId ?? NONE, onValueChange: (next: string | number) => setForm({ bandId: next === NONE ? null : String(next) }),
       options: [{ value: NONE, label: i18n._({ id: "None", message: "None" }) }, ...input.bands.slice(0, PRESET_LIMIT).map((row) => ({ value: row.id, label: row.name ?? i18n._({ id: "Untitled band", message: "Untitled band" }) }))] }] : []),
   ] : [];
   const label = make === "song" ? (restyle ? EDIT_LABEL()[input.change] : createLabel(form.takes)) : make === "sound" ? soundLabel(form.takes)

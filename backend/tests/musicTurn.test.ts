@@ -18,7 +18,7 @@ import { getMusicJobFor } from "@/lib/music/jobs";
 import { householdAllowsMusic } from "@/lib/music/policy";
 import { createAttachment } from "@/lib/attachments";
 import { insertProvisionalTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
-import { MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SOUND_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 let people: ReturnType<typeof createBenchPeople>;
@@ -53,6 +53,19 @@ test("an adult's first turn earns generation; a made-here song earns editing on 
       await runTurnNext(people.owner, "chat", "hello", { conversationId: result.value.conversation_id });
       expect(names(nextSeen.find((r) => (r.tools?.length ?? 0) > 0))).toContain("edit_music");
     });
+  });
+});
+
+test("a sound effect start (generate_music kind sound) is answered with the sound line, not the song line", async () => {
+  const call = { id: "soundcall", name: "generate_music", args: JSON.stringify({ kind: "sound", description: "rain on a tin roof", seconds: 10 }) };
+  await withStub({ calls: (r) => r.tool_choice === "none" || isPhrasing(r) ? undefined : [call], reply: () => "The sound is ready." }, async () => {
+    const result = await runTurnNext(people.owner, "chat", "Make the sound of rain on a tin roof");
+    if (!result.ok) throw new Error("turn failed");
+    expect(result.value.reply.text).toBe(SOUND_STARTED_LINE);
+    expect(result.value.reply.text).not.toContain("song");
+    const id = result.value.music?.id;
+    expect(id).toBeDefined();
+    await waitForMusic(() => getMusicJobFor(people.owner, id!)?.state === "done");
   });
 });
 
