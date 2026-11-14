@@ -801,6 +801,122 @@
                             "pid",
                             "alive"
                           ]
+                        },
+                        "identify": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "stalled",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed",
+                                "blocked"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "never_fits",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "reduced_swap",
+                                "offline",
+                                "tier_reduced",
+                                "gpu",
+                                "upgrading",
+                                null
+                              ]
+                            },
+                            "identify_state": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "no_key",
+                                "fpcalc_missing",
+                                "nothing_to_match"
+                              ]
+                            },
+                            "identify_line": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive",
+                            "identify_state",
+                            "identify_line"
+                          ]
                         }
                       },
                       "required": [
@@ -123972,6 +124088,182 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/music/identify": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Name the song in a short clip",
+        "description": "Body: the clip bytes. Send `?kind=pcm16&rate=16000` for raw 16-bit mono PCM, otherwise any audio container ffmpeg reads. Up to 20 seconds and 2 MB. The clip is never stored; only its fingerprint can leave the home, and only when Name songs online allows it. Add `confirmed=1` after the person said yes to an Ask each time question.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pcm16",
+                "container"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 4000,
+              "maximum": 48000
+            },
+            "required": false,
+            "name": "rate",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            },
+            "required": false,
+            "name": "confirmed",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A typed result: matched, no_match, needs_confirm, not_ready, failed or rate_limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "matched",
+                        "no_match",
+                        "needs_confirm",
+                        "not_ready",
+                        "failed",
+                        "rate_limited"
+                      ]
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "artist": {
+                          "type": "string"
+                        },
+                        "album": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "musicbrainz_recording_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "musicbrainz_artist_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "musicbrainz_release_group_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "library",
+                            "acoustid"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "artist",
+                        "album",
+                        "musicbrainz_recording_id",
+                        "musicbrainz_artist_id",
+                        "musicbrainz_release_group_id",
+                        "score",
+                        "source"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "Why nothing was named: for not_ready the readiness state, for failed the cause."
+                    },
+                    "line": {
+                      "type": "string",
+                      "description": "For not_ready: the one sentence that says where to act."
+                    },
+                    "retry_after_s": {
+                      "type": "number",
+                      "description": "For rate_limited: seconds until another clip is taken."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No clip or a bad query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The clip is over 20 seconds or 2 MB."
           }
         }
       }
