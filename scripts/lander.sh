@@ -386,7 +386,7 @@ stop_stray_tests() {
 
 run_t2_tests() {
   local output="$1" command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
-  bounded_step "${MAIPAI_LAND_T2_SECONDS:-5400}" "safety-surface tests" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
+  bounded_step "${MAIPAI_LAND_T2_SECONDS:-5400}" "safety-surface tests" "$output" env MAIPAI_GATE_MIN_SHARDS=8 MAIPAI_GATE_SHARD_PEAKS_DIR="$main/data-scratch/gate-stats/shard-peaks" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
 }
 
 run_static_check() {
@@ -780,7 +780,7 @@ outbox_summary() {
 
 run_one() {
   local request="$1" safety_ok=0 entry_checked=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
-  local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
+  local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md" "frontend/src/lib/settingCopy.generated.ts")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
 import json, sys
@@ -893,7 +893,7 @@ PY
     fi
   else
     phase "generating files"
-    if ! MAIPAI_COMMONS_DIR="$gen_scratch" MAIPAI_DATA_DIR="$gen_scratch/data" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
+    if ! MAIPAI_COMMONS_DIR="$gen_scratch" MAIPAI_DATA_DIR="$gen_scratch/data" bounded_step "${MAIPAI_LAND_GENERATE_SECONDS:-600}" "generate files" "$output" bash -c 'cd "$1" && (cd backend && bun run gen:settings) && (cd frontend && bun scripts/extract-setting-copy.ts) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }' _ "$checkout"; then
       last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
       rm -rf "$gen_scratch"
       bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0

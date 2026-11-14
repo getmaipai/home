@@ -67,6 +67,10 @@ Where it ended up (measured on the Studio):
 
 ## 4. Components
 
+Before queueing, `land.sh` checks that changed backend and frontend workspaces have installs matching their lockfiles and pins, and runs the frontend i18n lint plus generated setting copy/catalog freshness check when frontend or settings files changed. `MAIPAI_LAND_SKIP_PRECHECK=1` skips these checks with a warning. The same prequeue step uses `git merge-tree` against fetched `origin/main` and names conflicts in `bun.lock` or `package.json` before creating a queue entry. These checks run on the submitting session.
+
+For `--checked` safety tests, the lander requests at least eight shards and stores per-shard peak measurements under `data-scratch/gate-stats/shard-peaks`; the existing memory pressure guard still controls safe concurrency. The lander also regenerates `frontend/src/lib/settingCopy.generated.ts` and commits it with other generated outputs.
+
 | File | Role |
 |---|---|
 | `scripts/dev.sh`, `scripts/seed.ts` | `bun run dev`: seeded hot-reload Home per worktree. `seed.ts` is the one demo-household seeder, shared with the chat smoke. |

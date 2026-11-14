@@ -80,6 +80,35 @@ note_md="$data/notes/$slug.md"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
+prequeue_checks() {
+  local root changed=0 relevant=0 d path merge_output rc stamp line conflicts
+  root="$(git rev-parse --show-toplevel)"
+  if git diff --name-only "$base"...HEAD -- backend frontend | grep -q .; then changed=1; fi
+  if (( changed )) && [[ "${MAIPAI_LAND_SKIP_DEPS:-0}" == 1 ]]; then
+    echo "warning: MAIPAI_LAND_SKIP_DEPS=1; skipping dependency freshness check" >&2
+  elif (( changed )); then
+    for d in backend frontend; do
+      path="$root/$d"
+      [[ -d "$path" && -f "$path/package.json" ]] || continue
+      deps_current "$path" || die "dependencies in $path are stale; run bun install --force in $path first"
+    done
+  fi
+  if git diff --name-only "$base"...HEAD -- frontend/ backend/src/settings | grep -q .; then
+    relevant=1
+  fi
+  if (( relevant )); then
+    line="$(cd "$root/frontend" && bun run lint:i18n 2>&1)" || { rc=$?; printf '%s\n' "$line" >&2; return "$rc"; }
+    line="$(cd "$root/frontend" && bun run i18n:check 2>&1)" || { rc=$?; printf '%s\n' "$line" >&2; return "$rc"; }
+  fi
+  merge_output="$(git merge-tree --write-tree HEAD "$base" 2>&1)" || {
+    conflicts="$(grep -E '^CONFLICT .* (bun\.lock|package\.json)( |$)' <<<"$merge_output" || true)"
+    if [[ -n "$conflicts" ]]; then
+      printf '%s\n' "$merge_output" >&2
+      die "merge conflict with origin/main in $(grep -Eo '(bun\.lock|package\.json)' <<<"$conflicts" | sort -u | paste -sd ', ' -)"
+    fi
+  }
+}
+
 # The exact commit the lander put on main for this branch (the rebased one), for rush-ship.sh to ship.
 landed_sha_line() {
   python3 - "$note" <<'PY' || true
@@ -169,12 +198,14 @@ if (( ! queue_anyway )); then
     die "the lander is not running: start it with bash scripts/pipeline.sh start (or install-service)" 3
   fi
 fi
+if [[ -f "$here/lib/deps.sh" ]]; then source "$here/lib/deps.sh"; fi
 dirty="$(git status --porcelain --untracked-files=no)"
 [[ -z "$dirty" ]] || die "tracked changes are uncommitted; commit by file name or discard, then run land.sh again."
 # OUTBOX-01: GitHub being slow or down does not stop a landing request; the lander lands on its own main and pushes afterwards.
 gitnet fetch origin || echo "land.sh: GitHub did not answer$( ((GITNET_TIMED_OUT)) && echo ' in time'); queueing against the last known main (the lander catches GitHub up later)." >&2
 base="$(pipeline_main_sha . 2>/dev/null || true)"
 [[ -n "$base" ]] || die "no main to compare with; fetch origin once the network is back, then run land.sh again."
+prequeue_checks
 ahead="$(git rev-list --count "$base..HEAD")" || die "could not compare your branch with main; fetch and repair the checkout, then retry."
 (( ahead > 0 )) || die "branch has no commit over origin/main or the landed main; make and commit a change, then run land.sh again."
 watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
