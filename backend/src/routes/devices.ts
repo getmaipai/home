@@ -40,6 +40,9 @@ import { forgetRobotHost } from "@/lib/robotHost";
 import { getRobotCheckin, recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
 import { apiError } from "@/lib/apiErrorCopy";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { createHash } from "node:crypto";
+import { botReleaseVersion, ensureStackChanFirmware } from "@/lib/botRelease";
+import { verifiedFlashPart, verifiedStackChanManifest } from "@/lib/stackchanInstall";
 
 export const devicesRoutes = apiRouter();
 
@@ -182,12 +185,75 @@ const robotCheckinSchema = z.object({
   free_heap_internal: loose(z.number().int().nonnegative()), free_heap_min: loose(z.number().int().nonnegative()), psram_free: loose(z.number().int().nonnegative()),
   boot_reason: loose(z.number().int()), crash_resets: loose(z.number().int().nonnegative()),
   battery_level: loose(z.number().int().min(0).max(100)), charging: loose(z.boolean()),
+  updating: loose(z.boolean()), update_progress: loose(z.number().int().min(0).max(100)),
 });
 const robotCheckinRoute = createRoute({
   method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",
   middleware: [requireDeviceSession("robot")] as const,
   request: { body: { content: { "application/json": { schema: z.record(z.string(), z.unknown()).openapi({ description: "The body's check-in report; fields are listed in docs/dev/robot-checkin in the bot repository. Unknown or odd readings become null." }) } } } },
   responses: { 204: { description: "Check-in accepted." }, ...errorResponses({ 400: "Malformed check-in", 401: "Not signed in", 403: "Not a robot device" }) },
+});
+
+type FirmwareVersion = { core: [number, number, number]; prerelease: string[] | null };
+function parseFirmwareSemver(value: string): FirmwareVersion | null {
+  const normalized = value.replace(/-stackchan$/, "");
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(normalized);
+  if (!match) return null;
+  const prerelease = match[4]?.split(".") ?? null;
+  if (prerelease?.some((part) => !part || (/^\d+$/.test(part) && part.length > 1 && part.startsWith("0")))) return null;
+  return { core: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease };
+}
+function semverGreater(a: FirmwareVersion, b: FirmwareVersion): boolean {
+  for (let i = 0; i < 3; i++) if (a.core[i] !== b.core[i]) return a.core[i]! > b.core[i]!;
+  if (a.prerelease === null) return b.prerelease !== null;
+  if (b.prerelease === null) return false;
+  for (let i = 0; i < Math.max(a.prerelease.length, b.prerelease.length); i++) {
+    const left = a.prerelease[i]; const right = b.prerelease[i];
+    if (left === undefined) return false;
+    if (right === undefined) return true;
+    if (left === right) continue;
+    const leftNumeric = /^\d+$/.test(left); const rightNumeric = /^\d+$/.test(right);
+    if (leftNumeric && rightNumeric) return Number(left) > Number(right);
+    if (leftNumeric !== rightNumeric) return !leftNumeric;
+    return left > right;
+  }
+  return false;
+}
+const firmwareUpdatePath = "/me/firmware-update";
+const firmwareUpdateRoute = createRoute({
+  method: "get", path: firmwareUpdatePath, tags: ["Devices"], summary: "Check for a verified StackChan firmware update",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { query: z.object({ current: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ available: z.boolean(), version: z.string().optional(), sha256: z.string().optional(), size: z.number().int().optional(), reason: z.enum(["up_to_date", "no_firmware", "manifest_unverified", "bad_current"]).optional() }) } }, description: "Verified firmware update status." } },
+});
+devicesRoutes.openapi(firmwareUpdateRoute, async (c) => {
+  const current = parseFirmwareSemver(c.req.valid("query").current);
+  if (!current) return c.json({ available: false as const, reason: "bad_current" as const }, 200);
+  try { await ensureStackChanFirmware(); } catch { return c.json({ available: false as const, reason: "no_firmware" as const }, 200); }
+  let manifest: Awaited<ReturnType<typeof verifiedStackChanManifest>>["manifest"];
+  let releaseDir: string;
+  try { ({ manifest, releaseDir } = await verifiedStackChanManifest()); }
+  catch { return c.json({ available: false as const, reason: "manifest_unverified" as const }, 200); }
+  const part = manifest.builds.flatMap((build) => build.parts).find((item) => item.path === "maipai-stackchan.bin");
+  if (!part) return c.json({ available: false as const, reason: "manifest_unverified" as const }, 200);
+  try { if (!verifiedFlashPart(manifest, releaseDir, part.path)) throw new Error("missing"); }
+  catch { return c.json({ available: false as const, reason: "manifest_unverified" as const }, 200); }
+  const version = botReleaseVersion();
+  const latest = parseFirmwareSemver(version);
+  if (!latest || !semverGreater(latest, current)) return c.json({ available: false as const, reason: "up_to_date" as const }, 200);
+  return c.json({ available: true as const, version, sha256: part.sha256, size: part.size }, 200);
+});
+
+const firmwareAppRoute = createRoute({ method: "get", path: "/me/firmware-update/app.bin", tags: ["Devices"], summary: "Download the verified StackChan OTA app", middleware: [requireDeviceSession("robot")] as const, responses: { 200: { description: "Verified OTA app bytes." }, 404: { description: "No verified app is available." } } });
+devicesRoutes.openapi(firmwareAppRoute, async (c) => {
+  try {
+    const { manifest, releaseDir } = await verifiedStackChanManifest();
+    const part = manifest.builds.flatMap((build) => build.parts).find((item) => item.path === "maipai-stackchan.bin");
+    if (!part) return c.text("Firmware app not found", 404);
+    const bytes = verifiedFlashPart(manifest, releaseDir, part.path);
+    if (!bytes || createHash("sha256").update(bytes).digest("hex") !== part.sha256) return c.text("Firmware app not found", 404);
+    return new Response(bytes, { status: 200, headers: { "content-type": "application/octet-stream", "content-length": String(bytes.length) } });
+  } catch { return c.text("Firmware app not found", 404); }
 });
 devicesRoutes.openapi(robotCheckinRoute, (c) => {
   const parsed = robotCheckinSchema.safeParse(c.req.valid("json"));

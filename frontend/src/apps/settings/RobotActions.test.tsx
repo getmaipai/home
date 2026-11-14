@@ -43,6 +43,7 @@ describe("STACKCHAN-HOME-01 robot actions", () => {
     expect(robotHasDance(robot({ capabilities: ["speaker"] }))).toBe(false);
     expect(render(<RobotActions device={robot({ capabilities: ["speaker"] })} />).queryByTestId("robot-actions")).toBeNull();
     expect(checkinFacts({ timers_active: 2, self_restarts: 1, heal_hold: true, mic_level: 40 })).toEqual(["Timers: 2", "Restarted itself 1 time", "Restart guard is holding", "Microphone level 40"]);
+    expect(checkinFacts({ updating: true })).toEqual(["Updating its software"]);
     expect(checkinFacts({ timers_active: null, heal_hold: false })).toEqual([]);
     expect(checkinFacts(null)).toEqual([]);
   });

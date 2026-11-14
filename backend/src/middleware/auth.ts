@@ -208,6 +208,7 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["POST", /^\/api\/music\/identify\/?$/],
   ["GET", /^\/api\/stt\/stream\/?$/],
   ["GET", /^\/api\/devices\/me\/events\/?$/],
+  ["GET", /^\/api\/devices\/me\/firmware-update(?:\/app\.bin)?\/?$/],
   ["POST", /^\/api\/tts\/?$/],
   ["PUT", /^\/api\/devices\/me\/state\/?$/],
   ["PUT", /^\/api\/devices\/me\/checkin\/?$/],

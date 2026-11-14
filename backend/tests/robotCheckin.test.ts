@@ -71,4 +71,9 @@ describe("robot check-in", () => {
     expect((await robot.put("/api/devices/me/checkin", payload())).status).toBe(204);
     expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { timers_active: null, mic_level: null } });
   });
+
+  test("shows the firmware update state in the existing robot status", async () => {
+    expect((await robot.put("/api/devices/me/checkin", payload({ updating: true, update_progress: 42 }))).status).toBe(204);
+    expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { updating: true, update_progress: 42 } });
+  });
 });

@@ -27,6 +27,8 @@ export type RobotCheckin = {
   self_restarts?: number | null;
   heal_hold?: boolean | null;
   mic_level?: number | null;
+  updating?: boolean | null;
+  update_progress?: number | null;
 };
 
 const latest = new Map<string, { value: RobotCheckin; receivedAt: number }>();

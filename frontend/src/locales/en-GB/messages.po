@@ -834,7 +834,7 @@ msgid "{name} conversations"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:147
+#: src/apps/settings/HouseholdRobotsSection.tsx:148
 msgid "{name} could not be forgotten. Check the connection and try again."
 msgstr ""
 
@@ -966,7 +966,7 @@ msgid "{name} sections"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:82
+#: src/apps/settings/HouseholdRobotsSection.tsx:83
 msgid "{name} settings"
 msgstr ""
 
@@ -1180,7 +1180,7 @@ msgid "{row}: {category}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:190
+#: src/apps/settings/HouseholdRobotsSection.tsx:191
 msgid "{running}. Ready: {available}."
 msgstr ""
 
@@ -2023,7 +2023,7 @@ msgid "area.Access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:203
+#: src/apps/settings/HouseholdRobotsSection.tsx:204
 msgid "Access"
 msgstr ""
 
@@ -2116,7 +2116,7 @@ msgid "Add a place"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:78
+#: src/apps/settings/HouseholdRobotsSection.tsx:79
 #: src/shell/pages/settings/settingsViews.tsx:117
 msgid "Add a robot"
 msgstr ""
@@ -3348,7 +3348,7 @@ msgid "Archive \"{text}\""
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:203
+#: src/apps/settings/HouseholdRobotsSection.tsx:204
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
 msgid "Area"
 msgstr ""
@@ -3722,7 +3722,7 @@ msgid "Back to profile"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:157
+#: src/apps/settings/HouseholdRobotsSection.tsx:158
 msgid "Back to robots"
 msgstr ""
 
@@ -3879,12 +3879,12 @@ msgid "Battery"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:172
+#: src/apps/settings/HouseholdRobotsSection.tsx:173
 msgid "Battery {level}%"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:172
+#: src/apps/settings/HouseholdRobotsSection.tsx:173
 msgid "Battery {level}%, charging"
 msgstr ""
 
@@ -4287,7 +4287,7 @@ msgid "Bot options"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:189
+#: src/apps/settings/HouseholdRobotsSection.tsx:190
 msgid "Bot software on this computer"
 msgstr ""
 
@@ -4528,8 +4528,8 @@ msgid "Cancel enrollment"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Cancel install"
 msgstr ""
 
@@ -4560,7 +4560,7 @@ msgid "Cancel the {label} download"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Cancel the install and forget {name}?"
 msgstr ""
 
@@ -6349,7 +6349,7 @@ msgid "Connecting to the StackChan. This takes up to 30 seconds."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:169
+#: src/apps/settings/HouseholdRobotsSection.tsx:170
 #: src/shell/pages/settings/HouseSettings.tsx:45
 #: src/shell/pages/settings/HouseSettings.tsx:45
 msgid "Connection"
@@ -6978,7 +6978,7 @@ msgid "Could not load the household. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:68
+#: src/apps/settings/HouseholdRobotsSection.tsx:69
 msgid "Could not load the household's robots."
 msgstr ""
 
@@ -7388,7 +7388,7 @@ msgid "Could not save this chat's settings. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:134
+#: src/apps/settings/HouseholdRobotsSection.tsx:135
 msgid "Could not save this robot. Check the connection and try again."
 msgstr ""
 
@@ -10003,7 +10003,7 @@ msgid "Forget"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Forget {name}?"
 msgstr ""
 
@@ -10028,8 +10028,8 @@ msgid "Forget selected"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Forget this robot"
 msgstr ""
 
@@ -11709,7 +11709,7 @@ msgid "setting.news.lists.teen.option_label.feeds-household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:80
+#: src/apps/settings/HouseholdRobotsSection.tsx:81
 msgid "Household robots"
 msgstr ""
 
@@ -12544,7 +12544,7 @@ msgid "Installed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:182
+#: src/apps/settings/HouseholdRobotsSection.tsx:183
 msgid "Installed {version}, recorded {date}. Ready to install: {available}."
 msgstr ""
 
@@ -12672,7 +12672,7 @@ msgid "IP address"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:173
+#: src/apps/settings/HouseholdRobotsSection.tsx:174
 msgid "IP address {ip}"
 msgstr ""
 
@@ -12738,7 +12738,7 @@ msgid "It takes about a minute. It shows up in your list."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."
 msgstr ""
 
@@ -12882,7 +12882,7 @@ msgid "Keep in my Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Keep installing"
 msgstr ""
 
@@ -12893,7 +12893,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/DevicesSection.tsx:141
 #: src/apps/settings/DevicesSection.tsx:222
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 #: src/apps/settings/ModelsAndStorageSection.tsx:124
 #: src/apps/settings/styles/StyleEditor.tsx:182
 #: src/shell/pages/FilesPage.tsx:402
@@ -13357,7 +13357,7 @@ msgid "Last probe:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:163
+#: src/apps/settings/HouseholdRobotsSection.tsx:164
 msgid "Last seen {format}"
 msgstr ""
 
@@ -14315,7 +14315,7 @@ msgid "Loading repairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:68
+#: src/apps/settings/HouseholdRobotsSection.tsx:69
 #: src/apps/settings/RobotCards.tsx:25
 msgid "Loading robots"
 msgstr ""
@@ -16122,7 +16122,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:226
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/CodingSettings.tsx:234
-#: src/apps/settings/HouseholdRobotsSection.tsx:203
+#: src/apps/settings/HouseholdRobotsSection.tsx:204
 #: src/apps/settings/styles/StyleAddFile.tsx:52
 #: src/apps/settings/styles/StyleConfirm.tsx:85
 #: src/apps/settings/styles/StyleEditor.tsx:83
@@ -16392,7 +16392,7 @@ msgid "never connected"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:85
+#: src/apps/settings/HouseholdRobotsSection.tsx:86
 msgid "Never connected"
 msgstr ""
 
@@ -16714,7 +16714,7 @@ msgid "No commands yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:174
+#: src/apps/settings/HouseholdRobotsSection.tsx:175
 msgid "No connection details reported."
 msgstr ""
 
@@ -16918,7 +16918,7 @@ msgid "No robot found on your network yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:79
+#: src/apps/settings/HouseholdRobotsSection.tsx:80
 msgid "No robots yet."
 msgstr ""
 
@@ -17289,7 +17289,7 @@ msgid "Not reachable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:183
+#: src/apps/settings/HouseholdRobotsSection.tsx:184
 msgid "Not recorded. Ready to install: {available}. Install the update from here to keep track."
 msgstr ""
 
@@ -17305,14 +17305,14 @@ msgid "Not responding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:192
+#: src/apps/settings/HouseholdRobotsSection.tsx:193
 #: src/shell/pages/status/StatusComponents.tsx:41
 #: src/shell/pages/status/StatusComponents.tsx:43
 msgid "Not running"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:190
+#: src/apps/settings/HouseholdRobotsSection.tsx:191
 msgid "Not running. Ready: {available}."
 msgstr ""
 
@@ -17819,8 +17819,8 @@ msgid "setting.robot.initiative.accept_phrases.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:163
-#: src/apps/settings/HouseholdRobotsSection.tsx:176
+#: src/apps/settings/HouseholdRobotsSection.tsx:164
+#: src/apps/settings/HouseholdRobotsSection.tsx:177
 #: src/shell/pages/EnginesPage.tsx:35
 #: src/shell/pages/FamilyPage.tsx:77
 msgid "Offline"
@@ -17872,8 +17872,8 @@ msgid "Offline reference library."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:85
-#: src/apps/settings/HouseholdRobotsSection.tsx:170
+#: src/apps/settings/HouseholdRobotsSection.tsx:86
+#: src/apps/settings/HouseholdRobotsSection.tsx:171
 msgid "Offline, last seen {time}"
 msgstr ""
 
@@ -18172,10 +18172,10 @@ msgid "Ongoing since {time} · {duration}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:85
-#: src/apps/settings/HouseholdRobotsSection.tsx:87
-#: src/apps/settings/HouseholdRobotsSection.tsx:163
-#: src/apps/settings/HouseholdRobotsSection.tsx:176
+#: src/apps/settings/HouseholdRobotsSection.tsx:86
+#: src/apps/settings/HouseholdRobotsSection.tsx:88
+#: src/apps/settings/HouseholdRobotsSection.tsx:164
+#: src/apps/settings/HouseholdRobotsSection.tsx:177
 #: src/shell/pages/FamilyPage.tsx:77
 msgid "Online"
 msgstr ""
@@ -20345,7 +20345,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/DevicesSection.tsx:150
 #: src/apps/settings/FreeUpSpaceDialog.tsx:114
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
 #: src/apps/settings/styles/StyleEditor.tsx:98
 #: src/apps/settings/styles/StyleEditor.tsx:183
@@ -20468,7 +20468,7 @@ msgid "Remove the vocals"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Remove this robot from the household."
 msgstr ""
 
@@ -20801,7 +20801,7 @@ msgid "Restart guard is holding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:192
+#: src/apps/settings/HouseholdRobotsSection.tsx:193
 msgid "Restart needed"
 msgstr ""
 
@@ -21112,7 +21112,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:142
 #: src/apps/settings/DevicesSection.tsx:23
-#: src/apps/settings/HouseholdRobotsSection.tsx:155
+#: src/apps/settings/HouseholdRobotsSection.tsx:156
 #: src/apps/settings/RobotBody.tsx:188
 #: src/apps/settings/RobotPasswordSection.tsx:152
 #: src/shell/pages/FamilyPage.tsx:77
@@ -21150,7 +21150,7 @@ msgid "setting.person.robot.topics.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:180
+#: src/apps/settings/HouseholdRobotsSection.tsx:181
 msgid "Robot firmware"
 msgstr ""
 
@@ -21212,7 +21212,7 @@ msgid "Robot settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:167
+#: src/apps/settings/HouseholdRobotsSection.tsx:168
 msgid "Robot software"
 msgstr ""
 
@@ -21277,7 +21277,7 @@ msgid "area.Robots"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:78
+#: src/apps/settings/HouseholdRobotsSection.tsx:79
 msgid "Robots"
 msgstr ""
 
@@ -21523,7 +21523,7 @@ msgid "Save name"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:203
+#: src/apps/settings/HouseholdRobotsSection.tsx:204
 msgid "Save name and area"
 msgstr ""
 
@@ -21664,7 +21664,7 @@ msgstr ""
 #: src/apps/people/ProfileForm.tsx:190
 #: src/apps/people/ProfileForm.tsx:195
 #: src/apps/settings/AiSlotDialog.tsx:152
-#: src/apps/settings/HouseholdRobotsSection.tsx:203
+#: src/apps/settings/HouseholdRobotsSection.tsx:204
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/SignInSecretSection.tsx:74
 #: src/shell/pages/MusicComposer.tsx:111
@@ -23348,7 +23348,7 @@ msgid "Soft piano, slow and warm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:166
+#: src/apps/settings/HouseholdRobotsSection.tsx:167
 msgid "Software"
 msgstr ""
 
@@ -24220,7 +24220,7 @@ msgid "Stop the Max job"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Stop this robot's installation."
 msgstr ""
 
@@ -25646,7 +25646,7 @@ msgid "The hub's logs still mention them, without anything they said, for 7 days
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:147
+#: src/apps/settings/HouseholdRobotsSection.tsx:148
 msgid "The install could not be cancelled. Check the connection and try again."
 msgstr ""
 
@@ -26720,7 +26720,7 @@ msgid "This replaces the note everyone can see now."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "This revokes its enrollment code and deletes its saved firmware backup."
 msgstr ""
 
@@ -27655,8 +27655,8 @@ msgid "unknown"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:185
-#: src/apps/settings/HouseholdRobotsSection.tsx:192
+#: src/apps/settings/HouseholdRobotsSection.tsx:186
+#: src/apps/settings/HouseholdRobotsSection.tsx:193
 #: src/apps/settings/RobotBody.tsx:209
 #: src/apps/settings/RobotBody.tsx:225
 #: src/apps/settings/RobotBody.tsx:226
@@ -27819,8 +27819,8 @@ msgid "Up to {minutes, plural, one {# minute} other {# minutes}} on this compute
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:185
-#: src/apps/settings/HouseholdRobotsSection.tsx:192
+#: src/apps/settings/HouseholdRobotsSection.tsx:186
+#: src/apps/settings/HouseholdRobotsSection.tsx:193
 #: src/shell/library/TranscriptCaptionTracks.tsx:127
 #: src/shell/pages/UpdatesPage.tsx:61
 #: src/shell/pages/UpdatesPage.tsx:63
@@ -27833,7 +27833,7 @@ msgid "Update actions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:185
+#: src/apps/settings/HouseholdRobotsSection.tsx:186
 #: src/shell/pages/EnginesPage.tsx:78
 #: src/shell/pages/UpdatesPage.tsx:58
 #: src/shell/pages/UpdatesPage.tsx:63
@@ -27883,6 +27883,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/Attention.tsx:26
 msgid "Updates lets you review and apply it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/HouseholdRobotsSection.tsx:45
+msgid "Updating its software"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28004,7 +28009,7 @@ msgid "Use the account your family's phones and tablets will use."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:126
+#: src/apps/settings/HouseholdRobotsSection.tsx:127
 msgid "Use the companion's voice"
 msgstr ""
 
@@ -28658,7 +28663,7 @@ msgid "Waiting for sign-in"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:175
+#: src/apps/settings/HouseholdRobotsSection.tsx:176
 msgid "Waiting for the robot to check in."
 msgstr ""
 
@@ -29320,7 +29325,7 @@ msgid "Whose voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:171
+#: src/apps/settings/HouseholdRobotsSection.tsx:172
 msgid "Wi-Fi {signal}"
 msgstr ""
 
@@ -29442,7 +29447,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 #: src/shell/library/TranscriptCaptionTracks.tsx:71
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60
@@ -29535,7 +29540,7 @@ msgid "Yes, adults only"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Yes, cancel install"
 msgstr ""
 
@@ -29555,7 +29560,7 @@ msgid "Yes, forget everything"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/HouseholdRobotsSection.tsx:204
+#: src/apps/settings/HouseholdRobotsSection.tsx:205
 msgid "Yes, forget it"
 msgstr ""
 

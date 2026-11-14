@@ -16,6 +16,7 @@ import { devices, deviceTokens } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { FLASH_BACKUP_MAX_BYTES } from "@/lib/stackchanInstall";
 import { dataDir as homeDataDir } from "@/lib/paths";
+import { issueDeviceToken } from "@/lib/deviceTokens";
 
 const dataDir = robotHostDataDir("device-stacktest");
 const temps: string[] = [];
@@ -40,7 +41,7 @@ function signedManifest() {
     id: "stackchan-test",
     name: "StackChan",
     version: "test",
-    builds: [{ chipFamily: "ESP32-S3" as const, parts: [{ path: "app.bin", offset: 0x10000, size: 3, sha256: createHash("sha256").update(Buffer.from([1, 2, 3])).digest("hex") }] }],
+    builds: [{ chipFamily: "ESP32-S3" as const, parts: [{ path: "maipai-stackchan.bin", offset: 0x10000, size: 3, sha256: createHash("sha256").update(Buffer.from([1, 2, 3])).digest("hex") }] }],
     flash_size: "16MB",
     provenance: "test",
     created_at: "2026-10-20T00:00:00Z",
@@ -81,8 +82,8 @@ function firmwareAsset(badSignature = false) {
   if (badSignature) manifest.signature.sig = Buffer.alloc(64).toString("base64");
   const part = Buffer.from([1, 2, 3]);
   const tarDir = mkdtempSync(join(tmpdir(), "stackchan-fw-src-")); temps.push(tarDir);
-  writeFileSync(join(tarDir, "flash-manifest.json"), JSON.stringify(manifest)); writeFileSync(join(tarDir, "app.bin"), part);
-  const proc = Bun.spawn(["tar", "-czf", "-", "-C", tarDir, "flash-manifest.json", "app.bin"], { stdout: "pipe" });
+  writeFileSync(join(tarDir, "flash-manifest.json"), JSON.stringify(manifest)); writeFileSync(join(tarDir, "maipai-stackchan.bin"), part);
+  const proc = Bun.spawn(["tar", "-czf", "-", "-C", tarDir, "flash-manifest.json", "maipai-stackchan.bin"], { stdout: "pipe" });
   const bytesPromise = new Response(proc.stdout).arrayBuffer();
   return { manifest, key, privateKey, bytesPromise };
 }
@@ -104,8 +105,8 @@ describe("StackChan install integrity and backup", () => {
     const bad = { ...manifest, signature: { ...manifest.signature, sig: Buffer.alloc(64).toString("base64") } };
     expect(() => verifyStackChanManifest(bad, [key])).toThrow("could not be verified");
     const release = mkdtempSync(join(tmpdir(), "stackchan-part-test-")); temps.push(release);
-    writeFileSync(join(release, "app.bin"), Buffer.from([9, 9, 9]));
-    expect(() => verifiedFlashPart(manifest as never, release, "app.bin")).toThrow("did not match");
+    writeFileSync(join(release, "maipai-stackchan.bin"), Buffer.from([9, 9, 9]));
+    expect(() => verifiedFlashPart(manifest as never, release, "maipai-stackchan.bin")).toThrow("did not match");
     expect(verifiedFlashPart(manifest as never, release, "outside.bin")).toBeNull();
   });
 
@@ -126,15 +127,42 @@ describe("StackChan install integrity and backup", () => {
     const fixture = firmwareAsset(); const bytes = new Uint8Array(await fixture.bytesPromise);
     __setBotReleaseForTests({ pin: pinForFirmware(bytes, fixture.key), fetch: releaseFetch(bytes, fixture.privateKey) });
     const manifest = await client.get("/api/robots/stackchan/flash-manifest"); expect(manifest.status).toBe(200);
-    const part = await client.get("/api/robots/stackchan/flash-parts/app.bin"); expect(part.status).toBe(200); expect(new Uint8Array(await part.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    const part = await client.get("/api/robots/stackchan/flash-parts/maipai-stackchan.bin"); expect(part.status).toBe(200); expect(new Uint8Array(await part.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
     expect((await client.get("/api/robots/stackchan/flash-parts/absent.bin")).status).toBe(404);
-    const actualInstalled = join(homeDataDir, "robots/firmware/77.1.0-stackchan/app.bin");
+    const actualInstalled = join(homeDataDir, "robots/firmware/77.1.0-stackchan/maipai-stackchan.bin");
     writeFileSync(actualInstalled, Buffer.from([9, 9, 9]));
-    expect((await client.get("/api/robots/stackchan/flash-parts/app.bin")).status).toBe(502);
+    expect((await client.get("/api/robots/stackchan/flash-parts/maipai-stackchan.bin")).status).toBe(502);
     // A distinct pin version forces a fresh install of the bad-signature set.
     const bad = firmwareAsset(true); const badBytes = new Uint8Array(await bad.bytesPromise);
     __setBotReleaseForTests({ pin: { ...pinForFirmware(badBytes, bad.key), version: "77.2.0" }, fetch: releaseFetch(badBytes, bad.privateKey) });
     expect((await client.get("/api/robots/stackchan/flash-manifest")).status).toBe(502);
+  });
+
+  test("device firmware update check and download serve only newer verified OTA firmware", async () => {
+    const { client, id } = await owner();
+    const fixture = firmwareAsset(); const bytes = new Uint8Array(await fixture.bytesPromise);
+    __setBotReleaseForTests({ pin: pinForFirmware(bytes, fixture.key), fetch: releaseFetch(bytes, fixture.privateKey) });
+    const { token } = issueDeviceToken(id, "robot", "StackChan", ["no_vendor_login"]);
+    const robot = new TestClient(); await robot.post("/api/auth/devices/redeem", { token });
+    const check = (current: string) => robot.get(`/api/devices/me/firmware-update?current=${encodeURIComponent(current)}`);
+    expect(await (await check("77.0.0")).json()).toMatchObject({ available: true, version: "77.1.0", size: 3 });
+    expect(await (await check("77.1.0")).json()).toMatchObject({ available: false, reason: "up_to_date" });
+    expect(await (await check("77.2.0")).json()).toMatchObject({ available: false, reason: "up_to_date" });
+    expect((await robot.get("/api/devices/me/firmware-update/app.bin")).status).toBe(200);
+    const app = await robot.get("/api/devices/me/firmware-update/app.bin");
+    expect(new Uint8Array(await app.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(app.headers.get("content-length")).toBe("3");
+    const unauthenticated = new TestClient();
+    expect((await unauthenticated.get("/api/devices/me/firmware-update?current=77.0.0")).status).toBe(401);
+    expect((await unauthenticated.get("/api/devices/me/firmware-update/app.bin")).status).toBe(401);
+    const actual = join(homeDataDir, "robots/firmware/77.1.0-stackchan/maipai-stackchan.bin");
+    rmSync(actual, { force: true });
+    expect(await (await check("77.0.0")).json()).toMatchObject({ available: false, reason: "manifest_unverified" });
+    expect((await robot.get("/api/devices/me/firmware-update/app.bin")).status).toBe(404);
+    const bad = firmwareAsset(true); const badBytes = new Uint8Array(await bad.bytesPromise);
+    __setBotReleaseForTests({ pin: { ...pinForFirmware(badBytes, bad.key), version: "77.2.0" }, fetch: releaseFetch(badBytes, bad.privateKey) });
+    expect(await (await check("77.0.0")).json()).toMatchObject({ available: false, reason: "manifest_unverified" });
+    expect(await (await check("not-a-version")).json()).toMatchObject({ available: false, reason: "bad_current" });
   });
 
   test("enroll-image returns private bytes, records the code id, and cleans its temporary image", async () => {

@@ -35,13 +35,14 @@ function statusText(device: DeviceInfo): string {
 }
 
 /** STACKCHAN-HOME-01: the bot 0.2.65 check-in extras as small plain facts; a field the robot did not send shows nothing. */
-export function checkinFacts(checkin: { timers_active?: number | null; self_restarts?: number | null; heal_hold?: boolean | null; mic_level?: number | null } | null): string[] {
+export function checkinFacts(checkin: { timers_active?: number | null; self_restarts?: number | null; heal_hold?: boolean | null; mic_level?: number | null; updating?: boolean | null } | null): string[] {
   if (!checkin) return [];
   const facts: string[] = [];
   if (typeof checkin.timers_active === "number") facts.push(i18n._({ id: "Timers: {count}", message: "Timers: {count}", values: { count: checkin.timers_active } }));
   if (typeof checkin.self_restarts === "number") facts.push(i18n._({ id: "Restarted itself {count, plural, one {# time} other {# times}}", message: "Restarted itself {count, plural, one {# time} other {# times}}", values: { count: checkin.self_restarts } }));
   if (checkin.heal_hold === true) facts.push(i18n._({ id: "Restart guard is holding", message: "Restart guard is holding" }));
   if (typeof checkin.mic_level === "number") facts.push(i18n._({ id: "Microphone level {level}", message: "Microphone level {level}", values: { level: checkin.mic_level } }));
+  if (checkin.updating === true) facts.push(i18n._({ id: "Updating its software", message: "Updating its software" }));
   return facts;
 }
 

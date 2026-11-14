@@ -33349,6 +33349,8 @@ How it works:
   Bot request happens only while a robot is paired. It is the same
   unauthenticated `api.github.com` call, no identifier sent.
 
+StackChan bodies use their paired device session to check `GET /api/devices/me/firmware-update?current=<version>` and download `GET /api/devices/me/firmware-update/app.bin`; Home verifies the signed firmware manifest and app hash before reporting an update or streaming its bytes.
+
 ## ROBOT-MUTE-01: the mute command needs its own channel (filed 2026-09-29)
 
 Surfaced while resolving ROBOT-CARD-01's state transport: `bot`'s
