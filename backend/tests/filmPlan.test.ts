@@ -24,6 +24,22 @@ describe("film planner", () => {
     expect(seenFormat).toEqual(FILM_PLAN_RESPONSE_FORMAT);
   });
 
+  test("keeps a valid reel format, drops an unknown format, and accepts a normal plan without one", async () => {
+    __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify({ ...goodPlan, format: "travel" }) }));
+    expect(await planFilm({ idea: "A quiet trip through the mountains" })).toMatchObject({ ok: true, plan: { format: "travel" } });
+    __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify({ ...goodPlan, format: "banana" }) }));
+    const unknown = await planFilm({ idea: "A quiet trip through the mountains" });
+    expect(unknown.ok).toBe(true);
+    if (unknown.ok) expect(unknown.plan).not.toHaveProperty("format");
+    __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify(goodPlan) }));
+    expect(await planFilm({ idea: "A sailor crosses the sea" })).toEqual({ ok: true, plan: goodPlan });
+  });
+
+  test("offers the six reel ids as a response schema enum", () => {
+    const jsonSchema = FILM_PLAN_RESPONSE_FORMAT.json_schema.schema as { properties: Record<string, { enum?: string[] }> };
+    expect(jsonSchema.properties.format?.enum).toEqual(["day-in-the-life", "outfit-transition", "get-ready-with-me", "point-of-view", "trend", "travel"]);
+  });
+
   test("sends the target length in planner data and accepts a plan in one call", async () => {
     let calls = 0;
     let userMessage = "";
@@ -88,7 +104,7 @@ describe("film planner", () => {
     }
     const jsonSchema = FILM_PLAN_RESPONSE_FORMAT.json_schema.schema as { properties: Record<string, unknown>; required: string[] };
     expect(Object.keys(jsonSchema.properties).sort()).toEqual(Object.keys(filmPlanSchema.shape).sort());
-    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => key !== "look" && key !== "letterbox" && key !== "title_card" && key !== "credits_card" && key !== "target_seconds"));
+    expect(jsonSchema.required).toEqual(Object.keys(filmPlanSchema.shape).filter((key) => !["look", "letterbox", "title_card", "credits_card", "target_seconds", "format", "preset"].includes(key)));
   });
 
   test("a plan is fitted to the asked length in code: shots plus overlaps plus the title and credits", async () => {

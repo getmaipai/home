@@ -1,0 +1,6 @@
+[
+  {"id":"warm-and-calm","title":"Warm and calm","summary":"Gentle, welcoming images with an unhurried feel.","look":"soft warm light, natural texture, gentle contrast","pace":"slow, steady cuts with room to breathe","music_hint":"quiet piano or soft acoustic tones","caption_style":"simple captions with generous spacing"},
+  {"id":"fast-and-punchy","title":"Fast and punchy","summary":"Bright energy, crisp movement and quick changes.","look":"clear light, bold natural colors, crisp detail","pace":"quick cuts that follow the action","music_hint":"upbeat percussion and a lively pulse","caption_style":"short bold captions timed to the beat"},
+  {"id":"dreamy","title":"Dreamy","summary":"Airy images and flowing movement for a reflective mood.","look":"soft highlights, gentle haze, muted colors","pace":"flowing shots with occasional slow pauses","music_hint":"light ambient tones or delicate strings","caption_style":"light captions with soft timing"},
+  {"id":"clean-and-bright","title":"Clean and bright","summary":"Open, clear images with an even pace and fresh feel.","look":"bright natural light, clean whites, balanced color","pace":"even cuts with clear visual steps","music_hint":"light instrumental music with a steady pulse","caption_style":"clear high contrast captions with consistent placement"}
+]
