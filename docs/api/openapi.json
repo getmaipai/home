@@ -34750,6 +34750,78 @@
         }
       }
     },
+    "/api/devices/me/firmware-update": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Check for a verified StackChan firmware update",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "current",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified firmware update status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "up_to_date",
+                        "no_firmware",
+                        "manifest_unverified",
+                        "bad_current"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "available"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/me/firmware-update/app.bin": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Download the verified StackChan OTA app",
+        "responses": {
+          "200": {
+            "description": "Verified OTA app bytes."
+          },
+          "404": {
+            "description": "No verified app is available."
+          }
+        }
+      }
+    },
     "/api/devices/me/checkin": {
       "put": {
         "tags": [
@@ -37353,6 +37425,14 @@
                           "type": "integer",
                           "nullable": true
                         },
+                        "updating": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "update_progress": {
+                          "type": "integer",
+                          "nullable": true
+                        },
                         "heap": {
                           "type": "object",
                           "properties": {
@@ -37389,6 +37469,8 @@
                         "self_restarts",
                         "heal_hold",
                         "mic_level",
+                        "updating",
+                        "update_progress",
                         "heap"
                       ]
                     },
