@@ -2,7 +2,7 @@ import type { PersonRow } from "@/types";
 import { isDeviceConnected, listRobotsPairedUnderPerson } from "@/lib/deviceCommands";
 import { getDeviceState } from "@/lib/deviceStates";
 import { mediaBandOf } from "@/lib/media/band";
-import { robotControlsOf, stricterBand } from "@/lib/robotCompanion";
+import { robotCompanionBand, stricterBand } from "@/lib/robotCompanion";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import { getMusicJobFor } from "@/lib/music/store";
 import { musicJobLockItem, musicJobLockState } from "@/lib/music/lock";
@@ -19,10 +19,10 @@ const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f<>\[\]{}|]/g,
 export function robotsFor(person: PersonRow): string[] {
   return listRobotsPairedUnderPerson(person.id);
 }
-/** Face text and heard-song context pass the stricter of the player's band and the robot's controls band. */
+/** Face text and heard-song context pass the stricter of the player's band and the band the robot gives an unknown speaker: its controls level when a companion is assigned, else child (RULES.md rule 0, robot paragraph). */
 export function titleAllowedFor(person: PersonRow, robotId: string, text: string): boolean {
   try {
-    const band = stricterBand(mediaBandOf(person), robotControlsOf(robotId));
+    const band = stricterBand(mediaBandOf(person), robotCompanionBand(robotId) ?? "child");
     if (band === "adult") return true;
     const checked = forOutput(evaluateSafety(text, band, "reply"));
     return checked.action === "allow" && !checked.flagged;

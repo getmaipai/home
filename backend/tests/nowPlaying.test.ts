@@ -48,6 +48,10 @@ function setRobotBand(robotId: string, band: "child" | "teen" | "adult"): void {
   const now = new Date().toISOString();
   db.insert(settingsValues).values({ scope: `device:${robotId}`, key: "robot.controls", value: JSON.stringify(band), hlc: "1:0:test", source: "user", updatedAt: now, setBy: null }).run();
 }
+function assignCompanion(robotId: string, companionId: string): void {
+  const now = new Date().toISOString();
+  db.insert(settingsValues).values({ scope: `device:${robotId}`, key: "robot.companion.id", value: JSON.stringify(companionId), hlc: "1:0:test", source: "user", updatedAt: now, setBy: null }).run();
+}
 function addSong(person: PersonRow, id: string, title: string, adultOnly = false, adultLock: "on" | "off" = "on"): void {
   const now = new Date().toISOString();
   db.insert(musicJobs).values({ id, personId: person.id, task: "text2music", request: JSON.stringify({ title, ...(adultOnly ? { adultOnly, adultLock } : {}) }), state: "done", progress: 1, createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
@@ -80,6 +84,7 @@ describe("now playing keeps a person's listening to their own robots", () => {
     const adult = addPerson("adult-per-robot", "adult");
     addRobot("child-per-robot", adult.id); addRobot("teen-per-robot", adult.id); addRobot("adult-per-robot-r", adult.id);
     setRobotBand("teen-per-robot", "teen"); setRobotBand("adult-per-robot-r", "adult");
+    assignCompanion("teen-per-robot", "rivet"); assignCompanion("adult-per-robot-r", "rivet");
     addSong(adult, "safe-song", "Sunny Day");
     const out = reportNowPlaying(adult, { state: "playing", song_id: "safe-song" });
     expect(out.pushed).toBe(0);
@@ -96,10 +101,26 @@ describe("now playing keeps a person's listening to their own robots", () => {
 
   test("an adult-only song never reaches a robot even when its lock is off", () => {
     const adult = addPerson("adult-only-person", "adult");
-    addRobot("adult-only-robot", adult.id); setRobotBand("adult-only-robot", "adult");
+    addRobot("adult-only-robot", adult.id); setRobotBand("adult-only-robot", "adult"); assignCompanion("adult-only-robot", "rivet");
     addSong(adult, "adult-only-song", "Private Track", true, "off");
     reportNowPlaying(adult, { state: "playing", song_id: "adult-only-song" });
     expect(heardSongFor("adult-only-robot")).toBeNull();
     expect(db.select().from(deviceCommands).all()).toHaveLength(0);
+  });
+
+  test("a robot with adult controls and no companion gets the child floor (RULES.md rule 0: an unknown speaker gets the child result)", () => {
+    const adult = addPerson("adult-no-companion", "adult");
+    addRobot("adult-no-companion-r", adult.id); setRobotBand("adult-no-companion-r", "adult");
+    expect(titleAllowedFor(adult, "adult-no-companion-r", "how to kill myself")).toBe(false);
+    expect(titleAllowedFor(adult, "adult-no-companion-r", "Sunny Day")).toBe(true);
+    addSong(adult, "no-companion-unsafe", "how to kill myself");
+    reportNowPlaying(adult, { state: "playing", song_id: "no-companion-unsafe" });
+    expect(heardSongFor("adult-no-companion-r")?.title).not.toBe("how to kill myself");
+  });
+
+  test("with a companion assigned the robot takes the admin's controls level", () => {
+    const adult = addPerson("adult-with-companion", "adult");
+    addRobot("adult-with-companion-r", adult.id); setRobotBand("adult-with-companion-r", "adult"); assignCompanion("adult-with-companion-r", "rivet");
+    expect(titleAllowedFor(adult, "adult-with-companion-r", "how to kill myself")).toBe(true);
   });
 });
