@@ -73,6 +73,18 @@ export function householdHomeSkyInput(): { lat: number; lon: number } | null {
   return { lat: Number(geo.lat.toFixed(2)), lon: Number(geo.lon.toFixed(2)) };
 }
 
+/** Coarse scene location only. Coordinates are consumed here and never returned. */
+export function homeOrAway(lat: number, lon: number): "home" | "away" | "unknown" {
+  const home = householdHomeSkyInput();
+  if (!home || !Number.isFinite(lat) || !Number.isFinite(lon)) return "unknown";
+  const radians = (value: number) => value * Math.PI / 180;
+  const dLat = radians(lat - home.lat);
+  const dLon = radians(lon - home.lon);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(home.lat)) * Math.cos(radians(lat)) * Math.sin(dLon / 2) ** 2;
+  const meters = 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return meters <= 1000 ? "home" : "away";
+}
+
 /** Returns the configured household home name without geocoding it. */
 export function householdHomePlaceName(): string | null {
   return householdHomeEntity()?.name.trim() || null;

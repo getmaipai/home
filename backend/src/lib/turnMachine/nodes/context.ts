@@ -267,7 +267,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const sceneNow = Date.now();
   const lookCount = state.surface === "robot" && state.deviceId ? sceneFor(state.deviceId, sceneNow)?.people ?? null : null;
   const speakerForScene = sceneSpeakerForTurn(state.surface, state.actor.id, state.speakerEvidence);
-  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
+  const roomDevice = state.deviceId ? getDeviceById(state.deviceId) : null;
+  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
   setScene(currentScene, sceneNow);
 
   const items: ContextItem[] = [];

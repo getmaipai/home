@@ -172,6 +172,17 @@ describe("scene fusion", () => {
     const gpsRoom = obs("room", { room: "kitchen" }, "gps", t + 2);
     expect(fuseScene(empty(), [gpsRoom], t + 2).place).toBeNull();
   });
+  test("configured robot room renders as detail and missing room emits nothing", () => {
+    const t = 100;
+    const observations = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceKind: "robot", deviceArea: "kitchen", actorId: "person-sage", actorBand: "adult", now: t });
+    expect(observations).toHaveLength(2); // weak device-address place plus configured room
+    const scene = fuseScene(empty(), observations, t);
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult" } as never;
+    expect(renderScene(scene, t, sage, [sage])).toContain("Place: indoors, kitchen.");
+    const noRoom = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceKind: "robot", actorId: "person-sage", actorBand: "adult", now: t });
+    expect(noRoom.some((item) => item.kind === "room")).toBe(false);
+    expect(renderScene(fuseScene(empty(), noRoom, t), t, sage, [sage])).not.toContain("Place:");
+  });
   test("conversation scene store supports touch, end, and temporary conversation cleanup", () => {
     clearScenes();
     const item = fuseScene(empty("temporary-1"), [obs("person_here", person("person-guest1"), "typed", 50, "weak", SCENE_TTL.typed)], 50);

@@ -4,6 +4,7 @@ import type { Scene } from "@maipai/spec/gen/ts/scene.js";
 import { onConversationFolded } from "@/lib/conversationHistory";
 import type { Surface } from "@/lib/turnShared";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
+import { homeOrAway } from "@/lib/places";
 
 export const SCENE_TTL = { face: 90_000, voice: 120_000, typed: 1_800_000, look: 90_000, gps: 600_000, signed_in: Number.POSITIVE_INFINITY, robot_room: 1_800_000, ha_entity: 1_800_000, sound: 60_000, light: 300_000, temperature: 300_000, motion: 60_000 } as const;
 const MAX_SCENES = 200;
@@ -68,8 +69,8 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
       if (!["robot_room", "ha_entity", "typed"].includes(o.source.sensor)) continue;
       const value = o.value as { room: string };
       const priority = (sensor: string) => sensor === "typed" ? 3 : sensor === "signed_in" ? 2 : sensor === "robot_room" || sensor === "ha_entity" ? 1 : 0;
-      if (place && priority(o.source.sensor) < priority(place.basis)) continue;
-      place = { where: place?.where ?? "unknown", setting: place?.setting ?? "indoor", area: value.room, precision: "room", basis: o.source.sensor, expires_at: clampExpires(o) };
+      if (place && priority(o.source.sensor) < priority(place.basis) && !(place.where === "unknown" && !place.area)) continue;
+      place = { where: place?.where ?? "unknown", setting: !place || place.setting === "unknown" ? "indoor" : place.setting, area: value.room, precision: "room", basis: o.source.sensor, expires_at: clampExpires(o) };
       continue;
     }
     if (o.kind === "place") {
@@ -120,7 +121,7 @@ export function observeSceneClaims(conversationId: string, observations: readonl
   return scene;
 }
 
-export function observationsForTurn(input: { surface: Surface; deviceId?: string; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; now: number }): SceneObservation[] {
+export function observationsForTurn(input: { surface: Surface; deviceId?: string; deviceArea?: string | null; deviceKind?: string; currentLocation?: { lat: number; lon: number } | null; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; now: number }): SceneObservation[] {
   const result: SceneObservation[] = [];
   for (const p of input.present ?? []) {
     if (!input.speakerEvidence && p.person === input.actorId) continue;
@@ -128,6 +129,14 @@ export function observationsForTurn(input: { surface: Surface; deviceId?: string
     result.push({ id: `present-${sensor}-${input.now}-${p.person ?? "unknown"}`, source: { surface: input.surface, device_id: input.deviceId ?? null, sensor }, kind: "person_here", value: { person_id: p.person?.startsWith("person-") ? p.person : null, label: null, relation: "unknown", band: "unknown", level: p.level === "confirmed" ? "confirmed" : "tentative" }, confidence: p.level === "confirmed" ? 0.95 : 0.5, strength: p.level === "confirmed" ? "strong" : "weak", at: input.now, expires_at: input.now + SCENE_TTL[sensor as keyof typeof SCENE_TTL] });
   }
   if (input.lookPeople !== null && input.lookPeople !== undefined && input.lookPeople > 0) result.push({ id: `look-${input.now}`, source: { surface: input.surface, device_id: input.deviceId ?? null, sensor: "look" }, kind: "people_count", value: input.lookPeople, confidence: 1, strength: "strong", at: input.now, expires_at: input.now + SCENE_TTL.look });
+  if (input.currentLocation) {
+    const decimals = input.actorBand === "child" ? 1 : 2;
+    const lat = Number(input.currentLocation.lat.toFixed(decimals));
+    const lon = Number(input.currentLocation.lon.toFixed(decimals));
+    result.push({ id: `gps-place-${input.now}`, source: { surface: input.surface, device_id: input.deviceId ?? null, sensor: "gps" }, kind: "place", value: { where: homeOrAway(lat, lon), setting: "unknown", area: null, precision: "area" }, confidence: 1, strength: "strong", at: input.now, expires_at: input.now + SCENE_TTL.gps });
+  }
+  else if (input.deviceId) result.push({ id: `signed-place-${input.now}`, source: { surface: input.surface, device_id: input.deviceId, sensor: "signed_in" }, kind: "place", value: { where: "unknown", setting: "unknown", area: null, precision: "area" }, confidence: 0.4, strength: "weak", at: input.now, expires_at: input.now + SCENE_TTL.signed_in });
+  if ((input.deviceKind === "robot" || input.deviceKind === "pod") && input.deviceArea?.trim()) result.push({ id: `device-room-${input.now}`, source: { surface: input.surface, device_id: input.deviceId ?? null, sensor: "robot_room" }, kind: "room", value: { room: input.deviceArea.trim() }, confidence: 1, strength: "strong", at: input.now, expires_at: input.now + SCENE_TTL.robot_room });
   return result;
 }
 export function sceneCounts(scene: Scene | null | undefined) { return { people: scene?.people.length ?? 0, strong: scene?.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in" )).length ?? 0, typed: scene?.people.filter((p) => p.basis.includes("typed")).length ?? 0, place_known: !!scene?.place && scene.place.where !== "unknown", child_present: scene?.child_present ?? false, events: scene?.ambient?.events.length ?? 0 }; }

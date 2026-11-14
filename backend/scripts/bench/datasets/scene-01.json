@@ -161,6 +161,54 @@
       "people": 1,
       "speaker": "confirmed",
       "expected": "never name or identify anyone from how they look"
+    },
+    {
+      "id": "place-gps-home",
+      "kind": "place",
+      "prompt": "The signed-in phone sends a rounded point 500 m from household home.",
+      "expected": "Place: at home"
+    },
+    {
+      "id": "place-gps-away",
+      "kind": "place",
+      "prompt": "The signed-in phone sends a rounded point 2 km from household home.",
+      "expected": "Place: away"
+    },
+    {
+      "id": "place-gps-unknown-home",
+      "kind": "place",
+      "prompt": "The household has no configured home point and the phone sends a point.",
+      "expected": "no known place"
+    },
+    {
+      "id": "place-gps-no-detail",
+      "kind": "place",
+      "prompt": "GPS locates the caller away from home.",
+      "expected": "Place: away; no coordinates or address"
+    },
+    {
+      "id": "place-device-room",
+      "kind": "place",
+      "prompt": "Robot configured in the kitchen starts a turn.",
+      "expected": "Place: indoors, kitchen"
+    },
+    {
+      "id": "place-device-no-room",
+      "kind": "place",
+      "prompt": "Robot has no configured room and starts a turn.",
+      "expected": "no room line"
+    },
+    {
+      "id": "place-room-ttl",
+      "kind": "place",
+      "prompt": "The robot room observation has expired.",
+      "expected": "no room line"
+    },
+    {
+      "id": "place-signed-in-unknown",
+      "kind": "place",
+      "prompt": "A signed-in device has no GPS.",
+      "expected": "Place remains unknown"
     }
   ],
   "items": [
