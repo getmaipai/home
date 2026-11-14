@@ -5,7 +5,7 @@
   "category": "Utilities",
   "display": "Name that tune",
   "description": "Identify music playing now through the connected robot. Use for 'what song is this', 'name that tune', or 'who sings this' when the song is not already known. Calls record a short clip.",
-  "offer": { "mode": "conditional", "gate": "songNameAllowed", "bench_row": "song-name", "priority": 998 },
+  "offer": { "mode": "off", "reason": "Off until the song-name bench row has a passed run (rule 1). Then back to conditional with gate songNameAllowed." },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
