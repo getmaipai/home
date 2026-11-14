@@ -36,7 +36,7 @@ describe("composer modes by band", () => {
     stack(all);
     const { row } = await owner();
     const res = await composerModesFor(row as PersonRow);
-    expect(ids(res)).toEqual(["ask", "picture", "video", "from-picture", "animate", "talking-avatar", "voiceover", "film", "song"]);
+    expect(ids(res)).toEqual(["ask", "picture", "video", "from-picture", "animate", "talking-avatar", "voiceover", "film", "song", "sound"]);
     const picture = res.modes.find((m) => m.id === "picture")!;
     expect(picture.route).toBe("/apps/image/create");
     expect(picture.placeholder).toContain("@");
@@ -64,7 +64,7 @@ describe("composer modes by band", () => {
     expect(video.availability).toBe("ready");
   });
 
-  test("the video stub pages are modes: two hand the picture to Video Create, three say plainly they are coming soon", async () => {
+  test("the video stub pages are modes: two hand the picture to Video Create, two say plainly they are coming soon", async () => {
     stack(all);
     const { row } = await owner();
     const res = await composerModesFor(row as PersonRow);
@@ -72,7 +72,11 @@ describe("composer modes by band", () => {
     expect(mode("from-picture").references.map((r) => r.id)).toEqual(["start_frame"]);
     expect(mode("from-picture").comingSoon).toBeNull();
     expect(mode("animate").comingSoon).toBeNull();
-    for (const id of ["talking-avatar", "voiceover", "film"]) {
+    expect(mode("talking-avatar").comingSoon).toBeNull();
+    expect(mode("talking-avatar").route).toBe("/apps/video/talking-avatar");
+    expect(mode("talking-avatar").references.map((r) => r.id)).toEqual(["cast"]);
+    expect(mode("talking-avatar").chips.map((c) => c.id)).toContain("orientation");
+    for (const id of ["voiceover", "film"]) {
       expect(mode(id).comingSoon).toMatch(/coming soon\. Until then/);
       expect(mode(id).primary.label.length).toBeGreaterThan(0);
       expect(mode(id).placeholder.length).toBeGreaterThan(0);

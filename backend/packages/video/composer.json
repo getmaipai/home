@@ -59,8 +59,7 @@
       "gate": "videos",
       "tools": [
         "clear"
-      ],
-      "coming_soon": "Talking avatar is coming soon. Until then, make a video from a picture."
+      ]
     },
     {
       "id": "voiceover",
