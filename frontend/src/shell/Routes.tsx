@@ -33,6 +33,9 @@ import { AdultLockController, useAdultLockProps } from "@/shell/AdultLockHost";
 import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { MusicPlayerBar } from "@/shell/music/MusicPlayerBar";
+import { musicPaneTabs } from "@/shell/music/MusicQueuePane";
+import { isMusicTab, musicPane, useMusicPane } from "@/shell/music/musicPane";
+import { useIsPhoneLayout } from "@maipai/ui/src/hooks/useIsPhoneLayout";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
@@ -360,7 +363,42 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     // WEB-TAB-03: the Web tab, for everyone but a guest; the server applies the household's sources and the age rules.
     webSearch: person.role === "guest" ? undefined : (text: string) => api.searchWebResults(text),
   }), [recentChats.data, ambient, person.role]);
-  const ambientRightPane = ambient ? <RightPane {...ambientPaneProps} /> : undefined;
+  // SF-08c: Queue and Recent are two more tabs of this one right pane (rule S2). On a phone, or with no pane to give, the player bar opens
+  // the same tabs in a drawer instead (`hosted` tells it which).
+  const musicState = useMusicPane();
+  const phoneLayout = useIsPhoneLayout();
+  const musicHosted = !!ambient && !phoneLayout;
+  useEffect(() => { musicPane.setHosted(musicHosted); return () => musicPane.setHosted(false); }, [musicHosted]);
+  const musicAsk = musicState.tab !== null ? musicState.nonce : 0;
+  useEffect(() => { if (musicHosted && musicAsk > 0) setPaneState((current) => {
+    if (current.open) return current;
+    const next = { ...current, open: true };
+    try { window.localStorage.setItem("maipai.ambient.pane", JSON.stringify(next)); } catch { /* local storage may be unavailable */ }
+    return next;
+  }); }, [musicHosted, musicAsk]);
+  useEffect(() => { if (!paneState.open) musicPane.release(); }, [paneState.open]);
+  // Esc closes the pane while a Music tab shows, unless the key belongs to a menu, a text box or a dialog.
+  useEffect(() => {
+    if (!musicHosted || musicState.tab === null || !paneState.open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [role="menu"], [role="dialog"], [role="listbox"], [role="combobox"]')) return;
+      event.preventDefault();
+      musicPane.release();
+      updatePaneState({ ...paneState, open: false });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  const ambientRightPane = ambient ? <RightPane
+    {...ambientPaneProps}
+    {...(musicHosted ? {
+      tabs: [...ambientPaneProps.tabs, ...musicPaneTabs()] as never,
+      activeTab: (musicState.tab ?? ambientPaneProps.activeTab) as never,
+      onActiveTabChange: ((id: string) => { if (isMusicTab(id)) musicPane.select(id); else { musicPane.release(); ambientPaneProps.onActiveTabChange(id as never); } }) as never,
+      onOpenChange: (open: boolean) => { if (!open) musicPane.release(); ambientPaneProps.onOpenChange(open); },
+    } : {})}
+  /> : undefined;
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const [railExpanded, setRailExpanded] = useRailExpanded(person.id);
   // The person opened the menu on a page that folds it by itself: that choice wins until they leave such pages.

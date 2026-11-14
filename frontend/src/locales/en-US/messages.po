@@ -3778,7 +3778,7 @@ msgstr "Backup storage limit (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:168
+#: src/shell/Routes.tsx:171
 msgid "Backups"
 msgstr "Backups"
 
@@ -5018,7 +5018,7 @@ msgstr "Chat settings"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:171
+#: src/shell/Routes.tsx:174
 msgid "Chat showcase"
 msgstr "Chat showcase"
 
@@ -6207,7 +6207,7 @@ msgstr "Coming up"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:169
+#: src/shell/Routes.tsx:172
 msgid "Commands"
 msgstr "Commands"
 
@@ -6729,7 +6729,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:400
+#: src/shell/Routes.tsx:438
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -7194,7 +7194,7 @@ msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -7615,7 +7615,7 @@ msgstr "Cover art"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:416
+#: src/shell/Routes.tsx:454
 msgid "Create"
 msgstr "Create"
 
@@ -9748,7 +9748,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 msgid "Find me"
 msgstr "Find me"
 
@@ -10812,8 +10812,8 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:414
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:452
+#: src/shell/Routes.tsx:506
 msgid "Home"
 msgstr "Home"
 
@@ -13770,7 +13770,7 @@ msgstr "Levels and models"
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:417
+#: src/shell/Routes.tsx:455
 msgid "Library"
 msgstr "Library"
 
@@ -15470,8 +15470,8 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:415
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:453
+#: src/shell/Routes.tsx:506
 msgid "Media"
 msgstr "Media"
 
@@ -16054,7 +16054,7 @@ msgid "mute"
 msgstr "mute"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:85
+#: src/shell/music/MusicPlayerBar.tsx:93
 msgid "Mute"
 msgstr "Mute"
 
@@ -16858,7 +16858,7 @@ msgid "No places yet"
 msgstr "No places yet"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:28
+#: src/shell/music/MusicPlayerBar.tsx:30
 msgid "No playable songs are left. Check the song files and try again."
 msgstr "No playable songs are left. Check the song files and try again."
 
@@ -17575,7 +17575,7 @@ msgid "Now all ages."
 msgstr "Now all ages."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:150
+#: src/shell/music/MusicPlayerBar.tsx:168
 msgid "Now playing"
 msgstr "Now playing"
 
@@ -18319,8 +18319,8 @@ msgid "Open in Library"
 msgstr "Open in Library"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:69
-#: src/shell/music/MusicPlayerBar.tsx:69
+#: src/shell/music/MusicPlayerBar.tsx:71
+#: src/shell/music/MusicPlayerBar.tsx:71
 #: src/shell/pages/MakeSongPage.tsx:97
 #: src/shell/pages/MusicLibrary.tsx:98
 #: src/shell/pages/MusicSongDetails.tsx:147
@@ -18876,7 +18876,7 @@ msgstr "Percent of the normal text size. \"Preset\" follows your ease of use cho
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:167
 msgid "Performance"
 msgstr "Performance"
 
@@ -19855,6 +19855,7 @@ msgstr "Questions and answers on cooking, repairs, gardens and computers."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
+#: src/shell/music/MusicPlayerBar.tsx:85
 msgid "Queue"
 msgstr "Queue"
 
@@ -20585,7 +20586,7 @@ msgstr "Repair issues"
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:166
+#: src/shell/Routes.tsx:169
 msgid "Repairs"
 msgstr "Repairs"
 
@@ -20607,7 +20608,7 @@ msgstr "Repeat"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat all songs"
 msgstr "Repeat all songs"
 
@@ -20623,7 +20624,7 @@ msgstr "Repeat ends"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat off"
 msgstr "Repeat off"
 
@@ -20634,7 +20635,7 @@ msgstr "Repeat on"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat one song"
 msgstr "Repeat one song"
 
@@ -22202,7 +22203,7 @@ msgstr "Seed {seed}. Take {index} of {total}."
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:94
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Seek"
 msgstr "Seek"
 
@@ -22573,7 +22574,7 @@ msgstr "Setting up your AI"
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:506
 msgid "Settings"
 msgstr "Settings"
 
@@ -22803,7 +22804,7 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:376
+#: src/shell/Routes.tsx:414
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -22944,7 +22945,7 @@ msgstr "Shows your companion at the top right of every page. Hover or tap it to 
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:76
+#: src/shell/music/MusicPlayerBar.tsx:78
 msgid "Shuffle"
 msgstr "Shuffle"
 
@@ -24062,7 +24063,7 @@ msgstr "Starts at (seconds)"
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:167
+#: src/shell/Routes.tsx:170
 msgid "Status"
 msgstr "Status"
 
@@ -24273,7 +24274,7 @@ msgstr "Stopwatch running"
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:163
+#: src/shell/Routes.tsx:166
 msgid "Storage"
 msgstr "Storage"
 
@@ -25014,7 +25015,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
@@ -26050,7 +26051,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr "The song goes under the video as a new version. Your first video is kept."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:151
+#: src/shell/music/MusicPlayerBar.tsx:169
 msgid "The song, its words and the player controls."
 msgstr "The song, its words and the player controls."
 
@@ -26730,7 +26731,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr "This song could not be made. Open it to try again."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:122
+#: src/shell/music/MusicPlayerBar.tsx:139
 msgid "This song could not be played. Check the file and try again."
 msgstr "This song could not be played. Check the file and try again."
 
@@ -27364,7 +27365,7 @@ msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:389
-#: src/shell/Routes.tsx:190
+#: src/shell/Routes.tsx:193
 msgid "Turn trace"
 msgstr "Turn trace"
 
@@ -27703,7 +27704,7 @@ msgid "unmute"
 msgstr "unmute"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:85
+#: src/shell/music/MusicPlayerBar.tsx:93
 msgid "Unmute"
 msgstr "Unmute"
 
@@ -27846,7 +27847,7 @@ msgstr "Updated {when}"
 #: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:165
+#: src/shell/Routes.tsx:168
 msgid "Updates"
 msgstr "Updates"
 
@@ -28132,7 +28133,7 @@ msgstr "Used yesterday"
 #: src/apps/settings/UsersSection.tsx:232
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
-#: src/shell/Routes.tsx:170
+#: src/shell/Routes.tsx:173
 msgid "Users"
 msgstr "Users"
 
@@ -28569,7 +28570,7 @@ msgstr "Voices are still getting ready. This takes a minute after setup."
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:86
+#: src/shell/music/MusicPlayerBar.tsx:94
 #: src/shell/pages/MusicStudioView.tsx:35
 msgid "Volume"
 msgstr "Volume"

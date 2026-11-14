@@ -10,6 +10,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@maipai/ui/src/ui/drawer";
 import { Slider } from "@maipai/ui/src/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { useIsPhoneLayout } from "@maipai/ui/src/hooks/useIsPhoneLayout";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -21,6 +22,9 @@ import { studioAddress } from "@/shell/pages/musicAddresses";
 import { musicPlayer, useMusicClock, useMusicPlayer, useMusicVolume } from "./musicPlayer";
 import type { Track } from "./musicQueue";
 import { WaveformSeek, usePeaks } from "./WaveformSeek";
+import { musicPaneTabs } from "./MusicQueuePane";
+import { say } from "./MusicQueuePane.helpers";
+import { isMusicTab, musicPane, QUEUE_TAB, useMusicPane, type MusicPaneTab } from "./musicPane";
 
 const icon = (name: string, className?: string) => { const One = getIcon(name); return <One aria-hidden="true" {...(className ? { className } : {})} />; };
 
@@ -109,6 +113,8 @@ export function MusicPlayerBar() {
   const snap = useMusicPlayer();
   const mode = usePlayMode();
   const [expanded, setExpanded] = useState(false);
+  const pane = useMusicPane();
+  const [drawer, setDrawer] = useState<MusicPaneTab | null>(null);
   const held = dock.current;
   const track = snap.track;
 
@@ -118,6 +124,13 @@ export function MusicPlayerBar() {
   const heldStarted = !!held?.started;
   useEffect(() => { if (heldStarted && !musicPlayer.get().playing) musicPlayer.stop(); }, [heldStarted]);
   useEffect(() => { if (!track) setExpanded(false); }, [track]);
+  // Closing the player closes its queue drawer too; the shell pane keeps its own state.
+  useEffect(() => { if (!track) setDrawer(null); }, [track]);
+  const pressQueue = () => {
+    if (pane.hosted && !phone) { musicPane.request(QUEUE_TAB); return; }
+    setDrawer((open) => (open ? null : QUEUE_TAB));
+  };
+  const queueOpen = drawer !== null || (pane.hosted && !phone && pane.tab !== null);
   useEffect(() => {
     if (snap.notice) push(i18n._({ id: "This song could not be played. Check the file and try again.", message: "This song could not be played. Check the file and try again." }));
   }, [snap.notice, push]);
@@ -126,6 +139,8 @@ export function MusicPlayerBar() {
   const latest = useRef(askNext); latest.current = askNext;
   const keys = useRef({ next: () => latest.current() }).current;
   useMusicKeys(!!track, keys);
+  const queueTabs = musicPaneTabs();
+  const queueLabel = i18n._({ id: "Queue", message: "Queue" });
 
   if (!track) return null;
   const poster = track.artworkUrl ?? undefined;
@@ -143,6 +158,7 @@ export function MusicPlayerBar() {
           actionsSlot: <>
             <SeekRow track={track} wide="w-24 lg:w-48 xl:w-72" />
             <PlayModeButtons />
+            <Button type="button" variant="ghost" size="icon" aria-label={queueLabel} title={queueLabel} aria-pressed={queueOpen} className={queueOpen ? "text-primary" : undefined} data-testid="music-bar-queue" onClick={pressQueue}>{icon("list-music")}</Button>
             <VolumeControl />
             {studioButton(track)}
           </> })} />
@@ -154,6 +170,15 @@ export function MusicPlayerBar() {
       {expanded ? null : <div data-slot="global-mini-player" data-testid="music-player-bar" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
         <div className="pointer-events-auto surface-float relative overflow-hidden">{body}</div>
       </div>}
+      <Drawer open={drawer !== null} onOpenChange={(open) => { if (!open) setDrawer(null); }}>
+        <DrawerContent data-testid="music-queue-drawer">
+          <DrawerHeader><DrawerTitle>{say("Queue")}</DrawerTitle><DrawerDescription className="sr-only">{say("The songs coming up, and the songs you played lately.")}</DrawerDescription></DrawerHeader>
+          <Tabs value={drawer ?? QUEUE_TAB} onValueChange={(value) => { if (isMusicTab(value)) setDrawer(value as MusicPaneTab); }}>
+            <TabsList>{queueTabs.map((one) => <TabsTrigger key={one.id} value={one.id}>{one.label}</TabsTrigger>)}</TabsList>
+            {queueTabs.map((one) => <TabsContent key={one.id} value={one.id}><div className="max-h-[60vh] overflow-y-auto">{one.content}</div></TabsContent>)}
+          </Tabs>
+        </DrawerContent>
+      </Drawer>
       {expanded && phone ? <Drawer open onOpenChange={(open) => { if (!open) setExpanded(false); }}>
         <DrawerContent data-testid="music-player-expanded" data-music-expanded>
           <DrawerHeader><DrawerTitle>{title}</DrawerTitle><DrawerDescription className="sr-only">{lead}</DrawerDescription></DrawerHeader>

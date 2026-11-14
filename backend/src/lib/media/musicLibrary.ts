@@ -210,3 +210,19 @@ export function musicLibraryData(person: PersonRow, dataId: string, params: Data
   if (params.scope === "recent-searches") return recentSearchRows(person);
   return null;
 }
+
+export interface RecentSong { id: string; title: string; subtitle: string | null; artwork_url: string | null; played_at: string; duration_s: number | null }
+
+/** SF-08c: the songs this person played lately for the Recent tab, newest first, each once. Only songs they may read; nothing else leaves. */
+export function recentMusicSongs(person: PersonRow, limit = 30): RecentSong[] {
+  const seen = new Set<string>();
+  const rows: RecentSong[] = [];
+  for (const progress of recentProgress(person.id, 200)) {
+    const item = readableIn(person, "audio", progress.media_id);
+    if (!item || item.kind !== "track" || seen.has(item.id)) continue;
+    seen.add(item.id);
+    rows.push({ id: item.id, title: item.title, subtitle: item.subtitle ?? null, artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, played_at: progress.updated_at, duration_s: progress.duration_s ?? null });
+    if (rows.length >= Math.min(Math.max(limit, 1), 100)) break;
+  }
+  return rows;
+}

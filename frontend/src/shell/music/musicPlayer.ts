@@ -4,10 +4,10 @@
 import { useSyncExternalStore } from "react";
 import type { AudioHandle, AudioSession } from "@/shell/audioSession";
 import { getPlayMode } from "@/shell/media/playMode";
-import { pickNext, pickPrevious, queueFor, type Track } from "./musicQueue";
+import { appendToQueue, clearPlayNext, clearUpcoming, insertNext, moveUpcoming, pickNext, pickPrevious, queueFor, removeUpcoming, trackIsPlayable, type QueueEdit, type QueueSource, type Track } from "./musicQueue";
 import { reportPlayerError } from "@/lib/clientErrors";
 
-export type { Track } from "./musicQueue";
+export type { QueueSource, Track } from "./musicQueue";
 
 export interface MusicSnapshot {
   track: Track | null;
@@ -17,10 +17,14 @@ export interface MusicSnapshot {
   /** True when the browser could not play the file; cleared by the next song. */
   failed: boolean;
   notice: string | null;
+  /** SF-08c: the keys of the songs placed by Play next, in order; they are the first songs after the one playing. */
+  manual: readonly string[];
+  /** SF-08c: the list, album, band or playlist the queue came from; null means the person's own songs. */
+  source: QueueSource | null;
 }
 
 const VOLUME_KEY = "music.volume";
-const EMPTY: MusicSnapshot = { track: null, queue: [], index: -1, playing: false, failed: false, notice: null };
+const EMPTY: MusicSnapshot = { track: null, queue: [], index: -1, playing: false, failed: false, notice: null, manual: [], source: null };
 const UNPLAYABLE = "This song could not be played. Check the file and try again.";
 
 function readVolume(): { volume: number; muted: boolean } {
@@ -37,7 +41,17 @@ export interface MusicPlayerStore {
   /** The audio element; made on first use. The bar hands it to the kit Player. */
   element(): HTMLAudioElement;
   /** Play `track`; the queue is the songs around it (the list's rows). Pressing the song that plays pauses it. */
-  toggle(track: Track, queue?: readonly Track[]): void;
+  toggle(track: Track, queue?: readonly Track[], source?: QueueSource | null): void;
+  /** SF-08c: Play next puts the song right after the one playing; Add to queue puts it at the end. Both edit this queue, never start a song. */
+  playNext(track: Track): void;
+  addToQueue(track: Track): void;
+  removeFromQueue(key: string): void;
+  /** Moves an upcoming song before another upcoming song (null: to the end). */
+  moveInQueue(key: string, beforeKey: string | null): void;
+  /** Drops the upcoming songs ("all"), or only the Play next tier ("play-next"). */
+  clearQueue(which: "all" | "play-next"): void;
+  /** Plays the song with this key from the queue as it stands (a row pressed in the pane). */
+  playFromQueue(key: string): void;
   playPause(): void;
   next(): void;
   /** False when Next has nowhere to go (the last song, repeat off). */
@@ -136,6 +150,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     if (handle) { handle.updateItem(item); return; }
     if (session && el) handle = session.registerElement(el, { kind: "music", item, previous: () => store.previous(), next: () => store.next() });
   };
+  const apply = (edit: QueueEdit) => set({ queue: edit.queue, index: edit.index, manual: edit.manual });
   const load = (queue: readonly Track[], index: number, fresh: boolean) => {
     const track = queue[index];
     if (!track) return;
@@ -149,7 +164,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     loadStartedAt = audio.currentTime;
     stopping = false;
     audio.loop = track.loop === true;
-    set({ track, queue, index, failed: false, notice: null });
+    set({ track, queue, index, failed: false, notice: null, ...(fresh ? { manual: [], source: null } : {}) });
     clockTick();
     handle?.requestFocus();
     void audio.play().catch((error: unknown) => {
@@ -186,10 +201,32 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     get: () => snap,
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     element: ensure,
-    toggle(track, queue) {
+    toggle(track, queue, source) {
       if (snap.track?.key === track.key && el) { store.playPause(); return; }
       const list = queueFor(track, queue, canPlayType);
       load(list, list.findIndex((one) => one.key === track.key), true);
+      if (source) set({ source });
+    },
+    playNext(track) {
+      if (!snap.track) { store.toggle(track); return; }
+      apply(insertNext(snap.queue, snap.index, snap.manual, track));
+    },
+    addToQueue(track) {
+      if (!snap.track) { store.toggle(track); return; }
+      apply(appendToQueue(snap.queue, snap.index, snap.manual, track));
+    },
+    removeFromQueue(key) { if (snap.track) apply(removeUpcoming(snap.queue, snap.index, snap.manual, key)); },
+    moveInQueue(key, beforeKey) { if (snap.track) apply(moveUpcoming(snap.queue, snap.index, snap.manual, key, beforeKey)); },
+    clearQueue(which) {
+      if (!snap.track) return;
+      apply(which === "all" ? clearUpcoming(snap.queue, snap.index, snap.manual) : clearPlayNext(snap.queue, snap.index, snap.manual));
+    },
+    playFromQueue(key) {
+      const at = snap.queue.findIndex((one) => one.key === key);
+      if (at < 0 || at === snap.index || !trackIsPlayable(snap.queue[at]!, canPlayType)) return;
+      if (snap.track) history.push(snap.track.key);
+      silentEnds = 0; stopping = false;
+      load(snap.queue, at, false);
     },
     playPause() {
       if (!el || !snap.track) return;

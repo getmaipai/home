@@ -31,7 +31,7 @@ import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { changePlaylistMembers, musicPlaylistOps, playlistFor } from "@/lib/media/musicPlaylists";
-import { reportKeptSongs, clearMusicSearches, musicQueueAction, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
+import { reportKeptSongs, clearMusicSearches, musicQueueAction, recentMusicSongs, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
@@ -414,6 +414,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   if (appId === "audio") {
     routes.post("/offline", requireAuth, async (c) => respond(c, reportKeptSongs(c.get("person"), deviceKeyOf(c), await jsonBody(c))));
+    routes.get("/recent-songs", requireAuth, (c) => c.json({ songs: recentMusicSongs(c.get("person")) }, 200));
     routes.post("/pin", requireAuth, async (c) => respond(c, pinMusicItem(c.get("person"), await jsonBody(c))));
     routes.post("/recent-searches", requireAuth, async (c) => {
       const body = await jsonBody(c);

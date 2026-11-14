@@ -3775,7 +3775,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:168
+#: src/shell/Routes.tsx:171
 msgid "Backups"
 msgstr ""
 
@@ -5015,7 +5015,7 @@ msgstr ""
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:171
+#: src/shell/Routes.tsx:174
 msgid "Chat showcase"
 msgstr ""
 
@@ -6204,7 +6204,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:169
+#: src/shell/Routes.tsx:172
 msgid "Commands"
 msgstr ""
 
@@ -6726,7 +6726,7 @@ msgid "Could not delete this voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:400
+#: src/shell/Routes.tsx:438
 msgid "Could not discard Incognito chats. Try again."
 msgstr ""
 
@@ -7191,7 +7191,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 msgid "Could not reach {name}. Try again."
 msgstr ""
 
@@ -7612,7 +7612,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:416
+#: src/shell/Routes.tsx:454
 msgid "Create"
 msgstr ""
 
@@ -9745,7 +9745,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 msgid "Find me"
 msgstr ""
 
@@ -10809,8 +10809,8 @@ msgstr ""
 #: src/shell/pages/WikipediaPage.tsx:154
 #: src/shell/pages/WikipediaPage.tsx:178
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:414
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:452
+#: src/shell/Routes.tsx:506
 msgid "Home"
 msgstr ""
 
@@ -13767,7 +13767,7 @@ msgstr ""
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:417
+#: src/shell/Routes.tsx:455
 msgid "Library"
 msgstr ""
 
@@ -15457,8 +15457,8 @@ msgstr ""
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:415
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:453
+#: src/shell/Routes.tsx:506
 msgid "Media"
 msgstr ""
 
@@ -16041,7 +16041,7 @@ msgid "mute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:85
+#: src/shell/music/MusicPlayerBar.tsx:93
 msgid "Mute"
 msgstr ""
 
@@ -16845,7 +16845,7 @@ msgid "No places yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:28
+#: src/shell/music/MusicPlayerBar.tsx:30
 msgid "No playable songs are left. Check the song files and try again."
 msgstr ""
 
@@ -17562,7 +17562,7 @@ msgid "Now all ages."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:150
+#: src/shell/music/MusicPlayerBar.tsx:168
 msgid "Now playing"
 msgstr ""
 
@@ -18306,8 +18306,8 @@ msgid "Open in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:69
-#: src/shell/music/MusicPlayerBar.tsx:69
+#: src/shell/music/MusicPlayerBar.tsx:71
+#: src/shell/music/MusicPlayerBar.tsx:71
 #: src/shell/pages/MakeSongPage.tsx:97
 #: src/shell/pages/MusicLibrary.tsx:98
 #: src/shell/pages/MusicSongDetails.tsx:147
@@ -18863,7 +18863,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:164
+#: src/shell/Routes.tsx:167
 msgid "Performance"
 msgstr ""
 
@@ -19842,6 +19842,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
+#: src/shell/music/MusicPlayerBar.tsx:85
 msgid "Queue"
 msgstr ""
 
@@ -20572,7 +20573,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:166
+#: src/shell/Routes.tsx:169
 msgid "Repairs"
 msgstr ""
 
@@ -20594,7 +20595,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat all songs"
 msgstr ""
 
@@ -20610,7 +20611,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat off"
 msgstr ""
 
@@ -20621,7 +20622,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:74
+#: src/shell/music/MusicPlayerBar.tsx:76
 msgid "Repeat one song"
 msgstr ""
 
@@ -22189,7 +22190,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:94
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Seek"
 msgstr ""
 
@@ -22560,7 +22561,7 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:506
 msgid "Settings"
 msgstr ""
 
@@ -22790,7 +22791,7 @@ msgid "Show in the sidebar"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:376
+#: src/shell/Routes.tsx:414
 msgid "Show me around"
 msgstr ""
 
@@ -22931,7 +22932,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:76
+#: src/shell/music/MusicPlayerBar.tsx:78
 msgid "Shuffle"
 msgstr ""
 
@@ -24049,7 +24050,7 @@ msgstr ""
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:167
+#: src/shell/Routes.tsx:170
 msgid "Status"
 msgstr ""
 
@@ -24260,7 +24261,7 @@ msgstr ""
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:163
+#: src/shell/Routes.tsx:166
 msgid "Storage"
 msgstr ""
 
@@ -25001,7 +25002,7 @@ msgstr ""
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:337
+#: src/shell/Routes.tsx:340
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr ""
@@ -26037,7 +26038,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:151
+#: src/shell/music/MusicPlayerBar.tsx:169
 msgid "The song, its words and the player controls."
 msgstr ""
 
@@ -26717,7 +26718,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:122
+#: src/shell/music/MusicPlayerBar.tsx:139
 msgid "This song could not be played. Check the file and try again."
 msgstr ""
 
@@ -27351,7 +27352,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:389
-#: src/shell/Routes.tsx:190
+#: src/shell/Routes.tsx:193
 msgid "Turn trace"
 msgstr ""
 
@@ -27690,7 +27691,7 @@ msgid "unmute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:85
+#: src/shell/music/MusicPlayerBar.tsx:93
 msgid "Unmute"
 msgstr ""
 
@@ -27833,7 +27834,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:165
+#: src/shell/Routes.tsx:168
 msgid "Updates"
 msgstr ""
 
@@ -28119,7 +28120,7 @@ msgstr ""
 #: src/apps/settings/UsersSection.tsx:232
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
-#: src/shell/Routes.tsx:170
+#: src/shell/Routes.tsx:173
 msgid "Users"
 msgstr ""
 
@@ -28556,7 +28557,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:86
+#: src/shell/music/MusicPlayerBar.tsx:94
 #: src/shell/pages/MusicStudioView.tsx:35
 msgid "Volume"
 msgstr ""
