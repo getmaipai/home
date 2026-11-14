@@ -825,7 +825,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, SHORT_CLIP_MAX_S, isShortClip, shortClipRows |
 | `backend/src/lib/media/videoFilters.ts` | VIDEO_FILTERED_IDS, SHORT_BELOW_S, LONG_FROM_S, videoFilterOf, videoSortOf, wantsVideoRules |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
-| `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, MEDIA_REASK_INSTRUCTION, asksForSong |
+| `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SOUND_STARTED_LINE, MEDIA_REASK_INSTRUCTION |
 | `backend/src/lib/mediaOps/chatSchema.ts` | editPictureSpec, generateImageSchema |
 | `backend/src/lib/mediaOps/clearerLevels.ts` | CLEARER_LEVELS, CLEARER_VIDEO_LEVELS |
 | `backend/src/lib/mediaOps/coverage.ts` | PICTURE_COVERAGE |
