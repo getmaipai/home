@@ -114,13 +114,13 @@ describe("StatusPartsBody", () => {
 
   test("song naming shows readiness and the relative last try", async () => {
     const at = Date.now();
-    const body = health({ engines: { ...health().engines, identify: { kind: "none", pid: null, alive: true, availability: "ready", reason: null, identify_state: "ready", identify_line: "Ready to name songs.", identify_last: { at, status: "matched", line: "Matched: Blue Sky by The Example (from your library)." } } } });
+    const body = health({ engines: { ...health().engines, identify: { kind: "none", pid: null, alive: true, availability: "ready", reason: null, identify_state: "ready", identify_line: "Ready to name songs.", identify_last: { at, status: "matched", line: "Matched a song from your library." } } } });
     const restore = stubHealth(body);
     try {
       const view = renderWithQuery(<StatusPartsBody person={makePerson("owner")} health={body} />);
       expect(await view.findByTestId("song-naming-row")).toHaveTextContent("Song naming");
       expect(view.getByText("Ready to name songs.")).toBeInTheDocument();
-      expect(view.getByText("Last try now: Matched: Blue Sky by The Example (from your library)." )).toBeInTheDocument();
+      expect(view.getByText("Last try now: Matched a song from your library." )).toBeInTheDocument();
     } finally { restore(); }
   });
 

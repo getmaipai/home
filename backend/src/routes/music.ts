@@ -706,7 +706,7 @@ musicRoutes.openapi(identifyRoute, async (c) => {
   const query = c.req.valid("query");
   const deviceId = c.get("deviceId") ?? null;
   const source = deviceId ? "robot" as const : "person" as const;
-  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "shazam" | "acoustid" | "home" } = {}) => {
+  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { matchSource?: "library" | "shazam" | "acoustid" | "home" } = {}) => {
     const at = Date.now();
     recordIdentifyOutcome({ at, deviceId, status: status as IdentifyOutcome["status"] | "bad_input", reason, seconds: clipSeconds, source, ...extra });
     console.info(`[music-identify] device=${deviceId ?? "person"} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` source=${extra.matchSource}` : ""}`);
@@ -737,7 +737,7 @@ musicRoutes.openapi(identifyRoute, async (c) => {
     if (heardNoted) addHeardCandidates(deviceId, candidates); else earlyCandidates = candidates;
   } });
   const resultSeconds = clipSeconds;
-  finish(outcome.status, "reason" in outcome ? outcome.reason : null, resultSeconds, outcome.status === "matched" ? { title: outcome.result.title, artist: outcome.result.artist, matchSource: outcome.result.source } : {});
+  finish(outcome.status, "reason" in outcome ? outcome.reason : null, resultSeconds, outcome.status === "matched" ? { matchSource: outcome.result.source } : {});
   if (deviceId) {
     if (outcome.status === "matched") {
       noteHeardSong(deviceId, { title: outcome.result.title, artist: outcome.result.artist || undefined, album: outcome.result.album || undefined, year: outcome.result.year ?? undefined, source: outcome.result.source, score: outcome.result.score, at: Date.now() });

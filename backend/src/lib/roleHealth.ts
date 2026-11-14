@@ -244,7 +244,8 @@ export function identifyHealthEntry(): IdentifyHealthEntry {
   const ready = readiness.state === "ready";
   const last = lastIdentifyOutcome();
   let line: string | null = null;
-  if (last?.status === "matched") line = `Matched: ${last.title ?? "a song"}${last.artist ? ` by ${last.artist}` : ""} (from ${last.matchSource === "library" ? "your library" : "AcoustID"}).`;
+  const sourceName = last?.matchSource === "library" ? "your library" : last?.matchSource === "shazam" ? "Shazam" : last?.matchSource === "home" ? "a song made at home" : "AcoustID";
+  if (last?.status === "matched") line = `Matched a song from ${sourceName}.`;
   else if (last?.status === "no_match") line = "Heard a clip but found no match.";
   else if (last?.status === "needs_confirm") line = "Waiting for permission to search for the song.";
   else if (last?.status === "rate_limited") line = "Waited: one clip a minute per robot.";
