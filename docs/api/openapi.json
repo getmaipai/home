@@ -36529,6 +36529,9 @@
                   "password": {
                     "type": "string",
                     "maxLength": 63
+                  },
+                  "confirm_lan": {
+                    "type": "boolean"
                   }
                 },
                 "required": [

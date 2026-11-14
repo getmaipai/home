@@ -222,7 +222,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
 | `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
-| `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | checkinFacts, HouseholdRobotsSection |
+| `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | isTestFirmware, checkinFacts, HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
