@@ -807,6 +807,9 @@ export interface SidecarStatusEntry {
   start?: SidecarStartDiagnostic;
 }
 
+/** MUSIC-ID-01: the song-naming health row. */
+export type IdentifyHealthEntry = EngineHealthEntry & { identify_state: "ready" | "no_key" | "fpcalc_missing" | "nothing_to_match"; identify_line: string };
+
 export interface EngineHealthEntry {
   kind: EngineHealthKind;
   pid: number | null;
@@ -858,7 +861,7 @@ export interface HealthStatus {
   ok: boolean;
   /** ENGINE-STATUS-MEDIA-01 (additive): `image` and `video` say whether a picture or a clip can be started now, with `cause` and a
    * per-band `notice` (failureCopy.ts's makingNotice) while not ready. They never change `ok`. Absent from an older hub. */
-  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry; image?: EngineHealthEntry; video?: EngineHealthEntry; /** COMPOSER-03 (additive): song and speaking making, read like `image` and `video`. */ music?: EngineHealthEntry; voices?: EngineHealthEntry };
+  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry; image?: EngineHealthEntry; video?: EngineHealthEntry; /** COMPOSER-03 (additive): song and speaking making, read like `image` and `video`. */ music?: EngineHealthEntry; voices?: EngineHealthEntry; /** MUSIC-ID-01 (additive): whether song naming can run now, read once on the hub (lib/music/identify.ts identifyReadiness); `identify_state` and `identify_line` say why not. Never changes `ok`. */ identify?: IdentifyHealthEntry };
   uptimeSeconds: number;
   sidecars: SidecarStatusEntry[];
 }

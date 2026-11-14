@@ -49,6 +49,7 @@ import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 import { writeSongLyrics } from "@/lib/music/lyricsWriter";
+import { MAX_CLIP_BYTES, MAX_CLIP_SECONDS, deviceGate, identifySong, type IdentifyOutcome } from "@/lib/music/identify";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -670,3 +671,41 @@ function findOwnedSong(actor: PersonRow, fileId: string): MusicJob | null {
   const row = db.select({ id: musicJobs.id }).from(musicJobs).where(and(eq(musicJobs.personId, actor.id), eq(musicJobs.fileId, fileId))).get();
   return row ? getMusicJobFor(actor, row.id) : null;
 }
+
+// MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): "what song is this?" for every surface. The clip is read in memory, never stored.
+const identifyOutcomeSchema = z.object({
+  status: z.enum(["matched", "no_match", "needs_confirm", "not_ready", "failed", "rate_limited"]),
+  result: z.object({ title: z.string(), artist: z.string(), album: z.string().nullable(), musicbrainz_recording_id: z.string().nullable(), musicbrainz_artist_id: z.string().nullable(), musicbrainz_release_group_id: z.string().nullable(), score: z.number(), source: z.enum(["library", "acoustid"]) }).optional(),
+  reason: z.string().optional().describe("Why nothing was named: for not_ready the readiness state, for failed the cause."),
+  line: z.string().optional().describe("For not_ready: the one sentence that says where to act."),
+  retry_after_s: z.number().optional().describe("For rate_limited: seconds until another clip is taken."),
+});
+const IDENTIFY_REFUSAL_LINE = `That clip is too long or too big. Send up to ${MAX_CLIP_SECONDS} seconds and ${MAX_CLIP_BYTES / 1024 / 1024} MB.`;
+const identifyRoute = createRoute({ method: "post", path: "/identify", tags: ["Music"], summary: "Name the song in a short clip",
+  description: "Body: the clip bytes. Send `?kind=pcm16&rate=16000` for raw 16-bit mono PCM, otherwise any audio container ffmpeg reads. Up to 20 seconds and 2 MB. The clip is never stored; only its fingerprint can leave the home, and only when Name songs online allows it. Add `confirmed=1` after the person said yes to an Ask each time question.",
+  middleware: viewMiddleware,
+  request: { query: z.object({ kind: z.enum(["pcm16", "container"]).optional(), rate: z.coerce.number().int().min(4000).max(48000).optional(), confirmed: z.enum(["0", "1"]).optional() }),
+    body: { required: true, content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } } } },
+  responses: { 200: { content: { "application/json": { schema: identifyOutcomeSchema } }, description: "A typed result: matched, no_match, needs_confirm, not_ready, failed or rate_limited." }, 413: { description: "The clip is over 20 seconds or 2 MB." }, ...errorResponses({ 400: "No clip or a bad query", 401: "Not signed in", 403: "Music is off for this profile" }) } });
+const identifyView = (outcome: IdentifyOutcome) => outcome.status === "matched" ? { status: outcome.status, result: outcome.result }
+  : outcome.status === "not_ready" ? { status: outcome.status, reason: outcome.reason, line: outcome.line }
+  : outcome.status === "failed" ? { status: outcome.status, reason: outcome.reason }
+  : outcome.status === "rate_limited" ? { status: outcome.status, retry_after_s: outcome.retry_after_s } : { status: outcome.status };
+musicRoutes.openapi(identifyRoute, async (c) => {
+  const query = c.req.valid("query");
+  if (query.kind === "pcm16" && query.rate === undefined) return c.json({ error: "Add rate=<samples per second> for a pcm16 clip." }, 400, NO_STORE) as never;
+  const declared = Number(c.req.header("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_CLIP_BYTES) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  const bytes = new Uint8Array(await c.req.arrayBuffer());
+  if (bytes.byteLength === 0) return c.json({ error: "Send the clip bytes in the request body." }, 400, NO_STORE) as never;
+  if (bytes.byteLength > MAX_CLIP_BYTES) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  const kind = query.kind === "pcm16" ? { kind: "pcm16" as const, rate: query.rate! } : { kind: "container" as const };
+  if (kind.kind === "pcm16" && bytes.byteLength / 2 / kind.rate > MAX_CLIP_SECONDS) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  // One clip a minute for each device (memory only). A person on the web with no device id is counted as themselves.
+  const gateKey = c.get("deviceId") || `person:${c.get("person").id}`;
+  const gate = deviceGate(gateKey);
+  if (!gate.ok) return c.json({ status: "rate_limited" as const, retry_after_s: gate.retry_after_s }, 200, NO_STORE) as never;
+  const outcome = await identifySong({ bytes, kind }, { confirmed: query.confirmed === "1" });
+  if (outcome.status === "failed" && (outcome.reason === "too_long" || outcome.reason === "too_big")) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  return c.json(identifyView(outcome), 200, NO_STORE) as never;
+});

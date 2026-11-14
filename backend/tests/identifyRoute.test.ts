@@ -1,0 +1,86 @@
+// MUSIC-ID-01: POST /api/music/identify and the readiness row in /api/health, offline (fake fpcalc, real ffmpeg where present).
+import { beforeEach, describe, expect, test } from "bun:test";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { resetDb } from "./reset-db";
+import { TestClient } from "./client";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __resetIdentifyForTests, MAX_CLIP_BYTES } from "@/lib/music/identify";
+
+async function owner() {
+  const client = new TestClient();
+  expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
+  return client;
+}
+/** PATH with only a directory that holds (or lacks) a fake fpcalc, so the real one never leaks in. */
+function withPath<T>(fpcalc: boolean, run: () => Promise<T>): Promise<T> {
+  const dir = mkdtempSync(join(tmpdir(), "id-route-"));
+  if (fpcalc) { writeFileSync(join(dir, "fpcalc"), `#!/bin/sh\ncat >/dev/null\ncase "$*" in *-raw*) echo '{"duration":5,"fingerprint":[1,2,3]}';; *) echo '{"duration":5,"fingerprint":"AQAAx"}';; esac\n`); chmodSync(join(dir, "fpcalc"), 0o755); }
+  const old = process.env.PATH;
+  process.env.PATH = `${dir}:/usr/bin:/bin`;
+  return run().finally(() => { process.env.PATH = old; });
+}
+beforeEach(() => { resetDb(); __resetIdentifyForTests(); });
+
+describe("POST /api/music/identify", () => {
+  test("needs a signed-in person", async () => {
+    const res = await new TestClient().postBytes("/api/music/identify", new Uint8Array(10), "audio/wav");
+    expect(res.status).toBe(401);
+  });
+  test("an empty body and a pcm16 clip with no rate are plain 400 errors", async () => {
+    const client = await owner();
+    expect((await client.postBytes("/api/music/identify", new Uint8Array(0), "application/octet-stream")).status).toBe(400);
+    expect((await client.postBytes("/api/music/identify?kind=pcm16", new Uint8Array(100), "application/octet-stream")).status).toBe(400);
+  });
+  test("a clip over 2 MB or over 20 seconds is refused with a plain 413", async () => {
+    const client = await owner();
+    const big = await client.postBytes("/api/music/identify", new Uint8Array(MAX_CLIP_BYTES + 1), "audio/wav");
+    expect(big.status).toBe(413);
+    expect(((await big.json()) as { error: string }).error).toContain("20 seconds");
+    const long = await client.postBytes("/api/music/identify?kind=pcm16&rate=8000", new Uint8Array(21 * 8000 * 2), "application/octet-stream");
+    expect(long.status).toBe(413);
+  });
+  test("no fpcalc on this computer: a typed not_ready, not an error", async () => {
+    const client = await owner();
+    await withPath(false, async () => {
+      const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+    });
+  });
+  test("a second clip within 60 seconds from the same device is a typed rate_limited", async () => {
+    const client = await owner();
+    await withPath(true, async () => {
+      setHouseholdSettingValue("music.identify.online", "off");
+      const first = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
+      expect(first.status).toBe(200);
+      expect(((await first.json()) as { status: string }).status).not.toBe("rate_limited");
+      const second = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
+      expect(second.status).toBe(200);
+      expect(await second.json()).toMatchObject({ status: "rate_limited" });
+    });
+  });
+  test("ask each time with a key returns needs_confirm and makes no request", async () => {
+    const client = await owner();
+    setHouseholdSettingValue("music.identify.online", "ask");
+    setHouseholdSettingValue("acoustid.client", "test-key");
+    await withPath(true, async () => {
+      if (!Bun.which("ffmpeg")) return;
+      const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
+      expect(await res.json()).toMatchObject({ status: "needs_confirm" });
+    });
+  });
+});
+
+describe("/api/health carries the one readiness answer", () => {
+  test("engines.identify says why song naming cannot run", async () => {
+    const client = await owner();
+    await withPath(false, async () => {
+      const body = (await (await client.get("/api/health")).json()) as { engines: { identify?: { identify_state: string; identify_line: string; availability: string } } };
+      expect(body.engines.identify?.identify_state).toBe("fpcalc_missing");
+      expect(body.engines.identify?.availability).toBe("unavailable");
+      expect(body.engines.identify?.identify_line).toContain("Chromaprint");
+    });
+  });
+});

@@ -2330,6 +2330,17 @@ export const mediaItems = sqliteTable(
   ],
 );
 
+// MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): each scanned library song's Chromaprint fingerprint, kept next to the library
+// records so a heard clip is matched against the household's own music with no network. `fingerprint` is base64 of little-endian 32-bit
+// words ('' when fpcalc could not read the file, so it is not retried until the file changes); `file_key` is the item's own
+// `media_items.fingerprint` (size-mtime) when this was made. Nothing here is a person, a device or something heard.
+export const musicFingerprints = sqliteTable("music_fingerprints", {
+  itemId: text("item_id").primaryKey().references(() => mediaItems.id, { onDelete: "cascade" }),
+  fingerprint: text("fingerprint").notNull(),
+  fileKey: text("file_key").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 // LYRICS-LOOKUP: the receipts and pause state for the lyrics lookup
 // (lib/media/lyricsLookup.ts). One row per media item the lookup already
 // ran for (a hit or a miss), so the same item is never asked about twice;

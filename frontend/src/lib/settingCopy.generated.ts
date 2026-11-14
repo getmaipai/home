@@ -3,6 +3,8 @@ import { i18n } from "@lingui/core";
 
 /** Registry copy by id: `en` is the spec English (a translation is used only while the incoming text still equals it). */
 export const SETTING_COPY: Record<string, { en: string; t: () => string }> = {
+  "setting.acoustid.client.label": { en: "AcoustID key (for naming songs online)", t: () => i18n._({ id: "setting.acoustid.client.label", message: "AcoustID key (for naming songs online)" }) },
+  "setting.acoustid.client.help": { en: "Optional. An application key from acoustid.org lets Home name songs that are not in your own library. Only a short audio fingerprint and the clip length are sent, never the recording. The key is stored encrypted and can't be read back. Clear it to name songs from your own library only.", t: () => i18n._({ id: "setting.acoustid.client.help", message: "Optional. An application key from acoustid.org lets Home name songs that are not in your own library. Only a short audio fingerprint and the clip length are sent, never the recording. The key is stored encrypted and can't be read back. Clear it to name songs from your own library only." }) },
   "setting.alarms.snooze_minutes.label": { en: "Snooze duration", t: () => i18n._({ id: "setting.alarms.snooze_minutes.label", message: "Snooze duration" }) },
   "setting.alarms.snooze_minutes.option_label.5": { en: "5", t: () => i18n._({ id: "setting.alarms.snooze_minutes.option_label.5", message: "5" }) },
   "setting.alarms.snooze_minutes.option_label.10": { en: "10", t: () => i18n._({ id: "setting.alarms.snooze_minutes.option_label.10", message: "10" }) },

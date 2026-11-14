@@ -30,6 +30,13 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     help: "In the background, Home asks the Cover Art Archive for the front cover of an album that has no art in its files or folder, using only the album's public MusicBrainz id, and keeps the picture on your computer. Nothing about your home is sent. Art in your files or folders is never replaced. Off stops it; covers already kept stay, and other albums show the generated cover.",
     level: "advanced", secret: false, lives_in: "household.media_lookups", honoured_by: ["home"],
   }),
+  // MUSIC-ID-01: identical to the pinned spec's entry (spec-v0.1.389 and later); kept here like the other music keys.
+  SettingsKey.parse({
+    key: "music.identify.online", scope: "household", selector: "select", range: { options: ["on", "ask", "off"] }, default: "on",
+    label: "Name songs online",
+    help: "When Home hears a song and has no match in your own library, it can look the song up online. Only a short audio fingerprint and the clip length are sent to the open AcoustID service, never the recording. \"Ask each time\" asks first; \"Off\" matches your own library only.",
+    level: "advanced", secret: false, lives_in: "household.media_lookups", honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "generation.music.enabled",
     scope: "household",

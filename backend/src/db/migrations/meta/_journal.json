@@ -1366,6 +1366,13 @@
       "when": 1794581500094,
       "tag": "0195_media_subject_cast",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "6",
+      "when": 1794581501094,
+      "tag": "0196_music_fingerprints",
+      "breakpoints": true
     }
   ]
 }
