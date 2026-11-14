@@ -36096,6 +36096,129 @@
         }
       }
     },
+    "/api/devices/{id}/wifi": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Add or forget a saved Wi-Fi network on a robot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "add",
+                      "forget"
+                    ]
+                  },
+                  "ssid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "password": {
+                    "type": "string",
+                    "maxLength": 63
+                  }
+                },
+                "required": [
+                  "action",
+                  "ssid"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The requested Wi-Fi action was sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sent": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sent"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Wi-Fi request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an admin can change a robot's Wi-Fi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such robot or the network is not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The robot cannot safely accept this request or is offline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{id}/motor-reboot": {
       "post": {
         "tags": [
@@ -37431,6 +37554,18 @@
                         },
                         "update_progress": {
                           "type": "integer",
+                          "nullable": true
+                        },
+                        "wifi_saved": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 10
+                        },
+                        "link_encrypted": {
+                          "type": "boolean",
                           "nullable": true
                         },
                         "heap": {

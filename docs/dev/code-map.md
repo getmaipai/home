@@ -237,6 +237,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/RobotCompanionChoices.tsx` | RobotCompanionChoices |
 | `frontend/src/apps/settings/RobotPasswordSection.tsx` | RobotPasswordRow, RobotPasswordSection |
 | `frontend/src/apps/settings/RobotSelfTests.tsx` | RobotSelfTests |
+| `frontend/src/apps/settings/RobotWifi.tsx` | RobotWifi |
 | `frontend/src/apps/settings/RoutingStatsSection.tsx` | RoutingStatsSection |
 | `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
@@ -572,7 +573,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/dataClasses.ts` | DATA_CLASSES, dataClassById |
 | `backend/src/lib/deliveryChoice.ts` | DELIVERY_DEADLINE_MS, parseDelivery, chooseDelivery, __setDeliveryRunnerForTests |
 | `backend/src/lib/denoHost.ts` | buildDenoRunArgs, denoEnv, killLiveProcessForInstallChange, callTier1Handle, startIdleSweep, registerDenoHostGracefulExit |
-| `backend/src/lib/deviceCommands.ts` | DEVICE_COMMAND_RETENTION_MS, DEVICE_HEARTBEAT_MS, registerDeviceAlarmActionHandler, isDeviceConnected, issueDeviceCommand, listRobotsPairedUnderPerson |
+| `backend/src/lib/deviceCommands.ts` | DEVICE_COMMAND_RETENTION_MS, DEVICE_HEARTBEAT_MS, registerDeviceAlarmActionHandler, isDeviceConnected, issueDeviceCommand, sendEphemeralDeviceCommand |
 | `backend/src/lib/deviceId.ts` | getDeviceId6 |
 | `backend/src/lib/deviceStates.ts` | ROBOT_STATE_STALE_MS, recordRobotSocketAddress, getRobotSocketAddress, forgetRobotSocketAddress, resolveRequestDevice, latchedRebootOffer |
 | `backend/src/lib/deviceTokens.ts` | hashDeviceToken, issueDeviceToken, deviceHasToken, redeemDeviceToken, pruneExpiredDeviceTokens, hasRedeemedDeviceToken |
