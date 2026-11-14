@@ -1082,8 +1082,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
-| `backend/src/lib/scene.ts` | SCENE_TTL, sceneForTests, fuseScene, getScene, setScene, dropScene |
+| `backend/src/lib/scene.ts` | SCENE_TTL, weatherCacheLease, getWeatherCue, setWeatherCue, setWeatherFailure, dropWeatherCue |
 | `backend/src/lib/sceneTool.ts` | SCENE_TOOL_ID, sceneToolStreamArgs, cleanSceneLabel, sceneObservations, runSceneTool |
+| `backend/src/lib/sceneWeather.ts` | fetchSceneWeatherForContext, fetchSceneWeather |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, SCHEDULE_PRUNE_DAYS |
 | `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, ONCE_GRACE_MS, pauseTask, fireHubDeviceTask |
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
