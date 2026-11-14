@@ -71,9 +71,21 @@ describe("robot check-in", () => {
     expect((await robot.put("/api/devices/me/checkin", payload())).status).toBe(204);
     expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { timers_active: null, mic_level: null } });
   });
+  test("a realistic newest-bot body (extra additive facts, nulls, odd values) answers 204 and stores what is valid", async () => {
+    const body = payload({ timers_active: 1, self_restarts: 0, heal_hold: false, mic_level: 12, orientation: "upright", muted: false, vision_off: false, quiet: false, mic_off_verified: true, mute_source: "button", dance: { enabled: true, style: "wiggle" }, timers: [{ id: "t1", seconds: 60 }], announce: { enabled: true }, repeat: false, music: { volume: 40, playing: null } });
+    expect((await robot.put("/api/devices/me/checkin", body)).status).toBe(204);
+    expect(getRobotCheckin(deviceId)).toMatchObject({ online: true, ip: "192.168.1.8", firmware_version: "0.2.24", rssi: -48, battery_level: 87, timers_active: 1, mic_level: 12 });
+  });
 
-  test("shows the firmware update state in the existing robot status", async () => {
-    expect((await robot.put("/api/devices/me/checkin", payload({ updating: true, update_progress: 42 }))).status).toBe(204);
-    expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { updating: true, update_progress: 42 } });
+  test("an unknown extra field never fails the check-in", async () => {
+    expect((await robot.put("/api/devices/me/checkin", payload({ some_future_fact: { nested: [1, 2, 3] }, another: "x" }))).status).toBe(204);
+  });
+  test("a firmware version that is not semver (stored from an earlier check-in) never fails the next check-in", async () => {
+    expect((await robot.put("/api/devices/me/checkin", payload({ firmware_version: "0.2.24.106" }))).status).toBe(204);
+    expect((await robot.put("/api/devices/me/checkin", payload({ firmware_version: "0.2.24.106" }))).status).toBe(204);
+    expect((await robot.put("/api/devices/me/checkin", payload({ firmware_version: "0.2.24" }))).status).toBe(204);
+    expect(getDeviceSettingValue(deviceId, "robot.firmware.installed")).toMatchObject({ version: "0.2.24" });
+    const software = await owner.get(`/api/robots/hosts/${deviceId}/software`);
+    expect(software.status).toBe(200);
   });
 });
