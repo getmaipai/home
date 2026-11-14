@@ -21,6 +21,7 @@ export function RobotWifi({ deviceId, checkin }: {
   const [confirmLan, setConfirmLan] = useState(false);
   const [busy, setBusy] = useState(false);
   const [forgetting, setForgetting] = useState<string | null>(null);
+  const [gone, setGone] = useState<string[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   async function submit(action: "add" | "forget" | "use", network: string, secret?: string): Promise<void> {
@@ -28,6 +29,10 @@ export function RobotWifi({ deviceId, checkin }: {
     try {
       await api.robotWifi(deviceId, { action, ssid: network, ...(secret === undefined ? {} : { password: secret }), ...(action === "add" && !encrypted ? { confirm_lan: true } : {}) });
       setNote(action === "use" ? i18n._({ id: "Asked the robot to join {name} now. If it cannot reach the hub within 3 minutes it goes back by itself.", message: "Asked the robot to join {name} now. If it cannot reach the hub within 3 minutes it goes back by itself.", values: { name: network } }) : action === "add" ? i18n._({ id: "Wi-Fi network sent to the robot.", message: "Wi-Fi network sent to the robot." }) : i18n._({ id: "Asked the robot to forget {name}.", message: "Asked the robot to forget {name}.", values: { name: network } }));
+      if (action === "forget") {
+        setGone((list) => [...list, network]);
+        setNote(i18n._({ id: "Asked the robot to forget {name}. It drops it within a minute if it is online.", message: "Asked the robot to forget {name}. It drops it within a minute if it is online.", values: { name: network } }));
+      }
       if (action === "add") { setSsid(""); setPassword(""); setConfirmLan(false); }
       setForgetting(null);
     } catch (error) {
@@ -43,7 +48,7 @@ export function RobotWifi({ deviceId, checkin }: {
       setProblem(errorLine(error, i18n._({ id: "Could not start the tailnet test. Try again.", message: "Could not start the tailnet test. Try again." })));
     } finally { setBusy(false); }
   }
-  const names = checkin?.wifi_saved;
+  const names = checkin?.wifi_saved?.filter((n) => !gone.includes(n));
   const canOfferForm = encrypted || checkin?.link_path === "home" || checkin?.link_path === "away";
   return <Section heading={i18n._({ id: "Robot Wi-Fi", message: "Robot Wi-Fi" })}>
     <div className="flex flex-col gap-3">
