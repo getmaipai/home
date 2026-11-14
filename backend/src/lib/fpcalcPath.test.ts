@@ -37,9 +37,12 @@ test("the shipped disk plan includes the optional default fpcalc row", () => {
     const plan = shippedDiskPlan(tier);
     expect(plan.rows.find((row) => row.id === "fpcalc")).toMatchObject({ label: "Song naming tool (chromaprint)", need: "recommended", selectable: true, download_bytes: 1_300_000 });
     expect(plan.default_selected).toContain("fpcalc");
+    expect(plan.rows.find((row) => row.id === "shazam-signature")).toMatchObject({ label: "Song signature tool (shazamio-core)", need: "recommended", selectable: true, download_bytes: 1_700_000 });
+    expect(plan.default_selected).toContain("shazam-signature");
   }
 });
 
 test("missing fpcalc readiness names the Settings page", () => {
-  expect(identifyReadinessFor({ hasKey: false, hasFpcalc: false, hasLocalFingerprints: false, setting: "off" }).line).toBe("The song naming tool is not installed. Install it under Settings, AI and models.");
+  expect(identifyReadinessFor({ hasKey: false, hasFpcalc: false, hasLocalFingerprints: true, setting: "off" }).line).toBe("The song naming tool is not installed. Install it under Settings, AI and models.");
+  expect(identifyReadinessFor({ hasKey: false, hasFpcalc: true, hasShazamHelper: false, hasLocalFingerprints: false, setting: "on" }).line).toContain("The song signature tool is not installed. Install it under Settings, AI and models.");
 });

@@ -130,10 +130,10 @@ describe("POST /api/music/identify", () => {
     await withPath(false, async () => {
       const response = await robot.postBytes(`/api/music/identify?kind=pcm16&rate=16000&request=${requestId}`, new Uint8Array(32000), "application/octet-stream");
       expect(response.status).toBe(200);
-      // No fpcalc and no key: the only online provider is Shazam, which the test run never reaches, so nothing could answer.
-      expect(await response.json()).toMatchObject({ status: "failed", reason: "lookup_failed" });
+      // The separately installed signature helper is absent in this isolated test, so no provider can answer.
+      expect(await response.json()).toMatchObject({ status: "no_match" });
     });
-    expect(await pending).toMatchObject({ status: "failed", reason: "lookup_failed" });
+    expect(await pending).toMatchObject({ status: "no_match" });
   });
 
   test("without request the device route does not resolve a pending waiter", async () => {

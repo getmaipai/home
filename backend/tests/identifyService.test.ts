@@ -33,7 +33,7 @@ const prints = (raw: number[] | null, compressed: string | null = null): Fingerp
 });
 const clip = (): IdentifyClip => ({ bytes: new Uint8Array([1, 2, 3, 4]), kind: { kind: "container" } });
 function opts(over: IdentifyOptions = {}): IdentifyOptions {
-  return { decode, fingerprint: prints(null), library: () => [], mode: "on", key: SECRET_KEY, hasFpcalc: true, acoustIdBase: base(), sleep: async () => {}, log: () => {}, cache: new FingerprintCache(200), limiter: new RateLimiter(3, () => 0), ...over };
+  return { decode, signature: async () => ({ uri: "data:audio/vnd.shazam.sig;base64,AA==", sampleMs: 10000 }), fingerprint: prints(null), library: () => [], mode: "on", key: SECRET_KEY, hasFpcalc: true, acoustIdBase: base(), sleep: async () => {}, log: () => {}, cache: new FingerprintCache(200), limiter: new RateLimiter(3, () => 0), ...over };
 }
 function song(id: string, raw: number[]): LibraryFingerprint {
   return { itemId: id, title: `Local ${id}`, artist: "Local Artist", album: "Local Album", recordingId: null, artistId: null, releaseGroupId: null, raw: Uint32Array.from(raw) };

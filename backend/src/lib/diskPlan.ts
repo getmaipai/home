@@ -35,6 +35,18 @@ export function shippedDiskPlan(tier: DiskPlan["tier"]): DiskPlan {
       totals.required_free_bytes += row.installed_bytes;
     }
   }
+  if (!plan.rows.some((row) => row.id === "shazam-signature")) {
+    const row: DiskPlan["rows"][number] = { id: "shazam-signature", label: "Song signature tool (shazamio-core)", note: "Makes a small signature from a few seconds of music so Home can name the song. MIT.", kind: "model", need: "recommended", selectable: true, download_bytes: 1_700_000, installed_bytes: 1_700_000, peak_temp_bytes: 0, model_ids: [], engines: [], installed: false, basis: "estimate" };
+    plan.rows.push(row);
+    plan.default_selected.push("shazam-signature");
+    for (const key of ["default", "everything"] as const) {
+      const totals = plan[key];
+      totals.download_bytes += row.download_bytes;
+      totals.installed_bytes += row.installed_bytes;
+      totals.needed_bytes += row.installed_bytes;
+      totals.required_free_bytes += row.installed_bytes;
+    }
+  }
   return plan;
 }
 

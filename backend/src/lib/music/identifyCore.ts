@@ -185,7 +185,7 @@ export type IdentifyReadiness = {
  * household's own fingerprints are the only source: none -> nothing_to_match; some but no `fpcalc` to fingerprint the clip -> fpcalc_missing.
  * `no_key` is kept in the type for older clients and is no longer produced.
  */
-export function identifyReadinessFor(input: { hasKey: boolean; hasFpcalc: boolean; hasLocalFingerprints: boolean; setting: "on" | "ask" | "off" }): IdentifyReadiness {
+export function identifyReadinessFor(input: { hasKey: boolean; hasFpcalc: boolean; hasLocalFingerprints: boolean; hasShazamHelper?: boolean; setting: "on" | "ask" | "off" }): IdentifyReadiness {
   if (input.setting === "off") {
     if (!input.hasLocalFingerprints) {
       return { state: "nothing_to_match", line: "Song naming is off and your library has no fingerprints yet, so there is nothing to match. Turn on online naming in Settings." };
@@ -194,5 +194,7 @@ export function identifyReadinessFor(input: { hasKey: boolean; hasFpcalc: boolea
       return { state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." };
     }
   }
-  return { state: "ready", line: "Song naming is ready." };
+  return { state: "ready", line: input.setting !== "off" && input.hasShazamHelper === false
+    ? "Song naming is ready. The song signature tool is not installed. Install it under Settings, AI and models."
+    : "Song naming is ready." };
 }

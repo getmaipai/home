@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { RateLimiter } from "./identifyCore";
 import { __resetShazamForTests, lookupShazam, parseShazam, SHAZAM_USER_AGENT, type ShazamOptions } from "./shazamLookup";
-import type { Signature } from "./shazamSignature";
+import type { Signature } from "./shazamHelper";
 
-const signature: Signature = { sampleRate: 16000, samples: 192000, bands: [[{ pass: 1, magnitude: 2, bin: 3 }], [], [], []] };
+const signature: Signature = { uri: "data:audio/vnd.shazam.sig;base64,AA==", sampleMs: 12000 };
 const fixture = { track: { title: "Song", subtitle: "Artist", sections: [{ metadata: [{ title: "Album", text: "Record" }, { title: "Released", text: "1972" }] }] } };
 const options = (over: ShazamOptions = {}): ShazamOptions => ({ now: () => 1000, limiter: new RateLimiter(20, () => 1000), uuid: () => "uuid", ...over });
 

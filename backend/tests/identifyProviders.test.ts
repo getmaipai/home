@@ -12,7 +12,7 @@ const matchingRaw = Uint32Array.from([0x12345678, 0x23456789, 0x3456789a, 0x4567
 const libraryRow: LibraryFingerprint = { itemId: "1", title: "Local", artist: "Artist", album: null, recordingId: null, artistId: null, releaseGroupId: null, raw: Uint32Array.from([9, 9, ...matchingRaw, 8, 8]) };
 let calls: { shazam: number; acoustid: number };
 function opts(over: IdentifyOptions = {}): IdentifyOptions {
-  return { decode: async () => ({ pcm, seconds: 5 }), fingerprint: async (_pcm, want) => ({ raw: want.raw ? matchingRaw : null, compressed: want.compressed ? "fingerprint" : null, seconds: 5 }), library: () => [], hasFpcalc: true, mode: "on", key: "key", fetch: async () => { calls.acoustid++; return Response.json({ status: "ok", results: [{ score: 0.9, recordings: [{ title: "AcoustID", artists: [{ name: "Artist" }] }] }] }); }, shazam: async () => { calls.shazam++; return { kind: "ok", result: result("Shazam", "shazam") }; }, shazamEnabled: true, cache: new FingerprintCache(20), limiter: new RateLimiter(20, () => 0), log: () => {}, ...over };
+  return { decode: async () => ({ pcm, seconds: 5 }), signature: async () => ({ uri: "data:audio/vnd.shazam.sig;base64,AA==", sampleMs: 10000 }), fingerprint: async (_pcm, want) => ({ raw: want.raw ? matchingRaw : null, compressed: want.compressed ? "fingerprint" : null, seconds: 5 }), library: () => [], hasFpcalc: true, mode: "on", key: "key", fetch: async () => { calls.acoustid++; return Response.json({ status: "ok", results: [{ score: 0.9, recordings: [{ title: "AcoustID", artists: [{ name: "Artist" }] }] }] }); }, shazam: async () => { calls.shazam++; return { kind: "ok", result: result("Shazam", "shazam") }; }, shazamEnabled: true, cache: new FingerprintCache(20), limiter: new RateLimiter(20, () => 0), log: () => {}, ...over };
 }
 beforeEach(() => { calls = { shazam: 0, acoustid: 0 }; __resetIdentifyForTests(); });
 
@@ -73,9 +73,9 @@ describe("identify providers", () => {
     expect(calls).toEqual({ shazam: 0, acoustid: 0 });
     expect(await identifySong(clip, opts({ mode: "off", library: () => [libraryRow], fingerprint: async () => ({ raw: Uint32Array.from([0xdeadbeef, 0x12345678, 0xdeadbeef]), compressed: null, seconds: 5 }) }))).toMatchObject({ status: "no_match" });
     expect(calls).toEqual({ shazam: 0, acoustid: 0 });
-    const { signatureUri, makeSignature } = await import("@/lib/music/shazamSignature");
-    const cache = new FingerprintCache(20); cache.set(signatureUri(makeSignature(new Int16Array(pcm.buffer))!), result("Cached", "shazam"));
-    expect(await identifySong(clip, opts({ key: null, cache }))).toMatchObject({ status: "matched", result: { source: "shazam", title: "Cached" } });
+    const cache = new FingerprintCache(20); cache.set("data:audio/vnd.shazam.sig;base64,AA==", result("Cached", "shazam"));
+    const signature = async () => ({ uri: "data:audio/vnd.shazam.sig;base64,AA==", sampleMs: 10000 });
+    expect(await identifySong(clip, opts({ key: null, cache, signature }))).toMatchObject({ status: "matched", result: { source: "shazam", title: "Cached" } });
     expect(calls.shazam).toBe(0);
   });
 });

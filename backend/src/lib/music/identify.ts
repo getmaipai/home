@@ -13,11 +13,11 @@ import {
   type IdentifyReadiness, type IdentifyResult,
 } from "./identifyCore";
 import {
-  decodeWithFfmpeg, findFpcalc, fingerprintWithFpcalc,
+  decodeWithFfmpeg, findFpcalc, fingerprintWithFpcalc, IDENTIFY_RATE,
   type ClipKind, type Decoder, type FingerprintRunner,
 } from "./identifyAudio";
 import { __resetShazamForTests, lookupShazam, type ShazamLookup } from "./shazamLookup";
-import { makeSignature, signatureUri, type Signature } from "./shazamSignature";
+import { findShazamPython, makeSignature, type Signature } from "./shazamHelper";
 import { libraryFingerprintCount, loadLibraryFingerprints, type LibraryFingerprint } from "./fingerprintStore";
 
 export const IDENTIFY_SETTING = "music.identify.online";
@@ -57,6 +57,7 @@ export interface IdentifyOptions {
   fetch?: FetchLike;
   /** Test seam for the snippet lookup. */
   shazam?: (signature: Signature, signal: AbortSignal) => Promise<ShazamLookup>;
+  signature?: typeof makeSignature;
   /** Test seam for the Shazam switch (`music.identify.shazam`). */
   shazamEnabled?: boolean;
   acoustIdBase?: string;
@@ -157,13 +158,14 @@ export function acoustIdKey(): string | null {
 }
 
 /** The one readiness answer (rule S6): served through healthSnapshot.ts and /api/health; no client recomputes it. */
-export function identifyReadiness(inputs: { key?: string | null; hasFpcalc?: boolean; localCount?: number; mode?: IdentifyMode } = {}): IdentifyReadiness {
+export function identifyReadiness(inputs: { key?: string | null; hasFpcalc?: boolean; hasShazamHelper?: boolean; shazamOn?: boolean; localCount?: number; mode?: IdentifyMode } = {}): IdentifyReadiness {
   let localCount = inputs.localCount;
   if (localCount === undefined) { try { localCount = libraryFingerprintCount(); } catch { localCount = 0; } }
   return identifyReadinessFor({
     hasKey: (inputs.key === undefined ? acoustIdKey() : inputs.key) !== null,
     hasFpcalc: inputs.hasFpcalc ?? findFpcalc() !== null,
     hasLocalFingerprints: localCount > 0,
+    hasShazamHelper: (inputs.shazamOn ?? shazamEnabled()) ? inputs.hasShazamHelper ?? findShazamPython() !== null : true,
     setting: inputs.mode ?? identifyMode(),
   });
 }
@@ -271,12 +273,12 @@ export async function identifySong(clip: IdentifyClip, options: IdentifyOptions 
     if (!needOnline) return done({ status: "needs_confirm" });
 
     // Online providers run together after local matching. Neither is aborted when the other matches.
-    const signature = makeSignature(toInt16(decoded.pcm));
     const shazamOn = options.shazamEnabled ?? shazamEnabled();
+    const signature = shazamOn ? await (options.signature ?? makeSignature)(toInt16(decoded.pcm), IDENTIFY_RATE) : null;
     const cache = options.cache ?? sharedCache;
     const providers: Provider[] = [];
     if (signature && shazamOn && providers.length === 0) {
-      const uri = signatureUri(signature);
+      const uri = signature.uri;
       const cached = cache.get(uri);
       if (cached) return done({ status: "matched", result: cached }, " source=cache");
       providers.push({

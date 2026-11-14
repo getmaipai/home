@@ -7,7 +7,7 @@
 // Rule 6: nothing here throws; a failure is a typed result and the caller falls back to AcoustID. Rule 6a: no title, artist or signature
 // is logged here.
 import { RateLimiter, type IdentifyResult } from "./identifyCore";
-import { signatureUri, type Signature } from "./shazamSignature";
+import type { Signature } from "./shazamHelper";
 
 export const SHAZAM_HOST = "amp.shazam.com";
 export const SHAZAM_USER_AGENT = "MaiPai-Home";
@@ -43,7 +43,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export function shazamBody(signature: Signature, nowMs: number): string {
   return JSON.stringify({
     geolocation: { altitude: 0, latitude: 0, longitude: 0 },
-    signature: { samplems: Math.trunc((signature.samples / signature.sampleRate) * 1000), timestamp: nowMs, uri: signatureUri(signature) },
+    signature: { samplems: signature.sampleMs, timestamp: nowMs, uri: signature.uri },
     timestamp: nowMs,
     timezone: "UTC",
   });
