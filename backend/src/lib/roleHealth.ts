@@ -6,6 +6,7 @@ import { warmupInFlight } from "@/lib/stackWarmup";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { readCapabilities } from "@/lib/memoryRoom";
 import { identifyReadiness } from "@/lib/music/identify";
+import { lastIdentifyOutcome } from "@/lib/music/identifyLast";
 import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import type { EngineHealthEntry, IdentifyHealthEntry } from "@/wire";
@@ -237,5 +238,15 @@ export async function voiceCallReady(): Promise<boolean> {
 export function identifyHealthEntry(): IdentifyHealthEntry {
   const readiness = identifyReadiness();
   const ready = readiness.state === "ready";
-  return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: readiness.line };
+  const last = lastIdentifyOutcome();
+  let line: string | null = null;
+  if (last?.status === "matched") line = `Matched: ${last.title ?? "a song"}${last.artist ? ` by ${last.artist}` : ""} (from ${last.matchSource === "library" ? "your library" : "AcoustID"}).`;
+  else if (last?.status === "no_match") line = "Heard a clip but found no match.";
+  else if (last?.status === "needs_confirm") line = "Waiting for permission to search for the song.";
+  else if (last?.status === "rate_limited") line = "Waited: one clip a minute per robot.";
+  else if (last?.status === "bad_input") line = "The song clip could not be read.";
+  else if (last?.reason === "too_big" || last?.reason === "too_long") line = "The clip was too long or too big.";
+  else if (last?.status === "not_ready") line = readiness.line;
+  else if (last?.status === "failed") line = last.reason === "too_long" || last.reason === "too_big" ? "The clip was too long or too big." : "Could not name the song from that clip.";
+  return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: readiness.line, identify_last: last && line ? { at: last.at, status: last.status, line } : null };
 }

@@ -1,5 +1,5 @@
 // MUSIC-ID-01: POST /api/music/identify and the readiness row in /api/health, offline (fake fpcalc, real ffmpeg where present).
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test, spyOn } from "bun:test";
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,7 @@ import { __resetIdentifyForTests, MAX_CLIP_BYTES } from "@/lib/music/identify";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { requestListen, __setListenCommandIssuerForTests, __resetListenRequestsForTests } from "@/lib/music/listenRequests";
+import { lastIdentifyOutcome, resetIdentifyLast } from "@/lib/music/identifyLast";
 
 async function owner() {
   const client = new TestClient();
@@ -28,7 +29,7 @@ function withPath<T>(fpcalc: boolean, run: () => Promise<T>): Promise<T> {
   process.env.MAIPAI_FPCALC_PATH_ONLY = "1";
   return run().finally(() => { process.env.PATH = old; if (oldOnly === undefined) delete process.env.MAIPAI_FPCALC_PATH_ONLY; else process.env.MAIPAI_FPCALC_PATH_ONLY = oldOnly; });
 }
-beforeEach(() => { resetDb(); __resetIdentifyForTests(); __resetListenRequestsForTests(); __setListenCommandIssuerForTests(null); });
+beforeEach(() => { resetDb(); __resetIdentifyForTests(); __resetListenRequestsForTests(); __setListenCommandIssuerForTests(null); resetIdentifyLast(); });
 
 describe("POST /api/music/identify", () => {
   test("needs a signed-in person", async () => {
@@ -47,6 +48,7 @@ describe("POST /api/music/identify", () => {
     expect(((await big.json()) as { error: string }).error).toContain("20 seconds");
     const long = await client.postBytes("/api/music/identify?kind=pcm16&rate=8000", new Uint8Array(21 * 8000 * 2), "application/octet-stream");
     expect(long.status).toBe(413);
+    expect(lastIdentifyOutcome()).toMatchObject({ status: "failed", reason: "too_long", source: "person" });
   });
   test("no fpcalc on this computer: a typed not_ready, not an error", async () => {
     const client = await owner();
@@ -54,7 +56,24 @@ describe("POST /api/music/identify", () => {
       const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+      expect(lastIdentifyOutcome()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
     });
+  });
+  test("no AcoustID key records and logs the not-ready reason", async () => {
+    const client = await owner();
+    const lines: string[] = [];
+    const info = spyOn(console, "info").mockImplementation((...args) => { lines.push(args.join(" ")); });
+    try {
+      setHouseholdSettingValue("music.identify.online", "ask");
+      await withPath(true, async () => {
+        const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(32000), "application/octet-stream");
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({ status: "not_ready", reason: "no_key" });
+      });
+      expect(lastIdentifyOutcome()).toMatchObject({ status: "not_ready", reason: "no_key" });
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("status=not_ready reason=no_key");
+    } finally { info.mockRestore(); }
   });
   test("a second clip within 60 seconds from the same device is a typed rate_limited", async () => {
     const client = await owner();
@@ -66,7 +85,27 @@ describe("POST /api/music/identify", () => {
       const second = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
       expect(second.status).toBe(200);
       expect(await second.json()).toMatchObject({ status: "rate_limited" });
+      expect(lastIdentifyOutcome()).toMatchObject({ status: "rate_limited" });
     });
+  });
+
+  test("logs one safe line per attempt and records the latest outcome", async () => {
+    const client = await owner();
+    const lines: string[] = [];
+    const info = spyOn(console, "info").mockImplementation((...args) => { lines.push(args.join(" ")); });
+    try {
+      await withPath(true, async () => {
+        setHouseholdSettingValue("music.identify.online", "ask");
+        setHouseholdSettingValue("acoustid.client", "sensitive-test-key");
+        const response = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(32000), "application/octet-stream");
+        expect(response.status).toBe(200);
+      });
+      expect(lastIdentifyOutcome()?.status).toBe("needs_confirm");
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain("[music-identify] device=person status=needs_confirm");
+      expect(lines[0]).not.toContain("sensitive-test-key");
+      expect(lines[0]).not.toContain("AQAAx");
+    } finally { info.mockRestore(); }
   });
   test("ask each time with a key returns needs_confirm and makes no request", async () => {
     const client = await owner();

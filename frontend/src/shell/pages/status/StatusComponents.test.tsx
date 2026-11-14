@@ -112,6 +112,18 @@ describe("StatusPartsBody", () => {
     }
   });
 
+  test("song naming shows readiness and the relative last try", async () => {
+    const at = Date.now();
+    const body = health({ engines: { ...health().engines, identify: { kind: "none", pid: null, alive: true, availability: "ready", reason: null, identify_state: "ready", identify_line: "Ready to name songs.", identify_last: { at, status: "matched", line: "Matched: Blue Sky by The Example (from your library)." } } } });
+    const restore = stubHealth(body);
+    try {
+      const view = renderWithQuery(<StatusPartsBody person={makePerson("owner")} health={body} />);
+      expect(await view.findByTestId("song-naming-row")).toHaveTextContent("Song naming");
+      expect(view.getByText("Ready to name songs.")).toBeInTheDocument();
+      expect(view.getByText("Last try now: Matched: Blue Sky by The Example (from your library)." )).toBeInTheDocument();
+    } finally { restore(); }
+  });
+
   test("uptime uses readable minute, hour and day phrases", () => {
     for (const [seconds, phrase] of [[60, "1 minute"], [3_600, "1 hour"], [172_800, "2 days"]] as const) {
       const view = renderWithQuery(<StatusBanner summary={{ level: "online", text: "All good", problems: [] }} uptimeSeconds={seconds} />);

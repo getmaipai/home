@@ -50,6 +50,7 @@ import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 import { writeSongLyrics } from "@/lib/music/lyricsWriter";
 import { MAX_CLIP_BYTES, MAX_CLIP_SECONDS, deviceGate, identifySong, type IdentifyOutcome } from "@/lib/music/identify";
+import { recordIdentifyOutcome } from "@/lib/music/identifyLast";
 import { resolveListen } from "@/lib/music/listenRequests";
 import { noteHeardSong } from "@/lib/music/heardSong";
 export const musicRoutes = apiRouter();
@@ -694,26 +695,37 @@ const identifyView = (outcome: IdentifyOutcome) => outcome.status === "matched" 
   : outcome.status === "failed" ? { status: outcome.status, reason: outcome.reason }
   : outcome.status === "rate_limited" ? { status: outcome.status, retry_after_s: outcome.retry_after_s } : { status: outcome.status };
 musicRoutes.openapi(identifyRoute, async (c) => {
+  const startedAt = Date.now();
   const query = c.req.valid("query");
-  if (query.kind === "pcm16" && query.rate === undefined) return c.json({ error: "Add rate=<samples per second> for a pcm16 clip." }, 400, NO_STORE) as never;
+  const deviceId = c.get("deviceId") ?? null;
+  const source = deviceId ? "robot" as const : "person" as const;
+  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "acoustid" } = {}) => {
+    const at = Date.now();
+    recordIdentifyOutcome({ at, deviceId, status: status as IdentifyOutcome["status"] | "bad_input", reason, seconds: clipSeconds, source, ...extra });
+    console.info(`[music-identify] device=${deviceId ?? "person"} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` source=${extra.matchSource}` : ""}`);
+  };
+  if (query.kind === "pcm16" && query.rate === undefined) { finish("bad_input", "missing_rate", null); return c.json({ error: "Add rate=<samples per second> for a pcm16 clip." }, 400, NO_STORE) as never; }
   const declared = Number(c.req.header("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_CLIP_BYTES) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  if (Number.isFinite(declared) && declared > MAX_CLIP_BYTES) { finish("failed", "too_big", null); return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never; }
   const bytes = new Uint8Array(await c.req.arrayBuffer());
-  if (bytes.byteLength === 0) return c.json({ error: "Send the clip bytes in the request body." }, 400, NO_STORE) as never;
-  if (bytes.byteLength > MAX_CLIP_BYTES) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  if (bytes.byteLength === 0) { finish("bad_input", "empty_clip", null); return c.json({ error: "Send the clip bytes in the request body." }, 400, NO_STORE) as never; }
+  if (bytes.byteLength > MAX_CLIP_BYTES) { finish("failed", "too_big", null); return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never; }
   const kind = query.kind === "pcm16" ? { kind: "pcm16" as const, rate: query.rate! } : { kind: "container" as const };
-  if (kind.kind === "pcm16" && bytes.byteLength / 2 / kind.rate > MAX_CLIP_SECONDS) return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never;
+  const clipSeconds = kind.kind === "pcm16" ? bytes.byteLength / 2 / kind.rate : null;
+  if (clipSeconds !== null && clipSeconds > MAX_CLIP_SECONDS) { finish("failed", "too_long", clipSeconds); return c.json({ error: IDENTIFY_REFUSAL_LINE }, 413, NO_STORE) as never; }
   // One clip a minute for each device (memory only). A person on the web with no device id is counted as themselves.
-  const deviceId = c.get("deviceId");
   const requestId = typeof query.request === "string" && /^[A-Za-z0-9]{1,64}$/.test(query.request) ? query.request : undefined;
   const gateKey = deviceId || `person:${c.get("person").id}`;
   const gate = deviceGate(gateKey);
   if (!gate.ok) {
     const limited = { status: "rate_limited" as const, retry_after_s: gate.retry_after_s };
+    finish(limited.status, null, clipSeconds);
     if (deviceId && requestId) resolveListen(deviceId, requestId, limited);
     return c.json(limited, 200, NO_STORE) as never;
   }
   const outcome = await identifySong({ bytes, kind }, { confirmed: query.confirmed === "1" });
+  const resultSeconds = clipSeconds;
+  finish(outcome.status, "reason" in outcome ? outcome.reason : null, resultSeconds, outcome.status === "matched" ? { title: outcome.result.title, artist: outcome.result.artist, matchSource: outcome.result.source } : {});
   if (deviceId) {
     if (outcome.status === "matched") {
       noteHeardSong(deviceId, { title: outcome.result.title, artist: outcome.result.artist || undefined, album: outcome.result.album || undefined, source: outcome.result.source, at: Date.now() });

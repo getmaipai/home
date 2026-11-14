@@ -808,7 +808,7 @@ export interface SidecarStatusEntry {
 }
 
 /** MUSIC-ID-01: the song-naming health row. */
-export type IdentifyHealthEntry = EngineHealthEntry & { identify_state: "ready" | "no_key" | "fpcalc_missing" | "nothing_to_match"; identify_line: string };
+export type IdentifyHealthEntry = EngineHealthEntry & { identify_state: "ready" | "no_key" | "fpcalc_missing" | "nothing_to_match"; identify_line: string; identify_last: { at: number; status: string; line: string } | null };
 
 export interface EngineHealthEntry {
   kind: EngineHealthKind;

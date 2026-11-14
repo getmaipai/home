@@ -14,7 +14,7 @@ import { api, isOwnerOrAdminRole, request, type EngineComputerStatus as EngineCo
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
 import { errorLine } from "@/lib/hubReachability";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, formatRelative } from "@/lib/format";
 
 interface StatusPartsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
 // The Status page lists the four engines that make up "is Home up"; the picture and video rows (ENGINE-STATUS-MEDIA-01) are read by the making controls instead.
@@ -140,6 +140,7 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
           {engineHealthRows().some((engine) => engine.key === row.key) && engineComputer?.configured && engineComputer.state !== "working" && state.status === "offline" ? <p className="pl-8 text-sm text-muted-foreground">{i18n._({ id: "This part cannot reach the engine computer: {value}", message: "This part cannot reach the engine computer: {value}", values: { value: engineComputer.reason ?? i18n._({ id: "the connection is unavailable.", message: "the connection is unavailable." }) } })}</p> : null}
         </div>;
       })}
+      {health.engines.identify ? <div className="flex flex-col gap-1 py-3" data-testid="song-naming-row"><span className="font-medium">{i18n._({ id: "Song naming", message: "Song naming" })}</span><p className="text-supporting text-muted-foreground">{health.engines.identify.identify_line}</p>{health.engines.identify.identify_last ? <p className="text-supporting text-muted-foreground">{i18n._({ id: "Last try {when}: {line}", message: "Last try {when}: {line}", values: { when: formatRelative(health.engines.identify.identify_last.at), line: health.engines.identify.identify_last.line } })}</p> : null}</div> : null}
       {history?.memory_ledger ? <div data-testid="memory-ledger" className="flex flex-col gap-2 py-3 sm:gap-2">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div className="min-w-0"><div className="flex min-h-12 items-center"><span className="font-medium">{i18n._({ id: "Memory", message: "Memory" })}</span></div><p className="text-sm text-muted-foreground">{i18n._({ id: "Memory used by the whole system.", message: "Memory used by the whole system." })}</p></div>

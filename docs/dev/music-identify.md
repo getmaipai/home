@@ -25,6 +25,13 @@ The AcoustID key is the household secret `acoustid.client` (write-only, encrypte
 `identifyReadiness()` reads the key, `fpcalc`, the library fingerprint count and the setting; `healthSnapshot.ts` serves it as
 `engines.identify` in `/api/health`. No client recomputes it.
 
+## Seeing an attempt
+
+Each identify request writes one `[music-identify]` console line with the device/person label, outcome, reason code, clip duration
+when known and elapsed time. A match also names whether it came from the local library or AcoustID. The line never includes audio,
+fingerprints, keys or song titles. Home keeps only the most recent outcome in memory; its plain-language summary appears under
+**Song naming** on Status and in Settings → Pictures, videos and music → Music. It clears when Home restarts.
+
 ## Robot chat tool (MUSIC-ID-02)
 
 On a connected, unmuted robot turn the model may call `song_name` when it needs to identify music playing now. The tool is offered

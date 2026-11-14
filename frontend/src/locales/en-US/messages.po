@@ -34,7 +34,7 @@ msgid " · Pinned"
 msgstr " · Pinned"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid " A reply being written right now will be cut off."
 msgstr " A reply being written right now will be cut off."
 
@@ -909,7 +909,7 @@ msgid "{name} is thinking"
 msgstr "{name} is thinking"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:155
+#: src/shell/pages/status/StatusComponents.tsx:156
 msgid "{name} is using {gb} GB. Closing it gives big jobs more room."
 msgstr "{name} is using {gb} GB. Closing it gives big jobs more room."
 
@@ -3166,7 +3166,7 @@ msgid "Anyone, and any robot, using it goes back to Home's default voice. The re
 msgstr "Anyone, and any robot, using it goes back to Home's default voice. The recording is deleted from Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid "Anything using it will pause for a moment.{value}"
 msgstr "Anything using it will pause for a moment.{value}"
 
@@ -4513,7 +4513,7 @@ msgstr "Can someone reach into your house?"
 #: src/shell/pages/settings/SettingField.tsx:268
 #: src/shell/pages/settings/SettingsRenderer.tsx:169
 #: src/shell/pages/status/StatusBoard.tsx:72
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 #: src/shell/pages/StoragePage.tsx:205
 #: src/shell/pages/TrashPage.tsx:67
 #: src/shell/pages/UpdatesPage.tsx:198
@@ -4929,7 +4929,7 @@ msgid "Chat history"
 msgstr "Chat history"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:154
+#: src/shell/pages/status/StatusComponents.tsx:155
 msgid "Chat is being paged out to disk. Close big apps, or stop a big job."
 msgstr "Chat is being paged out to disk. Close big apps, or stop a big job."
 
@@ -5159,7 +5159,7 @@ msgstr "Check your connection and try again."
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:152
 #: src/apps/settings/StackChanInstallDialog.tsx:21
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Checking"
 msgstr "Checking"
 
@@ -10054,7 +10054,7 @@ msgid "failure.tool.found_nothing.verb"
 msgstr "found nothing"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:150
+#: src/shell/pages/status/StatusComponents.tsx:151
 msgid "Free for jobs: {gb} GB"
 msgstr "Free for jobs: {gb} GB"
 
@@ -13107,7 +13107,7 @@ msgid "Kept in your Library"
 msgstr "Kept in your Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:148
+#: src/shell/pages/status/StatusComponents.tsx:149
 msgid "Kept ready for pictures and tools: {gb} GB"
 msgstr "Kept ready for pictures and tools: {gb} GB"
 
@@ -13373,6 +13373,12 @@ msgstr "Last signed in {whenText}"
 #: src/shell/pages/status/StatusApps.tsx:36
 msgid "Last success: {last_success_at}"
 msgstr "Last success: {last_success_at}"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/settings/MediaCardViews.tsx:87
+#: src/shell/pages/status/StatusComponents.tsx:143
+msgid "Last try {when}: {line}"
+msgstr "Last try {when}: {line}"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:226
@@ -15563,12 +15569,12 @@ msgstr "Memories for {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:29
-#: src/shell/pages/status/StatusComponents.tsx:145
+#: src/shell/pages/status/StatusComponents.tsx:146
 msgid "Memory"
 msgstr "Memory"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:147
+#: src/shell/pages/status/StatusComponents.tsx:148
 msgid "Memory in use by chat and voice: {gb} GB"
 msgstr "Memory in use by chat and voice: {gb} GB"
 
@@ -15593,7 +15599,7 @@ msgid "Memory used"
 msgstr "Memory used"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:145
+#: src/shell/pages/status/StatusComponents.tsx:146
 msgid "Memory used by the whole system."
 msgstr "Memory used by the whole system."
 
@@ -16004,7 +16010,7 @@ msgstr "Much lower"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:113
 #: src/shell/pages/ActivityPage.tsx:43
-#: src/shell/pages/settings/MediaCardViews.tsx:79
+#: src/shell/pages/settings/MediaCardViews.tsx:82
 msgid "Music"
 msgstr "Music"
 
@@ -16285,7 +16291,7 @@ msgstr "Needs another try"
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/status/StatusApps.tsx:47
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Needs attention"
 msgstr "Needs attention"
 
@@ -17621,7 +17627,7 @@ msgstr "off"
 #: src/apps/settings/RobotBody.tsx:213
 #: src/lib/settingCopy.ts:42
 #: src/shell/pages/dashboard/ArrangeHome.tsx:104
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Off"
 msgstr "Off"
 
@@ -18719,7 +18725,7 @@ msgid "setting.companion.voice.pal.label"
 msgstr "Pal's voice"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid "part"
 msgstr "part"
 
@@ -19245,7 +19251,7 @@ msgstr "pictures"
 #: src/apps/settings/performanceModel.ts:9
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/pages/ActivityPage.tsx:41
-#: src/shell/pages/settings/MediaCardViews.tsx:56
+#: src/shell/pages/settings/MediaCardViews.tsx:59
 msgid "Pictures"
 msgstr "Pictures"
 
@@ -20783,7 +20789,7 @@ msgstr "Resolved {date}"
 #: src/apps/setup/preview/SetupPreviewBar.tsx:43
 #: src/shell/pages/EnginesPage.tsx:240
 #: src/shell/pages/status/StatusComponents.tsx:136
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid "Restart"
 msgstr "Restart"
 
@@ -20793,7 +20799,7 @@ msgid "Restart {name}'s {join} {value}?"
 msgstr "Restart {name}'s {join} {value}?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid "Restart {value}?"
 msgstr "Restart {value}?"
 
@@ -20825,7 +20831,7 @@ msgstr "Restarting"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:136
-#: src/shell/pages/status/StatusComponents.tsx:160
+#: src/shell/pages/status/StatusComponents.tsx:161
 msgid "Restarting…"
 msgstr "Restarting…"
 
@@ -21418,7 +21424,7 @@ msgid "Running"
 msgstr "Running"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:149
+#: src/shell/pages/status/StatusComponents.tsx:150
 msgid "Running a big job: {gb} GB"
 msgstr "Running a big job: {gb} GB"
 
@@ -23506,6 +23512,12 @@ msgid "setting.generation.music.length.label"
 msgstr "Song length"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/MediaCardViews.tsx:87
+#: src/shell/pages/status/StatusComponents.tsx:143
+msgid "Song naming"
+msgstr "Song naming"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:158
 msgid "Song style (optional)"
 msgstr "Song style (optional)"
@@ -24390,7 +24402,7 @@ msgstr "Style and tags"
 #: src/shell/pages/MusicComposer.tsx:202
 #: src/shell/pages/MusicComposer.tsx:203
 #: src/shell/pages/MusicStudioPages.tsx:145
-#: src/shell/pages/settings/MediaCardViews.tsx:86
+#: src/shell/pages/settings/MediaCardViews.tsx:91
 msgid "Styles"
 msgstr "Styles"
 
@@ -28336,7 +28348,7 @@ msgstr "videos"
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/pages/ActivityPage.tsx:42
-#: src/shell/pages/settings/MediaCardViews.tsx:63
+#: src/shell/pages/settings/MediaCardViews.tsx:66
 msgid "Videos"
 msgstr "Videos"
 
@@ -28613,7 +28625,7 @@ msgstr "Wait for the end of a sentence before replying"
 #. js-lingui-explicit-id
 #: src/shell/pages/ActivityPage.tsx:25
 #: src/shell/pages/musicSongStatus.tsx:30
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Waiting"
 msgstr "Waiting"
 
@@ -28664,7 +28676,7 @@ msgid "Waiting for your choice"
 msgstr "Waiting for your choice"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:151
+#: src/shell/pages/status/StatusComponents.tsx:152
 msgid "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 msgstr "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 
@@ -28750,7 +28762,7 @@ msgid "Warning"
 msgstr "Warning"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Watching"
 msgstr "Watching"
 
@@ -29409,7 +29421,7 @@ msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, 
 #: src/shell/pages/CompanionsPage.tsx:324
 #: src/shell/pages/CompanionsPage.tsx:329
 #: src/shell/pages/status/StatusApps.tsx:51
-#: src/shell/pages/status/StatusComponents.tsx:158
+#: src/shell/pages/status/StatusComponents.tsx:159
 #: src/shell/pages/StatusPage.tsx:26
 #: src/shell/statusApps.ts:6
 msgid "Working"

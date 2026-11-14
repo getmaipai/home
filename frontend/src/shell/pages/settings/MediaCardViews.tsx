@@ -5,12 +5,15 @@ import { i18n } from "@lingui/core";
 // model fills a level is chosen in AI and models, so this area holds no second control for either.
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { StylesTab } from "@/apps/settings/styles/StylesTab";
 import { useTabItem } from "@/shell/tabIdentity";
 import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
+import { api } from "@/lib/api";
+import { formatRelative } from "@/lib/format";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
 /** The keys of a Styles card the generic renderer draws: the Adult-only select. The Civitai switch and key have their own rows in the Styles view (VIDEO-LORA-08), because the key is write-only. */
@@ -79,7 +82,9 @@ export function MediaMusicView(props: SettingsViewProps) {
   useTabItem(i18n._({ id: "Music", message: "Music" }));
   const copy = copyOf(props.card);
   const navigate = useNavigate();
-  return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
+  const health = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 15_000 });
+  const identify = health.data?.engines?.identify;
+  return <><MediaKeysList person={props.person} card={props.card} />{identify ? <ItemGroup><Item variant="outline"><ItemContent><ItemTitle>{i18n._({ id: "Song naming", message: "Song naming" })}</ItemTitle><ItemDescription clamp={false}>{identify.identify_line}</ItemDescription>{identify.identify_last ? <ItemDescription clamp={false}>{i18n._({ id: "Last try {when}: {line}", message: "Last try {when}: {line}", values: { when: formatRelative(identify.identify_last.at), line: identify.identify_last.line } })}</ItemDescription> : null}</ItemContent></Item></ItemGroup> : null}{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
 }
 
 export function MediaStylesView(props: SettingsViewProps) {
