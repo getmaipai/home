@@ -979,6 +979,8 @@ export const SETTING_COPY: Record<string, { en: string; t: () => string }> = {
   "setting.robot.camera.watch_level.option_label.off": { en: "Off", t: () => i18n._({ id: "setting.robot.camera.watch_level.option_label.off", message: "Off" }) },
   "setting.robot.camera.watch_level.option_label.presence": { en: "Presence", t: () => i18n._({ id: "setting.robot.camera.watch_level.option_label.presence", message: "Presence" }) },
   "setting.robot.camera.watch_level.option_label.identify": { en: "Identify", t: () => i18n._({ id: "setting.robot.camera.watch_level.option_label.identify", message: "Identify" }) },
+  "setting.robot.companion.guise.label": { en: "Robot impression", t: () => i18n._({ id: "setting.robot.companion.guise.label", message: "Robot impression" }) },
+  "setting.robot.companion.guise.help": { en: "A synth the robot is temporarily taking on.", t: () => i18n._({ id: "setting.robot.companion.guise.help", message: "A synth the robot is temporarily taking on." }) },
   "setting.robot.companion.id.label": { en: "Robot companion", t: () => i18n._({ id: "setting.robot.companion.id.label", message: "Robot companion" }) },
   "setting.robot.companion.id.help": { en: "The companion this robot talks as. Its type (child, teen or adult) sets how the robot answers. With none chosen the robot answers with child controls.", t: () => i18n._({ id: "setting.robot.companion.id.help", message: "The companion this robot talks as. Its type (child, teen or adult) sets how the robot answers. With none chosen the robot answers with child controls." }) },
   "setting.robot.controls.label": { en: "Robot controls", t: () => i18n._({ id: "setting.robot.controls.label", message: "Robot controls" }) },

@@ -35830,6 +35830,10 @@
                     "companion_id": {
                       "type": "string"
                     },
+                    "guise": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "companions": {
                       "type": "array",
                       "items": {
@@ -35899,6 +35903,7 @@
                   "required": [
                     "controls",
                     "companion_id",
+                    "guise",
                     "companions",
                     "home_location_set",
                     "speaking"
@@ -86941,6 +86946,10 @@
                           "companion_name": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "guise": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -86948,7 +86957,8 @@
                           "name",
                           "controls",
                           "companion_id",
-                          "companion_name"
+                          "companion_name",
+                          "guise"
                         ]
                       }
                     }
