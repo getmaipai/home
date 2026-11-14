@@ -72,6 +72,10 @@ export function robotCompanionOf(deviceId: string): CompanionInfo | null {
   return persona && companionFits(robotControlsOf(deviceId), persona.floor) ? persona : null;
 }
 
+// synths.ts registers who may see a synth at load (a hook like registerCastSynthGate), so this module and voiceForSpeech never import it (an import cycle crashed module start-up).
+let guiseVisible: ((actor: import("@/types").PersonRow, synthId: string) => boolean) | null = null;
+export function registerGuiseVisibility(fn: (actor: import("@/types").PersonRow, synthId: string) => boolean): void { guiseVisible = fn; }
+
 export interface CompanionLayers { customization: CompanionInfo | null; memory: "speaker-and-household"; synth: CompanionInfo | null; guise: boolean }
 /**
  * Companion turns compose three layers: customization (assigned companion settings), memory (the speaker and household),
@@ -81,7 +85,7 @@ export function companionLayersOf(deviceId: string, actor: import("@/types").Per
   const assigned = robotCompanionOf(deviceId);
   const id = getDeviceSettingValue(deviceId, ROBOT_GUISE_KEY);
   const synth = typeof id === "string" && id ? companionInfo(id) : null;
-  const valid = !!synth && companionFits(band, synth.floor) && companionFits(robotControlsOf(deviceId), synth.floor);
+  const valid = !!synth && !!guiseVisible && guiseVisible(actor, synth.id) && companionFits(band, synth.floor) && companionFits(robotControlsOf(deviceId), synth.floor);
   return valid && synth ? { customization: null, memory: "speaker-and-household", synth, guise: true }
     : { customization: assigned, memory: "speaker-and-household", synth: assigned, guise: false };
 }

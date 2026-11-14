@@ -31,12 +31,12 @@ export async function runImpressionTool(input: { actor: PersonRow; args: Record<
   const current = getDeviceSettingValue(deviceId, ROBOT_GUISE_KEY);
   if (action === "stop") {
     if (input.identified === false) return REFUSAL;
-    if (typeof current === "string" && current) {
-      const synth = synthById(current), name = synth?.persona.display_name ?? current, date = localDayKey(new Date(), hubTimeZone());
-      if (synth) rememberGuise(input.actor, synth.id, `I stopped appearing as ${name} on the robot on ${date}.`);
-    }
     const saved = setValue(input.actor, `device:${deviceId}`, ROBOT_GUISE_KEY, "");
     if (!saved.ok) return "The impression could not be stopped. Try again.";
+    if (typeof current === "string" && current) {
+      const synth = synthById(current), name = synth?.persona.display_name ?? current, date = localDayKey(new Date(), hubTimeZone());
+      if (synth) rememberGuise(input.actor, synth.id, `I had the robot stop appearing as ${name} on ${date}.`);
+    }
     publishSettingsChanged(`device:${deviceId}`, ROBOT_GUISE_KEY, ""); void renderClipBundle(deviceId);
     return "Impression stopped.";
   }

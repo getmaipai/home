@@ -7,7 +7,7 @@ import type { PersonRow } from "@/types";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds, copyBundledCompanion, copyHouseholdCompanion, createHouseholdCompanion, updateHouseholdCompanionSynth } from "@/lib/householdCompanions";
 import { personaFromManifest, reloadPersonas, type Persona } from "@/lib/persona";
-import { companionFloor } from "@/lib/robotCompanion";
+import { companionFloor, registerGuiseVisibility } from "@/lib/robotCompanion";
 import { mayUseCompanion, pickRefusal } from "@/lib/companionsApp";
 import { getPersonSettingValue, getSettingValueForPerson, setValue } from "@/lib/settings";
 import { canManage } from "@/lib/personLifecycle";
@@ -236,3 +236,6 @@ export function isCompanionFork(id: string): boolean {
 
 // A production may cast a synth's subject when the actor may use the synth (TALENT-02; mediaProductions.ts never imports this module).
 registerCastSynthGate((actor, synthId, subjectId) => { const synth = synthById(synthId); return !!synth && maySeeSynth(actor, synth) && synth.subject_id === subjectId; });
+
+// A robot may take only a synth that is visible to the speaker and not private to one person (IMPRESSION-01).
+registerGuiseVisibility((actor, synthId) => { const synth = synthById(synthId); return !!synth && synth.private_to === null && maySeeSynth(actor, synth); });
