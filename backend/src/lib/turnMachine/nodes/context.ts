@@ -157,7 +157,7 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   }
   const alerts = (scene as FusedScene & { weather_alerts?: import("@/lib/scene").WeatherAlertCue[] }).weather_alerts ?? [];
   for (const alert of alerts.filter((item) => Date.parse(item.ends) > now).sort((a, b) => severityRank(b.severity) - severityRank(a.severity))) {
-    if (isSuppressed({ kind: "weather_alert", personId: actor.id, now })) continue;
+    if (isSuppressed({ kind: "weather_alert", personId: actor.id, refId: alert.id, now })) continue;
     const line = `Weather alert: ${alert.event}, until ${new Date(alert.ends).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} (${alert.severity}).`;
     if (weatherTokenShare(lines) + line.split(/\s+/).length <= 60) lines.push(line);
   }

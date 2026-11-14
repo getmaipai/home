@@ -18,12 +18,13 @@ const kinds: Record<SuppressionKind, { tier: "notable" | "emergency" | "sensor" 
 type Hold = {
   kind: SuppressionKind; scope: SuppressionScope; deviceId: string | null; room: string | null;
   personId: string | null; until: number; count: number; startedAt: number; ceilingUntil: number; reAlerted: boolean;
+  refId: string | null;
 };
 const holds = new Map<string, Hold>();
 const dailyCounts = new Map<string, number>();
 
-function key(h: Pick<Hold, "kind" | "scope" | "deviceId" | "room" | "personId">): string {
-  return JSON.stringify([h.kind, h.scope, h.scope === "device" ? h.deviceId : null, h.scope === "room" ? h.room : null, h.scope === "self" ? h.personId : null]);
+function key(h: Pick<Hold, "kind" | "scope" | "deviceId" | "room" | "personId" | "refId">): string {
+  return JSON.stringify([h.kind, h.scope, h.scope === "device" ? h.deviceId : null, h.scope === "room" ? h.room : null, h.scope === "self" ? h.personId : null, h.refId]);
 }
 function live(now: number): Hold[] {
   for (const [k, h] of holds) if (h.until <= now) holds.delete(k);
@@ -50,13 +51,15 @@ export type DismissInput = {
   personId?: string | null; reason: DismissReason; now: number;
   byBand: "child" | "teen" | "adult" | "unknown"; byConfirmedAdult: boolean;
   untilOverrideMs?: number;
+  refId?: string | null;
 };
 export function dismiss(input: DismissInput): { ok: boolean; until: number | null; extendedTo?: number; refusal?: "adult_required" | "person_required" } {
   if (input.scope === "self" && !input.personId) return { ok: false, until: null, refusal: "person_required" };
   if (input.scope !== "self" && !input.byConfirmedAdult) return { ok: false, until: null, refusal: "adult_required" };
   live(input.now);
   const target = { kind: input.kind, scope: input.scope, deviceId: input.deviceId ?? null, room: input.room ?? null,
-    personId: input.scope === "self" ? input.personId ?? null : null };
+    personId: input.scope === "self" ? input.personId ?? null : null,
+    refId: input.kind === "weather_alert" ? input.refId ?? null : null };
   const id = key(target);
   const previous = holds.get(id);
   const repeated = previous && previous.until > input.now;
@@ -74,9 +77,10 @@ export function dismiss(input: DismissInput): { ok: boolean; until: number | nul
   return { ok: true, until, ...(repeated ? { extendedTo: until } : {}) };
 }
 
-export function isSuppressed(input: { kind: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; now: number }): boolean {
+export function isSuppressed(input: { kind: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; refId?: string | null; now: number }): boolean {
   return live(input.now).some((h) => {
     if (h.kind !== input.kind) return false;
+    if (input.kind === "weather_alert" && input.refId !== undefined && h.refId !== input.refId) return false;
     if (h.scope === "self") return !!input.personId && h.personId === input.personId;
     if (h.scope === "device") return !!input.deviceId && h.deviceId === input.deviceId;
     if (h.scope === "room") return !!input.room && h.room === input.room;
@@ -97,10 +101,11 @@ export function shouldReAlert(input: { kind: SuppressionKind; deviceId?: string 
   return true;
 }
 
-export function resume(input: { kind?: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; byConfirmedAdult: boolean; byPersonId?: string | null }): number {
+export function resume(input: { kind?: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; refId?: string | null; byConfirmedAdult: boolean; byPersonId?: string | null }): number {
   let cleared = 0;
   for (const [id, h] of holds) {
     if (input.kind && h.kind !== input.kind) continue;
+    if (input.refId !== undefined && h.refId !== input.refId) continue;
     const constrainedAdult = input.deviceId || input.room;
     const allowed = (!!input.byPersonId && input.byPersonId === h.personId) || (input.byConfirmedAdult && (!constrainedAdult ||
       ((h.scope === "device" && !!input.deviceId && h.deviceId === input.deviceId) || (h.scope === "room" && !!input.room && h.room === input.room))));
@@ -115,6 +120,11 @@ export function resume(input: { kind?: SuppressionKind; deviceId?: string | null
 
 export function listActive(now: number): Array<{ kind: SuppressionKind; scope: SuppressionScope; deviceId: string | null; until: number }> {
   return live(now).map(({ kind, scope, deviceId, until }) => ({ kind, scope, deviceId, until }));
+}
+export function weatherAlertDismissal(refId: string, personId: string, now: number): "none" | "you" | "household" {
+  const active = live(now).filter((h) => h.kind === "weather_alert" && h.refId === refId);
+  if (active.some((h) => h.scope === "household")) return "household";
+  return active.some((h) => h.scope === "self" && h.personId === personId) ? "you" : "none";
 }
 export function clearAll(): void { holds.clear(); dailyCounts.clear(); }
 export function __resetForTests(): void { clearAll(); }

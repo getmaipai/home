@@ -1050,6 +1050,7 @@ export type HealthChecks = {
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
 export const api = {
+  sceneWeatherAlerts: () => request<Array<{ id: string; event: string; severity: string; headline: string; ends: string; dismissed: "none" | "you" | "household" }>>("/api/scene/alerts"),
   lists: () => request<ListRecord[]>("/api/lists"),
   comingUp: () => request<ComingUpItem[]>("/api/coming-up"),
   houseSchedules: () => request<HouseSchedules>("/api/house/schedules"),

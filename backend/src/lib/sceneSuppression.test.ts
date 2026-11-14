@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { readFileSync } from "node:fs";
-import { dismiss, isSuppressed, shouldReAlert, resume, listActive, clearAll, __resetForTests, auditCount } from "./sceneSuppression";
+import { dismiss, isSuppressed, shouldReAlert, resume, listActive, clearAll, __resetForTests, auditCount, weatherAlertDismissal } from "./sceneSuppression";
 
 const adult = { byBand: "adult" as const, byConfirmedAdult: true };
 const child = { byBand: "child" as const, byConfirmedAdult: false };
@@ -79,6 +79,16 @@ describe("scene suppression", () => {
     expect(isSuppressed({ kind: "weather_alert", personId: "p2", now: end - 1 })).toBe(true);
     expect(isSuppressed({ kind: "weather_alert", personId: "p2", now: end })).toBe(false);
     expect(dismiss({ kind: "weather_alert", scope: "household", reason: "handled", now: 0, untilOverrideMs: 48 * 60 * minute, ...adult }).until).toBe(24 * 60 * minute);
+  });
+  test("weather alert holds are keyed by alert id and scope", () => {
+    dismiss({ kind: "weather_alert", scope: "self", personId: "p1", refId: "old", reason: "handled", now: 0, untilOverrideMs: 10 * minute, ...child });
+    expect(isSuppressed({ kind: "weather_alert", personId: "p1", refId: "old", now: 1 })).toBe(true);
+    expect(weatherAlertDismissal("old", "p1", 1)).toBe("you");
+    expect(isSuppressed({ kind: "weather_alert", personId: "p1", refId: "new", now: 1 })).toBe(false);
+    dismiss({ kind: "weather_alert", scope: "household", refId: "shared", reason: "handled", now: 0, untilOverrideMs: 10 * minute, ...adult });
+    expect(isSuppressed({ kind: "weather_alert", personId: "p2", refId: "shared", now: 1 })).toBe(true);
+    expect(weatherAlertDismissal("shared", "p2", 1)).toBe("household");
+    expect(resume({ kind: "weather_alert", refId: "shared", byConfirmedAdult: false, byPersonId: "p1" })).toBe(0);
   });
   test("audit exposes one count only and clearAll resets process state", () => {
     dismiss({ kind: "glass_breaking", scope: "device", deviceId: "opaque-device", reason: "other", now: Date.UTC(2026, 10, 14, 12), ...adult });

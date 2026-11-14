@@ -1,7 +1,7 @@
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import type { FusedScene } from "@/lib/scene";
 import type { PersonRow } from "@/types";
-import { dismiss as suppressScene, resume as resumeScene, type SuppressionKind, type SuppressionScope } from "@/lib/sceneSuppression";
+import { dismiss as suppressScene, isSuppressed, resume as resumeScene, type SuppressionKind, type SuppressionScope } from "@/lib/sceneSuppression";
 import { applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms } from "@/lib/safetyAlarm";
 import { getDeviceById } from "@/lib/devices";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -73,13 +73,24 @@ export function runSceneTool(input: { actor: PersonRow; args: Record<string, unk
         for (const kind of ["music_or_tv", "shouting"] as const) suppressScene({ kind, scope: "household", reason: "party", personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: true });
         line = "Done: I will ignore those sounds for everyone here for four hours.";
       }
+    } else if (input.args.kind === "weather_alert") {
+      const requested = input.args.scope as SuppressionScope | undefined;
+      const scope: SuppressionScope = !confirmedAdult ? "self" : requested ?? "household";
+      const alerts = input.scene?.weather_alerts ?? [];
+      const targetAlerts = alerts.filter((alert) => !isSuppressed({ kind: "weather_alert", personId: speakerPerson, refId: alert.id, now }));
+      let changed = 0;
+      for (const alert of targetAlerts) {
+        const untilOverrideMs = Math.max(0, Date.parse(alert.ends) - now);
+        if (suppressScene({ kind: "weather_alert", scope, reason: "handled", personId: speakerPerson, deviceId: input.deviceId, room, refId: alert.id, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult, untilOverrideMs }).ok) changed++;
+      }
+      line = changed ? "Done: I will ignore those alerts until they end." : "There are no active weather alerts to dismiss.";
     } else if (typeof input.args.kind === "string" && input.args.kind.length > 0) {
       // A heard-sound dismissal never touches a sounding hardware alarm.
       const requested = input.args.scope as SuppressionScope | undefined;
       const scope: SuppressionScope = !confirmedAdult ? "self" : requested ?? (room ? "room" : "device");
       const kind = input.args.kind as SuppressionKind;
       const result = suppressScene({ kind, reason: "handled", scope, personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult,
-        ...(kind === "weather_alert" ? { untilOverrideMs: Math.max(0, Math.min(24 * 60 * 60_000, Number(input.args.until_ms) || 60 * 60_000)) } : {}) });
+        });
       if (result.ok && result.until) line = `Done: I will ignore that until ${new Date(result.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${scope === "self" ? "for you only" : scope === "household" ? "for everyone here" : scope === "room" ? "in this room" : "on this device"}.`;
       else line = "I can't set that dismissal for this speaker.";
     } else {

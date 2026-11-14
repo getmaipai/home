@@ -47,7 +47,7 @@ async function fetchSceneWeatherAlerts(input: SceneWeatherInput): Promise<Weathe
   });
   setWeatherAlertCues(input.conversationId, point, alerts, input.now);
   await notifySevereWeatherAlerts(fetched);
-  return alerts.filter((alert) => !isSuppressed({ kind: "weather_alert", personId: input.actor.id, now: input.now }));
+  return alerts.filter((alert) => !isSuppressed({ kind: "weather_alert", personId: input.actor.id, refId: alert.id, now: input.now }));
 }
 
 

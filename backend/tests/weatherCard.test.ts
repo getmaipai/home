@@ -85,6 +85,20 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     expect(advice.every((chip) => chip.id !== "" && chip.label !== "" && chip.label.length <= 24)).toBe(true);
   });
 
+  test("the shared weather card renderer carries a weather alert", async () => {
+    const loaded = loadPackage("weather");
+    if (!loaded.ok) throw new Error(loaded.error);
+    const data = {
+      place: "Lantern Bay", temperature: 71.6, conditions: "clear", unit: "fahrenheit", block_code: 0, block_is_day: 1,
+      block_day_dates: ["2026-10-16"], block_day_highs: [74], block_day_lows: [55], block_day_codes: [0],
+      alert: { title: "Severe Thunderstorm Warning", text: "Move indoors now.", severity: "severe" },
+    };
+    const card = weatherCard("weather", "weather result in turn t1", data, loaded.value.manifest.data_sources?.[0]?.attribution);
+    const rendered = blocksForRecipeRun(loaded.value.manifest, { data, blocks: [card] } as any, {}) as Array<{ kind: string; props?: Record<string, unknown> }>;
+    expect(rendered[0]?.kind).toBe("weather_card");
+    expect(rendered[0]?.props?.alert).toEqual({ title: "Severe Thunderstorm Warning", text: "Move indoors now.", severity: "severe" });
+  });
+
   // WEATHER-FOLLOWUP-01: the daily arrays used to sit only under block_* keys, which the turn strips
   // before the model sees the result, so "and tomorrow?" was answered "I only have today".
   test("the daily forecast is also under model-visible names", async () => {
