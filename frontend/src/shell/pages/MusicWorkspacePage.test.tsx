@@ -61,10 +61,14 @@ const chooseMode = async (view: ReturnType<typeof open>, label: string) => {
   fireEvent.click(await view.findByRole("option", { name: label }));
 };
 
-/** Open one chip's popover on the composer and choose a value in it. */
-const choose = async (view: ReturnType<typeof open>, group: string, value: string | RegExp) => {
-  const trigger = await view.findByRole("button", { name: new RegExp(`^${group}(:|$)`) });
+/** Open the popover containing a chip and choose a value in it. Icon-only
+ * grouped triggers expose their member chip labels in the accessible name. */
+const choose = async (view: ReturnType<typeof open>, chipLabel: string, value: string | RegExp) => {
+  const escapedLabel = chipLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const trigger = await view.findByRole("button", { name: new RegExp(`(?:^| · )${escapedLabel}(?:$| ·|:)`) });
   if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
+  const tab = view.queryByRole("tab", { name: new RegExp(`^${escapedLabel}(?:$|\\s)`) });
+  if (tab) fireEvent.click(tab);
   fireEvent.click(await view.findByRole("radio", { name: value }));
 };
 const field = (view: ReturnType<typeof open>) => view.container.querySelector('[data-slot="prompt-bar"] textarea') as HTMLTextAreaElement;
@@ -79,10 +83,10 @@ describe("Create controls", () => {
     await chooseMode(view, "Sound effect");
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make a sound"));
     fireEvent.change(field(view), { target: { value: "A quiet knock" } });
-    await choose(view, "Sound", "Loop it");
-    await choose(view, "Sound", "Surprise me");
-    await choose(view, "Sound", "10 seconds");
-    await choose(view, "Sound", "3 takes");
+    await choose(view, "Loop it", "Loop it");
+    await choose(view, "Words", "Surprise me");
+    await choose(view, "Length", "10 seconds");
+    await choose(view, "Takes", "3 takes");
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make 3 sounds"));
     await waitFor(() => expect(primary(view).disabled).toBe(false));
     fireEvent.click(primary(view));
@@ -124,7 +128,7 @@ describe("Create controls", () => {
     await choose(view, "Change", "Sing it in another voice");
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Sing it in another voice"));
     await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar-note"]')?.textContent).toContain("Choose a voice"));
-    await choose(view, "Change", "Nova");
+    await choose(view, "Household voice", "Nova");
     await waitFor(() => expect(primary(view).disabled).toBe(false));
     fireEvent.click(primary(view));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/music/from-file/edit")).toBe(true));
@@ -155,8 +159,8 @@ describe("Create controls", () => {
     const view = open();
     await view.findByTestId("music-docked-bar");
     fireEvent.change(field(view), { target: { value: "a slow song about rain" } });
-    await choose(view, "Song details", /^Instrumental/);
-    await choose(view, "Song details", /^Quick/);
+    await choose(view, "Singing", /^Instrumental/);
+    await choose(view, "Length", /^Quick/);
     fireEvent.click(await view.findByRole("button", { name: /^Custom/ }));
     fireEvent.click(await view.findByRole("radio", { name: "2 takes" }));
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make 2 songs"));
@@ -221,7 +225,7 @@ describe("Create controls", () => {
     await view.findByTestId("music-docked-bar");
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Make voiceover"));
     fireEvent.change(field(view), { target: { value: "Hello there." } });
-    await choose(view, "Tags", "[sighs]");
+    await choose(view, "Add a tag", "[sighs]");
     await waitFor(() => expect(field(view).value).toBe("Hello there. [sighs]"));
     await waitFor(() => expect(primary(view).disabled).toBe(false));
     fireEvent.click(primary(view));
@@ -233,7 +237,7 @@ describe("Create controls", () => {
   test("Voiceover: Change a voice takes a file and posts its id with the voice, and the button waits for the file", async () => {
     const view = open("?make=voice");
     await view.findByTestId("music-docked-bar");
-    await choose(view, "Voice", /^Change a voice/);
+    await choose(view, "What to do", /^Change a voice/);
     await waitFor(() => expect(primary(view).getAttribute("aria-label")).toBe("Change voice"));
     await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar-note"]')?.textContent).toContain("Choose a file first"));
     expect(primary(view).disabled).toBe(true);
