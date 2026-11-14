@@ -1,5 +1,4 @@
-import { getRobotSoftware } from "@/lib/robotSoftware";
-import { setRobotFirmwareInstalled } from "@/lib/settings";
+import { setRobotFirmwareInstalled, getDeviceSettingValue } from "@/lib/settings";
 import { touchDevice } from "@/lib/devices";
 
 export const ROBOT_CHECKIN_ONLINE_MS = 150_000;
@@ -40,8 +39,9 @@ export function recordRobotCheckin(deviceId: string, value: RobotCheckin, setBy:
   if (value.online) unitOnlineAt.set(deviceId, now);
   touchDevice(deviceId);
   if (value.firmware_version !== null) {
-    const installed = getRobotSoftware(deviceId).firmware.installed;
-    if (installed?.version !== value.firmware_version) {
+    // Read the stored value directly: the software status compares versions and must never decide whether a check-in succeeds.
+    const stored = getDeviceSettingValue(deviceId, "robot.firmware.installed") as { version?: unknown } | null;
+    if (stored?.version !== value.firmware_version) {
       setRobotFirmwareInstalled(deviceId, { version: value.firmware_version, at: new Date(now).toISOString() }, setBy);
     }
   }

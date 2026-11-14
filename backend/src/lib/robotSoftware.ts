@@ -46,13 +46,16 @@ function installedFirmwareValue(value: unknown): InstalledFirmware | null {
   return typeof entry.version === "string" && typeof entry.at === "string" ? { version: entry.version, at: entry.at } : null;
 }
 
+/** Compare two versions, or null when either is not semver: a reported version that is odd means "unknown", never a thrown error. */
+function tryCompare(left: string, right: string): number | null {
+  try { return compareSemver(left, right); } catch { return null; }
+}
+
 export function robotSoftwareStatus(input: { installed: InstalledFirmware | null; running: string | null; available: string }): RobotSoftware {
-  const firmwareStatus: FirmwareStatus = !input.installed ? "unknown"
-    : compareSemver(input.installed.version, input.available) === 0 ? "up_to_date"
-      : compareSemver(input.installed.version, input.available) < 0 ? "update_available" : "unknown";
-  const botStatus: BotStatus = !input.running ? "unknown"
-    : compareSemver(input.running, input.available) === 0 ? "up_to_date"
-      : compareSemver(input.running, input.available) < 0 ? "restart_needed" : "unknown";
+  const fw = input.installed ? tryCompare(input.installed.version, input.available) : null;
+  const firmwareStatus: FirmwareStatus = fw === 0 ? "up_to_date" : fw !== null && fw < 0 ? "update_available" : "unknown";
+  const bot = input.running ? tryCompare(input.running, input.available) : null;
+  const botStatus: BotStatus = bot === 0 ? "up_to_date" : bot !== null && bot < 0 ? "restart_needed" : "unknown";
   return { firmware: { installed: input.installed, available: input.available, status: firmwareStatus }, bot: { running: input.running, available: input.available, status: botStatus } };
 }
 
