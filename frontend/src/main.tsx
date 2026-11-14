@@ -5,8 +5,10 @@ import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootW
 import "@/shell/tokens.css";
 import { applyFirstPaintPalette } from "@/shell/firstPaintPalette";
 import { installPlaybackUnlock } from "@/lib/voice/playbackContext";
+import { installClientErrors } from "@/lib/clientErrors";
 
 window.__setupPreview = __SETUP_PREVIEW__;
+if (!__SETUP_PREVIEW__) installClientErrors(window);
 // The main screens are the biggest chunk after the shell. Fetch them now, beside the sign-in and language requests, instead of after.
 if (!__SETUP_PREVIEW__) void import("@/shell/Routes").catch(() => undefined);
 if (!__SETUP_PREVIEW__) installStaleChunkRetry(window, sessionStorage);

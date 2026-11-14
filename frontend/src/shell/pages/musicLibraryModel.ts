@@ -2,7 +2,7 @@
 // splits into tags, how long a row reads, and what the take strip offers. The hub returns one card per song; a song asked for as
 // several takes is already one card whose versions are the takes (MP-05), so nothing here regroups.
 import type { MusicCard, MusicVersion, SavedSound } from "@/lib/musicApi";
-import type { Track } from "@/shell/music/musicQueue";
+import { trackIsPlayable, type Track } from "@/shell/music/musicQueue";
 
 export type LibraryFilter = "all" | "songs" | "sounds";
 export type LibraryRow = { kind: "song"; key: string; card: MusicCard } | { kind: "sound"; key: string; sound: SavedSound };
@@ -66,11 +66,13 @@ export function trackOf(card: MusicCard, takeId: string | null | undefined, unti
     key: version.id, url: version.url, title: `${card.title ?? untitled}${take ? ` (${take.label})` : ""}`,
     ...(styleTags(card.description, 3).length ? { subtitle: styleTags(card.description, 3).join(", ") } : {}),
     artworkUrl: card.cover_url, songId: card.id, jobId: card.id, duration: card.duration_s,
+    state: card.state, hasFile: version.has_file ?? false, mediaType: version.media_type ?? "audio/mp4",
     ...(lyrics ? { lyrics } : {}), ...(card.timed_lyrics?.length ? { timed: card.timed_lyrics } : {}),
   };
 }
 
 /** The songs a list plays one after another: every finished song row that has a version, in the order shown, each as the take chosen on its row. */
-export function queueOf(rows: readonly LibraryRow[], takes: Readonly<Record<string, string>>, untitled: string): Track[] {
-  return rows.flatMap((row) => (row.kind === "song" && row.card.state === "done" ? [trackOf(row.card, takes[row.card.id], untitled)] : [])).filter((one): one is Track => one !== null);
+export function queueOf(rows: readonly LibraryRow[], takes: Readonly<Record<string, string>>, untitled: string, canPlayType?: (type: string) => string): Track[] {
+  return rows.flatMap((row) => (row.kind === "song" ? [trackOf(row.card, takes[row.card.id], untitled)] : []))
+    .filter((one): one is Track => !!one && (canPlayType ? trackIsPlayable(one, canPlayType) : trackIsPlayable(one)));
 }

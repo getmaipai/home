@@ -86,7 +86,7 @@ musicRoutes.openapi(djLineRoute, async (c) => {
 const djDeleteRoute = createRoute({ method: "delete", path: "/dj/line", tags: ["Music"], summary: "Delete a prepared DJ line", middleware: viewMiddleware, request: { query: z.object({ before: z.string().min(1).max(80), position: djPosition }) }, responses: { 204: { description: "Line deleted or absent." }, ...refusals } });
 musicRoutes.openapi(djDeleteRoute, (c) => { const actor = c.get("person"), query = c.req.valid("query"); deleteCachedDjLine(actor, query.before, query.position as DjPosition); return c.body(null, 204); });
 const params = z.object({ id: z.string().min(1).max(80) });
-const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string(), seed: z.number().nullable().describe("The seed this version was made with.") });
+const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string(), has_file: z.boolean().optional(), media_type: z.string().optional(), seed: z.number().nullable().describe("The seed this version was made with.") });
 const lockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() });
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
 const soundStages = ["Queued", "Loading", "Making", "Finishing"] as const;
@@ -226,7 +226,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     fit_ask: root.state === "queued" && laneOf(musicRouteAudience(actor)) !== "child" ? answerableFitAsk(actor, root.id) : null,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
-    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job), seed: job.seed ?? null })),
+    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job), has_file: !!job.fileId && !!openMusicFile(actor, job, job.fileId), media_type: "audio/mp4", seed: job.seed ?? null })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS),
     quality: (current ?? root).request.quality === "max" ? "max" as const : (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, max_offered: maxShown, max_installed: musicMaxInstalled(engine), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,

@@ -30,7 +30,7 @@ import { songStatusCard } from "./musicSongStatus";
 import { clockOf, isLockedTile, isMaking, libraryRows, playableVersion, queueOf, styleTags, takeStrip, trackOf, type LibraryFilter, type LibraryRow } from "./musicLibraryModel";
 import { SongDetails, useBedPicker } from "./MusicSongDetails";
 import { useMusicPlayer, type MusicPlayer } from "@/shell/music/musicPlayer";
-import type { Track } from "@/shell/music/musicQueue";
+import { trackIsPlayable, trackUnavailableLine, type Track } from "@/shell/music/musicQueue";
 
 const WIDE = "(min-width: 960px)";
 const subscribeWide = (onChange: () => void) => { const list = window.matchMedia?.(WIDE); list?.addEventListener?.("change", onChange); return () => list?.removeEventListener?.("change", onChange); };
@@ -56,6 +56,8 @@ interface RowActions {
 function SongRow({ card, selected, player, queue, take, onTake, actions }: { card: MusicCard; selected: boolean; player: MusicPlayer; queue: readonly Track[]; take: string | null; onTake: (id: string) => void; actions: RowActions }) {
   const title = card.title ?? i18n._({ id: "Untitled song", message: "Untitled song" });
   const version = playableVersion(card, take);
+  const selectedTrack = trackOf(card, version?.id, i18n._({ id: "Untitled song", message: "Untitled song" }));
+  const unavailable = selectedTrack ? trackUnavailableLine(selectedTrack) : i18n._({ id: "This song's file is missing. Make it again.", message: "This song's file is missing. Make it again." });
   const strip = takeStrip(card);
   const here = !!version && player.track?.key === version.id;
   const playing = here && player.playing;
@@ -63,11 +65,11 @@ function SongRow({ card, selected, player, queue, take, onTake, actions }: { car
   const tags = styleTags(card.description, 4);
   const length = clockOf(card.duration_s);
   const playTake = (takeId: string | null) => { const one = trackOf(card, takeId, i18n._({ id: "Untitled song", message: "Untitled song" })); if (one) player.toggle(one, queue); };
-  const play = () => playTake(version?.id ?? null);
+  const play = () => { if (selectedTrack && trackIsPlayable(selectedTrack)) playTake(version?.id ?? null); };
   return <li data-testid="music-song-row" data-selected={selected ? "true" : undefined} className={`group relative flex items-start gap-3 rounded-xl p-2 transition-colors ${selected ? "bg-muted ring-border ring-1" : "hover:bg-muted/60"}`}>
     <div className="relative size-16 shrink-0 overflow-hidden rounded-lg sm:size-20">
       <Cover id={card.id} title={title} url={card.cover_url} bare />
-      <button type="button" onClick={play} aria-label={playing ? i18n._({ id: "Pause {title}", message: "Pause {title}", values: { title } }) : i18n._({ id: "Play {title}", message: "Play {title}", values: { title } })} aria-pressed={playing}
+      <button type="button" onClick={play} disabled={!selectedTrack || !trackIsPlayable(selectedTrack)} aria-label={playing ? i18n._({ id: "Pause {title}", message: "Pause {title}", values: { title } }) : i18n._({ id: "Play {title}", message: "Play {title}", values: { title } })} aria-pressed={playing}
         className={`bg-background/40 absolute inset-0 flex items-center justify-center transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${here ? "opacity-100" : "opacity-0"}`}>
         <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-full shadow-md"><Play aria-hidden="true" className="size-4" /></span>
       </button>
@@ -80,9 +82,10 @@ function SongRow({ card, selected, player, queue, take, onTake, actions }: { car
           {strip.length ? <Badge variant="outline">{i18n._({ id: "{count} takes", message: "{count} takes", values: { count: strip.length } })}</Badge> : null}
         </span>
         {tags.length ? <span className="text-muted-foreground line-clamp-2 text-badge">{tags.join(", ")}</span> : null}
+      {unavailable ? <span className="text-muted-foreground text-supporting">{unavailable}</span> : null}
       </button>
       {strip.length ? <div className="flex flex-wrap gap-1" role="group" aria-label={i18n._({ id: "Takes of {title}", message: "Takes of {title}", values: { title } })}>
-        {strip.map((one) => <Chip key={one.id} tone="quiet" size="strip" selected={version?.id === one.id} onClick={() => { onTake(one.id); playTake(one.id); }}>{i18n._({ id: "Take {number}", message: "Take {number}", values: { number: one.number } })}</Chip>)}
+        {strip.map((one) => { const takeTrack = trackOf(card, one.id, i18n._({ id: "Untitled song", message: "Untitled song" })); return <Chip key={one.id} tone="quiet" size="strip" selected={version?.id === one.id} onClick={() => { onTake(one.id); if (takeTrack && trackIsPlayable(takeTrack)) playTake(one.id); }}>{i18n._({ id: "Take {number}", message: "Take {number}", values: { number: one.number } })}</Chip>; })}
       </div> : null}
     </div>
     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -114,7 +117,7 @@ function SoundRow({ sound, player, onAdd }: { sound: SavedSound; player: MusicPl
   return <li data-testid="music-sound-row" className="group relative flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/60">
     <div className="relative size-16 shrink-0 overflow-hidden rounded-lg">
       <Cover id={sound.id} title={sound.title} url={null} bare />
-      <button type="button" onClick={() => player.toggle({ key: `sound-${sound.id}`, url: sound.src, title: sound.title, loop: sound.loop })} aria-label={playing ? i18n._({ id: "Pause {title}", message: "Pause {title}", values: { title: sound.title } }) : i18n._({ id: "Play {title}", message: "Play {title}", values: { title: sound.title } })} aria-pressed={playing}
+      <button type="button" onClick={() => player.toggle({ key: `sound-${sound.id}`, url: sound.src, title: sound.title, loop: sound.loop, state: "done", hasFile: true, mediaType: "audio/mpeg" })} aria-label={playing ? i18n._({ id: "Pause {title}", message: "Pause {title}", values: { title: sound.title } }) : i18n._({ id: "Play {title}", message: "Play {title}", values: { title: sound.title } })} aria-pressed={playing}
         className={`bg-background/40 absolute inset-0 flex items-center justify-center transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${here ? "opacity-100" : "opacity-0"}`}>
         <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-full shadow-md"><Play aria-hidden="true" className="size-4" /></span>
       </button>

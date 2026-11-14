@@ -3,7 +3,7 @@
 // again route yet, so the card offers neither.
 import { requestJson } from "@/lib/api";
 
-export interface MusicVersion { id: string; label: string; url: string; /** MP-05: the seed this version was made with. */ seed?: number | null }
+export interface MusicVersion { id: string; label: string; url: string; /** File availability and browser media type for playback. */ has_file?: boolean; media_type?: string; /** MP-05: the seed this version was made with. */ seed?: number | null }
 export interface MusicCard {
   /** The chat the card lives in; null for a temporary one. */ conversation_id?: string | null; /** A split of an audio file the person owns, not a song made here. */ made_from_file?: boolean;
   id: string;

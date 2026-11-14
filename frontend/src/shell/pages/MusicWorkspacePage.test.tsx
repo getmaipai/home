@@ -15,7 +15,7 @@ let calls: Array<{ url: string; method: string; body: string }>;
 let engine = true;
 let tiers: string[] = ["standard"];
 let uploadStatus = 200;
-const song = { id: "mus-1", title: "Neon Rain", state: "done", progress: 1, versions: [{ id: "v1", url: "/f/1" }], current_id: "v1" } as unknown as MusicCard;
+const song = { id: "mus-1", title: "Neon Rain", state: "done", progress: 1, versions: [{ id: "v1", url: "/f/1", has_file: true, media_type: "audio/mp4" }], current_id: "v1" } as unknown as MusicCard;
 
 
 beforeEach(() => {
@@ -319,7 +319,7 @@ describe("Your songs list", () => {
     expect(view.queryByRole("alertdialog")).toBeNull();
   });
   test("a song asked for as takes is one row with a take strip that plays each take", async () => {
-    withJobs([{ ...song, id: "mus-t", title: "Three Ways", takes: { group: "g", index: 0, total: 2 }, versions: [{ id: "t1", label: "Take 1", url: "/t/1", seed: 5 }, { id: "t2", label: "Take 2", url: "/t/2", seed: 6 }], current_id: "t1" }]);
+    withJobs([{ ...song, id: "mus-t", title: "Three Ways", takes: { group: "g", index: 0, total: 2 }, versions: [{ id: "t1", label: "Take 1", url: "/t/1", seed: 5, has_file: true, media_type: "audio/mp4" }, { id: "t2", label: "Take 2", url: "/t/2", seed: 6, has_file: true, media_type: "audio/mp4" }], current_id: "t1" }]);
     const view = open();
     expect(await view.findByText("2 takes")).toBeTruthy();
     const strip = within(await view.findByRole("group", { name: "Takes of Three Ways" }));

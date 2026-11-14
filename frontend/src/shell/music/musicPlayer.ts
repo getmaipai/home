@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import type { AudioHandle, AudioSession } from "@/shell/audioSession";
 import { getPlayMode } from "@/shell/media/playMode";
 import { pickNext, pickPrevious, queueFor, type Track } from "./musicQueue";
+import { reportPlayerError } from "@/lib/clientErrors";
 
 export type { Track } from "./musicQueue";
 
@@ -57,7 +58,7 @@ export interface MusicPlayerStore {
 }
 
 /** Made once per page for the shell; tests make their own with a fake element. */
-export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => new Audio()): MusicPlayerStore {
+export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => new Audio(), canPlayType?: (type: string) => string): MusicPlayerStore {
   let snap: MusicSnapshot = EMPTY;
   let el: HTMLAudioElement | null = null;
   let handle: AudioHandle | null = null;
@@ -113,7 +114,12 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       silentEnds = 0;
       goNext(true);
     });
-    made.addEventListener("error", () => { if (!stopping) noPlayback(true); });
+    made.addEventListener("error", () => {
+      if (!stopping) {
+        reportPlayerError({ songId: snap.track?.songId, mediaType: snap.track?.mediaType, error: made.error ?? new Error("The audio file could not be played.") });
+        noPlayback(true);
+      }
+    });
     // The kit Player's own M key and the session's sleep fade change the element directly; follow it so the bar's volume stays true.
     made.addEventListener("volumechange", () => {
       if (vol.volume === made.volume && vol.muted === made.muted) return;
@@ -146,7 +152,12 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     set({ track, queue, index, failed: false, notice: null });
     clockTick();
     handle?.requestFocus();
-    void audio.play().catch(() => { if (audio.dataset.key === snap.track?.key) noPlayback(true); });
+    void audio.play().catch((error: unknown) => {
+      if (audio.dataset.key === snap.track?.key) {
+        reportPlayerError({ songId: snap.track?.songId, mediaType: snap.track?.mediaType, error });
+        noPlayback(true);
+      }
+    });
   };
   const reallyPlayed = (): boolean => {
     const audio = el;
@@ -164,7 +175,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   const goNext = (ended: boolean): boolean => {
     const { queue, index, track } = snap;
     if (!track) return false;
-    const at = pickNext({ queue, index, mode: getPlayMode(), played, ended });
+    const at = pickNext({ queue, index, mode: getPlayMode(), played, ended, canPlayType });
     if (at === null) { if (ended) { set({ playing: false }); } return false; }
     if (at !== index) history.push(track.key);
     load(queue, at, false);
@@ -177,7 +188,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     element: ensure,
     toggle(track, queue) {
       if (snap.track?.key === track.key && el) { store.playPause(); return; }
-      const list = queueFor(track, queue);
+      const list = queueFor(track, queue, canPlayType);
       load(list, list.findIndex((one) => one.key === track.key), true);
     },
     playPause() {
@@ -186,7 +197,12 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
         stopping = false;
         const key = snap.track.key;
         handle?.requestFocus();
-        void el.play().catch(() => { if (el?.dataset.key === key) noPlayback(true); });
+        void el.play().catch((error: unknown) => {
+          if (el?.dataset.key === key) {
+            reportPlayerError({ songId: snap.track?.songId, mediaType: snap.track?.mediaType, error });
+            noPlayback(true);
+          }
+        });
       } else el.pause();
     },
     next() {
@@ -197,13 +213,13 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       stopping = false;
       goNext(false);
     },
-    canNext: () => !!snap.track && pickNext({ queue: snap.queue, index: snap.index, mode: getPlayMode(), played, ended: false, random: () => 0 }) !== null,
+    canNext: () => !!snap.track && pickNext({ queue: snap.queue, index: snap.index, mode: getPlayMode(), played, ended: false, random: () => 0, canPlayType }) !== null,
     previous() {
       const { queue, index, track } = snap;
       if (!track || !el) return;
       silentEnds = 0;
       stopping = false;
-      const to = pickPrevious({ queue, index, mode: getPlayMode(), time: el.currentTime, history });
+      const to = pickPrevious({ queue, index, mode: getPlayMode(), time: el.currentTime, history, canPlayType });
       if (to === "restart") { el.currentTime = 0; clockTick(); if (el.paused) store.playPause(); return; }
       if (getPlayMode().shuffle) history.pop();
       load(queue, to, false);

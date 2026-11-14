@@ -25,7 +25,7 @@ import { WaveformSeek, usePeaks } from "./WaveformSeek";
 const icon = (name: string, className?: string) => { const One = getIcon(name); return <One aria-hidden="true" {...(className ? { className } : {})} />; };
 
 /** What the bar says when Next has nowhere to go. */
-export const LAST_SONG_LINE = () => i18n._({ id: "That was the last song in the list. Turn on repeat to go round again.", message: "That was the last song in the list. Turn on repeat to go round again." });
+export const LAST_SONG_LINE = () => i18n._({ id: "No playable songs are left. Check the song files and try again.", message: "No playable songs are left. Check the song files and try again." });
 
 /** True for a key press that belongs to a text box, a menu or a slider, which the player keys must leave alone. */
 export function keyBelongsToControl(target: EventTarget | null, key: string): boolean {

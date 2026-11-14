@@ -2,6 +2,7 @@ import "@/lib/addedModels";
 import { libraryRoutes } from "@/routes/library";
 import { transcriptRoutes } from "@/routes/transcripts";
 import { musicRoutes } from "@/routes/music";
+import { clientErrorRoutes } from "@/routes/clientErrors";
 import { madeAlbumsRoutes, madeArtistsRoutes, songStylesRoutes } from "@/routes/musicMade";
 import { serveStatic } from "hono/bun";
 import { compressAssets, hashedAssetCache } from "@/middleware/assetCache";
@@ -371,6 +372,7 @@ app.route("/api/music/styles", songStylesRoutes);
 app.route("/api/music/bands", madeArtistsRoutes);
 app.route("/api/music/albums", madeAlbumsRoutes);
 app.route("/api/music", musicRoutes);
+app.route("/api/client-errors", clientErrorRoutes);
 app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this

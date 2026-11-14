@@ -35,21 +35,22 @@ describe("Your songs status cards", () => {
     expect(kinds).toEqual(["progress", "waiting", "problem"]);
     const text = document.body.textContent ?? "";
     expect(text).toContain("Making now");
-    expect(text).toContain("Singing the verse");
+    expect(text).not.toContain("Singing the verse");
     expect(text).toContain("30%");
-    expect(text).toContain("Waiting, number 2 in line");
+    expect(text.match(/Still being made\./g)).toHaveLength(2);
     expect(text).toContain("Could not finish");
-    expect(text).toContain("The song took longer than expected. Try again.");
+    expect(text).not.toContain("The song took longer than expected. Try again.");
+    expect(text).toContain("This song could not be made. Open it to try again.");
     expect(view.getByRole("button", { name: "Try again" })).toBeTruthy();
     expect(view.getAllByText("Neon Rain").length).toBeGreaterThan(0);
     expect(document.querySelectorAll("[data-status-kind=done]")).toHaveLength(0);
   });
 
-  test("a making song with no figure says how long it usually takes", async () => {
+  test("a making song with no figure still gets a short line", async () => {
     jobs[0] = card({ id: "m-run", title: "Rainy porch song", state: "running", progress: 0, stage_label: "Getting ready" });
     const view = renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search="" /></MemoryRouter></ToastProvider>);
     await waitFor(() => expect(view.getByText("Rainy porch song")).toBeTruthy());
-    expect(document.body.textContent).toContain("Usually about 2 minutes.");
+    expect(document.body.textContent).toContain("Still being made.");
     fireEvent.click(view.getAllByRole("button", { name: "Open" })[0]!);
   });
 });

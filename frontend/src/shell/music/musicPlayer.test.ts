@@ -17,10 +17,10 @@ class FakeAudio extends EventTarget {
   pause() { this.paused = true; this.dispatchEvent(new Event("pause")); }
   removeAttribute() { this.src = ""; }
 }
-const t = (key: string): Track => ({ key, url: `/a/${key}`, title: key });
+const t = (key: string): Track => ({ key, url: `/a/${key}`, title: key, state: "done", hasFile: true, mediaType: "audio/mp4" });
 const queue = ["a", "b", "c"].map(t);
 let fake: FakeAudio;
-const make = () => { fake = new FakeAudio(); return createMusicPlayer(() => fake as unknown as HTMLAudioElement); };
+const make = () => { fake = new FakeAudio(); return createMusicPlayer(() => fake as unknown as HTMLAudioElement, () => "probably"); };
 const realNow = Date.now;
 let fakeNow = 10_000;
 const advance = (ms = 301) => { fakeNow += ms; };
@@ -138,7 +138,7 @@ describe("music player", () => {
   test("immediate ended events stop without looping and show the notice", () => {
     fake = new FakeAudio();
     fake.endOnPlay = true;
-    const guarded = createMusicPlayer(() => fake as unknown as HTMLAudioElement);
+    const guarded = createMusicPlayer(() => fake as unknown as HTMLAudioElement, () => "probably");
     guarded.toggle(t("a"), queue);
     expect(fake.loads).toBeLessThanOrEqual(2);
     expect(fake.loads).toBe(1);
@@ -151,6 +151,26 @@ describe("music player", () => {
     expect(player.get().track?.key).toBe("a");
     expect(player.get().failed).toBe(true);
     expect(fake.loads).toBe(1);
+  });
+  test("Next does not load an unplayable entry and reports no playable next song", () => {
+    const player = make();
+    const mixed = [t("a"), { ...t("b"), mediaType: "audio/flac" }, t("c")];
+    player.toggle(t("a"), mixed);
+    player.next();
+    expect(player.get().track?.key).toBe("c");
+    expect(fake.loads).toBe(2);
+    advance();
+    player.next();
+    expect(player.canNext()).toBe(false);
+    expect(player.get().track?.key).toBe("c");
+    expect(fake.loads).toBe(2);
+  });
+  test("a false canPlayType result keeps a song from loading", () => {
+    fake = new FakeAudio();
+    const unsupported = createMusicPlayer(() => fake as unknown as HTMLAudioElement, () => "");
+    unsupported.toggle(t("a"), queue);
+    expect(fake.loads).toBe(0);
+    expect(unsupported.get().track).toBeNull();
   });
   test("a real ended event after playback advances once", () => {
     const player = make();
@@ -185,7 +205,7 @@ describe("music clock", () => {
       Object.defineProperty(this, "currentTime", { get: () => { if (!this.paused) at += 0.001; return at; }, set: (value: number) => { at = value; } });
     }
   }
-  const makeLive = () => { const live = new LiveClockAudio(); return { live, player: createMusicPlayer(() => live as unknown as HTMLAudioElement) }; };
+  const makeLive = () => { const live = new LiveClockAudio(); return { live, player: createMusicPlayer(() => live as unknown as HTMLAudioElement, () => "probably") }; };
   afterEach(cleanup);
 
   test("the clock reads the same between ticks even while the element's time moves", () => {

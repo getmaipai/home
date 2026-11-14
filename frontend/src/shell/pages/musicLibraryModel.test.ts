@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { clockOf, isLockedTile, libraryRows, playableVersion, queueOf, styleTags, takeStrip, trackOf } from "./musicLibraryModel";
 import type { MusicCard, SavedSound } from "@/lib/musicApi";
 
-const card = (patch: Partial<MusicCard>): MusicCard => ({ id: "a", state: "done", title: "Neon Rain", description: "dreamy indie pop, female vocal", versions: [], current_id: null, takes: null, sound: null, ...patch }) as MusicCard;
+const card = (patch: Partial<MusicCard>): MusicCard => ({ id: "a", state: "done", title: "Neon Rain", description: "dreamy indie pop, female vocal", current_id: null, takes: null, sound: null, ...patch, versions: (patch.versions ?? []).map((version) => ({ has_file: true, media_type: "audio/mp4", ...version })) }) as MusicCard;
 const sound = (patch: Partial<SavedSound>): SavedSound => ({ id: "s1", title: "Door creak", duration_s: 3, src: "/s", loop: false, ...patch });
 
 describe("clockOf", () => {
@@ -71,6 +71,13 @@ describe("trackOf and queueOf (the player's queue)", () => {
   });
   test("the queue is the finished song rows in order, each as its chosen take; sounds and unfinished songs are left out", () => {
     const rows = libraryRows([made, card({ id: "q", state: "running", versions: [] }), card({ id: "k", title: "Second", versions: [{ id: "g1", label: "x", url: "/g1" }], current_id: "g1" })], [sound({})], "all", "");
-    expect(queueOf(rows, { j1: "f2" }, "Untitled song").map((one) => one.key)).toEqual(["f2", "g1"]);
+    expect(queueOf(rows, { j1: "f2" }, "Untitled song", () => "probably").map((one) => one.key)).toEqual(["f2", "g1"]);
+  });
+  test("queue leaves out missing and unsupported files", () => {
+    const rows = libraryRows([
+      card({ id: "missing", versions: [{ id: "m", label: "x", url: "/m", has_file: false }] }),
+      card({ id: "unsupported", versions: [{ id: "u", label: "x", url: "/u", media_type: "audio/flac" }] }),
+    ], [], "all", "");
+    expect(queueOf(rows, {}, "Untitled song", (type) => type === "audio/flac" ? "" : "probably")).toEqual([]);
   });
 });
