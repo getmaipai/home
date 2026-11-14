@@ -57,4 +57,12 @@ describe("speakerLine", () => {
     expect(output).not.toContain("Marlow");
     expect(speakerLine(ev(nova.id, "voice", "confirmed"), "robot", nova, roster, false)).not.toContain("Nova");
   });
+
+  test("signed-in voice match lines disclose no score, number, or print id", () => {
+    const disagreement = speakerLine(ev(sage.id, "signed_in", "confirmed"), "chat", sage, roster, true, 0, "disagree");
+    const agreement = speakerLine(ev(sage.id, "signed_in", "confirmed"), "chat", sage, roster, true, 0, "agree");
+    expect(disagreement).toBe("Speaker: signed in as Sage, but the voice does not sound like Sage.");
+    expect(agreement).toBe("Speaker: Sage (signed in and confirmed by voice).");
+    for (const line of [disagreement, agreement]) expect(line).not.toMatch(/[0-9]|score|print/i);
+  });
 });

@@ -13,6 +13,7 @@ export function speakerLine(
   roster: readonly PersonRow[],
   greetByName: unknown = true,
   othersPresent = 0,
+  voiceMatch?: "agree" | "disagree",
 ): string {
   const other = othersPresent > 0 ? ` Others present: ${othersPresent} unknown.` : "";
   if (!evidence || evidence.basis === "unknown" || evidence.level === "unknown" || !evidence.person) {
@@ -31,6 +32,8 @@ export function speakerLine(
   }
   const person = roster.find((member) => member.id === evidence.person);
   if (!person) return `Speaker: unknown.${other}`;
+  if (evidence.basis === "signed_in" && voiceMatch === "disagree") return `Speaker: signed in as ${person.displayName}, but the voice does not sound like ${person.displayName}.${other}`;
+  if (evidence.basis === "signed_in" && voiceMatch === "agree") return `Speaker: ${person.displayName} (signed in and confirmed by voice).${other}`;
   if (evidence.basis !== "signed_in" && greetByName !== true) {
     const band = speakerAgeBand(person, new Date());
     return `Speaker: a household ${band}, confirmed by ${evidence.basis === "voice_and_face" ? "face and voice" : evidence.basis}; name not to be spoken.${other}`;
