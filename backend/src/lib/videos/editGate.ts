@@ -55,14 +55,16 @@ export function clipFileOf(actor: PersonRow, job: VideoJob): EditFile | null {
 }
 
 /** ADULT-LOCK-06: the flags a source clip carries right now (design 3.10): from its Library file when it has one (so a lock the creator cleared since the job
- * ran counts as cleared), else from what the job was marked at its start. A saved clip whose note does not say all-ages counts as adult-only with the lock on. */
+ * ran counts as cleared), else from what the job was marked at its start. An unlabeled saved clip is all-ages and unlocked. */
 export function clipMarkNow(job: VideoJob): MarkSource | null {
   const file = job.files[0];
   if (file && !job.temporary) {
     const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get();
     const item = row ? lockItemOfProvenance(row.ownerPersonId, row.provenance) : null;
-    if (item) return { madeAudience: item.madeAudience, lock: item.lock };
-    if (!row || fileAudience(row.provenance) !== "all-ages") return { madeAudience: "adult-only", lock: "on" };
+    if (item?.madeAudience === "adult-only") return { madeAudience: "adult-only", lock: item.lock };
+    const audience = row ? fileAudience(row.provenance) : null;
+    if (audience === "adult-only") return { madeAudience: "adult-only", lock: item?.lock ?? "on" };
+    if (audience === "all-ages") return { madeAudience: "all-ages", lock: "off" };
     return { madeAudience: "all-ages", lock: "off" };
   }
   if (job.request.adultOnly === true) return { madeAudience: "adult-only", lock: job.request.adultLock ?? "on" };

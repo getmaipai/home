@@ -372,6 +372,17 @@ describe("the audience floor and the Adult lock", () => {
     expect(audienceOf(await exportOf(planOf([vp(refOf(clean), { out_s: seconds(clean) })], { voice: { level_db: 0, muted: false, pieces: [lp(String(plain.piece.ref))] } })))).toBe("all-ages");
   });
 
+  test("an unlabeled saved clip exports as all-ages with the lock off", async () => {
+    const owner = person("owner");
+    const source = await makeClip(owner);
+    db.update(attachments).set({ provenance: "video-gen:{\"v\":1}" }).where(eq(attachments.id, source.files[0]!.id)).run();
+    const started = await startStudioExport(owner, { plan: planOf([vp(refOf(source), { in_s: 1, out_s: 4 })]) });
+    if (!started.ok) throw new Error(started.line);
+    const result = await finished(owner, started.job.id);
+    expect(audienceOf(result)).toBe("all-ages");
+    expect(libraryProvenance(db.select().from(attachments).where(eq(attachments.id, result.files[0]!.id)).get()!.provenance)).toMatchObject({ lock: "off", audience: "all-ages" });
+  });
+
   test("a locked clip opens as the lock row with nothing of it, cannot be added or exported without the unlock, and opens after it", async () => {
     const owner = person("owner");
     const clean = await makeClip(owner);

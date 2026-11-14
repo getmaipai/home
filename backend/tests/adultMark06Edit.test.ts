@@ -11,6 +11,8 @@ import { newConversationTurnId } from "@/lib/id";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { getVideoJobFor, type VideoJob } from "@/lib/videos/jobs";
 import { runEditVideo } from "@/lib/videos/editTool";
+import { clipMarkNow } from "@/lib/videos/editGate";
+import { prepareContinueFrame } from "@/lib/videos/editTool";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
@@ -29,7 +31,7 @@ beforeEach(() => {
   __resetVideoAdapterCacheForTests();
   video = installFakeVideoStack();
   video.ltx25 = "ready";
-  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never })));
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
   stack = installFakeEditStack();
@@ -85,7 +87,7 @@ describe("the audience table, row by row (newItemMark)", () => {
     expect(newItemMark([ADULT_CLEARED, ALL_AGES], false)).toEqual(adultOff);
   });
   test("another take of a cleared clip using the same adult-only style again (a new job): adult-only, on", () => expect(newItemMark([ADULT_CLEARED], true)).toEqual(adultOn));
-  test("a source that carries no flags counts as adult-only with the lock on, never lower", () => expect(newItemMark([{ madeAudience: null, lock: "on" }], false)).toEqual(adultOn));
+  test("a source that carries no flags is all-ages with the lock off", () => expect(newItemMark([{ madeAudience: "all-ages", lock: "off" }], false)).toEqual({ madeAudience: "all-ages", lock: "off" }));
 });
 
 /** A finished clip of `actor` in a chat, with its flags set the way the pipeline or the creator would leave them. */
@@ -106,6 +108,20 @@ const flagsOf = (actor: PersonRow, job: VideoJob) => {
 };
 
 describe("real edits follow their sources' current flags", () => {
+  test("an unlabeled saved clip is all-ages and unlocked for edits", async () => {
+    const owner = person("owner");
+    video.ltx25 = "ready";
+    const { job, state } = await makeClip(owner);
+    const file = job.files[0]!;
+    const row = db.select().from(attachments).where(eq(attachments.id, file.id)).get()!;
+    db.update(attachments).set({ provenance: "video-gen:{\"v\":1}" }).where(eq(attachments.id, file.id)).run();
+    expect(clipMarkNow(job)).toEqual({ madeAudience: "all-ages", lock: "off" });
+    const continued = await prepareContinueFrame({ actor: owner, audience: { band: "adult" } as never, source: job, body: { prompt: BOAT } as never, conversationId: state.conversationId!, turnId: state.turnId, temporary: false });
+    expect(continued).toMatchObject({ ok: true, adultOnly: false, adultLock: "off" });
+    const next = await finished(owner, await edit(state, { clip: "latest", change: "trim", from_s: 1, to_s: 4 }));
+    expect(next.state).toBe("done");
+    expect(flagsOf(owner, next)).toEqual({ madeAudience: "all-ages", lock: "off" });
+  });
   test("a trim of a locked clip is adult-only and locked, from the moment it starts", async () => {
     const owner = person("owner");
     __unlockRestOfTest(owner.id);
