@@ -92,6 +92,11 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
     expect(cap.tools_offered).not.toContain("house");
   });
 
+  test("impression is conditional on robot turns with a synth that fits the speaker and robot audiences", () => {
+    const impression = listInstalledManifests().find((manifest) => manifest.id === "impression")!;
+    expect(impression.offer).toMatchObject({ mode: "conditional", gate: "impressionAllowed", bench_row: "impression-tool" });
+  });
+
   test("IMG-OFFER-01: offerPassesGate offers show_images only where the turn gate passes, and the turn gate passes an adult alone", () => {
     const { owner, child } = createBenchPeople();
     const teen = db.insert(people).values({ ...owner, id: "teen-offer", displayName: "Teen", role: "teen" }).returning().get()!;

@@ -9,7 +9,7 @@ import { deviceCommands, devices, issues, people } from "@/db/schema";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { dataDir } from "@/lib/paths";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { startStackFixture } from "./stackFixture";
 import type { StackFixture } from "./stackFixture";
@@ -259,6 +259,17 @@ describe("robot clip bundles", () => {
     const { deviceId } = await robotFor(personId);
     await renderClipBundle(deviceId);
     expect((await owner.get("/api/devices/me/assets/clip-bundle")).status).toBe(403);
+  });
+
+  test("fixed clips keep the assigned robot voice while a guise is active", async () => {
+    const { owner, personId } = await household();
+    const { deviceId } = await robotFor(personId);
+    const person = db.select().from(people).where(eq(people.id, personId)).get()!;
+    setValue(person, `device:${deviceId}`, "robot.voice.id", "vera");
+    setValue(person, `device:${deviceId}`, "robot.companion.guise", "some-synth");
+    await renderClipBundle(deviceId);
+    const bundle = await readBundle(deviceId);
+    expect(bundle?.clips.every((clip) => clip.voice_id === "vera")).toBe(true);
   });
 
   test("an unauthenticated caller cannot read a clip bundle", async () => {

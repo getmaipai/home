@@ -362,6 +362,7 @@ export interface DeviceInfo {
 export interface RobotCompanionInfo {
   controls: "child" | "teen" | "adult";
   companion_id: string;
+  guise?: string | null;
   /** `audience` is who the companion is for: all (dynamic, any robot), teen or adult (explicit). `type` is the lowest controls level that may use it. */
   companions: Array<{ id: string; name: string; type: "child" | "teen" | "adult"; audience: "all" | "teen" | "adult" }>;
   home_location_set: boolean;
@@ -414,7 +415,7 @@ export interface CompanionList {
   allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
   discover: CompanionCard[];
-  robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
+  robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null; guise?: string | null }> | null;
 }
 
 export interface CompanionLookVersion { id: string; label: string; source: "upload" | "generated" | "edit"; width: number; height: number; created_at: string; from: string | null; clipped?: string[]; url: string }

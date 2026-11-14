@@ -16,7 +16,7 @@ import { closeRobotDeviceCommandChannels, listRobotsPairedUnderPerson, publishSe
 import { listDevicesByKind } from "@/lib/devices";
 import { renderClipBundle } from "@/lib/robotClips";
 import { personaWriteRefusal } from "@/lib/companionsApp";
-import { ROBOT_COMPANION_KEY, ROBOT_CONTROLS_KEY, robotAssignmentRefusal } from "@/lib/robotCompanion";
+import { ROBOT_COMPANION_KEY, ROBOT_CONTROLS_KEY, ROBOT_GUISE_KEY, robotAssignmentRefusal } from "@/lib/robotCompanion";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { validateWebSources } from "@/lib/retrieval/webSources";
@@ -68,7 +68,7 @@ async function applySettingSideEffects(scope: string, key: string, value: unknow
   return null;
 }
 
-function refreshRobotClips(deviceIds: string[]): void {
+export function refreshRobotClips(deviceIds: string[]): void {
   for (const deviceId of deviceIds) {
     void renderClipBundle(deviceId).catch(() => {
       console.error("[robot-clips] settings render failed; check Repairs to retry the bundle");
@@ -213,6 +213,10 @@ settingsRoutes.openapi(putRoute, async (c) => {
     const refusal = robotAssignmentRefusal(assignScope[1]!, body.key, body.value);
     if (refusal) return c.json({ error: refusal }, 400);
   }
+  if (assignScope && body.key === ROBOT_GUISE_KEY && isOwnerOrAdminActor(actor) && typeof body.value === "string" && body.value) {
+    const refusal = robotAssignmentRefusal(assignScope[1]!, ROBOT_COMPANION_KEY, body.value);
+    if (refusal) return c.json({ error: refusal }, 400);
+  }
   // COMPANIONS-APP-01: a person's companion must fit their own type (a child's list holds child companions only).
   if (body.key === "persona.active_id") {
     const personaRefusal = personaWriteRefusal(body.scope, body.value);
@@ -232,7 +236,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
   if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
   const robotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
-  if (robotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([robotVoiceScope[1]!]);
+  if (robotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY || body.key === ROBOT_GUISE_KEY)) refreshRobotClips([robotVoiceScope[1]!]);
   if (body.scope === "household" && body.key === "safety.alarm.sensors") {
     refreshRobotClips(listDevicesByKind("robot").map((device) => device.id));
   }

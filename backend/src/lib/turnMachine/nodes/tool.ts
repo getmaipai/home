@@ -200,6 +200,7 @@ import { runSceneTool, sceneToolStreamArgs } from "@/lib/sceneTool";
 import { listActivePeople } from "@/lib/access";
 import { getScene, observeSceneClaims } from "@/lib/scene";
 import { runSongNameTool } from "@/lib/songNameTool";
+import { runImpressionTool } from "@/lib/impressionTool";
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
@@ -223,6 +224,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     };
   }
   const outcomes: ToolExecutionOutcome[] = [];
+  let impressionUsed = false;
   const toolEvents: ToolStreamEvent[] = [];
   // RESEARCH-EMPTY-01: research searches of this round that returned no rows or failed, with what they ran on.
   const emptySearches: { index: number; callId: string; args: Record<string, unknown>; runArgs: Record<string, unknown> }[] = [];
@@ -321,7 +323,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === MAKE_INSPIRED_VOICE_TOOL_ID && !proposal.redactArgs) args = { name: args.name, level: args.level };
     // RESEARCH-TIER-01: on a research turn the step row names the search it ran (the model's own query), so the person sees what each round looked into.
     const stepLabel = tool === "websearch" && researchRun !== undefined && typeof (args as { expression?: unknown }).expression === "string" ? (args as { expression: string }).expression.trim().slice(0, 100) : "";
-    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === "scene" ? sceneToolStreamArgs(args as Record<string, unknown>) : tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : tool === MAKE_INSPIRED_VOICE_TOOL_ID ? { name: args.name, level: args.level } : args, ...(stepLabel ? { label: stepLabel } : {}) });
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args: tool === "scene" ? sceneToolStreamArgs(args as Record<string, unknown>) : tool === "impression" ? {} : tool === HOUSE_TOOL_ID && isScheduleAction(String(args.action)) ? { action: args.action } : tool === MAKE_INSPIRED_VOICE_TOOL_ID ? { name: args.name, level: args.level } : args, ...(stepLabel ? { label: stepLabel } : {}) });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
@@ -383,6 +385,19 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const outcome = await runSongNameTool({ callId, deviceId: state.deviceId, surface: state.surface, args: args as import("@/lib/songNameTool").SongNameArgs });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
+      continue;
+    }
+
+    if (tool === "impression") {
+      impressionUsed = true;
+      let text: string;
+      try {
+        text = await runImpressionTool({ actor: state.actor, args, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), identified: !speakerIsAnonymous(state), ...(state.surface === "robot" && state.deviceId ? { deviceId: state.deviceId } : {}) });
+      } catch {
+        text = "That impression could not be changed.";
+      }
+      outcomes.push({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: {}, result: { reply: { text }, actions: [] }, durationMs: 0 });
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text } });
       continue;
     }
 
@@ -683,5 +698,5 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   // THIN-4C: how many fetched rows and pages the minor floor dropped this
   // turn, counted on the trace (never their text).
   const droppedByFloor = outcomes.reduce((sum, o) => sum + (o.status === "succeeded" ? Number((o.result?.data as { floor_dropped?: unknown } | undefined)?.floor_dropped) || 0 : 0), 0);
-  return { outcome: droppedByFloor > 0 ? { ok: true, dropped_by_floor: droppedByFloor } : { ok: true }, output: { outcomes, toolEvents } };
+  return { outcome: { ok: true, ...(droppedByFloor > 0 ? { dropped_by_floor: droppedByFloor } : {}), ...(impressionUsed ? { impression_used: true } : {}) }, output: { outcomes, toolEvents } };
 };

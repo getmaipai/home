@@ -63,6 +63,7 @@ import { getRobotCheckin } from "@/lib/robotCheckin";
 import { getDeviceState } from "@/lib/deviceStates";
 import { heardSongFor, heardSongContextLine } from "@/lib/music/heardSong";
 import { getRobotSoftware } from "@/lib/robotSoftware";
+import { companionLayersOf } from "@/lib/robotCompanion";
 import { composerHintItem } from "@/lib/composerHint";
 import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
 import { fetchSceneWeatherForContext, fetchSceneWeatherAlertsForContext } from "@/lib/sceneWeather";
@@ -557,18 +558,22 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
         items.push({ id: `profile-${line.id}`, text: line.text, source: "profile", subjects: [], disclosure: line.disclosure, at: line.at });
       }
     }
-    const synth = !anonymous && !temporary ? getSynth(state.actor, state.persona.id) : null;
+    const layers = state.surface === "robot" && state.deviceId ? companionLayersOf(state.deviceId, state.actor, turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId)) : null;
+    const requestedSynthId = layers?.synth?.id ?? state.persona.id;
+    const candidateSynth = !anonymous && !temporary ? getSynth(state.actor, requestedSynthId) : null;
+    const validRobotSynth = state.surface !== "robot" || !layers?.guise || (!!candidateSynth && candidateSynth.id === state.persona.id);
+    const resolvedSynth = validRobotSynth ? candidateSynth : null;
     const companionTrace: { id: string; score?: number; source: "companion" }[] = [];
-    if (synth) {
+    if (resolvedSynth) {
+      const synth = resolvedSynth;
       const companionId = synth.id;
       const baseResearch = synth.forked_from
         ? listMemory(state.actor, { scope: "companion", companionId: synth.forked_from }).filter((record) => record.source.startsWith("talent.research"))
         : [];
-      // A synth with no life written yet costs the turn nothing: no card, no second recall.
       const companionRecords = listMemory(state.actor, { scope: "companion", companionId });
+      const cardText = synthCard(companionId, state.actor, now, turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
+      if (cardText) { items.push({ id: "synth-card", text: cardText, source: "profile", subjects: [], disclosure: "child_ok" }); companionTrace.push({ id: "synth-card", source: "companion" }); }
       if (companionRecords.length > 0 || baseResearch.length > 0) {
-        const cardText = synthCard(companionId, state.actor, now) || `${synth.persona.display_name}'s life so far:\n${companionRecords.slice(0, 4).map((record) => record.text).join("\n")}`;
-        if (cardText) { items.push({ id: "synth-card", text: cardText, source: "profile", subjects: [], disclosure: "child_ok" }); companionTrace.push({ id: "synth-card", source: "companion" }); }
         const beats = recall(state.actor, input.utterance, { scope: "companion", companionId, queryVector: recallVector, selfOnly: true, bumpUsage: false }).slice(0, 4);
         for (const match of beats) {
           const record = match.record;

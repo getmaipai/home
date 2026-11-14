@@ -47,7 +47,8 @@ import { existsSync } from "node:fs";
 import { loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { companionAreaOn, mayUseCompanion } from "@/lib/companionsApp";
-import { companionFits, robotCompanionOf } from "@/lib/robotCompanion";
+import { companionFits, companionLayersOf, robotControlsOf, robotCompanionOf } from "@/lib/robotCompanion";
+import { synthById, maySeeSynth, synthFloor } from "@/lib/synths";
 import { canHaveTemporaryChat, isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
@@ -633,12 +634,18 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const bare = opts.bare === true;
   // ROBOT-COMPANION-01: a robot with a companion assigned talks as that companion, whoever is signed in; the person's own pick and the household
   // companions switch are theirs, not the robot's (an admin chose this robot's companion).
-  const robotCompanion = surface === "robot" && opts.deviceId && !bare ? resolveRobotPersona(opts.deviceId) : null;
+  const robotLayers = surface === "robot" && opts.deviceId && !bare ? companionLayersOf(opts.deviceId, actor, band) : null;
+  const robotAssigned = robotLayers?.customization ? resolvePersona(robotLayers.customization.id) : null;
+  const robotCompanion = robotLayers?.synth ? resolvePersona(robotLayers.synth.id) : null;
+  const robotGuiseCandidate = robotLayers?.guise && robotLayers.synth ? synthById(robotLayers.synth.id) : null;
+  const robotGuiseValid = !robotLayers?.guise || (!!robotGuiseCandidate && robotGuiseCandidate.private_to === null && maySeeSynth(actor, robotGuiseCandidate) && companionFits(band, synthFloor(robotGuiseCandidate)) && companionFits(robotControlsOf(opts.deviceId!), synthFloor(robotGuiseCandidate)));
+  const robotGuiseRecord = robotGuiseValid && robotGuiseCandidate ? robotGuiseCandidate : null;
+  const robotPersona = robotLayers?.guise ? robotGuiseRecord ? resolvePersona(robotGuiseRecord.id) : robotAssigned : robotCompanion;
   // DYNAMIC-COMPANION-01: whichever companion speaks, it speaks at this turn's band (its band lines first, its vocabulary clamped).
   const mentionedPersona = !robotCompanion && !temporary && !bare && opts.mentionCompanionId
     ? mentionedConversationPersona(actor, opts.mentionCompanionId)
     : null;
-  const persona = adaptPersonaToBand(tryPersona ?? (robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id))), band);
+  const persona = adaptPersonaToBand(tryPersona ?? (robotGuiseValid ? robotPersona : null) ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id)), band);
   const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare || tryPersona ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? (conversation.companion_id ? mentionedPersona.id === conversation.companion_id : mentionedPersona.id === conversationPersona(actor, null).id) ? "conversation" : "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
@@ -656,7 +663,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surfaceClass,
     brevity: false,
     // ROBOT-COMPANION-01: every turn planned "direct" (no react, no question back); a robot with a companion assigned is not, so its dials decide.
-    companion: { directness: robotCompanion ? "diplomatic" as const : "direct" as const, engagement: persona.engagement, complexity: persona.complexity, social: persona.social },
+    companion: { directness: robotLayers?.guise ? "direct" as const : robotAssigned ? "diplomatic" as const : "direct" as const, engagement: persona.engagement, complexity: persona.complexity, social: persona.social },
     band,
     deferred: false,
     disclosureWithheld: false,
@@ -1050,7 +1057,7 @@ async function finalizeNextReply(state: TurnState, rawValue: TurnValue): Promise
   if (value.reply.language) {
     const language = value.reply.language;
     const voices = await getOfferedVoices();
-    const householdVoiceId = voiceForSpeech({ actor: state.actor, deviceId: state.deviceId });
+    const householdVoiceId = voiceForSpeech({ actor: state.actor, deviceId: state.deviceId, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) });
     const householdVoice = voices?.find((candidate) => candidate.id === householdVoiceId || candidate.id.endsWith(`-${householdVoiceId}`));
     const matching = voices?.find((candidate) => voiceMatchesLanguage(language, candidate.language));
     if (householdVoice && voiceMatchesLanguage(language, householdVoice.language)) {
@@ -1125,7 +1132,7 @@ export function mentionedConversationPersona(actor: PersonRow, companionId: stri
 }
 
 // ROBOT-COMPANION-01: the persona of the companion assigned to this robot, or null.
-function resolveRobotPersona(deviceId: string) {
+function resolveRobotPersona(deviceId: string, actor?: import("@/types").PersonRow) {
   const companion = robotCompanionOf(deviceId);
   return companion ? resolvePersona(companion.id) : null;
 }

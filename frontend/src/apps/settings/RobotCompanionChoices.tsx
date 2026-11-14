@@ -70,7 +70,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
           />
           <FieldDescription>{i18n._({ id: "The companion sets how this robot talks. The controls above set which protections apply. Who is speaking does not change either. A teen or adult companion is listed only when the controls allow it.", message: "The companion sets how this robot talks. The controls above set which protections apply. Who is speaking does not change either. A teen or adult companion is listed only when the controls allow it." })}</FieldDescription>
         </Field>
-        <FieldDescription>{speakingLine(info.speaking, voices)}</FieldDescription>
+        <FieldDescription>{info.guise ? `Taking on ${info.guise}.` : speakingLine(info.speaking, voices)}</FieldDescription>
         {!info.home_location_set ? (
           <Alert><AlertDescription>{i18n._({ id: "The weather needs a Home location.", message: "The weather needs a Home location." })} <Link to="/settings/household?tab=general">{i18n._({ id: "Set it in Settings, Home, General.", message: "Set it in Settings, Home, General." })}</Link></AlertDescription></Alert>
         ) : null}

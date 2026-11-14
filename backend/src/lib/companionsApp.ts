@@ -8,7 +8,7 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { listDevicesByKind } from "@/lib/devices";
 import { loadManifestOnly } from "@/lib/plugins";
 import { PERSONAS, personaFromManifest, resolvePersona, type Persona } from "@/lib/persona";
-import { companionFits, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
+import { companionFits, robotCompanionOf, robotControlsOf, ROBOT_GUISE_KEY } from "@/lib/robotCompanion";
 import { companionsAllowed } from "@/lib/companions";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
@@ -16,6 +16,7 @@ import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds } from "@/lib/householdCompanions";
 import type { PersonRow } from "@/types";
 import { readLook } from "@/lib/companionLook";
+import { getDeviceSettingValue } from "@/lib/settings";
 
 const FORMALITY: Record<Persona["formality"], string> = {
   casual: "Talks like a friend.",
@@ -224,15 +225,18 @@ export function companionDetail(person: PersonRow, persona: Persona, admin: bool
 function usersOf(companionId: string): NonNullable<CompanionDetail["used_by"]> {
   const rows = db.select().from(people).where(isNull(people.deletedAt)).all() as PersonRow[];
   const named = rows.filter((row) => currentCompanionId(row) === companionId).map((row) => ({ id: row.id, name: row.displayName }));
-  const robots = listDevicesByKind("robot").filter((device) => robotCompanionOf(device.id)?.id === companionId).map((device) => ({ id: device.id, name: device.name }));
+  const robots = listDevicesByKind("robot").filter((device) => robotCompanionOf(device.id)?.id === companionId || getDeviceSettingValue(device.id, ROBOT_GUISE_KEY) === companionId).map((device) => ({ id: device.id, name: device.name }));
   return { people: named, robots };
 }
 
 /** Admins only: each robot, its controls and its companion, for the page's Robots panel. */
-export function robotAssignments(): Array<{ id: string; name: string; controls: AgeBand; companion_id: string; companion_name: string | null }> {
+export function robotAssignments(): Array<{ id: string; name: string; controls: AgeBand; companion_id: string; companion_name: string | null; guise: string | null }> {
   return listDevicesByKind("robot").map((device) => {
     const companion = robotCompanionOf(device.id);
-    return { id: device.id, name: device.name, controls: robotControlsOf(device.id), companion_id: companion?.id ?? "", companion_name: companion?.name ?? null };
+    const guiseId = getDeviceSettingValue(device.id, ROBOT_GUISE_KEY);
+    const loaded = typeof guiseId === "string" && guiseId ? loadManifestOnly(guiseId) : null;
+    const guise = typeof guiseId === "string" && guiseId ? (getHouseholdCompanion(guiseId)?.companion?.display_name ?? (loaded?.ok ? loaded.value.companion?.display_name ?? null : null)) : null;
+    return { id: device.id, name: device.name, controls: robotControlsOf(device.id), companion_id: companion?.id ?? "", companion_name: companion?.name ?? null, guise };
   });
 }
 

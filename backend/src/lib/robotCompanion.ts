@@ -10,6 +10,7 @@ import { getHouseholdCompanion } from "@/lib/householdCompanions";
 
 export const ROBOT_CONTROLS_KEY = "robot.controls";
 export const ROBOT_COMPANION_KEY = "robot.companion.id";
+export const ROBOT_GUISE_KEY = "robot.companion.guise";
 
 const RANK: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 const COMPANION_WORD: Record<AgeBand, string> = { child: "all-ages", teen: "all-ages or teen", adult: "all-ages, teen or adult" };
@@ -69,6 +70,20 @@ export function robotCompanionOf(deviceId: string): CompanionInfo | null {
   if (typeof id !== "string" || !id) return null;
   const persona = companionInfo(id);
   return persona && companionFits(robotControlsOf(deviceId), persona.floor) ? persona : null;
+}
+
+export interface CompanionLayers { customization: CompanionInfo | null; memory: "speaker-and-household"; synth: CompanionInfo | null; guise: boolean }
+/**
+ * Companion turns compose three layers: customization (assigned companion settings), memory (the speaker and household),
+ * and synth (the selected synth's persona and life). A guise temporarily turns customization off while memory stays on.
+ */
+export function companionLayersOf(deviceId: string, actor: import("@/types").PersonRow, band: AgeBand): CompanionLayers {
+  const assigned = robotCompanionOf(deviceId);
+  const id = getDeviceSettingValue(deviceId, ROBOT_GUISE_KEY);
+  const synth = typeof id === "string" && id ? companionInfo(id) : null;
+  const valid = !!synth && companionFits(band, synth.floor) && companionFits(robotControlsOf(deviceId), synth.floor);
+  return valid && synth ? { customization: null, memory: "speaker-and-household", synth, guise: true }
+    : { customization: assigned, memory: "speaker-and-household", synth: assigned, guise: false };
 }
 
 /** The band an unknown speaker gets on this robot: the robot's own controls level when a companion is assigned (never the companion's

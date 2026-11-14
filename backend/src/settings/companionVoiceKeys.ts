@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { PACKAGES_DIR } from "@/lib/paths";
+import { dataDir, PACKAGES_DIR } from "@/lib/paths";
 
 export const COMPANION_VOICE_PREFIX = "companion.voice.";
 
@@ -15,11 +15,16 @@ export function companionVoiceKey(companionId: string): string {
 }
 
 export function companionVoiceSettingsKeys(): SettingsKey[] {
-  if (!existsSync(PACKAGES_DIR)) return [];
-  return readdirSync(PACKAGES_DIR).sort().flatMap((id) => {
+  const bundled = existsSync(PACKAGES_DIR) ? readdirSync(PACKAGES_DIR).sort() : [];
+  const householdDir = join(process.env.MAIPAI_DATA_DIR || dataDir, "companions");
+  const household = existsSync(householdDir) ? readdirSync(householdDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name) : [];
+  const ids = [...new Set([...bundled, ...household])].sort();
+  return ids.flatMap((id) => {
     const path = join(PACKAGES_DIR, id, "manifest.json");
-    if (!existsSync(path)) return [];
-    const manifest = JSON.parse(readFileSync(path, "utf-8")) as { kind?: string; companion?: { display_name?: string } };
+    const householdPath = join(householdDir, id, "manifest.json");
+    const manifestPath = existsSync(path) ? path : householdPath;
+    if (!existsSync(manifestPath)) return [];
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as { kind?: string; companion?: { display_name?: string } };
     if (manifest.kind !== "companion" || !manifest.companion?.display_name) return [];
     const name = manifest.companion.display_name;
     return [SettingsKey.parse({

@@ -12,6 +12,10 @@ import { resolveTurnBudgetBase, withTurnToolGates } from "@/lib/turnMachine/budg
 import { __resetToolGateLatchForTests, budgetWithTurnToolGates } from "@/lib/turnMachine/toolGates";
 import { resetDb } from "../reset-db";
 import type { PersonRow } from "@/types";
+import { createHouseholdCompanion, setHouseholdCompanionAudience } from "@/lib/householdCompanions";
+import { __reloadRegistryForTests } from "@/lib/settingsRegistry";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { setValue } from "@/lib/settings";
 
 const link = "maipai://news/story/news-1a2b3c4d";
 
@@ -67,6 +71,29 @@ afterEach(() => {
 });
 
 describe("conversation tool gate latch", () => {
+  test("impression offer follows the speaker band and robot controls audience floors", async () => {
+    const owner = makePerson("owner", "impression-offer-owner");
+    const child = makePerson("child", "impression-offer-child");
+    const teen = makePerson("teen", "impression-offer-teen");
+    const makeSynth = (name: string, audience: "all" | "teen" | "adult") => {
+      const made = createHouseholdCompanion({ display_name: name, formality: "formal", complexity: "standard", engagement: "brief", filler_density: "none", behavior: ["Be clear."], examples: ["One.", "Two.", "Three."], status: "ready", audience } as never, { person_id: owner.id, display_name: owner.displayName }, audience, { companion: { status: "ready", audience }, synth: { based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false } } });
+      if (!made.ok) throw new Error(made.error);
+      if (audience === "all") { const reviewed = setHouseholdCompanionAudience(made.value.id, "all", { person_id: owner.id, display_name: owner.displayName }); if (!reviewed.ok) throw new Error(reviewed.error); }
+    };
+    makeSynth("Adult audience impression", "adult");
+    const device = issueDeviceToken(owner.id, "robot", "StackChan");
+    __reloadRegistryForTests();
+    const robotOffer = async (actor: PersonRow, band: "child" | "teen" | "adult") => offered(actor, { band, surface: "robot", surfaceClass: "spoken", spoken: true, deviceId: device.deviceId });
+    expect(await robotOffer(child, "child")).toContain("impression");
+    expect(await robotOffer(teen, "teen")).toContain("impression");
+    expect(await robotOffer(owner, "adult")).toContain("impression");
+    setValue(owner, `device:${device.deviceId}`, "robot.controls", "child");
+    expect(await robotOffer(owner, "adult")).toContain("impression");
+    expect(await robotOffer(child, "child")).toContain("impression");
+    setValue(owner, `person:${owner.id}`, "companions.allowed", false);
+    expect(await robotOffer(owner, "adult")).not.toContain("impression");
+    expect(await offered(owner, { surface: "chat", surfaceClass: "spoken", spoken: true })).not.toContain("impression");
+  });
   test("SCENE-01c offers scene by surface structure, excludes guests and bare turns, preserves base set and cap", async () => {
     const actor = makePerson("owner", "scene-gate-owner");
     const base = resolveTurnBudgetBase(undefined, "adult");

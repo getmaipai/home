@@ -115,12 +115,13 @@ export async function tickLife(synth: SynthRecord, actor: PersonRow, today: stri
   return write.ok ? "beat" : write.status === 422 ? "none" : "skipped";
 }
 
-export function synthCard(synthId: string, actor: PersonRow, now = new Date()): string {
+export function synthCard(synthId: string, actor: PersonRow, now = new Date(), band?: import("@/lib/ageBand").AgeBand): string {
   const synth = synthById(synthId);
   if (!synth) return "";
   const lines = activeBeats(synthId, actor, now)
     .filter((record) => ["identity", "event", "state", "relationship"].includes(record.category))
     .sort((a, b) => b.importance - a.importance || b.created_at.localeCompare(a.created_at))
+    .filter((record) => !band || band === "adult" || (band === "teen" ? record.child_disclosure !== "adult_only" : record.child_disclosure === "child_ok"))
     .map((record) => ({ id: record.id, text: record.text, at: record.valid_from ?? record.created_at, disclosure: record.child_disclosure ?? "adult_only" }));
   const card: ProfileCard = { ruleLine: `${synth.persona.display_name}'s life so far:`, lines: lines.slice(0, Math.max(0, PROFILE_CARD_MAX_LINES - 1)) };
   while (card.lines.length && renderProfileCard(card).length > PROFILE_CARD_MAX_CHARS) card.lines.pop();

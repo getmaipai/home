@@ -366,7 +366,7 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
       {companion.used_by ? (
         <Section heading={i18n._({ id: "Who uses it", message: "Who uses it" })}>
           <p>{i18n._({ id: "People: {list}.", message: "People: {list}.", values: { list: companion.used_by.people.length ? formatList(companion.used_by.people.map((person) => person.name)) : i18n._({ id: "nobody yet", message: "nobody yet" }) } })}</p>
-          <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? formatList(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Synth settings", message: "Synth settings" })}</Link></p>
+      <p>{i18n._({ id: "Robots: {list}.", message: "Robots: {list}.", values: { list: companion.used_by.robots.length ? formatList(companion.used_by.robots.map((robot) => robot.name)) : i18n._({ id: "none yet", message: "none yet" }) } })}{" "}<Link to={ROBOT_SETTINGS} className="underline">{i18n._({ id: "Synth settings", message: "Synth settings" })}</Link></p>
         </Section>
       ) : null}
         </section> : null}

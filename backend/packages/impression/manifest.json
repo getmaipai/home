@@ -1,0 +1,17 @@
+{
+  "id": "impression",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Impression",
+  "description": "Temporarily take on a household synth as a companion.",
+  "offer": { "mode": "conditional", "gate": "impressionAllowed", "bench_row": "impression-tool", "priority": 999 },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "args": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["start", "stop"] }, "synth": { "type": "string", "minLength": 1, "maxLength": 120 } }, "additionalProperties": false },
+  "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"],
+  "min_role": "child", "consequential": false, "offline": "full", "config": [], "data_sources": [],
+  "permissions": ["memory:write"], "notifications": [], "backup": "hot", "background": false, "contributes": {},
+  "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze"
+}

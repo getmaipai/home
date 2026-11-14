@@ -1,0 +1,5 @@
+{
+  "id": "impression",
+  "inputs": [{ "name": "synth", "selector": "text" }],
+  "steps": [{ "op": "format", "as": "reply", "text": "Impression ready.", "speech": "Impression ready." }]
+}

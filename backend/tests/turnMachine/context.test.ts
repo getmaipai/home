@@ -211,14 +211,44 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
     const made = await createSynth(people.owner, { persona: { display_name: "Mica", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", audience: "all" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
     if (!made.ok) throw new Error("companion setup failed");
     const synth = made.value.manifest;
-    const seeded = remember(people.owner, { text: "Mica remembers the blue kite", category: "fact", tier: "durable", scope: "companion", companion_id: synth.id, source: "talent.life.test", importance: 0.9 });
+    const seeded = remember(people.owner, { text: "Mica remembers the blue kite", category: "event", tier: "durable", scope: "companion", companion_id: synth.id, source: "talent.life.test", importance: 0.9, child_disclosure: "child_ok" });
     if (!seeded.ok) throw new Error("setup failed");
     await embedMemoryRecordSafely(seeded.value.id, "Mica remembers the blue kite");
     const state = stateFor(people.owner);
+    const { issueDeviceToken } = await import("@/lib/deviceTokens");
+    const robot = issueDeviceToken(people.owner.id, "robot", "StackChan");
+    const { setValue } = await import("@/lib/settings");
+    setValue(people.owner, `device:${robot.deviceId}`, "robot.controls", "adult");
+    state.surface = "robot";
+    state.deviceId = robot.deviceId;
+    state.speakerEvidence = { person: people.owner.id, level: "confirmed", basis: "signed_in" };
+    state.planBasis = { ...state.planBasis!, surfaceClass: "spoken" };
     state.persona = { ...state.persona, id: synth.id } as typeof state.persona;
     const { output } = await contextNode(state, { utterance: "what do you remember about the blue kite" }, SIGNAL);
     expect(output.memoryTrace?.companion).toContainEqual(expect.objectContaining({ id: "synth-card", source: "companion" }));
     expect(output.memoryTrace?.companion).toEqual(expect.arrayContaining([expect.objectContaining({ id: "synth-card", source: "companion" }), expect.objectContaining({ id: seeded.value.id, source: "companion" })]));
+  });
+
+  test("robot guise keeps speaker memory retrieval keyed to the person", async () => {
+    const made = await createSynth(people.owner, { persona: { display_name: "Mica", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", audience: "all" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
+    if (!made.ok) throw new Error("companion setup failed");
+    const fact = "Sage's dog is named Juniper";
+    const saved = remember(people.owner, { text: fact, category: "relationship", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.9 });
+    if (!saved.ok) throw new Error("memory setup failed");
+    const { injectVector } = await import("../fixtures/injectVector"); injectVector(saved.value.id, [1, 0, 0]);
+    const { issueDeviceToken } = await import("@/lib/deviceTokens");
+    const device = issueDeviceToken(people.owner.id, "robot", "StackChan");
+    const { setValue } = await import("@/lib/settings");
+    const { ROBOT_GUISE_KEY } = await import("@/lib/robotCompanion");
+    setValue(people.owner, `device:${device.deviceId}`, "robot.controls", "adult");
+    setValue(people.owner, `device:${device.deviceId}`, ROBOT_GUISE_KEY, made.value.id);
+    const state = stateFor(people.owner); state.surface = "robot"; state.deviceId = device.deviceId;
+    state.speakerEvidence = { person: people.owner.id, basis: "voice", level: "confirmed" };
+    const vector = await (await import("@/lib/memory")).embedQueryForRecall("What is my dog's name?");
+    const direct = recall(people.owner, "What is my dog's name? Juniper", { selfOnly: true, queryVector: vector, withholdSensitive: true, anonymous: false, deviceId: device.deviceId, surface: "robot" });
+    expect(direct.map((match) => match.record.text)).toContain(fact);
+    const { output } = await contextNode(state, { utterance: "What is my dog's name? Juniper" }, SIGNAL);
+    expect(output.memoryTrace?.injected.map((entry) => entry.id)).toContain(saved.value.id);
   });
 
   test("caps at MAX_MEMORY_SNIPPETS (5) even when more than five records clear the floor", async () => {

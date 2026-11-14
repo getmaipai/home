@@ -134,7 +134,7 @@ const listRoute = createRoute({
       allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."), can_create: z.boolean(), can_discover: z.boolean(), default_id: z.string(),
       companions: z.array(Card),
       discover: z.array(Card),
-      robots: z.array(z.object({ id: z.string(), name: z.string(), controls: Type, companion_id: z.string(), companion_name: z.string().nullable() })).nullable(),
+      robots: z.array(z.object({ id: z.string(), name: z.string(), controls: Type, companion_id: z.string(), companion_name: z.string().nullable(), guise: z.string().nullable() })).nullable(),
     }) } }, description: "My companions. The robots list is for owners and admins only." },
     ...errorResponses({ 401: "Not signed in" }),
   },

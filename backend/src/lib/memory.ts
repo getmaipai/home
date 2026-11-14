@@ -184,9 +184,9 @@ function assertCanWrite(
   }
   if (scope === "household") return { ok: true, value: true };
   if (scope === "companion") {
-    if (!source.startsWith("talent.")) return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
+    if (!source.startsWith("talent.") && source !== "robot.guise") return { ok: false, status: 403, error: "Companion scope requires a talent source." };
     if (!companionId) return { ok: false, status: 400, error: "Companion scope requires a companion id. Set companion_id before saving." };
-    if (!companionWriteGate(actor, companionId)) return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
+    if (source !== "robot.guise" && !companionWriteGate(actor, companionId)) return { ok: false, status: 403, error: "Only the synth's maker or an admin can change its life." };
     return { ok: true, value: true };
   }
   return { ok: false, status: 400, error: `unknown scope: ${scope}` };

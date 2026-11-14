@@ -4,6 +4,7 @@
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const ROBOT_COMPANION_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({ key: "robot.companion.guise", scope: "device", selector: "text", default: "", label: "Robot impression", help: "A synth the robot is temporarily taking on.", level: "expert", lives_in: "robot.settings", honoured_by: ["home"] }),
   SettingsKey.parse({
     key: "robot.controls",
     scope: "device",
