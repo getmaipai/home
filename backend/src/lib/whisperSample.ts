@@ -47,18 +47,18 @@ async function make(id: string): Promise<boolean> {
   const clip = readClonedVoiceClip(id);
   if (!clip) return false;
   const transcript = clip.transcript?.trim() || (await transcribeClonedVoiceOnce(id, clip.bytes, clip.mimeType))?.trim();
-  if (!transcript) return false;
+  if (!transcript) { appendLogLine("voice.whisper_sample made=no reason=no-transcript"); return false; }
   return render(id, clip.bytes, clip.mimeType, transcript);
 }
 
 /** Renders the whisper from a reference clip and saves it as `<id>.whisper.wav`. False when the recorded engine is not installed or gives nothing usable. */
 async function render(id: string, bytes: Uint8Array, mimeType: string, transcript: string): Promise<boolean> {
   const status = await waitForRecordedSpeech();
-  if (!status?.available || !status.installed) return false;
+  if (!status?.available || !status.installed) { appendLogLine(`voice.whisper_sample made=no reason=engine-${status?.available ? "not-installed" : "unavailable"}`); return false; }
   const submitted = await submitRecordedSpeech(WHISPER_SAMPLE_TEXT, bytes, mimeType, transcript);
   const audio = await fetchRecordedSpeech(submitted.job, submitted.done ? submitted.data : null);
   // A real WAV with some length to it (the engine wrote about ten seconds): an empty or cut-off reply is not a usable sample.
-  if (!audio || audio.bytes.length < 100_000 || String.fromCharCode(...audio.bytes.slice(0, 4)) !== "RIFF") return false;
+  if (!audio || audio.bytes.length < 100_000 || String.fromCharCode(...audio.bytes.slice(0, 4)) !== "RIFF") { appendLogLine("voice.whisper_sample made=no reason=engine-gave-no-audio"); return false; }
   const path = whisperSamplePath(id);
   writeFileSync(`${path}.tmp`, audio.bytes, { mode: 0o600 });
   renameSync(`${path}.tmp`, path);

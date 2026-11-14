@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { decodeWavClip, encodeWavClip } from "@/lib/voiceShift";
-import { joinReferenceClips, normalizePeak, trimSilence } from "@/lib/voiceSamples";
+import { joinReferenceClips, prepareStyleClip, normalizePeak, trimSilence } from "@/lib/voiceSamples";
 
 const tone = (seconds: number, amp: number, rate = 16000) => encodeWavClip({ sampleRate: rate, samples: Float32Array.from({ length: Math.floor(seconds * rate) }, (_, i) => amp * Math.sin(i / 8)) });
 
@@ -29,5 +29,18 @@ describe("voiceSamples", () => {
     expect(silent.ok).toBe(false);
     const four = await joinReferenceClips(Array.from({ length: 4 }, () => ({ bytes: tone(3, 0.5), extension: "wav" })));
     expect(four.ok).toBe(false);
+  });
+  test("pads the joined clip so it does not start or end on a hard edge", async () => {
+    const result = await joinReferenceClips([{ bytes: tone(8, 0.5), extension: "wav" }]);
+    if (!result.ok) throw new Error("join failed");
+    const pcm = decodeWavClip(result.wav)!;
+    expect(Math.max(...pcm.samples.slice(0, 6000).map(Math.abs))).toBeLessThan(0.01);
+    expect(Math.max(...pcm.samples.slice(-6000).map(Math.abs))).toBeLessThan(0.01);
+  });
+  test("a style recording under 6 seconds is refused with a plain next step", async () => {
+    const short = await prepareStyleClip(tone(3, 0.5), "wav", "whisper");
+    expect(short.ok).toBe(false);
+    if (!short.ok) expect(short.error).toContain("too short");
+    expect((await prepareStyleClip(tone(10, 0.5), "wav", "anger")).ok).toBe(true);
   });
 });

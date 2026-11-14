@@ -18,6 +18,8 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [clip, setClip] = useState<File | undefined>();
+  const [whisperClip, setWhisperClip] = useState<File | undefined>();
+  const [angerClip, setAngerClip] = useState<File | undefined>();
   const [extraClips, setExtraClips] = useState<(File | undefined)[]>([undefined, undefined]);
   const [temperature, setTemperature] = useState("");
   const [pitch, setPitch] = useState("");
@@ -51,7 +53,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     const voiceName = name.trim();
     setBusy(true); setError(null);
     try {
-      await householdVoicesApi.make({ name: voiceName, clip, extraClips: inspired ? undefined : extraClips.filter((item): item is File => item !== undefined), temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
+      await householdVoicesApi.make({ name: voiceName, clip, whisperClip: inspired ? undefined : whisperClip, angerClip: inspired ? undefined : angerClip, extraClips: inspired ? undefined : extraClips.filter((item): item is File => item !== undefined), temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
       setBusy(false);
       onMade(voiceName);
@@ -65,7 +67,12 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     <div className={FIELD}><label htmlFor="add-voice-name" className="text-base">{i18n._({ id: "Name", message: "Name" })}</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></div>
     <div className={FIELD}><label htmlFor="add-voice-recording" className="text-base">{i18n._({ id: "Recording", message: "Recording" })}</label><Input id="add-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} disabled={busy} /></div>
     {!inspired ? [0, 1].map((slot) => <div key={slot} className={FIELD}><label htmlFor={`add-voice-recording-${slot + 2}`} className="text-base">{slot === 0 ? i18n._({ id: "Second recording (optional)", message: "Second recording (optional)" }) : i18n._({ id: "Third recording (optional)", message: "Third recording (optional)" })}</label><Input id={`add-voice-recording-${slot + 2}`} type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setExtraClips((old) => old.map((item, index) => index === slot ? event.target.files?.[0] : item))} disabled={busy} /></div>) : null}
-    {!inspired ? <p className={HELP}>{i18n._({ id: "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds.", message: "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds." })}</p> : null}
+    {!inspired ? <p className={HELP}>{i18n._({ id: "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one.", message: "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one." })}</p> : null}
+    {!inspired ? <>
+      <div className={FIELD}><label htmlFor="add-voice-whisper" className="text-base">{i18n._({ id: "Whisper recording (optional)", message: "Whisper recording (optional)" })}</label><Input id="add-voice-whisper" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setWhisperClip(event.target.files?.[0])} disabled={busy} /></div>
+      <div className={FIELD}><label htmlFor="add-voice-anger" className="text-base">{i18n._({ id: "Angry recording (optional)", message: "Angry recording (optional)" })}</label><Input id="add-voice-anger" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setAngerClip(event.target.files?.[0])} disabled={busy} /></div>
+      <p className={HELP}>{i18n._({ id: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you.", message: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you." })}</p>
+    </> : null}
     {inspired ? <div className={FIELD}>
       <span className="text-base">{i18n._({ id: "How different from the original", message: "How different from the original" })}</span>
       <Select aria-label={i18n._({ id: "How different from the original", message: "How different from the original" })} value={level} options={INSPIRED_LEVELS} getLabel={(id) => inspiredLevelLabel(id as InspiredLevel)} onValueChange={(id) => setLevel(id as InspiredLevel)} disabled={busy} />

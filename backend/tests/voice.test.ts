@@ -290,7 +290,7 @@ describe("cloned voices", () => {
     const owner = await ownerClient();
     const form = new FormData();
     form.set("label", "Too big");
-    form.set("file", new File([new Uint8Array(61 * 1024 * 1024)], "big.wav", { type: "audio/wav" }));
+    form.set("file", new File([new Uint8Array(101 * 1024 * 1024)], "big.wav", { type: "audio/wav" }));
     const res = await owner.postForm("/api/voice/cloned", form);
     expect(res.status).toBe(413);
   }, 20_000);

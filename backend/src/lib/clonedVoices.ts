@@ -263,6 +263,7 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   const filePath = join(clonedVoicesDir, row.fileName);
   try {
     if (existsSync(whisperSamplePath(id))) unlinkSync(whisperSamplePath(id));
+    if (existsSync(angerSamplePath(id))) unlinkSync(angerSamplePath(id));
     if (existsSync(filePath)) unlinkSync(filePath);
   } catch {
     // Same "harmless orphan, not a stuck delete" reasoning as the
@@ -275,6 +276,17 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
 /** WHISPER-01: where a voice's whisper sample lives. It is made once from the voice's own clip (lib/whisperSample.ts) and is derived data: no row, so deleting the voice removes it and a lost file is made again. */
 export function whisperSamplePath(id: string): string {
   return join(clonedVoicesDir, `${id}.whisper.wav`);
+}
+
+/** VOICE-STYLES-01: where a voice's angry sample lives (a recording the person made; stored with the voice, removed with it). */
+export function angerSamplePath(id: string): string {
+  return join(clonedVoicesDir, `${id}.anger.wav`);
+}
+
+/** Saves a person's own whisper or angry recording for a voice. A real whisper replaces the one the engine would have made. */
+export function saveStyleSample(id: string, style: "whisper" | "anger", wav: Uint8Array): void {
+  writeFileSync(style === "whisper" ? whisperSamplePath(id) : angerSamplePath(id), wav, { mode: 0o600 });
+  appendLogLine(`voice.style_sample style=${style} source=recording`);
 }
 
 /** The whisper form of a household voice: the same voice settings, with the address of its whisper sample, or null when it has none yet. */

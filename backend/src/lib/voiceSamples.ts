@@ -4,11 +4,18 @@
 import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voiceShift";
 
 export const MAX_SAMPLES = 3;
-export const MAX_SECONDS = 29;
+export const MAX_SECONDS = 28;
 const RATE = 24000;
 const GAP_SECONDS = 0.3;
 const SILENCE_LEVEL = 0.015;
 const PEAK_TARGET = 0.9;
+const PAD_SECONDS = 0.3;
+const FADE_SECONDS = 0.02;
+
+function fade(samples: Float32Array): void {
+  const n = Math.min(Math.floor(FADE_SECONDS * RATE), Math.floor(samples.length / 2));
+  for (let i = 0; i < n; i++) { const g = i / n; samples[i]! *= g; samples[samples.length - 1 - i]! *= g; }
+}
 
 function resampleTo(clip: PcmClip, rate: number): Float32Array {
   if (clip.sampleRate === rate) return clip.samples;
@@ -62,8 +69,21 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
   }
   const gap = Math.floor(GAP_SECONDS * RATE);
   const total = parts.reduce((sum, part) => sum + part.length, 0) + gap * (parts.length - 1);
-  const joined = new Float32Array(total);
-  let offset = 0;
-  for (const part of parts) { joined.set(part, offset); offset += part.length + gap; }
-  return { ok: true, wav: encodeWavClip({ samples: joined, sampleRate: RATE }), seconds: total / RATE };
+  // A short pause before and after, and a soft fade where a clip was cut, so the engine never starts or ends on a hard edge
+  // (the first word of a reply came out clipped, "lo" for "hello", on 2026-11-14).
+  const pad = Math.floor(PAD_SECONDS * RATE);
+  const joined = new Float32Array(total + pad * 2);
+  let offset = pad;
+  for (const part of parts) { fade(part); joined.set(part, offset); offset += part.length + gap; }
+  return { ok: true, wav: encodeWavClip({ samples: joined, sampleRate: RATE }), seconds: joined.length / RATE };
+}
+
+export type StyleName = "whisper" | "anger";
+
+/** A whisper or angry recording: cleaned the same way, and it must be 6 to 30 seconds because the engine uses it as a voice sample. */
+export async function prepareStyleClip(bytes: Uint8Array, extension: string, style: StyleName): Promise<{ ok: true; wav: Uint8Array } | { ok: false; error: string }> {
+  const joined = await joinReferenceClips([{ bytes, extension }]);
+  if (!joined.ok) return { ok: false, error: `The ${style === "whisper" ? "whisper" : "angry"} recording: ${joined.error}` };
+  if (joined.seconds < 6.5) return { ok: false, error: `The ${style === "whisper" ? "whisper" : "angry"} recording is too short. Record 10 to 25 seconds of it.` };
+  return { ok: true, wav: joined.wav };
 }

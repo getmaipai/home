@@ -25,9 +25,10 @@ import { isOwnerOrAdmin, mayUseClipVoices } from "@/lib/access";
 import { requireRole } from "@/middleware/auth";
 import { storeVoiceTrace, VoiceTraceUploadSchema } from "@/lib/voiceTrace";
 import { ResolvedSettingSchema } from "@/routes/settings";
-import { joinReferenceClips } from "@/lib/voiceSamples";
+import { joinReferenceClips, prepareStyleClip } from "@/lib/voiceSamples";
 import {
   listClonedVoices,
+  saveStyleSample,
   saveClonedVoice,
   saveInspiredVoice,
   previewInspiredVoice,
@@ -605,7 +606,7 @@ const clonedUploadRoute = createRoute({
     "Uploads a real audio sample as a new cloned voice. Accepts a multipart " +
     "form with a file field (the audio) and a label field (a display name). " +
     "The upload is bounded by bodyLimit to prevent multi-gigabyte memory use.",
-  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES * 3 + 64 * 1024 })] as const,
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES * 5 + 64 * 1024 })] as const,
   request: {
     body: {
       content: {
@@ -662,11 +663,24 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
     if (joined.ok) { saveBytes = joined.wav as Uint8Array<ArrayBuffer>; saveType = "audio/wav"; }
     else if (extra.length > 0) return c.json({ error: joined.error }, 400);
   }
+  // VOICE-STYLES-01: an optional whisper and an optional angry recording, checked before anything is saved.
+  const styleClips: { style: "whisper" | "anger"; wav: Uint8Array }[] = [];
+  if (!inspiredLevel) {
+    for (const [field, style] of [["whisper_file", "whisper"], ["anger_file", "anger"]] as const) {
+      const item = body[field];
+      if (!(item instanceof File)) continue;
+      const ext = (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? "wav").toLowerCase();
+      const prepared = await prepareStyleClip(new Uint8Array(await item.arrayBuffer()), ext, style);
+      if (!prepared.ok) return c.json({ error: prepared.error }, 400);
+      styleClips.push({ style, wav: prepared.wav });
+    }
+  }
   const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel, typeof body.base_voice_id === "string" && body.base_voice_id ? body.base_voice_id : null) : saveClonedVoice(actor, label, saveBytes, saveType, options);
   if (!result.ok) {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  for (const item of styleClips) saveStyleSample(result.value.id, item.style, item.wav);
   // The engine measures the clip and refuses one outside 6 to 30 seconds; such a voice is not kept.
   const check = await renderHouseholdVoice(result.value.id, c.req.raw.signal);
   if (!check.ok) {

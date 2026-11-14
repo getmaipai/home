@@ -95,7 +95,7 @@ msgid "‘{name}’ moved to Trash. Kept 30 days"
 msgstr "‘{name}’ moved to Trash. Kept 30 days"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:362
+#: src/shell/pages/CompanionsPage.tsx:363
 msgid "“{line}”"
 msgstr "“{line}”"
 
@@ -1437,7 +1437,7 @@ msgid "setting.generation.kids_daily_videos.help"
 msgstr "0 means none."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:81
+#: src/apps/settings/AddVoiceForm.tsx:88
 msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "0.1 to 2. Higher is livelier and also raises the pitch."
 
@@ -1934,9 +1934,9 @@ msgstr "A whole song"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:81
-#: src/shell/pages/CompanionsPage.tsx:327
-#: src/shell/pages/CompanionsPage.tsx:334
-#: src/shell/pages/CompanionsPage.tsx:347
+#: src/shell/pages/CompanionsPage.tsx:328
+#: src/shell/pages/CompanionsPage.tsx:335
+#: src/shell/pages/CompanionsPage.tsx:348
 msgid "About"
 msgstr "About"
 
@@ -2058,8 +2058,8 @@ msgstr "Active"
 #: src/shell/InstallDock.tsx:256
 #: src/shell/NotificationBell.tsx:273
 #: src/shell/pages/ActivityPage.tsx:74
-#: src/shell/pages/CompanionsPage.tsx:327
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:328
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Activity"
 msgstr "Activity"
 
@@ -2084,8 +2084,8 @@ msgstr "Activity was not cleared"
 #: src/apps/chat/composerAddMenu.tsx:315
 #: src/apps/reminders/ListMain.tsx:77
 #: src/apps/settings/AddVoiceBox.tsx:69
-#: src/shell/pages/CompanionsPage.tsx:172
-#: src/shell/pages/CompanionsPage.tsx:344
+#: src/shell/pages/CompanionsPage.tsx:173
+#: src/shell/pages/CompanionsPage.tsx:345
 msgid "Add"
 msgstr "Add"
 
@@ -2653,6 +2653,11 @@ msgid "area.AI settings"
 msgstr "AI settings"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:70
+msgid "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one."
+msgstr "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one."
+
+#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:33
 #: src/shell/AlarmRinger.tsx:50
 msgid "Alarm"
@@ -2714,7 +2719,7 @@ msgstr "Alerts"
 #: src/shell/pages/AllAppsPage.tsx:26
 #: src/shell/pages/AllAppsPage.tsx:41
 #: src/shell/pages/AllAppsPage.tsx:43
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:169
 #: src/shell/pages/MusicLibrary.tsx:134
 #: src/shell/reader/SearchResults.tsx:40
 msgid "All"
@@ -2775,7 +2780,7 @@ msgid "All speakers"
 msgstr "All speakers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:243
 msgid "All synths"
 msgstr "All synths"
 
@@ -3051,6 +3056,11 @@ msgstr "An update is available for {name}: {version}."
 #: src/shell/pages/dashboard/Attention.tsx:26
 msgid "An update is ready"
 msgstr "An update is ready"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:73
+msgid "Angry recording (optional)"
+msgstr "Angry recording (optional)"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowDialog.tsx:16
@@ -3765,7 +3775,7 @@ msgid "Back to Settings"
 msgstr "Back to Settings"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Back to tasks"
 msgstr "Back to tasks"
 
@@ -3860,7 +3870,7 @@ msgid "Band"
 msgstr "Band"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:340
+#: src/shell/pages/CompanionsPage.tsx:341
 #: src/shell/pages/MusicStudioPages.tsx:143
 msgid "Bands"
 msgstr "Bands"
@@ -3891,7 +3901,7 @@ msgstr "Based on"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:92
-#: src/shell/pages/CompanionsPage.tsx:251
+#: src/shell/pages/CompanionsPage.tsx:252
 msgid "Based on {name}"
 msgstr "Based on {name}"
 
@@ -4074,8 +4084,8 @@ msgid "Bio must be 160 characters or less."
 msgstr "Bio must be 160 characters or less."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:76
-#: src/apps/settings/AddVoiceForm.tsx:77
+#: src/apps/settings/AddVoiceForm.tsx:83
+#: src/apps/settings/AddVoiceForm.tsx:84
 msgid "Blend with (optional)"
 msgstr "Blend with (optional)"
 
@@ -4419,7 +4429,7 @@ msgid "Built in"
 msgstr "Built in"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:243
 msgid "Built-in synth"
 msgstr "Built-in synth"
 
@@ -4519,7 +4529,7 @@ msgstr "Can someone reach into your house?"
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
-#: src/apps/settings/AddVoiceForm.tsx:89
+#: src/apps/settings/AddVoiceForm.tsx:96
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/CodingSettings.tsx:173
@@ -4542,7 +4552,7 @@ msgstr "Can someone reach into your house?"
 #: src/shell/pages/ChatPage.tsx:1711
 #: src/shell/pages/ChatPage.tsx:1727
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
-#: src/shell/pages/CompanionsPage.tsx:182
+#: src/shell/pages/CompanionsPage.tsx:183
 #: src/shell/pages/FilesPage.tsx:427
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
@@ -4865,8 +4875,8 @@ msgstr "Charles"
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
 #: src/shell/pages/ChatPage.tsx:1781
-#: src/shell/pages/CompanionsPage.tsx:163
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:164
+#: src/shell/pages/CompanionsPage.tsx:169
 #: src/shell/pages/settings/settingsBackLink.ts:52
 #: src/shell/pages/UiShowcasePage.tsx:90
 msgid "Chat"
@@ -5073,7 +5083,7 @@ msgid "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other
 msgstr "Chat window: {tokens} tokens per slot ({slots, plural, one {# slot} other {# slots}})."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:244
+#: src/shell/pages/CompanionsPage.tsx:245
 msgid "Chat with {name}"
 msgstr "Chat with {name}"
 
@@ -5437,7 +5447,7 @@ msgid "Choose a style"
 msgstr "Choose a style"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Choose a task to see its details."
 msgstr "Choose a task to see its details."
 
@@ -6311,7 +6321,7 @@ msgid "Compare with the bare model"
 msgstr "Compare with the bare model"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Completed"
 msgstr "Completed"
 
@@ -6410,7 +6420,7 @@ msgstr "Connection"
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/shell/AmbientCompanionPane.tsx:273
 #: src/shell/pages/companionFlow/AnimateStep.tsx:156
-#: src/shell/pages/CompanionsPage.tsx:163
+#: src/shell/pages/CompanionsPage.tsx:164
 #: src/shell/pages/dashboard/HomeShelves.tsx:46
 #: src/shell/pages/dashboard/HomeShelves.tsx:86
 #: src/shell/pages/SignInPage.tsx:164
@@ -6477,8 +6487,8 @@ msgid "setting.companions.allowed.does"
 msgstr "Controls who can see and use the available companions."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:309
-#: src/shell/pages/CompanionsPage.tsx:315
+#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:316
 msgid "Conversation"
 msgstr "Conversation"
 
@@ -6579,7 +6589,7 @@ msgid "Could not add that person."
 msgstr "Could not add that person."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:282
+#: src/shell/pages/CompanionsPage.tsx:283
 msgid "Could not add this life beat. Check your connection and try again."
 msgstr "Could not add this life beat. Check your connection and try again."
 
@@ -6670,7 +6680,7 @@ msgid "Could not change this chat's companion."
 msgstr "Could not change this chat's companion."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:127
+#: src/shell/pages/CompanionsPage.tsx:128
 msgid "Could not change this synth's status. Check your connection and try again."
 msgstr "Could not change this synth's status. Check your connection and try again."
 
@@ -6822,7 +6832,7 @@ msgid "Could not fix that repair."
 msgstr "Could not fix that repair."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:283
+#: src/shell/pages/CompanionsPage.tsx:284
 msgid "Could not forget this life beat. Check your connection and try again."
 msgstr "Could not forget this life beat. Check your connection and try again."
 
@@ -6854,7 +6864,7 @@ msgid "Could not load access rules. Check your connection and try again."
 msgstr "Could not load access rules. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Could not load activity. Check your connection and try again."
 msgstr "Could not load activity. Check your connection and try again."
 
@@ -6989,12 +6999,12 @@ msgid "Could not load storage."
 msgstr "Could not load storage."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:335
+#: src/shell/pages/CompanionsPage.tsx:336
 msgid "Could not load synth credits or life. Check your connection and try again."
 msgstr "Could not load synth credits or life. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Could not load tasks. Check your connection and try again."
 msgstr "Could not load tasks. Check your connection and try again."
 
@@ -7056,7 +7066,7 @@ msgid "Could not load the robots."
 msgstr "Could not load the robots."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:143
+#: src/shell/pages/CompanionsPage.tsx:144
 msgid "Could not load the synths. Check your connection and try again."
 msgstr "Could not load the synths. Check your connection and try again."
 
@@ -7081,7 +7091,7 @@ msgid "Could not load this robot's companion. Check the connection and try again
 msgstr "Could not load this robot's companion. Check the connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:208
+#: src/shell/pages/CompanionsPage.tsx:209
 msgid "Could not load this synth. Check your connection and try again."
 msgstr "Could not load this synth. Check your connection and try again."
 
@@ -7186,7 +7196,7 @@ msgid "Could not log out. Try again."
 msgstr "Could not log out. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:126
+#: src/shell/pages/CompanionsPage.tsx:127
 msgid "Could not make a copy. Check your connection and try again."
 msgstr "Could not make a copy. Check your connection and try again."
 
@@ -7202,7 +7212,7 @@ msgid "Could not make this key. Try again."
 msgstr "Could not make this key. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:59
+#: src/apps/settings/AddVoiceForm.tsx:61
 msgid "Could not make this voice. Try again."
 msgstr "Could not make this voice. Try again."
 
@@ -7242,8 +7252,8 @@ msgid "Could not open your library. Check that Home is running, then try again."
 msgstr "Could not open your library. Check that Home is running, then try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:44
-#: src/lib/householdVoicesApi.ts:51
+#: src/apps/settings/AddVoiceForm.tsx:46
+#: src/lib/householdVoicesApi.ts:53
 msgid "Could not play a sample. Try again."
 msgstr "Could not play a sample. Try again."
 
@@ -7260,7 +7270,7 @@ msgstr "Could not reach {name}. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/errors.ts:4
-#: src/shell/pages/CompanionsPage.tsx:250
+#: src/shell/pages/CompanionsPage.tsx:251
 #: src/shell/pages/useCompanionStates.ts:9
 msgid "Could not reach Home. Check your connection and try again."
 msgstr "Could not reach Home. Check your connection and try again."
@@ -7456,7 +7466,7 @@ msgid "Could not save this sample."
 msgstr "Could not save this sample."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:414
+#: src/shell/pages/CompanionsPage.tsx:415
 msgid "Could not save this voice. Check your connection and try again."
 msgstr "Could not save this voice. Check your connection and try again."
 
@@ -7467,7 +7477,7 @@ msgstr "Could not save this. Check the connection and try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:52
-#: src/shell/pages/CompanionsPage.tsx:248
+#: src/shell/pages/CompanionsPage.tsx:249
 msgid "Could not save this. Check your connection and try again."
 msgstr "Could not save this. Check your connection and try again."
 
@@ -7794,7 +7804,7 @@ msgid "setting.music.library_sort.option_label.creator"
 msgstr "Creator"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:337
+#: src/shell/pages/CompanionsPage.tsx:338
 msgid "Credits"
 msgstr "Credits"
 
@@ -7825,8 +7835,8 @@ msgid "Current PIN or password"
 msgstr "Current PIN or password"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:330
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Current work"
 msgstr "Current work"
 
@@ -7868,7 +7878,7 @@ msgid "Customize"
 msgstr "Customize"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:245
+#: src/shell/pages/CompanionsPage.tsx:246
 msgid "Customize a copy"
 msgstr "Customize a copy"
 
@@ -7985,7 +7995,7 @@ msgid "area.Data and privacy"
 msgstr "Data and privacy"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:344
+#: src/shell/pages/CompanionsPage.tsx:345
 msgid "Date"
 msgstr "Date"
 
@@ -8115,7 +8125,7 @@ msgstr "Degrees Fahrenheit, like 72 F."
 #: src/shell/library/LibraryViewer.tsx:170
 #: src/shell/library/LibraryViewer.tsx:170
 #: src/shell/pages/CompanionsPage.tsx:82
-#: src/shell/pages/CompanionsPage.tsx:182
+#: src/shell/pages/CompanionsPage.tsx:183
 #: src/shell/pages/FilesPage.tsx:354
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/SoundExtras.tsx:47
@@ -8130,7 +8140,7 @@ msgstr "Delete ‘{name}’?"
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:184
 #: src/apps/reminders/RemindersPage.tsx:184
-#: src/shell/pages/CompanionsPage.tsx:181
+#: src/shell/pages/CompanionsPage.tsx:182
 msgid "Delete {name}?"
 msgstr "Delete {name}?"
 
@@ -8433,7 +8443,7 @@ msgid "Different"
 msgstr "Different"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:72
+#: src/apps/settings/AddVoiceForm.tsx:79
 msgid "Different sounds like a relative of the voice. Very different sounds like someone else with a similar feel. Lower and Much lower make the voice deeper."
 msgstr "Different sounds like a relative of the voice. Very different sounds like someone else with a similar feel. Lower and Much lower make the voice deeper."
 
@@ -8535,7 +8545,7 @@ msgid "Discarding"
 msgstr "Discarding"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:157
+#: src/shell/pages/CompanionsPage.tsx:158
 msgid "Discover"
 msgstr "Discover"
 
@@ -8812,9 +8822,9 @@ msgid "setting.install.recommended_auto_on_upgrade.does"
 msgstr "Downloads the recommended extras right after the licences are accepted on an existing Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:163
-#: src/shell/pages/CompanionsPage.tsx:172
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:164
+#: src/shell/pages/CompanionsPage.tsx:173
+#: src/shell/pages/CompanionsPage.tsx:243
 msgid "Draft · needs a portrait"
 msgstr "Draft · needs a portrait"
 
@@ -8941,7 +8951,7 @@ msgstr "Echo"
 #: src/shell/library/TranscriptPanel.tsx:554
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/CompanionsPage.tsx:73
-#: src/shell/pages/CompanionsPage.tsx:246
+#: src/shell/pages/CompanionsPage.tsx:247
 msgid "Edit"
 msgstr "Edit"
 
@@ -9135,7 +9145,7 @@ msgid "Engine computer: {state}"
 msgstr "Engine computer: {state}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:81
+#: src/apps/settings/AddVoiceForm.tsx:88
 msgid "Engine default"
 msgstr "Engine default"
 
@@ -9775,12 +9785,12 @@ msgid "Filling in the parts that were cut off..."
 msgstr "Filling in the parts that were cut off..."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:259
+#: src/shell/pages/CompanionsPage.tsx:260
 msgid "Film"
 msgstr "Film"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:339
+#: src/shell/pages/CompanionsPage.tsx:340
 msgid "Filmography"
 msgstr "Filmography"
 
@@ -9889,8 +9899,8 @@ msgid "Finish your character on the first screen before making animations."
 msgstr "Finish your character on the first screen before making animations."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:309
-#: src/shell/pages/CompanionsPage.tsx:324
+#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:325
 msgid "Finished"
 msgstr "Finished"
 
@@ -10067,7 +10077,7 @@ msgstr "For safety, a Wi-Fi password is not sent to the robot over your home net
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotWifi.tsx:46
-#: src/shell/pages/CompanionsPage.tsx:343
+#: src/shell/pages/CompanionsPage.tsx:344
 msgid "Forget"
 msgstr "Forget"
 
@@ -11001,7 +11011,7 @@ msgstr "Home can't hear you right now. Type your message instead, or open Repair
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:100
-#: src/shell/pages/CompanionsPage.tsx:417
+#: src/shell/pages/CompanionsPage.tsx:418
 msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr "Home can't reach its voice service. Check Repairs, then come back."
 
@@ -11808,7 +11818,7 @@ msgid "setting.storage.household.cap_bytes.label"
 msgstr "Household storage cap (bytes)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:243
 msgid "Household synth"
 msgstr "Household synth"
 
@@ -11841,8 +11851,8 @@ msgid "setting.robot.brightness.help"
 msgstr "How bright this robot's screen is by default, from 10 to 100 percent. You can also tell it 'brightness to 50'. At night it dims and goes back to this level in the morning."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:70
-#: src/apps/settings/AddVoiceForm.tsx:71
+#: src/apps/settings/AddVoiceForm.tsx:77
+#: src/apps/settings/AddVoiceForm.tsx:78
 msgid "How different from the original"
 msgstr "How different from the original"
 
@@ -11877,7 +11887,7 @@ msgid "setting.resources.preset.help"
 msgstr "How Home shares the computer when a big job needs more room. A preset sets the quiet time, the wait and whether Home asks before lowering a job. Changing one of those by hand shows Custom."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:353
+#: src/shell/pages/CompanionsPage.tsx:354
 msgid "How it talks"
 msgstr "How it talks"
 
@@ -12857,7 +12867,7 @@ msgid "Its file moves to Recently removed for 30 days, then it is deleted. Clips
 msgstr "Its file moves to Recently removed for 30 days, then it is deleted. Clips already made with it stay."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:398
+#: src/shell/pages/CompanionsPage.tsx:399
 msgid "Its own voice"
 msgstr "Its own voice"
 
@@ -13241,7 +13251,7 @@ msgid "area.Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:169
 msgid "Kids"
 msgstr "Kids"
 
@@ -13942,12 +13952,12 @@ msgid "Licences of the AI models Home installs"
 msgstr "Licences of the AI models Home installs"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:342
+#: src/shell/pages/CompanionsPage.tsx:343
 msgid "Life"
 msgstr "Life"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:344
+#: src/shell/pages/CompanionsPage.tsx:345
 msgid "Life beat"
 msgstr "Life beat"
 
@@ -13988,7 +13998,7 @@ msgid "Like"
 msgstr "Like"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:350
+#: src/shell/pages/CompanionsPage.tsx:351
 msgid "Likes: {list}."
 msgstr "Likes: {list}."
 
@@ -14175,7 +14185,7 @@ msgid "Live view stops by itself after 10 minutes. Nothing is recorded."
 msgstr "Live view stops by itself after 10 minutes. Nothing is recorded."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:81
+#: src/apps/settings/AddVoiceForm.tsx:88
 msgid "Liveliness (optional)"
 msgstr "Liveliness (optional)"
 
@@ -14237,7 +14247,7 @@ msgid "Loading activity"
 msgstr "Loading activity"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Loading activity…"
 msgstr "Loading activity…"
 
@@ -14465,19 +14475,19 @@ msgstr "Loading styles"
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:22
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:23
-#: src/shell/pages/CompanionsPage.tsx:209
+#: src/shell/pages/CompanionsPage.tsx:210
 msgid "Loading synth"
 msgstr "Loading synth"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:18
 #: src/shell/pages/companionFlow/CompanionFlowPage.tsx:19
-#: src/shell/pages/CompanionsPage.tsx:144
+#: src/shell/pages/CompanionsPage.tsx:145
 msgid "Loading synths"
 msgstr "Loading synths"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Loading tasks…"
 msgstr "Loading tasks…"
 
@@ -15159,7 +15169,7 @@ msgid "Make caption track"
 msgstr "Make caption track"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:90
+#: src/apps/settings/AddVoiceForm.tsx:97
 msgid "Make Inspired voice"
 msgstr "Make Inspired voice"
 
@@ -15247,7 +15257,7 @@ msgid "Make transcript"
 msgstr "Make transcript"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:90
+#: src/apps/settings/AddVoiceForm.tsx:97
 msgid "Make voice"
 msgstr "Make voice"
 
@@ -15345,12 +15355,12 @@ msgid "Making the sound"
 msgstr "Making the sound"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:87
+#: src/apps/settings/AddVoiceForm.tsx:94
 msgid "Making the voice"
 msgstr "Making the voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:87
+#: src/apps/settings/AddVoiceForm.tsx:94
 msgid "Making the voice. This can take up to a minute the first time."
 msgstr "Making the voice. This can take up to a minute the first time."
 
@@ -15651,7 +15661,7 @@ msgid "setting.robot.dance.auto_sensitivity.option.medium"
 msgstr "Medium, fits most rooms"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:134
+#: src/shell/pages/CompanionsPage.tsx:135
 msgid "Meet the synths in your home. Chat with one, or pick yours."
 msgstr "Meet the synths in your home. Chat with one, or pick yours."
 
@@ -15857,7 +15867,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.mix"
 msgstr "Mix"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:78
+#: src/apps/settings/AddVoiceForm.tsx:85
 msgid "Mixes the new voice with a voice already made at home."
 msgstr "Mixes the new voice with a voice already made at home."
 
@@ -15970,11 +15980,6 @@ msgid "More options for {name}"
 msgstr "More options for {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:68
-msgid "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds."
-msgstr "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:275
 msgid "setting.ease.spacing.option.roomy"
 msgstr "More room between things."
@@ -15985,7 +15990,7 @@ msgid "More snooze options"
 msgstr "More snooze options"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:174
+#: src/shell/pages/CompanionsPage.tsx:175
 msgid "More synths from the catalog are coming soon."
 msgstr "More synths from the catalog are coming soon."
 
@@ -16234,7 +16239,7 @@ msgstr "My styles"
 #: src/apps/people/ProfileForm.tsx:168
 #: src/apps/reminders/CreateListSheet.tsx:33
 #: src/apps/reminders/ListMenu.tsx:45
-#: src/apps/settings/AddVoiceForm.tsx:65
+#: src/apps/settings/AddVoiceForm.tsx:67
 #: src/apps/settings/AssistantKeysSettings.tsx:83
 #: src/apps/settings/CodingSettings.tsx:226
 #: src/apps/settings/CodingSettings.tsx:232
@@ -16425,15 +16430,15 @@ msgid "Needs setup"
 msgstr "Needs setup"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
-#: src/shell/pages/CompanionsPage.tsx:332
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:330
+#: src/shell/pages/CompanionsPage.tsx:333
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Needs you"
 msgstr "Needs you"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:323
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:324
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Needs your choice"
 msgstr "Needs your choice"
 
@@ -16605,7 +16610,7 @@ msgid "New speaker name"
 msgstr "New speaker name"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:136
+#: src/shell/pages/CompanionsPage.tsx:137
 msgid "New synth"
 msgstr "New synth"
 
@@ -16745,7 +16750,7 @@ msgid "No active sessions."
 msgstr "No active sessions."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "No activity for {name} yet."
 msgstr "No activity for {name} yet."
 
@@ -16973,7 +16978,7 @@ msgid "No one to enroll"
 msgstr "No one to enroll"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:31
+#: src/apps/settings/AddVoiceForm.tsx:33
 msgid "No other voice"
 msgstr "No other voice"
 
@@ -17173,7 +17178,7 @@ msgid "api.error.no_such_session"
 msgstr "No such session"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:151
+#: src/shell/pages/CompanionsPage.tsx:152
 msgid "No synths are installed yet."
 msgstr "No synths are installed yet."
 
@@ -17249,7 +17254,7 @@ msgid "Nobody"
 msgstr "Nobody"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:368
+#: src/shell/pages/CompanionsPage.tsx:369
 msgid "nobody yet"
 msgstr "nobody yet"
 
@@ -17290,7 +17295,7 @@ msgid "api.error.list_move_none"
 msgstr "None of those items are on the list any more. Refresh the list and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:369
+#: src/shell/pages/CompanionsPage.tsx:370
 msgid "none yet"
 msgstr "none yet"
 
@@ -17524,7 +17529,7 @@ msgid "Note"
 msgstr "Note"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Nothing has finished yet."
 msgstr "Nothing has finished yet."
 
@@ -17579,7 +17584,7 @@ msgid "Nothing is queued after this song."
 msgstr "Nothing is queued after this song."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Nothing is running."
 msgstr "Nothing is running."
 
@@ -17594,7 +17599,7 @@ msgid "Nothing listed."
 msgstr "Nothing listed."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Nothing needs you right now."
 msgstr "Nothing needs you right now."
 
@@ -18118,7 +18123,7 @@ msgid "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Ho
 msgstr "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:346
+#: src/shell/pages/CompanionsPage.tsx:347
 msgid "On air"
 msgstr "On air"
 
@@ -18392,7 +18397,7 @@ msgid "Only this computer will be able to reach Home."
 msgstr "Only this computer will be able to reach Home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:85
+#: src/apps/settings/AddVoiceForm.tsx:92
 msgid "Only use your own voice, or the voice of someone who said yes."
 msgstr "Only use your own voice, or the voice of someone who said yes."
 
@@ -18427,7 +18432,7 @@ msgid "Open a song from your list, then choose Studio."
 msgstr "Open a song from your list, then choose Studio."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:315
+#: src/shell/pages/CompanionsPage.tsx:316
 msgid "Open chat"
 msgstr "Open chat"
 
@@ -18520,7 +18525,7 @@ msgid "Open Repairs"
 msgstr "Open Repairs"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Open result"
 msgstr "Open result"
 
@@ -18530,7 +18535,7 @@ msgid "Open Settings"
 msgstr "Open Settings"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Open source conversation"
 msgstr "Open source conversation"
 
@@ -19010,7 +19015,7 @@ msgid "People with access can use Coding again."
 msgstr "People with access can use Coding again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:368
+#: src/shell/pages/CompanionsPage.tsx:369
 msgid "People: {list}."
 msgstr "People: {list}."
 
@@ -19341,7 +19346,7 @@ msgid "setting.engines.stack.where.does"
 msgstr "Picks which computer does the thinking and speaking for Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:259
+#: src/shell/pages/CompanionsPage.tsx:260
 #: src/shell/pages/FilesPage.tsx:165
 msgid "Picture"
 msgstr "Picture"
@@ -19503,7 +19508,7 @@ msgid "Pitch"
 msgstr "Pitch"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:82
+#: src/apps/settings/AddVoiceForm.tsx:89
 msgid "Pitch (optional)"
 msgstr "Pitch (optional)"
 
@@ -19567,7 +19572,7 @@ msgid "Play {title}"
 msgstr "Play {title}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:401
+#: src/shell/pages/CompanionsPage.tsx:402
 msgid "Play a sample"
 msgstr "Play a sample"
 
@@ -19597,7 +19602,7 @@ msgid "Playful"
 msgstr "Playful"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:73
+#: src/apps/settings/AddVoiceForm.tsx:80
 msgid "Playing a sample"
 msgstr "Playing a sample"
 
@@ -19819,7 +19824,7 @@ msgid "Pretend the next Tailscale step is done"
 msgstr "Pretend the next Tailscale step is done"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:73
+#: src/apps/settings/AddVoiceForm.tsx:80
 #: src/shell/library/TranscriptFindReplace.tsx:107
 #: src/shell/pages/companionFlow/AnimateStep.tsx:115
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
@@ -19915,8 +19920,8 @@ msgstr "Profile not found"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/AnimateStep.tsx:131
-#: src/shell/pages/CompanionsPage.tsx:332
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Progress"
 msgstr "Progress"
 
@@ -19937,7 +19942,7 @@ msgid "Projects keep related chats together."
 msgstr "Projects keep related chats together."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:349
+#: src/shell/pages/CompanionsPage.tsx:350
 msgid "Pronouns: {pronouns}"
 msgstr "Pronouns: {pronouns}"
 
@@ -20203,7 +20208,7 @@ msgstr "Reading the details…"
 #: src/apps/setup/CheckGrid.tsx:31
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/companionFlow/AnimateStep.tsx:31
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:243
 #: src/shell/pages/EnginesPage.tsx:34
 msgid "Ready"
 msgstr "Ready"
@@ -20311,7 +20316,7 @@ msgid "Record a sample"
 msgstr "Record a sample"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:66
+#: src/apps/settings/AddVoiceForm.tsx:68
 msgid "Recording"
 msgstr "Recording"
 
@@ -20344,7 +20349,7 @@ msgid "Reduced"
 msgstr "Reduced"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:260
+#: src/shell/pages/CompanionsPage.tsx:261
 msgid "Reel"
 msgstr "Reel"
 
@@ -20872,7 +20877,7 @@ msgid "setting.chat.search_assist.option_label.rescue"
 msgstr "Rescue"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:169
 msgid "Research"
 msgstr "Research"
 
@@ -21147,12 +21152,12 @@ msgstr "Reverting"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ActivityPage.tsx:36
-#: src/shell/pages/CompanionsPage.tsx:315
+#: src/shell/pages/CompanionsPage.tsx:316
 msgid "Review"
 msgstr "Review"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:330
 msgid "Review task"
 msgstr "Review task"
 
@@ -21435,7 +21440,7 @@ msgid "Robots found on your network"
 msgstr "Robots found on your network"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:369
+#: src/shell/pages/CompanionsPage.tsx:370
 msgid "Robots: {list}."
 msgstr "Robots: {list}."
 
@@ -21555,7 +21560,7 @@ msgstr "Rung:"
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/setup/SetupWizard.tsx:483
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:333
 #: src/shell/pages/status/StatusComponents.tsx:40
 #: src/shell/pages/status/StatusComponents.tsx:50
 #: src/shell/pages/status/StatusComponents.tsx:120
@@ -22165,8 +22170,8 @@ msgid "Search styles, or paste a Hugging Face link"
 msgstr "Search styles, or paste a Hugging Face link"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:159
-#: src/shell/pages/CompanionsPage.tsx:159
+#: src/shell/pages/CompanionsPage.tsx:160
+#: src/shell/pages/CompanionsPage.tsx:160
 msgid "Search synths"
 msgstr "Search synths"
 
@@ -22294,7 +22299,7 @@ msgid "SearXNG is a search service you run yourself. It searches many sites at o
 msgstr "SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:67
+#: src/apps/settings/AddVoiceForm.tsx:69
 msgid "Second recording (optional)"
 msgstr "Second recording (optional)"
 
@@ -22433,7 +22438,7 @@ msgid "setting.chat.model_id.label"
 msgstr "Selected chat model"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:82
+#: src/apps/settings/AddVoiceForm.tsx:89
 msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr "Semitones, -12 to 12. A negative number lowers the voice."
 
@@ -22856,7 +22861,7 @@ msgstr "Shelves"
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/reminderTypes.ts:16
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:169
 msgid "Shopping"
 msgstr "Shopping"
 
@@ -22886,7 +22891,7 @@ msgid "setting.ease.reading_level.option.plain"
 msgstr "Shorter sentences and everyday words."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:260
+#: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/MusicLibrary.tsx:194
 msgid "Show"
 msgstr "Show"
@@ -23051,7 +23056,7 @@ msgid "setting.ease.word_help.option.on"
 msgstr "Shown."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:338
+#: src/shell/pages/CompanionsPage.tsx:339
 msgid "Shows"
 msgstr "Shows"
 
@@ -23631,7 +23636,7 @@ msgstr "Something went wrong. Try asking again."
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:120
-#: src/shell/pages/CompanionsPage.tsx:260
+#: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/musicComposerMode.ts:18
 #: src/shell/pages/PersonProfilePage.tsx:176
@@ -23722,7 +23727,7 @@ msgstr "Sort by"
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:94
 #: src/apps/clock/AlarmEditor.tsx:96
-#: src/shell/pages/CompanionsPage.tsx:260
+#: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/musicComposerMode.ts:158
 #: src/shell/pages/MusicLibrary.tsx:126
 msgid "Sound"
@@ -24173,7 +24178,7 @@ msgid "Starting {title}…"
 msgstr "Starting {title}…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:244
+#: src/shell/pages/CompanionsPage.tsx:245
 msgid "Starting chat…"
 msgstr "Starting chat…"
 
@@ -24324,7 +24329,7 @@ msgstr "Stone"
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:310
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
 #: src/shell/pages/companionFlow/PackSection.tsx:80
-#: src/shell/pages/CompanionsPage.tsx:401
+#: src/shell/pages/CompanionsPage.tsx:402
 #: src/shell/pages/EnginesPage.tsx:239
 #: src/shell/pages/musicSongStatus.tsx:36
 #: src/shell/pages/status/StatusComponents.tsx:136
@@ -24379,8 +24384,8 @@ msgid "Stop this robot's installation."
 msgstr "Stop this robot's installation."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:309
-#: src/shell/pages/CompanionsPage.tsx:324
+#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:325
 #: src/shell/pages/musicSongStatus.tsx:13
 #: src/shell/pages/musicSongStatus.tsx:30
 #: src/shell/pages/SoundExtras.tsx:43
@@ -24477,7 +24482,7 @@ msgid "Storage usage by person"
 msgstr "Storage usage by person"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:168
+#: src/shell/pages/CompanionsPage.tsx:169
 msgid "Stories"
 msgstr "Stories"
 
@@ -24624,7 +24629,7 @@ msgid "setting.generation.video.enabled.does"
 msgstr "Switches making clips on or off for the whole home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:200
+#: src/shell/pages/CompanionsPage.tsx:201
 msgid "Synth"
 msgstr "Synth"
 
@@ -24644,7 +24649,7 @@ msgid "Synth Preview"
 msgstr "Synth Preview"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:369
+#: src/shell/pages/CompanionsPage.tsx:370
 msgid "Synth settings"
 msgstr "Synth settings"
 
@@ -24661,7 +24666,7 @@ msgid "area.Synths"
 msgstr "Synths"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:149
+#: src/shell/pages/CompanionsPage.tsx:150
 msgid "Synths are turned off for you. Ask an owner or admin to turn them on."
 msgstr "Synths are turned off for you. Ask an owner or admin to turn them on."
 
@@ -24749,13 +24754,13 @@ msgid "Tap to turn the sound on"
 msgstr "Tap to turn the sound on"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:315
+#: src/shell/pages/CompanionsPage.tsx:316
 msgid "Task"
 msgstr "Task"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:327
-#: src/shell/pages/CompanionsPage.tsx:332
+#: src/shell/pages/CompanionsPage.tsx:328
+#: src/shell/pages/CompanionsPage.tsx:333
 msgid "Tasks"
 msgstr "Tasks"
 
@@ -25108,7 +25113,7 @@ msgstr "That did not send. Try again."
 #: src/apps/people/ProfileForm.tsx:187
 #: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
-#: src/apps/settings/AddVoiceForm.tsx:86
+#: src/apps/settings/AddVoiceForm.tsx:93
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
 #: src/apps/settings/AssistantKeysSettings.tsx:74
@@ -25394,7 +25399,7 @@ msgid "That style is not in the list yet. Reload this page and look again."
 msgstr "That style is not in the list yet. Reload this page and look again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:208
+#: src/shell/pages/CompanionsPage.tsx:209
 msgid "That synth is not on your list. Go back and pick one from the gallery."
 msgstr "That synth is not on your list. Go back and pick one from the gallery."
 
@@ -26532,7 +26537,7 @@ msgid "setting.robot.voice.id.help"
 msgstr "The voice this robot speaks with. \"default\" keeps the voice Home uses for it today."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:398
+#: src/shell/pages/CompanionsPage.tsx:399
 msgid "The voice you chose in Settings"
 msgstr "The voice you chose in Settings"
 
@@ -26593,7 +26598,7 @@ msgid "They lose access now."
 msgstr "They lose access now."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:360
+#: src/shell/pages/CompanionsPage.tsx:361
 msgid "Things it might say"
 msgstr "Things it might say"
 
@@ -26619,7 +26624,7 @@ msgid "Thinking:"
 msgstr "Thinking:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:67
+#: src/apps/settings/AddVoiceForm.tsx:69
 msgid "Third recording (optional)"
 msgstr "Third recording (optional)"
 
@@ -26845,7 +26850,7 @@ msgid "This MaiPai Home itself."
 msgstr "This MaiPai Home itself."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:84
+#: src/apps/settings/AddVoiceForm.tsx:91
 msgid "This makes a new voice based on the recording. It is not a copy of the voice."
 msgstr "This makes a new voice based on the recording. It is not a copy of the voice."
 
@@ -26910,7 +26915,7 @@ msgid "api.error.passkey_registration_expired"
 msgstr "This registration attempt has expired. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:181
+#: src/shell/pages/CompanionsPage.tsx:182
 msgid "This removes it for the whole home."
 msgstr "This removes it for the whole home."
 
@@ -27000,7 +27005,7 @@ msgid "This station did not start. Check your connection, then press Retry."
 msgstr "This station did not start. Check your connection, then press Retry."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:252
+#: src/shell/pages/CompanionsPage.tsx:253
 msgid "This synth comes with Home, so it can't be changed. Make a copy and edit that."
 msgstr "This synth comes with Home, so it can't be changed. Make a copy and edit that."
 
@@ -27153,7 +27158,7 @@ msgstr "To skip SearXNG, leave the address empty and press Continue. That turns 
 #: src/apps/reminders/SmartListView.tsx:14
 #: src/i18n.chain.test.tsx:96
 #: src/i18n.test.tsx:53
-#: src/shell/pages/CompanionsPage.tsx:305
+#: src/shell/pages/CompanionsPage.tsx:306
 #: src/shell/pages/dashboard/TodaySection.tsx:122
 #: src/shell/pages/dashboard/TodaySection.tsx:166
 #: src/shell/pages/dashboard/TodaySection.tsx:167
@@ -27836,7 +27841,7 @@ msgid "Understanding"
 msgstr "Understanding"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:324
+#: src/shell/pages/CompanionsPage.tsx:325
 msgid "Understood the request"
 msgstr "Understood the request"
 
@@ -28502,7 +28507,7 @@ msgstr "Very Simple"
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
-#: src/shell/pages/CompanionsPage.tsx:259
+#: src/shell/pages/CompanionsPage.tsx:260
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/PersonProfilePage.tsx:176
 msgid "Video"
@@ -28606,7 +28611,7 @@ msgid "area.Videos with sound"
 msgstr "Videos with sound"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:315
+#: src/shell/pages/CompanionsPage.tsx:316
 msgid "View"
 msgstr "View"
 
@@ -28616,7 +28621,7 @@ msgid "View history"
 msgstr "View history"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:163
+#: src/shell/pages/CompanionsPage.tsx:164
 msgid "View page"
 msgstr "View page"
 
@@ -28680,7 +28685,7 @@ msgstr "Vocals, drums, bass and the rest. This takes a minute or two. The rows a
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:160
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:160
-#: src/shell/pages/CompanionsPage.tsx:365
+#: src/shell/pages/CompanionsPage.tsx:366
 #: src/shell/pages/musicComposerMode.ts:135
 #: src/shell/pages/settings/settingsViews.tsx:172
 #: src/shell/pages/status/StatusComponents.tsx:30
@@ -28743,7 +28748,7 @@ msgid "Voice for {who}"
 msgstr "Voice for {who}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:407
+#: src/shell/pages/CompanionsPage.tsx:408
 msgid "Voice for this synth"
 msgstr "Voice for this synth"
 
@@ -28894,12 +28899,12 @@ msgid "Waiting for the robot to report its networks."
 msgstr "Waiting for the robot to report its networks."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:309
+#: src/shell/pages/CompanionsPage.tsx:310
 msgid "Waiting for you"
 msgstr "Waiting for you"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:324
+#: src/shell/pages/CompanionsPage.tsx:325
 msgid "Waiting for your choice"
 msgstr "Waiting for your choice"
 
@@ -29469,6 +29474,16 @@ msgid "setting.voice.speculative_start.help"
 msgstr "While you are still finishing a sentence, Home begins working out its answer from what it has heard so far. If the words change, the early start is thrown away and nothing is kept. Adults only. Off until it is measured."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:74
+msgid "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you."
+msgstr "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AddVoiceForm.tsx:72
+msgid "Whisper recording (optional)"
+msgstr "Whisper recording (optional)"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1726
 msgid "area.Who can code"
 msgstr "Who can code"
@@ -29541,7 +29556,7 @@ msgid "Who may hear this"
 msgstr "Who may hear this"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:367
+#: src/shell/pages/CompanionsPage.tsx:368
 msgid "Who uses it"
 msgstr "Who uses it"
 
@@ -29665,9 +29680,9 @@ msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, 
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:140
-#: src/shell/pages/CompanionsPage.tsx:309
-#: src/shell/pages/CompanionsPage.tsx:324
-#: src/shell/pages/CompanionsPage.tsx:329
+#: src/shell/pages/CompanionsPage.tsx:310
+#: src/shell/pages/CompanionsPage.tsx:325
+#: src/shell/pages/CompanionsPage.tsx:330
 #: src/shell/pages/status/StatusApps.tsx:51
 #: src/shell/pages/status/StatusComponents.tsx:159
 #: src/shell/pages/StatusPage.tsx:26
@@ -29838,7 +29853,7 @@ msgstr "Yes, sign it out"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:49
-#: src/shell/pages/CompanionsPage.tsx:306
+#: src/shell/pages/CompanionsPage.tsx:307
 msgid "Yesterday"
 msgstr "Yesterday"
 
@@ -29878,7 +29893,7 @@ msgid "You also accept the licences of the AI models and tools Home installs for
 msgstr "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:85
+#: src/apps/settings/AddVoiceForm.tsx:92
 msgid "You are responsible for having the right to use this voice."
 msgstr "You are responsible for having the right to use this voice."
 
@@ -30126,9 +30141,9 @@ msgstr "Your Coding keys"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:91
-#: src/shell/pages/CompanionsPage.tsx:163
-#: src/shell/pages/CompanionsPage.tsx:172
-#: src/shell/pages/CompanionsPage.tsx:242
+#: src/shell/pages/CompanionsPage.tsx:164
+#: src/shell/pages/CompanionsPage.tsx:173
+#: src/shell/pages/CompanionsPage.tsx:243
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/VoiceStage.tsx:26
@@ -30441,7 +30456,7 @@ msgid "Your video is ready."
 msgstr "Your video is ready."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/CompanionsPage.tsx:156
+#: src/shell/pages/CompanionsPage.tsx:157
 msgid "Yours"
 msgstr "Yours"
 
