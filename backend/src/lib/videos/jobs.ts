@@ -620,7 +620,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
       // MEM-RETRY-01: the Stack's memory watchdog stopped the clip (a Max clip ends `failed` with the same code; an older Stack said `no_memory` on a `cancelled` clip). Never a person's Stop: that is code `cancelled` and ends the clip.
       const memoryWatchdogStop = status.state === "cancelled" && (status.code === MEMORY_CANCELLED_CODE || status.code === "no_memory")
-        || status.state === "failed" && !job.request.reference && status.code === MEMORY_CANCELLED_CODE;
+        || status.state === "failed" && status.code === MEMORY_CANCELLED_CODE;
       if (memoryWatchdogStop) {
         if (controller.signal.aborted || explicitlyStopped.has(job.id)) return;
         const request = job.request as VideoRequest & { memoryRequeues?: number };
@@ -849,8 +849,9 @@ export interface EditedClip { video: Uint8Array; seconds: number | null; width: 
   surround?: Uint8Array;
   /** SPATIAL-04: the plain line kept with the clip (the Stack's lines for a spatial-sound step). */
   note?: string }
+/** `refusalCode` is the Stack refusing the SUBMIT (held and retried by the queue); `failureCode` is a clip that failed after it started (ends with its plain line, never held). */
 /** The work of one edit (the Stack call, and any speech made first). It never throws: a failure is one plain line. */
-export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void, hooks?: EditHooks) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string; refusalCode?: string }>;
+export type EditRun = (signal: AbortSignal, onProgress?: (percent: number) => void, hooks?: EditHooks) => Promise<{ ok: true; clip: EditedClip } | { ok: false; line: string; refusalCode?: string; failureCode?: string }>;
 export const EDIT_FAILED_PREFIX = "I couldn't change that video.";
 export const EDIT_RESTART_LINE = `${EDIT_FAILED_PREFIX} Home restarted while it was working. Ask again.`;
 
@@ -878,7 +879,7 @@ export function startVideoEditJob(input: StartEditInput): { ok: true; job: Video
 const editRuns = new Map<string, { actor: PersonRow; run: EditRun; source: VideoJob; onSaved?: (fileId: string) => void; phase: string }>();
 
 async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: VideoJob, onSaved?: (fileId: string) => void): Promise<void> {
-  if (explicitlyStopped.has(job.id)) return;
+  if (explicitlyStopped.has(job.id)) { explicitlyStopped.delete(job.id); return; }
   job.state = "running";
   job.percent = Math.max(5, job.percent);
   job.phase = editRuns.get(job.id)?.phase ?? job.phase ?? "editing";
@@ -939,8 +940,7 @@ async function runEdit(job: VideoJob, actor: PersonRow, run: EditRun, source: Vi
     try { saveVideoJob(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
-    if (job.state !== "queued") liveJobs.delete(job.id);
-    if (job.state !== "queued") editRuns.delete(job.id);
+    if (job.state !== "queued") { liveJobs.delete(job.id); editRuns.delete(job.id); explicitlyStopped.delete(job.id); }
     if (job.state === "queued") persistVideoJob(job); else refreshHouseholdQueue();
   }
 }

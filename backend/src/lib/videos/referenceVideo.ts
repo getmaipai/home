@@ -233,7 +233,7 @@ function stackClipRun(actor: PersonRow, firstLine: string, submit: () => Promise
         const job = await getStackVideoJob(submitted.job, view);
         if (job.state === "failed" || job.state === "cancelled") {
           const known = job.code && Object.prototype.hasOwnProperty.call(INGREDIENTS_FAILURE_COPY, job.code) ? INGREDIENTS_FAILURE_COPY[job.code as keyof typeof INGREDIENTS_FAILURE_COPY] : null;
-          return { ok: false, line: failed(known ?? "It did not finish. Try again."), ...(job.code ? { refusalCode: job.code } : {}) };
+          return { ok: false, line: failed(known ?? "It did not finish. Try again."), ...(job.code ? { failureCode: job.code } : {}) };
         }
         if (job.state === "done") {
           const clip = job.data[0];
