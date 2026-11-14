@@ -191,6 +191,12 @@ export function creationOfFile(personId: string, fileId: string): Creation | nul
   return row ? (JSON.parse(row.body) as Creation) : null;
 }
 
+/** Read the review mark without exposing or parsing the rest of a creation record. */
+export function reviewOfFile(personId: string, fileId: string): Creation["review"] | null {
+  const review = rowOfFile(personId, fileId)?.review;
+  return (review as Creation["review"] | undefined) ?? null;
+}
+
 /** Update advisory clip-check fields and take review without rewriting provenance. */
 export function updateCreationReview(personId: string, fileId: string, patch: { checks?: Record<string, unknown>; review?: Creation["review"] }): Creation | null {
   try {
