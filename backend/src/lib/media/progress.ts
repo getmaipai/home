@@ -86,9 +86,12 @@ function unionMarks(a: readonly Mark[], b: readonly Mark[], bWins: boolean): Mar
   const byTime = new Map<number, Mark>();
   for (const mark of [...(bWins ? a : b), ...(bWins ? b : a)]) {
     const prior = byTime.get(mark.at_s);
-    if (bWins && mark.label?.startsWith("podcast-snip:deleted:") && prior?.label?.startsWith("podcast-snip:") && !prior.label.startsWith("podcast-snip:deleted:")) {
+    // A tombstone (`<kind>:deleted:...`) replaces a live mark of the same kind; a plain unlabeled mark never replaces a snip or a video moment.
+    const kinds = ["podcast-snip:", "video-moment:"];
+    const gone = kinds.find((kind) => mark.label?.startsWith(`${kind}deleted:`) && prior?.label?.startsWith(kind) && !prior.label.startsWith(`${kind}deleted:`));
+    if (bWins && gone) {
       byTime.set(mark.at_s, mark);
-    } else if (!(bWins && mark.label === null && prior?.label?.startsWith("podcast-snip:"))) {
+    } else if (!(bWins && mark.label === null && kinds.some((kind) => prior?.label?.startsWith(kind)))) {
       byTime.set(mark.at_s, mark);
     }
   }

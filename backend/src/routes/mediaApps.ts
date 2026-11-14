@@ -98,7 +98,7 @@ function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
   // AUDIT-DUP-ROUTES-01: one gate per path prefix; a person without the app is refused here, never passed to the next router.
-  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "audio" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "video" ? ["/playlists/*", "/history/*"] : [])]);
+  gateMediaApp(routes, appId, ["/data/*", "/actions/*", "/progress", "/watchlist", "/playlist", "/queue", "/watch-later", "/like", ...(appId === "audio" ? ["/library/*", "/radio/*", "/pin", "/recent-searches", "/offline"] : []), ...(appId === "video" ? ["/playlists/*", "/history/*", "/moment", "/moment/*"] : [])]);
 
   if (appId === "audio") {
     const radio = radioRoutes();

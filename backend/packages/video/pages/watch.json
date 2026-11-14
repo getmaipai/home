@@ -77,6 +77,20 @@
               }
             },
             {
+              "label": "Save moment",
+              "icon": "bookmark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/moment",
+                  "args": {
+                    "media_id": "{id}",
+                    "at_s": "{position_s}"
+                  },
+                  "success_label": "Moment saved"
+                }
+              }
+            },
+            {
               "label": "Share",
               "icon": "share",
               "action": {
@@ -160,6 +174,9 @@
                 }
               }
             }
+          },
+          "marks": {
+            "field": "marks"
           },
           "details_show": [
             "facts",
