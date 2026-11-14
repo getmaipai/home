@@ -9,22 +9,26 @@
       "layout": "chat",
       "chat_distribution": "start_end",
       "label": "What should they say",
-      "placeholder": "Pick a picture, then type what it should say.",
-      "prompt_state": "prompt",
+      "placeholder": "Type what they should say.",
+      "prompt_state": "line",
       "max_length": 1200,
-      "submit_label": "Make talk",
+      "submit_label": "Generate",
       "starts": "video",
-      "references": [
-        {
-          "state": "start_frame",
-          "label": "Picture",
-          "kind": "picture",
-          "placement": "in_field"
-        }
+      "chips": [
+        { "state": "orientation", "label": "Shape", "default": "landscape", "options": [{ "value": "landscape", "label": "Landscape" }, { "value": "portrait", "label": "Portrait" }], "group": "Settings", "presentation": "popover" }
       ],
+      "references": [{ "state": "cast", "label": "Cast", "kind": "character", "placement": "in_field" }],
       "submit": {
-        "navigate": {
-          "to": "/apps/video/create"
+        "call": {
+          "target": "/api/plugins/video/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "A close-up of the person talking to the camera, looking natural.",
+            "cast": "{cast}",
+            "line": "{line}",
+            "orientation": "{orientation}",
+            "tier": "{tier}"
+          }
         }
       }
     }

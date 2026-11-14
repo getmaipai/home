@@ -18,7 +18,7 @@ import sharp from "sharp";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off" }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
@@ -34,9 +34,15 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   const notGiven = (value: unknown): boolean => typeof value === "string" && (/^\{[a-z_]+\}$/.test(value.trim()) || value.trim().toLowerCase() === "none");
   raw = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, notGiven(value) ? "" : value]));
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
-  if (prompt.length < 3 || prompt.length > 1200) return { ok: false, error: "Describe the video in 3 to 1200 characters, then try again." };
+  const line = typeof raw.line === "string" ? raw.line : "";
+  const effectivePrompt = prompt.length >= 3 ? prompt : line ? "A close-up of the person talking to the camera, looking natural." : prompt;
+  if (effectivePrompt.length < 3 || effectivePrompt.length > 1200) return { ok: false, error: "Describe the video in 3 to 1200 characters, then try again." };
   const text = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
-  const body: MakeVideoBody = { prompt };
+  const body: MakeVideoBody = { prompt: effectivePrompt };
+  if (line) { if (line.length > 1200) return { ok: false, error: "Type a line up to 1200 characters, then try again." }; body.line = line; }
+  const castValue = raw.cast;
+  const cast = Array.isArray(castValue) ? castValue.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : typeof castValue === "string" && castValue.trim() ? [castValue.trim()] : [];
+  if (cast.length) body.cast = cast;
   const orientation = text(raw.orientation);
   if (orientation) {
     if (orientation !== "landscape" && orientation !== "portrait") return { ok: false, error: "Choose landscape or portrait for the shape, or leave it empty." };
@@ -127,7 +133,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   const outcome = await runGenerateVideo({
     ...(body.styles && body.styles.length > 0 ? { styleIds: body.styles } : {}),
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
+    args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;

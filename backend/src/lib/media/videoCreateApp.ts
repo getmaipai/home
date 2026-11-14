@@ -145,6 +145,23 @@ registerAppPageFill("video", "create", (person, page) => {
   }
 });
 
+// CREATOR-26: reuse Create's own Shape and Quality fill so the option lists and icons have one definition.
+registerAppPageFill("video", "talking-avatar", (person, page) => {
+  const bar = findNode(page.body, "prompt_bar");
+  if (!bar) return;
+  const chips = Array.isArray(bar.chips) ? bar.chips as Array<Record<string, unknown>> : [];
+  for (const chip of chips) {
+    if (chip.state === "orientation") {
+      chip.icon = "rectangle-horizontal";
+      chip.icon_only = true;
+      const icons: Record<string, string> = { landscape: "rectangle-horizontal", portrait: "rectangle-vertical" };
+      if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
+    }
+  }
+  const tier = videoTierSegment(person);
+  bar.chips = [...chips, { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengthOptions().map((value) => ({ value, label: `${value} seconds` })) }, ...(tier ? [{ state: "tier", label: "Quality", icon: "sparkles", icon_only: true, presentation: "popover", default: tier.default, options: (tier.tiers as Array<{ id: string; label: string }>).map((entry) => ({ value: entry.id, label: entry.label })) }] : [])];
+});
+
 /** CREATOR-20b: the Video composer reads the all-ages shot-card vocabulary from the fragment catalog. */
 function shotCardChips(person: PersonRow): Array<Record<string, unknown>> {
   // The kit page schema allows at most 16 chips on a prompt bar.
