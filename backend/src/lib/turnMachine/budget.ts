@@ -202,8 +202,8 @@ const VOICEOVER_SWAP_ORDER = "make_sound show_images edit_picture".split(" ");
  * are the only sources; disabled or smoke-failed packages are excluded,
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
-/** The music tools dropped first, in this order, when `edit_video` would take the offer set past the model cap. */
-const MUSIC_SHRINK_ORDER = "writing_format make_song_style make_album edit_band edit_album edit_song_style make_sound edit_music make_band generate_music".split(" ");
+/** In a full media turn, these lower-priority offers give way before music and video creation/editing. */
+const MUSIC_SHRINK_ORDER = `writing_format show_images ${START_PROJECT_TOOL_ID} make_song_style make_album edit_band edit_album edit_song_style make_sound edit_music make_band generate_music`.split(" ");
 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
 const STUDIO_SHRINK_ORDER = "house uptime writing_format make_song_style make_album make_sound edit_music".split(" ");

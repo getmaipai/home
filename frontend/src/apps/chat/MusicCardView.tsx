@@ -31,7 +31,7 @@ export function soundHintOf(card: MusicCard): string {
   if (card.sound?.engine === "sfx") notes.push(i18n._({ id: "Powered by Stability AI", message: "Powered by Stability AI" }));
   return notes.join(" ");
 }
-export const soundCardCopy = { saveToLibrary: "Save to Sounds", makeAnother: "Make another take", generating: "Making the sound", failed: "I couldn't make that sound.", queued: "Waiting its turn" };
+export const soundCardCopy = { saveToLibrary: "Save to Sounds", makeAnother: "Make another take", generating: "Making a sound", failed: "I couldn't make that sound.", queued: "Waiting its turn" };
 
 const descriptionOf = (card: MusicCard) => {
   const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
@@ -61,7 +61,7 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStemsStart
   const queryClient = useQueryClient();
   const shownId = picked && picked.base === card.current_id && card.versions.some(version => version.id === picked.id) ? picked.id : card.current_id;
   const shown = card.versions.find(version => version.id === shownId) ?? card.versions.at(-1);
-  const songTitle = card.title ?? "Your song";
+  const songTitle = card.title ?? (isSound ? "Your sound" : "Your song");
   const title = card.task === "stems" && shown ? `${songTitle.replace(/ \([^)]*\)$/, "")} (${shown.label.toLowerCase()})` : songTitle;
   const ready = status === "ready" && shown !== undefined;
   const prepared = useQuery({ queryKey: ["music-share", shown?.url], queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: musicFileName(title) }), enabled: ready && !onShare && !isSound, staleTime: Infinity, gcTime: 10 * 60_000, retry: false });

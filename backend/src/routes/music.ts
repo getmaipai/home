@@ -90,6 +90,7 @@ const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string(), seed: z.number().nullable().describe("The seed this version was made with.") });
 const lockedCardSchema = z.object({ locked: z.literal(true), making: z.boolean() });
 const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
+const soundStages = ["Queued", "Loading", "Making", "Finishing"] as const;
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
 const musicCardSchema = z.object({
   conversation_id: z.string().nullable().optional(), made_from_file: z.boolean().optional(),
@@ -127,8 +128,16 @@ const MUSIC_STAGE_INDEX: Record<string, number> = {
 };
 const lastKnownMusicStage = new Map<string, number>();
 export function musicStageIndex(job: MusicJob): number {
+  const stageCount = job.request.sound ? soundStages.length : stages.length;
   if (job.state === "queued" || job.stage === "queued") { lastKnownMusicStage.set(job.id, 0); return 0; }
-  if (job.state === "done") { lastKnownMusicStage.set(job.id, stages.length - 1); return stages.length - 1; }
+  if (job.state === "done") { lastKnownMusicStage.set(job.id, stageCount - 1); return stageCount - 1; }
+  if (job.request.sound) {
+    const index = job.stage && ["loading", "starting"].includes(job.stage) ? 1
+      : job.stage && ["saving", "encoding", "mixing", "decoding", "vae"].includes(job.stage) ? 3 : 2;
+    const soundIndex = Math.max(lastKnownMusicStage.get(job.id) ?? 0, index);
+    lastKnownMusicStage.set(job.id, soundIndex);
+    return soundIndex;
+  }
   const known = job.stage ? MUSIC_STAGE_INDEX[job.stage] : undefined;
   if (known !== undefined) {
     const index = Math.max(lastKnownMusicStage.get(job.id) ?? 0, known);
@@ -147,6 +156,12 @@ export function musicStageLabel(job: MusicJob, audience: "adult" | "child" = "ad
   if (job.state === "queued" && job.stage === "queued") return jobQueueCopy("queued", "queue", job.position, null, audience);
   if (job.stage === "paused") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.stage === "longer") return ["queued", "running"].includes(job.state) ? "Making it longer so every line fits" : "";
+  if (job.request.sound) {
+    if (job.state !== "running") return "";
+    if (["loading", "starting"].includes(job.stage)) return "Loading";
+    if (["saving", "encoding", "mixing", "decoding", "vae"].includes(job.stage)) return "Finishing";
+    return "Making";
+  }
   const label = MUSIC_STAGE_LABELS[job.stage];
   if (!label && !warnedMusicStages.has(job.stage)) {
     warnedMusicStages.add(job.stage);
@@ -199,7 +214,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   // MUSIC-MAX-01: Max follows Boost's gate (grant, age band, level switch) and is shown only when the engine lists a Max maker.
   const maxShown = maxOffered(actor, "music", undefined, musicMaxOffered(engine));
   return {
-    stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
+    stages: (root.request.sound ? soundStages : stages).map((label, index) => ({ id: (root.request.sound ? ["queued", "model", "making", "finishing"] : ["queued", "model", "planning", "making", "mixing", "finishing"])[index]!, label })),
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
     making_version: makingVersion,
