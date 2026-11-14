@@ -1,8 +1,8 @@
 import type { PersonRow } from "@/types";
 import { isDeviceConnected, listRobotsPairedUnderPerson } from "@/lib/deviceCommands";
 import { getDeviceState } from "@/lib/deviceStates";
-import { listDevicesByKind } from "@/lib/devices";
 import { mediaBandOf } from "@/lib/media/band";
+import { evaluateSafety, forOutput } from "@/lib/safety";
 import { getMusicJobFor } from "@/lib/music/store";
 import { musicJobLockState } from "@/lib/music/lock";
 import { clearNowPlaying, noteNowPlaying } from "@/lib/music/heardSong";
@@ -14,9 +14,18 @@ const entries = new Map<string, Entry>();
 const lastText = new Map<string, string>();
 const TTL = 150_000;
 const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f<>\[\]{}|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60).trim();
-function robotsFor(person: PersonRow): string[] {
-  const own = listRobotsPairedUnderPerson(person.id);
-  return own.length || mediaBandOf(person) !== "adult" ? own : listDevicesByKind("robot").map((robot) => robot.id);
+/** A person's activity stays theirs: only the robots paired to the person who is playing (RULES.md, the org privacy rule). No fallback to the household's other robots. */
+export function robotsFor(person: PersonRow): string[] {
+  return listRobotsPairedUnderPerson(person.id);
+}
+/** Face text and the heard-song context pass the same floor a chat reply passes before a child or teen robot shows it (RULES.md rule 0 robot paragraph); fail closed. */
+export function titleAllowedFor(person: PersonRow, text: string): boolean {
+  try {
+    const band = mediaBandOf(person);
+    if (band === "adult") return true;
+    const checked = forOutput(evaluateSafety(text, band, "reply"));
+    return checked.action === "allow" && !checked.flagged;
+  } catch { return false; }
 }
 function push(person: PersonRow, text: string): number {
   let changed = 0;
@@ -38,17 +47,14 @@ function clear(person: PersonRow): number {
 export function reportNowPlaying(person: PersonRow, input: NowPlayingInput, now = Date.now()): { ok: true; pushed: number } {
   try {
     if (input.state === "stopped") return { ok: true, pushed: clear(person) };
-    let title = input.title ?? "", artist = input.artist, album = input.album, year = input.year;
+    // The title is looked up on the server from the person's own song record; a client-supplied title, artist or album is never shown.
     const job = input.song_id ? getMusicJobFor(person, input.song_id) : null;
-    if (job) {
-      if (musicJobLockState(job, person) !== "open") return { ok: true, pushed: clear(person) };
-      title = job.request.title || title;
-      artist = job.request.band?.name || undefined;
-      album = undefined;
-      year = undefined;
-    }
-    title = clean(title);
-    if (!title) return { ok: true, pushed: clear(person) };
+    if (!job) return { ok: true, pushed: clear(person) };
+    if (musicJobLockState(job, person) !== "open") return { ok: true, pushed: clear(person) };
+    const title = clean(job.request.title || "");
+    const artist = job.request.band?.name || undefined;
+    const album = undefined as string | undefined, year = undefined as number | undefined;
+    if (!title || !titleAllowedFor(person, [title, artist].filter(Boolean).join(" "))) return { ok: true, pushed: clear(person) };
     const robotIds = robotsFor(person);
     const entry: Entry = { title, ...(artist ? { artist: clean(artist) } : {}), ...(album ? { album: clean(album) } : {}), ...(year ? { year } : {}), at: now, expiresAt: now + TTL, robotIds };
     entries.set(person.id, entry);
