@@ -1379,7 +1379,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     reactionTags: spokenTurn && speakerAgeBand(actor, new Date()) === "adult" ? await getTtsTags() : [],
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
-    ...(typeof body.conversation_id === "string" ? (() => { const conversation = getConversation(actor, body.conversation_id); return conversation.ok && conversation.value.device_id ? { deviceId: conversation.value.device_id } : {}; })() : {}),
+    // A turn from a robot is that robot's own turn: its speech (the filler and the reply) follows the robot's voice chain, including an impression, whether or not the conversation is bound to the device.
+    ...(surface === "robot" && deviceId ? { deviceId } : typeof body.conversation_id === "string" ? (() => { const conversation = getConversation(actor, body.conversation_id); return conversation.ok && conversation.value.device_id ? { deviceId: conversation.value.device_id } : {}; })() : {}),
     turnId: result.turnId,
     answerMetadata: !body.temporary && body.bare !== true && !ephemeral ? result.answerMetadata : undefined,
     controller: abortController,
