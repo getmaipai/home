@@ -547,12 +547,15 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   return c.json({ id: command.id }, 202);
 });
 
-const wifiLinkRefusal = "For safety, a Wi-Fi password is not sent to the robot over your home network's plain link. Join the robot's own Wi-Fi (its screen shows the name when it cannot connect) and use its setup page, or scan a Wi-Fi QR code once the new firmware is installed.";
+const wifiLinkRefusal = "This password would cross a network that is not your home network or your tailnet, so it was not sent. Add networks while the robot is at home or connected through your tailnet.";
+// Owner-approved 2026-11-14 (Jesse: "add a way I can edit the connections"): over the plain HOME link an admin may add a network after an explicit
+// confirmation (confirm_lan). The password is still write-only. A path that is neither the home LAN nor the tailnet is always refused.
+const wifiPlainConfirmRefusal = "This sends the password across your home network to the robot. Confirm that this is your own home network, then try again.";
 const robotWifiRoute = createRoute({
   method: "post", path: "/{id}/wifi", tags: ["Devices"], summary: "Add, forget or switch to a saved Wi-Fi network on a robot",
   middleware: [requireAuth] as const,
   request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: z.object({
-    action: z.enum(["add", "forget", "use"]), ssid: z.string().min(1).max(32), password: z.string().max(63).optional(),
+    action: z.enum(["add", "forget", "use"]), ssid: z.string().min(1).max(32), password: z.string().max(63).optional(), confirm_lan: z.boolean().optional(),
   }) } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ sent: z.literal(true) }) } }, description: "The requested Wi-Fi action was sent." }, ...errorResponses({ 400: "Invalid Wi-Fi request", 401: "Not signed in", 403: "Only an admin can change a robot's Wi-Fi.", 404: "No such robot or the network is not saved", 409: "The robot cannot safely accept this request or is offline" }) },
 });
@@ -562,7 +565,7 @@ devicesRoutes.openapi(robotWifiRoute, (c) => {
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
   if (!device || device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
-  const { action, ssid, password } = c.req.valid("json");
+  const { action, ssid, password, confirm_lan: confirmLan } = c.req.valid("json");
   const report = getRobotCheckin(id);
   if (action === "forget") {
     if (!report?.wifi_saved?.includes(ssid)) return c.json({ error: "That network is not saved on this robot." }, 404);
@@ -577,7 +580,11 @@ devicesRoutes.openapi(robotWifiRoute, (c) => {
     issueDeviceCommand(device.id, "wifi_use", { ssid }, 60_000);
     return c.json({ sent: true as const }, 202);
   }
-  if (report?.link_encrypted !== true) return c.json({ error: wifiLinkRefusal }, 409);
+  // Encrypted link (the tailnet): no confirmation needed. The home LAN link: the admin confirms once. Anything else: refused.
+  if (report?.link_encrypted !== true) {
+    if (report?.link_path !== "home" && report?.link_path !== "away") return c.json({ error: wifiLinkRefusal }, 409);
+    if (confirmLan !== true) return c.json({ error: wifiPlainConfirmRefusal }, 409);
+  }
   if ((report.wifi_saved?.length ?? 0) >= 10 && !report.wifi_saved?.includes(ssid)) return c.json({ error: "This robot already holds 10 Wi-Fi networks. Forget one first." }, 409);
   if (!report?.online) return c.json({ error: "The robot is offline, so it cannot take a network now." }, 409);
   if (password === undefined) return c.json({ error: "Add a password, then try again." }, 400);

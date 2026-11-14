@@ -37,6 +37,11 @@ function statusText(device: DeviceInfo): string {
 }
 
 /** STACKCHAN-HOME-01: the bot 0.2.65 check-in extras as small plain facts; a field the robot did not send shows nothing. */
+/** A firmware that is not a plain official release number (for example 0.2.206-tailnet-rc) is a test build: the USB update would replace it with the public image. */
+export function isTestFirmware(version: string | null | undefined): boolean {
+  return typeof version === "string" && version.length > 0 && !/^\d+\.\d+\.\d+$/.test(version);
+}
+
 export function checkinFacts(checkin: { timers_active?: number | null; self_restarts?: number | null; heal_hold?: boolean | null; mic_level?: number | null; updating?: boolean | null } | null): string[] {
   if (!checkin) return [];
   const facts: string[] = [];
@@ -163,7 +168,7 @@ function RobotDetail({ device, tab, role, onClose }: { device: DeviceInfo; tab?:
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         {activeTab === "overview" ? <>
-        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(device.lastSeenAt, { dateStyle: "medium", timeStyle: "short" }) } })}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{softwareQuery.data.checkin.ip ? i18n._({ id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }), ip: softwareQuery.data.checkin.ip } }) : i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(device.lastSeenAt, { dateStyle: "medium", timeStyle: "short" }) } })}</> : null}</p>
         <RobotSelfTests device={device} />
         <RobotActions device={device} />
         {role && isOwnerOrAdminRole(role) ? <RobotWifi deviceId={device.id} checkin={softwareQuery.data?.checkin} /> : null}
@@ -187,8 +192,9 @@ function RobotDetail({ device, tab, role, onClose }: { device: DeviceInfo; tab?:
                 <ItemDescription>{softwareQuery.data.firmware.installed
                   ? i18n._({ id: "Installed {version}, recorded {date}. Ready to install: {available}.", message: "Installed {version}, recorded {date}. Ready to install: {available}.", values: { version: softwareQuery.data.firmware.installed.version, date: formatDate(softwareQuery.data.firmware.installed.at, { month: "short", day: "numeric" }), available: softwareQuery.data.firmware.available } })
                   : i18n._({ id: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", message: "Not recorded. Ready to install: {available}. Install the update from here to keep track.", values: { available: softwareQuery.data.firmware.available } })}</ItemDescription>
+                {isTestFirmware(softwareQuery.data.firmware.installed?.version) ? <ItemDescription>{i18n._({ id: "This robot runs a test firmware. Updating from here is off so it keeps its tailnet.", message: "This robot runs a test firmware. Updating from here is off so it keeps its tailnet." })}</ItemDescription> : null}
               </ItemContent>
-              <Badge variant="secondary">{softwareQuery.data.firmware.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.firmware.status === "update_available" ? i18n._({ id: "Update available", message: "Update available" }) : i18n._({ id: "Unknown", message: "Unknown" })}</Badge>
+              <Badge variant="secondary">{isTestFirmware(softwareQuery.data.firmware.installed?.version) ? i18n._({ id: "Test build", message: "Test build" }) : softwareQuery.data.firmware.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.firmware.status === "update_available" ? i18n._({ id: "Update available", message: "Update available" }) : i18n._({ id: "Unknown", message: "Unknown" })}</Badge>
             </Item>
             <Item size="setting">
               <ItemContent>
@@ -198,7 +204,7 @@ function RobotDetail({ device, tab, role, onClose }: { device: DeviceInfo; tab?:
               <Badge variant="secondary">{softwareQuery.data.bot.status === "up_to_date" ? i18n._({ id: "Up to date", message: "Up to date" }) : softwareQuery.data.bot.status === "restart_needed" ? i18n._({ id: "Restart needed", message: "Restart needed" }) : softwareQuery.data.bot.running ? i18n._({ id: "Unknown", message: "Unknown" }) : i18n._({ id: "Not running", message: "Not running" })}</Badge>
             </Item>
           </ItemGroup>
-          <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status !== "up_to_date"} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
+          <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status !== "up_to_date" && !isTestFirmware(softwareQuery.data.firmware.installed?.version)} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
         </Section> : null}
         </> : null}
         {activeTab === "behaviour" ? <>

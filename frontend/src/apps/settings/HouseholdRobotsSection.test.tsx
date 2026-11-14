@@ -49,6 +49,20 @@ describe("robot software details", () => {
     expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
   });
 
+  test("a test firmware is labelled, shows no Update firmware button and gives the plain reason", async () => {
+    const view = renderRobot({ firmware: { installed: { version: "0.2.206-tailnet-rc", at: "2026-11-14T12:00:00.000Z" }, available: "0.2.104", status: "unknown" }, bot: { running: "0.2.104", available: "0.2.104", status: "up_to_date" } });
+    await waitFor(() => expect(view.getByText(/Installed 0\.2\.206-tailnet-rc, recorded/)).toBeTruthy());
+    expect(view.getByText("Test build")).toBeTruthy();
+    expect(view.getByText(/This robot runs a test firmware\. Updating from here is off/)).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Update firmware" })).toBeNull();
+  });
+
+  test("the last seen line fills in the time and the address (no unfilled placeholders)", async () => {
+    const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" }, checkin: { online: true, lastSeen: "2026-11-14T22:50:00.000Z", ip: "192.0.2.8", signal: "strong", battery: { level: 80, charging: false } } });
+    await waitFor(() => expect(view.getByText(/Last seen .* · IP address 192\.0\.2\.8/)).toBeTruthy());
+    expect(view.queryByText(/\{format\}|\{ip\}/)).toBeNull();
+  });
+
   test("shows last seen in the robots list after a device has checked in", async () => {
     const seenAt = new Date(Date.now() - 5 * 60_000).toISOString();
     const robot = { id: "device-test", kind: "robot", name: "Rivet", area: "Kitchen", lastSeenAt: seenAt, createdAt: seenAt, capabilities: [] };

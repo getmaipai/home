@@ -14,10 +14,52 @@ test("lists saved networks and confirms before forgetting", async () => {
   expect(view.getByText("Forget Home on this robot?")).toBeTruthy();
 });
 
-test("does not show password form when the link is not encrypted", () => {
-  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: [], link_encrypted: false }} />);
+test("on the home link the add form shows behind a confirmation, and Add stays off until it is ticked", async () => {
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(String(init?.body));
+    return Response.json({ sent: true }, { status: 202 });
+  }) as typeof fetch;
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: [], link_encrypted: false, link_path: "home" }} />);
+  expect(view.getByText(/This sends the password across your home network to the robot/)).toBeTruthy();
+  fireEvent.change(view.getByLabelText("Network name"), { target: { value: "Phone" } });
+  fireEvent.change(view.getByLabelText("Wi-Fi password"), { target: { value: "PrivateFixture987" } });
+  const add = view.getByRole("button", { name: "Add network" }) as HTMLButtonElement;
+  expect(add.disabled).toBe(true);
+  fireEvent.click(view.getByRole("checkbox", { name: /This is my own home network/ }));
+  expect(add.disabled).toBe(false);
+  fireEvent.click(add);
+  await waitFor(() => expect(bodies.length).toBe(1));
+  expect(bodies[0]).toContain('"confirm_lan":true');
+});
+
+test("Show password reveals the field and hides it again", () => {
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: [], link_encrypted: true, link_path: "away" }} />);
+  const field = view.getByLabelText("Wi-Fi password") as HTMLInputElement;
+  expect(field.type).toBe("password");
+  fireEvent.click(view.getByRole("checkbox", { name: "Show password" }));
+  expect(field.type).toBe("text");
+});
+
+test("an unknown connection path shows no add form and says why", () => {
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: [], link_encrypted: false, link_path: "other" }} />);
   expect(view.queryByLabelText("Wi-Fi password")).toBeNull();
-  expect(view.getByText(/For safety, a Wi-Fi password is not sent/)).toBeTruthy();
+  expect(view.getByText(/not your home network or your tailnet/)).toBeTruthy();
+});
+
+test("on the encrypted tailnet link no confirmation is asked", async () => {
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(String(init?.body));
+    return Response.json({ sent: true }, { status: 202 });
+  }) as typeof fetch;
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: [], link_encrypted: true, link_path: "away" }} />);
+  expect(view.queryByText(/This sends the password across your home network/)).toBeNull();
+  fireEvent.change(view.getByLabelText("Network name"), { target: { value: "Phone" } });
+  fireEvent.change(view.getByLabelText("Wi-Fi password"), { target: { value: "PrivateFixture987" } });
+  fireEvent.click(view.getByRole("button", { name: "Add network" }));
+  await waitFor(() => expect(bodies.length).toBe(1));
+  expect(bodies[0]).not.toContain("confirm_lan");
 });
 
 test("clears the password field after submit", async () => {

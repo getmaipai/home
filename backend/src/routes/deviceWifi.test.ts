@@ -67,6 +67,27 @@ test("add refuses an unencrypted link, a full list, and an offline robot", async
   checkin({ wifi_saved: [], link_encrypted: true, online: false });
   expect((await send(ownerToken, { action: "add", ssid: "New", password: SAMPLE_PW })).status).toBe(409);
 });
+test("owner-approved 2026-11-14: on the home link an add needs the confirmation, on any other path it is refused", async () => {
+  const distinctiveTestSecret = "sample-lan-needle";
+  const logs: string[] = [];
+  console.log = (...values: unknown[]) => logs.push(values.join(" "));
+  console.error = (...values: unknown[]) => logs.push(values.join(" "));
+  checkin({ wifi_saved: [], link_encrypted: false, link_path: "home", online: true });
+  const unconfirmed = await send(ownerToken, { action: "add", ssid: "Phone", password: distinctiveTestSecret });
+  expect(unconfirmed.status).toBe(409);
+  expect(await unconfirmed.text()).toContain("Confirm that this is your own home network");
+  const confirmed = await send(ownerToken, { action: "add", ssid: "Phone", password: distinctiveTestSecret, confirm_lan: true });
+  expect(confirmed.status).toBe(409); // past the link gate: the only thing missing is an open device channel in this HTTP test
+  expect(await confirmed.text()).toContain("offline");
+  checkin({ wifi_saved: [], link_encrypted: false, link_path: "other", online: true });
+  const other = await send(ownerToken, { action: "add", ssid: "Phone", password: distinctiveTestSecret, confirm_lan: true });
+  expect(other.status).toBe(409);
+  expect(await other.text()).toContain("not your home network or your tailnet");
+  checkin({ wifi_saved: [], link_encrypted: false, link_path: null, online: true });
+  expect((await send(ownerToken, { action: "add", ssid: "Phone", password: distinctiveTestSecret, confirm_lan: true })).status).toBe(409);
+  expect(logs.join("\n")).not.toContain(distinctiveTestSecret);
+  expect(db.select().from(deviceCommands).all()).toHaveLength(0);
+});
 test("encrypted add sends without a row, response or log containing the password", async () => {
   const distinctiveTestSecret = "sample-no-log-needle";
   checkin({ wifi_saved: [], link_encrypted: true, online: true });

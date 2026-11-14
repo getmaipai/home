@@ -25,3 +25,18 @@ The check-in reports `link_encrypted: true` when the robot's connection comes fr
 tailnet client reports connected (WireGuard encrypts that channel end to end), so the add-network form on the card
 unlocks while the robot is away on the tailnet. A connection from another tailnet address, such as the laptop relay, stays
 plain.
+
+## Adding a network over the home link (owner-approved 2026-11-14)
+Owner-approved 2026-11-14: Jesse asked for "a way I can edit the connections" and the tailnet unlock alone left the add form hidden
+while the robot was on the home link. The rule "Home refuses to send a Wi-Fi password over the plain link" becomes
+**confirm-on-LAN**:
+
+- Encrypted link (the robot's own tailnet connection): the form works with no confirmation, as before.
+- Home LAN link (`link_path: "home"`) or a tailnet path whose encryption flag is not set (`link_path: "away"`): the form shows with one explicit
+  line ("This sends the password across your home network to the robot. OK on your own home network. Use the tailnet for networks away from
+  home.") and a checkbox ("This is my own home network"); **Add network** stays off until it is ticked, and the browser sends
+  `confirm_lan: true`. The route refuses the add without it (409).
+- Any other path (`other`, such as the laptop relay, or unknown): refused, no form.
+- The password stays write-only: sent to the live socket only, never stored, logged, returned or replayed. Forget and Use this
+  network now never carried a password and are unchanged.
+
