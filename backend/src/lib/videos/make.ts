@@ -7,6 +7,7 @@ import { getVideoJobFor, markAnotherTake, type VideoJob } from "./jobs";
 import { videoLookFor, videoRecipeFor, videoVoicesFor } from "./recipes";
 import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { laneOf } from "@/lib/pictures/lane";
 import { videoDenial, VIDEO_DENIAL_LINE, type VideoAudience } from "./policy";
 import { loadLibraryPicture } from "./jobs";
@@ -16,9 +17,16 @@ import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
 
+export const SAY_FIRST_LINE = "Pick who should say it first. Press the cast button in the box, choose someone, then try again.";
+/** CREATOR-26: a typed line as the video model should hear it: read the way a person says it (numbers, times, abbreviations), inside one pair of quotes.
+ * A quote mark typed inside the line becomes a single quote, so the pair around the line stays whole. Empty words give an empty answer. */
+export function quotedLine(words: string): string {
+  const said = normalizeForSpeech(words).replace(/["\u201c\u201d]/g, "'").replace(/\s+/g, " ").trim();
+  return said ? `"${said}"` : "";
+}
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; /** CREATOR-26: cast ids (GET /api/cast), the same `cast` the chat tool takes. */ cast?: string[]; /** CREATOR-26: the Talking avatar page: the words are a line the cast member says, so they go in quotes. */ speak?: boolean; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off" }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
@@ -90,6 +98,13 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (startFrame.length > 200) return { ok: false, error: "Choose a picture from your Library, or leave the Picture slot empty." };
     body.start_frame = startFrame;
   }
+  // CREATOR-26: the Talking avatar page sends one cast id (the slot's value) or a list, and `speak: true`. An unfilled slot leaves `{cast}`, which `notGiven` already turned into "".
+  const castList = Array.isArray(raw.cast) ? raw.cast : typeof raw.cast === "string" ? raw.cast.split(",") : [];
+  if (castList.some((v) => typeof v !== "string")) return { ok: false, error: "Choose people from the cast list." };
+  const cast = [...new Set((castList as string[]).map((v) => v.trim()).filter((v) => v !== "" && !/^\{[a-z_]+\}$/.test(v)))];
+  if (cast.length > 6) return { ok: false, error: "Choose up to 6 people from the cast list." };
+  if (cast.length > 0) body.cast = cast;
+  if (raw.speak === true || raw.speak === "true") body.speak = true;
   // ONE-COMPOSER-2026-11-13: the From a picture and Animate pages make a clip from a picture, so they ask for one; an empty slot gets one plain line, nothing starts.
   if ((raw.need_picture === true || raw.need_picture === "true") && !startFrame) return { ok: false, error: "Pick a picture first. Press the picture button in the box, choose one, then try again." };
   return { ok: true, body };
@@ -124,10 +139,13 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
     const styled = await resolveStyles({ audience, ids: body.styles });
     if (!styled.ok) return styled.locked ? { ok: false, status: 403, error: LOCKED_START_LINE, code: "locked" } : { ok: false, status: 422, error: styled.line, code: styled.code };
   }
+  // CREATOR-26: a spoken line needs someone to say it; the words go through the speech normalizer into quotes, and the cast goes in the tool's own `cast` argument.
+  if (body.speak && !body.cast?.length) return { ok: false, status: 422, error: SAY_FIRST_LINE, code: "no_cast" };
+  const words = body.speak ? `They say: ${quotedLine(body.prompt)}` : body.prompt;
   const outcome = await runGenerateVideo({
     ...(body.styles && body.styles.length > 0 ? { styleIds: body.styles } : {}),
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.prompt, ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
+    args: { prompt: words, ...(body.cast?.length ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}),  ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;

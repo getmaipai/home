@@ -96,9 +96,11 @@ function findNode(nodes: unknown, type: string): Record<string, unknown> | undef
 /** The level segment reads the Stack's video status without waiting (`peekVideoEngineStatus`), which is empty on the first page after Home starts and
  * left Max out of the segment until a reload. The page awaits one real read first, for at most this long, so a slow Stack costs the page a moment, never the page. */
 export const VIDEO_STATUS_WARM_MS = 1500;
-registerAppPageWarm("video", "create", async () => {
+const warmVideoStatus = async (): Promise<void> => {
   await Promise.race([Promise.all([videoEngineStatus(), syncLoras()]).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, VIDEO_STATUS_WARM_MS))]);
-});
+};
+registerAppPageWarm("video", "create", warmVideoStatus);
+registerAppPageWarm("video", "talking-avatar", warmVideoStatus);
 
 /** The time under Generate, in plain words per level (docs/design/video-tiers-2026-11-02.md section 3: Standard 10 s about 43 s, Boost 5 s 42 to 74 s,
  * Max 10 s 205 s). Never credits, memory or model names. */
@@ -110,20 +112,12 @@ registerAppPageFill("video", "create", (person, page) => {
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
-  const lengths = lengthOptions();
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   // Owner rule (2026-11-13): every chip is icon-only (the dropdown names the choices, the tooltip says "Label: value"). Orientation comes from the page JSON, so it gets its icons here.
-  for (const item of chips) {
-    const chip = item as Record<string, unknown>;
-    if (chip?.state !== "orientation") continue;
-    chip.icon = "rectangle-horizontal";
-    chip.icon_only = true;
-    const icons: Record<string, string> = { landscape: "rectangle-horizontal", portrait: "rectangle-vertical" };
-    if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
-  }
+  iconShapeChips(chips);
   bar.chips = [
     ...chips,
-    { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
+    lengthChip(),
     { state: "look", label: "Look", icon: "palette", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", icon: "clapperboard", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
@@ -136,13 +130,41 @@ registerAppPageFill("video", "create", (person, page) => {
   // action is not drawn, so nobody presses a button whose answer is a refusal.
   const feed = findNode(page.body, "result_feed");
   if (feed && Array.isArray(feed.actions) && !maxOfferedNow(person)) feed.actions = (feed.actions as Array<{ action?: { call?: { target?: string } } }>).filter((entry) => !entry.action?.call?.target?.endsWith("/actions/max"));
-  const tier = videoTierSegment(person);
-  if (tier) {
-    bar.tier = { ...tier, label: "Quality", presentation: "dropdown" };
-    delete bar.submit_detail;
-  } else {
-    delete bar.submit_detail;
+  applyQualityTier(bar, person);
+});
+
+/** The Shape chip of a page's JSON gets its icons (owner rule 2026-11-13: every chip is icon-only). One definition for Create and Talking avatar. */
+function iconShapeChips(chips: unknown[]): void {
+  for (const item of chips) {
+    const chip = item as Record<string, unknown>;
+    if (chip?.state !== "orientation") continue;
+    chip.icon = "rectangle-horizontal";
+    chip.icon_only = true;
+    const icons: Record<string, string> = { landscape: "rectangle-horizontal", portrait: "rectangle-vertical" };
+    if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
   }
+}
+
+/** The Length chip, from the engine ceilings (`lengthOptions`). One definition for Create and Talking avatar. */
+function lengthChip(): Record<string, unknown> {
+  return { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengthOptions().map((value) => ({ value, label: `${value} seconds` })) };
+}
+
+/** The Quality dropdown (the level segment) of a prompt bar, when this person has more than Standard to choose from. */
+function applyQualityTier(bar: Record<string, unknown>, person: PersonRow): void {
+  const tier = videoTierSegment(person);
+  if (tier) bar.tier = { ...tier, label: "Quality", presentation: "dropdown" };
+  delete bar.submit_detail;
+}
+
+/** CREATOR-26: the Talking avatar page's bar takes the Create page's Shape, Length and Quality (the same functions) and nothing else: a cast member and one line. */
+registerAppPageFill("video", "talking-avatar", (person, page) => {
+  const bar = findNode(page.body, "prompt_bar");
+  if (!bar) return;
+  const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
+  iconShapeChips(chips);
+  bar.chips = [...chips, lengthChip()];
+  applyQualityTier(bar, person);
 });
 
 /** CREATOR-20b: the Video composer reads the all-ages shot-card vocabulary from the fragment catalog. */
