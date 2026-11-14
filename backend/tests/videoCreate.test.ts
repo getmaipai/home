@@ -229,8 +229,8 @@ describe("the Create page and the make action", () => {
     expect(segment ? { ...segment, label: "Quality", presentation: "dropdown" } : null).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
-    // five page chips plus the five shot-card chips (CREATOR-20b), the kit page limit is 10: a second request gets the same set, not a doubled one
-    expect(promptBarOf(again.body)!.chips).toHaveLength(10);
+    // five page chips plus the seven shot-card chips (CREATOR-20b): a second request gets the same set, not a doubled one
+    expect(promptBarOf(again.body)!.chips).toHaveLength(12);
     // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
