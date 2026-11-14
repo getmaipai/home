@@ -1143,6 +1143,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/sileroVad.ts` | getSileroStream, SileroVadStream |
 | `backend/src/lib/skills.ts` | listSkillIds, __resetSkillCacheForTests, loadSkill, loadAllSkills |
 | `backend/src/lib/smoke.ts` | setDenoLookupForTest, runDenoTestSmoke, runSmoke, runAllSmokeTests, getPackageStatus, allPackageStatuses |
+| `backend/src/lib/speakerLine.ts` | speakerLine |
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
 | `backend/src/lib/speculation.ts` | SPECULATIVE_START_KEY, SPECULATION_HOLD_MS, SPECULATION_MAX_WORDS, newSpeculationHold, speculationCounters, noteSpeculation |
 | `backend/src/lib/speechDictionary.ts` | speechDictionary |
