@@ -41,6 +41,7 @@ import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
 import bandToolRows from "./datasets/band-tool.json";
 import studioToolRows from "./datasets/music-studio-tool.json";
+import songNameRows from "./datasets/song-name.json";
 import writingFormatRows from "./datasets/writing-format.json";
 import { WRITING_FORMAT_TOOL_ID, writingFormatToolSpec } from "@/lib/writingFormats";
 import routeDataset from "./datasets/chat-ab-01.json";
@@ -56,6 +57,7 @@ import { scoreRun } from "./freshScore";
 import { hashValue } from "./routeStats";
 import { createStackClient } from "@/lib/stack/client";
 import { isRouteE1Arm, routeE1ArmConfig } from "./routeE1Arms";
+import { songNameScore, type SongNameRun } from "./songNameScore";
 
 interface ToolCallCorpusRow {
   utterance: string;
@@ -191,6 +193,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
     const budgetOnly = await budgetOfferedPass();
     return { executed: budgetOnly, engine };
   }
+  if (process.env.MAIPAI_BENCH_PASS === "song-name") {
+    const songOnly = await songNamePass();
+    return { executed: songOnly, engine };
+  }
   console.log(`Running ${corpus.length} tool-call-corpus rows, ${REPEATS} repeats each...\n`);
 
   let falseCallAttempts = 0; // every repeat of a negative row (expect_calls: [])
@@ -226,8 +232,9 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const imageExecuted = await answerImagesPass();
   const bandExecuted = await bandToolPass();
   const studioExecuted = await studioToolPass();
+  const songNameExecuted = await songNamePass();
   const writingExecuted = await writingFormatPass();
-  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted + studioExecuted + writingExecuted, engine };
+  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted + bandExecuted + studioExecuted + songNameExecuted + writingExecuted, engine };
 }
 
 interface RouteItem { id: string; prompt: string; kind: string; family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; acceptable_tools: string[]; expected_terms?: string[]; }
@@ -494,6 +501,43 @@ async function studioToolPass(): Promise<number> {
     console.log(`${row.label === "N" ? "N" : "T"} ${passed}/${REPEATS} ${row.label}  "${row.id}" -> ${outcomes.join(" | ")}`);
   }
   console.log(`\nStudio-tool pass: the expected tool on ${wantCalls}/${wantRuns} runs, a studio tool on ${otherCalls}/${otherRuns} other runs`);
+  return executed;
+}
+
+/** SONG-NAME: measure the song_name rows with the tool offered through MAIPAI_BENCH_OFFER. */
+async function songNamePass(): Promise<number> {
+  const tools = budgetOfferedTools();
+  if (!tools.some((t) => t.id === "song_name")) {
+    console.log("\nSong-name rows skipped: song_name is not offered (set MAIPAI_BENCH_OFFER=song_name to measure it before it ships).");
+    return 0;
+  }
+  type Row = { id: string; label: "song_name" | "N"; text: string; action?: "listen" | "reject" | "suggest" | "confirm"; title?: string; messages?: { role: "user" | "assistant"; content: string }[] };
+  const rows = songNameRows.rows as Row[];
+  console.log(`\nSong-name pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
+  let executed = 0;
+  const runs: SongNameRun[] = [];
+  for (const row of rows) {
+    let passed = 0;
+    const outcomes: string[] = [];
+    for (let i = 0; i < REPEATS; i++) {
+      const messages: LlmMessage[] = [...(row.messages ?? []), { role: "user", content: row.text }];
+      const result = await completeWithTimeout("chat", messages, { tools, tool_choice: "auto" });
+      if (!result.ok) { outcomes.push("no reply"); runs.push({ label: row.label, called: false }); continue; }
+      executed++;
+      const calls = result.value.tool_calls ?? [];
+      const call = calls.find((c) => c.tool === "song_name");
+      const args = call?.args as { action?: unknown; title?: unknown } | undefined;
+      const ok = row.label === "N" ? !call : !!call && (row.action === undefined || args?.action === row.action) && (row.title === undefined || (typeof args?.title === "string" && args.title.toLocaleLowerCase() === row.title.toLocaleLowerCase()));
+      if (ok) passed++;
+      runs.push({ label: row.label, called: !!call, passed: ok });
+      const ids = calls.map((c) => c.tool).sort();
+      outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]${call ? ` ${JSON.stringify(args ?? {})}` : ""}`);
+    }
+    console.log(`${row.label === "N" ? "N" : "song_name"} ${passed}/${REPEATS}  "${row.id}" -> ${outcomes.join(" | ")}`);
+  }
+  const score = songNameScore(runs);
+  console.log(`\nSong-name pass: song_name on ${score.songPass}/${score.songRuns} song rows, ${score.falseCalls}/${score.otherRuns} other runs`);
+  console.log(`Song-name score: ${JSON.stringify(score)}`);
   return executed;
 }
 
