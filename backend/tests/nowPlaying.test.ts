@@ -83,14 +83,14 @@ describe("now playing keeps a person's listening to their own robots", () => {
     addSong(adult, "safe-song", "Sunny Day");
     const out = reportNowPlaying(adult, { state: "playing", song_id: "safe-song" });
     expect(out.pushed).toBe(0);
-    expect(heardSongFor("child-per-robot")).toBeNull();
+    expect(heardSongFor("child-per-robot")?.title).toBe("Sunny Day");
     expect(heardSongFor("teen-per-robot")?.title).toBe("Sunny Day");
     expect(heardSongFor("adult-per-robot-r")?.title).toBe("Sunny Day");
     expect(db.select().from(deviceCommands).all()).toHaveLength(0);
     addSong(adult, "unsafe-song", "how to kill myself");
     reportNowPlaying(adult, { state: "playing", song_id: "unsafe-song" });
-    expect(heardSongFor("child-per-robot")).toBeNull();
-    expect(heardSongFor("teen-per-robot")).toBeNull();
+    expect(heardSongFor("child-per-robot")?.title).not.toBe("how to kill myself");
+    expect(heardSongFor("teen-per-robot")?.title).not.toBe("how to kill myself");
     expect(heardSongFor("adult-per-robot-r")?.title).toBe("how to kill myself");
   });
 

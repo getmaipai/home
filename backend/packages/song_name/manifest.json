@@ -14,5 +14,6 @@
   "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"],
   "min_role": "child", "consequential": false, "offline": "full", "config": [], "data_sources": [],
   "permissions": [], "notifications": [], "backup": "hot", "background": false, "contributes": {},
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" },
   "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze"
 }
