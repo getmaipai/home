@@ -860,8 +860,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/djLines.ts` | DJ_ANGLES, DJ_LINE_PROMPT, writeDjLine, synthesizeDjLine, saveDjLine, pruneDjLines |
 | `backend/src/lib/music/effects.ts` | EFFECT_CHANGES, isEffectChange, EQ_PRESETS, EQ_BANDS_HZ, EFFECT_LABELS, COMPRESSOR_BOUNDS |
 | `backend/src/lib/music/exportFormat.ts` | EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, EXPORT_FAILED_LINE, convertSong |
-| `backend/src/lib/music/fingerprintStore.ts` | libraryFingerprintCount, loadLibraryFingerprints, __resetFingerprintMemoForTests, runFingerprintPass, kickFingerprintPass |
-| `backend/src/lib/music/heardSong.ts` | noteHeardSong, heardSongFor, clearHeardSong, __resetHeardSongsForTests, heardSongContextLine |
+| `backend/src/lib/music/fingerprintStore.ts` | libraryFingerprintCount, libraryFingerprintProgress, loadLibraryFingerprints, __resetFingerprintMemoForTests, runFingerprintPass, watchForFpcalc |
+| `backend/src/lib/music/heardSong.ts` | noteHeardSong, noteNowPlaying, clearNowPlaying, heardSongFor, addHeardCandidates, rejectHeardSong |
 | `backend/src/lib/music/identify.ts` | IDENTIFY_SETTING, ACOUSTID_KEY_SETTING, ACOUSTID_HOST, MAX_CLIP_SECONDS, MAX_CLIP_BYTES, DEVICE_COOLDOWN_MS |
 | `backend/src/lib/music/identifyAudio.ts` | IDENTIFY_RATE, decodeArgs, decodeWithFfmpeg, parseFpcalc, fingerprintWithFpcalc, fingerprintFile |
 | `backend/src/lib/music/identifyCore.ts` | parseAcoustId, acoustIdUrl, RateLimiter, FingerprintCache, popcount, compareFingerprints |
@@ -877,11 +877,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/madeRecords.ts` | MADE_KINDS, listMade, getMade, createMade, updateMade, deleteMade |
 | `backend/src/lib/music/mixParts.ts` | __setMusicMixRunnerForTests, __setMusicMixToolsForTests, SAMPLE_RATE, parseWav, mixPcmWav, run |
 | `backend/src/lib/music/models.ts` | MUSIC_ENGINE, KNOWN_MUSIC_MODELS, modelStampFor |
+| `backend/src/lib/music/nowPlaying.ts` | reportNowPlaying, sweepNowPlaying, __resetNowPlayingForTests |
 | `backend/src/lib/music/objects.ts` | isMusicObjectRef, musicObjectOf, cardProvenance, threadMusicObject, readMusicBand, readMusicAlbum |
 | `backend/src/lib/music/peaks.ts` | PEAK_COUNT, PEAKS_NO_FFMPEG_LINE, PEAKS_FAILED_LINE, __setPeaksDecoderForTests, bucketPeaks, computePeaks |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
+| `backend/src/lib/music/shazamLookup.ts` | SHAZAM_HOST, SHAZAM_USER_AGENT, SHAZAM_QUIET_MS, __resetShazamForTests, shazamQuietUntil, shazamBody |
+| `backend/src/lib/music/shazamSignature.ts` | SIGNATURE_RATE, makeSignature, crc32, encodeSignature, signatureUri, decodeSignature |
 | `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/soundAudio.ts` | LOOP_FADE_SECONDS, wavOfPcm, crossfadeLoopWav, mixSoundAtWav, m4aToWav, wavToM4a |
@@ -1148,7 +1151,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/sileroVad.ts` | getSileroStream, SileroVadStream |
 | `backend/src/lib/skills.ts` | listSkillIds, __resetSkillCacheForTests, loadSkill, loadAllSkills |
 | `backend/src/lib/smoke.ts` | setDenoLookupForTest, runDenoTestSmoke, runSmoke, runAllSmokeTests, getPackageStatus, allPackageStatuses |
-| `backend/src/lib/songNameTool.ts` | SONG_NAME_TOOL_ID, songNameText, runSongNameTool |
+| `backend/src/lib/songNameTool.ts` | SONG_NAME_TOOL_ID, shownTitle, sendSongTitle, songNameText, runSongNameTool |
 | `backend/src/lib/speakerLine.ts` | speakerLine |
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
 | `backend/src/lib/speculation.ts` | SPECULATIVE_START_KEY, SPECULATION_HOLD_MS, SPECULATION_MAX_WORDS, newSpeculationHold, speculationCounters, noteSpeculation |
