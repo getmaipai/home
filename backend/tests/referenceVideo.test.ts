@@ -400,13 +400,16 @@ describe("failures are plain, never a crash", () => {
       await until(() => getVideoJobFor(actor, id)?.state === "queued");
       const queuedRequest = getVideoJobFor(actor, id)!.request as { submitQueueFullHolds?: number; submitMemoryHolds?: number };
       expect(queuedRequest.submitQueueFullHolds ?? queuedRequest.submitMemoryHolds).toBeGreaterThan(0);
+      expect(videoCardView(actor, getVideoJobFor(actor, id)!, true).items[0]).toMatchObject({ state: "queued", error: null });
       ingredientRefusal = null;
       const { releaseHouseholdQueue } = await import("@/lib/jobs/householdQueue");
       await releaseHouseholdQueue();
       await until(() => fake.jobs.length > 0);
       expect(getVideoJobFor(actor, id)?.state).toBe("running");
+      expect((await finished(actor, outcome)).state).toBe("done");
+      fake.jobs.length = 0;
     }
-  });
+  }, 30_000);
 });
 
 describe("a picture that is already a reference sheet", () => {

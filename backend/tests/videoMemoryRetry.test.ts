@@ -167,3 +167,35 @@ describe("the words", () => {
     expect(videoCardView(who.actor, getVideoJobFor(who.actor, running.id)!, true).items[0]!.state).toBe("running");
   });
 });
+
+describe("a refusal at submit is held in the household queue", () => {
+  const maxBody = { prompt: "a paper boat", size: "1024x576", seconds: 5, seed: 7, audience: "adult", model: "ltx25-max", tier: "max" };
+  for (const code of ["queue_full", "no_memory"]) {
+    test(`a Max clip refused with ${code} goes back to queued and starts after the second attempt`, async () => {
+      fake.ltx25max = "ready";
+      fake.refuseSubmit = { status: 503, code, error: "not right now" };
+      const who = await owner();
+      const job = await start(who, { tier: "max", body: maxBody });
+      await until(() => getVideoJobFor(who.actor, job.id)?.state === "queued" && fake.submitted.length >= 1);
+      expect(videoCardView(who.actor, getVideoJobFor(who.actor, job.id)!, true).items[0]).toMatchObject({ state: "queued", error: null });
+      fake.refuseSubmit = null;
+      await until(() => getVideoJobFor(who.actor, job.id)?.state === "done", 15_000);
+    });
+  }
+  test("a Standard clip refused with no_memory keeps the refusal (not held)", async () => {
+    fake.refuseSubmit = { status: 503, code: "no_memory", error: "not right now" };
+    const who = await owner();
+    const job = await start(who);
+    await until(() => getVideoJobFor(who.actor, job.id)?.state === "failed");
+    expect(getVideoJobFor(who.actor, job.id)!.error).toBeTruthy();
+    expect(videoCardView(who.actor, getVideoJobFor(who.actor, job.id)!, true).items[0]!.state).toBe("failed");
+  });
+  test("a clip that failed after it started with a known code ends plainly and is not held", async () => {
+    fake.failWith = { error: "raw failure text", code: "no_memory" } as never;
+    const who = await owner();
+    const job = await start(who);
+    await until(() => getVideoJobFor(who.actor, job.id)?.state === "failed");
+    expect(getVideoJobFor(who.actor, job.id)!.error).not.toContain("raw failure text");
+    expect(fake.submitted).toHaveLength(1);
+  });
+});
