@@ -55,8 +55,10 @@ describe("heard song context", () => {
     noteNowPlaying("r", { title: "Home song", artist: "Home artist", album: "Record", year: 2024 }, now);
     noteHeardSong("r", { title: "Guess", source: "shazam", at: now + 100 });
     expect(heardSongFor("r", now + 100)?.title).toBe("Home song");
-    expect(heardSongContextLine(heardSongFor("r", now + 100)!, now + 100)).toContain("Home is playing Home song by Home artist (Record, 2024) on this robot's person's player.");
+    expect(heardSongContextLine(heardSongFor("r", now + 100)!, now + 100)).toContain("Home is playing Home song by Home artist (Record, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen.");
     clearNowPlaying("r");
     expect(heardSongContextLine(heardSongFor("r", now + 121_000)!, now + 121_000)).toContain("Home was playing Home song by Home artist (Record, 2024) 2 min ago.");
+    expect(heardSongContextLine(heardSongFor("r", now + 121_000)!, now + 121_000)).not.toContain("You already know this song");
+    expect(heardSongContextLine({ title: "Other", source: "library", at: now }, now)).not.toContain("You already know this song");
   });
 });

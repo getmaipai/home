@@ -5,7 +5,7 @@ import { confirmHeardSong, findHeardCandidate, heardSongFor, rejectHeardSong } f
 import { issueDeviceCommand } from "@/lib/deviceCommands";
 
 export const SONG_NAME_TOOL_ID = "song_name";
-export type SongNameArgs = { action?: "listen" | "reject" | "suggest" | "confirm"; title?: string };
+export type SongNameArgs = { action?: "listen" | "playback" | "reject" | "suggest" | "confirm"; title?: string; question?: string };
 
 /** What the robot shows: the same `Title - Artist` form the body sets when it names a song itself. */
 export function shownTitle(song: { title: string; artist?: string | null }): string { return song.artist ? `${song.title} - ${song.artist}` : song.title; }
@@ -34,7 +34,8 @@ export async function runSongNameTool(input: { callId: string; deviceId?: string
     if (input.surface === "robot" && input.deviceId) {
       const action = input.args?.action ?? "listen";
       const titleCommand = (text: string) => { try { (input.command ?? sendSongTitle)(input.deviceId!, text); } catch { /* command delivery never fails the answer */ } };
-      if (action !== "listen") {
+      if (action === "playback") text = "I can name the song, but I cannot control the player from here. Use the player on your screen.";
+      else if (action !== "listen") {
         const current = heardSongFor(input.deviceId);
         if (!current) text = "I do not have a recent song guess to discuss.";
         else if (action === "reject") {
@@ -50,10 +51,16 @@ export async function runSongNameTool(input: { callId: string; deviceId?: string
           text = confirmed ? `Got it, that is ${confirmed.title}${confirmed.artist ? ` by ${confirmed.artist}` : ""}.` : "I do not have a recent song guess to confirm.";
           if (confirmed && confirmed.title !== current.title) titleCommand(shownTitle(confirmed));
         }
-      } else {
+      } else if (typeof input.args?.question !== "string" || input.args.question.trim().length === 0) text = "Ask me what the song is and I will listen.";
+      else {
+        const heard = heardSongFor(input.deviceId);
+        if (heard?.source === "home" && heard.nowPlaying) {
+          text = `That is ${heard.title}${heard.artist ? ` by ${heard.artist}` : ""}.`;
+        } else {
         const state = getDeviceState(input.deviceId);
         if (isDeviceConnected(input.deviceId) && state && state.reachable && !state.muted) text = songNameText(await requestListen(input.deviceId));
         else text = "The robot is not ready to listen right now.";
+        }
       }
     }
   } catch { text = "I could not identify the song just now."; }

@@ -511,7 +511,7 @@ async function songNamePass(): Promise<number> {
     console.log("\nSong-name rows skipped: song_name is not offered (set MAIPAI_BENCH_OFFER=song_name to measure it before it ships).");
     return 0;
   }
-  type Row = { id: string; label: "song_name" | "N"; text: string; action?: "listen" | "reject" | "suggest" | "confirm"; title?: string; messages?: { role: "user" | "assistant"; content: string }[] };
+  type Row = { id: string; label: "song_name" | "N"; text: string; action?: string; title?: string; messages?: { role: "system" | "user" | "assistant"; content: string }[] };
   const rows = songNameRows.rows as Row[];
   console.log(`\nSong-name pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
   let executed = 0;
@@ -526,10 +526,11 @@ async function songNamePass(): Promise<number> {
       executed++;
       const calls = result.value.tool_calls ?? [];
       const call = calls.find((c) => c.tool === "song_name");
-      const args = call?.args as { action?: unknown; title?: unknown } | undefined;
-      const ok = row.label === "N" ? !call : !!call && (row.action === undefined || args?.action === row.action) && (row.title === undefined || (typeof args?.title === "string" && args.title.toLocaleLowerCase() === row.title.toLocaleLowerCase()));
+      const args = call?.args as { action?: unknown; title?: unknown; question?: unknown } | undefined;
+      const expectedAction = row.action ?? "listen";
+      const ok = row.label === "N" ? !call : !!call && args?.action === expectedAction && (expectedAction !== "listen" || (typeof args.question === "string" && args.question.trim().length > 0)) && (row.title === undefined || (typeof args?.title === "string" && args.title.toLocaleLowerCase() === row.title.toLocaleLowerCase()));
       if (ok) passed++;
-      runs.push({ label: row.label, called: !!call, passed: ok });
+      runs.push({ label: row.label, called: !!call, action: typeof args?.action === "string" ? args.action : undefined, passed: ok, split: row.id.startsWith("heldout3-") ? "heldout3" : "dev" });
       const ids = calls.map((c) => c.tool).sort();
       outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]${call ? ` ${JSON.stringify(args ?? {})}` : ""}`);
     }
@@ -538,6 +539,8 @@ async function songNamePass(): Promise<number> {
   const score = songNameScore(runs);
   console.log(`\nSong-name pass: song_name on ${score.songPass}/${score.songRuns} song rows, ${score.falseCalls}/${score.otherRuns} other runs`);
   console.log(`Song-name score: ${JSON.stringify(score)}`);
+  const heldoutScore = songNameScore(runs.filter((run) => run.split === "heldout3"));
+  console.log(`Song-name held-out score: ${JSON.stringify(heldoutScore)}`);
   return executed;
 }
 

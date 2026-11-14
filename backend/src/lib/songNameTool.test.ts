@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { __resetHeardSongsForTests, addHeardCandidates, noteHeardSong } from "@/lib/music/heardSong";
+import { __resetHeardSongsForTests, addHeardCandidates, noteHeardSong, noteNowPlaying } from "@/lib/music/heardSong";
 import { runSongNameTool, songNameText } from "./songNameTool";
 
 describe("song_name tool result copy", () => {
@@ -15,6 +15,25 @@ describe("song_name tool result copy", () => {
     const outcome = await runSongNameTool({ callId: "c1", surface: "chat", deviceId: null });
     expect(outcome.result.reply.text).toBe("I can only listen through the robot right now.");
     expect(outcome.status).toBe("succeeded");
+  });
+  test("playback is a fixed redirect and never listens", async () => {
+    const out = await runSongNameTool({ callId: "c", deviceId: "robot", surface: "robot", args: { action: "playback" } });
+    expect(out.result.reply.text).toBe("I can name the song, but I cannot control the player from here. Use the player on your screen.");
+  });
+  test.each([undefined, "", "   "])("listen without a question does not listen (%s)", async (question) => {
+    const out = await runSongNameTool({ callId: "c", deviceId: "robot", surface: "robot", args: { action: "listen", question } });
+    expect(out.result.reply.text).toBe("Ask me what the song is and I will listen.");
+  });
+  test("a nonsense question string is passed through without interpretation", async () => {
+    __resetHeardSongsForTests();
+    const out = await runSongNameTool({ callId: "c", deviceId: "robot", surface: "robot", args: { action: "listen", question: "xyzzy nonsense" } });
+    expect(out.result.reply.text).toBe("The robot is not ready to listen right now.");
+  });
+  test("Home now-playing answers without listening", async () => {
+    __resetHeardSongsForTests();
+    noteNowPlaying("robot", { title: "Moonlight Drive", artist: "Quill" });
+    const out = await runSongNameTool({ callId: "c", deviceId: "robot", surface: "robot", args: { action: "listen", question: "what is this?" } });
+    expect(out.result.reply.text).toBe("That is Moonlight Drive by Quill.");
   });
 });
 

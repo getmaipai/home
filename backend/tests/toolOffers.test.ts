@@ -24,7 +24,13 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
   test("song_name declares optional discussion actions and stays off until its bench row passes", () => {
     const manifest = listInstalledManifests().find((entry) => entry.id === "song_name")!;
     expect(manifest.offer).toMatchObject({ mode: "off" });
-    expect(manifest.args).toMatchObject({ type: "object", additionalProperties: false, properties: { action: { enum: ["listen", "reject", "suggest", "confirm"] }, title: { type: "string", maxLength: 80 } } });
+    expect(manifest.args).toMatchObject({ oneOf: [
+      { properties: { action: { const: "listen" }, question: { type: "string", maxLength: 200 } }, required: ["action", "question"], additionalProperties: false },
+      { properties: { action: { const: "playback" } }, required: ["action"], additionalProperties: false },
+      { properties: { action: { const: "reject" } }, required: ["action"], additionalProperties: false },
+      { properties: { action: { const: "suggest" }, title: { type: "string", maxLength: 80 } }, required: ["action", "title"], additionalProperties: false },
+      { properties: { action: { const: "confirm" }, title: { type: "string", maxLength: 80 } }, required: ["action"], additionalProperties: false },
+    ] });
   });
   test("every bundled package with args and every virtual tool resolves to a declared or not-measured decision", () => {
     const bundled = readdirSync(PACKAGES_DIR, { withFileTypes: true })

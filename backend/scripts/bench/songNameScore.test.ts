@@ -8,13 +8,19 @@ describe("songNameScore", () => {
       ...Array.from({ length: 10 }, () => ({ label: "song_name" as const, called: true, passed: false })),
       ...Array.from({ length: 50 }, () => ({ label: "N" as const, called: false })),
     ];
-    expect(songNameScore(results)).toEqual({ songPass: 90, songRuns: 100, falseCalls: 0, otherRuns: 50, ok: true });
+    expect(songNameScore(results)).toEqual({ songPass: 90, songRuns: 100, falseCalls: 0, redirected: 0, otherRuns: 50, ok: true });
   });
 
   test("fails recall or false-call limits", () => {
     expect(songNameScore([
       { label: "song_name", called: true, passed: false },
       { label: "N", called: true },
-    ])).toEqual({ songPass: 0, songRuns: 1, falseCalls: 1, otherRuns: 1, ok: false });
+    ])).toEqual({ songPass: 0, songRuns: 1, falseCalls: 1, redirected: 0, otherRuns: 1, ok: false });
+  });
+  test("playback on a negative row is redirected, while listen remains a false call", () => {
+    expect(songNameScore([
+      { label: "N", called: true, action: "playback" },
+      { label: "N", called: true, action: "listen" },
+    ])).toEqual({ songPass: 0, songRuns: 0, falseCalls: 1, redirected: 1, otherRuns: 2, ok: false });
   });
 });
