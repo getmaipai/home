@@ -29,6 +29,8 @@ import { joinReferenceClips, prepareStyleClip } from "@/lib/voiceSamples";
 import {
   listClonedVoices,
   saveStyleSample,
+  updateClonedVoice,
+  readClonedVoiceClip,
   saveClonedVoice,
   saveInspiredVoice,
   previewInspiredVoice,
@@ -653,13 +655,14 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   // V5 "Inspired voice": an inspired_level field (much_lower, lower, different or very_different) makes a new voice based on the clip instead of a copy.
   const inspiredLevel = typeof body.inspired_level === "string" && body.inspired_level ? body.inspired_level : null;
   if (inspiredLevel && (options.temperature !== null || options.pitchSemitones !== null)) return c.json({ error: "An Inspired voice has no liveliness or pitch setting. Make it without them." }, 400);
+  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1" };
   // VOICE-SAMPLES-01: up to three recordings (file, file2, file3) are cleaned and joined into one reference clip.
   let saveBytes: Uint8Array<ArrayBuffer> = bytes, saveType = file.type;
   if (!inspiredLevel) {
     const extra = [body.file2, body.file3].filter((item): item is File => item instanceof File);
     const all = [file, ...extra];
     const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? (item.type.includes("mpeg") ? "mp3" : item.type.includes("flac") ? "flac" : "wav")).toLowerCase();
-    const joined = await joinReferenceClips(await Promise.all(all.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))));
+    const joined = await joinReferenceClips(await Promise.all(all.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))), cleanOptions);
     if (joined.ok) { saveBytes = joined.wav as Uint8Array<ArrayBuffer>; saveType = "audio/wav"; }
     else if (extra.length > 0) return c.json({ error: joined.error }, 400);
   }
@@ -670,7 +673,7 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
       const item = body[field];
       if (!(item instanceof File)) continue;
       const ext = (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? "wav").toLowerCase();
-      const prepared = await prepareStyleClip(new Uint8Array(await item.arrayBuffer()), ext, style);
+      const prepared = await prepareStyleClip(new Uint8Array(await item.arrayBuffer()), ext, style, cleanOptions);
       if (!prepared.ok) return c.json({ error: prepared.error }, 400);
       styleClips.push({ style, wav: prepared.wav });
     }
@@ -798,6 +801,60 @@ const ClonedVoiceSchema = z.object({
   id: z.string(), label: z.string(), creatorId: z.string(), creatorName: z.string(), bytes: z.number().int().nonnegative(), createdAt: z.string(),
   temperature: z.number().optional(), pitchSemitones: z.number().optional(),
 });
+
+const clonedUpdateRoute = createRoute({
+  method: "post",
+  path: "/cloned/:id/update",
+  tags: ["Voice"],
+  summary: "Edit a cloned voice in place",
+  description: "Multipart form, every field optional: file, file2, file3 (new normal recordings, joined), whisper_file, anger_file, reduce_noise and reduce_echo (\"1\"; with no new file they clean the existing recording), temperature and pitch_semitones. The voice keeps its id, so anyone and any robot using it keeps it.",
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES * 5 + 64 * 1024 })] as const,
+  request: { params: z.object({ id: z.string() }), body: { content: { "multipart/form-data": { schema: z.unknown() } } } },
+  responses: {
+    200: { content: { "application/json": { schema: ClonedVoiceSchema } }, description: "The edited voice." },
+    ...errorResponses({ 400: "A recording or setting was refused", 401: "Not signed in", 403: "Only the creator or an owner/admin can edit", 404: "Cloned voice not found" }),
+  },
+});
+
+voiceRoutes.openapi(clonedUpdateRoute, async (c) => {
+  const actor = c.get("person");
+  const id = c.req.valid("param").id;
+  const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+  const cleanOptions = { noise: body.reduce_noise === "1", echo: body.reduce_echo === "1" };
+  const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? "wav").toLowerCase();
+  const files = [body.file, body.file2, body.file3].filter((item): item is File => item instanceof File);
+  let clip: Uint8Array | undefined;
+  if (files.length > 0) {
+    const joined = await joinReferenceClips(await Promise.all(files.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))), cleanOptions);
+    if (!joined.ok) return c.json({ error: joined.error }, 400);
+    clip = joined.wav;
+  } else if (cleanOptions.noise || cleanOptions.echo) {
+    const existing = readClonedVoiceClip(id);
+    if (!existing) return c.json({ error: "cloned voice not found" }, 404);
+    const ext = existing.mimeType.includes("mpeg") ? "mp3" : existing.mimeType.includes("flac") ? "flac" : "wav";
+    const joined = await joinReferenceClips([{ bytes: existing.bytes, extension: ext }], cleanOptions);
+    if (!joined.ok) return c.json({ error: joined.error }, 400);
+    clip = joined.wav;
+  }
+  const styleClips: { style: "whisper" | "anger"; wav: Uint8Array }[] = [];
+  for (const [field, style] of [["whisper_file", "whisper"], ["anger_file", "anger"]] as const) {
+    const item = body[field];
+    if (!(item instanceof File)) continue;
+    const prepared = await prepareStyleClip(new Uint8Array(await item.arrayBuffer()), extensionOf(item), style, cleanOptions);
+    if (!prepared.ok) return c.json({ error: prepared.error }, 400);
+    styleClips.push({ style, wav: prepared.wav });
+  }
+  const result = updateClonedVoice(actor, id, { ...(clip ? { clip } : {}), ...(typeof body.temperature === "string" && body.temperature !== "" ? { temperature: Number(body.temperature) } : {}), ...(typeof body.pitch_semitones === "string" && body.pitch_semitones !== "" ? { pitchSemitones: Number(body.pitch_semitones) } : {}) });
+  if (!result.ok) return result.status === 404 ? c.json({ error: result.error }, 404) : result.status === 403 ? c.json({ error: result.error }, 403) : c.json({ error: result.error }, 400);
+  if (clip) {
+    const check = await renderHouseholdVoice(id, c.req.raw.signal);
+    if (!check.ok) { result.value.undo(); dropHouseholdPreview(id); return c.json({ error: check.error }, 400); }
+    if (check.audio && check.audio.byteLength > 44) cacheHouseholdPreview(id, check.audio);
+  } else dropHouseholdPreview(id);
+  for (const item of styleClips) saveStyleSample(id, item.style, item.wav);
+  return c.json(result.value.info, 200);
+});
+
 
 const clonedRenameRoute = createRoute({
   method: "post",

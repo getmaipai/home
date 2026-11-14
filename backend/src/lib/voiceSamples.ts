@@ -1,7 +1,42 @@
 // VOICE-SAMPLES-01 (2026-11-14): a voice can be made from up to three recordings. Each is cleaned (silence trimmed from both ends,
 // volume matched) and they are joined, with a short pause between, into the one reference clip the speech engine takes.
 // The engine accepts a reference of 6 to 30 seconds, so the joined clip is kept under MAX_SECONDS.
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voiceShift";
+import { findFfmpeg } from "@/lib/ffmpegPath";
+
+/** VOICE-CLEAN-01: what the person chose to clean from a recording before it is used as a voice sample. */
+export interface CleanOptions { noise?: boolean; echo?: boolean }
+
+/** The ffmpeg filter chain for the chosen options (null when nothing is chosen). Noise: rumble cut, then spectral and non-local-means denoising.
+ * Echo: a low cut plus a gate that closes between words, which shortens the room's tail; it reduces echo, it does not remove it. */
+export function cleanFilter(options: CleanOptions): string | null {
+  const chain: string[] = [];
+  if (options.noise || options.echo) chain.push(`highpass=f=${options.echo ? 110 : 80}`);
+  if (options.noise) chain.push("afftdn=nr=20:nf=-38:tn=1", "anlmdn=s=6");
+  if (options.echo) chain.push("agate=threshold=0.03:ratio=4:attack=3:release=60:knee=2");
+  return chain.length ? chain.join(",") : null;
+}
+
+export const __cleanForTests: { run: ((input: string, output: string, filter: string) => Promise<boolean>) | null } = { run: null };
+
+/** Runs the chosen cleaning on a WAV; null when it cannot run (no ffmpeg on this computer). */
+export async function cleanWav(wav: Uint8Array, options: CleanOptions): Promise<Uint8Array | null> {
+  const filter = cleanFilter(options);
+  if (!filter) return wav;
+  const ffmpeg = findFfmpeg();
+  if (!ffmpeg && !__cleanForTests.run) return null;
+  const dir = mkdtempSync(join(tmpdir(), "maipai-clean-"));
+  try {
+    const input = join(dir, "in.wav"), output = join(dir, "out.wav");
+    writeFileSync(input, wav, { mode: 0o600 });
+    const ok = __cleanForTests.run ? await __cleanForTests.run(input, output, filter) : (await Bun.spawn([ffmpeg!, "-hide_banner", "-loglevel", "error", "-y", "-i", input, "-af", filter, "-ac", "1", output], { cwd: dir, stdout: "ignore", stderr: "ignore" }).exited) === 0;
+    return ok && existsSync(output) ? new Uint8Array(readFileSync(output)) : null;
+  } catch { return null; }
+  finally { rmSync(dir, { recursive: true, force: true }); }
+}
 
 export const MAX_SAMPLES = 3;
 export const MAX_SECONDS = 28;
@@ -54,13 +89,15 @@ export function normalizePeak(samples: Float32Array): Float32Array {
 }
 
 /** Cleans each recording and joins them into one WAV, or says why it could not. Each recording gets an equal share of the 29 seconds. */
-export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: string }[]): Promise<{ ok: true; wav: Uint8Array; seconds: number } | { ok: false; error: string }> {
+export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: string }[], clean: CleanOptions = {}): Promise<{ ok: true; wav: Uint8Array; seconds: number } | { ok: false; error: string }> {
   if (clips.length === 0) return { ok: false, error: "Add at least one recording." };
   if (clips.length > MAX_SAMPLES) return { ok: false, error: `Use up to ${MAX_SAMPLES} recordings.` };
   const share = Math.floor((MAX_SECONDS - GAP_SECONDS * (clips.length - 1)) / clips.length * RATE);
   const parts: Float32Array[] = [];
   for (const clip of clips) {
-    const wav = await clipToWav(clip.bytes, clip.extension);
+    const raw = await clipToWav(clip.bytes, clip.extension);
+    const wav = raw && (clean.noise || clean.echo) ? await cleanWav(raw, clean) : raw;
+    if (raw && !wav) return { ok: false, error: "Cleaning the recording needs ffmpeg, which is not installed on this computer. Turn off the cleaning options and try again." };
     const pcm = wav ? decodeWavClip(wav) : null;
     if (!pcm) return { ok: false, error: `A recording could not be read. Save it as a WAV, MP3 or FLAC file and choose it again.` };
     const cleaned = normalizePeak(trimSilence(resampleTo(pcm, RATE), RATE));
@@ -81,8 +118,8 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
 export type StyleName = "whisper" | "anger";
 
 /** A whisper or angry recording: cleaned the same way, and it must be 6 to 30 seconds because the engine uses it as a voice sample. */
-export async function prepareStyleClip(bytes: Uint8Array, extension: string, style: StyleName): Promise<{ ok: true; wav: Uint8Array } | { ok: false; error: string }> {
-  const joined = await joinReferenceClips([{ bytes, extension }]);
+export async function prepareStyleClip(bytes: Uint8Array, extension: string, style: StyleName, clean: CleanOptions = {}): Promise<{ ok: true; wav: Uint8Array } | { ok: false; error: string }> {
+  const joined = await joinReferenceClips([{ bytes, extension }], clean);
   if (!joined.ok) return { ok: false, error: `The ${style === "whisper" ? "whisper" : "angry"} recording: ${joined.error}` };
   if (joined.seconds < 6.5) return { ok: false, error: `The ${style === "whisper" ? "whisper" : "angry"} recording is too short. Record 10 to 25 seconds of it.` };
   return { ok: true, wav: joined.wav };

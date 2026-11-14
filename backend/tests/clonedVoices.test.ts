@@ -14,6 +14,7 @@ import {
   getClonedVoiceFile,
   clonedVoiceExists,
   clonedVoiceUrl,
+  updateClonedVoice,
 } from "@/lib/clonedVoices";
 import { setPersonTtsVoiceUnchecked, getPersonSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
@@ -365,5 +366,45 @@ describe("making a voice (VOICES-04)", () => {
     expect(getPersonSettingValue(jesse, "tts.voice_id")).toBe(made.value.id);
     expect(deleteClonedVoice(jesse, made.value.id).ok).toBe(true);
     expect(getPersonSettingValue(jesse, "tts.voice_id")).not.toBe(made.value.id);
+  });
+});
+
+describe("updateClonedVoice()", () => {
+  beforeEach(() => { resetDb(); resetClonedVoicesDir(); });
+  test("replaces the recording in place: same id, new file, assignments kept", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const made = saveClonedVoice(jesse, "Mine", WAV_BYTES, "audio/wav");
+    if (!made.ok) throw new Error("save failed");
+    const id = made.value.id;
+    setPersonTtsVoiceUnchecked(jesse, id);
+    const bigger = new Uint8Array(WAV_BYTES.length + 100); bigger.set(WAV_BYTES);
+    const edited = updateClonedVoice(jesse, id, { clip: bigger, temperature: 0.7 });
+    expect(edited.ok).toBe(true);
+    if (!edited.ok) return;
+    expect(edited.value.info.id).toBe(id);
+    expect(getClonedVoiceFile(id)?.path.endsWith(`${id}.wav`)).toBe(true);
+    expect(readFileSync(getClonedVoiceFile(id)!.path).length).toBe(bigger.length);
+    expect(getPersonSettingValue(jesse, "tts.voice_id")).toBe(id);
+    expect(db.select().from(clonedVoices).all()[0]!.temperature).toBe(0.7);
+  });
+  test("a failed check can put the old recording back", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const made = saveClonedVoice(jesse, "Mine", WAV_BYTES, "audio/wav");
+    if (!made.ok) throw new Error("save failed");
+    const edited = updateClonedVoice(jesse, made.value.id, { clip: new Uint8Array(500) });
+    if (!edited.ok) throw new Error("edit failed");
+    edited.value.undo();
+    expect(readFileSync(getClonedVoiceFile(made.value.id)!.path).length).toBe(WAV_BYTES.length);
+  });
+  test("someone else cannot edit it, and a member cannot set pitch", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const made = saveClonedVoice(jesse, "Mine", WAV_BYTES, "audio/wav");
+    if (!made.ok) throw new Error("save failed");
+    const other = makePerson("Sage", "member");
+    expect(updateClonedVoice(other, made.value.id, {}).ok).toBe(false);
+    const own = saveClonedVoice(other, "Theirs", WAV_BYTES, "audio/wav");
+    if (!own.ok) throw new Error("save failed");
+    const tuned = updateClonedVoice(other, own.value.id, { pitchSemitones: 2 });
+    expect(tuned.ok).toBe(false);
   });
 });

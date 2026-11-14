@@ -227,6 +227,44 @@ export function renameClonedVoice(actor: PersonRow, id: string, label: string): 
   return { ok: true, value: toInfo({ ...row, label: trimmed }, creator?.name ?? "Someone") };
 }
 
+/** VOICE-EDIT-01: changes a voice in place. The id stays, so everyone and every robot or synth using it keeps it. `clip` (a WAV) replaces the
+ * recording and the old whisper sample is dropped so it is made again from the new one; temperature and pitch are owner and admin only, as at
+ * creation. Creator or owner/admin. Returns the old files so a caller whose check fails can put them back with `restoreClonedVoice`. */
+export function updateClonedVoice(actor: PersonRow, id: string, change: { clip?: Uint8Array; temperature?: number | null; pitchSemitones?: number | null }): ClonedVoiceOpResult<{ info: ClonedVoiceInfo; undo: () => void }> {
+  const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
+  if (!row) return { ok: false, status: 404, error: "cloned voice not found" };
+  if (row.creatorId !== actor.id && !isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "Only the person who made this voice, or an owner or admin, can edit it." };
+  const tuning = change.temperature !== undefined || change.pitchSemitones !== undefined;
+  if (tuning && !isOwnerOrAdmin(actor)) return { ok: false, status: 400, error: "Liveliness and pitch can only be set by the person who manages Home." };
+  if (change.temperature != null && !inRange(change.temperature, TEMPERATURE_RANGE)) return { ok: false, status: 400, error: "The sampling temperature must be a number from 0.1 to 2.0." };
+  if (change.pitchSemitones != null && !inRange(change.pitchSemitones, PITCH_RANGE)) return { ok: false, status: 400, error: "The pitch offset must be a number from -12 to 12 semitones." };
+  if (change.clip && change.clip.byteLength > MAX_BYTES) return { ok: false, status: 400, error: `file must be ${MAX_BYTES / (1024 * 1024)}MB or smaller` };
+  const oldPath = join(clonedVoicesDir, row.fileName);
+  const oldBytes = existsSync(oldPath) ? new Uint8Array(readFileSync(oldPath)) : null;
+  const oldWhisper = existsSync(whisperSamplePath(id)) ? new Uint8Array(readFileSync(whisperSamplePath(id))) : null;
+  const newName = `${id}.wav`;
+  const set: Partial<typeof clonedVoices.$inferInsert> = {};
+  if (change.temperature !== undefined) set.temperature = change.temperature;
+  if (change.pitchSemitones !== undefined) set.pitchSemitones = change.pitchSemitones;
+  if (change.clip) {
+    writeFileSync(join(clonedVoicesDir, newName), change.clip, { mode: 0o600 });
+    if (newName !== row.fileName && existsSync(oldPath)) unlinkSync(oldPath);
+    if (existsSync(whisperSamplePath(id))) unlinkSync(whisperSamplePath(id));
+    Object.assign(set, { fileName: newName, mimeType: "audio/wav", bytes: change.clip.byteLength, transcript: null });
+  }
+  if (Object.keys(set).length > 0) db.update(clonedVoices).set(set).where(eq(clonedVoices.id, id)).run();
+  appendLogLine(`voice.edited role=${actor.role} recording=${change.clip ? "replaced" : "kept"} tuning=${tuning ? "changed" : "kept"}`);
+  if (change.clip) void transcribeClonedVoiceOnce(id, change.clip, "audio/wav").then((transcript) => (transcript ? ensureWhisperSample(id) : false)).catch(() => {});
+  const creator = db.select({ name: people.displayName }).from(people).where(eq(people.id, row.creatorId)).get();
+  const undo = () => {
+    if (oldBytes) writeFileSync(oldPath, oldBytes, { mode: 0o600 });
+    if (oldWhisper) writeFileSync(whisperSamplePath(id), oldWhisper, { mode: 0o600 });
+    if (newName !== row.fileName && existsSync(join(clonedVoicesDir, newName))) unlinkSync(join(clonedVoicesDir, newName));
+    db.update(clonedVoices).set({ fileName: row.fileName, mimeType: row.mimeType, bytes: row.bytes, transcript: row.transcript, temperature: row.temperature, pitchSemitones: row.pitchSemitones }).where(eq(clonedVoices.id, id)).run();
+  };
+  return { ok: true, value: { info: toInfo({ ...row, ...set } as typeof row, creator?.name ?? "Someone"), undo } };
+}
+
 /** Creator or owner/admin may remove a household recording. */
 export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpResult<true> {
   const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();

@@ -11,6 +11,7 @@ import { householdVoicesApi, inspiredLevelLabel, type HouseholdVoice } from "@/l
 import { playableVoices, presetNameForVoice, voiceDisplayName } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { AddVoiceBox } from "@/apps/settings/AddVoiceBox";
+import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { errorLine } from "@/lib/hubReachability";
@@ -41,6 +42,8 @@ export function VoiceManagerSection() {
   const [preview, setPreview] = useState<VoicePreviewState>(voicePreviewPlayer.getState());
   const [removing, setRemoving] = useState<StackVoice | null>(null);
   const [renaming, setRenaming] = useState<StackVoice | null>(null);
+  const [editing, setEditing] = useState<HouseholdVoice | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
   const [newName, setNewName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +122,7 @@ export function VoiceManagerSection() {
               <div className="flex flex-wrap gap-2 xl:justify-end">
                 <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing && !preview.busy ? i18n._({ id: "Stop", message: "Stop" }) : i18n._({ id: "Test", message: "Test" })}</Button>
                 {home ? null : <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => void setDefault(voice)}>{i18n._({ id: "Set as default", message: "Set as default" })}</Button>}
+                {custom && record && record.kind !== "inspired" ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => setEditing(record)}>{i18n._({ id: "Edit", message: "Edit" })}</Button> : null}
                 {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => { setNewName(record?.label ?? voiceDisplayName(voice)); setRenaming(voice); }}>{i18n._({ id: "Rename", message: "Rename" })}</Button> : null}
                 {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => setRemoving(voice)}>{i18n._({ id: "Delete", message: "Delete" })}</Button> : null}
               </div>
@@ -126,6 +130,15 @@ export function VoiceManagerSection() {
           })}</ul>
         </div>}
       </AsyncState>}
+    <Dialog open={editing !== null} onOpenChange={(open) => { if (!open && !editBusy) setEditing(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{i18n._({ id: "Edit {value}", message: "Edit {value}", values: { value: editing?.label ?? "" } })}</DialogTitle>
+          <DialogDescription>{i18n._({ id: "Add or replace recordings, add a whisper or angry one, or clean the sound. The voice keeps its name and everyone and every robot using it keeps it.", message: "Add or replace recordings, add a whisper or angry one, or clean the sound. The voice keeps its name and everyone and every robot using it keeps it." })}</DialogDescription>
+        </DialogHeader>
+        {editing ? <AddVoiceForm key={editing.id} edit={editing} canTune onBusyChange={setEditBusy} onCancel={() => setEditing(null)} onMade={(name) => { setEditing(null); setNotice(i18n._({ id: "{name} is updated.", message: "{name} is updated.", values: { name } })); }} /> : null}
+      </DialogContent>
+    </Dialog>
     <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
       <DialogContent>
         <DialogHeader>

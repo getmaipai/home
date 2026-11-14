@@ -44,3 +44,20 @@ describe("voiceSamples", () => {
     expect((await prepareStyleClip(tone(10, 0.5), "wav", "anger")).ok).toBe(true);
   });
 });
+
+describe("cleaning options", () => {
+  test("builds the filter chain from the chosen options", async () => {
+    const { cleanFilter } = await import("@/lib/voiceSamples");
+    expect(cleanFilter({})).toBeNull();
+    expect(cleanFilter({ noise: true })).toContain("afftdn");
+    expect(cleanFilter({ echo: true })).toContain("agate");
+  });
+  test("runs real ffmpeg cleaning when ffmpeg exists and the clip stays usable", async () => {
+    const { cleanWav } = await import("@/lib/voiceSamples");
+    const { findFfmpeg } = await import("@/lib/ffmpegPath");
+    if (!findFfmpeg()) return;
+    const out = await cleanWav(tone(4, 0.5, 24000), { noise: true, echo: true });
+    expect(out).not.toBeNull();
+    expect(decodeWavClip(out!)).not.toBeNull();
+  });
+});

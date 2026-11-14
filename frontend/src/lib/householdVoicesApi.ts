@@ -28,11 +28,13 @@ export const inspiredLevelLabel = (level: InspiredLevel): string => level === "m
 export const householdVoicesApi = {
   list: () => requestJson<{ voices: HouseholdVoice[] }>("/api/voice/cloned"),
   /** `temperature` and `pitchSemitones` are sent only when given (a blank field means the default). */
-  make: (input: { name: string; clip: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
+  make: (input: { name: string; clip: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
     const form = new FormData();
     form.append("label", input.name);
     form.append("file", input.clip);
     (input.extraClips ?? []).slice(0, 2).forEach((extra, index) => form.append(`file${index + 2}`, extra));
+    if (input.reduceNoise) form.append("reduce_noise", "1");
+    if (input.reduceEcho) form.append("reduce_echo", "1");
     if (input.whisperClip) form.append("whisper_file", input.whisperClip);
     if (input.angerClip) form.append("anger_file", input.angerClip);
     if (input.temperature !== undefined) form.append("temperature", String(input.temperature));
@@ -53,6 +55,19 @@ export const householdVoicesApi = {
       throw new Error(body.error ?? i18n._({ id: "Could not play a sample. Try again.", message: "Could not play a sample. Try again." }));
     }
     return res.blob();
+  },
+  /** VOICE-EDIT-01: changes a voice in place (same id). Every field is optional; with no new recording the cleaning options clean the existing one. */
+  update: (id: string, input: { clip?: File; extraClips?: File[]; whisperClip?: File; angerClip?: File; reduceNoise?: boolean; reduceEcho?: boolean; temperature?: number; pitchSemitones?: number }) => {
+    const form = new FormData();
+    if (input.clip) form.append("file", input.clip);
+    (input.extraClips ?? []).slice(0, 2).forEach((extra, index) => form.append(`file${index + 2}`, extra));
+    if (input.whisperClip) form.append("whisper_file", input.whisperClip);
+    if (input.angerClip) form.append("anger_file", input.angerClip);
+    if (input.reduceNoise) form.append("reduce_noise", "1");
+    if (input.reduceEcho) form.append("reduce_echo", "1");
+    if (input.temperature !== undefined) form.append("temperature", String(input.temperature));
+    if (input.pitchSemitones !== undefined) form.append("pitch_semitones", String(input.pitchSemitones));
+    return requestJson<HouseholdVoice>(`/api/voice/cloned/${encodeURIComponent(id)}/update`, { method: "POST", body: form });
   },
   rename: (id: string, label: string) => requestJson<HouseholdVoice>(`/api/voice/cloned/${encodeURIComponent(id)}/rename`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }),
   remove: (id: string) => requestJson<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),
