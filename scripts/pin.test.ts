@@ -39,6 +39,7 @@ function createFixture() {
         darwin: { name: "bot-darwin.tar.gz", sha256: "0".repeat(64), size: 1 },
         linux: { name: "bot-linux.tar.gz", sha256: "1".repeat(64), size: 2 },
       },
+      firmware: { stackchan: { name: "stackchan-firmware-1.0.0.tar.gz", sha256: "2".repeat(64), size: 3 } },
     }, null, 2) + "\n",
   };
   for (const [path, contents] of Object.entries(files)) {
@@ -125,6 +126,7 @@ describe.serial("pin.sh", () => {
     const release = { assets: [
       { name: "bot-darwin.tar.gz", size: 900, digest: `sha256:${"a".repeat(64)}` },
       { name: "bot-linux.tar.gz", size: 901, digest: `sha256:${"b".repeat(64)}` },
+      { name: "stackchan-firmware-9.9.9.tar.gz", size: 902, digest: `sha256:${"c".repeat(64)}` },
     ] };
     writeFileSync(fixture.env.GH_JSON!, JSON.stringify(release));
     const out = run("bot", "9.9.9");
@@ -135,6 +137,8 @@ describe.serial("pin.sh", () => {
     expect(pin.version).toBe("9.9.9");
     expect(pin.assets.darwin).toMatchObject({ size: 900, sha256: "a".repeat(64) });
     expect(pin.assets.linux).toMatchObject({ size: 901, sha256: "b".repeat(64) });
+    // The firmware set is named after the release, so its entry follows the pin (it once stayed on an old name).
+    expect(pin.firmware.stackchan).toMatchObject({ name: "stackchan-firmware-9.9.9.tar.gz", size: 902, sha256: "c".repeat(64) });
     expect(serialized.startsWith('{\n  "_note"')).toBe(true);
     expect(serialized.indexOf('"darwin"')).toBeLessThan(serialized.indexOf('"linux"'));
     expect(gitRepo("log", "-1", "--format=%s")).toBe("Pin bot 9.9.9");

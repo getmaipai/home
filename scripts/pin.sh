@@ -115,8 +115,13 @@ PY
       if ! PIN_FILE="$pin_file" PIN_VERSION="$value" PIN_RELEASE="$release_json" python3 - <<'PY'
 import json, os, subprocess
 path, version = os.environ["PIN_FILE"], os.environ["PIN_VERSION"]
+import re
 pin = json.load(open(path)); assets = json.loads(os.environ["PIN_RELEASE"]).get("assets", [])
-for entry in pin.get("assets", {}).values():
+# The firmware set is named after the release (stackchan-firmware-<version>.tar.gz), so its entry moves with the pin; leaving
+# it on an older name made Home fetch a file the new release does not have (2026-11-14: wireless update found no firmware).
+for entry in pin.get("firmware", {}).values():
+    entry["name"] = re.sub(r"\d+\.\d+\.\d+", version, entry["name"], count=1)
+for entry in [*pin.get("assets", {}).values(), *pin.get("firmware", {}).values()]:
     asset = next((a for a in assets if a.get("name") == entry.get("name")), None)
     if asset is None: raise SystemExit(f"release asset missing: {entry.get('name')}")
     entry["size"] = asset["size"]
