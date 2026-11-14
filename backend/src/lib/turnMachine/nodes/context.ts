@@ -66,6 +66,7 @@ import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } f
 import { fetchSceneWeatherForContext } from "@/lib/sceneWeather";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
+import { homeAssistantEventsHealth, readHomeAssistantEntityState, subscribeHomeAssistantEntities } from "@/lib/integrations/homeAssistant";
 import type { Surface, SpeakerEvidence } from "@/lib/turnShared";
 import { speakerLine } from "@/lib/speakerLine";
 
@@ -121,14 +122,14 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
     const elapsed = Math.max(0, now - at);
     return elapsed < 60_000 ? "just now" : elapsed < 5 * 60_000 ? "a few minutes ago" : "a while ago";
   };
-  const basis = (p: FusedScene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
+  const basis = (p: FusedScene["people"][number]) => p.basis.includes("ha_entity") ? "suggested by Home Assistant" : p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
   const unknownOthers = scene.people.filter((person) => !person.person_id || !members.has(person.person_id)).length;
   lines.push(speakerLine(scene.speaker, surface, actor, household, getPersonSettingValue(actor, "person.robot.greet_by_name"), unknownOthers));
   if (scene.people.length) {
     const people = scene.people.map((p) => {
       const member = p.person_id ? members.get(p.person_id) : null;
-      const name = member?.displayName ?? p.label ?? "someone the camera does not know";
+      const name = member?.displayName ?? p.label ?? (p.basis.includes("ha_entity") ? "someone who may be nearby" : "someone the camera does not know");
       const band = member ? ` (${speakerAgeBand(member, new Date(now))})` : p.band !== "unknown" ? ` (${p.band})` : "";
       const how = p.basis.includes("typed") ? `${actor.displayName} said so` : basis(p);
       return `${name}${band} (${how} ${age(p.last_seen_at)})`;
@@ -276,10 +277,19 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
   const sceneNow = Date.now();
+  const ownHaEntityId = getPersonSettingValue(state.actor, "scene.ha_person_entity");
+  let ownHaState: Awaited<ReturnType<typeof readHomeAssistantEntityState>> = null;
+  if (typeof ownHaEntityId === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(ownHaEntityId)) {
+    const unsubscribe = subscribeHomeAssistantEntities(`scene-person-${state.actor.id}`, [ownHaEntityId], () => {});
+    try {
+      if (homeAssistantEventsHealth().state === "connected") ownHaState = await readHomeAssistantEntityState(ownHaEntityId);
+    } catch { /* HA is a soft cue source. */ }
+    finally { unsubscribe(); }
+  }
   const lookCount = state.surface === "robot" && state.deviceId ? sceneFor(state.deviceId, sceneNow)?.people ?? null : null;
   const speakerForScene = sceneSpeakerForTurn(state.surface, state.actor.id, state.speakerEvidence);
   const roomDevice = state.deviceId ? getDeviceById(state.deviceId) : null;
-  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
+  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, haStates: ownHaState ? [ownHaState] : [], ownHaEntityId: typeof ownHaEntityId === "string" ? ownHaEntityId : null, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
   currentScene.weather = null;
   if (!state.bare) {
     currentScene.weather = await fetchSceneWeatherForContext({ conversationId: conversation.id, actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, now: sceneNow });

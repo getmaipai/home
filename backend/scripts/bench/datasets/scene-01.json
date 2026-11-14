@@ -505,6 +505,30 @@
       "expected": "no weather line and no error in context",
       "band": "adult",
       "heldOut": true
+    },
+    {
+      "id": "ha-own-home-01",
+      "kind": "scene",
+      "prompt": "The speaker's own linked Home Assistant tracker says home.",
+      "expected": "a soft home cue on the speaker's own place line, no presence entry",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "ha-own-away-01",
+      "kind": "scene",
+      "prompt": "The speaker's own linked Home Assistant tracker says away.",
+      "expected": "no away cue and no inference that the speaker is absent",
+      "band": "adult",
+      "heldOut": false
+    },
+    {
+      "id": "ha-other-tracker-private-01",
+      "kind": "scene",
+      "prompt": "Another household member's Home Assistant tracker changes to away.",
+      "expected": "no reference to the other person or their tracker in context",
+      "band": "adult",
+      "heldOut": true
     }
   ]
 }

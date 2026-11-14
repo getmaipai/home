@@ -1,5 +1,7 @@
-import { describe, expect, test } from "bun:test";
-import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, sceneForTests, getWeatherCue, setWeatherCue, setWeatherFailure, type FusedScene } from "@/lib/scene";
+import { afterEach, describe, expect, test } from "bun:test";
+import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, homeAssistantObservations, sceneForTests, getWeatherCue, setWeatherCue, setWeatherFailure, type FusedScene } from "@/lib/scene";
+
+afterEach(() => { clearScenes(); });
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
@@ -11,6 +13,50 @@ const obs = (kind: SceneObservation["kind"], value: unknown, sensor: SceneObserv
 const empty = (conversation_id = "conversation-1"): FusedScene => sceneForTests({ conversation_id });
 
 describe("scene fusion", () => {
+  test("away, another person's tracker, unavailable, unknown, and stale HA states add no cue", () => {
+    const now = Date.parse("2026-11-14T12:00:00Z");
+    const states = [
+      { entity_id: "device_tracker.sage_phone", state: "away", attributes: {}, last_updated: new Date(now).toISOString() },
+      { entity_id: "person.marlow", state: "home", attributes: {}, last_updated: new Date(now).toISOString() },
+      { entity_id: "device_tracker.sage_phone", state: "unavailable", attributes: {}, last_updated: new Date(now).toISOString() },
+      { entity_id: "device_tracker.sage_old", state: "home", attributes: {}, last_updated: new Date(now - 30 * 60_000).toISOString() },
+    ];
+    expect(homeAssistantObservations(states, "device_tracker.sage_phone", "chat", now)).toEqual([]);
+  });
+  test("the own home tracker is visible only as a place cue and never establishes alone", () => {
+    const now = Date.parse("2026-11-14T12:00:00Z");
+    const own = { entity_id: "device_tracker.sage_phone", state: "home", attributes: {}, last_updated: new Date(now).toISOString() };
+    const ownCues = homeAssistantObservations([own], own.entity_id, "chat", now);
+    const scene = fuseScene(empty(), ownCues, now);
+    expect(scene.people).toHaveLength(0);
+    expect(scene.alone).toBe(true);
+    expect(scene.alone_observed).toBe(false);
+    expect(scene.place?.where).toBe("home");
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const text = renderScene(scene, now, sage, [sage]);
+    expect(text).toContain("Place: at home.");
+    const trace = JSON.stringify(sceneCounts(scene));
+    expect(trace).not.toContain(own.entity_id);
+    expect(text).not.toContain(own.entity_id);
+  });
+  test("another person's Home Assistant tracker cannot affect rendered text, trace, or evidence", () => {
+    const now = Date.parse("2026-11-14T12:00:00Z");
+    const states = [
+      { entity_id: "device_tracker.sage_phone", state: "home", attributes: {}, last_updated: new Date(now).toISOString() },
+      { entity_id: "person.marlow_private_tracker", state: "away", attributes: {}, last_updated: new Date(now).toISOString() },
+    ];
+    const cues = homeAssistantObservations(states, "device_tracker.sage_phone", "chat", now);
+    const scene = fuseScene(empty(), cues, now);
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    const text = renderScene(scene, now, sage, [sage]);
+    const trace = JSON.stringify(sceneCounts(scene));
+    const evidence = JSON.stringify(cues);
+    for (const forbidden of ["Marlow", "person.marlow_private_tracker", "device_tracker.marlow"]) {
+      expect(text).not.toContain(forbidden);
+      expect(trace).not.toContain(forbidden);
+      expect(evidence).not.toContain(forbidden);
+    }
+  });
   test("weather cache reuses a rounded point within TTL and invalidates on movement, source, or expiry", () => {
     clearScenes();
     const cue = { temp_f: 41, sky: "rainy", precipitation: "rain", wind_mph: 12, change: null, checked_at: 100, expires_at: 1_800_100, source: "current" as const };

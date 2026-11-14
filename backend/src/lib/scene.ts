@@ -67,7 +67,8 @@ function isExpired(expires: number, now: number): boolean { return expires <= no
 function clampExpires(o: SceneObservation): number { return Math.min(o.expires_at, o.at + (SCENE_TTL[o.source.sensor as keyof typeof SCENE_TTL] ?? IDLE_TTL)); }
 
 export function fuseScene(previous: FusedScene | null | undefined, observations: readonly SceneObservation[], now: number, conversationId = previous?.conversation_id ?? "", speaker: Scene["speaker"] = previous?.speaker ?? null): FusedScene {
-  const live = (previous?.people ?? []).filter((p) => !isExpired(p.expires_at, now));
+  const haEntityIds = new Set(observations.filter((o) => o.source.sensor === "ha_entity" && o.kind === "person_here").map((o) => o.id));
+  const live = (previous?.people ?? []).filter((p) => !isExpired(p.expires_at, now) && !(p.basis.includes("ha_entity") && !haEntityIds.size));
   let place = previous?.place && !isExpired(previous.place.expires_at, now) ? previous.place : null;
   let countFloor = 0;
   let aloneObservedUntil = previous?.alone_observed_until ?? null;
@@ -83,7 +84,7 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
       const value = o.value as Omit<Person, "basis" | "last_seen_at" | "expires_at">;
       if (value.person_id !== speaker?.person) aloneObservedUntil = null;
       const key = personKey(value);
-      const index = live.findIndex((p) => personKey(p) === key);
+      const index = live.findIndex((p) => personKey(p) === key && !(o.source.sensor === "ha_entity" && p.basis.includes("ha_entity")));
       const next: Person = { ...value, basis: [o.source.sensor], last_seen_at: o.at, expires_at: clampExpires(o) };
       if (o.strength === "strong" && value.person_id) strongIds.add(value.person_id);
       if (o.strength === "strong" && value.person_id && value.person_id === speaker?.person) continue;
@@ -154,8 +155,24 @@ export function observeSceneClaims(conversationId: string, observations: readonl
   return scene;
 }
 
-export function observationsForTurn(input: { surface: Surface; deviceId?: string; deviceArea?: string | null; deviceKind?: string; currentLocation?: { lat: number; lon: number } | null; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; now: number }): SceneObservation[] {
+export type HomeAssistantSceneState = { entity_id: string; state: string; attributes: Record<string, unknown>; last_updated?: string; area?: string | null };
+export function homeAssistantObservations(states: readonly HomeAssistantSceneState[], ownEntityId: string | null, surface: Surface, now: number): SceneObservation[] {
   const result: SceneObservation[] = [];
+  for (const state of states) {
+    const updated = state.last_updated ? Date.parse(state.last_updated) : NaN;
+    if (!Number.isFinite(updated) || updated + 30 * 60_000 <= now || state.state === "unknown" || state.state === "unavailable") continue;
+    const domain = state.entity_id.split(".", 1)[0];
+    if (state.entity_id === ownEntityId && (domain === "person" || domain === "device_tracker") && state.state === "home") {
+      result.push({ id: `ha-own-place-${now}`, source: { surface, device_id: null, sensor: "ha_entity" }, kind: "place", value: { where: "home", setting: "unknown", area: null, precision: "area" }, confidence: 0.4, strength: "weak", at: updated, expires_at: updated + 30 * 60_000 });
+      continue;
+    }
+  }
+  return result;
+}
+
+export function observationsForTurn(input: { surface: Surface; deviceId?: string; deviceArea?: string | null; deviceKind?: string; currentLocation?: { lat: number; lon: number } | null; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; haStates?: readonly HomeAssistantSceneState[]; ownHaEntityId?: string | null; now: number }): SceneObservation[] {
+  const result: SceneObservation[] = [];
+  result.push(...homeAssistantObservations(input.haStates ?? [], input.ownHaEntityId ?? null, input.surface, input.now));
   for (const p of input.present ?? []) {
     if (!input.speakerEvidence && p.person === input.actorId) continue;
     const sensor: SceneObservation["source"]["sensor"] = p.basis === "face" ? "face" : p.basis === "voice" || p.basis === "voice_and_face" ? "voice" : p.basis === "signed_in" ? "signed_in" : "typed";

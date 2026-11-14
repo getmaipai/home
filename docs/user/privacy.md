@@ -5,6 +5,8 @@ description: See exactly what, if anything, leaves your house.
 
 Your conversations, memories, and household profiles stay on this computer. MaiPai does not run a server that your family's information passes through, and nothing reports back to us about how you use it. A feature can send the small piece of information it needs directly to its own service, such as the place in a weather request or the word you want defined. The list below names every connection.
 
+When scene context is used, coarse home or away from your household's own Home Assistant may be used as a soft cue. Home reads it only for the person's own place line, using the entity that person linked in their own settings. Another person's tracker is not read for the turn. This cue can be wrong and does not establish who is present. A person's activity stays theirs.
+
 ## See what leaves your house
 
 Open **Settings**, then **Privacy and safety**, and choose **What connects to the internet**. It lists the connections MaiPai can make, including outbound services and inbound token access. For each one, you'll see:

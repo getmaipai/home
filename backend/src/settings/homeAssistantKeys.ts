@@ -25,6 +25,17 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const HOME_ASSISTANT_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
+    key: "scene.ha_person_entity",
+    scope: "person",
+    selector: "text",
+    default: "",
+    label: "Your Home Assistant presence entity",
+    help: "Link your own Home Assistant person or device tracker. Home may use its coarse home state as a soft cue on your place line.",
+    level: "advanced",
+    lives_in: "person.privacy",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "home.base_url",
     scope: "household",
     selector: "text",
