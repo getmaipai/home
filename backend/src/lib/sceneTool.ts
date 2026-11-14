@@ -2,7 +2,7 @@ import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js"
 import type { FusedScene } from "@/lib/scene";
 import type { PersonRow } from "@/types";
 import { dismiss as suppressScene, resume as resumeScene, type SuppressionKind, type SuppressionScope } from "@/lib/sceneSuppression";
-import { applyAlarmAction, listActiveSafetyAlarms } from "@/lib/safetyAlarm";
+import { applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms } from "@/lib/safetyAlarm";
 import { getDeviceById } from "@/lib/devices";
 import { speakerAgeBand } from "@/lib/ageBand";
 
@@ -50,45 +50,58 @@ export function sceneObservations(args: Record<string, unknown>, actor: PersonRo
 export function runSceneTool(input: { actor: PersonRow; args: Record<string, unknown>; callId: string; conversationId: string; speakerId?: string | null; roster: readonly PersonRow[]; scene?: FusedScene | null; surface: SceneObservation["source"]["surface"]; actorBand: "child" | "teen" | "adult"; deviceId?: string; speakerEvidence?: { person: string | null; basis: string; level: string } | null; observe: (conversationId: string, observations: readonly SceneObservation[]) => unknown }) {
   const { action } = input.args;
   if (action === "dismiss" || action === "resume" || action === "party") {
+    // WHO is speaking decides everything here (A3: the turn's own speaker evidence). On a robot or shared screen the account actor is the
+    // device's owner, not the speaker: only a confirmed person in the evidence is the speaker; anyone else is unknown and changes nothing.
+    const sharedSurface = input.surface !== "chat" && input.surface !== "phone";
     const evidence = input.speakerEvidence;
-    const confirmedAdult = input.actorBand === "adult" && ((!evidence && (input.surface === "chat" || input.surface === "phone")) ||
-      (!!evidence && evidence.person === input.actor.id && evidence.level === "confirmed" && ["signed_in", "voice", "face", "voice_and_face"].includes(evidence.basis)));
+    const confirmedEvidence = !!evidence && !!evidence.person && evidence.level === "confirmed" && ["signed_in", "voice", "face", "voice_and_face"].includes(evidence.basis);
+    const speakerPerson: string | null = sharedSurface ? (confirmedEvidence ? evidence!.person : null) : input.actor.id;
+    // Household authority: an adult account whose own confirmed evidence (or sign-in on a private surface) is the speaker.
+    const confirmedAdult = input.actorBand === "adult" && speakerPerson === input.actor.id && (sharedSurface ? confirmedEvidence : true);
     const device = input.deviceId ? getDeviceById(input.deviceId) : null;
     const room = device?.area ?? null;
     const now = Date.now();
+    const unknownSpeaker = "I can't tell who is asking, so I can't change that.";
     let line = "I couldn't change that.";
-    if (action === "resume") {
-      resumeScene({ personId: input.actor.id, deviceId: input.deviceId, room, byConfirmedAdult: confirmedAdult, byPersonId: input.actor.id });
+    if (!speakerPerson) line = unknownSpeaker;
+    else if (action === "resume") {
+      resumeScene({ personId: speakerPerson, deviceId: input.deviceId, room, byConfirmedAdult: confirmedAdult, byPersonId: speakerPerson });
       line = "Done: listening again.";
     } else if (action === "party") {
       if (!confirmedAdult) line = "Only a confirmed adult can set that household context.";
       else {
-        for (const kind of ["music_or_tv", "shouting"] as const) suppressScene({ kind, scope: "household", reason: "party", personId: input.actor.id, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: true });
+        for (const kind of ["music_or_tv", "shouting"] as const) suppressScene({ kind, scope: "household", reason: "party", personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: true });
         line = "Done: I will ignore those sounds for everyone here for four hours.";
       }
-    } else {
-      // A sounding hardware alarm takes precedence over every model supplied selector.
-      const active = listActiveSafetyAlarms();
-      const matching = room ? active.filter((alarm) => alarm.area === room) : [];
-      const alarm = matching.length === 1 ? matching[0] : active.length === 1 ? active[0] : undefined;
-      // A heard-sound dismissal (a kind is given) never acknowledges a sounding hardware alarm: only a dismissal with no kind is about the alarm.
-      const aboutSound = typeof input.args.kind === "string" && input.args.kind.length > 0;
-      if (alarm && !aboutSound) {
-        if (input.args.reason === "false_alarm") line = "I can't mark a sensor alarm as a false alarm here.";
-        else if (confirmedAdult) {
-          const result = applyAlarmAction(input.actor.id, alarm.id, "acknowledge");
-          line = result.ok ? "Done: the alarm is acknowledged." : "I couldn't dismiss that alarm.";
-        } else if (input.surface === "robot" && input.deviceId && device?.kind === "robot") {
-          const result = applyAlarmAction(input.actor.id, alarm.id, "quiet_here", input.deviceId);
-          line = result.ok ? "Done: the alarm is quiet on this robot for you only." : "I couldn't dismiss that alarm.";
-        } else line = "I couldn't dismiss that alarm for this speaker.";
-      } else if (input.args.kind && typeof input.args.kind === "string") {
+    } else if (typeof input.args.kind === "string" && input.args.kind.length > 0) {
+      // A heard-sound dismissal never touches a sounding hardware alarm.
       const requested = input.args.scope as SuppressionScope | undefined;
       const scope: SuppressionScope = !confirmedAdult ? "self" : requested ?? (room ? "room" : "device");
-      const result = suppressScene({ kind: input.args.kind as SuppressionKind, reason: input.args.reason as "media" | "handled" | "false_alarm" | "party" | "other", scope, personId: input.actor.id, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult });
+      const result = suppressScene({ kind: input.args.kind as SuppressionKind, reason: input.args.reason as "media" | "handled" | "false_alarm" | "party" | "other", scope, personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult });
       if (result.ok && result.until) line = `Done: I will ignore that until ${new Date(result.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${scope === "self" ? "for you only" : scope === "household" ? "for everyone here" : scope === "room" ? "in this room" : "on this device"}.`;
       else line = "I can't set that dismissal for this speaker.";
-      } else line = "There isn't one active alarm here that I can dismiss.";
+    } else {
+      // No kind: the dismissal is about a sounding hardware alarm. The model supplied no alarm id, kind, device or duration (ignored if sent):
+      // code finds the alarm, and refuses when it cannot be sure which one is meant.
+      const active = listActiveSafetyAlarms();
+      if (active.length === 0) line = "There isn't one active alarm here that I can dismiss.";
+      else if (active.length > 1) line = "More than one alarm is sounding, so I can't tell which one you mean.";
+      else if (input.args.reason === "false_alarm") line = "I can't mark a sensor alarm as a false alarm here.";
+      else {
+        const alarm = active[0]!;
+        const evidenceForRobot = confirmedEvidence ? evidence : null;
+        if (!sharedSurface) {
+          if (confirmedAdult) {
+            const result = applyAlarmAction(input.actor.id, alarm.id, "acknowledge");
+            line = result.ok ? "Done: the alarm is acknowledged for everyone, and that sensor stays quiet for 15 minutes." : "I couldn't dismiss that alarm.";
+          } else line = "I couldn't dismiss that alarm for this speaker.";
+        } else if (input.surface === "robot" && input.deviceId && device?.kind === "robot" && evidenceForRobot) {
+          // The alarm module re-checks the evidence, the speaker's age and the robot's owner itself.
+          const action2 = confirmedAdult ? "acknowledge" : "quiet_here";
+          const result = applyRobotAlarmAction(input.deviceId, alarm.id, action2, evidenceForRobot);
+          line = result.ok ? (action2 === "acknowledge" ? "Done: the alarm is acknowledged for everyone, and that sensor stays quiet for 15 minutes." : "Done: the alarm is quiet on this robot for you only.") : "I couldn't dismiss that alarm for this speaker.";
+        } else line = unknownSpeaker;
+      }
     }
     return { callId: input.callId, packageId: SCENE_TOOL_ID, status: "succeeded" as const, via: "tool_call" as const, args: {}, result: { reply: { text: line }, actions: [] }, durationMs: 0 };
   }

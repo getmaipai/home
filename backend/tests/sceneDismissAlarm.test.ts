@@ -38,6 +38,7 @@ async function soundingAlarm() {
   db.update(people).set({ role: "child", birthdate: `${new Date().getFullYear() - 8}-01-01` }).where(eq(people.id, childId)).run();
   const child = db.select().from(people).where(eq(people.id, childId)).get()! as unknown as PersonRow;
   const childRobotId = issueDeviceToken(childId, "robot", "Rin robot").deviceId;
+  const adultRobotId = issueDeviceToken(adult.id, "robot", "Sage robot").deviceId;
   setHouseholdSettingValue("home.base_url", "http://192.168.1.2:8123");
   setHouseholdSettingValue("home.access_token", "test-ha-token");
   setHouseholdSettingValue("safety.alarm.sensors", JSON.stringify([{ entityId: "binary_sensor.kitchen_smoke", area: "Kitchen", kind: "smoke" }]));
@@ -48,7 +49,7 @@ async function soundingAlarm() {
   ws.message(smokeOn); await new Promise((resolve) => setTimeout(resolve, 15));
   const alarm = db.select().from(safetyAlarms).get()!;
   expect(alarm.state).toBe("active");
-  return { adult, child, childRobotId, alarmId: alarm.id };
+  return { adult, child, childRobotId, adultRobotId, alarmId: alarm.id };
 }
 const call = (actor: PersonRow, args: Record<string, unknown>, extra: Record<string, unknown> = {}) => runSceneTool({
   actor, args, callId: "c1", conversationId: "conv", roster: [actor], surface: "chat", actorBand: actor.role === "child" ? "child" : "adult", observe: () => undefined, ...extra,
@@ -95,5 +96,37 @@ describe("DISMISS-01c: the scene tool against a sounding sensor alarm", () => {
     db.update(safetyAlarms).set({ state: "cleared" }).where(eq(safetyAlarms.id, alarmId)).run();
     const result = call(adult, { action: "dismiss", reason: "handled" });
     expect(result.result.reply.text).toContain("isn't one active alarm");
+  });
+
+  test("on a robot the SPEAKER acts, not the robot's owner: a child or an unknown speaker cannot quiet or acknowledge as the parent", async () => {
+    const { adult, child, adultRobotId } = await soundingAlarm();
+    // The turn's account actor on the parent's robot is the parent; the speaker evidence says it is the child.
+    const asChild = call(adult, { action: "dismiss", reason: "handled" }, { surface: "robot", deviceId: adultRobotId, actorBand: "child", speakerEvidence: { person: child.id, basis: "voice", level: "confirmed" } });
+    expect(asChild.result.reply.text).toContain("couldn't dismiss");
+    expect(state()).toBe("active");
+    // No confirmed evidence at all (an unknown voice): nothing changes and it says it cannot tell who is asking.
+    const unknown = call(adult, { action: "dismiss", reason: "handled" }, { surface: "robot", deviceId: adultRobotId, actorBand: "child", speakerEvidence: null });
+    expect(unknown.result.reply.text).toContain("can't tell who is asking");
+    expect(state()).toBe("active");
+    // An unknown speaker cannot set a self hold as the owner either.
+    const hold = call(adult, { action: "dismiss", reason: "other", kind: "dog_bark" }, { surface: "robot", deviceId: adultRobotId, actorBand: "child", speakerEvidence: { person: null, basis: "unknown", level: "unknown" } });
+    expect(hold.result.reply.text).toContain("can't tell who is asking");
+    expect(isSuppressed({ kind: "dog_bark", personId: adult.id, now: Date.now() })).toBe(false);
+  });
+
+  test("the confirmed adult speaking at their own robot acknowledges", async () => {
+    const { adult, adultRobotId } = await soundingAlarm();
+    const result = call(adult, { action: "dismiss", reason: "handled" }, { surface: "robot", deviceId: adultRobotId, actorBand: "adult", speakerEvidence: { person: adult.id, basis: "voice", level: "confirmed" } });
+    expect(result.result.reply.text).toContain("acknowledged for everyone");
+    expect(state()).toBe("acknowledged");
+  });
+
+  test("with two alarms sounding it refuses to guess which one is meant", async () => {
+    const { adult } = await soundingAlarm();
+    const at = new Date().toISOString();
+    db.insert(safetyAlarms).values({ id: "alarm-second", sensorId: "binary_sensor.hall_smoke", area: "Hall", kind: "smoke", state: "active", startedAt: at, updatedAt: at, endedAt: null, endedByPersonId: null, quietedDevices: "[]" }).run();
+    const result = call(adult, { action: "dismiss", reason: "handled" });
+    expect(result.result.reply.text).toContain("More than one alarm");
+    expect(db.select().from(safetyAlarms).where(eq(safetyAlarms.state, "active")).all()).toHaveLength(2);
   });
 });
