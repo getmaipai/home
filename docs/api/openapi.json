@@ -37568,6 +37568,24 @@
                           "type": "boolean",
                           "nullable": true
                         },
+                        "link_path": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "home",
+                            "away",
+                            "other",
+                            null
+                          ]
+                        },
+                        "link_state": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "link_attempt": {
+                          "type": "integer",
+                          "nullable": true
+                        },
                         "heap": {
                           "type": "object",
                           "properties": {
