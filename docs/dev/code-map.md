@@ -1372,7 +1372,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
-| `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
+| `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, companionOwnVoice, voiceForSpeech |
 | `backend/src/lib/voiceLibrary.ts` | buildVoiceLibrary, searchVoiceLibrary |
 | `backend/src/lib/voiceLibraryData.ts` | VCTK_SPEAKERS |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
