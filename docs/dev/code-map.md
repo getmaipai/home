@@ -1214,6 +1214,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |
 | `backend/src/lib/talkOver.ts` | TALK_OVER_KEY, TALK_OVER_WINDOW_KEY, TALK_OVER_WINDOW_DEFAULT_MS, TALK_OVER_WINDOW_MIN_MS, TALK_OVER_WINDOW_MAX_MS, talkOverLevel |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
+| `backend/src/lib/templateCovers.ts` | TEMPLATE_COVER_IDS, templateCoverUrl |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
 | `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, MODEL_OF_CHOICE, copyLegacyIntoSlot, migrateTierSlots |
