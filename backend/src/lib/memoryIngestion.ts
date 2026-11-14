@@ -240,7 +240,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
   }
 
   if (scope === "companion") {
-    if (!input.source.startsWith("talent.") && input.source !== "robot.guise") {
+    if (!input.source.startsWith("talent.")) {
       return { ok: false, status: 403, error: "Companion scope requires a source starting with talent. Use a talent source before saving." };
     }
     if (!companionId) {

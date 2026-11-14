@@ -84,8 +84,9 @@ describe("held robot synth guise", () => {
     const matches = recall(owner, "What is my dog's name?", { scope: "person", person: owner.id, queryVector: vector, selfOnly: true });
     expect(matches.map((match) => match.record.text).join(" ")).toContain("Juniper");
     const rows = db.select().from(memoryRecords).all();
-    expect(rows.some((row) => row.scope === "companion" && row.companionId === id && row.source === "robot.guise" && row.text.includes("Rivet"))).toBe(true);
-    expect(rows.some((row) => row.companionId === id && row.text.includes("Juniper"))).toBe(false);
+    // The record is the speaker's own (person scope); nothing is written into the synth's shared life, and the synth never learns household facts.
+    expect(rows.some((row) => row.scope === "person" && row.source === "robot.guise" && row.text.includes("Rivet"))).toBe(true);
+    expect(rows.some((row) => row.scope === "companion" && row.source === "robot.guise")).toBe(false);
     expect(rows.filter((row) => row.companionId === id).every((row) => !row.text.includes("Juniper"))).toBe(true);
   });
   test("the admin assignment view reports the stored guise name", async () => {

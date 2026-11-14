@@ -14,7 +14,7 @@ export const IMPRESSION_UNKNOWN_LINE = "That synth could not be found. Check its
 const REFUSAL = "That synth cannot be used for this speaker or device.";
 function rememberGuise(actor: PersonRow, synthId: string, text: string): void {
   if (!canWritePersonMemory(actor, actor.id)) return;
-  try { remember(actor, { text, category: "event", tier: "observation", scope: "companion", companion_id: synthId, source: "robot.guise", importance: 0.5, skip_dedupe: true }); } catch { /* The guise succeeds even when its optional memory record cannot be saved. */ }
+  try { remember(actor, { text, category: "event", tier: "observation", scope: "person", person: actor.id, source: "robot.guise", importance: 0.5, skip_dedupe: true }); } catch { /* The guise succeeds even when its optional memory record cannot be saved. */ }
 }
 export function impressionAvailable(actor: PersonRow, band: AgeBand, deviceId: string): boolean {
   return listSynths(actor).some((synth) => synth.private_to === null && maySeeSynth(actor, synth) && companionFits(band, synthFloor(synth)) && companionFits(robotControlsOf(deviceId), synthFloor(synth)));
@@ -36,7 +36,8 @@ export async function runImpressionTool(input: { actor: PersonRow; args: Record<
       if (synth) rememberGuise(input.actor, synth.id, `I stopped appearing as ${name} on the robot on ${date}.`);
     }
     const saved = setValue(input.actor, `device:${deviceId}`, ROBOT_GUISE_KEY, "");
-    if (saved.ok) { publishSettingsChanged(`device:${deviceId}`, ROBOT_GUISE_KEY, ""); void renderClipBundle(deviceId); }
+    if (!saved.ok) return "The impression could not be stopped. Try again.";
+    publishSettingsChanged(`device:${deviceId}`, ROBOT_GUISE_KEY, ""); void renderClipBundle(deviceId);
     return "Impression stopped.";
   }
   const requested = typeof input.args.synth === "string" ? input.args.synth.trim() : "";

@@ -391,13 +391,18 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     if (tool === "impression") {
       impressionUsed = true;
       let text: string;
+      let failed = false;
       try {
         text = await runImpressionTool({ actor: state.actor, args, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), identified: !speakerIsAnonymous(state), ...(state.surface === "robot" && state.deviceId ? { deviceId: state.deviceId } : {}) });
       } catch {
+        // RULES.md rule 6: a failed tool is recorded as failed (the model is told only the kind, an admin sees the indicator) and never fails the answer.
         text = "That impression could not be changed.";
+        failed = true;
       }
-      outcomes.push({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: {}, result: { reply: { text }, actions: [] }, durationMs: 0 });
-      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text } });
+      outcomes.push(failed
+        ? outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args: {}, errorCode: "impression_failed", failureKind: "errored", userMessage: text, durationMs: 0 })
+        : { callId, packageId: tool, status: "succeeded", via: "tool_call", args: {}, result: { reply: { text }, actions: [] }, durationMs: 0 });
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: failed ? { text, error_code: "errored" } : { text } });
       continue;
     }
 
