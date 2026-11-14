@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Impression",
-  "description": "Temporarily take on a household synth as a companion.",
+  "description": "Call with action start and a synth name when asked for an impression of, or to act as, a synth or person; do not ask first. Call with action stop when told to stop. Keeps its voice and memories.",
   "offer": { "mode": "conditional", "gate": "impressionAllowed", "bench_row": "impression-tool", "priority": 999 },
   "author": "MaiPai",
   "license": "AGPL-3.0",
