@@ -592,3 +592,64 @@ R3. **The look is context, never a claim.** A live description rides into that r
 R4. **A robot turn still carries no picture.** The turn route's rule that pictures ride only on written chat turns is unchanged; the
     robot's look reaches the model only as the description above.
 
+## Ambient sensing
+
+Record: [scene awareness](scene-awareness-2026-11-13.md) (sections 4, 5 and 14). Owner-approved 2026-11-13 (chat): Jesse approved this
+section as written, then re-approved A1 to A3 with the changes of questions 26 and 28 (Apple's on-device classifier on iPhone, an
+in-memory-only dismissal state, listening off by default on every device, anyone dismisses alerts to themselves). Nothing here turns
+anything on; sound listening ships only through SCENE-02c, off by default.
+Owner-approved: 2026-11-13
+
+Governs: backend/src/lib/scene.ts, backend/src/lib/hear.ts, backend/src/routes/devices.ts (`/me/scene`), frontend/src/lib/ambient/**,
+the Stack `hear` component, backend/src/lib/safetyAlarm.ts and backend/src/lib/sceneSuppression.ts
+
+A1. **Sound, light and temperature are classified once and dropped.** A device runs the Stack's pinned
+    sound-event model on its own audio, or posts at most 4 seconds of audio to the hub's `hear` component,
+    which classifies it and drops it when the call returns. On an iPhone the platform's own on-device
+    sound classifier (Apple Sound Recognition) may run beside the Stack's model; its result is mapped to
+    the same closed list, handled exactly like the Stack's, and alone never raises an emergency event. Only
+    typed events from the closed list reach Home, held in this process's memory for at most 10 minutes,
+    one scene per conversation. No audio, transcript, label, class, score or sensor reading is ever
+    written to disk, a stored turn, a memory, the summary, the library, a backup, a log, a stat,
+    telemetry or a persisted queue. No route returns them; nobody, admin included, can read them or a
+    history (there is none). Logs carry counts and timings only, never a class. The one exception is the
+    dismissal state of A3: the kind being ignored, the device, its expiry and a count, held in this
+    process's memory only, cleared by a restart back to normal alerting, never written to disk, and shown
+    on the robot card and the Status page as what is being ignored until when, so it can be undone. No
+    new outbound connection exists for this: the model is a pinned Stack download.
+
+A2. **An admin enables it per device, and the person sees it.** Robots and hub devices (pods, a
+    kiosk) carry `device.ambient` with `continual`, `on_demand` (only during a turn) and `none`, the
+    default for every device, robots included (SOUND-EVENTS-01, OWNER-ANSWERS 5); an admin turns a robot
+    or a hub device on, per device, and the owner has one household switch that turns every device off.
+    Browser and phone listening follows the wake-word invariants: off by default, an adult turns it on for
+    their own device, the listening indicator with its one-step Turn off shows on every page while the
+    microphone is open, and a hidden tab stops it. A guest or a minor never enables it, and a child's own
+    device never runs it. Audio from a device is never used to identify a person it is not enrolled to
+    recognise.
+
+A3. **An event is context, never a claim, and speaks only through the existing paths.** Events ride
+    into a turn as labelled background data with their age. An emergency event takes the deterministic
+    safety-alarm path and its fixed reviewed clip; a notable event may become a robot offer under
+    INITIATIVE-01's gates and a Notification for an adult who is away; anything else never speaks or
+    notifies. Dismissal follows whom the alert
+    is for (owner's ruling, 2026-11-13, "anyone may dismiss alerts to themselves"): any person of any age
+    may dismiss an alert directed at them (their own notification, the spoken alert on their own device,
+    their own card), which stops it for them only; a dismissal that holds a sound kind quiet for a device,
+    a room or the household, and any dismissal of a real sensor alarm for others, is a confirmed adult's or
+    the owning adult's; a child's or an unconfirmed speaker's "ignore that" therefore silences their own
+    alert while the alarm and every other person's alert continue. The dismissal covers that event and
+    its kind for a set, visible time, never a different kind; a real sensor alarm (smoke, CO, gas, water
+    leak, temperature and the like from Home Assistant or other hardware) is dismissed for 15 minutes
+    whatever the reason given, a heard sound for the time its reason sets; Home confirms aloud what it
+    dismissed and for whom; the same kind that persists or escalates past the stated margin re-alerts
+    once with a short line and can be dismissed again; every dismissal is undoable and logged as a count.
+    No model code reaches the safety-alarm module: a sensor alarm is dismissed only through the existing
+    deterministic actions (`acknowledge` for the household by a confirmed adult or the signed-in adult;
+    `quiet_here` for a person's own device at any age) with the turn's own speaker evidence or the
+    signed-in person, never a model argument, and only while that alarm is sounding; marking an alarm
+    false stays an admin's action. A proactive turn runs as the owning person without write or physical
+    tools; its listener on a robot or shared surface is an unknown speaker at the child band.
+
+A4. **A device turn still carries no audio.** The turn route accepts no sound; events reach the model
+    only as the scene block.
