@@ -21,6 +21,7 @@ import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { RobotActions } from "@/apps/settings/RobotActions";
 import { RobotWifi } from "@/apps/settings/RobotWifi";
+import { linkLine, linkStateLine } from "@/apps/settings/robotLink";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -170,7 +171,9 @@ function RobotDetail({ device, tab, role, onClose }: { device: DeviceInfo; tab?:
           <ItemGroup variant="card" aria-label={i18n._({ id: "Robot software", message: "Robot software" })}>
             <Item size="setting">
               <ItemContent><ItemTitle>{i18n._({ id: "Connection", message: "Connection" })}</ItemTitle><ItemDescription>{softwareQuery.data.checkin || softwareQuery.data.lastSeenAt
-                ? [softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: formatTime(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!) } }),
+                ? [softwareQuery.data.checkin?.online ? linkLine(softwareQuery.data.checkin) : null,
+                  softwareQuery.data.checkin?.online ? linkStateLine(softwareQuery.data.checkin.link_state, softwareQuery.data.checkin.link_attempt) : null,
+                  softwareQuery.data.checkin?.online ? null : i18n._({ id: "Offline, last seen {time}", message: "Offline, last seen {time}", values: { time: formatTime(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!) } }),
                   softwareQuery.data.checkin?.signal ? i18n._({ id: "Wi-Fi {signal}", message: "Wi-Fi {signal}", values: { signal: softwareQuery.data.checkin.signal } }) : null,
                   softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? (softwareQuery.data.checkin.battery.charging ? i18n._({ id: "Battery {level}%, charging", message: "Battery {level}%, charging", values: { level: softwareQuery.data.checkin.battery.level } }) : i18n._({ id: "Battery {level}%", message: "Battery {level}%", values: { level: softwareQuery.data.checkin.battery.level } })) : null,
                   softwareQuery.data.checkin?.ip ? i18n._({ id: "IP address {ip}", message: "IP address {ip}", values: { ip: softwareQuery.data.checkin.ip } }) : null,

@@ -21,6 +21,7 @@ const softwareShape = z.object({
     timers_active: z.number().int().nullable(), self_restarts: z.number().int().nullable(), heal_hold: z.boolean().nullable(), mic_level: z.number().int().nullable(),
     updating: z.boolean().nullable(), update_progress: z.number().int().nullable(),
     wifi_saved: z.array(z.string()).max(10).nullable().optional(), link_encrypted: z.boolean().nullable().optional(),
+    link_path: z.enum(["home", "away", "other"]).nullable().optional(), link_state: z.string().nullable().optional(), link_attempt: z.number().int().nullable().optional(),
     heap: z.object({ internal: z.number().int().nullable(), minimum: z.number().int().nullable(), psram: z.number().int().nullable() }),
   }).nullable(),
   lastSeenAt: z.string().nullable(),
@@ -43,6 +44,7 @@ robotHostRoutes.openapi(softwareRoute, (c) => {
     timers_active: report.timers_active ?? null, self_restarts: report.self_restarts ?? null, heal_hold: report.heal_hold ?? null, mic_level: report.mic_level ?? null,
     updating: report.updating ?? null, update_progress: report.update_progress ?? null,
     wifi_saved: report.wifi_saved ?? null, link_encrypted: report.link_encrypted ?? null,
+    link_path: report.link_path ?? null, link_state: report.link_state ?? null, link_attempt: report.link_attempt ?? null,
     heap: { internal: report.free_heap_internal, minimum: report.free_heap_min, psram: report.psram_free },
   } : null, lastSeenAt: getDeviceById(deviceId)?.lastSeenAt ?? null }, 200);
 });

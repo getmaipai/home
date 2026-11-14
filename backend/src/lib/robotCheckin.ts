@@ -30,6 +30,10 @@ export type RobotCheckin = {
   update_progress?: number | null;
   wifi_saved?: string[] | null;
   link_encrypted?: boolean | null;
+  /** Bot 0.2.103: how the robot is connected (home network, away through the laptop relay, other) and what the unit says about its hub link. */
+  link_path?: "home" | "away" | "other" | null;
+  link_state?: string | null;
+  link_attempt?: number | null;
 };
 
 const latest = new Map<string, { value: RobotCheckin; receivedAt: number }>();

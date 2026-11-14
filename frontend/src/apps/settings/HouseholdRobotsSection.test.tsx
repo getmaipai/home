@@ -23,6 +23,13 @@ function renderRobot(software: unknown) {
 }
 
 describe("robot software details", () => {
+  test("AWAY-LINK-01: the Connection row says how the robot is connected and what its hub link is doing", async () => {
+    const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" }, checkin: { online: true, lastSeen: "2026-10-21T12:00:00.000Z", ip: "100.81.94.122", rssi: -48, signal: "strong", battery: { level: 87, charging: false }, boot_reason: 1, crash_resets: 0, link_path: "away", link_state: "ws_retry", link_attempt: 2, heap: { internal: 10000, minimum: 9000, psram: 20000 } } });
+    await waitFor(() => expect(view.getAllByText("Up to date")).toHaveLength(2));
+    expect(view.getByText(/Connected away from home \(through your laptop\)/)).toBeTruthy();
+    expect(view.getByText(/The robot is reconnecting to the hub \(try 2\)/)).toBeTruthy();
+  });
+
   test("shows recorded firmware and running Bot versions with their current badges", async () => {
     const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" }, checkin: { online: true, lastSeen: "2026-10-21T12:00:00.000Z", ip: "192.168.1.8", rssi: -48, signal: "strong", battery: { level: 87, charging: false }, boot_reason: 1, crash_resets: 0, heap: { internal: 10000, minimum: 9000, psram: 20000 } } });
     await waitFor(() => expect(view.getAllByText("Up to date")).toHaveLength(2));

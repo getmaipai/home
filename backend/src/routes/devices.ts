@@ -187,6 +187,7 @@ const robotCheckinSchema = z.object({
   battery_level: loose(z.number().int().min(0).max(100)), charging: loose(z.boolean()),
   updating: loose(z.boolean()), update_progress: loose(z.number().int().min(0).max(100)),
   wifi_saved: loose(z.array(z.string().max(32)).max(10)), link_encrypted: loose(z.boolean()),
+  link_path: z.enum(["home", "away", "other"]).nullable().catch(null), link_state: loose(z.string().max(32)), link_attempt: loose(z.number().int().nonnegative()),
 });
 const robotCheckinRoute = createRoute({
   method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",

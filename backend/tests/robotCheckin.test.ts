@@ -77,6 +77,14 @@ describe("robot check-in", () => {
     expect(getRobotCheckin(deviceId)).toMatchObject({ online: true, ip: "192.168.1.8", firmware_version: "0.2.24", rssi: -48, battery_level: 87, timers_active: 1, mic_level: 12 });
   });
 
+  test("AWAY-LINK-01: how the robot is connected (home, away through the laptop relay) and the unit's hub link state are kept and shown, and an odd value becomes null", async () => {
+    expect((await robot.put("/api/devices/me/checkin", payload({ link_path: "away", link_state: "ws_retry", link_attempt: 3 }))).status).toBe(204);
+    expect(getRobotCheckin(deviceId)).toMatchObject({ link_path: "away", link_state: "ws_retry", link_attempt: 3 });
+    expect(await (await owner.get(`/api/robots/hosts/${deviceId}/software`)).json()).toMatchObject({ checkin: { link_path: "away", link_state: "ws_retry", link_attempt: 3 } });
+    expect((await robot.put("/api/devices/me/checkin", payload({ link_path: "satellite", link_state: 7, link_attempt: -2 }))).status).toBe(204);
+    expect(getRobotCheckin(deviceId)).toMatchObject({ link_path: null, link_state: null, link_attempt: null });
+  });
+
   test("an unknown extra field never fails the check-in", async () => {
     expect((await robot.put("/api/devices/me/checkin", payload({ some_future_fact: { nested: [1, 2, 3] }, another: "x" }))).status).toBe(204);
   });
