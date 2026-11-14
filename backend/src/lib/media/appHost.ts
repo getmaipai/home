@@ -13,7 +13,8 @@ import { and, desc, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm
 import { db } from "@/db";
 import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
 import { fileIsAdultOnly, fileLockState, mediaItemLocked } from "@/lib/adultLock";
-import { musicRowIsLocked } from "@/lib/music/lock";
+import { musicJobLockState, musicRowIsLocked } from "@/lib/music/lock";
+import type { MusicJob } from "@/lib/music/types";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -144,7 +145,7 @@ export function allowedSources(person: PersonRow): MediaSource[] {
 export function readableIn(person: PersonRow, appId: MediaAppId, id: string): MediaItem | null {
   const item = readableItem(person, id);
   if (item && appId === "audio" && !allowedSources(person).some((source) => source.id === item.source_id && source.kind === "root")) return null;
-  if (!item || !(MEDIA_APPS[appId].kinds as readonly string[]).includes(item.kind)) return null;
+  if (!item || !(MEDIA_APPS[appId].kinds as readonly string[]).includes(item.kind) && !(appId === "audio" && item.kind === "sound")) return null;
   if (item.kind === "chapter") {
     const parent = item.parent_id ? readableItem(person, item.parent_id) : null;
     if (!parent || parent.kind !== "audiobook") return null;
@@ -1060,15 +1061,20 @@ export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaIt
 
 /** Save a completed sound effect as a private sound media item. */
 export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaItem | null {
+  const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, fileId)).get();
+  if (!job || job.personId !== person.id || job.state !== "done") return null;
+  let request: MusicJob["request"];
+  let musicJob: MusicJob;
+  try {
+    request = JSON.parse(job.request) as MusicJob["request"];
+    musicJob = { ...job, request, task: job.task as MusicJob["task"], state: job.state as MusicJob["state"], temporary: false };
+  } catch { return null; }
+  if (!request.sound || musicJobLockState(musicJob, person) !== "open") return null;
   const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
   if (existing) return existing.kind === "sound" ? readableItem(person, existing.id) : null;
   const file = listLibrary(person, { type: "audio", origin: "made", sort: "newest", limit: 100 }).items.find((entry) => entry.id === fileId) ?? null;
   if (!file) return null;
-  const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, file.id)).get();
-  if (!job || job.personId !== person.id || job.state !== "done") return null;
-  let request: { sound?: { loop?: boolean }; description?: string };
-  try { request = JSON.parse(job.request) as typeof request; } catch { return null; }
-  if (!request.sound) return null;
+  request = JSON.parse(job.request) as MusicJob["request"];
   let source = allowedSources(person).find((candidate) => candidate.id === madeSourceId(person.id) && candidate.kind === "root");
   if (!source) {
     const sourceId = madeSourceId(person.id), now = new Date().toISOString();
@@ -1084,6 +1090,16 @@ export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaIt
 }
 
 export function savedMadeSounds(person: PersonRow) {
+  // Backfill older completed sounds on the person's first Sounds read. Temporary jobs live only in memory and never enter this query.
+  const finished = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.state, "done"))).orderBy(desc(musicJobs.createdAt)).all();
+  for (const row of finished) {
+    if (!row.fileId) continue;
+    let job: MusicJob;
+    try { job = { ...row, request: JSON.parse(row.request) as MusicJob["request"], task: row.task as MusicJob["task"], state: row.state as MusicJob["state"], temporary: false }; }
+    catch { continue; }
+    if (!job.request.sound || job.task === "stems" || musicJobLockState(job, person) !== "open") continue;
+    promoteMadeSoundFile(person, row.fileId);
+  }
   const roots = allowedSources(person).filter((source) => source.kind === "root");
   if (!roots.length) return [];
   return db.select().from(mediaItems).where(and(isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), eq(mediaItems.kind, "sound"), inArray(mediaItems.sourceId, roots.map((source) => source.id)), inArray(mediaItems.bandOk, allowedBandsFor(person))))
@@ -1091,6 +1107,12 @@ export function savedMadeSounds(person: PersonRow) {
       const item = readableItem(person, row.id);
       if (!item || item.kind !== "sound" || !item.location.file_id) return [];
       const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, item.location.file_id)).get();
+      if (job) {
+        try {
+          const musicJob = { ...job, request: JSON.parse(job.request) as MusicJob["request"], task: job.task as MusicJob["task"], state: job.state as MusicJob["state"], temporary: false };
+          if (musicJobLockState(musicJob, person) !== "open") return [];
+        } catch { return []; }
+      }
       let loop = false;
       try { const sound = (JSON.parse(job?.request ?? "{}") as { sound?: { loop?: boolean; looped?: boolean } }).sound; loop = !!sound?.loop && sound.looped !== false; } catch { /* malformed job has no loop flag */ }
       return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, job_id: job?.id ?? null, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop }];
@@ -1309,6 +1331,10 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     return params.scope === "creation-people" ? musicCreationPeople(person, params.id) : musicCreation(person, params.id);
   }
   if (dataId === "songs" && params.scope === "made") return madeFiles(person, "audio").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
+  if (dataId === "sounds" && params.scope === "library") return savedMadeSounds(person).map((sound) => {
+    const loop = sound.loop;
+    return { id: sound.id, title: sound.title, channel: loop ? "Loop" : "Sound effect", summary: "", kind: "sound", thumbnail: null, backdrop: null, duration_s: sound.duration_s, copy_label: "Saved", playing: sound.id === queueCurrent(person) };
+  }).filter((row) => readableIn(person, "audio", row.id) !== null);
   if (dataId === "songs" && params.scope === "top") return topResult(person, params.query);
   if (dataId === "songs" && params.scope === "categories") return categoryRows(person);
   if (dataId === "history" && params.scope === "quick") return quickAlbums(person, 6);
@@ -1420,7 +1446,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     const tracks = groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? [];
     return [...groupTracks(tracks, "album")].map(([id, group]) => albumTile(person, id, group)).sort((a, b) => a.title.localeCompare(b.title));
   }
-  if (dataId === "radio-seeds") {
+  if (dataId === "radio-seeds" || (dataId === "radio" && params.scope === "seeds")) {
     if (noDiscovery(person)) return [];
     return [...groupTracks(musicLibrary(person), "artist")].map(([, tracks]) => ({ ...rowsOf(person, [tracks.find((item) => item.artwork) ?? tracks[0]!])[0]!, id: tracks[0]!.id, title: `${artistKey(tracks[0]!)} radio`, channel: null, kind: "track", queue_mode: "radio", radio_seed: tracks[0]!.id }));
   }
@@ -1495,14 +1521,17 @@ export function startMusicQueue(person: PersonRow, args: Record<string, unknown>
     const collection = playlistFor(person, id)?.collection;
     if (collection) tracks = playlistTracks(person, collection);
   } else {
-    const item = library.find((item) => item.id === id) ?? (id ? promoteMadeMusicFile(person, id) : null);
+    const item = readableIn(person, "audio", id) ?? library.find((item) => item.id === id) ?? (id ? promoteMadeMusicFile(person, id) : null);
     if (item) {
+      if (item.kind === "sound") tracks = [item];
+      else {
       const current = resolveCollection(person.id, "queue")!;
       const index = current.items.findIndex((entry) => entry.media_id === item.id);
       if (index >= 0) { setPointer(current, index); return { ok: true, value: { id: item.id } }; }
       const currentLibrary = library.some((candidate) => candidate.id === item.id) ? library : [...library, item];
       tracks = albumOrder(currentLibrary.filter((candidate) => albumKey(candidate) === albumKey(item)));
       tracks = tracks.slice(tracks.findIndex((candidate) => candidate.id === item.id));
+      }
     }
   }
   if (shuffle) tracks = shuffled(tracks);

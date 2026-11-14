@@ -332,6 +332,10 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (stopped(job)) return;
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
+  if (job.request.sound && !job.temporary && job.fileId && musicJobLockState(job, actor) === "open") {
+    const { promoteMadeSoundFile } = await import("@/lib/media/appHost");
+    promoteMadeSoundFile(actor, job.fileId);
+  }
   if (job.request.sound) void startNextSoundTake(job, actor).catch(() => {});
   else if (job.request.takes) void startNextSongTake(job, actor).catch(() => {});
   if (!job.request.sound) {

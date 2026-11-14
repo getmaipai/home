@@ -6,14 +6,14 @@ import { __setMusicStatusForTests, __setSoundStatusForTests, readyMusicStatusFor
 import { __setMusicFetchForTests, cancelOrDeleteSound, fetchSound, getSoundJob, soundStatus, submitSound } from "./stack";
 import { KNOWN_MUSIC_MODELS, modelStampFor } from "./models";
 import { getMusicJobFor } from "./jobs";
-import { attachments } from "@/db/schema";
+import { attachments, mediaItems } from "@/db/schema";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { writeFileSync } from "node:fs";
 import { toRecord } from "@/lib/attachments";
 import { musicForOutcomes, musicStartIsSound } from "../composer";
 import { makeSoundArgs, runMakeSound } from "./soundMaker";
-import { generationOf } from "./types";
+import { generationOf, MUSIC_NOTE } from "./types";
 import { runGenerateMusic } from "./tool";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import { musicCardView, musicStageIndex, musicStageLabel } from "@/routes/music";
@@ -22,13 +22,14 @@ import { addSoundToSong, soundTakesOf } from "./soundTakes";
 import { __setMusicMixRunnerForTests, __setMusicMixToolsForTests } from "./mixParts";
 import { wavOfPcm } from "./soundAudio";
 import { readMusicFile } from "./jobs";
+import { mediaAppData, startMusicQueue } from "@/lib/media/appHost";
 import type { PersonRow } from "@/types";
 
 let people: ReturnType<typeof createBenchPeople>;
 let fake: ReturnType<typeof installFakeMusicStack>;
 beforeEach(() => { resetDb(); people = createBenchPeople(); fake = installFakeMusicStack(); });
 afterEach(() => { fake.restore(); __setMusicStatusForTests(undefined); __setMusicMixRunnerForTests(null); __setMusicMixToolsForTests(null); });
-const input = (actor: PersonRow, args: Record<string, unknown>) => runMakeSound({ state: musicState(actor), args, callId: "s", spoken: false });
+const input = (actor: PersonRow, args: Record<string, unknown>, temporary = false) => runMakeSound({ state: musicState(actor, temporary), args, callId: "s", spoken: false });
 
 describe("make_sound", () => {
   test("validates the bounded sound arguments", () => {
@@ -103,6 +104,41 @@ describe("make_sound", () => {
     expect(file && toRecord(file).provenance.package_id).toBe("make_sound");
     expect(job.coverJobId).toBeNull(); expect(job.coverFileId).toBeNull(); expect(job.timedWords).toBeNull();
     expect(fake.align.submitted).toHaveLength(0);
+    const sounds = mediaAppData(people.owner, "audio", "sounds", { scope: "library" }) as unknown as Array<Record<string, unknown>>;
+    expect(sounds).toHaveLength(1);
+    expect(sounds[0]).toMatchObject({ channel: "Sound effect", kind: "sound", thumbnail: null });
+    expect(String(sounds[0]!.id)).toEqual(db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId!)).get()!.id);
+    expect(mediaAppData(people.child, "audio", "sounds", { scope: "library" })).toEqual([]);
+    expect(startMusicQueue(people.owner, { id: String(sounds[0]!.id) }).ok).toBe(true);
+    expect(mediaAppData(people.owner, "audio", "item", { id: String(sounds[0]!.id) })).toMatchObject({ kind: "sound" });
+    expect((mediaAppData(people.owner, "audio", "sounds", { scope: "library" }) as unknown as Array<Record<string, unknown>>)[0]).toMatchObject({ playing: true });
+    mediaAppData(people.owner, "audio", "sounds", { scope: "library" });
+    expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId!)).all()).toHaveLength(1);
+  });
+  test("a Sounds read backfills an older finished sound job", async () => {
+    const out = await input(people.owner, { description: "a desk knock" });
+    const id = musicForOutcomes([out])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const job = getMusicJobFor(people.owner, id)!;
+    db.delete(mediaItems).where(eq(mediaItems.locFileId, job.fileId!)).run();
+    const sounds = mediaAppData(people.owner, "audio", "sounds", { scope: "library" }) as Array<{ id: string }>;
+    expect(sounds).toHaveLength(1);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, job.fileId!)).all()).toHaveLength(1);
+  });
+  test("temporary sounds and locked sounds are not promoted or listed", async () => {
+    const temporary = await input(people.owner, { description: "a private temporary sound" }, true);
+    const temporaryId = musicForOutcomes([temporary])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, temporaryId)?.state === "done");
+    expect(mediaAppData(people.owner, "audio", "sounds", { scope: "library" })).toEqual([]);
+
+    const locked = await input(people.owner, { description: "an adult locked sound" });
+    const lockedId = musicForOutcomes([locked])!.id;
+    const lockedJob = getMusicJobFor(people.owner, lockedId)!;
+    await waitForMusic(() => getMusicJobFor(people.owner, lockedId)?.state === "done");
+    db.delete(mediaItems).where(eq(mediaItems.locFileId, lockedJob.fileId!)).run();
+    db.update(attachments).set({ provenance: `${MUSIC_NOTE}${JSON.stringify({ kind: "sound", audience: "adult-only", made_audience: "adult-only", lock: "on" })}` }).where(eq(attachments.id, lockedJob.fileId!)).run();
+    expect(mediaAppData(people.owner, "audio", "sounds", { scope: "library" })).toEqual([]);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, lockedJob.fileId!)).all()).toHaveLength(0);
   });
   test("takes are limited to 1 to 3", () => {
     expect(makeSoundArgs.safeParse({ description: "a door knock", takes: 3 }).success).toBe(true);

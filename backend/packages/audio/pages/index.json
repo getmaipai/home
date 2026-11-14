@@ -392,7 +392,8 @@
       "heading": "Radio from your music",
       "bind": {
         "source": "package",
-        "path": "radio-seeds"
+        "path": "radio",
+        "params": { "scope": "seeds" }
       },
       "item_key_field": "id",
       "item_label_field": "title",
