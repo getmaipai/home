@@ -29,7 +29,7 @@ import { HOUSE_TOOL_ID, houseToolSpec } from "@/lib/house/tool";
 import { UPTIME_TOOL_ID, uptimeToolSpec, visibleUptimeInstances } from "@/lib/uptime/tool";
 import { collapseSpaces, isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
-import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SOUND_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import type { Lane } from "@/lib/pictures/lane";
@@ -39,7 +39,7 @@ import { streamWatchdog, replyIsUncapped } from "../deadline";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import { classifyGenerationFailure, engineComputerAwayFromHome, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
-import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes, sourceNumberOffsets, researchEvidenceChars } from "@/lib/composer";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes, musicStartIsSound, sourceNumberOffsets, researchEvidenceChars } from "@/lib/composer";
 import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { planLineForTurnMachine } from "@/lib/register";
 import { repeatNotes } from "@/lib/echo";
@@ -1412,7 +1412,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // start, the person gets only the started line, however the model phrases its follow-up.
   if (attempt.heldBack && (!attempt.toolCalls || attempt.toolCalls.length === 0)) {
     if (musicForOutcomes(state.outcomes)) {
-      attempt = { ...attempt, text: MUSIC_STARTED_LINE };
+      attempt = { ...attempt, text: musicStartIsSound(state.outcomes) ? SOUND_STARTED_LINE : MUSIC_STARTED_LINE };
     } else if (claimsMedia(attempt.text)) {
       let second: GenerationResult | undefined;
       if (mediaOffered && !signal.aborted) {

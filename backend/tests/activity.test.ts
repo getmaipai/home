@@ -66,6 +66,15 @@ describe("ACTIVITY-PAGE-01: the list", () => {
     expect(activityForViewer(childRow).items).toHaveLength(3);
   });
 
+  test("a running sound effect row tells the progress strip it is a sound; a song row does not", async () => {
+    const { ownerRow } = await household();
+    song("own-sound", ownerRow.id, { request: JSON.stringify({ description: "rain on a tin roof", sound: { loop: false, surprise: false }, instrumental: true, seconds: 5 }) });
+    song("own-song", ownerRow.id);
+    const rows = activeGenerationRows(ownerRow) as Array<{ id: string; provenance?: { sound?: boolean } }>;
+    expect(rows.find((row) => row.id === "song:own-sound")?.provenance?.sound).toBe(true);
+    expect(rows.find((row) => row.id === "song:own-song")?.provenance).toBeUndefined();
+  });
+
   test("a child sees the child-safe label and line, never the prompt", async () => {
     const { childRow } = await household();
     picture("c1", childRow.id, { prompt: "a dragon eating a school" });

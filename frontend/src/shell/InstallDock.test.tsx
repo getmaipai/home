@@ -133,6 +133,10 @@ describe("InstallDock", () => {
 
 describe("InstallDock making jobs", () => {
   const making: HomeJobView = { id: "v1", kind: "video", state: "running", title: "A dog on a beach", progress: { percent: 40 } };
+  test("a running sound effect says sound, a song says song", () => {
+    expect(buildDock(null, [{ id: "song:a", kind: "song", state: "running", title: "Rain", progress: { percent: 10 }, provenance: { sound: true } }]).primary?.label).toBe("Making a sound");
+    expect(buildDock(null, [{ id: "song:b", kind: "song", state: "running", title: "Tune", progress: { percent: 10 } }]).primary?.label).toBe("Making a song");
+  });
   test("a running video shows with its percent when nothing is installing, and links to its app", () => {
     const model = buildDock(null, [making]);
     expect(model.primary?.label).toBe("Making a video");

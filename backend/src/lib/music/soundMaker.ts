@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";
 import { outcomeOf } from "@/lib/turnContext";
-import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
+import { SOUND_STARTED_LINE } from "@/lib/mediaClaims";
 import { musicAudienceOf, musicRefusalFor, REFUSED_PREFIX, type MusicToolInput } from "./tool";
 import { musicEngineStatus, musicStatusReady, soundEngineStatus, soundStatusReady } from "./ready";
 import { plainMusicFailure, startMusicJob } from "./jobs";
@@ -31,7 +31,7 @@ async function startSfx(input: MusicToolInput, data: z.infer<typeof makeSoundArg
     const job = await startMusicJob({ actor: state.actor as PersonRow, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null,
       temporary: state.temporary === true || state.ephemeral === true, task: "text2music", request, body, parentFileId: null });
     return outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
-      result: { reply: { text: `${MUSIC_STARTED_LINE} ${takes > 1 ? `${takes} takes of a sound effect or ambience are being made one after another and will show below as each finishes.` : "A sound effect or ambience is being made and will show below when it's finished."} Reply briefly that it has started; do not say it is ready, done or finished.` }, data: { musicJobId: job.id }, actions: [] } });
+      result: { reply: { text: `${SOUND_STARTED_LINE} ${takes > 1 ? `${takes} takes of a sound effect or ambience are being made one after another and will show below as each finishes.` : "A sound effect or ambience is being made and will show below when it's finished."} Reply briefly that it has started; do not say it is ready, done or finished.` }, data: { musicJobId: job.id }, actions: [] } });
   } catch (error) {
     const code = error instanceof StackMusicError ? error.code : "failed";
     const failed = (kind: "bad_arguments" | "unavailable" | "errored") => outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: code, failureKind: kind, durationMs: 0 });
@@ -73,7 +73,7 @@ export async function runMakeSound(input: MusicToolInput): Promise<ToolExecution
       temporary: state.temporary === true || state.ephemeral === true, task: "text2music", request, body, parentFileId: null });
     const minimumNote = asked !== undefined && asked < minimum ? " The music model cannot make less than its minimum length, so the sound is made at the minimum length and then cut to the length asked." : "";
     return outcomeOf({ callId, packageId: MAKE_SOUND_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
-      result: { reply: { text: `${MUSIC_STARTED_LINE} ${takes > 1 ? `${takes} takes of a sound effect or ambience are being made one after another and will show below as each finishes.` : "A sound effect or ambience is being made and will show below when it's finished."} Reply briefly that it has started; do not say it is ready, done or finished.${minimumNote}` }, data: { musicJobId: job.id }, actions: [] } });
+      result: { reply: { text: `${SOUND_STARTED_LINE} ${takes > 1 ? `${takes} takes of a sound effect or ambience are being made one after another and will show below as each finishes.` : "A sound effect or ambience is being made and will show below when it's finished."} Reply briefly that it has started; do not say it is ready, done or finished.${minimumNote}` }, data: { musicJobId: job.id }, actions: [] } });
   } catch (error) {
     const code = error instanceof StackMusicError ? error.code : "failed";
     if (code === "already_making") return refused(plainMusicFailure(code), code);

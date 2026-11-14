@@ -12,7 +12,7 @@ import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { engineComputerAwayFromHome, failureLine, type FailureKind } from "@/lib/generationFailure";
-import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
+import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes, musicForOutcomes, musicStartIsSound } from "@/lib/composer";
 import { PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { startAnswerImages } from "@/lib/answerImages/turn";
@@ -232,7 +232,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // stream ended while the job began). "Something went wrong while writing that" would be false and would make
       // the person ask again, so a second job; the job is real and its card is coming, so say that.
       if (pictureForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: PICTURE_STARTED_LINE, sources: [] } };
-      if (musicForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: "Your song is being made. It will show up right below when it is ready.", sources: [] } };
+      if (musicForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: musicStartIsSound(state.outcomes) ? "Your sound is being made. It will show up right below when it is ready." : "Your song is being made. It will show up right below when it is ready.", sources: [] } };
       if (videoForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: VIDEO_STARTED_LINE, sources: [] } };
       // THIN-DL-02: the line follows the failure kind (generationFailure.ts),
       // never the generic apology.

@@ -771,6 +771,16 @@ export function musicForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { i
   return null;
 }
 
+/** True when the music start of this turn was a sound effect: the call was make_sound, or generate_music with kind sound (the hub runs both as make_sound). */
+export function musicStartIsSound(outcomes: readonly ToolExecutionOutcome[]): boolean {
+  for (const outcome of outcomes) {
+    if (outcome.status !== "succeeded" || (outcome.packageId !== "generate_music" && outcome.packageId !== "make_sound" && outcome.packageId !== "edit_music" && outcome.packageId !== "make_band" && outcome.packageId !== "make_album")) continue;
+    const id = recordData(outcome.result?.data)?.musicJobId;
+    if (typeof id === "string" && id) return outcome.packageId === "make_sound" || (outcome.packageId === "generate_music" && outcome.args?.kind === "sound");
+  }
+  return false;
+}
+
 export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {
     if (outcome.status !== "succeeded" || (outcome.packageId !== "generate_video" && outcome.packageId !== "edit_video" && outcome.packageId !== "make_reference_video")) continue;

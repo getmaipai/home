@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { writeFileSync } from "node:fs";
 import { toRecord } from "@/lib/attachments";
-import { musicForOutcomes } from "../composer";
+import { musicForOutcomes, musicStartIsSound } from "../composer";
 import { makeSoundArgs, runMakeSound } from "./soundMaker";
 import { generationOf } from "./types";
 import { runGenerateMusic } from "./tool";
@@ -43,7 +43,8 @@ describe("make_sound", () => {
     const job = getMusicJobFor(people.owner, jobId)!;
     expect(job.request).toMatchObject({ instrumental: true, lyrics: "[Instrumental]", seconds: 10, quality: "quick", sound: { loop: true, surprise: true } });
     expect(job.request.description).toBe("sound effect, no melody, no singing: rain on a window, seamless loop");
-    expect(out.result?.reply?.text).toContain("started");
+    expect(out.result?.reply?.text).toStartWith("I've started your sound. It will show below when it's finished.");
+    expect(out.result?.reply?.text).not.toContain("your song");
     expect(out.result?.reply?.text).toContain("minimum length");
     expect(fake.submitted[0]).toMatchObject({ task: "text2music", duration_s: 10 });
   });
@@ -54,6 +55,8 @@ describe("make_sound", () => {
     const out = output.outcomes[0]!;
     expect(out.status).toBe("succeeded");
     expect(out.packageId).toBe("make_sound");
+    expect(out.result?.reply?.text).toStartWith("I've started your sound.");
+    expect(musicStartIsSound([out])).toBe(true);
     const job = getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!;
     expect(job.request).toMatchObject({ instrumental: true, sound: { engine: "sfx", loop: true } });
     expect(job.request.seconds).toBe(4);

@@ -56,7 +56,7 @@ function makingHref(row: HomeJobView): string | null {
 }
 
 function makingItem(row: HomeJobView): DockItem {
-  const what = MAKING_WORDS[row.kind] ?? "something";
+  const what = row.kind === "song" && row.provenance?.sound === true ? "a sound" : MAKING_WORDS[row.kind] ?? "something";
   const raw = row.progress && typeof row.progress.percent === "number" ? row.progress.percent : null;
   const percent = raw === null ? null : Math.max(0, Math.min(100, Math.round(raw <= 1 && raw > 0 ? raw * 100 : raw)));
   const label = row.state === "queued" ? i18n._({ id: "Waiting to make {what}", message: "Waiting to make {what}", values: { what } }) : i18n._({ id: "Making {what}", message: "Making {what}", values: { what } });
