@@ -39,6 +39,8 @@ process.env.MAIPAI_IMGQ09_REASK ??= "0";
 // The focal-crop model is a 20 MB download the first time a picture is framed; a test run must never fetch it (it also lands in the
 // shared vision folder, which the storage tests count). Framing falls back to the centre, as when the model is not installed.
 process.env.MAIPAI_FOCAL_DOWNLOAD ??= "0";
+// Song naming asks Shazam over the network; a test run must never reach it (a test that injects its own fetch still can).
+process.env.MAIPAI_SHAZAM_OFFLINE ??= "1";
 
 let defaultScriptedStack: StackFixture;
 

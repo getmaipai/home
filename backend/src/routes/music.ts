@@ -52,7 +52,7 @@ import { writeSongLyrics } from "@/lib/music/lyricsWriter";
 import { MAX_CLIP_BYTES, MAX_CLIP_SECONDS, deviceGate, identifySong, type IdentifyOutcome } from "@/lib/music/identify";
 import { recordIdentifyOutcome } from "@/lib/music/identifyLast";
 import { resolveListen } from "@/lib/music/listenRequests";
-import { noteHeardSong } from "@/lib/music/heardSong";
+import { addHeardCandidates, noteHeardSong } from "@/lib/music/heardSong";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -678,7 +678,7 @@ function findOwnedSong(actor: PersonRow, fileId: string): MusicJob | null {
 // MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): "what song is this?" for every surface. The clip is read in memory, never stored.
 const identifyOutcomeSchema = z.object({
   status: z.enum(["matched", "no_match", "needs_confirm", "not_ready", "failed", "rate_limited"]),
-  result: z.object({ title: z.string(), artist: z.string(), album: z.string().nullable(), musicbrainz_recording_id: z.string().nullable(), musicbrainz_artist_id: z.string().nullable(), musicbrainz_release_group_id: z.string().nullable(), score: z.number(), source: z.enum(["library", "acoustid"]) }).optional(),
+  result: z.object({ title: z.string(), artist: z.string(), album: z.string().nullable(), year: z.number().nullable(), musicbrainz_recording_id: z.string().nullable(), musicbrainz_artist_id: z.string().nullable(), musicbrainz_release_group_id: z.string().nullable(), score: z.number(), source: z.enum(["library", "shazam", "acoustid"]) }).optional(),
   reason: z.string().optional().describe("Why nothing was named: for not_ready the readiness state, for failed the cause."),
   line: z.string().optional().describe("For not_ready: the one sentence that says where to act."),
   retry_after_s: z.number().optional().describe("For rate_limited: seconds until another clip is taken."),
@@ -699,7 +699,7 @@ musicRoutes.openapi(identifyRoute, async (c) => {
   const query = c.req.valid("query");
   const deviceId = c.get("deviceId") ?? null;
   const source = deviceId ? "robot" as const : "person" as const;
-  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "acoustid" } = {}) => {
+  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "shazam" | "acoustid" } = {}) => {
     const at = Date.now();
     recordIdentifyOutcome({ at, deviceId, status: status as IdentifyOutcome["status"] | "bad_input", reason, seconds: clipSeconds, source, ...extra });
     console.info(`[music-identify] device=${deviceId ?? "person"} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` source=${extra.matchSource}` : ""}`);
@@ -723,12 +723,19 @@ musicRoutes.openapi(identifyRoute, async (c) => {
     if (deviceId && requestId) resolveListen(deviceId, requestId, limited);
     return c.json(limited, 200, NO_STORE) as never;
   }
-  const outcome = await identifySong({ bytes, kind }, { confirmed: query.confirmed === "1" });
+  let heardNoted = false;
+  let earlyCandidates: Parameters<typeof addHeardCandidates>[1] | null = null;
+  const outcome = await identifySong({ bytes, kind }, { confirmed: query.confirmed === "1", onCandidates: (candidates) => {
+    if (!deviceId) return;
+    if (heardNoted) addHeardCandidates(deviceId, candidates); else earlyCandidates = candidates;
+  } });
   const resultSeconds = clipSeconds;
   finish(outcome.status, "reason" in outcome ? outcome.reason : null, resultSeconds, outcome.status === "matched" ? { title: outcome.result.title, artist: outcome.result.artist, matchSource: outcome.result.source } : {});
   if (deviceId) {
     if (outcome.status === "matched") {
-      noteHeardSong(deviceId, { title: outcome.result.title, artist: outcome.result.artist || undefined, album: outcome.result.album || undefined, source: outcome.result.source, at: Date.now() });
+      noteHeardSong(deviceId, { title: outcome.result.title, artist: outcome.result.artist || undefined, album: outcome.result.album || undefined, year: outcome.result.year ?? undefined, source: outcome.result.source, score: outcome.result.score, at: Date.now() });
+      heardNoted = true;
+      if (earlyCandidates) addHeardCandidates(deviceId, earlyCandidates);
     }
     if (requestId) resolveListen(deviceId, requestId, outcome);
   }

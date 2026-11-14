@@ -21,6 +21,7 @@ import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs, runTimeCriticalJobs } from "@/lib/scheduler";
+import { kickFingerprintPass, watchForFpcalc } from "@/lib/music/fingerprintStore";
 import { registerScheduleReconcile, registerScheduleRecheck } from "@/lib/schedules/reconcile";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
 import { reverifyStoredLists } from "@/lib/blocklists/listStore";
@@ -150,6 +151,9 @@ sweepDownloads();
 setInterval(sweepDownloads, 60 * 60 * 1000).unref();
 await recordBootGap();
 void recordStatusSample();
+watchForFpcalc();
+setTimeout(() => { void kickFingerprintPass(); }, 90_000).unref();
+setInterval(() => { void kickFingerprintPass(); }, 60 * 60 * 1000).unref();
 
 // COR-8 (code review, 2026-09-06): activeJob (lib/modelDownloadJobs.ts)
 // is in-memory only and always starts null on a fresh process - a crash

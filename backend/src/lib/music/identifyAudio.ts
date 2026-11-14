@@ -1,11 +1,11 @@
 // MUSIC-ID-01: the two outside programs song identification uses, each behind one small function so tests inject a fake.
-// ffmpeg decodes the clip to 11025 Hz mono 16-bit PCM in memory (stdin and stdout pipes, nothing written to disk); Chromaprint's
+// ffmpeg decodes the clip to 16000 Hz mono 16-bit PCM in memory (stdin and stdout pipes, nothing written to disk); Chromaprint's
 // `fpcalc` turns PCM into a fingerprint (the same pipes). Rule 6: nothing here throws; a missing program or a failed run is a null.
 import { findFfmpeg } from "@/lib/ffmpegPath";
 import { findFpcalc } from "@/lib/fpcalcPath";
 export { findFpcalc } from "@/lib/fpcalcPath";
 
-export const IDENTIFY_RATE = 11025;
+export const IDENTIFY_RATE = 16000;
 /** A decoded clip: raw signed 16-bit little-endian mono samples at IDENTIFY_RATE. */
 export type DecodedClip = { pcm: Uint8Array; seconds: number };
 /** What the caller declares about the clip bytes: any container ffmpeg reads, or raw 16-bit PCM mono at a sample rate. */
@@ -15,7 +15,7 @@ export type Fingerprints = { raw: Uint32Array; compressed: string | null; second
 export type Decoder = (clip: Uint8Array, kind: ClipKind) => Promise<DecodedClip | null>;
 export type FingerprintRunner = (pcm: Uint8Array, want: { raw: boolean; compressed: boolean }) => Promise<{ raw: Uint32Array | null; compressed: string | null; seconds: number } | null>;
 
-/** ffmpeg arguments: read the clip from stdin (a declared raw PCM kind, or sniffed container), write 11025 Hz mono s16le to stdout. */
+/** ffmpeg arguments: read the clip from stdin (a declared raw PCM kind, or sniffed container), write 16000 Hz mono s16le to stdout. */
 export function decodeArgs(kind: ClipKind): string[] {
   const input = kind.kind === "pcm16" ? ["-f", "s16le", "-ar", String(kind.rate), "-ac", "1"] : [];
   return ["-hide_banner", "-loglevel", "error", "-nostdin", ...input, "-i", "pipe:0", "-vn", "-ac", "1", "-ar", String(IDENTIFY_RATE), "-f", "s16le", "pipe:1"];

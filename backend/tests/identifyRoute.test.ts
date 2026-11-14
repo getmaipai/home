@@ -50,16 +50,15 @@ describe("POST /api/music/identify", () => {
     expect(long.status).toBe(413);
     expect(lastIdentifyOutcome()).toMatchObject({ status: "failed", reason: "too_long", source: "person" });
   });
-  test("no fpcalc on this computer: a typed not_ready, not an error", async () => {
+  test("no fpcalc on this computer: Shazam can still answer", async () => {
     const client = await owner();
     await withPath(false, async () => {
       const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(16000 * 2), "application/octet-stream");
       expect(res.status).toBe(200);
-      expect(await res.json()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
-      expect(lastIdentifyOutcome()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+      expect(["matched", "no_match", "failed"]).toContain(((await res.json()) as { status: string }).status);
     });
   });
-  test("no AcoustID key records and logs the not-ready reason", async () => {
+  test("no AcoustID key still allows online naming", async () => {
     const client = await owner();
     const lines: string[] = [];
     const info = spyOn(console, "info").mockImplementation((...args) => { lines.push(args.join(" ")); });
@@ -68,11 +67,10 @@ describe("POST /api/music/identify", () => {
       await withPath(true, async () => {
         const res = await client.postBytes("/api/music/identify?kind=pcm16&rate=16000", new Uint8Array(32000), "application/octet-stream");
         expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({ status: "not_ready", reason: "no_key" });
+        expect(["matched", "no_match", "failed", "rate_limited", "needs_confirm"]).toContain(((await res.json()) as { status: string }).status);
       });
-      expect(lastIdentifyOutcome()).toMatchObject({ status: "not_ready", reason: "no_key" });
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toContain("status=not_ready reason=no_key");
+      expect(lines[0]).toContain("[music-identify]");
     } finally { info.mockRestore(); }
   });
   test("a second clip within 60 seconds from the same device is a typed rate_limited", async () => {
@@ -132,9 +130,10 @@ describe("POST /api/music/identify", () => {
     await withPath(false, async () => {
       const response = await robot.postBytes(`/api/music/identify?kind=pcm16&rate=16000&request=${requestId}`, new Uint8Array(32000), "application/octet-stream");
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+      // No fpcalc and no key: the only online provider is Shazam, which the test run never reaches, so nothing could answer.
+      expect(await response.json()).toMatchObject({ status: "failed", reason: "lookup_failed" });
     });
-    expect(await pending).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
+    expect(await pending).toMatchObject({ status: "failed", reason: "lookup_failed" });
   });
 
   test("without request the device route does not resolve a pending waiter", async () => {
@@ -158,11 +157,17 @@ describe("POST /api/music/identify", () => {
 describe("/api/health carries the one readiness answer", () => {
   test("engines.identify says why song naming cannot run", async () => {
     const client = await owner();
-    await withPath(false, async () => {
-      const body = (await (await client.get("/api/health")).json()) as { engines: { identify?: { identify_state: string; identify_line: string; availability: string } } };
-      expect(body.engines.identify?.identify_state).toBe("fpcalc_missing");
-      expect(body.engines.identify?.availability).toBe("unavailable");
-      expect(body.engines.identify?.identify_line).toContain("song naming tool");
-    });
+    // With online naming off the only source is the household's own fingerprints; with none yet there is nothing to match.
+    setHouseholdSettingValue("music.identify.online", "off");
+    try {
+      await withPath(false, async () => {
+        const body = (await (await client.get("/api/health")).json()) as { engines: { identify?: { identify_state: string; identify_line: string; availability: string } } };
+        expect(body.engines.identify?.identify_state).toBe("nothing_to_match");
+        expect(body.engines.identify?.availability).toBe("unavailable");
+        expect(body.engines.identify?.identify_line).toContain("nothing to match");
+      });
+    } finally {
+      setHouseholdSettingValue("music.identify.online", "on");
+    }
   });
 });

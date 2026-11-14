@@ -15,6 +15,13 @@ export function libraryFingerprintCount(): number {
   return db.select({ n: sql<number>`count(*)` }).from(musicFingerprints).where(sql`${musicFingerprints.fingerprint} <> ''`).get()?.n ?? 0;
 }
 
+export function libraryFingerprintProgress(): { done: number; total: number; running: boolean } {
+  const eligible = and(eq(mediaItems.kind, "track"), isNull(mediaItems.deletedAt), eq(mediaSources.kind, "root"), sql`${mediaItems.locRootId} IS NOT NULL AND ${mediaItems.locPath} IS NOT NULL`, sql`${mediaItems.provenance} <> 'music:generated-library'`, sql`${mediaItems.sourceId} NOT LIKE 'msrc-made%'`);
+  const total = db.select({ n: sql<number>`count(*)` }).from(mediaItems).innerJoin(mediaSources, eq(mediaSources.id, mediaItems.sourceId)).where(eligible).get()?.n ?? 0;
+  const done = db.select({ n: sql<number>`count(*)` }).from(musicFingerprints).innerJoin(mediaItems, eq(mediaItems.id, musicFingerprints.itemId)).innerJoin(mediaSources, eq(mediaSources.id, mediaItems.sourceId)).where(and(eligible, sql`${musicFingerprints.fileKey} = coalesce(${mediaItems.fingerprint}, '')`)).get()?.n ?? 0;
+  return { done, total, running: running !== null };
+}
+
 // Decoded fingerprints are kept in memory between calls and rebuilt when the stored count or newest write changes.
 let memo: { stamp: string; rows: LibraryFingerprint[] } | null = null;
 /** Every usable library fingerprint with the song it belongs to. Trashed and hidden songs are left out. */
@@ -28,7 +35,7 @@ export function loadLibraryFingerprints(): LibraryFingerprint[] {
     recordingId: mediaItems.musicbrainzRecordingId, artistId: mediaItems.musicbrainzArtistId, releaseGroupId: mediaItems.musicbrainzReleaseGroupId,
     fingerprint: musicFingerprints.fingerprint,
   }).from(musicFingerprints).innerJoin(mediaItems, eq(mediaItems.id, musicFingerprints.itemId))
-    .where(and(sql`${musicFingerprints.fingerprint} <> ''`, eq(mediaItems.kind, "track"), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false))).all()
+    .where(and(sql`${musicFingerprints.fingerprint} <> ''`, eq(mediaItems.kind, "track"), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), sql`${mediaItems.provenance} <> 'music:generated-library'`, sql`${mediaItems.sourceId} NOT LIKE 'msrc-made%'`)).all()
     .map((row) => ({ itemId: row.itemId, title: row.title, artist: row.artist ?? "", album: row.album, recordingId: row.recordingId, artistId: row.artistId, releaseGroupId: row.releaseGroupId, raw: unpackRaw(row.fingerprint) }));
   memo = { stamp: key, rows };
   return rows;
@@ -40,9 +47,11 @@ export interface FingerprintPassDeps {
   hasFpcalc?: () => boolean;
   now?: () => number;
   budget?: number;
+  pause?: (ms: number) => Promise<void>;
 }
 export type FingerprintPassResult = { considered: number; stored: number; failed: number; skipped: boolean; ms: number };
 const PASS_BUDGET = 25;
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** One pass: library songs with no fingerprint (or whose file changed), one at a time. Never throws. */
 export async function runFingerprintPass(deps: FingerprintPassDeps = {}): Promise<FingerprintPassResult> {
@@ -64,6 +73,7 @@ export async function runFingerprintPass(deps: FingerprintPassDeps = {}): Promis
       ))
       .limit(deps.budget ?? PASS_BUDGET).all();
     for (const row of rows) {
+      if (!(deps.hasFpcalc ?? (() => findFpcalc() !== null))()) { result.skipped = true; break; }
       result.considered++;
       const abs = resolveUnderRoot(row.sourceId!, row.path!);
       let packed = "";
@@ -76,6 +86,7 @@ export async function runFingerprintPass(deps: FingerprintPassDeps = {}): Promis
       if (packed === "") result.failed++; else result.stored++;
       const values = { itemId: row.id, fingerprint: packed, fileKey: row.fileKey ?? "", createdAt: new Date(now()).toISOString() };
       db.insert(musicFingerprints).values(values).onConflictDoUpdate({ target: musicFingerprints.itemId, set: values }).run();
+      await (deps.pause ?? pause)(100);
     }
   } catch { /* best effort */ }
   result.ms = now() - started;
@@ -85,7 +96,19 @@ export async function runFingerprintPass(deps: FingerprintPassDeps = {}): Promis
 
 let running: Promise<FingerprintPassResult> | null = null;
 let again = false;
-/** Start a pass in the background (a request during a pass asks for one more after it). Never awaited by a scan. */
+let sawFpcalc = false;
+let watcher: ReturnType<typeof setInterval> | null = null;
+/** Kick a pass when fpcalc first becomes available after having been missing (an install finished). Started once by the server boot. */
+export function watchForFpcalc(): void {
+  if (watcher) return;
+  watcher = setInterval(() => {
+    const available = findFpcalc() !== null;
+    if (available && !sawFpcalc) void kickFingerprintPass();
+    sawFpcalc = available;
+  }, 30_000);
+  watcher.unref();
+}
+/** Start a background drain in 25-song batches. Never awaited by a scan. */
 export function kickFingerprintPass(deps: FingerprintPassDeps = {}): Promise<FingerprintPassResult> {
   if (process.env.MAIPAI_FINGERPRINT_NO_AUTOSTART === "1") return Promise.resolve({ considered: 0, stored: 0, failed: 0, skipped: true, ms: 0 });
   if (running) { again = true; return running; }
@@ -94,7 +117,7 @@ export function kickFingerprintPass(deps: FingerprintPassDeps = {}): Promise<Fin
     do {
       again = false;
       last = await runFingerprintPass(deps);
-    } while (again && last.considered > 0);
+    } while (!last.skipped && (last.considered >= (deps.budget ?? PASS_BUDGET) || again));
     return last;
   })().finally(() => { running = null; });
   running = run;

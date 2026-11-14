@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { __resetHeardSongsForTests, clearHeardSong, heardSongContextLine, heardSongFor, noteHeardSong } from "./heardSong";
+import { __resetHeardSongsForTests, addHeardCandidates, clearHeardSong, confirmHeardSong, findHeardCandidate, heardSongContextLine, heardSongFor, noteHeardSong, rejectHeardSong } from "./heardSong";
+import type { IdentifyCandidate } from "./identify";
+
+const candidate = (title: string, source: IdentifyCandidate["source"], score: number, agrees: boolean): IdentifyCandidate => ({ title, artist: "Artist", album: null, year: null, source, score, agrees });
 
 describe("heard song context", () => {
   test("expires after fifteen minutes and a newer note replaces the old one", () => {
@@ -22,5 +25,28 @@ describe("heard song context", () => {
     expect(line).toContain("Heard on this robot 3 min ago:");
     expect(line).toContain("named from your library");
     expect(line.length).toBeLessThan(300);
+  });
+  test("merges candidates, discusses disagreement and promotes on rejection", () => {
+    __resetHeardSongsForTests();
+    noteHeardSong("r", { title: "Alpha", artist: "Artist", source: "shazam", score: 0.8, at: 1 });
+    addHeardCandidates("r", [candidate("Alpha", "shazam", 0.8, true), candidate("Beta", "acoustid", 0.7, false)], 2);
+    const line = heardSongContextLine(heardSongFor("r", 2)!, 2);
+    expect(line).toContain("The other service heard it as Beta by Artist.");
+    expect(rejectHeardSong("r", 2)?.title).toBe("Beta");
+    expect(heardSongFor("r", 2)?.candidates?.find((c) => c.title === "Alpha")?.rejected).toBe(true);
+  });
+  test("suggestion lookup and confirmation settle the chosen song", () => {
+    __resetHeardSongsForTests();
+    noteHeardSong("r", { title: "Alpha", source: "shazam", at: 1 });
+    addHeardCandidates("r", [candidate("Alpha", "shazam", 0.8, true), candidate("Alpha", "acoustid", 0.7, true), candidate("Beta", "acoustid", 0.9, false)], 2);
+    expect(findHeardCandidate("r", "bet", 2)?.alsoSuggested).toBe(false);
+    expect(findHeardCandidate("r", "alph", 2)?.alsoSuggested).toBe(true);
+    expect(confirmHeardSong("r", "Beta", 2)).toMatchObject({ title: "Beta", settled: true });
+    expect(heardSongContextLine(heardSongFor("r", 2)!, 2)).toContain("The person confirmed it.");
+    expect(JSON.stringify(heardSongFor("r", 2))).not.toMatch(/audio|signature|fingerprint/i);
+  });
+  test("expires from the injected clock after fifteen minutes", () => {
+    __resetHeardSongsForTests(); noteHeardSong("r", { title: "A", source: "library", at: 500 });
+    expect(heardSongFor("r", 500 + 15 * 60_000)).toBeNull();
   });
 });

@@ -5,7 +5,24 @@ import { privacyConnections, platformConnections, pluginConnections, offlinePlug
 import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { listPackageIds, loadPackage } from "@/lib/plugins";
 import type { PrivacyConnection } from "@/wire";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { __resetSettingsCacheForTests, setHouseholdSettingValue } from "@/lib/settings";
+import { spyOn } from "bun:test";
+
+describe("Shazam privacy row", () => {
+  test("appears only while online naming and Shazam are enabled", async () => {
+    expect(platformConnections().some((c) => c.id === "platform:music-identify-shazam")).toBe(true);
+    const row = platformConnections().find((c) => c.id === "platform:music-identify-shazam")!;
+    expect(row.destination).toBe("amp.shazam.com"); expect(row.what).toContain("never audio");
+    setHouseholdSettingValue("music.identify.online", "off");
+    __resetSettingsCacheForTests();
+    expect(platformConnections().some((c) => c.id === "platform:music-identify-shazam")).toBe(false);
+    setHouseholdSettingValue("music.identify.online", "on");
+    __resetSettingsCacheForTests();
+    const switchSpy = spyOn(await import("@/lib/music/identify"), "shazamEnabled").mockReturnValue(false);
+    expect(platformConnections().some((c) => c.id === "platform:music-identify-shazam")).toBe(false);
+    switchSpy.mockRestore();
+  });
+});
 
 beforeEach(() => {
   resetDb();

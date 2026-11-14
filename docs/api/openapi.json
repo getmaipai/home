@@ -124186,6 +124186,10 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "year": {
+                          "type": "number",
+                          "nullable": true
+                        },
                         "musicbrainz_recording_id": {
                           "type": "string",
                           "nullable": true
@@ -124205,6 +124209,7 @@
                           "type": "string",
                           "enum": [
                             "library",
+                            "shazam",
                             "acoustid"
                           ]
                         }
@@ -124213,6 +124218,7 @@
                         "title",
                         "artist",
                         "album",
+                        "year",
                         "musicbrainz_recording_id",
                         "musicbrainz_artist_id",
                         "musicbrainz_release_group_id",

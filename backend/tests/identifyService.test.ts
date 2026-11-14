@@ -93,23 +93,22 @@ describe("the setting and readiness gates", () => {
     expect((await identifySong(clip(), opts({ mode: "ask", confirmed: true }))).status).toBe("matched");
     expect(requests).toHaveLength(1);
   });
-  test("no key: not_ready no_key and no request", async () => {
-    const out = await identifySong(clip(), opts({ key: null }));
-    expect(out).toMatchObject({ status: "not_ready", reason: "no_key" });
-    expect(requests).toHaveLength(0);
+  test("no key: Shazam remains available", async () => {
+    const out = await identifySong(clip(), opts({ key: null, shazam: async () => ({ kind: "ok", result: { title: "Quick", artist: "Artist", album: null, year: null, musicbrainz_recording_id: null, musicbrainz_artist_id: null, musicbrainz_release_group_id: null, score: 0.9, source: "shazam" } }) }));
+    expect(out.status).toBe("matched");
   });
   test("fpcalc missing: not_ready fpcalc_missing, and a runner that fails is failed", async () => {
-    expect(await identifySong(clip(), opts({ hasFpcalc: false }))).toMatchObject({ status: "not_ready", reason: "fpcalc_missing" });
-    expect(await identifySong(clip(), opts({ fingerprint: async () => null }))).toEqual({ status: "failed", reason: "fingerprint_failed" });
+    expect(await identifySong(clip(), opts({ hasFpcalc: false, shazamEnabled: false }))).toEqual({ status: "no_match" });
+    expect(await identifySong(clip(), opts({ fingerprint: async () => null, shazamEnabled: false }))).toMatchObject({ status: "failed" });
     expect(await identifySong(clip(), opts({ decode: async () => null }))).toEqual({ status: "failed", reason: "decode_failed" });
     expect(requests).toHaveLength(0);
   });
   test("readiness states", () => {
     const base = { key: SECRET_KEY, hasFpcalc: true, localCount: 0, mode: "on" as const };
     expect(identifyReadiness(base).state).toBe("ready");
-    expect(identifyReadiness({ ...base, key: null }).state).toBe("no_key");
+    expect(identifyReadiness({ ...base, key: null }).state).toBe("ready");
     expect(identifyReadiness({ ...base, key: null, localCount: 3 }).state).toBe("ready");
-    expect(identifyReadiness({ ...base, hasFpcalc: false }).state).toBe("fpcalc_missing");
+    expect(identifyReadiness({ ...base, hasFpcalc: false }).state).toBe("ready");
     expect(identifyReadiness({ ...base, mode: "off" }).state).toBe("nothing_to_match");
     expect(identifyReadiness({ ...base, mode: "off", localCount: 2 }).state).toBe("ready");
   });
@@ -181,7 +180,7 @@ describe("privacy", () => {
     await identifySong(clip(), opts({ log }));
     await identifySong(clip(), opts({ log, key: null }));
     const text = lines.join("\n");
-    expect(lines.length).toBe(3);
+    expect(lines.filter((line) => line.includes("status=")).length).toBe(3);
     for (const secret of [SECRET_TITLE, SECRET_ARTIST, SECRET_FP, SECRET_KEY, "Night Album"]) expect(text).not.toContain(secret);
     expect(text).toMatch(/status=matched/);
     expect(text).toMatch(/ms=\d+/);
@@ -193,7 +192,7 @@ describe("privacy", () => {
     expect(store.size).toBe(1);
     const [[key, value]] = [...store.entries()] as [[string, Record<string, unknown>]];
     expect(key).toMatch(/^[0-9a-f]{64}$/);
-    expect(Object.keys(value).sort()).toEqual(["album", "artist", "musicbrainz_artist_id", "musicbrainz_recording_id", "musicbrainz_release_group_id", "score", "source", "title"]);
+    expect(Object.keys(value).sort()).toEqual(["album", "artist", "musicbrainz_artist_id", "musicbrainz_recording_id", "musicbrainz_release_group_id", "score", "source", "title", "year"]);
     expect(JSON.stringify([...store.entries()])).not.toMatch(/person|device|user/i);
     expect(JSON.stringify([...store.entries()])).not.toContain(SECRET_FP);
   });

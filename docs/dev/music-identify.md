@@ -1,52 +1,45 @@
-# Music identification (MUSIC-ID-01)
+# Music identification (MUSIC-ID-01 and MUSIC-ID-05)
 
-Design: [docs/design/music-identify-2026-11-13.md](../design/music-identify-2026-11-13.md). One service, `identifySong` in
-`backend/src/lib/music/identify.ts`, used by every surface; the pure parts are in `identifyCore.ts`.
+Design: [the 2026-11-14 Shazam decision](../design/music-identify-shazam-2026-11-14.md). The service is `identifySong` in
+`backend/src/lib/music/identify.ts`; the pure AcoustID parts are in `identifyCore.ts`.
 
-## Flow
+## Providers and flow
 
-1. `POST /api/music/identify` takes the clip bytes (`?kind=pcm16&rate=16000` for raw 16-bit mono PCM, otherwise any container ffmpeg
-   reads; `?confirmed=1` after an `ask` confirm). More than 2 MB or 20 s is refused with a plain 413. A device that sent a clip in the
-   last 60 s gets a typed `rate_limited` result (200, not an error).
-2. `identifyAudio.ts` decodes to 11025 Hz mono PCM through ffmpeg pipes (nothing written to disk) and fingerprints with Chromaprint
-   `fpcalc` on stdin. `fpcalc` is a download listed in the installer, never vendored.
-3. Local first: the clip's raw fingerprint is compared with the library's (`music_fingerprints`, filled by `fingerprintStore.ts` after a
-   library scan, one file at a time, skipped without `fpcalc`). A clear match returns `source: "library"`.
-4. Otherwise, with `music.identify.online` = `on` (or `ask` and `confirmed`), one AcoustID request (fingerprint and length only,
-   3 per second, one in flight, 5 s timeout, one retry). `ask` returns `needs_confirm` and makes no request; `off` is local only.
+Home decodes clips to 16 kHz mono PCM through ffmpeg pipes. It first compares Chromaprint fingerprints against the household library.
+When `music.identify.online` is On, or Ask each time was confirmed, a local miss starts the enabled online providers together:
 
-Results are typed: `matched`, `no_match`, `needs_confirm`, `not_ready` (with `reason`), `failed` (with `reason`), `rate_limited`.
-Nothing throws. Logs carry counts and timings only (rule 6a); the cache (200 entries, memory, keyed by a hash of the fingerprint) never
-holds a person or a device.
+- Shazam receives a small peak signature made locally from the middle of the clip, plus its length. It does not receive audio.
+- AcoustID receives a Chromaprint fingerprint and length and names whole recordings from their start. It needs the optional household key.
 
-## Key and readiness
+The first real match returns immediately. Other providers keep running through the shared deadline and every answer is kept as a
+candidate. A candidate agreeing on normalized title and artist is marked as agreeing; a different answer remains available for the
+person to discuss. A failed provider does not block another provider. With the online setting Off, only a local library match runs.
+Shazam has a separate `music.identify.shazam` switch in the Home code; registering it in the user settings awaits the next shared spec
+pin because settings keys are spec-owned. The memory cache is keyed by a hash and stores only the result.
 
-The AcoustID key is the household secret `acoustid.client` (write-only, encrypted by the settings layer, like `search.brave_api_key`).
-`identifyReadiness()` reads the key, `fpcalc`, the library fingerprint count and the setting; `healthSnapshot.ts` serves it as
-`engines.identify` in `/api/health`. No client recomputes it.
+The signature encoder follows SongRec's reverse-engineered Shazam format. Attribution: SongRec by Marin Maillard and contributors,
+GPL-3.0; Home is AGPL-3.0, compatible under AGPL section 13. This is an independent implementation, not vendored code.
 
-## Seeing an attempt
+## Measurement
 
-Each identify request writes one `[music-identify]` console line with the device/person label, outcome, reason code, clip duration
-when known and elapsed time. A match also names whether it came from the local library or AcoustID. The line never includes audio,
-fingerprints, keys or song titles. Home keeps only the most recent outcome in memory; its plain-language summary appears under
-**Song naming** on Status and in Settings → Pictures, videos and music → Music. It clears when Home restarts.
+On a synthetic 10 second 8 kHz mu-law clip, decoded to 16 kHz and given added noise, the local fingerprint matched all 6 of 6 source
+songs. The matching local score ranged from 0.88 to 1.00; unrelated songs scored about 0.58. This is simulated degradation, not a real
+room measurement, and should not be read as a real-world recognition rate.
 
-## Robot chat tool (MUSIC-ID-02)
+## Robot discussion
 
-On a connected, unmuted robot turn the model may call `song_name` when it needs to identify music playing now. The tool is offered
-under the same age and surface policy as the scene tool, but only on that robot. The model chooses when to call it. Home issues a
-`listen_song` device command with a random request id and a short expiry. The robot records a short clip and posts it to
-`POST /api/music/identify?request=<id>`; the route resolves only a waiter belonging to that robot. The tool waits up to 22 seconds,
-then returns a plain result to the model. Failures stay tool results so the model can answer from what it knows.
+`heardSong.ts` keeps one current guess and provider candidates per robot in memory for 15 minutes. `song_name` supports `listen` (the
+default), `reject`, `suggest` with a title, and `confirm` with an optional title. Reject promotes the best remaining candidate;
+confirm settles the selected guess. A title update is sent through the `song_title` device command. The log line records provider names,
+outcomes and candidate counts, never titles, artists, signatures, fingerprints or keys.
 
-On a successful match from a robot, Home keeps only title, artist, album, source and match time in process memory, one recent song
-per robot for at most 15 minutes. Robot turns receive a short labelled context line during that window, so follow-up questions can
-refer to the song without another recording. Home keeps no clip or fingerprint for this context. The robot can decline a listen when
-muted, at night or already capturing; in that case the tool reports its ordinary failure result. The waiting request is memory only
-and times out if the robot does not post its response.
+## Reading logs
+
+`[music-identify]` is the route outcome: status, reason code, clip duration, elapsed time and (for a match) provider source. `[music]`
+identify lines show only status/source or provider outcome counts and timings. Provider labels are `library`, `shazam`, `acoustid`, or
+`cache`. No song text or identifying payload belongs in these lines.
 
 ## Tests
 
-`backend/tests/identifyCore.test.ts` (pure), `identifyService.test.ts` (fake `fpcalc`, injected decoder, fake AcoustID server),
-`identifyRoute.test.ts` and `identifyFingerprints.test.ts`. All offline.
+Signature and lookup tests use fixed local samples and fake fetch. `backend/tests/identifyProviders.test.ts` injects every provider;
+`identifyFingerprints.test.ts` exercises the library pass and progress. The request tests are offline.

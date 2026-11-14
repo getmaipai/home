@@ -380,7 +380,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     }
 
     if (tool === "song_name") {
-      const outcome = await runSongNameTool({ callId, deviceId: state.deviceId, surface: state.surface });
+      const outcome = await runSongNameTool({ callId, deviceId: state.deviceId, surface: state.surface, args: args as import("@/lib/songNameTool").SongNameArgs });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result.reply.text } });
       continue;

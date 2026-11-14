@@ -10,7 +10,7 @@ export const ACOUSTID_SETTINGS_KEYS: SettingsKey[] = [
     selector: "text",
     default: "",
     label: "AcoustID key (for naming songs online)",
-    help: "Optional. An application key from acoustid.org lets Home name songs that are not in your own library. Only a short audio fingerprint and the clip length are sent, never the recording. The key is stored encrypted and can't be read back. Clear it to name songs from your own library only.",
+    help: "Optional. AcoustID runs beside Shazam and names whole recordings from their start. An application key from acoustid.org lets Home use it as another song guess. Only a short audio fingerprint and the clip length are sent, never the recording. The key is stored encrypted and can't be read back.",
     level: "advanced",
     secret: true,
     lives_in: "household.media_lookups",

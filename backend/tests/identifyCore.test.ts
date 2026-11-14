@@ -10,6 +10,7 @@ const result = (over: Partial<IdentifyResult> = {}): IdentifyResult => ({
   title: "Song",
   artist: "Someone",
   album: null,
+  year: null,
   musicbrainz_recording_id: null,
   musicbrainz_artist_id: null,
   musicbrainz_release_group_id: null,
@@ -41,6 +42,7 @@ describe("parseAcoustId", () => {
       title: "Morning Light",
       artist: "Ada Lovelace, Babbage Ensemble",
       album: "Analytical Engine",
+      year: null,
       musicbrainz_recording_id: "rec-1",
       musicbrainz_artist_id: "art-1",
       musicbrainz_release_group_id: "rg-1",
@@ -250,10 +252,10 @@ describe("isLocalMatch", () => {
 });
 
 describe("identifyReadinessFor", () => {
-  test("fpcalc missing wins over everything else", () => {
+  test("off without fingerprints is nothing to match; local fingerprints need fpcalc", () => {
     const missing = { hasFpcalc: false, hasKey: false, hasLocalFingerprints: false, setting: "off" as const };
-    expect(identifyReadinessFor(missing)).toEqual({ state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." });
-    expect(identifyReadinessFor({ hasFpcalc: false, hasKey: true, hasLocalFingerprints: true, setting: "on" })).toMatchObject({ state: "fpcalc_missing" });
+    expect(identifyReadinessFor(missing).state).toBe("nothing_to_match");
+    expect(identifyReadinessFor({ hasFpcalc: false, hasKey: false, hasLocalFingerprints: true, setting: "off" })).toMatchObject({ state: "fpcalc_missing" });
   });
 
   test("setting off with no local fingerprints says nothing to match", () => {
@@ -267,12 +269,9 @@ describe("identifyReadinessFor", () => {
     expect(identifyReadinessFor({ hasKey: false, hasFpcalc: true, hasLocalFingerprints: true, setting: "off" })).toEqual({ state: "ready", line: "Song naming is ready." });
   });
 
-  test("on or ask with no key and no local fingerprints asks for the key", () => {
-    expect(identifyReadinessFor({ hasKey: false, hasFpcalc: true, hasLocalFingerprints: false, setting: "on" })).toEqual({
-      state: "no_key",
-      line: "Add your AcoustID key in Credentials to name songs that are not in your library.",
-    });
-    expect(identifyReadinessFor({ hasKey: false, hasFpcalc: true, hasLocalFingerprints: false, setting: "ask" })).toMatchObject({ state: "no_key" });
+  test("on or ask is ready without a key or local fingerprints", () => {
+    expect(identifyReadinessFor({ hasKey: false, hasFpcalc: false, hasLocalFingerprints: false, setting: "on" })).toMatchObject({ state: "ready" });
+    expect(identifyReadinessFor({ hasKey: false, hasFpcalc: false, hasLocalFingerprints: false, setting: "ask" })).toMatchObject({ state: "ready" });
   });
 
   test("ready when a key or local fingerprints exist", () => {

@@ -16,6 +16,8 @@ import {
   decodeWithFfmpeg, findFpcalc, fingerprintWithFpcalc,
   type ClipKind, type Decoder, type FingerprintRunner,
 } from "./identifyAudio";
+import { __resetShazamForTests, lookupShazam, type ShazamLookup } from "./shazamLookup";
+import { makeSignature, signatureUri, type Signature } from "./shazamSignature";
 import { libraryFingerprintCount, loadLibraryFingerprints, type LibraryFingerprint } from "./fingerprintStore";
 
 export const IDENTIFY_SETTING = "music.identify.online";
@@ -53,6 +55,10 @@ export interface IdentifyOptions {
   fingerprint?: FingerprintRunner;
   library?: () => LibraryFingerprint[];
   fetch?: FetchLike;
+  /** Test seam for the snippet lookup. */
+  shazam?: (signature: Signature, signal: AbortSignal) => Promise<ShazamLookup>;
+  /** Test seam for the Shazam switch (`music.identify.shazam`). */
+  shazamEnabled?: boolean;
   acoustIdBase?: string;
   mode?: IdentifyMode;
   key?: string | null;
@@ -64,6 +70,64 @@ export interface IdentifyOptions {
   limiter?: RateLimiter;
   cache?: FingerprintCache;
   log?: (line: string) => void;
+  onCandidates?: (candidates: IdentifyCandidate[]) => void;
+  deadlineMs?: number;
+}
+
+export type IdentifyCandidate = { title: string; artist: string; album: string | null; year: number | null; source: IdentifyResult["source"]; score: number; agrees: boolean };
+
+type ProviderAnswer = { kind: "match"; result: IdentifyResult } | { kind: "no_match" } | { kind: "rate_limited"; retryAfterS: number } | { kind: "failed" };
+type Provider = { name: "shazam" | "acoustid"; run: (abort: AbortSignal) => Promise<ProviderAnswer> };
+type ProviderOutcome = { name: Provider["name"]; state: "match" | "no_match" | "rate_limited" | "failed" | "aborted"; retryAfterS?: number };
+
+type RaceWinner = { name: Provider["name"]; result: IdentifyResult };
+type RaceSettled = { winner: RaceWinner | null; outcomes: ProviderOutcome[]; answers: RaceWinner[] };
+
+/**
+ * Start every provider at once and never abort one. `first` resolves as soon as a provider returns a real match (or with null once all have
+ * answered without one); `settled` resolves when all have answered or the deadline passes, with every provider's outcome and every match
+ * as a candidate. A provider that fails, is rate limited or finds nothing does not end the race. Never rejects.
+ */
+export function startRace(providers: Provider[], deadlineMs = 8_000): { first: Promise<RaceWinner | null>; settled: Promise<RaceSettled> } {
+  const abort = new AbortController();
+  const outcomes: ProviderOutcome[] = providers.map((p) => ({ name: p.name, state: "aborted" }));
+  const answers: RaceWinner[] = [];
+  let winner: RaceWinner | null = null;
+  let resolveFirst: (value: RaceWinner | null) => void = () => {};
+  const first = new Promise<RaceWinner | null>((resolve) => { resolveFirst = resolve; });
+  const settled = new Promise<RaceSettled>((resolve) => {
+    let pending = providers.length;
+    let done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(timer); if (pending > 0) abort.abort(); resolveFirst(winner); resolve({ winner, outcomes: outcomes.map((o) => ({ ...o })), answers: [...answers] }); };
+    const timer = setTimeout(finish, deadlineMs);
+    const settleOne = () => { pending -= 1; if (pending === 0) finish(); };
+    providers.forEach((provider, index) => {
+      provider.run(abort.signal).then((answer) => {
+        if (done) return;
+        if (answer.kind === "match") {
+          outcomes[index] = { name: provider.name, state: "match" };
+          answers.push({ name: provider.name, result: answer.result });
+          if (!winner) { winner = { name: provider.name, result: answer.result }; resolveFirst(winner); }
+        } else outcomes[index] = answer.kind === "rate_limited" ? { name: provider.name, state: "rate_limited", retryAfterS: answer.retryAfterS } : { name: provider.name, state: answer.kind };
+      }, () => { if (!done) outcomes[index] = { name: provider.name, state: "failed" }; }).finally(settleOne);
+    });
+    if (providers.length === 0) finish();
+  });
+  return { first, settled };
+}
+
+function candidatesOf(winner: RaceWinner, answers: RaceWinner[]): IdentifyCandidate[] {
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\([^)]*\)/g, " ").replace(/\bfeat\.?\b.*$/g, " ").replace(/[^a-z0-9]/g, "").trim();
+  const key = (r: IdentifyResult) => `${normalize(r.title)}|${normalize(r.artist)}`;
+  const winnerKey = key(winner.result);
+  return answers.map(({ result }) => ({ title: result.title, artist: result.artist, album: result.album, year: result.year, source: result.source, score: result.score, agrees: key(result) === winnerKey }));
+}
+
+/** Decoded 16 kHz s16le bytes as samples (copied, so odd byte offsets are safe). */
+function toInt16(pcm: Uint8Array): Int16Array {
+  const copy = new Uint8Array(pcm.byteLength - (pcm.byteLength % 2));
+  copy.set(pcm.subarray(0, copy.byteLength));
+  return new Int16Array(copy.buffer);
 }
 
 // ---- Settings and readiness -----------------------------------------------------------------------------------------------------
@@ -75,6 +139,11 @@ export function identifyMode(): IdentifyMode {
   } catch {
     return "on";
   }
+}
+
+/** Whether the snippet service (Shazam) may be asked: `music.identify.shazam`, on by default. */
+export function shazamEnabled(): boolean {
+  try { return getHouseholdSettingValue("music.identify.shazam") !== false; } catch { return true; }
 }
 
 /** The AcoustID key, or null when none is set (or it no longer decrypts). Never logged. */
@@ -104,7 +173,7 @@ export function identifyReadiness(inputs: { key?: string | null; hasFpcalc?: boo
 const sharedLimiter = new RateLimiter(MAX_PER_SECOND, () => Date.now());
 let sharedCache = new FingerprintCache(CACHE_SIZE);
 let inFlight: Promise<unknown> = Promise.resolve();
-export function __resetIdentifyForTests(): void { inFlight = Promise.resolve(); sharedCache = new FingerprintCache(CACHE_SIZE); deviceLast.clear(); }
+export function __resetIdentifyForTests(): void { __resetShazamForTests(); inFlight = Promise.resolve(); sharedCache = new FingerprintCache(CACHE_SIZE); deviceLast.clear(); }
 /** Test seam: the shared cache, so a test can check what it holds. */
 export function __sharedCacheForTests(): FingerprintCache { return sharedCache; }
 
@@ -157,7 +226,7 @@ function localMatch(raw: Uint32Array, library: LibraryFingerprint[]): IdentifyRe
   }
   if (!best || !isLocalMatch(best.score, second)) return null;
   const r = best.row;
-  return { title: r.title, artist: r.artist, album: r.album, musicbrainz_recording_id: r.recordingId, musicbrainz_artist_id: r.artistId, musicbrainz_release_group_id: r.releaseGroupId, score: best.score, source: "library" };
+  return { title: r.title, artist: r.artist, album: r.album, year: null, musicbrainz_recording_id: r.recordingId, musicbrainz_artist_id: r.artistId, musicbrainz_release_group_id: r.releaseGroupId, score: best.score, source: "library" };
 }
 
 /** Name the song in a short clip. Never throws; every outcome is a typed result. */
@@ -187,33 +256,74 @@ export async function identifySong(clip: IdentifyClip, options: IdentifyOptions 
     if (!decoded) return done({ status: "failed", reason: "decode_failed" });
     if (decoded.seconds > MAX_CLIP_SECONDS) return done({ status: "failed", reason: "too_long" });
 
-    // Local first: the raw fingerprint is all it needs. The compressed one is made only if a lookup is going to happen.
+    // Local first: the raw fingerprint is all it needs. No fpcalc, or none to compare with, just skips this step.
     const needOnline = mode === "on" || (mode === "ask" && options.confirmed === true);
-    const prints = await (options.fingerprint ?? fingerprintWithFpcalc)(decoded.pcm, { raw: localRows.length > 0, compressed: false });
-    if (!prints) return done({ status: "failed", reason: "fingerprint_failed" });
-    if (prints.raw && localRows.length > 0) {
-      const hit = localMatch(prints.raw, localRows);
-      if (hit) return done({ status: "matched", result: hit }, " source=library");
+    const haveFpcalc = options.hasFpcalc ?? findFpcalc() !== null;
+    if (localRows.length > 0 && haveFpcalc) {
+      const prints = await (options.fingerprint ?? fingerprintWithFpcalc)(decoded.pcm, { raw: true, compressed: false });
+      if (!prints && mode === "off") return done({ status: "failed", reason: "fingerprint_failed" });
+      if (prints?.raw) {
+        const hit = localMatch(prints.raw, localRows);
+        if (hit) return done({ status: "matched", result: hit }, " source=library");
+      }
     }
     if (mode === "off") return done({ status: "no_match" }, " online=off");
     if (!needOnline) return done({ status: "needs_confirm" });
-    if (key === null) return done({ status: "not_ready", reason: "no_key", line: identifyReadinessFor({ hasKey: false, hasFpcalc: true, hasLocalFingerprints: false, setting: mode }).line });
 
-    const online = await (options.fingerprint ?? fingerprintWithFpcalc)(decoded.pcm, { raw: false, compressed: true });
-    if (!online?.compressed) return done({ status: "failed", reason: "fingerprint_failed" });
+    // Online providers run together after local matching. Neither is aborted when the other matches.
+    const signature = makeSignature(toInt16(decoded.pcm));
+    const shazamOn = options.shazamEnabled ?? shazamEnabled();
     const cache = options.cache ?? sharedCache;
-    const cached = cache.get(online.compressed);
-    if (cached) return done({ status: "matched", result: cached }, " source=cache");
-    const answer = await lookupAcoustId(online.compressed, Math.max(1, Math.round(online.seconds || decoded.seconds)), key, {
-      fetch: options.fetch ?? ((input, init) => globalThis.fetch(input, init)),
-      acoustIdBase: options.acoustIdBase ?? `https://${ACOUSTID_HOST}`,
-      now, sleep: options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))), limiter: options.limiter ?? sharedLimiter,
-    });
-    if (answer.kind === "rate_limited") return done({ status: "rate_limited", retry_after_s: answer.retryAfterS });
-    if (answer.kind === "failed") return done({ status: "failed", reason: "lookup_failed" });
-    if (!answer.result) return done({ status: "no_match" }, " source=acoustid");
-    cache.set(online.compressed, answer.result);
-    return done({ status: "matched", result: answer.result }, " source=acoustid");
+    const providers: Provider[] = [];
+    if (signature && shazamOn && providers.length === 0) {
+      const uri = signatureUri(signature);
+      const cached = cache.get(uri);
+      if (cached) return done({ status: "matched", result: cached }, " source=cache");
+      providers.push({
+        name: "shazam",
+        run: async (abort) => {
+          const answer = await (options.shazam ?? ((sig, signal) => lookupShazam(sig, { now, signal })))(signature, abort);
+          if (answer.kind === "ok") { if (answer.result) cache.set(uri, answer.result); return answer.result ? { kind: "match", result: answer.result } : { kind: "no_match" }; }
+          return answer.kind === "rate_limited" ? { kind: "rate_limited", retryAfterS: answer.retryAfterS } : { kind: "failed" };
+        },
+      });
+    }
+    if (key !== null && haveFpcalc) {
+      providers.push({
+        name: "acoustid",
+        run: async (abort) => {
+          const online = await (options.fingerprint ?? fingerprintWithFpcalc)(decoded.pcm, { raw: false, compressed: true });
+          if (!online?.compressed) return { kind: "failed" };
+          const hit = cache.get(online.compressed);
+          if (hit) return { kind: "match", result: hit };
+          const answer = await lookupAcoustId(online.compressed, Math.max(1, Math.round(online.seconds || decoded.seconds)), key, {
+            fetch: options.fetch ?? ((input, init) => globalThis.fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, abort]) : abort })),
+            acoustIdBase: options.acoustIdBase ?? `https://${ACOUSTID_HOST}`,
+            now, sleep: options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))), limiter: options.limiter ?? sharedLimiter,
+          });
+          if (answer.kind === "ok") { if (answer.result) cache.set(online.compressed, answer.result); return answer.result ? { kind: "match", result: answer.result } : { kind: "no_match" }; }
+          return answer.kind === "rate_limited" ? { kind: "rate_limited", retryAfterS: answer.retryAfterS } : { kind: "failed" };
+        },
+      });
+    }
+    if (providers.length === 0) return done({ status: "no_match" }, " online=no_provider");
+    const race = startRace(providers, options.deadlineMs ?? 8_000);
+    const first = await race.first;
+    const detailOf = (outcomes: ProviderOutcome[]) => ` providers=${outcomes.map((o) => `${o.name}:${o.state}`).join(",")}`;
+    if (first) {
+      // The answer goes out at once; the slower providers keep running and their answers become candidates later.
+      void race.settled.then((all) => {
+        log(`[music] identify candidates=${all.answers.length}${detailOf(all.outcomes)}`);
+        try { options.onCandidates?.(candidatesOf(first, all.answers)); } catch { /* a hook never breaks the answer */ }
+      });
+      return done({ status: "matched", result: first.result }, ` source=${first.name}`);
+    }
+    const all = await race.settled;
+    const detail = detailOf(all.outcomes);
+    if (all.outcomes.some((o) => o.state === "no_match")) return done({ status: "no_match" }, detail);
+    const limited = all.outcomes.filter((o) => o.state === "rate_limited");
+    if (limited.length > 0) return done({ status: "rate_limited", retry_after_s: Math.max(...limited.map((o) => o.retryAfterS ?? 1)) }, detail);
+    return done({ status: "failed", reason: "lookup_failed" }, detail);
   } catch {
     return done({ status: "failed", reason: "unexpected" });
   }

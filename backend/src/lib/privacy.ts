@@ -23,7 +23,7 @@ import { LIST_INDEX_URL, LIST_SOURCE_HOST } from "@/lib/blocklists/listIndex";
 import { neededListIds } from "@/lib/blocklists/listSync";
 import { telegramConfigured } from "@/lib/telegramChannel";
 import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
-import { ACOUSTID_HOST, acoustIdKey, identifyMode } from "@/lib/music/identify";
+import { ACOUSTID_HOST, acoustIdKey, identifyMode, shazamEnabled } from "@/lib/music/identify";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
 import { DDGS_DESTINATION_HOST } from "@/lib/retrieval/ddgsSource";
 import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
@@ -236,6 +236,10 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:music-identify", identifyOnlineActive() ? ACOUSTID_HOST : null, {
       when: "only when someone asks Home to name a song it heard, only after your own library had no match, and only while Name songs online is On (or Ask each time and the person said yes). At most one request a minute for each device and three a second across the home. Nothing runs in the background.",
       what: "an audio fingerprint and the clip length, plus your home's internet address, never audio. The recording itself is never stored or sent. Nothing anyone in the house said or saved goes with it: no name, device ID, cookie or listening history.",
+    }),
+    row("platform:music-identify-shazam", identifyMode() !== "off" && shazamEnabled() ? "amp.shazam.com" : null, {
+      when: "only when someone asks Home to name a song it heard and Name songs online is On (or Ask each time and the person said yes), unless Shazam song naming is turned off in Music settings. Nothing runs in the background.",
+      what: "a small sound signature and the clip length, never audio, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, device ID, cookie or listening history.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",

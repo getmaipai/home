@@ -6,6 +6,8 @@ import { warmupInFlight } from "@/lib/stackWarmup";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { readCapabilities } from "@/lib/memoryRoom";
 import { identifyReadiness } from "@/lib/music/identify";
+import { libraryFingerprintProgress } from "@/lib/music/fingerprintStore";
+import { findFpcalc } from "@/lib/music/identifyAudio";
 import { lastIdentifyOutcome } from "@/lib/music/identifyLast";
 import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
@@ -237,6 +239,8 @@ export async function voiceCallReady(): Promise<boolean> {
 /** MUSIC-ID-01: the song-naming row, read the same way as the others and served through healthSnapshot.ts. One reading of `identifyReadiness()`; no client recomputes it. */
 export function identifyHealthEntry(): IdentifyHealthEntry {
   const readiness = identifyReadiness();
+  const progress = libraryFingerprintProgress();
+  const identifyLine = findFpcalc() && progress.done < progress.total ? `${readiness.line} Learning your music library: ${progress.done.toLocaleString("en-US")} of ${progress.total.toLocaleString("en-US")} songs.` : readiness.line;
   const ready = readiness.state === "ready";
   const last = lastIdentifyOutcome();
   let line: string | null = null;
@@ -248,5 +252,5 @@ export function identifyHealthEntry(): IdentifyHealthEntry {
   else if (last?.reason === "too_big" || last?.reason === "too_long") line = "The clip was too long or too big.";
   else if (last?.status === "not_ready") line = readiness.line;
   else if (last?.status === "failed") line = last.reason === "too_long" || last.reason === "too_big" ? "The clip was too long or too big." : "Could not name the song from that clip.";
-  return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: readiness.line, identify_last: last && line ? { at: last.at, status: last.status, line } : null };
+  return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: identifyLine, identify_last: last && line ? { at: last.at, status: last.status, line } : null };
 }

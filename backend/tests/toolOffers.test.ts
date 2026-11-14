@@ -21,6 +21,11 @@ beforeEach(() => { resetDb(); registerFixtureProjectType(); });
 afterAll(() => __resetProjectTypesForTests());
 
 describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
+  test("song_name declares optional discussion actions without changing its robot gate", () => {
+    const manifest = listInstalledManifests().find((entry) => entry.id === "song_name")!;
+    expect(manifest.offer).toMatchObject({ mode: "conditional", gate: "songNameAllowed" });
+    expect(manifest.args).toMatchObject({ type: "object", additionalProperties: false, properties: { action: { enum: ["listen", "reject", "suggest", "confirm"] }, title: { type: "string", maxLength: 80 } } });
+  });
   test("every bundled package with args and every virtual tool resolves to a declared or not-measured decision", () => {
     const bundled = readdirSync(PACKAGES_DIR, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())

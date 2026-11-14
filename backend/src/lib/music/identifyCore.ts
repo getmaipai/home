@@ -5,11 +5,12 @@ export type IdentifyResult = {
   title: string;
   artist: string;
   album: string | null;
+  year: number | null;
   musicbrainz_recording_id: string | null;
   musicbrainz_artist_id: string | null;
   musicbrainz_release_group_id: string | null;
   score: number;
-  source: "library" | "acoustid";
+  source: "library" | "shazam" | "acoustid";
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -51,10 +52,13 @@ export function parseAcoustId(json: unknown): IdentifyResult | null {
     if (names.length === 0) return null;
     const groups = Array.isArray(recObj.releasegroups) ? (recObj.releasegroups as unknown[]) : [];
     const firstGroup = groups.find((g) => isRecord(g) && typeof g.title === "string") as Record<string, unknown> | undefined;
+    const date = typeof recObj.firstreleasedate === "string" ? recObj.firstreleasedate : typeof firstGroup?.firstreleasedate === "string" ? firstGroup.firstreleasedate : "";
+    const yearMatch = /^(\d{4})/.exec(date);
     return {
       title: recObj.title as string,
       artist: names.join(", "),
       album: firstGroup && typeof firstGroup.title === "string" ? firstGroup.title : null,
+      year: yearMatch ? Number(yearMatch[1]) : null,
       musicbrainz_recording_id: typeof recObj.id === "string" ? recObj.id : null,
       musicbrainz_artist_id: artistId,
       musicbrainz_release_group_id: firstGroup && typeof firstGroup.id === "string" ? firstGroup.id : null,
@@ -176,18 +180,19 @@ export type IdentifyReadiness = {
 };
 
 /**
- * Decide the readiness in this order: no fpcalc -> fpcalc_missing; setting off with no local fingerprints ->
- * nothing_to_match; setting on or ask with no key and no local fingerprints -> no_key; otherwise ready.
+ * Decide the readiness (MUSIC-ID-05). With online naming on (or ask) the snippet service needs nothing installed and no key, so the
+ * answer is ready; `fpcalc` and an AcoustID key only add the library match and the whole-song fallback. With online naming off, the
+ * household's own fingerprints are the only source: none -> nothing_to_match; some but no `fpcalc` to fingerprint the clip -> fpcalc_missing.
+ * `no_key` is kept in the type for older clients and is no longer produced.
  */
 export function identifyReadinessFor(input: { hasKey: boolean; hasFpcalc: boolean; hasLocalFingerprints: boolean; setting: "on" | "ask" | "off" }): IdentifyReadiness {
-  if (!input.hasFpcalc) {
-    return { state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." };
-  }
-  if (input.setting === "off" && !input.hasLocalFingerprints) {
-    return { state: "nothing_to_match", line: "Song naming is off and your library has no fingerprints yet, so there is nothing to match. Turn on online naming in Settings." };
-  }
-  if ((input.setting === "on" || input.setting === "ask") && !input.hasKey && !input.hasLocalFingerprints) {
-    return { state: "no_key", line: "Add your AcoustID key in Credentials to name songs that are not in your library." };
+  if (input.setting === "off") {
+    if (!input.hasLocalFingerprints) {
+      return { state: "nothing_to_match", line: "Song naming is off and your library has no fingerprints yet, so there is nothing to match. Turn on online naming in Settings." };
+    }
+    if (!input.hasFpcalc) {
+      return { state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." };
+    }
   }
   return { state: "ready", line: "Song naming is ready." };
 }

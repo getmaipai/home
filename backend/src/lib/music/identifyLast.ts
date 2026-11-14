@@ -9,7 +9,7 @@ export type IdentifyLastOutcome = {
   source: "robot" | "person";
   title?: string;
   artist?: string;
-  matchSource?: "library" | "acoustid";
+  matchSource?: "library" | "shazam" | "acoustid";
 };
 
 let last: IdentifyLastOutcome | null = null;
