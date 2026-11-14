@@ -21,7 +21,22 @@ export type { DiskLevel, DiskPlan, DiskVerdict, DiskVolume };
 const tiers = (table as unknown as { tiers: Record<DiskPlan["tier"], DiskPlan> }).tiers;
 
 /** The shipped plan of one tier (a copy of the Stack's table, so it names the sizes the Stack pinned when this Home was released). */
-export function shippedDiskPlan(tier: DiskPlan["tier"]): DiskPlan { return structuredClone(tiers[tier]); }
+export function shippedDiskPlan(tier: DiskPlan["tier"]): DiskPlan {
+  const plan = structuredClone(tiers[tier]);
+  if (!plan.rows.some((row) => row.id === "fpcalc")) {
+    const row: DiskPlan["rows"][number] = { id: "fpcalc", label: "Song naming tool (chromaprint)", note: "Names songs from a short audio clip. LGPL-2.1-or-later.", kind: "model", need: "recommended", selectable: true, download_bytes: 1_300_000, installed_bytes: 1_300_000, peak_temp_bytes: 0, model_ids: [], engines: [], installed: false, basis: "estimate" };
+    plan.rows.push(row);
+    plan.default_selected.push("fpcalc");
+    for (const key of ["default", "everything"] as const) {
+      const totals = plan[key];
+      totals.download_bytes += row.download_bytes;
+      totals.installed_bytes += row.installed_bytes;
+      totals.needed_bytes += row.installed_bytes;
+      totals.required_free_bytes += row.installed_bytes;
+    }
+  }
+  return plan;
+}
 
 /** Graphics memory in GB that an NVIDIA computer reports, or null when it cannot be read. */
 function nvidiaMemoryGb(): number | null {

@@ -2,6 +2,8 @@
 // ffmpeg decodes the clip to 11025 Hz mono 16-bit PCM in memory (stdin and stdout pipes, nothing written to disk); Chromaprint's
 // `fpcalc` turns PCM into a fingerprint (the same pipes). Rule 6: nothing here throws; a missing program or a failed run is a null.
 import { findFfmpeg } from "@/lib/ffmpegPath";
+import { findFpcalc } from "@/lib/fpcalcPath";
+export { findFpcalc } from "@/lib/fpcalcPath";
 
 export const IDENTIFY_RATE = 11025;
 /** A decoded clip: raw signed 16-bit little-endian mono samples at IDENTIFY_RATE. */
@@ -12,10 +14,6 @@ export type Fingerprints = { raw: Uint32Array; compressed: string | null; second
 
 export type Decoder = (clip: Uint8Array, kind: ClipKind) => Promise<DecodedClip | null>;
 export type FingerprintRunner = (pcm: Uint8Array, want: { raw: boolean; compressed: boolean }) => Promise<{ raw: Uint32Array | null; compressed: string | null; seconds: number } | null>;
-
-export function findFpcalc(path?: string): string | null {
-  return Bun.which("fpcalc", { PATH: path ?? process.env.PATH ?? "" }) ?? process.env.MAIPAI_FPCALC_PATH ?? null;
-}
 
 /** ffmpeg arguments: read the clip from stdin (a declared raw PCM kind, or sniffed container), write 11025 Hz mono s16le to stdout. */
 export function decodeArgs(kind: ClipKind): string[] {

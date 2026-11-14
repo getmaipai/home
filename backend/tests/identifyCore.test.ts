@@ -252,7 +252,7 @@ describe("isLocalMatch", () => {
 describe("identifyReadinessFor", () => {
   test("fpcalc missing wins over everything else", () => {
     const missing = { hasFpcalc: false, hasKey: false, hasLocalFingerprints: false, setting: "off" as const };
-    expect(identifyReadinessFor(missing)).toEqual({ state: "fpcalc_missing", line: "Song naming needs Chromaprint, which is not installed on this computer yet." });
+    expect(identifyReadinessFor(missing)).toEqual({ state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." });
     expect(identifyReadinessFor({ hasFpcalc: false, hasKey: true, hasLocalFingerprints: true, setting: "on" })).toMatchObject({ state: "fpcalc_missing" });
   });
 

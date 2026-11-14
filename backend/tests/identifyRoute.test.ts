@@ -18,8 +18,10 @@ function withPath<T>(fpcalc: boolean, run: () => Promise<T>): Promise<T> {
   const dir = mkdtempSync(join(tmpdir(), "id-route-"));
   if (fpcalc) { writeFileSync(join(dir, "fpcalc"), `#!/bin/sh\ncat >/dev/null\ncase "$*" in *-raw*) echo '{"duration":5,"fingerprint":[1,2,3]}';; *) echo '{"duration":5,"fingerprint":"AQAAx"}';; esac\n`); chmodSync(join(dir, "fpcalc"), 0o755); }
   const old = process.env.PATH;
+  const oldOnly = process.env.MAIPAI_FPCALC_PATH_ONLY;
   process.env.PATH = `${dir}:/usr/bin:/bin`;
-  return run().finally(() => { process.env.PATH = old; });
+  process.env.MAIPAI_FPCALC_PATH_ONLY = "1";
+  return run().finally(() => { process.env.PATH = old; if (oldOnly === undefined) delete process.env.MAIPAI_FPCALC_PATH_ONLY; else process.env.MAIPAI_FPCALC_PATH_ONLY = oldOnly; });
 }
 beforeEach(() => { resetDb(); __resetIdentifyForTests(); });
 
@@ -80,7 +82,7 @@ describe("/api/health carries the one readiness answer", () => {
       const body = (await (await client.get("/api/health")).json()) as { engines: { identify?: { identify_state: string; identify_line: string; availability: string } } };
       expect(body.engines.identify?.identify_state).toBe("fpcalc_missing");
       expect(body.engines.identify?.availability).toBe("unavailable");
-      expect(body.engines.identify?.identify_line).toContain("Chromaprint");
+      expect(body.engines.identify?.identify_line).toContain("song naming tool");
     });
   });
 });

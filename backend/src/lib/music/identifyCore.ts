@@ -181,7 +181,7 @@ export type IdentifyReadiness = {
  */
 export function identifyReadinessFor(input: { hasKey: boolean; hasFpcalc: boolean; hasLocalFingerprints: boolean; setting: "on" | "ask" | "off" }): IdentifyReadiness {
   if (!input.hasFpcalc) {
-    return { state: "fpcalc_missing", line: "Song naming needs Chromaprint, which is not installed on this computer yet." };
+    return { state: "fpcalc_missing", line: "The song naming tool is not installed. Install it under Settings, AI and models." };
   }
   if (input.setting === "off" && !input.hasLocalFingerprints) {
     return { state: "nothing_to_match", line: "Song naming is off and your library has no fingerprints yet, so there is nothing to match. Turn on online naming in Settings." };

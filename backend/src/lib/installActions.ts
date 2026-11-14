@@ -154,7 +154,9 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
   }
   if (facesAsked) void ensureVisionAssets().catch(() => {});
   // MP-09: ffmpeg is a required row with no model files, so the pulls never carry it; the wizard asks the Stack to install it as a component (it asks only when the Stack lists it and it is not installed, so an installed ffmpeg is never re-requested and a Stack that does not list it yet changes nothing).
-  if (diskPlan?.rows.some((row) => row.id === "ffmpeg") && (!selected || selected.includes("ffmpeg"))) void listStackComponents().then(async (list) => { const part = list.components.find((component) => component.id === "ffmpeg"); if (part && part.state !== "installed" && part.state !== "installing") await installStackComponent("ffmpeg"); }).catch(() => {});
+  for (const componentId of ["ffmpeg", "fpcalc"]) {
+    if (diskPlan?.rows.some((row) => row.id === componentId) && (!selected || selected.includes(componentId))) void listStackComponents().then(async (list) => { const part = list.components.find((component) => component.id === componentId); if (part && part.state !== "installed" && part.state !== "installing") await installStackComponent(componentId); }).catch(() => {});
+  }
   void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}) }).catch(() => {});
   const pending = plan.models.filter((model) => !model.installed).length + (selected && plan.disk ? (plan.optional_models ?? []).filter((model) => !model.installed && plan.disk!.rows.some((row) => selected.includes(row.id) && row.model_ids.includes(model.id))).length : 0);
   return { ok: true, models: pending + startedLicensed + (facesAsked ? 1 : 0), ...(fitted.leftOut.length ? { leftOut: fitted.leftOut } : {}) };
