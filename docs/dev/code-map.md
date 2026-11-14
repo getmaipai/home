@@ -865,6 +865,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/identify.ts` | IDENTIFY_SETTING, ACOUSTID_KEY_SETTING, ACOUSTID_HOST, MAX_CLIP_SECONDS, MAX_CLIP_BYTES, DEVICE_COOLDOWN_MS |
 | `backend/src/lib/music/identifyAudio.ts` | IDENTIFY_RATE, decodeArgs, decodeWithFfmpeg, parseFpcalc, fingerprintWithFpcalc, fingerprintFile |
 | `backend/src/lib/music/identifyCore.ts` | parseAcoustId, acoustIdUrl, RateLimiter, FingerprintCache, popcount, compareFingerprints |
+| `backend/src/lib/music/identifyLast.ts` | recordIdentifyOutcome, lastIdentifyOutcome, resetIdentifyLast |
 | `backend/src/lib/music/jobs.ts` | __setMusicPollMsForTests, slotBodyFor, plainMusicFailure, prepareStemsJob, OWNED_STEMS_MAX_BYTES, resolveSongSource |
 | `backend/src/lib/music/libraryAlign.ts` | QUICK_WINDOW_S, QUICK_LEAD_S, INSTANT_MATCH_S, RETRY_AFTER_MS, LIBRARY_ALIGN_MAX_BYTES, __setLibraryAlignPollMsForTests |
 | `backend/src/lib/music/listenRequests.ts` | requestListen, resolveListen, __resetListenRequestsForTests, __setListenCommandIssuerForTests |
