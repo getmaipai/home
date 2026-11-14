@@ -134,6 +134,12 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   const basis = (p: FusedScene["people"][number]) => p.basis.includes("ha_entity") ? "suggested by Home Assistant" : p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
   if (deviceId && mediaPlaying(deviceId, now)) lines.push("Media is playing on this device.");
+  const motion = (scene as FusedScene & { motion?: { state: string; expires_at: number } | null }).motion;
+  // A carry line is only true while the frame is fresh; a robot put down since then reports resting, which adds nothing to the scene.
+  if (motion && motion.expires_at > now && now - (motion as { at?: number }).at! < 15_000) {
+    if (motion.state === "lifted" || motion.state === "carried") lines.push("The robot is being carried.");
+    else if (motion.state === "falling") lines.push("The robot is falling.");
+  }
   const unknownOthers = scene.people.filter((person) => !person.person_id || !members.has(person.person_id)).length;
   lines.push(speakerLine(scene.speaker, surface, actor, household, getPersonSettingValue(actor, "person.robot.greet_by_name"), unknownOthers));
   if (scene.people.length) {
@@ -307,7 +313,10 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const lookCount = state.surface === "robot" && state.deviceId ? sceneFor(state.deviceId, sceneNow)?.people ?? null : null;
   const speakerForScene = sceneSpeakerForTurn(state.surface, state.actor.id, state.speakerEvidence);
   const roomDevice = state.deviceId ? getDeviceById(state.deviceId) : null;
-  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, haStates: ownHaState ? [ownHaState] : [], ownHaEntityId: typeof ownHaEntityId === "string" ? ownHaEntityId : null, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
+  const latestRobotState = state.deviceId ? getDeviceState(state.deviceId) : null;
+  const motionReportedAt = latestRobotState?.reportedAt ? Date.parse(latestRobotState.reportedAt) : NaN;
+  const deviceMotion = Number.isFinite(motionReportedAt) && sceneNow - motionReportedAt < 30_000 ? { state: latestRobotState?.motion ?? null, pose: latestRobotState?.motion_pose ?? null, reportedAtMs: motionReportedAt } : null;
+  const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, deviceMotion, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, haStates: ownHaState ? [ownHaState] : [], ownHaEntityId: typeof ownHaEntityId === "string" ? ownHaEntityId : null, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
   currentScene.weather = null;
   if (!state.bare) {
     const weatherInput = { conversationId: conversation.id, actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, now: sceneNow };
@@ -640,7 +649,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
   const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
   const requiredSpeakerLine = voiceMatchLine || speakerLine(currentScene.speaker, state.surface, state.actor, listActivePeople(), getPersonSettingValue(state.actor, "person.robot.greet_by_name"), currentScene.people.filter((person) => !person.person_id || !listActivePeople().some((member) => member.id === person.person_id)).length);
-  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${requiredSpeakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
+  const motionLine = renderedScene.match(/The robot is (?:being carried|falling)\./)?.[0] ?? "";
+  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${motionLine} ${requiredSpeakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
   sceneItem.text = fittedScene.text;
   const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
   items.push(sceneItem);

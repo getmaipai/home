@@ -165,6 +165,7 @@ export interface DeviceState extends RobotStateFrame {
   app_version: string | null;
   reachable: boolean;
   unreachableSince: string | null;
+  reportedAt: string;
 }
 
 export function getDeviceState(deviceId: string): DeviceState | null {
@@ -188,5 +189,6 @@ export function getDeviceState(deviceId: string): DeviceState | null {
     thermal: row.thermal ?? undefined,
     reachable,
     unreachableSince: reachable ? null : row.reportedAt,
+    reportedAt: row.reportedAt,
   };
 }

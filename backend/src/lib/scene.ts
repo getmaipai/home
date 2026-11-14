@@ -11,7 +11,7 @@ const MAX_SCENES = 200;
 const IDLE_TTL = 30 * 60_000;
 const store = new Map<string, FusedScene>();
 type Person = Scene["people"][number];
-export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null; weather_alerts?: WeatherAlertCue[] };
+export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null; weather_alerts?: WeatherAlertCue[]; motion?: { state: string; pose?: string; at: number; expires_at: number } | null };
 
 export type WeatherCue = {
   temp_f?: number;
@@ -84,12 +84,22 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
   const haEntityIds = new Set(observations.filter((o) => o.source.sensor === "ha_entity" && o.kind === "person_here").map((o) => o.id));
   const live = (previous?.people ?? []).filter((p) => !isExpired(p.expires_at, now) && !(p.basis.includes("ha_entity") && !haEntityIds.size));
   let place = previous?.place && !isExpired(previous.place.expires_at, now) ? previous.place : null;
+  let sceneMotion = previous?.motion;
+  if (sceneMotion && sceneMotion.expires_at <= now) sceneMotion = null;
   let countFloor = 0;
   let aloneObservedUntil = previous?.alone_observed_until ?? null;
   if (aloneObservedUntil !== null && aloneObservedUntil <= now) aloneObservedUntil = null;
   const typedLeft = new Set<string>();
   const strongIds = new Set<string>();
   const incoming = [...observations].filter((o) => !isExpired(clampExpires(o), now));
+  const activeMotion = incoming.find((o) => o.kind === "motion" && (o.value as { state?: string }).state);
+  const movingAway = activeMotion && ["lifted", "carried"].includes((activeMotion.value as { state: string }).state);
+  const motionState = activeMotion ? (activeMotion.value as { state: string }).state : null;
+  if (activeMotion) sceneMotion = { ...(activeMotion.value as { state: string; pose?: string }), at: activeMotion.at, expires_at: clampExpires(activeMotion) };
+
+  if (movingAway && place?.basis === "robot_room") {
+    place = { ...place, where: "unknown", setting: "unknown", area: null, precision: "area", basis: "motion", expires_at: clampExpires(activeMotion) };
+  }
 
   for (const o of incoming) {
     if (o.kind === "person_left") { if (o.strength === "weak") typedLeft.add(personKey(o.value as Person)); continue; }
@@ -113,8 +123,10 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
       }
       continue;
     }
+    if (o.kind === "motion") continue;
     if (o.kind === "room") {
       if (!["robot_room", "ha_entity", "typed"].includes(o.source.sensor)) continue;
+      if (o.source.sensor === "robot_room" && (movingAway || motionState === "set_down")) continue;
       const value = o.value as { room: string };
       const priority = (sensor: string) => sensor === "typed" ? 3 : sensor === "signed_in" ? 2 : sensor === "robot_room" || sensor === "ha_entity" ? 1 : 0;
       if (place && priority(o.source.sensor) < priority(place.basis) && !(place.where === "unknown" && !place.area)) continue;
@@ -130,6 +142,10 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
       }
     }
   }
+  if (movingAway && !live.some((p) => p.level === "confirmed" && (p.basis.includes("face") || p.basis.includes("voice") || p.basis.includes("signed_in") || p.basis.includes("typed")))) {
+    const motion = activeMotion!;
+    if (!live.some((p) => p.basis.includes("motion") && p.expires_at > now)) live.push({ person_id: null, label: "someone nearby", relation: "unknown", band: "unknown", level: "tentative", basis: ["motion"], last_seen_at: motion.at, expires_at: motion.at + 60_000 });
+  }
   for (let i = live.length - 1; i >= 0; i--) {
     const p = live[i]!;
     if (typedLeft.has(personKey(p)) && p.basis.length > 0 && p.basis.every((b) => b === "typed")) live.splice(i, 1);
@@ -144,7 +160,7 @@ export function fuseScene(previous: FusedScene | null | undefined, observations:
   const otherCountFloor = Math.max(0, countFloor - (aloneObservedUntil !== null && aloneObservedUntil > now ? 1 : 0));
   while (live.length < otherCountFloor) live.push({ person_id: null, label: null, relation: "unknown", band: "unknown", level: "tentative", basis: ["look"], last_seen_at: now, expires_at: now + SCENE_TTL.look });
   const people = live.filter((p) => !isExpired(p.expires_at, now));
-  return { conversation_id: conversationId, people, speaker, place, ambient: previous?.ambient ?? null, weather: previous?.weather ?? null, alone: people.length === 0, alone_observed: aloneObservedUntil !== null && aloneObservedUntil > now, alone_observed_until: aloneObservedUntil, child_present: people.some((p) => p.band === "child"), updated_at: now };
+  return { conversation_id: conversationId, people, speaker, place, ambient: previous?.ambient ?? null, weather: previous?.weather ?? null, motion: sceneMotion ?? null, alone: people.length === 0, alone_observed: aloneObservedUntil !== null && aloneObservedUntil > now, alone_observed_until: aloneObservedUntil, child_present: people.some((p) => p.band === "child"), updated_at: now };
 }
 
 export function getScene(conversationId: string, now = Date.now()): FusedScene | null {
@@ -184,9 +200,15 @@ export function homeAssistantObservations(states: readonly HomeAssistantSceneSta
   return result;
 }
 
-export function observationsForTurn(input: { surface: Surface; deviceId?: string; deviceArea?: string | null; deviceKind?: string; currentLocation?: { lat: number; lon: number } | null; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; haStates?: readonly HomeAssistantSceneState[]; ownHaEntityId?: string | null; now: number }): SceneObservation[] {
+export function observationsForTurn(input: { surface: Surface; deviceId?: string; deviceArea?: string | null; deviceKind?: string; deviceMotion?: { state: string | null; pose?: string | null; reportedAtMs: number } | null; currentLocation?: { lat: number; lon: number } | null; actorId: string; actorBand: "child" | "teen" | "adult"; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; lookPeople?: number | null; haStates?: readonly HomeAssistantSceneState[]; ownHaEntityId?: string | null; now: number }): SceneObservation[] {
   const result: SceneObservation[] = [];
   result.push(...homeAssistantObservations(input.haStates ?? [], input.ownHaEntityId ?? null, input.surface, input.now));
+  const motionAliases: Record<string, string> = { held: "lifted" };
+  const motions = new Set(["lifted", "carried", "set_down", "shaken", "tilted", "tapped", "falling", "bumped", "rolling"]);
+  const motionState = input.deviceMotion?.state ? motionAliases[input.deviceMotion.state] ?? input.deviceMotion.state : null;
+  if (input.deviceId && input.deviceMotion && input.deviceMotion.reportedAtMs <= input.now && input.deviceMotion.reportedAtMs + SCENE_TTL.motion > input.now && motionState && motions.has(motionState)) {
+    result.push({ id: `motion-${input.now}`, source: { surface: input.surface, device_id: input.deviceId, sensor: "motion" }, kind: "motion", value: { state: motionState, ...(input.deviceMotion.pose ? { pose: input.deviceMotion.pose } : {}) }, confidence: 1, strength: "strong", at: input.deviceMotion.reportedAtMs, expires_at: input.deviceMotion.reportedAtMs + SCENE_TTL.motion });
+  }
   for (const p of input.present ?? []) {
     if (!input.speakerEvidence && p.person === input.actorId) continue;
     const sensor: SceneObservation["source"]["sensor"] = p.basis === "face" ? "face" : p.basis === "voice" || p.basis === "voice_and_face" ? "voice" : p.basis === "signed_in" ? "signed_in" : "typed";

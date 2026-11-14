@@ -282,6 +282,42 @@ describe("scene fusion", () => {
     expect(noRoom.some((item) => item.kind === "room")).toBe(false);
     expect(renderScene(fuseScene(empty(), noRoom, t), t, sage, [sage])).not.toContain("Place:");
   });
+  test("motion maps old held frames, clears the robot room, and adds one expiring weak person cue", () => {
+    const t = 1_000_000;
+    const held = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceKind: "robot", deviceArea: "kitchen", deviceMotion: { state: "held", reportedAtMs: t }, actorId: "actor", actorBand: "adult", now: t });
+    expect(held.find((item) => item.kind === "motion")?.value).toEqual({ state: "lifted" });
+    const initial = fuseScene(empty(), observationsForTurn({ surface: "robot", deviceId: "device-x", deviceKind: "robot", deviceArea: "kitchen", actorId: "actor", actorBand: "adult", now: t }), t);
+    const lifted = fuseScene(initial, held.filter((item) => item.kind === "motion"), t);
+    expect(lifted.place).toMatchObject({ where: "unknown", area: null, basis: "motion" });
+    expect(lifted.people).toHaveLength(1);
+    expect(lifted.people[0]).toMatchObject({ label: "someone nearby", band: "unknown", level: "tentative", basis: ["motion"], expires_at: t + 60_000 });
+    expect(fuseScene(lifted, [], t + 60_000).people).toHaveLength(0);
+  });
+  test("set_down does not add a room and confirmed person suppresses the weak nearby cue", () => {
+    const t = 2_000_000;
+    const setDown = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceKind: "robot", deviceArea: "kitchen", deviceMotion: { state: "set_down", reportedAtMs: t }, actorId: "actor", actorBand: "adult", now: t });
+    expect(fuseScene(empty(), setDown, t).place).toMatchObject({ where: "unknown", area: null, basis: "signed_in" });
+    const confirmed = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceMotion: { state: "carried", reportedAtMs: t }, present: [{ person: "person-confirmed1", basis: "face", level: "confirmed" }], actorId: "actor", actorBand: "adult", now: t });
+    expect(fuseScene(empty(), confirmed, t).people).toHaveLength(1);
+  });
+  test("old resting and unknown motion values are ignored without rejecting the frame", () => {
+    for (const state of ["resting", "unknown-motion-value"]) {
+      const observations = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceMotion: { state, reportedAtMs: 3_000_000 }, actorId: "actor", actorBand: "adult", now: 3_000_000 });
+      expect(observations.some((item) => item.kind === "motion")).toBe(false);
+    }
+  });
+  test("motion never changes sensitive permission and carries only the allowed prompt line", () => {
+    const t = 4_000_000;
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    for (const state of ["carried", "tapped"]) {
+      const observations = observationsForTurn({ surface: "robot", deviceId: "device-x", deviceMotion: { state, reportedAtMs: t }, actorId: "actor", actorBand: "adult", now: t });
+      const scene = fuseScene(empty(), observations, t);
+      const text = renderScene(scene, t, sage, [sage]);
+      expect(text.includes("The robot is being carried.")).toBe(state === "carried");
+      expect(text).not.toContain("The robot is falling.");
+      expect(sensitiveAllowed("robot", null, null, "person-test", scene)).toBe(sensitiveAllowed("robot", null, null, "person-test", empty()));
+    }
+  });
   test("conversation scene store supports touch, end, and temporary conversation cleanup", () => {
     clearScenes();
     const item = fuseScene(empty("temporary-1"), [obs("person_here", person("person-guest1"), "typed", 50, "weak", SCENE_TTL.typed)], 50);
