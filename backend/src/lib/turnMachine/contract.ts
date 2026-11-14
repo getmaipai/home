@@ -211,6 +211,9 @@ export interface TurnState {
    * other surface. An unidentified robot speaker is anonymous
    * (speaker.ts's speakerIsAnonymous()). */
   speakerEvidence?: SpeakerEvidence | null;
+  /** VOICE-MATCH-01 volatile result; never copied to stored turn evidence or trace. */
+  voiceMatchDisagreed?: boolean;
+  voiceMatchAgreed?: boolean;
   present?: readonly PresentPerson[] | null;
   utterance: string;
   /** STT-SMARTTURN-01: set on a speculative run (begun on the edge partial, held privately). Resolves true when the final
@@ -498,7 +501,7 @@ export interface NodeExecution {
    * "so the replay bench and the weekly report can prove a minor's row
    * never carried a reasoning event." Absent on every other node. */
   reasoning?: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] };
-  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number };
+  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number; matched: number; disagreed: number; unavailable: number; skipped: number };
 }
 
 /** A node reads TurnState and its own typed input, and returns its typed

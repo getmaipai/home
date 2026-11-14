@@ -98,6 +98,15 @@ test("sensitiveAllowed(): retains the robot floor and tightens shared surfaces",
   }
 });
 
+test("a disagreeing voice only tightens private chat and phone sensitive access", () => {
+  const owner = "person-1";
+  for (const surface of ["chat", "phone"] as const) {
+    expect(sensitiveAllowed(surface, null, null, owner)).toBe(true);
+    expect(sensitiveAllowed(surface, null, null, owner, null, true)).toBe(false);
+  }
+  expect(sensitiveAllowed("robot", null, null, owner, null, true)).toBe(false);
+});
+
 test("asksHowKnown(): recognizes fixed provenance questions only", () => {
   for (const text of ["how do you know", "how do you know that", "where did that come from", "are you sure", "did you make that up", "source?"]) expect(asksHowKnown(text)).toBe(true);
   expect(asksHowKnown("how do I know that?" )).toBe(false);

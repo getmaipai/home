@@ -60,7 +60,8 @@ export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidenc
  * empty or missing present list means the body said nothing, so nothing
  * sensitive is said; switching it off withholds sensitive records entirely
  * rather than guessing. */
-export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvidence | null | undefined, present: readonly PresentPerson[] | null | undefined, actorId: string, scene?: FusedScene | null): boolean {
+export function sensitiveAllowed(surface: Surface, speakerEvidence: SpeakerEvidence | null | undefined, present: readonly PresentPerson[] | null | undefined, actorId: string, scene?: FusedScene | null, voiceDisagreed = false): boolean {
+  if (voiceDisagreed && (surface === "chat" || surface === "phone")) return false;
   const scenePeople = scene?.people ?? [];
   const otherPresent = scenePeople.some((person) => person.person_id !== actorId);
   if ((surface === "chat" || surface === "phone") && otherPresent) return false;

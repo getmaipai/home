@@ -28,6 +28,8 @@ export interface SttSessionConfig {
   endpointing?: { endpointer: Endpointer; holdS: number };
   /** TALK-OVER-01: scores the edge partial's text for completeness (lib/talkOver.ts); when set, the edge partial carries `end`. */
   turnEnd?: (text: string) => TurnEndMark;
+  /** Optional private voice-match input. Called once at finalization with a copy of voiced audio only. */
+  onSpeechClip?: (clip: Float32Array, sampleRate: number) => void;
 }
 
 export type TurnEndLevel = "none" | "gentle" | "natural";
@@ -469,6 +471,15 @@ export class SttSession {
       if (wasPaused) this.resumeReply();
       this.send({ t: "no_speech" });
       return;
+    }
+
+    // Keep only the last ten seconds of voiced speech. This copy is handed
+    // to the optional matcher before the transcription buffer is discarded;
+    // partials never reach the callback.
+    if (this.cfg.onSpeechClip && this.lastVoicedLen >= this.cfg.sampleRate) {
+      const voiced = this.flatten().subarray(0, this.lastVoicedLen);
+      const clip = voiced.slice(Math.max(0, voiced.length - 10 * this.cfg.sampleRate));
+      try { this.cfg.onSpeechClip(clip, this.cfg.sampleRate); } catch { /* matching must never fail transcription */ }
     }
 
     let text = "";

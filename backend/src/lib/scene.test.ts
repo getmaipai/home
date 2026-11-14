@@ -100,8 +100,9 @@ describe("scene fusion", () => {
     const trace = new TraceRecorder();
     trace.record("context", "context", "v1", 1, 2, { ok: true });
     trace.setSceneCounts("context", { people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
-    expect(trace.nodes()[0]?.scene).toEqual({ people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
+    expect(trace.nodes()[0]?.scene).toEqual({ people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37, matched: 0, disagreed: 0, unavailable: 0, skipped: 0 });
     expect(typeof trace.nodes()[0]?.scene?.scene_tokens).toBe("number");
+    for (const key of ["matched", "disagreed", "unavailable", "skipped"] as const) expect(typeof trace.nodes()[0]?.scene?.[key]).toBe("number");
     expect(JSON.stringify(trace.nodes()[0]?.scene)).not.toMatch(/name|label|room|person.?id/i);
   });
 
@@ -183,6 +184,20 @@ describe("scene fusion", () => {
     const cleared = fuseScene(observed, [obs("person_here", person("person-other"), "face", 12)], 12);
     expect(cleared.alone_observed).toBe(false);
     expect(cleared.alone_observed_until).toBeNull();
+  });
+  test("voice verdicts only tighten sensitive access across surfaces", () => {
+    const actorId = "person-sage";
+    const actorSpeaker = { person: actorId, basis: "signed_in", level: "confirmed" } as const;
+    const scene = { ...sceneForTests({ conversation_id: "voice-match-gate", speaker: actorSpeaker, people: [] }), alone: true, alone_observed: true };
+    const present = [{ person: actorId, level: "confirmed" }] as never;
+    for (const surface of ["chat", "phone", "robot", "tv", "overlay", "pod"] as const) {
+      const withoutVerdict = sensitiveAllowed(surface, actorSpeaker, present, actorId, scene);
+      for (const verdict of ["agree", "disagree"] as const) {
+        const withVerdict = sensitiveAllowed(surface, actorSpeaker, present, actorId, scene, verdict === "disagree");
+        if (!withoutVerdict) expect(withVerdict).toBe(false);
+        if ((surface === "chat" || surface === "phone") && verdict === "disagree") expect(withVerdict).toBe(false);
+      }
+    }
   });
   test("an unknown robot speaker remains unknown and absent evidence does not list the signed-in actor", () => {
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;

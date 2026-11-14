@@ -16,4 +16,6 @@ MaiPai turns each recording into numbers derived from your voice. The recording 
 
 The person being enrolled must be allowed to consent. A child cannot consent for themself. A teen must consent for themself. Guests cannot enroll.
 
+To compare a spoken turn with your samples, turn on **Match my voice when I talk to Home** in your person settings. Home checks only your own samples. If the voice does not match, Home keeps your signed-in account and memory owner the same, but leaves out sensitive records for that turn. The comparison result is held briefly in memory and then discarded.
+
 Your browser asks for microphone access while recording. If access is off, allow the microphone for this site in your browser settings, then try again.

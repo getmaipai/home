@@ -35,8 +35,8 @@ export class TraceRecorder {
     if (entry) entry.stages = { ...entry.stages, [key]: value };
   }
 
-  setSceneCounts(node: NodeName, counts: NonNullable<NodeExecution["scene"]>): void {
+  setSceneCounts(node: NodeName, counts: Omit<NonNullable<NodeExecution["scene"]>, "matched" | "disagreed" | "unavailable" | "skipped"> & Partial<Pick<NonNullable<NodeExecution["scene"]>, "matched" | "disagreed" | "unavailable" | "skipped">>): void {
     const entry = [...this.entries].reverse().find((item) => item.node === node);
-    if (entry) entry.scene = { ...counts, scene_tokens: Number.isFinite(counts.scene_tokens) ? counts.scene_tokens : 0 };
+    if (entry) entry.scene = { ...counts, scene_tokens: Number.isFinite(counts.scene_tokens) ? counts.scene_tokens : 0, matched: Number.isFinite(counts.matched) ? counts.matched! : 0, disagreed: Number.isFinite(counts.disagreed) ? counts.disagreed! : 0, unavailable: Number.isFinite(counts.unavailable) ? counts.unavailable! : 0, skipped: Number.isFinite(counts.skipped) ? counts.skipped! : 0 };
   }
 }

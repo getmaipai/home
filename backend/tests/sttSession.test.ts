@@ -215,6 +215,33 @@ describe("SttSession reply pause", () => {
   });
 });
 
+describe("SttSession speech clip callback", () => {
+  test("calls once at finalize with a copied clip capped at ten seconds", async () => {
+    scriptTranscript("hello there");
+    const clips: Array<{ clip: Float32Array; rate: number }> = [];
+    const session = new SttSession({ ...config(), onSpeechClip: (clip, rate) => clips.push({ clip, rate }) }, () => {});
+    for (let i = 0; i < 11 * 100; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 80; i++) session.pushPcm(silenceFrame());
+    await flush(); await flush();
+    expect(clips).toHaveLength(1);
+    expect(clips[0]!.rate).toBe(SAMPLE_RATE);
+    expect(clips[0]!.clip.length).toBeLessThanOrEqual(10 * SAMPLE_RATE);
+    expect(clips[0]!.clip.length).toBeGreaterThanOrEqual(SAMPLE_RATE);
+  });
+
+  test("does not call when unset or when voiced speech is shorter than one second", async () => {
+    scriptTranscript("hello there");
+    let calls = 0;
+    const session = new SttSession({ ...config(), onSpeechClip: () => { calls++; } }, () => {});
+    for (let i = 0; i < 50; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 80; i++) session.pushPcm(silenceFrame());
+    await flush(); await flush();
+    expect(calls).toBe(0);
+  });
+});
+
 describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", () => {
   test("a held mid-sentence pause that resumes produces one final carrying the whole utterance and nothing else", async () => {
     const receivedSamples: number[] = [];

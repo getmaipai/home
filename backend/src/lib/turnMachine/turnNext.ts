@@ -98,6 +98,7 @@ import type { GateDecision } from "@/lib/gate/types";
 import { composerHintAllowed, resolveComposerHint } from "@/lib/composerHint";
 import { getScene } from "@/lib/scene";
 import { countTokens } from "@/lib/tokenCount";
+import { consumeVoiceMatchVerdict } from "@/lib/voiceMatchVerdict";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -491,6 +492,9 @@ interface BegunTurn {
  * done. */
 async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts): Promise<{ ok: true; value: BegunTurn } | { ok: false; result: Extract<TurnStreamResult, { ok: false }> }> {
   const startedAt = Date.now();
+  // Only a signed-in person's spoken chat/phone turn may consume the one-shot result.
+  const voiceVerdict = opts.spoken === true && (surface === "chat" || surface === "phone")
+    ? await consumeVoiceMatchVerdict(actor.id, 500) : null;
   // THIN-7C: "a child's turn can never run bare, whoever flips the switch".
   // speakerAgeBand() !== "adult" covers both minor bands (child and teen).
   if (opts.bare === true) {
@@ -709,6 +713,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(surface === "robot" && opts.robotName ? { robotName: opts.robotName } : {}),
     ...(surface === "chat" && conversation.device_id ? { deviceId: conversation.device_id, robotName: getDeviceById(conversation.device_id)?.name, replyVoiceId: voiceForSpeech({ actor, deviceId: conversation.device_id }) } : {}),
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
+    ...(voiceVerdict === "disagree" ? { voiceMatchDisagreed: true } : {}),
+    ...(voiceVerdict === "agree" ? { voiceMatchAgreed: true } : {}),
     utterance: text,
     ...(opts.speculation ? { speculation: opts.speculation } : {}),
     ...(offerTurn ? { offer: offerTurn } : {}),

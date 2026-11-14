@@ -135,6 +135,8 @@ export type StackReducedResult =
   | { state: "refused"; reason: string };
 
 export interface StackClient {
+  /** POST /v1/audio/speaker-embedding: one local, in-memory voice embedding. */
+  speakerEmbedding(form: FormData, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<{ data: { model_id: string; dim: number; embedding: number[] }; identity: EngineIdentity }>;
   getCodingMode(opts?: { signal?: AbortSignal }): Promise<StackCodingMode>;
   setCodingMode(mode: "normal" | "coding", opts?: { signal?: AbortSignal }): Promise<void>;
   runCodingModeSelfTest(opts?: { signal?: AbortSignal }): Promise<void>;
@@ -408,6 +410,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
   }
 
   return {
+    speakerEmbedding: (form, opts) => call("/v1/audio/speaker-embedding", formInit(form), rawJson<{ model_id: string; dim: number; embedding: number[] }>, opts),
     async chat(request, opts) {
       const stream = request.stream === true;
       if (stream) {

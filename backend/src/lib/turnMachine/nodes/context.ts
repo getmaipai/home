@@ -84,8 +84,8 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 export const TOOL_ROUND_SHARE = 0.25;
 const SCENE_RENDER_TOKEN_LIMIT = 320;
 const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
-function sceneCountsForTrace(scene: FusedScene, sceneTokens: number) {
-  return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens };
+function sceneCountsForTrace(scene: FusedScene, sceneTokens: number, voiceMatch: "matched" | "disagreed" | "unavailable" | "skipped") {
+  return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens, matched: Number(voiceMatch === "matched"), disagreed: Number(voiceMatch === "disagreed"), unavailable: Number(voiceMatch === "unavailable"), skipped: Number(voiceMatch === "skipped") };
 }
 export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): FusedScene["speaker"] {
   if (evidence) return { ...evidence };
@@ -437,8 +437,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // speaker_evidence does not name the signed-in person), so an
     // unidentified speaker recalls no person-scope record, and only the
     // household records a child may see.
-    const sceneGate = sensitiveAllowed(state.surface, state.speakerEvidence, state.present, state.actor.id, currentScene);
-    const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen" || !sceneGate;
+    const sceneGate = sensitiveAllowed(state.surface, state.speakerEvidence, state.present, state.actor.id, currentScene, state.voiceMatchDisagreed === true);
+  const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen" || !sceneGate || state.voiceMatchDisagreed === true;
     const anonymous = speakerIsAnonymous(state);
     const embedStart = Date.now();
     const queryVector = await embedQueryForRecall(input.utterance);
@@ -629,15 +629,20 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
-  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople(), state.surface, state.deviceId)} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
+  const voiceMatchLine = state.voiceMatchDisagreed
+    ? `Speaker: signed in as ${state.actor.displayName}, but the voice does not sound like ${state.actor.displayName}.`
+    : state.voiceMatchAgreed ? `Speaker: ${state.actor.displayName} (signed in and confirmed by voice).` : "";
+  const renderedScene = renderScene(currentScene, now.getTime(), state.actor, listActivePeople(), state.surface, state.deviceId);
+  const sceneWithVoice = voiceMatchLine ? renderedScene.replace(/^Speaker:.*$/m, voiceMatchLine) : renderedScene;
+  const sceneText = `${sceneWithVoice} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
   const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
   const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
   const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
-  const requiredSpeakerLine = speakerLine(currentScene.speaker, state.surface, state.actor, listActivePeople(), getPersonSettingValue(state.actor, "person.robot.greet_by_name"), currentScene.people.filter((person) => !person.person_id || !listActivePeople().some((member) => member.id === person.person_id)).length);
+  const requiredSpeakerLine = voiceMatchLine || speakerLine(currentScene.speaker, state.surface, state.actor, listActivePeople(), getPersonSettingValue(state.actor, "person.robot.greet_by_name"), currentScene.people.filter((person) => !person.person_id || !listActivePeople().some((member) => member.id === person.person_id)).length);
   const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${requiredSpeakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
   sceneItem.text = fittedScene.text;
-  const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
+  const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens, state.voiceMatchAgreed ? "matched" : state.voiceMatchDisagreed ? "disagreed" : "skipped");
   items.push(sceneItem);
 
   // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries

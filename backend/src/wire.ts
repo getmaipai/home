@@ -319,7 +319,7 @@ export interface TurnNodeExecution {
    * (see this file's own header note on why these two are hand-kept
    * in step rather than imported). */
   reasoning?: { emitted: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
-  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number };
+  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number; matched: number; disagreed: number; unavailable: number; skipped: number };
 }
 
 // ADMIN-COMPARE-01: POST /api/turn/bare's own trace and NDJSON event

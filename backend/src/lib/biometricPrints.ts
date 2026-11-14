@@ -51,6 +51,7 @@ export type BiometricPrintSummary = Omit<BiometricPrintT, "embedding">;
 // added here the day that lands, never assumed.
 const KNOWN_MODELS: Record<string, { modality: "face" | "voice"; sha256: string; dim: number }> = {
   [SFACE_MODEL_ID]: { modality: "face", sha256: SFACE_SHA256, dim: SFACE_DIM },
+  "nemo-titanet-small-v1": { modality: "voice", sha256: "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e", dim: 192 },
 };
 
 function toSummary(row: PrintRow): BiometricPrintSummary {
@@ -278,6 +279,54 @@ export function decryptBiometricPrintEmbedding(printId: string): number[] | null
   const row = db.select().from(biometricPrints).where(eq(biometricPrints.id, printId)).get() as PrintRow | undefined;
   if (!row || !row.embeddingEncrypted) return null;
   return JSON.parse(decryptSecret(row.embeddingEncrypted)) as number[];
+}
+
+/** Matcher-only read, constrained in SQL to this person's live voice prints. */
+export function decryptVoicePrintEmbeddingsForPerson(personId: string): number[][] {
+  const rows = db.select().from(biometricPrints).where(and(eq(biometricPrints.personId, personId), eq(biometricPrints.modality, "voice"), isNull(biometricPrints.deletedAt))).all() as PrintRow[];
+  return rows.flatMap((row) => row.embeddingEncrypted ? [JSON.parse(decryptSecret(row.embeddingEncrypted)) as number[]] : []);
+}
+
+/** Store one newly consented voice sample, reusing the same consent rules as face enrollment. */
+export function enrollVoiceSample(actor: PersonRow, personId: string, embedding: number[]): OpResult<BiometricPrintSummary> {
+  const target = findTarget(personId);
+  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+  if (!canConsentFor(actor, target)) return consentError(target);
+  const current = db.select({ id: biometricPrints.id }).from(biometricPrints).where(and(eq(biometricPrints.personId, personId), eq(biometricPrints.modality, "voice"), isNull(biometricPrints.deletedAt))).all();
+  if (current.length >= 8) return { ok: false, status: 400, error: "A person can save up to 8 voice samples" };
+  const built = buildPrint(actor, { person_id: personId, model_id: "nemo-titanet-small-v1", embedding }, new Date().toISOString());
+  if (!built.ok) return built;
+  insertPrint(db, built.value);
+  const { embedding: _embedding, ...summary } = built.value;
+  return { ok: true, status: 201, value: summary };
+}
+
+/** Consent preflight so callers do not send audio to Stack for an ineligible enrollment. */
+export function canEnrollVoiceSample(actor: PersonRow, personId: string): OpResult<true> {
+  const target = findTarget(personId);
+  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+  return canConsentFor(actor, target) ? { ok: true, status: 200, value: true } : consentError(target);
+}
+
+export function deleteVoicePrintsForPerson(actor: PersonRow, personId: string): OpResult<{ success: true }> {
+  const target = findTarget(personId);
+  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+  if (!canManage(actor, target)) return { ok: false, status: 403, error: "Not allowed to revoke this person's biometric prints" };
+  const rows = db.select({ id: biometricPrints.id }).from(biometricPrints).where(and(eq(biometricPrints.personId, personId), eq(biometricPrints.modality, "voice"), isNull(biometricPrints.deletedAt))).all();
+  const now = new Date().toISOString();
+  for (const row of rows) tombstonePrint(db, row.id, now);
+  return { ok: true, status: 200, value: { success: true } };
+}
+
+export function deleteVoiceBiometricPrint(actor: PersonRow, printId: string): OpResult<{ success: true }> {
+  const row = db.select().from(biometricPrints).where(and(eq(biometricPrints.id, printId), eq(biometricPrints.modality, "voice"), isNull(biometricPrints.deletedAt))).get() as PrintRow | undefined;
+  if (!row) return { ok: false, status: 404, error: "No such voice print" };
+  if (actor.id !== row.personId) {
+    const target = db.select({ id: people.id, role: people.role }).from(people).where(eq(people.id, row.personId)).get() as { id: string; role: string } | undefined;
+    if (!target || !canManage(actor, target)) return { ok: false, status: 403, error: "Not allowed to revoke this voice print" };
+  }
+  tombstonePrint(db, printId, new Date().toISOString());
+  return { ok: true, status: 200, value: { success: true } };
 }
 
 /** Revoking one's OWN print is always allowed regardless of role
