@@ -76,7 +76,7 @@ function PackageAppHeaderCenter() {
     <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
       {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
       {modes.length > 1 && state.mode ? (
-        <Tabs value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
+        <Tabs className="max-md:hidden" value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
           <TabsList variant="pill" aria-label={`${state.label} mode`}>
             {modes.map((mode) => <TabsTrigger key={mode.id} value={mode.id}>{mode.label}</TabsTrigger>)}
           </TabsList>
@@ -129,10 +129,16 @@ export interface SectionsBarEntries {
   searchTo?: string;
   more: Array<{ to: string; icon: string; label: string }>;
 }
-export function sectionsBarEntries(app: { to: string; label?: string; icon?: string | null; settings_area?: { id: string } | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
+export function sectionsBarEntries(app: { to: string; label?: string; icon?: string | null; settings_area?: { id: string } | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean, modePages: ReadonlyArray<{ page: string }> = []): SectionsBarEntries {
+  const sections = app.sections.filter((section) => section.page !== "search");
+  const modePageSet = new Set(modePages.filter((mode) => mode.page !== "index").map((mode) => mode.page));
+  const orderedSections = modePageSet.size === 0 ? sections : [
+    ...sections.filter((section) => modePageSet.has(section.page)),
+    ...sections.filter((section) => !modePageSet.has(section.page)),
+  ];
   const entries = [
     { to: app.to, icon: HOME_ICONS[app.to] ?? iconOrNull(app.icon) ?? "layout-grid", label: homeLabel, exact: true },
-    ...app.sections.filter((section) => section.page !== "search").map((section) => ({ to: `${app.to}/${section.page}`, icon: SECTION_ICONS[section.page] ?? iconOrNull(section.icon) ?? "layout-grid", label: section.label })),
+    ...orderedSections.map((section) => ({ to: `${app.to}/${section.page}`, icon: SECTION_ICONS[section.page] ?? iconOrNull(section.icon) ?? "layout-grid", label: section.label })),
   ];
   // The last item is always the three-dot More button: the app's settings live under it, with anything that did not fit.
   const more = app.settings_area?.id ? [{ to: `/settings/${app.settings_area.id}`, icon: "settings", label: `${app.label ?? "App"} settings` }] : [];

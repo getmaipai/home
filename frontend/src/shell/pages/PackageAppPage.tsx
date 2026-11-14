@@ -222,7 +222,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   useHeaderExtra(PackageAppHeaderLeft, PackageAppHeaderActions);
   // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Back first; Search sits in the header beside the companion when the
   // app has a search page; a page that plays something (a video, a book) draws no bar.
-  const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;
+  const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search"), app.header?.modes) : null;
   // The reader draws its own Back and action pill, so on a phone the shell bar shrinks to the menu button and the pill sits beside it
   // (packageAppNews.css) instead of under an empty bar.
   const readingStory = packageId === "news" && pageId === "story";
