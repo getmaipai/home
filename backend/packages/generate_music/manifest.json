@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
-  "description": "Make a song when asked.",
+  "description": "Make a song or sound effect, kind sound.",
   "offer": {
     "mode": "conditional",
     "gate": "musicAllowed",
@@ -37,16 +37,21 @@
     "properties": {
       "description": {
         "type": "string",
-        "grounded": false,
-        "description": "Genre, mood, instruments, voice. Never claim a song without calling this.",
         "minLength": 3,
-        "maxLength": 1200
+        "maxLength": 1200,
+        "grounded": false
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "song",
+          "sound"
+        ]
       },
       "lyrics": {
         "type": "string",
-        "grounded": false,
-        "description": "Lyrics, [Verse]/[Chorus] tags.",
-        "maxLength": 4000
+        "maxLength": 4000,
+        "grounded": false
       },
       "bpm": {
         "type": "number",
@@ -55,32 +60,37 @@
       },
       "key": {
         "type": "string",
-        "grounded": false,
         "maxLength": 20,
-        "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
+        "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$",
+        "grounded": false
       },
       "imitates_real_voice": {
-        "type": "boolean",
-        "description": "Sounds like a real person."
+        "type": "boolean"
       },
       "instrumental": {
         "type": "boolean"
       },
       "seconds": {
         "type": "number",
-        "minimum": 10,
+        "minimum": 1,
         "default": 60
+      },
+      "loop": {
+        "type": "boolean"
+      },
+      "stick_to_words": {
+        "type": "boolean"
       },
       "language": {
         "type": "string",
-        "grounded": false,
         "maxLength": 20,
-        "pattern": "^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$"
+        "pattern": "^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$",
+        "grounded": false
       },
       "title": {
         "type": "string",
-        "grounded": false,
-        "maxLength": 200
+        "maxLength": 200,
+        "grounded": false
       },
       "length": {
         "type": "string",
@@ -95,39 +105,67 @@
           "standard",
           "boost",
           "max"
-        ],
-        "description": "Only if asked; max needs admin."
+        ]
       },
       "song_style": {
         "type": "string",
-        "grounded": false,
-        "maxLength": 40
+        "maxLength": 40,
+        "grounded": false
       },
       "band": {
         "type": "string",
-        "grounded": false,
-        "maxLength": 40
+        "maxLength": 40,
+        "grounded": false
       },
       "album": {
         "type": "string",
-        "grounded": false,
-        "maxLength": 40
+        "maxLength": 40,
+        "grounded": false
       },
       "takes": {
         "type": "integer",
-        "grounded": false,
-        "description": "Takes 1-3, one card; only if options asked.",
         "minimum": 1,
-        "maximum": 3
+        "maximum": 3,
+        "grounded": false
       },
       "seed": {
         "type": "integer",
-        "grounded": false,
-        "description": "Same seed, similar song.",
         "minimum": 1,
-        "maximum": 2147483646
+        "maximum": 2147483646,
+        "grounded": false
       }
-    }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "sound"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "then": {
+          "properties": {
+            "seconds": {
+              "maximum": 60
+            },
+            "description": {
+              "maxLength": 600
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "seconds": {
+              "minimum": 10
+            }
+          }
+        }
+      }
+    ]
   },
   "incognito": "ephemeral",
   "requires": [],

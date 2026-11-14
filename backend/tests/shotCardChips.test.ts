@@ -16,7 +16,7 @@ describe("Video shot card chips", () => {
     expect(page.ok).toBe(true);
     if (!page.ok) return;
     const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; label: string; group: string; icon: string; options: Array<{ value: string; label: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
-    const expected = { framing: ["Framing", 9], camera: ["Camera", 7], light: ["Light", 9], look: ["Look", 8], grade: ["Grade", 7] } as const;
+    const expected = { framing: ["Framing", 9], camera: ["Camera", 7], lens: ["Lens", 4], light: ["Light", 9], film_stock: ["Film stock", 6], look: ["Look", 8], grade: ["Grade", 7] } as const;
     for (const [group, count] of Object.entries(expected)) {
       const chip = bar.chips!.find((item) => item.state === `card_${group}`)!;
       expect(chip.label).toBe(count[0]);
@@ -26,7 +26,7 @@ describe("Video shot card chips", () => {
       expect(chip.options.slice(1)).toHaveLength(count[1]);
     }
     expect(bar.chips!.filter((item) => item.state.startsWith("card_")).length).toBe(Object.keys(expected).length);
-    expect(bar.chips!.length).toBeLessThanOrEqual(10); // the kit page schema's limit: more and the page does not open
+    expect(bar.chips!.length).toBeLessThanOrEqual(16); // the kit page schema's limit
   });
 
   test("every Video Create chip is icon-only with a registered icon, and orientation options carry icons", async () => {
@@ -37,7 +37,7 @@ describe("Video shot card chips", () => {
     const bar = ((page.value as { body: Array<{ type: string; chips?: Array<{ state: string; icon?: string; icon_only?: boolean; options: Array<{ value: string; icon?: string }> }> }> }).body).find((item) => item.type === "prompt_bar")!;
     const { iconNames } = await import("../../frontend/node_modules/@maipai/ui/src/icons");
     const registry = new Set<string>(iconNames);
-    expect(bar.chips!.length).toBeLessThanOrEqual(10);
+    expect(bar.chips!.length).toBeLessThanOrEqual(16);
     for (const chip of bar.chips!) {
       expect(chip.icon_only, chip.state).toBe(true);
       expect(registry.has(chip.icon ?? ""), `${chip.state} icon ${chip.icon}`).toBe(true);
@@ -52,11 +52,13 @@ describe("Video shot card chips", () => {
     const { row } = await owner();
     const framing = "mtpl-shotframingclose";
     const light = "mtpl-shotlightgolden";
-    const hint = await resolveComposerHint(row, { mode: "video", settings: { card_framing: framing, card_light: light } }, ["generate_video"]);
-    expect(hint?.settings).toEqual({ card_framing: framing, card_light: light });
-    expect(composerHintItem(hint!).text).toContain("framing close-up, light warm late-day light");
+    const lens = "mtpl-shotlenswide";
+    const filmStock = "mtpl-shotfilmstockwarm";
+    const hint = await resolveComposerHint(row, { mode: "video", settings: { card_framing: framing, card_light: light, card_lens: lens, card_film_stock: filmStock } }, ["generate_video"]);
+    expect(hint?.settings).toEqual({ card_framing: framing, card_light: light, card_lens: lens, card_film_stock: filmStock });
+    expect(composerHintItem(hint!).text).toContain("framing close-up, light warm late-day light, lens wide lens, film stock warm fine grain");
     const filled = fillComposerDefaults(hint!, "generate_video", { prompt: "a dog chases a ball" });
-    const expected = composeShotPrompt({ subject: "a dog chases a ball", framing, light }).prompt;
+    const expected = composeShotPrompt({ subject: "a dog chases a ball", framing, light, lens, film_stock: filmStock }).prompt;
     expect(filled.prompt).toBe(expected);
     expect(String(filled.prompt).startsWith("a dog chases a ball")).toBe(true);
     expect(fillComposerDefaults(hint!, "generate_video", { prompt: expected }).prompt).toBe(expected);

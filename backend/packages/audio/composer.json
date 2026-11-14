@@ -21,6 +21,21 @@
       "chat_args": {
         "quality": "tier"
       }
+    },
+    {
+      "id": "sound",
+      "label": "Sound effect",
+      "icon": "music",
+      "page": "create",
+      "route": "/apps/audio/create",
+      "engine": "music",
+      "gate": "music",
+      "fallback": {
+        "placeholder": "Describe the sound effect or ambience you want.",
+        "primary": "Make sound"
+      },
+      "chat_tool": "generate_music",
+      "chat_args": {}
     }
   ]
 }

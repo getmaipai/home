@@ -32,11 +32,15 @@ const common = {
   description: z.string().trim().min(3).max(1200).optional(), lyrics: z.string().max(4000).optional(),
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(),
 };
-export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional(),
+export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), kind: z.enum(["song", "sound"]).optional(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(1).optional(), loop: z.boolean().optional(), stick_to_words: z.boolean().optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional(),
   /** MUSIC-STUDIO-STYLE: make the song in a saved song style, a made band's sound, or an album (ids the person can read). */
   song_style: z.string().regex(/^sstyle-[a-z0-9]{6,}$/).optional(), band: z.string().regex(/^mband-[a-z0-9]{6,}$/).optional(), album: z.string().regex(/^malbum-[a-z0-9]{6,}$/).optional(),
   /** MP-05: 1 to 3 takes of one request (each its own queue job, shown as one card) and the seed of the first take. */
-  takes: z.number().int().min(1).max(3).optional(), seed: z.number().int().min(1).max(2_147_483_646).optional() });
+  takes: z.number().int().min(1).max(3).optional(), seed: z.number().int().min(1).max(2_147_483_646).optional() }).superRefine((value, ctx) => {
+    if (value.kind === "sound" && value.description.length > 600) ctx.addIssue({ code: "custom", path: ["description"], message: "A sound description can be at most 600 characters." });
+    if (value.kind === "sound" && value.seconds !== undefined && value.seconds > 60) ctx.addIssue({ code: "custom", path: ["seconds"], message: "A sound can be at most 60 seconds." });
+    if (value.kind !== "sound" && value.seconds !== undefined && value.seconds < 10) ctx.addIssue({ code: "custom", path: ["seconds"], message: "A song must be at least 10 seconds." });
+  });
 export const editMusicArgs = z.object({
   ...common, title: z.string().trim().min(1).max(200).optional(), track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems", "parts", "voice_swap", ...EFFECT_CHANGES]),
   parts: z.object({ keep: z.array(z.string()).min(1).optional(), drop: z.array(z.string()).min(1).optional() }).optional(),

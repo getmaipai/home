@@ -6,10 +6,8 @@
   "display": "Make a Sound",
   "description": "Make a short sound effect or ambience with no melody or singing.",
   "offer": {
-    "mode": "conditional",
-    "gate": "musicAllowed",
-    "bench_row": "music-tool",
-    "reason": "adult on their own written screen with music enabled and an available Stack music model"
+    "mode": "off",
+    "reason": "Sound creation is offered through generate_music kind=sound; keep this package id for saved-file provenance and older conversations."
   },
   "author": "MaiPai",
   "license": "AGPL-3.0",

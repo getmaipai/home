@@ -88,6 +88,15 @@ describe("validation against the person's band", () => {
     expect(await resolveComposerHint(people.owner, picture({ shape: "tall" }), ["generate_video"])).toBeNull();
   });
 
+  test("Sound effect mode points to generate_music and changes no offered tools", async () => {
+    const soundMode = (await composerModesFor(people.owner)).modes.find((mode) => mode.id === "sound");
+    expect(soundMode).toMatchObject({ label: "Sound effect", engine: "music", route: "/apps/audio/create" });
+    const hint = await resolveComposerHint(people.owner, { mode: "sound" }, OFFERED);
+    expect(hint).toMatchObject({ tool: "generate_music", mode: "sound", label: "Sound effect", settings: {} });
+    expect(composerHintItem(hint!).text).toContain("The person chose Sound effect in the composer");
+    expect(await resolveComposerHint(people.owner, { mode: "sound" }, ["generate_image"])).toBeNull();
+  });
+
   test("a child never gets a mode the child band cannot use, and a minor's Quality chip carries only the tiers the modes list shows", async () => {
     const kid = asRole(people.child.id, "child");
     expect(await resolveComposerHint(kid, { mode: "video", settings: { orientation: "portrait" } }, OFFERED)).toBeNull();

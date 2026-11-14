@@ -15,6 +15,8 @@ import { musicForOutcomes } from "../composer";
 import { makeSoundArgs, runMakeSound } from "./soundMaker";
 import { generationOf } from "./types";
 import { runGenerateMusic } from "./tool";
+import { toolNode } from "@/lib/turnMachine/nodes/tool";
+import { musicCardView, musicStageIndex, musicStageLabel } from "@/routes/music";
 import { LYRICS } from "../../../tests/musicFixture";
 import { addSoundToSong, soundTakesOf } from "./soundTakes";
 import { __setMusicMixRunnerForTests, __setMusicMixToolsForTests } from "./mixParts";
@@ -43,6 +45,30 @@ describe("make_sound", () => {
     expect(job.request.description).toBe("sound effect, no melody, no singing: rain on a window, seamless loop");
     expect(out.result?.reply?.text).toContain("started");
     expect(out.result?.reply?.text).toContain("minimum length");
+    expect(fake.submitted[0]).toMatchObject({ task: "text2music", duration_s: 10 });
+  });
+  test("generate_music kind=sound routes through the sound maker and keeps make_sound provenance", async () => {
+    __setSoundStatusForTests(readySoundStatusForTests());
+    const state = musicState(people.owner);
+    const { output } = await toolNode(state, { proposals: [{ kind: "read_only", request: { tool: "generate_music", args: { kind: "sound", description: "rain on a tin roof", seconds: 4, loop: true }, callId: "kind-sound" } }] }, new AbortController().signal);
+    const out = output.outcomes[0]!;
+    expect(out.status).toBe("succeeded");
+    expect(out.packageId).toBe("make_sound");
+    const job = getMusicJobFor(people.owner, musicForOutcomes([out])!.id)!;
+    expect(job.request).toMatchObject({ instrumental: true, sound: { engine: "sfx", loop: true } });
+    expect(job.request.seconds).toBe(4);
+    expect(fake.sound.submitted).toHaveLength(1);
+    job.state = "running";
+    job.stage = "planning";
+    expect(musicStageLabel(job)).toBe("Making");
+    expect(musicStageIndex(job)).toBe(2);
+    const card = await musicCardView(people.owner, job);
+    expect(card.stages.map((stage) => stage.label)).toEqual(["Queued", "Loading", "Making", "Finishing"]);
+  });
+  test("the historical make_sound call id still routes to the same sound maker", async () => {
+    const state = musicState(people.owner);
+    const { output } = await toolNode(state, { proposals: [{ kind: "read_only", request: { tool: "make_sound", args: { description: "a short thunderclap" }, callId: "legacy-sound" } }] }, new AbortController().signal);
+    expect(output.outcomes[0]).toMatchObject({ status: "succeeded", packageId: "make_sound" });
     expect(fake.submitted[0]).toMatchObject({ task: "text2music", duration_s: 10 });
   });
   test("passes policy refusals through musicRefusalFor", async () => {

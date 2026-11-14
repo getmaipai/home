@@ -1,0 +1,9 @@
+{
+  "id": "sound-tool-choice",
+  "note": "COMPOSER-04 sound mode acceptance rows. Each prompt runs with and without the Sound effect composer mode. The mode may improve selection of generate_music kind=sound, but must not change other tool rates or the offered count.",
+  "rows": [
+    { "id": "sound-rain-tin", "prompt": "rain on a tin roof", "expected": "sound" },
+    { "id": "song-rain", "prompt": "make a song about rain", "expected": "song" },
+    { "id": "plain-rain", "prompt": "what is rain", "expected": "none" }
+  ]
+}

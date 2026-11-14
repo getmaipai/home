@@ -465,7 +465,11 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
 
     // MUSIC-GEN-03: both music tools start a Stack job and return its card id at once.
     if (tool === GENERATE_MUSIC_TOOL_ID || tool === EDIT_MUSIC_TOOL_ID || tool === MAKE_SOUND_TOOL_ID) {
-      const outcome = keepModelArgs(redactLockedMusicOutcome(state.actor, await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : tool === MAKE_SOUND_TOOL_ID ? runMakeSound : runGenerateMusic)({ state, args: chosenArgs(args as Record<string, unknown>), callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" })));
+      const musicArgs = chosenArgs(args as Record<string, unknown>);
+      // The old make_sound id remains dispatchable for saved conversations. New sound requests
+      // use the single offered generate_music schema and retain make_sound as job provenance.
+      const makeSound = tool === MAKE_SOUND_TOOL_ID || (tool === GENERATE_MUSIC_TOOL_ID && musicArgs.kind === "sound");
+      const outcome = keepModelArgs(redactLockedMusicOutcome(state.actor, await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : makeSound ? runMakeSound : runGenerateMusic)({ state, args: musicArgs, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" })));
       outcomes.push(outcome);
       const data = outcome.result?.data as { musicJobId?: string } | undefined;
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text ?? LOCKED_MUSIC_RESULT_TEXT, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });

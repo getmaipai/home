@@ -137,14 +137,32 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
 });
 
 describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-tool cap", () => {
+  test("a ready adult written chat offers sound creation through generate_music at the local Qwen cap", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    expect(base.max_tools).toBe(16);
+    // The real candidate set is the ten BASE_TOOL_IDS plus show_images, generate_image,
+    // generate_video, edit_video, generate_music, edit_music, voiceover, make_film and
+    // writing_format (19 total). The 16-tool result removes writing_format, show_images
+    // and start_project; it keeps every requested create/edit tool. make_sound is now an
+    // alias and does not consume a candidate slot.
+    const offered = withTurnToolGates(base, true, true, true, true, true, false, false, true, null, true, false, true, true).tools_offered;
+    const music = listInstalledManifests().find((manifest) => manifest.id === "generate_music")!;
+    expect((music.args as { properties: { kind: { enum: string[] } } }).properties.kind.enum).toContain("sound");
+    expect(offered).toHaveLength(16);
+    expect(offered).toEqual(expect.arrayContaining(["generate_music", "edit_music", "edit_video", "make_film", "voiceover", "generate_image", "generate_video"]));
+    expect(offered).toEqual(expect.arrayContaining(BASE_TOOL_IDS.filter((id) => id !== START_PROJECT_TOOL_ID)));
+    expect(offered).not.toContain("make_sound");
+    expect(offered).not.toEqual(expect.arrayContaining(["writing_format", "show_images", START_PROJECT_TOOL_ID]));
+  });
+
   test("generation requires musicAllowed; editing also requires the conversation's made-here state gate", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
     expect(withTurnToolGates(base, false, false, false, false, true).tools_offered).not.toContain("edit_music");
     const make = withTurnToolGates(base, false, false, false, true, false).tools_offered;
-    expect(make).toContain("generate_music"); expect(make).toContain("make_sound"); expect(make).not.toContain("edit_music");
+    expect(make).toContain("generate_music"); expect(make).not.toContain("make_sound"); expect(make).not.toContain("edit_music");
     const both = withTurnToolGates(base, true, true, true, true, true).tools_offered;
-    expect(both).toContain("generate_music"); expect(both).toContain("make_sound"); expect(both).toContain("edit_music");
-    expect(both).toHaveLength(16);
+    expect(both).toContain("generate_music"); expect(both).not.toContain("make_sound"); expect(both).toContain("edit_music");
+    expect(both).toHaveLength(15);
   });
   test("the real worst case plus the planned link reader is exactly sixteen, and a seventeenth still throws", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
@@ -168,7 +186,7 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
       const full = withTurnToolGates(base, true, true, true, true, true, false, false, true).tools_offered;
       expect(full.length).toBeLessThanOrEqual(16);
       expect(full).toEqual(expect.arrayContaining(["generate_video", "edit_video", "generate_music", "read_link"]));
-      expect(full).not.toContain("edit_music");
+      expect(full).toContain("edit_music");
     } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
   });
   test("FILM-04: make_film counts in the video set and music shrinks first at the cap", () => {
