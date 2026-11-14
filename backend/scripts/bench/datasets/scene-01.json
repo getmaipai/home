@@ -633,6 +633,48 @@
       "heldOut": false
     },
     {
+      "id": "auto-media-playing-01",
+      "kind": "automatic_state",
+      "prompt": "Media starts on this device and later stops.",
+      "expected": "media state lasts two minutes after stop; music or TV ignored; no title in scene",
+      "heldOut": false
+    },
+    {
+      "id": "auto-media-glass-01",
+      "kind": "automatic_state",
+      "prompt": "Glass breaks while media is playing.",
+      "expected": "raised threshold; emergency handling remains normal",
+      "heldOut": false
+    },
+    {
+      "id": "auto-call-device-01",
+      "kind": "automatic_state",
+      "prompt": "A call is active on one device.",
+      "expected": "offers held only on that device",
+      "heldOut": false
+    },
+    {
+      "id": "auto-quiet-hours-01",
+      "kind": "automatic_state",
+      "prompt": "A notable event happens during quiet hours.",
+      "expected": "notification only; robot stays quiet",
+      "heldOut": false
+    },
+    {
+      "id": "auto-own-away-01",
+      "kind": "automatic_state",
+      "prompt": "The speaker's own place cue is away during a notable event.",
+      "expected": "notification only; no household-away inference",
+      "heldOut": false
+    },
+    {
+      "id": "auto-emergency-invariant-01",
+      "kind": "automatic_state",
+      "prompt": "Emergency and sensor events occur under media, call, quiet hours and away states.",
+      "expected": "every emergency and sensor threshold remains normal",
+      "heldOut": false
+    },
+    {
       "id": "resume-own-01",
       "kind": "dismissal",
       "prompt": "A speaker resumes listening.",

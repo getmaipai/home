@@ -66,6 +66,7 @@ import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
 import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
 import { fetchSceneWeatherForContext, fetchSceneWeatherAlertsForContext } from "@/lib/sceneWeather";
+import { mediaPlaying } from "@/lib/sceneAutoStates";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
 import { homeAssistantEventsHealth, readHomeAssistantEntityState, subscribeHomeAssistantEntities } from "@/lib/integrations/homeAssistant";
@@ -124,7 +125,7 @@ async function fitSceneBlockMeasured(text: string, required: string, count: (val
   const finalCount = await count(candidate);
   return finalCount !== null && finalCount <= limit ? { text: candidate, tokens: finalCount } : { text: required, tokens: finalCount ?? 0 };
 }
-export function renderScene(scene: FusedScene, now: number, actor: PersonRow, household: readonly PersonRow[], surface: Surface = "robot"): string {
+export function renderScene(scene: FusedScene, now: number, actor: PersonRow, household: readonly PersonRow[], surface: Surface = "robot", deviceId?: string | null): string {
   const members = new Map(household.map((person) => [person.id, person]));
   const age = (at: number) => {
     const elapsed = Math.max(0, now - at);
@@ -132,6 +133,7 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   };
   const basis = (p: FusedScene["people"][number]) => p.basis.includes("ha_entity") ? "suggested by Home Assistant" : p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
+  if (deviceId && mediaPlaying(deviceId, now)) lines.push("Media is playing on this device.");
   const unknownOthers = scene.people.filter((person) => !person.person_id || !members.has(person.person_id)).length;
   lines.push(speakerLine(scene.speaker, surface, actor, household, getPersonSettingValue(actor, "person.robot.greet_by_name"), unknownOthers));
   if (scene.people.length) {
@@ -627,7 +629,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
-  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople(), state.surface)} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
+  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople(), state.surface, state.deviceId)} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
   const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
   const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";

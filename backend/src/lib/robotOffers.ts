@@ -17,6 +17,7 @@ import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { ROBOT_MAY_ADDRESS_KEY, getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingSource, getSettingValueForPerson } from "@/lib/settings";
+import { offersAllowed } from "@/lib/sceneAutoStates";
 
 export const OFFER_SNOOZE_MS = 30 * 60_000;
 export const OFFER_BACKOFF_MS = 60 * 60_000;
@@ -27,7 +28,7 @@ const HOUR_MS = 60 * 60_000;
 export type OfferRow = typeof robotOffers.$inferSelect;
 
 export type OfferHold =
-  | "disabled" | "tier_not_allowed" | "may_address" | "quiet_hours" | "no_robot" | "not_allowed_here" | "rate_limit" | "backoff" | "outstanding" | "snoozed";
+  | "disabled" | "tier_not_allowed" | "may_address" | "quiet_hours" | "call_in_progress" | "no_robot" | "not_allowed_here" | "rate_limit" | "backoff" | "outstanding" | "snoozed";
 
 export interface CreateOfferInput {
   personId: string;
@@ -93,6 +94,7 @@ export function offerHold(offer: OfferRow, deviceId: string, now: Date): OfferHo
   const person = personRow(offer.personId);
   if (!person || !personMayBeAddressed(person, now)) return "may_address";
   if (quietHours(person, now).active) return "quiet_hours";
+  if (!offersAllowed(deviceId, now.getTime())) return "call_in_progress";
   if (getDeviceSettingValue(deviceId, "robot.initiative.allowed_here") !== true) return "not_allowed_here";
   const open = db.select().from(robotOffers).where(and(eq(robotOffers.deviceId, deviceId), eq(robotOffers.state, "sent"))).all()
     .some((row) => Date.parse(row.expiresAt) > now.getTime());

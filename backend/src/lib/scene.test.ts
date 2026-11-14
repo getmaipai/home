@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { fuseScene, getScene, setScene, dropScene, clearScenes, sceneCounts, SCENE_TTL, observationsForTurn, homeAssistantObservations, sceneForTests, getWeatherCue, setWeatherCue, setWeatherFailure, type FusedScene } from "@/lib/scene";
 
-afterEach(() => { clearScenes(); });
+afterEach(() => { clearScenes(); __resetHeardSongsForTests(); });
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { comparePrompt } from "@/lib/promptPrefix";
 import type { SceneObservation } from "@maipai/spec/gen/ts/scene-observation.js";
 import { renderScene, fitSceneBlock } from "@/lib/turnMachine/nodes/context";
+import { noteNowPlaying, __resetHeardSongsForTests } from "@/lib/music/heardSong";
 import { TraceRecorder } from "@/lib/turnMachine/trace";
 
 const person = (id: string | null, band: "child" | "teen" | "adult" | "unknown" = "adult", level: "confirmed" | "tentative" | "claimed" = "confirmed") => ({ person_id: id, label: null, relation: id ? "household" as const : "unknown" as const, band, level });
@@ -85,6 +86,15 @@ describe("scene fusion", () => {
     expect(rendered).not.toMatch(/40\.71|-74\.01/);
     expect(renderScene({ ...scene, place: { ...scene.place!, setting: "indoor" } }, at, actor, [actor])).not.toContain("said they are outside");
     expect(renderScene({ ...scene, weather: { ...scene.weather as object, expires_at: at } }, at, actor, [actor])).not.toContain("Weather here:");
+  });
+  test("media adds one title-free scene line only during playback", () => {
+    const at = 1_000_000;
+    const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
+    noteNowPlaying("scene-device", { title: "Secret Album" }, at);
+    const playing = renderScene(empty(), at, sage, [sage], "robot", "scene-device");
+    expect(playing).toContain("Media is playing on this device.");
+    expect(playing).not.toContain("Secret Album");
+    expect(renderScene(empty(), at, sage, [sage], "robot", "other-device")).not.toContain("Media is playing on this device.");
   });
   test("context trace scene counts contain the measured token count and no identity fields", () => {
     const trace = new TraceRecorder();
