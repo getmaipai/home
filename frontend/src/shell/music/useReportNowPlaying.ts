@@ -3,7 +3,8 @@ import { musicPlayer, type MusicPlayerStore } from "./musicPlayer";
 
 type Payload = { state: "playing" | "stopped"; song_id?: string; key?: string; title?: string };
 type Timers = { setTimeout(fn: () => void, ms: number): ReturnType<typeof setTimeout>; clearTimeout(id: ReturnType<typeof setTimeout>): void; setInterval(fn: () => void, ms: number): ReturnType<typeof setInterval>; clearInterval(id: ReturnType<typeof setInterval>): void; pagehide(fn: () => void): () => void };
-const defaultTimers: Timers = { setTimeout, clearTimeout, setInterval, clearInterval, pagehide(fn) { window.addEventListener("pagehide", fn); return () => window.removeEventListener("pagehide", fn); } };
+// Arrow wrappers: the browser rejects setTimeout called with the timers object as `this` ("Can only call Window.setTimeout on instances of Window"), which crashed every page.
+const defaultTimers: Timers = { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (id) => clearTimeout(id), setInterval: (fn, ms) => setInterval(fn, ms), clearInterval: (id) => clearInterval(id), pagehide(fn) { window.addEventListener("pagehide", fn); return () => window.removeEventListener("pagehide", fn); } };
 async function post(payload: Payload, keepalive = false): Promise<void> {
   try { await fetch("/api/music/now-playing", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), keepalive }); } catch { /* player reporting is best effort */ }
 }
