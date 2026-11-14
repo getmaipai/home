@@ -10,7 +10,7 @@ import { issueDeviceCommand, registerDeviceAlarmActionHandler } from "@/lib/devi
 import { readHomeAssistantEntityState, subscribeHomeAssistantEntities, type HomeAssistantChange } from "@/lib/integrations/homeAssistant";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { trigger } from "@/lib/notifications";
-import { dismiss, isSuppressed, shouldReAlert, type SuppressionKind } from "@/lib/sceneSuppression";
+import { dismiss, isSuppressed, type SuppressionKind } from "@/lib/sceneSuppression";
 import { setBounded } from "@/lib/boundedMap";
 import { isOwnerOrAdminRole } from "@/wire";
 
@@ -79,17 +79,9 @@ function broadcast(alarm: AlarmRow, state: "active" | "cleared" | "false_alarm",
 async function activate(mapping: SafetySensorMapping, opts: { afterHold?: boolean } = {}): Promise<void> {
   if (activeForSensor(mapping.entityId)) return;
   const suppressionKind = suppressedKind(mapping.kind);
-  if (!opts.afterHold && suppressionKind && isSuppressed({ kind: suppressionKind, room: mapping.area, now: clockNow() })) {
-    const suppressionNow = clockNow();
-    setBounded(heldSensors, mapping.entityId, mapping, MAX_HELD_SENSORS);
-    const secondSource = [...heldSensors.values()].some((held) => held.kind === mapping.kind && held.entityId !== mapping.entityId);
-    if (!secondSource) return;
-    let state;
-    try { state = await readHomeAssistantEntityState(mapping.entityId); }
-    catch { return; }
-    const should = state?.state === "on" && shouldReAlert({ kind: suppressionKind, room: mapping.area, escalation: { secondSource: true }, now: suppressionNow });
-    if (!should) return;
-  }
+  // Owner's ruling (2026-11-14): the hold covers ONLY the sensor that was acknowledged. Any other sensor, of any room, alarms at once,
+  // so an acknowledged kitchen alarm can never keep a bedroom smoke sensor silent. The held sensor stays quiet until the hold ends.
+  if (!opts.afterHold && suppressionKind && heldSensors.has(mapping.entityId) && isSuppressed({ kind: suppressionKind, room: mapping.area, now: clockNow() })) return;
   heldSensors.delete(mapping.entityId);
   const at = new Date().toISOString();
   const row: AlarmRow = {
@@ -168,7 +160,6 @@ function startCandidate(mapping: SafetySensorMapping): void {
 
 function clearActive(entityId: string): void {
   cancelCandidate(entityId);
-  heldSensors.delete(entityId);
   const row = activeForSensor(entityId);
   if (!row) return;
   const at = new Date().toISOString();
@@ -183,7 +174,6 @@ function onChange(mappingById: Map<string, SafetySensorMapping>, change: HomeAss
   if (change.newState.state === "on") {
     if (change.oldState?.state !== "on") startCandidate(mapping);
   } else if (["off", "clear", "disarmed"].includes(change.newState.state)) {
-    heldSensors.delete(change.entityId);
     clearActive(change.entityId);
   }
 }
@@ -239,7 +229,7 @@ function endAlarm(row: AlarmRow, state: "acknowledged" | "false_alarm", personId
       // The acknowledged sensor may still read on: it is a source for the hold's re-alert rules (a second sensor agrees, or it is still on when the hold ends).
       setBounded(heldSensors, row.sensorId, { entityId: row.sensorId, area: row.area, kind: row.kind as SafetyAlarmKind }, MAX_HELD_SENSORS);
     }
-    void trigger("safety.alarm_dismissed", { area: row.area ?? "home" });
+    trigger("safety.alarm_dismissed", { area: row.area ?? "home" }).catch((error) => console.error(`[safety-alarm] dismissed notification failed: ${String(error)}`));
   }
 }
 

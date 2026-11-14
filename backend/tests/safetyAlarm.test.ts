@@ -139,6 +139,31 @@ describe("deterministic safety alarm path", () => {
     expect(db.select().from(safetyAlarms).all()).toHaveLength(2);
   });
 
+  test("an acknowledged sensor holds only itself: another sensor alarms at once, even after the first cleared", async () => {
+    const { adult } = await setupHousehold();
+    setHouseholdSettingValue("safety.alarm.sensors", JSON.stringify([
+      { entityId: "binary_sensor.kitchen_smoke", area: "Kitchen", kind: "smoke" },
+      { entityId: "binary_sensor.hall_smoke", area: "Hall", kind: "smoke" },
+    ]));
+    const ws = new FakeSocket();
+    __setSafetyAlarmDebounceForTests(5);
+    __setHomeAssistantEventAdaptersForTests({ socket: () => ws as never, readState: async (_settings, entityId) => ({ entity_id: entityId, state: "on", attributes: {} }) });
+    refreshSafetyAlarmSensors(); connect(ws); await new Promise((resolve) => setTimeout(resolve, 0));
+    const msg = (entityId: string, old: "on" | "off", next: "on" | "off") => ({ type: "event", event: { event_type: "state_changed", data: { entity_id: entityId, old_state: { entity_id: entityId, state: old, attributes: {} }, new_state: { entity_id: entityId, state: next, attributes: {} } } } });
+    ws.message(msg("binary_sensor.kitchen_smoke", "off", "on")); await new Promise((resolve) => setTimeout(resolve, 15));
+    const first = db.select().from(safetyAlarms).get()!;
+    applyAlarmAction(adult.id, first.id, "acknowledge");
+    ws.message(msg("binary_sensor.kitchen_smoke", "on", "off")); await new Promise((resolve) => setTimeout(resolve, 5));
+    // The same sensor going on again inside the hold stays quiet.
+    ws.message(msg("binary_sensor.kitchen_smoke", "off", "on")); await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(db.select().from(safetyAlarms).where(eq(safetyAlarms.state, "active")).all()).toHaveLength(0);
+    // A different sensor of the same kind alarms immediately, the first having cleared.
+    ws.message(msg("binary_sensor.hall_smoke", "off", "on")); await new Promise((resolve) => setTimeout(resolve, 15));
+    const active = db.select().from(safetyAlarms).where(eq(safetyAlarms.state, "active")).all();
+    expect(active).toHaveLength(1);
+    expect(active[0]!.sensorId).toBe("binary_sensor.hall_smoke");
+  });
+
   test("hold expiry re-alerts once only while the sensor remains on", async () => {
     const { adult } = await setupHousehold();
     const ws = new FakeSocket();
