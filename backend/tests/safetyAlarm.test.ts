@@ -194,6 +194,29 @@ describe("deterministic safety alarm path", () => {
     expect(db.select().from(safetyAlarms).where(eq(safetyAlarms.state, "active")).all()).toHaveLength(1);
   });
 
+  test("a failed sensor read at hold expiry is retried, never lost", async () => {
+    const { adult } = await setupHousehold();
+    const ws = new FakeSocket();
+    let now = Date.now();
+    let failReads = 0;
+    __setSafetyAlarmClockForTests(() => now);
+    __setSafetyAlarmDebounceForTests(5);
+    __setHomeAssistantEventAdaptersForTests({ socket: () => ws as never, readState: async (_settings, entityId) => {
+      if (failReads > 0) { failReads--; throw new Error("hub unreachable"); }
+      return { entity_id: entityId, state: "on", attributes: {} };
+    } });
+    refreshSafetyAlarmSensors(); connect(ws); await new Promise((resolve) => setTimeout(resolve, 0));
+    ws.message(change("on")); await new Promise((resolve) => setTimeout(resolve, 15));
+    const alarm = db.select().from(safetyAlarms).get()!;
+    applyAlarmAction(adult.id, alarm.id, "acknowledge");
+    now += 15 * 60_000;
+    failReads = 1;
+    initSafetyAlarm();
+    await new Promise((resolve) => setTimeout(resolve, 2_150));
+    // The first read failed, the next tick read "on": the sensor still alarms.
+    expect(db.select().from(safetyAlarms).where(eq(safetyAlarms.state, "active")).all()).toHaveLength(1);
+  });
+
   test("quiet_here silences only that robot while the household alarm stays active", async () => {
     const { adult, childId, robotId } = await setupHousehold();
     const ws = new FakeSocket();
@@ -203,10 +226,13 @@ describe("deterministic safety alarm path", () => {
     ws.message(change("on")); await new Promise((resolve) => setTimeout(resolve, 15));
     const alarm = db.select().from(safetyAlarms).get()!;
     db.update(people).set({ role: "child", birthdate: `${new Date().getFullYear() - 8}-01-01` }).where(eq(people.id, childId)).run();
-    expect(applyRobotAlarmAction(robotId, alarm.id, "quiet_here", { person: childId, basis: "voice", level: "confirmed" })).toEqual({ ok: true, state: "quiet_here" });
-    expect(applyRobotAlarmAction(robotId, alarm.id, "quiet_here", { person: childId, basis: "claimed", level: "confirmed" })).toMatchObject({ ok: false, status: 403 });
+    const childRobotId = issueDeviceToken(childId, "robot", "Rin robot").deviceId;
+    // A3: quiet_here is for a person's OWN device. A child cannot quiet an adult's robot.
+    expect(applyRobotAlarmAction(robotId, alarm.id, "quiet_here", { person: childId, basis: "voice", level: "confirmed" })).toMatchObject({ ok: false, status: 403 });
+    expect(applyRobotAlarmAction(childRobotId, alarm.id, "quiet_here", { person: childId, basis: "voice", level: "confirmed" })).toEqual({ ok: true, state: "quiet_here" });
+    expect(applyRobotAlarmAction(childRobotId, alarm.id, "quiet_here", { person: childId, basis: "claimed", level: "confirmed" })).toMatchObject({ ok: false, status: 403 });
     expect(applyAlarmAction(childId, alarm.id, "acknowledge")).toMatchObject({ ok: false, status: 403 });
     expect(db.select().from(safetyAlarms).get()?.state).toBe("active");
-    expect(JSON.parse(db.select().from(safetyAlarms).get()!.quietedDevices)).toEqual([robotId]);
+    expect(JSON.parse(db.select().from(safetyAlarms).get()!.quietedDevices)).toEqual([childRobotId]);
   });
 });

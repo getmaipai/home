@@ -25,6 +25,7 @@ const DEBOUNCE_MS = 10_000;
 const candidates = new Map<string, { timer: ReturnType<typeof setTimeout>; mapping: SafetySensorMapping }>();
 const lastRepeatAt = new Map<string, number>();
 const heldSensors = new Map<string, SafetySensorMapping>();
+const checkingHeld = new Set<string>();
 const MAX_HELD_SENSORS = 200;
 let clockNow = () => Date.now();
 let unsubscribe: (() => void) | undefined;
@@ -88,7 +89,6 @@ async function activate(mapping: SafetySensorMapping, opts: { afterHold?: boolea
     catch { return; }
     const should = state?.state === "on" && shouldReAlert({ kind: suppressionKind, room: mapping.area, escalation: { secondSource: true }, now: suppressionNow });
     if (!should) return;
-    heldSensors.clear();
   }
   heldSensors.delete(mapping.entityId);
   const at = new Date().toISOString();
@@ -125,13 +125,18 @@ function checkHeldSensors(now: number): void {
     const kind = suppressedKind(mapping.kind);
     if (!kind) { heldSensors.delete(entityId); continue; }
     if (isSuppressed({ kind, room: mapping.area, now })) continue;
-    heldSensors.delete(entityId);
+    if (checkingHeld.has(entityId)) continue;
+    checkingHeld.add(entityId);
+    // The entry leaves the map only after a successful read: a failed read is retried on the next tick, never lost.
     void (async () => {
       try {
         const state = await readHomeAssistantEntityState(mapping.entityId);
+        heldSensors.delete(entityId);
         if (state?.state === "on") await activate(mapping, { afterHold: true });
       } catch (error) {
         console.error(`[safety-alarm] held sensor read failed for ${mapping.entityId}: ${String(error)}`);
+      } finally {
+        checkingHeld.delete(entityId);
       }
     })();
   }
@@ -244,13 +249,17 @@ export function applyAlarmAction(personId: string, alarmId: string, action: Safe
   const person = db.select().from(people).where(and(eq(people.id, personId), eq(people.enabled, true), isNull(people.deletedAt))).get();
   if (!person) return { ok: false, status: 403, error: "The speaker is not a household member" };
   const role = person.role;
+  let robotOwner: string | null = null;
   if (robotId) {
-    const robot = db.select({ id: devices.id }).from(devices)
+    const robot = db.select({ id: devices.id, personId: devices.personId }).from(devices)
       .where(and(eq(devices.id, robotId), eq(devices.kind, "robot"))).get();
     if (!robot) return { ok: false, status: 403, error: "The device is not a paired robot" };
+    robotOwner = robot.personId ?? null;
   }
   const isAdult = speakerAgeBand(person, new Date()) === "adult";
   if (action !== "quiet_here" && !isAdult) return { ok: false, status: 403, error: "Only an adult can act on a safety alarm" };
+  // A minor may quiet only their own robot (A3: quiet_here is for a person's own device); it never silences another person's robot.
+  if (action === "quiet_here" && !isAdult && robotOwner !== personId) return { ok: false, status: 403, error: "A minor can quiet only their own robot" };
   if (action === "false_alarm" && !isOwnerOrAdminRole(role)) return { ok: false, status: 403, error: "Only an admin can mark a safety alarm as false" };
   if (action === "quiet_here" && !robotId) return { ok: false, status: 400, error: "quiet_here needs a robot" };
   const row = db.select().from(safetyAlarms).where(and(eq(safetyAlarms.id, alarmId), eq(safetyAlarms.state, "active"))).get();
@@ -298,7 +307,7 @@ export function __resetSafetyAlarmForTests(): void {
   repeatTimer = undefined;
   for (const entityId of candidates.keys()) cancelCandidate(entityId);
   lastRepeatAt.clear();
-  heldSensors.clear();
+  heldSensors.clear(); checkingHeld.clear();
   clockNow = () => Date.now();
   debounceMs = DEBOUNCE_MS;
 }
