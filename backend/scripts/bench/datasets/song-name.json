@@ -1,5 +1,5 @@
 {
-  "about": "SONG-NAME: rows for song_name (bench_row song-name). song_name rows expect a call; action/title fields, when present, constrain the expected arguments. N rows expect no song_name call. Discussion rows include prior turns so follow-up intent is measured in context. Persona names only. Rows prefixed heldout- were added after the wording was tuned and were not used for tuning. Rows prefixed heldout2- were added after a second wording round and were not used for tuning.",
+  "about": "SONG-NAME: rows for song_name (bench_row song-name). song_name rows expect a call; action/title fields, when present, constrain the expected arguments. N rows expect no song_name call. Discussion rows include prior turns so follow-up intent is measured in context. Persona names only. Rows prefixed heldout- were added after the wording was tuned and were not used for tuning. Rows prefixed heldout2- were added after a second wording round and were not used for tuning. Round 6 (2026-11-14): rows with id prefix heldout3- were written before the playback and question change and are the only rows cited for the pass decision; every earlier row is the frozen dev split. heldout3-home-* rows carry the Home-playing context line and expect NO listen (the answer is already in the context).",
   "rows": [
     {
       "id": "name-this",
@@ -206,6 +206,171 @@
       "id": "heldout2-negative-dance",
       "label": "N",
       "text": "Dance for me!"
+    },
+    {
+      "id": "heldout3-negative-skip-this",
+      "label": "N",
+      "text": "Skip this one."
+    },
+    {
+      "id": "heldout3-negative-repeat",
+      "label": "N",
+      "text": "Put this on repeat."
+    },
+    {
+      "id": "heldout3-negative-playlist-maker",
+      "label": "N",
+      "text": "Who made this playlist?"
+    },
+    {
+      "id": "heldout3-negative-louder-please",
+      "label": "N",
+      "text": "Louder please."
+    },
+    {
+      "id": "heldout3-negative-hate-next",
+      "label": "N",
+      "text": "I hate this song, next."
+    },
+    {
+      "id": "heldout3-negative-pause",
+      "label": "N",
+      "text": "Pause."
+    },
+    {
+      "id": "heldout3-negative-turn-down",
+      "label": "N",
+      "text": "Turn it down."
+    },
+    {
+      "id": "heldout3-negative-play-again",
+      "label": "N",
+      "text": "Play that again."
+    },
+    {
+      "id": "heldout3-negative-make-louder",
+      "label": "N",
+      "text": "Make it louder."
+    },
+    {
+      "id": "heldout3-negative-shuffle",
+      "label": "N",
+      "text": "Shuffle my music."
+    },
+    {
+      "id": "heldout3-name-is-daft-punk",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Is this Daft Punk?"
+    },
+    {
+      "id": "heldout3-name-whos-singing",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Who's singing?"
+    },
+    {
+      "id": "heldout3-name-what-listening",
+      "label": "song_name",
+      "action": "listen",
+      "text": "What are we listening to?"
+    },
+    {
+      "id": "heldout3-name-movie",
+      "label": "song_name",
+      "action": "listen",
+      "text": "This is from a movie, which one?"
+    },
+    {
+      "id": "heldout3-name-name-this",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Name this."
+    },
+    {
+      "id": "heldout3-name-what-song",
+      "label": "song_name",
+      "action": "listen",
+      "text": "What song is this?"
+    },
+    {
+      "id": "heldout3-name-who-sings",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Who sings this?"
+    },
+    {
+      "id": "heldout3-name-name-tune",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Name that tune."
+    },
+    {
+      "id": "heldout3-name-shazam",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Shazam this."
+    },
+    {
+      "id": "heldout3-name-whats-track",
+      "label": "song_name",
+      "action": "listen",
+      "text": "What's this track?"
+    },
+    {
+      "id": "heldout3-home-what-song",
+      "label": "N",
+      "text": "What song is this?",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Home is playing Moonlight Drive by Quill (Night Tide, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen."
+        }
+      ]
+    },
+    {
+      "id": "heldout3-home-who-sings",
+      "label": "N",
+      "text": "Who sings this?",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Home is playing Moonlight Drive by Quill (Night Tide, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen."
+        }
+      ]
+    },
+    {
+      "id": "heldout3-home-name-tune",
+      "label": "N",
+      "text": "Name that tune.",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Home is playing Moonlight Drive by Quill (Night Tide, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen."
+        }
+      ]
+    },
+    {
+      "id": "heldout3-home-pause",
+      "label": "N",
+      "text": "Pause.",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Home is playing Moonlight Drive by Quill (Night Tide, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen."
+        }
+      ]
+    },
+    {
+      "id": "heldout3-home-skip",
+      "label": "N",
+      "text": "Skip this one.",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Home is playing Moonlight Drive by Quill (Night Tide, 2024) on this robot's person's player. You already know this song; answer from this line and do not call song_name listen."
+        }
+      ]
     }
   ]
 }
