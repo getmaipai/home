@@ -1379,7 +1379,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceMatch.ts` | computeVoiceVerdict |
 | `backend/src/lib/voiceMatchVerdict.ts` | voiceMatchSessionKey, setVoiceMatchVerdict, consumeVoiceMatchVerdict, clearVoiceMatchVerdictsForTests |
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
-| `backend/src/lib/voiceSamples.ts` | MAX_SAMPLES, MAX_SECONDS, trimSilence, normalizePeak, joinReferenceClips, prepareStyleClip |
+| `backend/src/lib/voiceSamples.ts` | cleanFilter, __cleanForTests, cleanWav, MAX_SAMPLES, MAX_SECONDS, trimSilence |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
 | `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, makeInspiredVoiceToolSpec |
