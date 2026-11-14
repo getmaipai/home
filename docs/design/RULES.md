@@ -653,3 +653,26 @@ A3. **An event is context, never a claim, and speaks only through the existing p
 
 A4. **A device turn still carries no audio.** The turn route accepts no sound; events reach the model
     only as the scene block.
+
+## Words in pictures
+
+Owner rule (Jesse, 2026-11-13). Design and build rows: `docs/design/text-in-pictures-2026-11-14.md`.
+
+W1. **A picture that must show words is made with a text-capable model.** A poster, flyer, card, sticker or merch graphic with words, an ad,
+    a sign, an album, song, film or video cover with a title, and a template with a headline blank are made with ERNIE-Image-Turbo (the
+    model the bakeoff found good at text), whatever the household's Standard picture choice is. If it is not installed or cannot run, nothing
+    starts and one plain line says what to add and where (Settings, AI and models); it is never made on a model that misspells.
+W2. **A picture that must show no words says so.** Every model that is not text-capable (Klein, Z-Image and any model the catalog does not
+    mark `text: true`) gets the addendum "No text, no letters, no words, no logos anywhere in the picture." and a negative prompt where the
+    model takes one, whenever the picture has no words. It is never added to a picture that has words, and never to an edit of a picture
+    that already has text.
+W3. **The model decides that a picture has words, never a word rule.** The chat model passes the exact words in the tool call (`words`); a
+    template or a feature that prints a title (a cover, a poster) declares them from its own data; the Create page asks the chat model once
+    when nothing declared them. No regex, word list or code reading of the person's wording decides it (chat rule 1).
+W4. **The words are checked.** The finished picture's text is read back on the Mac (Apple Vision text recognition, no network) and compared
+    with the exact words; a miss is re-made up to two more times in the same job; if it still misses, the picture is shown with one plain
+    line naming the words that did not come out right and offering another take. A check that could not run never says the words are right.
+W5. **The exact words are kept.** They are written in the prompt in quotes, "spelled exactly as written", and stored on the creation record,
+    so Another take, Fix the words and Make clearer know them.
+W6. **Every outcome has a plain line.** Model missing, words wrong, check not run, chat model unavailable: one line beside the button that
+    says what happened and what to do (RULES S6, never silence).

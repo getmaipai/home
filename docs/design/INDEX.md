@@ -92,6 +92,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [ai-models-glance-2026-10-26.md](ai-models-glance-2026-10-26.md) | approved 2026-10-26 (architect); amends ai-models-simple | AIMODELS-GLANCE-2026-10-26 |
 | [add-a-chat-model-2026-10-27.md](add-a-chat-model-2026-10-27.md) | approved 2026-10-27 (architect) | MODEL-ADD-01 |
 | [image-model-bakeoff-2026-10-25.md](image-model-bakeoff-2026-10-25.md) | current; decided, not built | none yet (slices in section 6) |
+| [text-in-pictures-2026-11-14.md](text-in-pictures-2026-11-14.md) | current; decided, not built | TEXT-PIC-01 to TEXT-PIC-07 |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (cut 2026-11-06 in BACKLOG; today the Integrations rows it supersedes) |
 | [connector-instances-2026-11-06.md](connector-instances-2026-11-06.md) | architect APPROVED 2026-11-06 (CONNECTOR-INSTANCES-01); no code | SPEC-INSTANCES-01, CONN-INSTANCES-01 |
