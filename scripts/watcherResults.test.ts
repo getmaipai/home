@@ -19,6 +19,17 @@ describe("main watcher", () => {
     expect(run(f, "watcher.sh", ["run-once"]).stdout).toContain("up to date");
   }, 60_000);
 
+  test("checked T2 wanted sha runs first, writes green, and clears wanted ancestors", () => {
+    const f = fixture();
+    const sha = git(f.main, "rev-parse", "HEAD");
+    const wanted = join(f.data, "t2-wanted"); mkdirSync(wanted, { recursive: true });
+    writeFileSync(join(wanted, sha), "wt/checked\nbackend/src/db/migrations/1000_test.sql\n2026-11-14T00:00:00Z\n");
+    const out = run(f, "watcher.sh", ["run-once"], { ...f.env, MAIPAI_LAND_T2_CMD: "echo t2-pass" });
+    expect(out.status).toBe(0); expect(out.stdout).toContain("checked T2 green");
+    expect(existsSync(join(f.data, "t2-green", sha))).toBe(true);
+    expect(existsSync(join(wanted, sha))).toBe(false);
+  }, 60_000);
+
   test("LAND-FIRST-01: in direct mode a failing post-landing check (typecheck or boot) records red and skips the suite; gated and unset skip the check", () => {
     const f = fixture();
     expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);

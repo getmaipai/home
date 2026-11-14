@@ -250,6 +250,8 @@ for want in glob.glob(os.path.join(wdir, '*.want')):
         continue
     parts = rd(want).split('\t')
     if not parts[0]: continue
+    if parts[0] == 'github':
+        continue
     msg = holds(parts[0], parts[1:])
     if not msg: continue
     try:
@@ -779,7 +781,7 @@ outbox_summary() {
 }
 
 run_one() {
-  local request="$1" safety_ok=0 entry_checked=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
+  local request="$1" safety_ok=0 entry_checked=0 entry_express=0 boot_note="" gen_settings="" base base_state ref_before local_branch branch sha started output origin_branch conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md" "frontend/src/lib/settingCopy.generated.ts")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -968,7 +970,10 @@ PY
       landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests skipped (DIRECT mode: the nightly runs them)"
       safety_files=""
     fi
-    if [[ -n "$safety_files" ]]; then
+    if [[ -n "$safety_files" && "$entry_checked" == 1 && "$(lander_mode)" == direct ]]; then
+      landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests run in the watcher after landing"
+      entry_label="static and boot checks on top of main; safety-surface tests after landing"
+    elif [[ -n "$safety_files" ]]; then
       # HOST-GUARD-09: under memory pressure, or while the host guard paused heavy work, the safety tests do not start; the entry is held
       # and retried (2026-11-12: two landings paused 2,400 s at pressure 2 and died "unfinished"). The sharder itself exits 75 ("deferred
       # (memory)") when pressure arrives mid-run; that is held the same way, never a pass and never a failure of the branch.
@@ -1022,9 +1027,24 @@ PY
     phase "pushing to GitHub"
     entry_github="$(outbox_flush_sync "$main_sha")"
   fi
+  if [[ -n "$safety_files" && "$entry_checked" == 1 && "$(lander_mode)" == direct ]]; then
+    local watch_dir="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
+    mkdir -p "$watch_dir/t2-wanted"
+    printf '%s\n' "$branch" >"$watch_dir/t2-wanted/$main_sha"
+    printf '%s\n' "$safety_files" >>"$watch_dir/t2-wanted/$main_sha"
+    printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$watch_dir/t2-wanted/$main_sha"
+    landing_note="${landing_note:+$landing_note; }landed; safety-surface tests run in the watcher, ship waits for them"
+  fi
   phase_close
   seconds=$(( $(date +%s) - started ))
   atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
+  python3 - "$data/notes/${branch//\//-}.json" "$entry_express" <<'PY'
+import json,sys
+try: d=json.load(open(sys.argv[1]))
+except Exception: d={}
+d['express']=sys.argv[2]=='1'
+with open(sys.argv[1],'w') as f: json.dump(d,f); f.write('\n')
+PY
   log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
   rm -f "$request" "$output"
   echo "landed: $branch at $sha${entry_github:+ (GitHub main: $entry_github)}"

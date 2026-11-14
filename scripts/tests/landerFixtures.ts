@@ -20,6 +20,7 @@ const env: Record<string, string | undefined> = {
   MAIPAI_PIPELINE_BIN: pipelineBin,
   MAIPAI_LAND_CHECKOUT: warm,
   MAIPAI_LAND_SKIP_INSTALL: "1",
+  MAIPAI_LAND_SKIP_DEPS: "1", // fixture checkouts have no real installs; the dependency check has its own test in landQueue.test.ts
   MAIPAI_LAND_UPDATE_MAIN: "0",
   MAIPAI_LAND_GIT_ENV: "",
   GITNET_STATE_DIR: join(scratch, "gitnet-state"),

@@ -514,6 +514,36 @@ checkout_lock_take() {
 }
 checkout_lock_release() { [[ "$(cat "$checkout_lock/pid" 2>/dev/null || true)" != "$$" ]] || rm -rf "$checkout_lock"; }
 
+run_t2_wanted() {
+  local dir="$data/t2-wanted" sha branch files rc=0 output command item
+  [[ -d "$dir" ]] || return 1
+  sha="$(find "$dir" -maxdepth 1 -type f -exec basename {} \; | sort | tail -n 1)"; [[ -n "$sha" ]] || return 1
+  IFS= read -r branch <"$dir/$sha" || branch=unknown
+  files="$(sed -n '2,$p' "$dir/$sha" | sed '$d')"
+  checkout_lock_take || { echo "checked T2 waiting: checkout busy"; return 0; }
+  output="$(mktemp "$data/.t2.$sha.XXXXXX")"
+  if ! gitnet -C "$checkout" fetch origin >/dev/null 2>&1 || ! git -C "$checkout" checkout --detach "$sha" >>"$output" 2>&1; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) checked T2 could not check out $sha ($branch); wanted entry retained" >>"$data/watcher.log"
+    rm -f "$output"; checkout_lock_release; return 0
+  fi
+  install_if_needed || rc=$?
+  command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
+  if (( rc == 0 )); then
+    ( cd "$checkout" && nice -n "${MAIPAI_WATCH_NICE:-10}" env MAIPAI_GATE_MIN_SHARDS=8 MAIPAI_GATE_SHARD_PEAKS_DIR="$main/data-scratch/gate-stats/shard-peaks" bash -c "eval \"$command\"" ) >"$output" 2>&1 || rc=$?
+  fi
+  mkdir -p "$data/t2-green" "$data/reds"
+  if (( rc == 0 )); then
+    : >"$data/t2-green/$sha"
+    while IFS= read -r item; do git -C "$checkout" merge-base --is-ancestor "$item" "$sha" 2>/dev/null && rm -f "$dir/$item"; done < <(find "$dir" -maxdepth 1 -type f -exec basename {} \;)
+    echo "checked T2 green at ${sha:0:7} ($branch)"
+  else
+    { printf 'checked T2 failed: %s\nbranch: %s\nsafety files: %s\n' "$sha" "$branch" "$files"; tail -n 80 "$output"; } >"$data/reds/t2-$sha.md"
+    echo "checked T2 red at ${sha:0:7} ($branch); wanted entry retained"
+  fi
+  rm -f "$output"; checkout_lock_release
+  return 0
+}
+
 run_once() {
   local rc=0
   run_once_body "$@" || rc=$?
@@ -524,6 +554,8 @@ run_once() {
 run_once_body() {
   local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
   local bisect_started bisect_budget bisect_spent
+  mkdir -p "$data/t2-wanted" "$data/t2-green"
+  if [[ -n "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]]; then run_t2_wanted; return 0; fi
   # OUTBOX-01: the watcher tests the pipeline's main, which is a landing ahead of GitHub's while the outbox is still pushing, so a slow
   # or failed fetch only gets a log line; the landed commits are tested all the same.
   GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"

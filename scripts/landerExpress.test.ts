@@ -76,7 +76,7 @@ describe("the express lane", () => {
     const n = note("ex_basic") as Record<string, unknown>;
     expect(n.label).toBe("starts and typechecks on top of main (express: no tests run)");
     expect(String(n.label)).not.toContain("tested");
-    expect(String(n.github)).toMatch(/^pushed/);
+    expect(String(n.github)).toMatch(/^(pushed|push queued)/);
     expect(existsSync(join(data, "boot-ok", landed!))).toBe(true);
     expect(readFileSync(join(data, "notes", "wt-ex_basic.md"), "utf8")).toContain("What was checked: starts and typechecks on top of main");
   }, 120_000);
@@ -243,7 +243,7 @@ describe("land.sh --checked (CHECKED-LANE-01)", () => {
     const f = queueFiles().find((q) => q.endsWith(`-wt-${name}.json`));
     return { r, f, req: f ? JSON.parse(readFileSync(join(data, "queue", f), "utf8")) : undefined };
   };
-  test("in DIRECT mode a --checked landing takes the normal lane with the full checks and the safety tests; the mode file is untouched", () => {
+  test("in DIRECT mode a --checked safety landing records watcher T2; the mode file is untouched", () => {
     const modeFile = join(scratch, "mode-untouched");
     const prior = { c: env.MAIPAI_LAND_CHECK_CMD, t: env.MAIPAI_LAND_T2_CMD, f: env.MAIPAI_MODE_FILE, m: env.MAIPAI_MODE };
     env.MAIPAI_MODE_FILE = modeFile; env.MAIPAI_MODE = "direct";
@@ -258,16 +258,15 @@ describe("land.sh --checked (CHECKED-LANE-01)", () => {
       run("lander.sh", ["run-once"]);
       expect(note("chk_bad").status).toBe("bounced");
       expect(note("chk_bad").reason).toContain("static check failed");
-      // A safety file runs the T2 tests in direct mode too: failing tests bounce it, passing tests land it.
+      // DIRECT lands the safety change without holding the queue for T2.
       env.MAIPAI_LAND_CHECK_CMD = "echo checked";
-      env.MAIPAI_LAND_T2_CMD = "echo t2 failed; exit 1";
-      const t2bad = checked("chk_t2bad", "backend/src/lib/session.ts", "direct");
+      env.MAIPAI_LAND_T2_CMD = `echo called >> ${join(scratch, "inline-t2-called")}`;
+      checked("chk_t2bad", "backend/src/lib/session.ts", "direct");
       run("lander.sh", ["run-once"]);
-      expect(note("chk_t2bad").reason).toContain("safety-surface tests failed");
-      env.MAIPAI_LAND_T2_CMD = "echo t2 ok";
-      checked("chk_t2ok", "backend/src/lib/session.ts", "direct");
-      expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/chk_t2ok");
-      expect(String((note("chk_t2ok") as Record<string, unknown>).label)).toContain("safety-surface tests");
+      expect(note("chk_t2bad").status).toBe("landed");
+      const landedSha = String((note("chk_t2bad") as Record<string, unknown>).main_sha);
+      expect(existsSync(join(env.MAIPAI_WATCH_DATA!, "t2-wanted", landedSha))).toBe(true);
+      expect(existsSync(join(scratch, "inline-t2-called"))).toBe(false);
       expect(existsSync(modeFile)).toBe(false);
     } finally {
       for (const [k, v] of [["MAIPAI_LAND_CHECK_CMD", prior.c], ["MAIPAI_LAND_T2_CMD", prior.t], ["MAIPAI_MODE_FILE", prior.f], ["MAIPAI_MODE", prior.m]] as const) { if (v === undefined) delete env[k]; else env[k] = v; }
@@ -275,9 +274,14 @@ describe("land.sh --checked (CHECKED-LANE-01)", () => {
   }, 180_000);
 
   test("--checked works in GATED mode, and --checked with --express is refused", () => {
-    const g = checked("chk_gated", "chk_gated.txt", "gated");
+    const g = checked("chk_gated", "backend/src/lib/session.ts", "gated"); // a safety file, so GATED must run T2 inline
     expect(g.r.exitCode).toBe(0);
     expect(g.req.checked).toBe(true);
+    env.MAIPAI_LAND_T2_CMD = "echo gated-t2-called >> " + join(scratch, "gated-t2-called");
+    const priorMode = env.MAIPAI_MODE; env.MAIPAI_MODE = "gated"; // GATED still runs T2 inline; only DIRECT hands --checked T2 to the watcher
+    try { expect(run("lander.sh", ["run-once"]).stdout).toContain("landed: wt/chk_gated"); }
+    finally { if (priorMode === undefined) delete env.MAIPAI_MODE; else env.MAIPAI_MODE = priorMode; }
+    expect(existsSync(join(scratch, "gated-t2-called"))).toBe(true);
     rmSync(join(data, "queue", g.f!), { force: true });
     const { w } = change("chk_both");
     const both = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--checked", "--express"], { cwd: w, env: env as Record<string, string>, stdout: "pipe", stderr: "pipe" });

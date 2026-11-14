@@ -16,6 +16,7 @@ git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 [[ -z "$git_env" || ! -f "$git_env" ]] || source "$git_env"
 data="${MAIPAI_SHIP_DATA:-$main/data-scratch/ship}"
 watch="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
+pending_t2="$watch/t2-wanted"
 live="${MAIPAI_SHIP_LIVE:-/usr/local/maipai-home}"
 promote="${MAIPAI_PROMOTE_BIN:-/usr/local/libexec/maipai-promote}"
 sudo_cmd="${MAIPAI_SHIP_SUDO-sudo -n}"
@@ -33,17 +34,18 @@ health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
 # `ship.sh status` answers "is a release deploying right now?" in one line, for people and sessions to run before they say the hub is up or down
 # (2026-10-30: a session reported the hub down without knowing a ship was installing; the lock below was there, nothing read it).
 if [[ "${1:-}" == status ]]; then
+  pending_t2_count="$(find "$pending_t2" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ' || true)"
   status_lock="${MAIPAI_SHIP_LOCK:-$data/ship.lock.d}"
   status_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo unknown)"
   if [[ -n "$health_cmd" ]]; then if eval "$health_cmd" >/dev/null 2>&1; then status_hub=yes; else status_hub=no; fi
   elif curl -fsS -m 5 -o /dev/null "${web_url%/}/healthz" 2>/dev/null; then status_hub=yes; else status_hub=no; fi
   status_pid="$(cat "$status_lock/pid" 2>/dev/null || true)"
   if [[ "$status_pid" =~ ^[0-9]+$ ]] && kill -0 "$status_pid" 2>/dev/null; then
-    echo "deploy: IN PROGRESS ($(cat "$status_lock/what" 2>/dev/null || echo unknown), running $(ps -o etime= -p "$status_pid" 2>/dev/null | tr -d ' ')); live tag $status_tag; hub answering: $status_hub. The hub can be down for a few minutes while it installs: wait for it, do not restart or ship anything."
+    echo "deploy: IN PROGRESS ($(cat "$status_lock/what" 2>/dev/null || echo unknown), running $(ps -o etime= -p "$status_pid" 2>/dev/null | tr -d ' ')); live tag $status_tag; hub answering: $status_hub; pending safety tests: ${pending_t2_count:-0}. The hub can be down for a few minutes while it installs: wait for it, do not restart or ship anything."
   elif pgrep -f "$promote" >/dev/null 2>&1; then
-    echo "deploy: IN PROGRESS (an install is running outside ship.sh); live tag $status_tag; hub answering: $status_hub. Wait for it to finish."
+    echo "deploy: IN PROGRESS (an install is running outside ship.sh); live tag $status_tag; hub answering: $status_hub; pending safety tests: ${pending_t2_count:-0}. Wait for it to finish."
   else
-    echo "deploy: none running; live tag $status_tag; hub answering: $status_hub."
+    echo "deploy: none running; live tag $status_tag; hub answering: $status_hub; pending safety tests: ${pending_t2_count:-0}."
   fi
   exit 0
 fi
@@ -58,6 +60,15 @@ if (( ! dry )) && [[ -f scripts/lib/hostmem.sh ]]; then source scripts/lib/hostm
 gitnet fetch origin || echo "ship.sh: GitHub did not answer$( ((GITNET_TIMED_OUT)) && echo ' in time'); judging against the last known origin/main." >&2
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
 else sha="$(git rev-parse --verify "$target^{commit}" 2>/dev/null)" || die "could not resolve $target to a commit; fetch or check the SHA and retry."; fi
+if [[ -d "$pending_t2" ]]; then
+  while IFS= read -r wanted; do
+    [[ -f "$pending_t2/$wanted" ]] || continue
+    if git merge-base --is-ancestor "$wanted" "$sha" 2>/dev/null; then
+      wanted_branch="$(head -n 1 "$pending_t2/$wanted")"
+      die "sha ${sha:0:7} includes a safety change whose tests have not passed yet (branch $wanted_branch); wait for the watcher or run it"
+    fi
+  done < <(find "$pending_t2" -maxdepth 1 -type f -exec basename {} \;)
+fi
 if ! git merge-base --is-ancestor "$sha" origin/main; then
   # OUTBOX-01: a commit can be landed (on the pipeline's main) before the outbox has pushed it. A hub install pins what GitHub has, so wait for it.
   if git rev-parse --verify -q "$PIPELINE_MAIN_REF^{commit}" >/dev/null && git merge-base --is-ancestor "$sha" "$PIPELINE_MAIN_REF" 2>/dev/null; then

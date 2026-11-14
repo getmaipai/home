@@ -76,6 +76,14 @@ describe("ship pipeline", () => {
     mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n"); const green = run([sha]); if (green.status !== 0) throw new Error(green.stderr + green.stdout); expect(green.status).toBe(0); expect(green.stdout).toContain("shipped:");
     rmSync(join(watch, "green", sha)); const override = run([sha, "--before-green", "--reinstall"]); expect(override.status).toBe(0); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"before_green":true');
   }, 60_000);
+  test("pending checked safety ancestor blocks even before-green and clears after watcher green", () => {
+    const wanted = join(watch, "t2-wanted"); mkdirSync(wanted, { recursive: true });
+    writeFileSync(join(wanted, sha), "wt/safety\nbackend/src/db/migrations/9999_test.sql\n2026-11-14T00:00:00Z\n");
+    const blocked = run([sha, "--before-green", "--dry-run"]);
+    expect(blocked.status).toBe(1); expect(blocked.stderr).toContain("safety change whose tests have not passed yet (branch wt/safety)");
+    rmSync(join(wanted, sha));
+    const green = run([sha, "--before-green", "--dry-run"]); expect(green.status).toBe(0);
+  }, 60_000);
   test("success promotes full SHA and records shipped", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); const out = run([sha]); expect(out.status).toBe(0); expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"shipped"'); expect(out.stdout).toContain("shipped:");
   }, 60_000);
