@@ -479,7 +479,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/backupCrypto.ts` | BACKUP_KEY_NAME, encryptFile, decryptFile |
 | `backend/src/lib/backupTargets.ts` | getSmbTarget, setSmbTarget, removeSmbTarget |
 | `backend/src/lib/benchSampling.ts` | benchChatSampling, seedFields, __setSamplingSeedForBench, promptNow, __setPromptClockForBench, seededOutcomeFor |
-| `backend/src/lib/biometricPrints.ts` | createBiometricPrint, enrollBiometricPrints, listBiometricPrints, decryptBiometricPrintEmbedding, deleteBiometricPrint, visionWatchOf |
+| `backend/src/lib/biometricPrints.ts` | createBiometricPrint, enrollBiometricPrints, listBiometricPrints, decryptBiometricPrintEmbedding, decryptVoicePrintEmbeddingsForPerson, countLiveVoicePrintsForPerson |
 | `backend/src/lib/blocklists/blockViewer.ts` | runAsBlockViewer, currentBlockViewer |
 | `backend/src/lib/blocklists/customHosts.ts` | HOSTS_DENY_KEY, HOSTS_ALLOW_KEY, MAX_CUSTOM_HOSTS, parseHostEntries, validateCustomHosts, customHostRules |
 | `backend/src/lib/blocklists/hostLists.ts` | LISTS_NOT_READY, __setHostHashForTests, normalizeHost, prepareHostIndex, warmHostIndex, __resetHostIndexForTests |
@@ -1375,6 +1375,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceLibrary.ts` | buildVoiceLibrary, searchVoiceLibrary |
 | `backend/src/lib/voiceLibraryData.ts` | VCTK_SPEAKERS |
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
+| `backend/src/lib/voiceMatch.ts` | computeVoiceVerdict |
+| `backend/src/lib/voiceMatchVerdict.ts` | voiceMatchSessionKey, setVoiceMatchVerdict, consumeVoiceMatchVerdict, clearVoiceMatchVerdictsForTests |
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
