@@ -9,10 +9,10 @@
       "text": "Combine pictures will be here. This page is coming soon.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Open Create"
     }
   ]
 }

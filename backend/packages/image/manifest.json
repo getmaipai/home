@@ -40,7 +40,6 @@
           "mode": "browse",
           "pages": [
             "index",
-            "templates",
             "favorites"
           ]
         },
@@ -74,9 +73,8 @@
           "title": "Make",
           "pages": [
             "create",
-            "from-reference",
-            "from-template",
-            "character-sheet"
+            "templates",
+            "creations"
           ]
         },
         {
@@ -84,8 +82,7 @@
           "mode": "create",
           "title": "Edit",
           "pages": [
-            "studio",
-            "combine"
+            "studio"
           ]
         }
       ]
@@ -191,7 +188,7 @@
         "id": "from-reference",
         "label": "From a reference",
         "icon": "camera",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "from-reference"
       },
@@ -199,7 +196,7 @@
         "id": "from-template",
         "label": "From a template",
         "icon": "rectangle-horizontal",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "from-template"
       },
@@ -207,7 +204,7 @@
         "id": "character-sheet",
         "label": "Character sheet",
         "icon": "palette",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "character-sheet"
       },
@@ -223,7 +220,7 @@
         "id": "combine",
         "label": "Combine pictures",
         "icon": "layers",
-        "nav": true,
+        "nav": false,
         "kind": "schema",
         "module": "combine"
       },

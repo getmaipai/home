@@ -141,14 +141,35 @@
             "count": "{count}",
             "tier": "{tier}",
             "reference": "{reference}",
-            "cast": "{cast}"
+            "cast": "{cast}",
+            "template": "{template}"
           }
         }
       }
     },
     {
       "type": "media_shelf",
-      "heading": "Your pictures",
+      "heading": "Templates",
+      "bind": {
+        "source": "package",
+        "path": "templates"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "My creations",
       "bind": {
         "source": "package",
         "path": "recent"

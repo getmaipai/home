@@ -51,6 +51,7 @@ describe("Images Create make", () => {
     expect(readPictureMakeBody({ prompt: "a boat", shape: "sideways" }).ok).toBe(false);
     expect(readPictureMakeBody({ prompt: "a boat", count: "9" }).ok).toBe(false);
     expect(readPictureMakeBody({ prompt: "a boat", references: ["a", "b", "c", "d"] }).ok).toBe(false);
+    expect(readPictureMakeBody({ prompt: "a boat", template: "none" })).toEqual(readPictureMakeBody({ prompt: "a boat" }));
   });
 
   test("a cast id from the Create page's Cast slot reaches the make body, and an unfilled slot reads as empty", () => {

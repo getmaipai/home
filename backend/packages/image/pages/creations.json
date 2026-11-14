@@ -4,15 +4,28 @@
   "title": "My creations",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "folder",
-      "text": "My creations will be here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/image/templates"
-        }
+      "type": "media_shelf",
+      "heading": "My creations",
+      "bind": {
+        "source": "package",
+        "path": "recent"
       },
-      "action_label": "Browse templates"
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "item_subtitle_field": "{subtitle}",
+      "item_badge_field": "badge",
+      "item_meta_field": "meta",
+      "aspect": "square",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/studio",
+          "state": {
+            "file": "{id}"
+          }
+        }
+      }
     }
   ]
 }

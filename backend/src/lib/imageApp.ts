@@ -83,9 +83,17 @@ registerAppData("image", imageAppData);
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
-  const chips = pictureFragmentChips(person);
-  if (chips.length === 0) return;
+  const templates = listTemplates({ actor: person, kind: "picture" });
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
+  const templateChip = {
+    state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true,
+    presentation: "popover", default: "none", quiet_value: "none",
+    options: [{ value: "none", label: "No template" }, ...templates.map((template) => ({ value: template.id, label: template.title }))],
+  };
+  const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
+  if (call?.args) call.args.template = "{template}";
+  const chips = pictureFragmentChips(person);
+  if (chips.length === 0) { bar.chips = [...existing, templateChip]; return; }
   for (const item of existing) if (item && typeof item === "object") {
     const chip = item as Record<string, unknown>;
     if (chip.state === "shape") {
@@ -97,8 +105,7 @@ registerAppPageFill("image", "create", (person, page) => {
     }
     if (chip.state === "count") { chip.group = "Pictures"; chip.icon = "layers"; chip.icon_only = true; }
   }
-  bar.chips = [...existing, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
-  const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
+  bar.chips = [...existing, templateChip, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   if (call?.args) for (const chip of chips) call.args[chip.id] = `{${chip.id}}`;
 });
 function findPromptBar(value: unknown): Record<string, unknown> | undefined {
