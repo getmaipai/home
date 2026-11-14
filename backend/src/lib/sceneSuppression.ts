@@ -26,7 +26,9 @@ function key(h: Pick<Hold, "kind" | "scope" | "deviceId" | "room" | "personId">)
   return JSON.stringify([h.kind, h.scope, h.scope === "device" ? h.deviceId : null, h.scope === "room" ? h.room : null, h.scope === "self" ? h.personId : null]);
 }
 function live(now: number): Hold[] {
-  for (const [k, h] of holds) if (h.until <= now) holds.delete(k);
+  for (const [k, h] of holds) {
+    if (h.until <= now) holds.delete(k);
+  }
   return [...holds.values()];
 }
 function dailyKey(now: number): string { return new Date(now).toISOString().slice(0, 10); }
@@ -74,6 +76,7 @@ export function dismiss(input: DismissInput): { ok: boolean; until: number | nul
 export function isSuppressed(input: { kind: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null; now: number }): boolean {
   return live(input.now).some((h) => {
     if (h.kind !== input.kind) return false;
+    if (h.scope === "household") return true;
     if (h.scope === "self") return !!input.personId && h.personId === input.personId;
     if (h.scope === "device") return !!input.deviceId && h.deviceId === input.deviceId;
     if (h.scope === "room") return !!input.room && h.room === input.room;
@@ -83,14 +86,16 @@ export function isSuppressed(input: { kind: SuppressionKind; deviceId?: string |
 
 export function shouldReAlert(input: { kind: SuppressionKind; deviceId?: string | null; room?: string | null; personId?: string | null;
   escalation: { dbLouder?: number; longerSeconds?: number; secondSource?: boolean }; now: number }): boolean {
-  const candidates = live(input.now).filter((h) => h.kind === input.kind && (h.scope === "household" ||
-    (h.scope === "device" && h.deviceId === (input.deviceId ?? null)) || (h.scope === "room" && h.room === (input.room ?? null)) ||
+  const candidates = [...holds.values()].filter((h) => h.kind === input.kind && (h.until > input.now || (kinds[h.kind].tier === "sensor" && (input.escalation.longerSeconds ?? 0) >= 60)) && (h.scope === "household" ||
+    (h.scope === "device" && h.deviceId === (input.deviceId ?? null)) ||
+    (h.scope === "room" && (h.room === (input.room ?? null) || input.escalation.secondSource === true)) ||
     (h.scope === "self" && h.personId === (input.personId ?? null))));
   const h = candidates.find((hold) => !hold.reAlerted);
   if (!h) return false;
   const e = input.escalation;
   if (!((e.dbLouder ?? 0) >= 6 || (e.longerSeconds ?? 0) >= 60 || e.secondSource === true)) return false;
   h.reAlerted = true;
+  if (h.until <= input.now) holds.delete(key(h));
   return true;
 }
 

@@ -99,6 +99,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  {
+    id: "safety.alarm_dismissed",
+    level: "passive",
+    audience: "adults",
+    template: "The safety alarm in {area} was held for 15 minutes.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
   // The org doc's own worked example ("a safety-flagged turn for a
   // parent" under `immediate`) and a real, previously-unrealized gap:
   // safety.ts's evaluateSafety() has computed `notify_parent` since it

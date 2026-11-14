@@ -10,6 +10,8 @@ import { issueDeviceCommand, registerDeviceAlarmActionHandler } from "@/lib/devi
 import { readHomeAssistantEntityState, subscribeHomeAssistantEntities, type HomeAssistantChange } from "@/lib/integrations/homeAssistant";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { trigger } from "@/lib/notifications";
+import { dismiss, isSuppressed, shouldReAlert, type SuppressionKind } from "@/lib/sceneSuppression";
+import { setBounded } from "@/lib/boundedMap";
 import { isOwnerOrAdminRole } from "@/wire";
 
 export type SafetyAlarmKind = "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel";
@@ -22,6 +24,9 @@ const ALARM_KIND_SET = new Set<SafetyAlarmKind>(["smoke", "carbon_monoxide", "ga
 const DEBOUNCE_MS = 10_000;
 const candidates = new Map<string, { timer: ReturnType<typeof setTimeout>; mapping: SafetySensorMapping }>();
 const lastRepeatAt = new Map<string, number>();
+const heldSensors = new Map<string, SafetySensorMapping>();
+const MAX_HELD_SENSORS = 200;
+let clockNow = () => Date.now();
 let unsubscribe: (() => void) | undefined;
 let repeatTimer: ReturnType<typeof setInterval> | undefined;
 let debounceMs = DEBOUNCE_MS;
@@ -70,8 +75,22 @@ function broadcast(alarm: AlarmRow, state: "active" | "cleared" | "false_alarm",
   }
 }
 
-async function activate(mapping: SafetySensorMapping): Promise<void> {
+async function activate(mapping: SafetySensorMapping, opts: { afterHold?: boolean } = {}): Promise<void> {
   if (activeForSensor(mapping.entityId)) return;
+  const suppressionKind = suppressedKind(mapping.kind);
+  if (!opts.afterHold && suppressionKind && isSuppressed({ kind: suppressionKind, room: mapping.area, now: clockNow() })) {
+    const suppressionNow = clockNow();
+    setBounded(heldSensors, mapping.entityId, mapping, MAX_HELD_SENSORS);
+    const secondSource = [...heldSensors.values()].some((held) => held.kind === mapping.kind && held.entityId !== mapping.entityId);
+    if (!secondSource) return;
+    let state;
+    try { state = await readHomeAssistantEntityState(mapping.entityId); }
+    catch { return; }
+    const should = state?.state === "on" && shouldReAlert({ kind: suppressionKind, room: mapping.area, escalation: { secondSource: true }, now: suppressionNow });
+    if (!should) return;
+    heldSensors.clear();
+  }
+  heldSensors.delete(mapping.entityId);
   const at = new Date().toISOString();
   const row: AlarmRow = {
     id: `alarm-${randomUUID()}`,
@@ -86,9 +105,36 @@ async function activate(mapping: SafetySensorMapping): Promise<void> {
     quietedDevices: "[]",
   };
   db.insert(safetyAlarms).values(row).run();
-  lastRepeatAt.set(row.id, Date.now());
+  lastRepeatAt.set(row.id, clockNow());
   broadcast(row, "active");
   await trigger("safety.alarm", { area: mapping.area ?? "home", kind: mapping.kind });
+}
+
+function suppressedKind(kind: SafetyAlarmKind): SuppressionKind | null {
+  switch (kind) {
+    case "smoke": return "smoke";
+    case "carbon_monoxide": return "co";
+    case "gas": return "gas";
+    case "water_leak": return "water_leak";
+    case "alarm_panel": return "intrusion";
+  }
+}
+
+function checkHeldSensors(now: number): void {
+  for (const [entityId, mapping] of [...heldSensors]) {
+    const kind = suppressedKind(mapping.kind);
+    if (!kind) { heldSensors.delete(entityId); continue; }
+    if (isSuppressed({ kind, room: mapping.area, now })) continue;
+    heldSensors.delete(entityId);
+    void (async () => {
+      try {
+        const state = await readHomeAssistantEntityState(mapping.entityId);
+        if (state?.state === "on") await activate(mapping, { afterHold: true });
+      } catch (error) {
+        console.error(`[safety-alarm] held sensor read failed for ${mapping.entityId}: ${String(error)}`);
+      }
+    })();
+  }
 }
 
 function cancelCandidate(entityId: string): void {
@@ -104,7 +150,9 @@ function startCandidate(mapping: SafetySensorMapping): void {
     void (async () => {
       try {
         const state = await readHomeAssistantEntityState(mapping.entityId);
-        if (state?.state === "on" && safetySensorMappings().some((item) => item.entityId === mapping.entityId)) await activate(mapping);
+        if (state?.state === "on" && safetySensorMappings().some((item) => item.entityId === mapping.entityId)) {
+          await activate(mapping);
+        }
       } catch (error) {
         console.error(`[safety-alarm] final sensor read failed for ${mapping.entityId}: ${String(error)}`);
       }
@@ -115,6 +163,7 @@ function startCandidate(mapping: SafetySensorMapping): void {
 
 function clearActive(entityId: string): void {
   cancelCandidate(entityId);
+  heldSensors.delete(entityId);
   const row = activeForSensor(entityId);
   if (!row) return;
   const at = new Date().toISOString();
@@ -129,6 +178,7 @@ function onChange(mappingById: Map<string, SafetySensorMapping>, change: HomeAss
   if (change.newState.state === "on") {
     if (change.oldState?.state !== "on") startCandidate(mapping);
   } else if (["off", "clear", "disarmed"].includes(change.newState.state)) {
+    heldSensors.delete(change.entityId);
     clearActive(change.entityId);
   }
 }
@@ -138,6 +188,8 @@ export function refreshSafetyAlarmSensors(): void {
   unsubscribe = undefined;
   for (const entityId of candidates.keys()) cancelCandidate(entityId);
   const mappings = safetySensorMappings();
+  const mappedIds = new Set(mappings.map((mapping) => mapping.entityId));
+  for (const entityId of heldSensors.keys()) if (!mappedIds.has(entityId)) heldSensors.delete(entityId);
   const mappingById = new Map(mappings.map((mapping) => [mapping.entityId, mapping]));
   if (mappings.length === 0) return;
   unsubscribe = subscribeHomeAssistantEntities(
@@ -152,7 +204,8 @@ export function initSafetyAlarm(): void {
   if (repeatTimer) clearInterval(repeatTimer);
   repeatTimer = setInterval(() => {
     const intervalSeconds = Math.max(10, Math.min(60, Number(getHouseholdSettingValue("safety.alarm.repeat_seconds") ?? 20) || 20));
-    const now = Date.now();
+    const now = clockNow();
+    checkHeldSensors(now);
     for (const alarm of activeAlarms()) {
       const last = lastRepeatAt.get(alarm.id) ?? Date.parse(alarm.startedAt);
       if (now - last < intervalSeconds * 1_000) continue;
@@ -174,6 +227,15 @@ function endAlarm(row: AlarmRow, state: "acknowledged" | "false_alarm", personId
   lastRepeatAt.delete(row.id);
   const outgoing = state === "false_alarm" ? "false_alarm" : "cleared";
   broadcast({ ...row, state, updatedAt: at, endedAt: at }, outgoing);
+  if (state === "acknowledged") {
+    const kind = suppressedKind(row.kind as SafetyAlarmKind);
+    if (kind) {
+      dismiss({ kind, scope: "household", reason: "handled", room: row.area, now: clockNow(), byBand: "adult", byConfirmedAdult: true });
+      // The acknowledged sensor may still read on: it is a source for the hold's re-alert rules (a second sensor agrees, or it is still on when the hold ends).
+      setBounded(heldSensors, row.sensorId, { entityId: row.sensorId, area: row.area, kind: row.kind as SafetyAlarmKind }, MAX_HELD_SENSORS);
+    }
+    void trigger("safety.alarm_dismissed", { area: row.area ?? "home" });
+  }
 }
 
 export type AlarmActionResult = { ok: true; state: string } | { ok: false; status: 400 | 403 | 404; error: string };
@@ -188,7 +250,7 @@ export function applyAlarmAction(personId: string, alarmId: string, action: Safe
     if (!robot) return { ok: false, status: 403, error: "The device is not a paired robot" };
   }
   const isAdult = speakerAgeBand(person, new Date()) === "adult";
-  if (!isAdult) return { ok: false, status: 403, error: "Only an adult can act on a safety alarm" };
+  if (action !== "quiet_here" && !isAdult) return { ok: false, status: 403, error: "Only an adult can act on a safety alarm" };
   if (action === "false_alarm" && !isOwnerOrAdminRole(role)) return { ok: false, status: 403, error: "Only an admin can mark a safety alarm as false" };
   if (action === "quiet_here" && !robotId) return { ok: false, status: 400, error: "quiet_here needs a robot" };
   const row = db.select().from(safetyAlarms).where(and(eq(safetyAlarms.id, alarmId), eq(safetyAlarms.state, "active"))).get();
@@ -229,12 +291,15 @@ export function listActiveSafetyAlarms(): Array<{ id: string; sensorId: string; 
 }
 
 export function __setSafetyAlarmDebounceForTests(ms: number): void { debounceMs = ms; }
+export function __setSafetyAlarmClockForTests(now: () => number): void { clockNow = now; }
 export function __resetSafetyAlarmForTests(): void {
   unsubscribe?.(); unsubscribe = undefined;
   if (repeatTimer) clearInterval(repeatTimer);
   repeatTimer = undefined;
   for (const entityId of candidates.keys()) cancelCandidate(entityId);
   lastRepeatAt.clear();
+  heldSensors.clear();
+  clockNow = () => Date.now();
   debounceMs = DEBOUNCE_MS;
 }
 

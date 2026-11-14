@@ -17,6 +17,7 @@ export const NOTIFICATION_ES: Readonly<Record<string, string>> = {
   "project.done": "Terminado: {title}.",
   "project.failed": "{title} no terminó: {reason}",
   "alarm.due": "{labelled, select, no {Alarma} other {Alarma: {task}}}",
+  "safety.alarm_dismissed": "La alarma de seguridad en {area} se mantuvo en silencio durante 15 minutos.",
   "remind.due": "Recordatorio: {task}",
   "timer.done": "Tu temporizador de {duration_text} terminó.",
 };
