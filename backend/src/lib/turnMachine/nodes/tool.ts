@@ -200,7 +200,6 @@ import { runSceneTool, sceneToolStreamArgs } from "@/lib/sceneTool";
 import { listActivePeople } from "@/lib/access";
 import { getScene, observeSceneClaims } from "@/lib/scene";
 import { runSongNameTool } from "@/lib/songNameTool";
-import { runImpressionTool } from "@/lib/impressionTool";
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   // RESEARCH-TIER-01: a Thinking or Max turn's rounds share one page budget (researchBudget.ts).
@@ -393,6 +392,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       let text: string;
       let failed = false;
       try {
+        // Loaded on first use: a static import pulls robotClips and synths into this node's start-up and creates an import cycle.
+        const { runImpressionTool } = await import("@/lib/impressionTool");
         text = await runImpressionTool({ actor: state.actor, args, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), identified: !speakerIsAnonymous(state), ...(state.surface === "robot" && state.deviceId ? { deviceId: state.deviceId } : {}) });
       } catch {
         // RULES.md rule 6: a failed tool is recorded as failed (the model is told only the kind, an admin sees the indicator) and never fails the answer.

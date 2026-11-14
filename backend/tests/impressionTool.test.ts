@@ -14,7 +14,7 @@ import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { ROBOT_GUISE_KEY, robotCompanionOf } from "@/lib/robotCompanion";
 import { __reloadRegistryForTests } from "@/lib/settingsRegistry";
 import { issueDeviceToken } from "@/lib/deviceTokens";
-import { remember, recall, embedQueryForRecall } from "@/lib/memory";
+import { remember, list as listMemory } from "@/lib/memory";
 import { robotAssignments } from "@/lib/companionsApp";
 
 beforeEach(() => resetDb());
@@ -80,9 +80,8 @@ describe("held robot synth guise", () => {
     setValue(owner, `device:${device.deviceId}`, "robot.controls", "adult");
     remember(owner, { text: "Sage's dog is named Juniper.", category: "relationship", tier: "durable", scope: "person", person: owner.id, source: "test", importance: 0.8 });
     await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "adult", args: { action: "start", synth: id } });
-    const vector = await embedQueryForRecall("What is my dog's name?");
-    const matches = recall(owner, "What is my dog's name?", { scope: "person", person: owner.id, queryVector: vector, selfOnly: true });
-    expect(matches.map((match) => match.record.text).join(" ")).toContain("Juniper");
+    // The speaker's own memory is still readable (turn-scoped, selfOnly) while the guise is on; listed directly so the test does not depend on the embedder.
+    expect(listMemory(owner, { scope: "person", person: owner.id, selfOnly: true }).map((record) => record.text).join(" ")).toContain("Juniper");
     const rows = db.select().from(memoryRecords).all();
     // The record is the speaker's own (person scope); nothing is written into the synth's shared life, and the synth never learns household facts.
     expect(rows.some((row) => row.scope === "person" && row.source === "robot.guise" && row.text.includes("Rivet"))).toBe(true);
