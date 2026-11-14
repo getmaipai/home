@@ -5,9 +5,10 @@ import { stackReducedChat } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { readCapabilities } from "@/lib/memoryRoom";
+import { identifyReadiness } from "@/lib/music/identify";
 import { __bumpStackEpochForTests, getStackClient, isStackConfigured, stackEpoch, stackRefusal } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
-import type { EngineHealthEntry } from "@/wire";
+import type { EngineHealthEntry, IdentifyHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 
 export type HealthRole = "chat" | "embed" | "background" | "voice" | MakingRole;
@@ -230,4 +231,11 @@ export async function voiceCallReady(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** MUSIC-ID-01: the song-naming row, read the same way as the others and served through healthSnapshot.ts. One reading of `identifyReadiness()`; no client recomputes it. */
+export function identifyHealthEntry(): IdentifyHealthEntry {
+  const readiness = identifyReadiness();
+  const ready = readiness.state === "ready";
+  return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: readiness.line };
 }

@@ -2,7 +2,7 @@ import { emptyLengthRetryCount } from "@/lib/reasoningReserve";
 import { stackEpoch } from "@/lib/stackEngine";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
-import { roleHealth, roleHealthEntry, localRoleHealthEntry, voiceCallReady } from "@/lib/roleHealth";
+import { roleHealth, roleHealthEntry, localRoleHealthEntry, voiceCallReady, identifyHealthEntry } from "@/lib/roleHealth";
 import { composerNotice, makingNotice, type ChatPauseCause, type MakingCause } from "@/lib/failureCopy";
 import { activeTransition, observeModeChange, transitionNotice } from "@/lib/chatTransitions";
 import { reducedChatNotice, reducedChatState } from "@/lib/reducedChat";
@@ -74,7 +74,7 @@ async function buildHealth() {
   const ok =
     [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked" && e.kind !== "stalled") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
-  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video, music, voices }, uptimeSeconds: process.uptime() };
+  return { llm: { empty_length_retry: emptyLengthRetryCount() }, sidecars, brain: getEngineStatus().kind, voice: "stack", voice_call_ready: callReady, ok, engines: { chat, embed, background, voice, image, video, music, voices, identify: identifyHealthEntry() }, uptimeSeconds: process.uptime() };
 }
 
 export type HealthSnapshot = Awaited<ReturnType<typeof buildHealth>>;

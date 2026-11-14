@@ -197,7 +197,7 @@ const HealthResponseSchema = z.object({
    * registered sidecar is unhealthy/crashed. The Health page's headline. */
   ok: z.boolean(),
   // ENGINE-STATUS-MEDIA-01: `image` and `video` say whether a picture or a clip can be started now; they never change `ok`.
-  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, background: EngineHealthSchema, voice: EngineHealthSchema, image: EngineHealthSchema.optional(), video: EngineHealthSchema.optional() }),
+  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, background: EngineHealthSchema, voice: EngineHealthSchema, image: EngineHealthSchema.optional(), video: EngineHealthSchema.optional(), identify: EngineHealthSchema.extend({ identify_state: z.enum(["ready", "no_key", "fpcalc_missing", "nothing_to_match"]), identify_line: z.string() }).optional() }),
   // Settings -> Household -> Health (2026-09-07): the plainest single
   // signal of "is the app actually up," next to which that page puts the
   // restart control (routes/host.ts's POST /api/host/restart).

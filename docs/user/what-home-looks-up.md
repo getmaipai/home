@@ -188,6 +188,18 @@ Open **Settings**, then **Privacy and safety**, and choose **What connects to th
 
 **How to clear what it saved:** Home keeps the answer for one day and may use it for up to seven days. An owner or admin can clear it in **Settings > Backups, storage and updates > Storage > Saved online data**. Home does not know how long MusicBrainz, the Wikimedia Foundation or the Cover Art Archive keeps request records. See its own policy.
 
+## Naming a song
+
+**What it is for:** Telling you what song is playing when you ask "what song is this?", from the app, the assistant or a robot.
+
+**When it happens:** Only when someone asks. Home listens to a short clip, turns it into a fingerprint on this computer and first compares it with the fingerprints of your own music library, with no internet at all. Only when your library has no match, and only while **Name songs online** is On (or Ask each time and the person said yes), Home asks the open AcoustID service. It needs an AcoustID key in **Settings > Music**. At most one lookup a minute for each device.
+
+**What it sends:** An audio fingerprint and the length of the clip, never the audio. The recording is never stored or sent, and Home does not keep a list of what it heard. Nothing about the person who asked goes with it.
+
+**Who can use it:** Everyone. Set **Name songs online** to Off to match your own library only.
+
+**How to clear what it saved:** Home keeps nothing about the clip. A small in-memory list of recent answers lasts only until the hub restarts. Your library's own fingerprints stay on this computer.
+
 ## Film and TV lookup
 
 **What it is for:** Looking up a film or show's director, cast, length, rating or release date.

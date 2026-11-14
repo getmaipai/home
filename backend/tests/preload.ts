@@ -132,6 +132,7 @@ process.env.MAIPAI_WIKIPEDIA_BASE_URL = "http://127.0.0.1:1";
 process.env.MAIPAI_MUSICBRAINZ_BASE_URL = "http://127.0.0.1:1";
 // A scan does not start the background pass in tests; tests call runMusicBrainzPass with a fake client.
 process.env.MAIPAI_MUSICBRAINZ_NO_AUTOSTART = "1";
+process.env.MAIPAI_FINGERPRINT_NO_AUTOSTART = "1";
 
 // Defer imports that reach the database until after MAIPAI_DATA_DIR is set.
 const [{ __setDefaultStackClientForTests }, { startDefaultScriptedStack, setDefaultScriptedStackFixture }] = await Promise.all([
