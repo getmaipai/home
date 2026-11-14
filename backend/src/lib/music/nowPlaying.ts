@@ -2,9 +2,10 @@ import type { PersonRow } from "@/types";
 import { isDeviceConnected, listRobotsPairedUnderPerson } from "@/lib/deviceCommands";
 import { getDeviceState } from "@/lib/deviceStates";
 import { mediaBandOf } from "@/lib/media/band";
+import { robotControlsOf, stricterBand } from "@/lib/robotCompanion";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import { getMusicJobFor } from "@/lib/music/store";
-import { musicJobLockState } from "@/lib/music/lock";
+import { musicJobLockItem, musicJobLockState } from "@/lib/music/lock";
 import { clearNowPlaying, noteNowPlaying } from "@/lib/music/heardSong";
 import { sendSongTitle, shownTitle } from "@/lib/songNameTool";
 
@@ -18,10 +19,10 @@ const clean = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f<>\[\]{}|]/g,
 export function robotsFor(person: PersonRow): string[] {
   return listRobotsPairedUnderPerson(person.id);
 }
-/** Face text and the heard-song context pass the same floor a chat reply passes before a child or teen robot shows it (RULES.md rule 0 robot paragraph); fail closed. */
-export function titleAllowedFor(person: PersonRow, text: string): boolean {
+/** Face text and heard-song context pass the stricter of the player's band and the robot's controls band. */
+export function titleAllowedFor(person: PersonRow, robotId: string, text: string): boolean {
   try {
-    const band = mediaBandOf(person);
+    const band = stricterBand(mediaBandOf(person), robotControlsOf(robotId));
     if (band === "adult") return true;
     const checked = forOutput(evaluateSafety(text, band, "reply"));
     return checked.action === "allow" && !checked.flagged;
@@ -41,7 +42,7 @@ function push(person: PersonRow, text: string): number {
 }
 function clear(person: PersonRow): number {
   entries.delete(person.id);
-  for (const id of robotsFor(person)) { clearNowPlaying(id); lastText.delete(id); }
+  for (const id of robotsFor(person)) clearNowPlaying(id);
   return push(person, "");
 }
 export function reportNowPlaying(person: PersonRow, input: NowPlayingInput, now = Date.now()): { ok: true; pushed: number } {
@@ -54,8 +55,18 @@ export function reportNowPlaying(person: PersonRow, input: NowPlayingInput, now 
     const title = clean(job.request.title || "");
     const artist = job.request.band?.name || undefined;
     const album = undefined as string | undefined, year = undefined as number | undefined;
-    if (!title || !titleAllowedFor(person, [title, artist].filter(Boolean).join(" "))) return { ok: true, pushed: clear(person) };
-    const robotIds = robotsFor(person);
+    if (!title) return { ok: true, pushed: clear(person) };
+    const item = musicJobLockItem(job);
+    const adultOnly = item?.madeAudience === "adult-only";
+    const text = [title, artist].filter(Boolean).join(" ");
+    const paired = robotsFor(person);
+    const robotIds = adultOnly ? [] : paired.filter((id) => titleAllowedFor(person, id, text));
+    const refused = paired.filter((id) => !robotIds.includes(id));
+    for (const id of refused) {
+      clearNowPlaying(id);
+      if (lastText.has(id)) { sendSongTitle(id, ""); lastText.delete(id); }
+    }
+    if (!robotIds.length) { entries.delete(person.id); return { ok: true, pushed: 0 }; }
     const entry: Entry = { title, ...(artist ? { artist: clean(artist) } : {}), ...(album ? { album: clean(album) } : {}), ...(year ? { year } : {}), at: now, expiresAt: now + TTL, robotIds };
     entries.set(person.id, entry);
     let pushed = 0;

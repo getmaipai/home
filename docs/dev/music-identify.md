@@ -16,8 +16,8 @@ candidate. A candidate agreeing on normalized title and artist is marked as agre
 person to discuss. A failed provider does not block another provider. With the online setting Off, only a local library match runs.
 Shazam has its own `music.identify.shazam` switch (shared spec 0.1.397, on by default), shown on the Name songs online card.
 
-The signature encoder follows SongRec's reverse-engineered Shazam format. Attribution: SongRec by Marin Maillard and contributors,
-GPL-3.0; Home is AGPL-3.0, compatible under AGPL section 13. This is an independent implementation, not vendored code.
+Home runs the downloaded MIT-licensed `shazamio-core` helper (installed by the Stack as the "Song signature tool", see
+`backend/src/lib/music/shazamHelper.ts`) as a separate process; Home contains no SongRec code.
 
 ## Measurement
 
@@ -39,10 +39,10 @@ minute. Home resolves a supplied song id against that person's song job, and rej
 the hub. No audio is involved and the state exists only in memory. An entry expires 150 seconds after its last refresh, so closing a
 tab without a stop eventually clears the robot title.
 
-Home sends `song_title` only when the displayed text changes. It targets the person's connected, reachable, unmuted paired robots. If
-an adult has no paired robot, Home targets every connected, reachable, unmuted household robot. Children and teens never send a title
-to another person's robot. The player's title is also a `home` heard-song entry for 15 minutes, with its artist, album and year; it
-outranks listening guesses and becomes “was playing” when playback stops.
+Home sends `song_title` only when the displayed text changes. It targets only the person's connected, reachable, unmuted paired robots.
+Each robot uses the stricter of the player's band and its own controls band for the output floor; an adult-only song never reaches a
+robot face or heard-song context, including when its lock is off. The player's title is also a `home` heard-song entry for 15 minutes
+only on robots allowed to show it; it outranks listening guesses and becomes “was playing” when playback stops.
 
 ## Reading logs
 

@@ -100,7 +100,8 @@ describe("POST /api/music/identify", () => {
       });
       expect(lastIdentifyOutcome()?.status).toBe("needs_confirm");
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toContain("[music-identify] device=person status=needs_confirm");
+      expect(lines[0]).toContain("[music-identify] source=person status=needs_confirm");
+      expect(lines[0]).not.toContain("device=");
       expect(lines[0]).not.toContain("sensitive-test-key");
       expect(lines[0]).not.toContain("AQAAx");
     } finally { info.mockRestore(); }

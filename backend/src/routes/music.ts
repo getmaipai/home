@@ -709,7 +709,7 @@ musicRoutes.openapi(identifyRoute, async (c) => {
   const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { matchSource?: "library" | "shazam" | "acoustid" | "home" } = {}) => {
     const at = Date.now();
     recordIdentifyOutcome({ at, deviceId, status: status as IdentifyOutcome["status"] | "bad_input", reason, seconds: clipSeconds, source, ...extra });
-    console.info(`[music-identify] device=${deviceId ?? "person"} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` source=${extra.matchSource}` : ""}`);
+    console.info(`[music-identify] source=${source} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` provider=${extra.matchSource}` : ""}`);
   };
   if (query.kind === "pcm16" && query.rate === undefined) { finish("bad_input", "missing_rate", null); return c.json({ error: "Add rate=<samples per second> for a pcm16 clip." }, 400, NO_STORE) as never; }
   const declared = Number(c.req.header("content-length"));

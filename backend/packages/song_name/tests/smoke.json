@@ -1,0 +1,17 @@
+{
+  "description": "A listening request without a connected robot returns a clear response.",
+  "inputs": {
+    "action": "listen"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "I could not identify the song just now.",
+      "speech": "I could not identify the song just now."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

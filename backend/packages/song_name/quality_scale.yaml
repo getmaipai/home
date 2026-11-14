@@ -1,0 +1,29 @@
+package: song_name
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: Backend song naming and safety tests cover provider outcomes, discussion actions and access gates.
+  routing_examples:
+    met: true
+    note: Five user phrases are listed in manifest.json.
+  privacy_row_per_data_source:
+    met: true
+    note: The package declares no data sources; provider disclosures are in Home's music settings and privacy manifest.
+  offline_behavior_stated:
+    met: true
+    note: manifest.json states full offline behavior; local library matching works without online providers.
+  smoke_test:
+    met: true
+    note: tests/smoke.json covers a no-robot response without contacting providers.
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+gold:
+  real_service_verified:
+    met: false
+    note: Live provider verification is outside this package fixture.
