@@ -18,6 +18,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [clip, setClip] = useState<File | undefined>();
+  const [extraClips, setExtraClips] = useState<(File | undefined)[]>([undefined, undefined]);
   const [temperature, setTemperature] = useState("");
   const [pitch, setPitch] = useState("");
   const [level, setLevel] = useState<InspiredLevel>("different");
@@ -50,7 +51,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     const voiceName = name.trim();
     setBusy(true); setError(null);
     try {
-      await householdVoicesApi.make({ name: voiceName, clip, temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
+      await householdVoicesApi.make({ name: voiceName, clip, extraClips: inspired ? undefined : extraClips.filter((item): item is File => item !== undefined), temperature: !inspired && canTune && temperature !== "" ? Number(temperature) : undefined, pitchSemitones: !inspired && canTune && pitch !== "" ? Number(pitch) : undefined, inspiredLevel: inspired ? level : undefined, baseVoiceId: inspired && baseId !== "none" ? baseId : undefined });
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
       setBusy(false);
       onMade(voiceName);
@@ -63,6 +64,8 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
   return <form id="add-voice-form" onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
     <div className={FIELD}><label htmlFor="add-voice-name" className="text-base">{i18n._({ id: "Name", message: "Name" })}</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></div>
     <div className={FIELD}><label htmlFor="add-voice-recording" className="text-base">{i18n._({ id: "Recording", message: "Recording" })}</label><Input id="add-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} disabled={busy} /></div>
+    {!inspired ? [0, 1].map((slot) => <div key={slot} className={FIELD}><label htmlFor={`add-voice-recording-${slot + 2}`} className="text-base">{slot === 0 ? i18n._({ id: "Second recording (optional)", message: "Second recording (optional)" }) : i18n._({ id: "Third recording (optional)", message: "Third recording (optional)" })}</label><Input id={`add-voice-recording-${slot + 2}`} type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setExtraClips((old) => old.map((item, index) => index === slot ? event.target.files?.[0] : item))} disabled={busy} /></div>) : null}
+    {!inspired ? <p className={HELP}>{i18n._({ id: "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds.", message: "More recordings make a closer voice. Use clear speech with no music, up to 3 clips; they are joined and the total is kept to about 30 seconds." })}</p> : null}
     {inspired ? <div className={FIELD}>
       <span className="text-base">{i18n._({ id: "How different from the original", message: "How different from the original" })}</span>
       <Select aria-label={i18n._({ id: "How different from the original", message: "How different from the original" })} value={level} options={INSPIRED_LEVELS} getLabel={(id) => inspiredLevelLabel(id as InspiredLevel)} onValueChange={(id) => setLevel(id as InspiredLevel)} disabled={busy} />

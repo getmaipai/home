@@ -28,10 +28,11 @@ export const inspiredLevelLabel = (level: InspiredLevel): string => level === "m
 export const householdVoicesApi = {
   list: () => requestJson<{ voices: HouseholdVoice[] }>("/api/voice/cloned"),
   /** `temperature` and `pitchSemitones` are sent only when given (a blank field means the default). */
-  make: (input: { name: string; clip: File; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
+  make: (input: { name: string; clip: File; extraClips?: File[]; temperature?: number; pitchSemitones?: number; inspiredLevel?: InspiredLevel; baseVoiceId?: string }) => {
     const form = new FormData();
     form.append("label", input.name);
     form.append("file", input.clip);
+    (input.extraClips ?? []).slice(0, 2).forEach((extra, index) => form.append(`file${index + 2}`, extra));
     if (input.temperature !== undefined) form.append("temperature", String(input.temperature));
     if (input.pitchSemitones !== undefined) form.append("pitch_semitones", String(input.pitchSemitones));
     if (input.inspiredLevel !== undefined) form.append("inspired_level", input.inspiredLevel);

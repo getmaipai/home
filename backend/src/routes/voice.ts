@@ -25,6 +25,7 @@ import { isOwnerOrAdmin, mayUseClipVoices } from "@/lib/access";
 import { requireRole } from "@/middleware/auth";
 import { storeVoiceTrace, VoiceTraceUploadSchema } from "@/lib/voiceTrace";
 import { ResolvedSettingSchema } from "@/routes/settings";
+import { joinReferenceClips } from "@/lib/voiceSamples";
 import {
   listClonedVoices,
   saveClonedVoice,
@@ -604,7 +605,7 @@ const clonedUploadRoute = createRoute({
     "Uploads a real audio sample as a new cloned voice. Accepts a multipart " +
     "form with a file field (the audio) and a label field (a display name). " +
     "The upload is bounded by bodyLimit to prevent multi-gigabyte memory use.",
-  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES + 64 * 1024 })] as const,
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES * 3 + 64 * 1024 })] as const,
   request: {
     body: {
       content: {
@@ -651,7 +652,17 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   // V5 "Inspired voice": an inspired_level field (much_lower, lower, different or very_different) makes a new voice based on the clip instead of a copy.
   const inspiredLevel = typeof body.inspired_level === "string" && body.inspired_level ? body.inspired_level : null;
   if (inspiredLevel && (options.temperature !== null || options.pitchSemitones !== null)) return c.json({ error: "An Inspired voice has no liveliness or pitch setting. Make it without them." }, 400);
-  const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel, typeof body.base_voice_id === "string" && body.base_voice_id ? body.base_voice_id : null) : saveClonedVoice(actor, label, bytes, file.type, options);
+  // VOICE-SAMPLES-01: up to three recordings (file, file2, file3) are cleaned and joined into one reference clip.
+  let saveBytes: Uint8Array<ArrayBuffer> = bytes, saveType = file.type;
+  if (!inspiredLevel) {
+    const extra = [body.file2, body.file3].filter((item): item is File => item instanceof File);
+    const all = [file, ...extra];
+    const extensionOf = (item: File) => (/\.([a-z0-9]+)$/i.exec(item.name)?.[1] ?? (item.type.includes("mpeg") ? "mp3" : item.type.includes("flac") ? "flac" : "wav")).toLowerCase();
+    const joined = await joinReferenceClips(await Promise.all(all.map(async (item) => ({ bytes: new Uint8Array(await item.arrayBuffer()), extension: extensionOf(item) }))));
+    if (joined.ok) { saveBytes = joined.wav as Uint8Array<ArrayBuffer>; saveType = "audio/wav"; }
+    else if (extra.length > 0) return c.json({ error: joined.error }, 400);
+  }
+  const result = inspiredLevel ? await saveInspiredVoice(actor, label, bytes, file.type, inspiredLevel, typeof body.base_voice_id === "string" && body.base_voice_id ? body.base_voice_id : null) : saveClonedVoice(actor, label, saveBytes, saveType, options);
   if (!result.ok) {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
