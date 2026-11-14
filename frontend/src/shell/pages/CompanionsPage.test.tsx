@@ -196,7 +196,7 @@ test("the household detail shows settings icon and copy actions", async () => {
   expect(view.getByText(/Talks like a friend/)).toBeTruthy();
   expect(view.getByText(/Wow, a slushie/)).toBeTruthy();
   expect(view.getByRole("button", { name: "Play a sample" })).toBeTruthy();
-  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/create");
+  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/create?step=3");
   expect(view.getByRole("button", { name: "Customize a copy" })).toBeTruthy();
   
   expect(saved).toEqual([]);
@@ -491,7 +491,7 @@ test("Edit opens the three-screen flow for that companion, and the Audience dial
   fireEvent.click(view.getByRole("button", { name: "Cancel" }));
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
-  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create?step=3"));
 });
 
 test("with the preview setting off, New synth and the card menu Edit still open the three-screen flow", async () => {
@@ -502,5 +502,5 @@ test("with the preview setting off, New synth and the card menu Edit still open 
   expect(view.getByRole("link", { name: "New synth" }).getAttribute("href")).toBe("/companions/create");
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
-  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create?step=3"));
 });
