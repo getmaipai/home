@@ -1185,8 +1185,28 @@ export const tileOfArtist = (person: PersonRow, tracks: readonly MediaItem[]): M
   const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
   return { ...rowsOf(person, [pictured])[0]!, id: artistKey(tracks[0]!), title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist" };
 };
-/** The albums the person played last, newest first, one tile each; topped up with the newest albums so the row is never a stub. */
+/** The id of the Liked songs tile on Listen now: it opens and plays like an album whose songs are this person's liked ones. */
+export const LIKED_TILE_ID = "liked-songs";
+/** This person's readable liked songs, newest like first. */
+function likedTracks(person: PersonRow): MediaItem[] {
+  const readable = new Set(musicLibrary(person).map((item) => item.id));
+  return itemsInOrder(person, "audio", [...collectionIds(person, "liked")].reverse(), ALL_TRACKS).filter((item) => readable.has(item.id));
+}
+/** An album's songs by its id; the Liked songs tile id answers with the liked songs, in the order they were liked. */
+function albumTracksFor(person: PersonRow, id: string): MediaItem[] {
+  return id === LIKED_TILE_ID ? likedTracks(person) : albumOrder(groupTracks(musicLibrary(person), "album").get(id) ?? []);
+}
+function likedTile(person: PersonRow, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> {
+  const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
+  return { ...rowsOf(person, [pictured])[0]!, id: LIKED_TILE_ID, title: "Liked songs", channel: songCount(tracks.length), kind: "track", queue_mode: "album" };
+}
+/** The albums the person played last, newest first, one tile each; topped up with the newest albums so the row is never a stub. Liked songs lead when there are any. */
 function quickAlbums(person: PersonRow, max: number): Array<MediaRow & Record<string, unknown>> {
+  const liked = noDiscovery(person) ? [] : likedTracks(person);
+  const lead = liked.length ? [likedTile(person, liked)] : [];
+  return [...lead, ...quickAlbumTiles(person, max - lead.length)];
+}
+function quickAlbumTiles(person: PersonRow, max: number): Array<MediaRow & Record<string, unknown>> {
   const groups = groupTracks(musicLibrary(person), "album");
   const keys: string[] = [];
   for (const item of itemsInOrder(person, "audio", recentProgress(person.id, 120).map((progress) => progress.media_id), 60)) {
@@ -1326,8 +1346,9 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     }).sort((a, b) => a.title.localeCompare(b.title));
   }
   if (dataId === "header" && params.scope === "album") {
-    const tracks = albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []);
+    const tracks = albumTracksFor(person, params.id ?? "");
     if (tracks.length === 0) return [];
+    if (params.id === LIKED_TILE_ID) return [{ ...likedTile(person, tracks), meta: "Playlist", footer_lines: [durationLine(tracks)].filter((line): line is string => !!line), visibility: { mode: "shared", people: [], can_manage: false }, made_at: tracks[0]!.added_at, shuffle_id: `shuffle:${LIKED_TILE_ID}`, share_id: LIKED_TILE_ID }];
     const years = [...new Set(tracks.map((item) => item.year).filter((year): year is number => !!year))];
     const genres = [...new Set(tracks.map((item) => item.genre?.trim()).filter((genre): genre is string => !!genre))];
     const tile = albumTile(person, params.id!, tracks);
@@ -1381,7 +1402,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
       meta: `Playlist · ${songCount(tracks.length)}`, footer_lines: [durationLine(tracks)], visibility: playlistVisibility(person, collection), candidates: memberCandidates(person, collection), made_at: collection.created_at }];
   }
   if (dataId === "album") {
-    const tracks = albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []);
+    const tracks = albumTracksFor(person, params.id ?? "");
     const discs = new Set(tracks.map((item) => item.disc_no ?? 1));
     return trackRows(person, tracks, discs.size > 1 ? (item) => ({ disc_label: `Disc ${item.disc_no ?? 1}` }) : undefined);
   }
@@ -1469,7 +1490,7 @@ export function startMusicQueue(person: PersonRow, args: Record<string, unknown>
     const seed = library.find((item) => item.id === id || (seedKind === "artist" && artistKey(item) === id) || (seedKind === "album" && albumKey(item) === id) || (seedKind === "genre" && item.genre === id));
     if (seed) tracks = radioTracks(library, seed);
   } else if (mode === "artist") tracks = albumOrder(library.filter((item) => artistKey(item) === id)).sort((a, b) => (a.album ?? "").localeCompare(b.album ?? ""));
-  else if (mode === "album") tracks = albumOrder(library.filter((item) => albumKey(item) === id));
+  else if (mode === "album") tracks = id === LIKED_TILE_ID ? likedTracks(person) : albumOrder(library.filter((item) => albumKey(item) === id));
   else if (mode === "playlist") {
     const collection = playlistFor(person, id)?.collection;
     if (collection) tracks = playlistTracks(person, collection);

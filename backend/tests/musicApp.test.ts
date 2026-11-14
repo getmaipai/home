@@ -233,6 +233,18 @@ test("Listen now data is per person: another person's play never shows in my rec
   expect(call(sprout, "history", { scope: "quick" }).map((row) => row.id)).not.toContain(id(3));
 });
 
+test("Listen now quick tiles lead with Liked songs when there are liked songs, and the tile opens and plays as an album", () => {
+  expect(call(atlas, "history", { scope: "quick" }).map((row) => row.id)).not.toContain("liked-songs");
+  expect(setListed(atlas, "audio", "liked", id(3), true).ok).toBe(true);
+  const tiles = call(atlas, "history", { scope: "quick" });
+  expect(tiles[0]).toMatchObject({ id: "liked-songs", title: "Liked songs", queue_mode: "album" });
+  expect(tiles.length).toBeLessThanOrEqual(6);
+  expect(call(atlas, "album", { id: "liked-songs" }).map((row) => row.id)).toEqual([id(3)]);
+  expect(call(atlas, "header", { scope: "album", id: "liked-songs" })[0]).toMatchObject({ title: "Liked songs" });
+  expect(startMusicQueue(atlas, { id: "liked-songs", mode: "album" }).ok).toBe(true);
+  expect(call(sprout, "history", { scope: "quick" }).map((row) => row.id)).not.toContain("liked-songs");
+});
+
 test("genre tiles each carry a safe hsl colour and no two tiles share a hue (MUSIC-POLISH-01)", () => {
   const genres = ["Chamber Folk", "Soft Rock", "Electronic", "Indie Pop", "Jazz", "Blues", "Ambient", "Hip Hop"];
   genres.forEach((genre, n) => { db.update(mediaItems).set({ genre }).where(eq(mediaItems.id, id(n % 5 + 1))).run(); });
