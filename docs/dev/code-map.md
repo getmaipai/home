@@ -985,7 +985,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
-| `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
+| `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, homeOrAway, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable |
 | `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
 | `backend/src/lib/prefixPrewarm.ts` | prewarmFailureReason, notePrefix, prewarmPrefix, prewarmConversation, rewarmConversation, prewarmPrefixHit |
