@@ -392,6 +392,21 @@ describe("failures are plain, never a crash", () => {
     expect(job.state).toBe("failed");
     expect(job.error).toContain(INGREDIENTS_FAILURE_COPY.no_memory);
   });
+  test("a submit refusal for a Max reference video waits and retries", async () => {
+    for (const code of ["queue_full", "no_memory"]) {
+      ingredientRefusal = { status: 429, code, error: "temporarily unavailable" };
+      const outcome = await run(await chatWithPictures(actor, 1), { request: "the girl plays" });
+      const id = (outcome.result?.data as { videoJobId?: string }).videoJobId!;
+      await until(() => getVideoJobFor(actor, id)?.state === "queued");
+      const queuedRequest = getVideoJobFor(actor, id)!.request as { submitQueueFullHolds?: number; submitMemoryHolds?: number };
+      expect(queuedRequest.submitQueueFullHolds ?? queuedRequest.submitMemoryHolds).toBeGreaterThan(0);
+      ingredientRefusal = null;
+      const { releaseHouseholdQueue } = await import("@/lib/jobs/householdQueue");
+      await releaseHouseholdQueue();
+      await until(() => fake.jobs.length > 0);
+      expect(getVideoJobFor(actor, id)?.state).toBe("running");
+    }
+  });
 });
 
 describe("a picture that is already a reference sheet", () => {

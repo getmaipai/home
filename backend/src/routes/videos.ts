@@ -140,12 +140,17 @@ export function referenceSteps(progress: ReferenceProgress) {
 
 function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; detailed: boolean; max?: boolean }) {
   const file = job.state === "done" ? job.files[0] : undefined;
+  // Queue holds are persisted on the phase/riseReason while the runner may
+  // still be settling a refusal. Present the canonical queued state and copy.
+  const phaseHold = job.phase?.startsWith("held:") === true;
+  const held = job.state === "queued" && (job.riseReason != null || phaseHold || job.phase === "requeued_memory");
+  const state = held && (job.state === "queued" || job.state === "running") ? "queued" : job.state;
   return {
-    id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
-    label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? plainStageLabel(getLive(job.id)?.stageLabel, laneOfPerson(actor) === "child" ? "child" : "adult") ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
+    id: job.id, state, percent: state === "done" ? 100 : job.percent,
+    label: state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : state === "running" ? plainStageLabel(getLive(job.id)?.stageLabel, laneOfPerson(actor) === "child" ? "child" : "adult") ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.request.reference?.request ?? job.prompt, kind: job.kind,
-    error: job.state === "failed" ? job.error : null,
+    error: state === "failed" ? job.error : null,
     note: job.state === "done" ? job.request.edit?.note ?? job.request.create?.note ?? null : null,
     ...(job.request.refProgress && (job.state === "queued" || job.state === "running") ? { phases: referenceSteps(job.request.refProgress) } : {}),
     ...(job.request.reference?.sheetFileIds.length ? { sheets: job.request.reference.sheetFileIds.map((id) => `/api/files/${encodeURIComponent(id)}/content`) } : {}),
