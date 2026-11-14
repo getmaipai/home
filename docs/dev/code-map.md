@@ -883,8 +883,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
+| `backend/src/lib/music/shazamHelper.ts` | findShazamPython, wavOf, makeSignature |
 | `backend/src/lib/music/shazamLookup.ts` | SHAZAM_HOST, SHAZAM_USER_AGENT, SHAZAM_QUIET_MS, __resetShazamForTests, shazamQuietUntil, shazamBody |
-| `backend/src/lib/music/shazamSignature.ts` | SIGNATURE_RATE, makeSignature, crc32, encodeSignature, signatureUri, decodeSignature |
 | `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/soundAudio.ts` | LOOP_FADE_SECONDS, wavOfPcm, crossfadeLoopWav, mixSoundAtWav, m4aToWav, wavToM4a |
