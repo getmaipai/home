@@ -1063,8 +1063,11 @@ companionsRoutes.openapi(saveRoute, async (c) => {
   if (!mayEdit(actor, id) || speakerAgeBand(actor, new Date()) === "child") return c.json({ error: "Only the author or an admin can save this companion." }, 403);
   const original = getHouseholdCompanion(id)?.companion; if (!original) return c.json({ error: "That household companion could not be found." }, 404);
   const look = readLook(id);
-  if (!look.rest || look.sheet?.state !== "approved") return c.json({ error: "Go back to the look screen and approve the starting picture.", go_back_to: "look" as const }, 409);
-  if (!readStates(id).states.idle?.approved) return c.json({ error: "Go back to animations and approve the idle animation.", go_back_to: "animations" as const }, 409);
+  // A picture and an animated character are optional (owner, 2026-11-14): a synth with no look at all saves its voice, personality and details without one.
+  // Once someone has started a look (a picture, a sheet or an approved clip), the existing checks apply so a half-made look is never published.
+  const hasLook = look.versions.length > 0 || Boolean(look.sheet) || Object.values(readStates(id).states).some((row) => row?.approved);
+  if (hasLook && (!look.rest || look.sheet?.state !== "approved")) return c.json({ error: "Go back to the look screen and approve the starting picture.", go_back_to: "look" as const }, 409);
+  if (hasLook && !readStates(id).states.idle?.approved) return c.json({ error: "Go back to animations and approve the idle animation.", go_back_to: "animations" as const }, 409);
   const preset = body.personality === "custom" ? null : COMPANION_PERSONALITIES[body.personality];
   const band = speakerAgeBand(actor, new Date());
   const checkedLines = (values: readonly string[], forBand: "child" | "teen" | "adult") => values.map((v) => v.replaceAll("{name}", original.display_name)).filter((line) => { const verdict = forOutput(evaluateSafety(line, forBand, "reply")); return verdict.action !== "refuse" && !carriesCrisisSignal(verdict); });
@@ -1081,7 +1084,7 @@ companionsRoutes.openapi(saveRoute, async (c) => {
   if (!result.ok) return c.json({ error: result.error }, 400);
   const appearance = appearanceStatus(id);
   let published = false;
-  if (appearance.can_publish || !appearance.published) {
+  if (hasLook && (appearance.can_publish || !appearance.published)) {
     const publishError = await publishAppearance(id, actor);
     if (publishError) { const go_back_to = publishError.go_back_to, error = go_back_to === "look" ? "Go back to the look screen and check the starting picture." : "Go back to animations and check the approved clips."; setHouseholdCompanionStatus(id, "draft"); return c.json({ error, go_back_to }, publishError.status); }
     published = true;

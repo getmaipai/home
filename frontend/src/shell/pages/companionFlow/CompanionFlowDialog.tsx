@@ -38,8 +38,8 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
       if (id) { setDraft((current) => ({ ...current, id })); setAsking(true); } else leave();
       return;
     }
-    // A draft that holds no picture is clutter; ask once whether to keep it.
-    if (draft.id && draft.pictures === 0) setAsking(true); else leave();
+    // A new draft that holds no picture is clutter; ask once whether to keep it. A synth that already exists (editing) is never put up for discard.
+    if (!companionId && draft.id && draft.pictures === 0) setAsking(true); else leave();
   }
   async function discard() {
     setDiscarding(true); setError("");

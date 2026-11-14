@@ -368,10 +368,18 @@ describe("companion backstory and Save routes", () => {
     expect((await request(`companions/${made.value.id}/backstory/generate`, other, "POST", {})).status).toBe(403);
   });
 
-  test("Save requires an approved starting picture and approved idle animation", async () => {
+  test("a synth with no picture or animation saves its voice and personality (a look is optional)", async () => {
+    const author = addPerson("save-nolook-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "No look" }, { display_name: "Author", person_id: "save-nolook-author" }); if (!made.ok) throw new Error(made.error);
+    const response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "friendly" });
+    expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ status: "ready", published: false });
+    expect(getHouseholdCompanion(made.value.id)?.companion).toMatchObject({ voice_id: "voice-test", status: "ready" });
+  });
+
+  test("Once a look is started, Save requires an approved starting picture and approved idle animation", async () => {
     const author = addPerson("save-gates-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Save gates" }, { display_name: "Author", person_id: "save-gates-author" }); if (!made.ok) throw new Error(made.error);
+    const first = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "first", width: 1024, height: 1024, from: null });
     let response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "friendly" });
-    expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ go_back_to: "look" });
+    expect(first.id).toBeTruthy(); expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ go_back_to: "look" });
     const png = await transparentPng(), version = addVersion(made.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(made.value.id, version.id); updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(made.value.id, "Author");
     response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "friendly" });
     expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ go_back_to: "animations" });
