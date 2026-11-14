@@ -3,6 +3,7 @@ import { getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingValue 
 import { getDeviceById } from "@/lib/devices";
 import { mayUseClipVoices } from "@/lib/access";
 import { companionLayersOf } from "@/lib/robotCompanion";
+import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { voicePresetName } from "@/lib/voiceResolve";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
@@ -24,8 +25,11 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
     const layers = companionLayersOf(input.deviceId, input.actor, input.band ?? "child");
     const guiseSynth = layers.guise ? layers.synth : null;
     const synthVoice = (id: string) => {
+      // The household voice setting for the synth wins; the voice chosen in the synth's own details (its voice_id) is next.
       const value = getHouseholdSettingValue(companionVoiceKey(id));
-      return typeof value === "string" && value && value !== VOICE_ENGINE_DEFAULT ? value : VOICE_ENGINE_DEFAULT;
+      if (typeof value === "string" && value && value !== VOICE_ENGINE_DEFAULT) return value;
+      const own = getHouseholdCompanion(id)?.companion?.voice_id;
+      return typeof own === "string" && own ? own : VOICE_ENGINE_DEFAULT;
     };
     if (guiseSynth) selected = synthVoice(guiseSynth.id);
     else if (typeof robotVoice === "string" && robotVoice !== VOICE_ENGINE_DEFAULT) selected = robotVoice;
