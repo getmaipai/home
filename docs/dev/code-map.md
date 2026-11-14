@@ -683,6 +683,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/subject.ts` | clippedEdges, subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |
 | `backend/src/lib/imaging/tools.ts` | submitImageTool, fetchImageToolResult, runImageTool, removeBackground, upscale |
+| `backend/src/lib/impressionTool.ts` | IMPRESSION_UNKNOWN_LINE, impressionAvailable, runImpressionTool |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, withoutUnfitJobs |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |
@@ -1069,7 +1070,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotAssets.ts` | ROBOT_ASSETS, robotAssetPath, verifyRobotAssetFile, isRobotAssetAvailable, ensureRobotAssets, ensureRobotAssetIds |
 | `backend/src/lib/robotCheckin.ts` | ROBOT_CHECKIN_ONLINE_MS, recordRobotCheckin, getRobotCheckin, getRobotUnitOnlineAt, forgetRobotCheckin |
 | `backend/src/lib/robotClips.ts` | buildRobotClips, clipTextPassesFloor, robotClipBundlePath, robotClipBundleExists, readRobotClipBundle, robotClipAssetForDevice |
-| `backend/src/lib/robotCompanion.ts` | ROBOT_CONTROLS_KEY, ROBOT_COMPANION_KEY, companionAudienceOf, companionFloor, companionInfo, allCompanions |
+| `backend/src/lib/robotCompanion.ts` | ROBOT_CONTROLS_KEY, ROBOT_COMPANION_KEY, ROBOT_GUISE_KEY, companionAudienceOf, companionFloor, companionInfo |
 | `backend/src/lib/robotCredentials.ts` | storeRobotCredential, getRobotCredential, getRobotCredentialForHostKey, hasRotatedRobotCredential, robotNeedsPasswordRotation |
 | `backend/src/lib/robotDiscovery.ts` | discoverRobots |
 | `backend/src/lib/robotHost.ts` | __setRobotHostReleaseForTests, robotHostRelease, robotHostRunningVersion, __resetRobotHostsForTests, getRobotHostRecord, updateRobotHostRecord |
