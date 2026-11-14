@@ -114949,6 +114949,12 @@
                                 "url": {
                                   "type": "string"
                                 },
+                                "has_file": {
+                                  "type": "boolean"
+                                },
+                                "media_type": {
+                                  "type": "string"
+                                },
                                 "seed": {
                                   "type": "number",
                                   "nullable": true,
@@ -115443,6 +115449,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -115932,6 +115944,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -116441,6 +116459,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -116958,6 +116982,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -117527,6 +117557,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -118055,6 +118091,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -118892,6 +118934,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -119438,6 +119486,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -119948,6 +120002,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -120464,6 +120524,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -121018,6 +121084,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -121709,6 +121781,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -122226,6 +122304,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -122749,6 +122833,12 @@
                                 "type": "string"
                               },
                               "url": {
+                                "type": "string"
+                              },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
                                 "type": "string"
                               },
                               "seed": {
@@ -123327,6 +123417,12 @@
                               "url": {
                                 "type": "string"
                               },
+                              "has_file": {
+                                "type": "boolean"
+                              },
+                              "media_type": {
+                                "type": "string"
+                              },
                               "seed": {
                                 "type": "number",
                                 "nullable": true,
@@ -123869,6 +123965,112 @@
           },
           "409": {
             "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client-errors": {
+      "post": {
+        "tags": [
+          "Client errors"
+        ],
+        "summary": "Send a scrubbed browser error to the Home log",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "error",
+                      "unhandledrejection",
+                      "boundary",
+                      "player"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "stack": {
+                    "type": "string",
+                    "maxLength": 12000
+                  },
+                  "route": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "song_id": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "build": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Error accepted."
+          },
+          "400": {
+            "description": "The report is not valid JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The report is too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many reports. Try again in a minute.",
             "content": {
               "application/json": {
                 "schema": {
