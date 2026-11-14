@@ -1730,6 +1730,7 @@ commons_archive_sha256() {
     spec-v0.1.389) printf '%s\n' "5df46b509d183b441995ae55f4683dece5f630489bdee532d1c550ea7457acb9" ;;
     spec-v0.1.393) printf '%s\n' "2586434867ad5eb24eb6b98c86787172acdc4169ddc727bdb2c9e63c323e5f95" ;;
     spec-v0.1.394) printf '%s\n' "224d9dd91fa69c4e81d58f56f6f088059ec5be5e23c077f294fc576beb1683e1" ;;
+    ui-v0.5.665) printf '%s\n' "a2b7f4a86a44b9af695e23290940892bd9370e3c2bc89a60e6e336d81e501415" ;;
     *) return 1 ;;
   esac
 }
