@@ -141,7 +141,7 @@ const voiceChips = (voice: VoiceMode): ComposerChipData[] => {
     { id: "voice", label: group, group, icon: "mic-vocal", iconOnly: true, value: voice.selectedId, onValueChange: (next) => voice.setVoice(String(next)), options,
       disabledReason: options.length === 0 ? i18n._({ id: "No voices are ready yet.", message: "No voices are ready yet." }) : undefined },
   ];
-  if (tags.length) chips.push({ id: "tag", label: i18n._({ id: "Add a tag", message: "Add a tag" }), group: i18n._({ id: "Tags", message: "Tags" }), icon: "hash", iconOnly: true, value: NONE, onValueChange: (next) => { if (next) voice.setScript(withTag(voice.script, String(next))); }, options: tags.map((tag) => ({ value: tag, label: `[${tag}]` })) });
+  if (tags.length) chips.push({ id: "tag", label: i18n._({ id: "Add a tag", message: "Add a tag" }), group: i18n._({ id: "Tags", message: "Tags" }), icon: "captions", iconOnly: true, value: NONE, onValueChange: (next) => { if (next) voice.setScript(withTag(voice.script, String(next))); }, options: tags.map((tag) => ({ value: tag, label: `[${tag}]` })) });
   return chips;
 };
 
