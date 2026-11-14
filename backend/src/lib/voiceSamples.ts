@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voiceShift";
 import { createHash } from "node:crypto";
 import { findFfmpeg } from "@/lib/ffmpegPath";
+import { appendLogLine } from "@/lib/log";
 import { deleteStemsJob, enhanceSpeech, fetchStem, getStemsJob, stemsStatus, stemsStatusReady, submitStems, type StackStem } from "@/lib/music/stack";
 
 /** VOICE-CLEAN-01: what the person chose to clean from a recording before it is used as a voice sample. */
@@ -21,31 +22,39 @@ export const ECHO_FALLBACK_NOTICE = "The echo remover is not installed, so a lig
 export async function removeEcho(wav: Uint8Array): Promise<Uint8Array | null> {
   return __enhanceForTests.run ? __enhanceForTests.run(wav) : enhanceSpeech(wav);
 }
-export const __isolateForTests: { run: ((wav: Uint8Array) => Promise<Uint8Array | null>) | null } = { run: null };
+export const __isolateForTests: { run: ((wav: Uint8Array) => Promise<Uint8Array | { reason: string } | null>) | null } = { run: null };
 const ISOLATE_WAIT_MS = 4 * 60_000;
 const ISOLATE_POLL_MS = 1_500;
 
 /** Keeps only the voice: the Stack's stem splitter (the same one that splits a song) separates it from music and other sounds, and its vocals
  * track is the clip. Null when the splitter is not installed or ready, or gives nothing; the caller says so. */
-export async function isolateVoice(wav: Uint8Array): Promise<Uint8Array | null> {
-  if (__isolateForTests.run) return __isolateForTests.run(wav);
-  if (!stemsStatusReady(await stemsStatus())) return null;
+export async function isolateVoice(wav: Uint8Array): Promise<Uint8Array | { reason: string }> {
+  if (__isolateForTests.run) return (await __isolateForTests.run(wav)) ?? { reason: "the splitter gave nothing" };
+  if (!stemsStatusReady(await stemsStatus())) return { reason: "the splitter is not installed or not ready" };
   let job: string | null = null;
   try {
     job = await submitStems(Buffer.from(wav).toString("base64"), createHash("sha256").update(wav).digest("hex"), "owned_file");
     const deadline = Date.now() + ISOLATE_WAIT_MS;
     while (Date.now() < deadline) {
       const status = await getStemsJob(job);
-      if (status.state === "failed" || status.state === "cancelled") return null;
+      if (status.state === "failed" || status.state === "cancelled") {
+        appendLogLine(`voice.isolate made=no state=${status.state} code=${status.code ?? "none"}`);
+        return { reason: status.code === "no_memory" ? "there is not enough free memory right now (close other large programs, wait a minute and try again)" : `the splitter stopped (${status.code ?? status.state})` };
+      }
       if (status.state === "done") {
         const vocals = ((status.data ?? []) as unknown as StackStem[]).find((entry) => entry.stem === "vocals");
-        if (!vocals) return null;
-        return await clipToWav(await fetchStem(vocals.url), "m4a");
+        if (!vocals) return { reason: "the splitter returned no voice track" };
+        return (await clipToWav(await fetchStem(vocals.url), "m4a")) ?? { reason: "the voice track could not be read back" };
       }
       await new Promise((resolve) => setTimeout(resolve, ISOLATE_POLL_MS));
     }
-    return null;
-  } catch { return null; }
+    appendLogLine("voice.isolate made=no reason=timeout");
+    return { reason: "it took longer than 4 minutes" };
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "error";
+    appendLogLine(`voice.isolate made=no reason=request code=${code}`);
+    return { reason: `the Stack refused or did not answer (${code})` };
+  }
   finally { if (job) void deleteStemsJob(job); }
 }
 
@@ -135,8 +144,9 @@ export async function joinReferenceClips(clips: { bytes: Uint8Array; extension: 
   for (const clip of clips) {
     let raw = await clipToWav(clip.bytes, clip.extension);
     if (raw && clean.isolate) {
-      raw = await isolateVoice(raw);
-      if (!raw) return { ok: false, error: "Isolating the voice needs the Stack's stem splitter, which is not ready. Turn off Isolate the voice, or install it in Settings, AI and models, and try again." };
+      const isolated = await isolateVoice(raw);
+      if (!(isolated instanceof Uint8Array)) return { ok: false, error: `Isolating the voice did not work: ${isolated.reason}. Try again, or turn off Isolate the voice.` };
+      raw = isolated;
     }
     let cleanNow = clean;
     if (raw && clean.echo) {

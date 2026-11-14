@@ -73,7 +73,7 @@ describe("isolate the voice", () => {
     __isolateForTests.run = async () => null;
     const bad = await joinReferenceClips([{ bytes: tone(8, 0.2), extension: "wav" }], { isolate: true });
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.error).toContain("stem splitter");
+    if (!bad.ok) expect(bad.error).toContain("Isolating the voice did not work");
     __isolateForTests.run = null;
   });
 });
