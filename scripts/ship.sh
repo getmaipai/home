@@ -65,7 +65,13 @@ if [[ -d "$pending_t2" ]]; then
     [[ -f "$pending_t2/$wanted" ]] || continue
     if git merge-base --is-ancestor "$wanted" "$sha" 2>/dev/null; then
       wanted_branch="$(head -n 1 "$pending_t2/$wanted")"
-      die "sha ${sha:0:7} includes a safety change whose tests have not passed yet (branch $wanted_branch); wait for the watcher or run it"
+      # DIRECT is "run first, checked after" (owner rule 2026-11-14: iteration must not wait on the watcher's suite): warn and ship. GATED refuses.
+      [[ -f scripts/lib/mode.sh ]] && source scripts/lib/mode.sh
+      if [[ "$(mode_get 2>/dev/null || echo unset)" == direct ]]; then
+        echo "ship.sh: warning: sha ${sha:0:7} includes a safety change whose watcher tests have not passed yet (branch $wanted_branch); DIRECT mode ships it, the watcher result follows." >&2
+      else
+        die "sha ${sha:0:7} includes a safety change whose tests have not passed yet (branch $wanted_branch); wait for the watcher or run it"
+      fi
     fi
   done < <(find "$pending_t2" -maxdepth 1 -type f -exec basename {} \;)
 fi

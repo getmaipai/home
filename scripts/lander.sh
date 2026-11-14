@@ -956,6 +956,11 @@ PY
 
     changed_files="$(git -C "$checkout" diff --name-only "$base"...HEAD 2>/dev/null || true)"
     safety_files="$(safety_surface_files "$changed_files")"
+    # A safety change made only of docs (RULES.md, design notes, any .md) cannot break the running app: in DIRECT mode it carries no test obligation.
+    if [[ -n "$safety_files" && "$(lander_mode)" == direct ]] && [[ -z "$(printf '%s\n' "$safety_files" | grep -vE '^(docs/|.*\.md$)' || true)" ]]; then
+      landing_note="${landing_note:+$landing_note; }tier: T2 files are docs only; no safety suite owed (DIRECT mode)"
+      safety_files=""
+    fi
     if [[ "$entry_express" == 1 ]]; then
       # The express lane runs no test suite (SINGLE-WRITER-01): typecheck of the changed workspaces on top of main, then the boot check.
       safety_files=""

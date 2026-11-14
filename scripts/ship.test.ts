@@ -81,6 +81,9 @@ describe("ship pipeline", () => {
     writeFileSync(join(wanted, sha), "wt/safety\nbackend/src/db/migrations/9999_test.sql\n2026-11-14T00:00:00Z\n");
     const blocked = run([sha, "--before-green", "--dry-run"]);
     expect(blocked.status).toBe(1); expect(blocked.stderr).toContain("safety change whose tests have not passed yet (branch wt/safety)");
+    mkdirSync(join(main, "scripts", "lib"), { recursive: true }); copyFileSync(join(import.meta.dir, "lib", "mode.sh"), join(main, "scripts", "lib", "mode.sh"));
+    const direct = run([sha, "--before-green", "--dry-run"], { MAIPAI_MODE: "direct" });
+    expect(direct.status).toBe(0); expect(direct.stderr).toContain("DIRECT mode ships it"); // run first, checked after: a pending watcher suite warns, never blocks
     rmSync(join(wanted, sha));
     const green = run([sha, "--before-green", "--dry-run"]); expect(green.status).toBe(0);
   }, 60_000);
