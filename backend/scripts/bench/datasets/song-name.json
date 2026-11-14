@@ -1,5 +1,5 @@
 {
-  "about": "SONG-NAME: rows for song_name (bench_row song-name). song_name rows expect a call; action/title fields, when present, constrain the expected arguments. N rows expect no song_name call. Discussion rows include prior turns so follow-up intent is measured in context. Persona names only.",
+  "about": "SONG-NAME: rows for song_name (bench_row song-name). song_name rows expect a call; action/title fields, when present, constrain the expected arguments. N rows expect no song_name call. Discussion rows include prior turns so follow-up intent is measured in context. Persona names only. Rows prefixed heldout- were added after the wording was tuned and were not used for tuning. Rows prefixed heldout2- were added after a second wording round and were not used for tuning.",
   "rows": [
     {
       "id": "name-this",
@@ -21,16 +21,32 @@
       "label": "song_name",
       "text": "Listen to the music and tell me what it is."
     },
-    { "id": "name-playing", "label": "song_name", "action": "listen", "text": "Hey, what's that song playing?" },
-    { "id": "name-track", "label": "song_name", "action": "listen", "text": "Do you know what this track is?" },
+    {
+      "id": "name-playing",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Hey, what's that song playing?"
+    },
+    {
+      "id": "name-track",
+      "label": "song_name",
+      "action": "listen",
+      "text": "Do you know what this track is?"
+    },
     {
       "id": "discussion-reject",
       "label": "song_name",
       "action": "reject",
       "text": "No, that's not it.",
       "messages": [
-        { "role": "user", "content": "What song is this?" },
-        { "role": "assistant", "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff." }
+        {
+          "role": "user",
+          "content": "What song is this?"
+        },
+        {
+          "role": "assistant",
+          "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff."
+        }
       ]
     },
     {
@@ -40,8 +56,14 @@
       "title": "Night Tide",
       "text": "Could it be Night Tide?",
       "messages": [
-        { "role": "user", "content": "What song is this?" },
-        { "role": "assistant", "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff." }
+        {
+          "role": "user",
+          "content": "What song is this?"
+        },
+        {
+          "role": "assistant",
+          "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff."
+        }
       ]
     },
     {
@@ -50,8 +72,14 @@
       "action": "confirm",
       "text": "Yeah, that's the one.",
       "messages": [
-        { "role": "user", "content": "What song is this?" },
-        { "role": "assistant", "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff." }
+        {
+          "role": "user",
+          "content": "What song is this?"
+        },
+        {
+          "role": "assistant",
+          "content": "That sounds like Moonlight Drive by Quill, but another service thought it might be Night Tide by Riff."
+        }
       ]
     },
     {
@@ -74,10 +102,110 @@
       "label": "N",
       "text": "Who invented the piano?"
     },
-    { "id": "negative-volume", "label": "N", "text": "Turn the music down." },
-    { "id": "negative-playlist", "label": "N", "text": "Add this song to my playlist." },
-    { "id": "negative-weather", "label": "N", "text": "What's the weather?" },
-    { "id": "negative-jazz", "label": "N", "text": "Tell me about the history of jazz." },
-    { "id": "negative-timer", "label": "N", "text": "Set a timer for ten minutes." }
+    {
+      "id": "negative-volume",
+      "label": "N",
+      "text": "Turn the music down."
+    },
+    {
+      "id": "negative-playlist",
+      "label": "N",
+      "text": "Add this song to my playlist."
+    },
+    {
+      "id": "negative-weather",
+      "label": "N",
+      "text": "What's the weather?"
+    },
+    {
+      "id": "negative-jazz",
+      "label": "N",
+      "text": "Tell me about the history of jazz."
+    },
+    {
+      "id": "negative-timer",
+      "label": "N",
+      "text": "Set a timer for ten minutes."
+    },
+    {
+      "id": "heldout-shazam",
+      "label": "song_name",
+      "text": "Shazam this for me."
+    },
+    {
+      "id": "heldout-band",
+      "label": "song_name",
+      "text": "Any idea what band this is?"
+    },
+    {
+      "id": "heldout-called",
+      "label": "song_name",
+      "text": "Is this one of Riff's songs? What's it called?"
+    },
+    {
+      "id": "heldout-negative-skip",
+      "label": "N",
+      "text": "Skip to the next track."
+    },
+    {
+      "id": "heldout-negative-favorites",
+      "label": "N",
+      "text": "Save this to my favorites."
+    },
+    {
+      "id": "heldout-negative-louder",
+      "label": "N",
+      "text": "Make it louder."
+    },
+    {
+      "id": "heldout-negative-president",
+      "label": "N",
+      "text": "Who is the president of France?"
+    },
+    {
+      "id": "heldout-negative-playlist2",
+      "label": "N",
+      "text": "Put some jazz on in the living room."
+    },
+    {
+      "id": "heldout2-name",
+      "label": "song_name",
+      "text": "What's the name of this one?"
+    },
+    {
+      "id": "heldout2-artist",
+      "label": "song_name",
+      "text": "Do you know who performs this?"
+    },
+    {
+      "id": "heldout2-negative-pause",
+      "label": "N",
+      "text": "Pause the music."
+    },
+    {
+      "id": "heldout2-negative-quieter",
+      "label": "N",
+      "text": "Turn it down a little."
+    },
+    {
+      "id": "heldout2-negative-repeat",
+      "label": "N",
+      "text": "Play that again."
+    },
+    {
+      "id": "heldout2-negative-like",
+      "label": "N",
+      "text": "I love this song, it's so good."
+    },
+    {
+      "id": "heldout2-negative-lyrics",
+      "label": "N",
+      "text": "Can you sing me a lullaby?"
+    },
+    {
+      "id": "heldout2-negative-dance",
+      "label": "N",
+      "text": "Dance for me!"
+    }
   ]
 }
