@@ -10,7 +10,7 @@ export type IdentifyResult = {
   musicbrainz_artist_id: string | null;
   musicbrainz_release_group_id: string | null;
   score: number;
-  source: "library" | "shazam" | "acoustid";
+  source: "library" | "shazam" | "acoustid" | "home";
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {

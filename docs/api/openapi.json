@@ -114383,6 +114383,107 @@
         }
       }
     },
+    "/api/music/now-playing": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Report the Home music player's current track",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "playing",
+                      "stopped"
+                    ]
+                  },
+                  "song_id": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "artist": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "album": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "year": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 2999
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current player state accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "pushed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "pushed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/dj/prepare": {
       "post": {
         "tags": [
@@ -124210,7 +124311,8 @@
                           "enum": [
                             "library",
                             "shazam",
-                            "acoustid"
+                            "acoustid",
+                            "home"
                           ]
                         }
                       },

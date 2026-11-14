@@ -33,6 +33,7 @@ import { AdultLockController, useAdultLockProps } from "@/shell/AdultLockHost";
 import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { MusicPlayerBar } from "@/shell/music/MusicPlayerBar";
+import { useReportNowPlaying } from "@/shell/music/useReportNowPlaying";
 import { musicPaneTabs } from "@/shell/music/MusicQueuePane";
 import { isMusicTab, musicPane, useMusicPane } from "@/shell/music/musicPane";
 import { useIsPhoneLayout } from "@maipai/ui/src/hooks/useIsPhoneLayout";
@@ -213,6 +214,7 @@ function ShellInstallStrip({ person }: { person: Roster }) {
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+  useReportNowPlaying();
   const location = useLocation();
   const everyApp = useAppCatalog();
   // ACTIVITY-PAGE-01: a guest has no jobs of their own, so no Activity entry in the rail, the drawer or All apps.

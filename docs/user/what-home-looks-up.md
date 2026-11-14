@@ -198,6 +198,8 @@ Open **Settings**, then **Privacy and safety**, and choose **What connects to th
 
 **Who can use it:** Everyone. Set **Name songs online** to Off to match your own library only.
 
+When music plays in Home's player, its title can also appear on the household's own robots. The title stays inside your home; no song audio is sent.
+
 **How to clear what it saved:** Home keeps nothing about the clip. A small in-memory list of recent answers lasts only until the hub restarts. Your library's own fingerprints stay on this computer.
 
 ## Film and TV lookup

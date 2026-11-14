@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { __resetHeardSongsForTests, addHeardCandidates, clearHeardSong, confirmHeardSong, findHeardCandidate, heardSongContextLine, heardSongFor, noteHeardSong, rejectHeardSong } from "./heardSong";
+import { __resetHeardSongsForTests, addHeardCandidates, clearHeardSong, clearNowPlaying, confirmHeardSong, findHeardCandidate, heardSongContextLine, heardSongFor, noteHeardSong, noteNowPlaying, rejectHeardSong } from "./heardSong";
 import type { IdentifyCandidate } from "./identify";
 
 const candidate = (title: string, source: IdentifyCandidate["source"], score: number, agrees: boolean): IdentifyCandidate => ({ title, artist: "Artist", album: null, year: null, source, score, agrees });
@@ -48,5 +48,15 @@ describe("heard song context", () => {
   test("expires from the injected clock after fifteen minutes", () => {
     __resetHeardSongsForTests(); noteHeardSong("r", { title: "A", source: "library", at: 500 });
     expect(heardSongFor("r", 500 + 15 * 60_000)).toBeNull();
+  });
+  test("Home playback takes precedence over listening guesses and remains as was playing", () => {
+    __resetHeardSongsForTests();
+    const now = Date.now();
+    noteNowPlaying("r", { title: "Home song", artist: "Home artist", album: "Record", year: 2024 }, now);
+    noteHeardSong("r", { title: "Guess", source: "shazam", at: now + 100 });
+    expect(heardSongFor("r", now + 100)?.title).toBe("Home song");
+    expect(heardSongContextLine(heardSongFor("r", now + 100)!, now + 100)).toContain("Home is playing Home song by Home artist (Record, 2024) on this robot's person's player.");
+    clearNowPlaying("r");
+    expect(heardSongContextLine(heardSongFor("r", now + 121_000)!, now + 121_000)).toContain("Home was playing Home song by Home artist (Record, 2024) 2 min ago.");
   });
 });

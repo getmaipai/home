@@ -8,7 +8,7 @@ export const SONG_NAME_TOOL_ID = "song_name";
 export type SongNameArgs = { action?: "listen" | "reject" | "suggest" | "confirm"; title?: string };
 
 /** What the robot shows: the same `Title - Artist` form the body sets when it names a song itself. */
-function shownTitle(song: { title: string; artist?: string | null }): string { return song.artist ? `${song.title} - ${song.artist}` : song.title; }
+export function shownTitle(song: { title: string; artist?: string | null }): string { return song.artist ? `${song.title} - ${song.artist}` : song.title; }
 
 export function sendSongTitle(deviceId: string, text: string): void {
   try { issueDeviceCommand(deviceId, "song_title" as never, { text: text.slice(0, 80) }, 60_000); } catch { /* command delivery never fails the answer */ }
@@ -39,11 +39,12 @@ export async function runSongNameTool(input: { callId: string; deviceId?: string
         if (!current) text = "I do not have a recent song guess to discuss.";
         else if (action === "reject") {
           const next = rejectHeardSong(input.deviceId);
-          if (next) { text = `Then it may be ${next.title}${next.artist ? ` by ${next.artist}` : ""} (heard by ${next.source === "library" ? "your library" : next.source === "shazam" ? "Shazam" : "AcoustID"}). Does that sound right?`; titleCommand(shownTitle(next)); }
+          if (current.source === "home") text = "That is the song Home is playing, so I know its name.";
+          else if (next) { text = `Then it may be ${next.title}${next.artist ? ` by ${next.artist}` : ""} (heard by ${next.source === "library" ? "your library" : next.source === "shazam" ? "Shazam" : "AcoustID"}). Does that sound right?`; titleCommand(shownTitle(next)); }
           else { text = "I have no other guess. I can listen again."; titleCommand(""); }
         } else if (action === "suggest") {
           const found = findHeardCandidate(input.deviceId, input.args?.title ?? "");
-          text = found ? `Yes, ${found.candidate.source === "library" ? "your library" : found.candidate.source === "shazam" ? "Shazam" : "AcoustID"} also suggested that.` : `No service suggested that; I only heard ${current.title}${current.artist ? ` by ${current.artist}` : ""}.`;
+          text = found ? `Yes, ${found.candidate.source === "library" ? "your library" : found.candidate.source === "shazam" ? "Shazam" : found.candidate.source === "home" ? "Home" : "AcoustID"} also suggested that.` : `No service suggested that; I only heard ${current.title}${current.artist ? ` by ${current.artist}` : ""}.`;
         } else {
           const confirmed = confirmHeardSong(input.deviceId, input.args?.title);
           text = confirmed ? `Got it, that is ${confirmed.title}${confirmed.artist ? ` by ${confirmed.artist}` : ""}.` : "I do not have a recent song guess to confirm.";

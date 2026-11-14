@@ -33,6 +33,18 @@ default), `reject`, `suggest` with a title, and `confirm` with an optional title
 confirm settles the selected guess. A title update is sent through the `song_title` device command. The log line records provider names,
 outcomes and candidate counts, never titles, artists, signatures, fingerprints or keys.
 
+## Now playing
+
+The signed-in Home player reports track changes, pause and stop to `POST /api/music/now-playing`; while playing it refreshes every
+minute. Home resolves a supplied song id against that person's song job, and rejects locked songs. Other track titles are cleaned on
+the hub. No audio is involved and the state exists only in memory. An entry expires 150 seconds after its last refresh, so closing a
+tab without a stop eventually clears the robot title.
+
+Home sends `song_title` only when the displayed text changes. It targets the person's connected, reachable, unmuted paired robots. If
+an adult has no paired robot, Home targets every connected, reachable, unmuted household robot. Children and teens never send a title
+to another person's robot. The player's title is also a `home` heard-song entry for 15 minutes, with its artist, album and year; it
+outranks listening guesses and becomes “was playing” when playback stops.
+
 ## Reading logs
 
 `[music-identify]` is the route outcome: status, reason code, clip duration, elapsed time and (for a match) provider source. `[music]`

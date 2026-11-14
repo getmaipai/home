@@ -1,5 +1,7 @@
 # Backlog
 
+- [ ] **MUSIC-ID-06: Home player now playing reaches the robot and chat** (M; Home backend and shell). Report player track changes, pauses and stops in memory; show the sanitized title on eligible connected robots and add a 15 minute Home heard-song context entry. Locked songs never appear; child and teen robot targeting stays within their own pairing. Tests use fake devices, stores, clocks and posts.
+
 What is missing to go from "the hub can chat" to a usable family app, per area, in the order the
 platform is built: the hub first, the robot for parity, Go last. A scannable list, not a narrative: reasoning and
 decision history live in `docs/dev.md` and the records under `docs/plans/` and `docs/design/`.

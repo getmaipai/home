@@ -53,6 +53,7 @@ import { MAX_CLIP_BYTES, MAX_CLIP_SECONDS, deviceGate, identifySong, type Identi
 import { recordIdentifyOutcome } from "@/lib/music/identifyLast";
 import { resolveListen } from "@/lib/music/listenRequests";
 import { addHeardCandidates, noteHeardSong } from "@/lib/music/heardSong";
+import { reportNowPlaying } from "@/lib/music/nowPlaying";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -69,6 +70,12 @@ const viewGate = createMiddleware<AppEnv>(async (c, next) => {
 });
 const middleware = [requireAuth, gate] as [typeof requireAuth, typeof gate];
 const viewMiddleware = [requireAuth, viewGate] as [typeof requireAuth, typeof viewGate];
+
+const nowPlayingRoute = createRoute({ method: "post", path: "/now-playing", tags: ["Music"], summary: "Report the Home music player's current track", middleware: [requireAuth], request: { body: { content: { "application/json": { schema: z.object({ state: z.enum(["playing", "stopped"]), song_id: z.string().max(80).optional(), key: z.string().max(120).optional(), title: z.string().max(120).optional(), artist: z.string().max(120).optional(), album: z.string().max(120).optional(), year: z.number().int().min(1000).max(2999).optional() }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), pushed: z.number().int() }) } }, description: "Current player state accepted." }, ...errorResponses({ 400: "Bad body", 401: "Not signed in" }) } });
+musicRoutes.openapi(nowPlayingRoute, (c) => {
+  try { return c.json(reportNowPlaying(c.get("person"), c.req.valid("json")), 200); }
+  catch { return c.json({ ok: true as const, pushed: 0 }, 200); }
+});
 const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song", 409: "Commercial export not allowed" });
 
 const djPosition = z.enum(["intro", "transition", "outro"]);
@@ -678,7 +685,7 @@ function findOwnedSong(actor: PersonRow, fileId: string): MusicJob | null {
 // MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): "what song is this?" for every surface. The clip is read in memory, never stored.
 const identifyOutcomeSchema = z.object({
   status: z.enum(["matched", "no_match", "needs_confirm", "not_ready", "failed", "rate_limited"]),
-  result: z.object({ title: z.string(), artist: z.string(), album: z.string().nullable(), year: z.number().nullable(), musicbrainz_recording_id: z.string().nullable(), musicbrainz_artist_id: z.string().nullable(), musicbrainz_release_group_id: z.string().nullable(), score: z.number(), source: z.enum(["library", "shazam", "acoustid"]) }).optional(),
+  result: z.object({ title: z.string(), artist: z.string(), album: z.string().nullable(), year: z.number().nullable(), musicbrainz_recording_id: z.string().nullable(), musicbrainz_artist_id: z.string().nullable(), musicbrainz_release_group_id: z.string().nullable(), score: z.number(), source: z.enum(["library", "shazam", "acoustid", "home"]) }).optional(),
   reason: z.string().optional().describe("Why nothing was named: for not_ready the readiness state, for failed the cause."),
   line: z.string().optional().describe("For not_ready: the one sentence that says where to act."),
   retry_after_s: z.number().optional().describe("For rate_limited: seconds until another clip is taken."),
@@ -699,7 +706,7 @@ musicRoutes.openapi(identifyRoute, async (c) => {
   const query = c.req.valid("query");
   const deviceId = c.get("deviceId") ?? null;
   const source = deviceId ? "robot" as const : "person" as const;
-  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "shazam" | "acoustid" } = {}) => {
+  const finish = (status: string, reason: string | null, clipSeconds: number | null, extra: { title?: string; artist?: string; matchSource?: "library" | "shazam" | "acoustid" | "home" } = {}) => {
     const at = Date.now();
     recordIdentifyOutcome({ at, deviceId, status: status as IdentifyOutcome["status"] | "bad_input", reason, seconds: clipSeconds, source, ...extra });
     console.info(`[music-identify] device=${deviceId ?? "person"} status=${status} reason=${reason ?? "-"} clip_s=${clipSeconds ?? "-"} ms=${at - startedAt}${extra.matchSource ? ` source=${extra.matchSource}` : ""}`);

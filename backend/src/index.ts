@@ -1,4 +1,5 @@
 import { resumeMusicJobs } from "@/lib/music/jobs";
+import { sweepNowPlaying } from "@/lib/music/nowPlaying";
 // SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
 // data directory and takes the data directory's one-hub lock before any
 // later import (app, db, keystore) can open the database.
@@ -141,6 +142,7 @@ try { reconcileInterruptedPackJobs(); } catch (error) { console.warn(`[pack-make
 try { reconcileInterruptedEditJobs(); } catch (error) { console.warn(`[image-edit] could not reconcile interrupted edits: ${(error as Error).message}`); }
 try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ }
 setInterval(() => { try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ } }, 60 * 60 * 1000).unref();
+setInterval(() => { try { sweepNowPlaying(); } catch { /* expiry maintenance is disposable */ } }, 30_000).unref();
 function sweepDownloads(): void {
   try {
     const { removed, bytes } = sweepStaleDownloads();
