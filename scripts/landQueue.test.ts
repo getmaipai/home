@@ -64,8 +64,8 @@ describe("land queue", () => {
     chmodSync(join(localBin, "bun"), 0o755);
     commit(wt, "frontend change");
     const localEnv = { ...env, MAIPAI_LAND_SKIP_DEPS: "1", PATH: `${localBin}:${env.PATH}` };
-    const result = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach"], { cwd: wt, env: localEnv, encoding: "utf8" });
-    expect(result.status).not.toBe(0);
+    const result = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach"], { cwd: wt, env: localEnv });
+    expect(result.exitCode).not.toBe(0);
     expect(result.stderr.toString()).toContain("stale i18n baseline");
     expect(queueFiles()).toHaveLength(0);
   });
@@ -74,14 +74,14 @@ describe("land queue", () => {
     const wt = makeWorktree("lock_conflict");
     writeFileSync(join(wt, "bun.lock"), "branch lock\n");
     commit(wt, "branch lock");
-    const git = (cwd: string, ...args: string[]) => Bun.spawnSync(["git", "-C", cwd, ...args], { encoding: "utf8" });
+    const git = (cwd: string, ...args: string[]) => Bun.spawnSync(["git", "-C", cwd, ...args]);
     git(main, "fetch", "origin", "main:refs/remotes/origin/main");
     git(main, "reset", "--hard", "origin/main");
     writeFileSync(join(main, "bun.lock"), "main lock\n");
     git(main, "add", "bun.lock"); git(main, "commit", "-m", "main lock"); git(main, "push", "origin", "HEAD:main"); git(wt, "fetch", "origin", "main:refs/remotes/origin/main");
     const localEnv = { ...env, MAIPAI_LAND_SKIP_DEPS: "1" };
-    const result = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach"], { cwd: wt, env: localEnv, encoding: "utf8" });
-    expect(result.status).not.toBe(0);
+    const result = Bun.spawnSync(["bash", join(main, "scripts", "land.sh"), "--queue-anyway", "--detach"], { cwd: wt, env: localEnv });
+    expect(result.exitCode).not.toBe(0);
     expect(result.stderr.toString()).toMatch(/CONFLICT .* (bun\.lock|package\.json)/);
     expect(result.stderr.toString()).toContain("merge conflict with origin/main in bun.lock");
     expect(queueFiles()).toHaveLength(0);
