@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 // slot, same phone clearance above the nav) and drawn by the kit Player: `mini` is the bar, `audio` is the expanded player with the cover,
 // the karaoke lyrics, shuffle and repeat. This file adds what Music needs beside them: the waveform seek bar, time, volume, shuffle and
 // repeat on the bar, Open in Studio, and the keys. The song list, the details and the Studio all press play on `musicPlayer`; the bar only draws it.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Player } from "@maipai/ui/src/primitives/Player";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -21,6 +21,13 @@ import { studioAddress } from "@/shell/pages/musicAddresses";
 import { musicPlayer, useMusicClock, useMusicPlayer, useMusicVolume } from "./musicPlayer";
 import type { Track } from "./musicQueue";
 import { WaveformSeek, usePeaks } from "./WaveformSeek";
+import { useMediaAnalyser } from "@/shell/media/useMediaAnalyser";
+import { createSpectrum } from "./musicSpectrum";
+import { useLike } from "./musicLike";
+import { useLyricsFollow } from "./useLyricsFollow";
+
+/** The event the queue button fires for the Music queue pane (another slice) to open on. The bar builds no pane. */
+export const MUSIC_QUEUE_EVENT = "music:open-queue";
 
 const icon = (name: string, className?: string) => { const One = getIcon(name); return <One aria-hidden="true" {...(className ? { className } : {})} />; };
 
@@ -78,6 +85,24 @@ function PlayModeButtons() {
   </>;
 }
 
+/** The like heart: writes the person's liked collection, turns at once and goes back with a note if the hub says no. */
+function LikeButton({ track }: { track: Track }) {
+  const { push } = useToast();
+  const { liked, toggle } = useLike(track);
+  const label = liked ? i18n._({ id: "Unlike", message: "Unlike" }) : i18n._({ id: "Like", message: "Like" });
+  return <Button type="button" variant="ghost" size="icon" data-testid="music-bar-like" aria-label={label} title={label} aria-pressed={liked}
+    onClick={() => { void toggle().then((kept) => { if (!kept) push(i18n._({ id: "That could not be saved. Try again.", message: "That could not be saved. Try again." })); }); }}>{icon("heart", liked ? "fill-primary text-primary" : undefined)}</Button>;
+}
+
+/** Follows the active line of the expanded lyrics. Its own component so the frame clock re-draws only this. */
+function LyricsFollow({ track }: { track: Track }) {
+  const { time } = useMusicClock();
+  const [root, setRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setRoot(document.querySelector<HTMLElement>("[data-music-expanded]")); }, []);
+  useLyricsFollow(root, track.timed, time, (seconds) => musicPlayer.seek(seconds));
+  return null;
+}
+
 function VolumeControl() {
   const { volume, muted } = useMusicVolume();
   const level = muted ? 0 : volume;
@@ -101,7 +126,7 @@ function SeekRow({ track, wide }: { track: Track; wide: string }) {
   </span>;
 }
 
-export function MusicPlayerBar() {
+export function MusicPlayerBar({ onQueue }: { onQueue?: () => void } = {}) {
   const session = useAudioSession();
   const dock = useMediaDock();
   const { push } = useToast();
@@ -109,6 +134,9 @@ export function MusicPlayerBar() {
   const snap = useMusicPlayer();
   const mode = usePlayMode();
   const [expanded, setExpanded] = useState(false);
+  // The spectrum behind the bar: the analyser is made lazily on the one player element, and read only while a song plays and the page shows.
+  const getAnalyser = useMediaAnalyser(musicPlayer.element(), true);
+  const spectrum = useMemo(() => createSpectrum({ analyser: getAnalyser, playing: () => musicPlayer.get().playing }), [getAnalyser]);
   const held = dock.current;
   const track = snap.track;
 
@@ -140,13 +168,18 @@ export function MusicPlayerBar() {
       {...(expanded
         ? { shuffle: mode.shuffle, repeat: mode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }), lyricsBlur: true, artSpring: true, ...(lyrics ? { lyrics } : {}), actionsSlot: studioButton(track) }
         : { placement: "dock" as const, onClose: () => musicPlayer.stop(), onExpand: () => setExpanded(true), swipeUpToExpand: true, swipeToSkip: true,
+          spectrum: { levels: spectrum.levels },
           actionsSlot: <>
+            <LikeButton track={track} />
             <SeekRow track={track} wide="w-24 lg:w-48 xl:w-72" />
             <PlayModeButtons />
+            {lyrics ? <Button type="button" variant="ghost" size="icon" data-testid="music-bar-lyrics" aria-label={i18n._({ id: "Lyrics", message: "Lyrics" })} title={i18n._({ id: "Lyrics", message: "Lyrics" })} onClick={() => setExpanded(true)}>{icon("mic")}</Button> : null}
+            <Button type="button" variant="ghost" size="icon" data-testid="music-bar-queue" aria-label={i18n._({ id: "Queue", message: "Queue" })} title={i18n._({ id: "Queue", message: "Queue" })} onClick={() => { onQueue?.(); window.dispatchEvent(new CustomEvent(MUSIC_QUEUE_EVENT)); }}>{icon("list-music")}</Button>
             <VolumeControl />
             {studioButton(track)}
           </> })} />
   );
+  const follow = expanded && track.timed?.length ? <LyricsFollow track={track} /> : null;
   const title = i18n._({ id: "Now playing", message: "Now playing" });
   const lead = i18n._({ id: "The song, its words and the player controls.", message: "The song, its words and the player controls." });
   return (
@@ -157,13 +190,13 @@ export function MusicPlayerBar() {
       {expanded && phone ? <Drawer open onOpenChange={(open) => { if (!open) setExpanded(false); }}>
         <DrawerContent data-testid="music-player-expanded" data-music-expanded>
           <DrawerHeader><DrawerTitle>{title}</DrawerTitle><DrawerDescription className="sr-only">{lead}</DrawerDescription></DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-6">{body}</div>
+          <div className="overflow-y-auto px-4 pb-6">{body}{follow}</div>
         </DrawerContent>
       </Drawer> : null}
       {expanded && !phone ? <Dialog open onOpenChange={(open) => { if (!open) setExpanded(false); }}>
         <DialogContent size="xl" scroll="viewport" data-testid="music-player-expanded" data-music-expanded>
           <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription className="sr-only">{lead}</DialogDescription></DialogHeader>
-          {body}
+          {body}{follow}
         </DialogContent>
       </Dialog> : null}
     </>

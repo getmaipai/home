@@ -8,6 +8,8 @@ export interface Track {
   /** The file id of the version, or `sound-<id>`. Unique in the queue. */
   key: string;
   url: string;
+  /** The hub's media id for the song, when the caller knows it; the like heart uses it (else the key). */
+  mediaId?: string;
   title: string;
   /** The style line under the title. */
   subtitle?: string;

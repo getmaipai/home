@@ -209,4 +209,14 @@ describe("music clock", () => {
     } finally { console.error = before; }
     expect(errors.map(String).filter((line) => /getSnapshot|Maximum update depth/.test(line))).toEqual([]);
   });
+  test("many reads between ticks give one object, and a seek or a tick gives a new one (the Safari cached clock)", () => {
+    const { live, player } = makeLive();
+    player.toggle(t("a"), queue);
+    const first = player.clock();
+    for (let i = 0; i < 50; i++) expect(player.clock()).toBe(first);
+    expect(live.currentTime).toBeGreaterThan(first.time);
+    player.seek(30);
+    expect(player.clock()).not.toBe(first);
+    expect(player.clock().time).toBeCloseTo(30, 1);
+  });
 });
