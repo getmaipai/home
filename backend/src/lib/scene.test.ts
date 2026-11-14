@@ -59,7 +59,7 @@ describe("scene fusion", () => {
       { person_id: null, label: "Bruno", relation: "unknown", band: "adult", level: "claimed", basis: ["typed"], last_seen_at: at - 90_000, expires_at: at + 1 },
     ] });
     const first = renderScene(scene, at, sage, [sage, marlow]);
-    expect(first).toContain("With Sage:");
+    expect(first).toContain("Speaker: Sage (signed in).");
     expect(first).toContain("Marlow (teen) (seen by the camera just now)");
     expect(first).toContain("someone the camera does not know");
     expect(first).toContain("Bruno (adult) (Sage said so a few minutes ago)");
@@ -139,8 +139,8 @@ describe("scene fusion", () => {
     const sage = { id: "person-sage", displayName: "Sage", role: "adult", birthdate: null } as never;
     const scene = sceneForTests({ ...empty(), speaker: { person: "person-other", basis: "voice", level: "confirmed" } });
     const text = renderScene(scene, 10, sage, [sage]);
-    expect(text).not.toContain("With Sage:");
-    expect(text).toContain("With: someone the system has not identified.");
+    expect(text).not.toContain("Speaker: Sage");
+    expect(text).toContain("Speaker: unknown.");
   });
   test("many typed people with long labels retain speaker, alone, and child lines", () => {
     const at = 10_000;
@@ -163,13 +163,13 @@ describe("scene fusion", () => {
       child_present: true,
     };
     const text = renderScene(scene, at, sage, [sage]);
-    expect(text).toContain("With Sage:");
+    expect(text).toContain("Speaker: Sage (signed in).");
     expect(text).toContain("Alone: positively observed.");
     expect(text).toContain("A child is in the room.");
     expect(text.length).toBeGreaterThan(1200);
   });
   test("scene budget keeps speaker, alone, and child lines over cap and with a missing tokenizer", async () => {
-    const required = "With: someone the system has not identified. Alone: not confirmed. A child is in the room.";
+    const required = "Speaker: unknown. Alone: not confirmed. A child is in the room.";
     const oversized = `Ambient events: ${"very loud event ".repeat(100)}. ${required}`;
     expect(await fitSceneBlock(oversized, required, async (value) => value === required ? 30 : 400)).toBe(required);
     expect(await fitSceneBlock(oversized, required, async () => null)).toBe(required);

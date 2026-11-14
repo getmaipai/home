@@ -212,6 +212,12 @@
     }
   ],
   "items": [
+    { "id": "who-am-i-01", "kind": "who_am_i", "prompt": "Who am I?", "expected": "speaker line matches confirmed voice evidence", "band": "adult", "heldOut": true },
+    { "id": "who-am-i-02", "kind": "who_am_i", "prompt": "Who am I?", "expected": "speaker line matches tentative face evidence without an unqualified name", "band": "teen", "heldOut": false },
+    { "id": "who-am-i-03", "kind": "who_am_i", "prompt": "Who am I?", "expected": "speaker line matches tentative voice evidence without an unqualified name", "band": "child", "heldOut": true },
+    { "id": "who-am-i-04", "kind": "who_am_i", "prompt": "Who am I?", "expected": "unknown speaker line on a shared screen", "band": "adult", "heldOut": false },
+    { "id": "who-am-i-05", "kind": "who_am_i", "prompt": "Who am I?", "expected": "speaker line uses signed-in roster identity", "band": "teen", "heldOut": false },
+    { "id": "who-am-i-06", "kind": "who_am_i", "prompt": "Who am I?", "expected": "claimed name remains unverified", "band": "child", "heldOut": true },
     {
       "id": "arrive-01",
       "kind": "typed",

@@ -67,6 +67,7 @@ import { fetchSceneWeatherForContext } from "@/lib/sceneWeather";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
 import type { Surface, SpeakerEvidence } from "@/lib/turnShared";
+import { speakerLine } from "@/lib/speakerLine";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -114,7 +115,7 @@ async function fitSceneBlockMeasured(text: string, required: string, count: (val
   const finalCount = await count(candidate);
   return finalCount !== null && finalCount <= limit ? { text: candidate, tokens: finalCount } : { text: required, tokens: finalCount ?? 0 };
 }
-export function renderScene(scene: FusedScene, now: number, actor: PersonRow, household: readonly PersonRow[]): string {
+export function renderScene(scene: FusedScene, now: number, actor: PersonRow, household: readonly PersonRow[], surface: Surface = "robot"): string {
   const members = new Map(household.map((person) => [person.id, person]));
   const age = (at: number) => {
     const elapsed = Math.max(0, now - at);
@@ -122,8 +123,8 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
   };
   const basis = (p: FusedScene["people"][number]) => p.basis.includes("face") ? "seen by the camera" : p.basis.includes("voice") ? "heard" : p.basis.includes("typed") ? "said so" : "seen by the camera";
   const lines = [SCENE_PROLOGUE];
-  if (scene.speaker?.person === actor.id && (scene.speaker.level === "confirmed" || scene.speaker.basis === "signed_in")) lines.push(`With ${actor.displayName}:`);
-  else lines.push("With: someone the system has not identified.");
+  const unknownOthers = scene.people.filter((person) => !person.person_id || !members.has(person.person_id)).length;
+  lines.push(speakerLine(scene.speaker, surface, actor, household, getPersonSettingValue(actor, "person.robot.greet_by_name"), unknownOthers));
   if (scene.people.length) {
     const people = scene.people.map((p) => {
       const member = p.person_id ? members.get(p.person_id) : null;
@@ -597,13 +598,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
-  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople())} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
+  const sceneText = `${renderScene(currentScene, now.getTime(), state.actor, listActivePeople(), state.surface)} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`;
   const sceneItem: ContextItem = { id: "scene", text: sceneText, source: "scene", subjects: [], disclosure: "child_ok" };
   const sceneTokenCount = async (text: string) => countTokens([{ role: "system", content: text }]);
   const aloneLine = currentScene.alone_observed && currentScene.alone ? "Alone: positively observed." : currentScene.alone ? "Alone: not confirmed." : "Other people are present.";
   const childLine = currentScene.child_present ? "A child is in the room." : "No child is known to be in the room.";
-  const speakerLine = currentScene.speaker?.person === state.actor.id && (currentScene.speaker.level === "confirmed" || currentScene.speaker.basis === "signed_in") ? `With ${state.actor.displayName}:` : "With: someone the system has not identified.";
-  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${speakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
+  const requiredSpeakerLine = speakerLine(currentScene.speaker, state.surface, state.actor, listActivePeople(), getPersonSettingValue(state.actor, "person.robot.greet_by_name"), currentScene.people.filter((person) => !person.person_id || !listActivePeople().some((member) => member.id === person.person_id)).length);
+  const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${requiredSpeakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
   sceneItem.text = fittedScene.text;
   const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
   items.push(sceneItem);
