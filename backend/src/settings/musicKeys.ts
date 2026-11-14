@@ -34,7 +34,14 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "music.identify.online", scope: "household", selector: "select", range: { options: ["on", "ask", "off"] }, default: "on",
     label: "Name songs online",
-    help: "When Home hears a song and has no match in your own library, it can look the song up online. Only a short audio fingerprint and the clip length are sent to the open AcoustID service, never the recording. \"Ask each time\" asks first; \"Off\" matches your own library only.",
+    help: "When Home hears a song and has no match in your own library, it can look the song up online, asking Shazam and AcoustID at the same time. Only a small sound signature or fingerprint and the clip length are sent, never the recording. \"Ask each time\" asks first; \"Off\" matches your own library only.",
+    level: "advanced", secret: false, lives_in: "household.media_lookups", honoured_by: ["home"],
+  }),
+  // MUSIC-ID-05: identical to the pinned spec's entry (spec-v0.1.397).
+  SettingsKey.parse({
+    key: "music.identify.shazam", scope: "household", selector: "boolean", default: true,
+    label: "Ask Shazam about short clips",
+    help: "When Home hears a song and has no match in your own library, it can ask Shazam about a few seconds of it. Home makes a small sound signature on this computer and sends only that and the clip length, never the recording. Turn this off to stop asking Shazam; Home can still use your library and AcoustID.",
     level: "advanced", secret: false, lives_in: "household.media_lookups", honoured_by: ["home"],
   }),
   SettingsKey.parse({
