@@ -12,7 +12,7 @@ import { quickReaction, chooseFillerGroup, type QuickCue } from "@/lib/quickReac
 import { reportFillerEvent } from "@/lib/fillerEvents";
 import { talkOverDecision } from "@/lib/talkOver";
 import { getTtsTags } from "@/lib/ttsCapabilities";
-import { voiceForSpeech } from "@/lib/voiceForSpeech";
+import { voiceForSpeech, companionOwnVoice } from "@/lib/voiceForSpeech";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -231,7 +231,13 @@ export function turnUtterance(turnId: string, ownerId: string): string | undefin
 /** Voice selected for a turn, including a robot-bound ambient side chat. */
 export function voiceForTurn(turnId: string, ownerId: string): string | undefined {
   const session = inFlightTurns.get(turnId);
-  return session && session.ownerId === ownerId ? voiceForSpeech({ actor: session.viewer, ...(session.deviceId ? { deviceId: session.deviceId } : {}) }) : undefined;
+  if (!session || session.ownerId !== ownerId) return undefined;
+  // A chat with a synth or companion is spoken in the voice that synth chose for itself (the person's own voice is the fallback). A robot turn keeps
+  // its own chain in voiceForSpeech (robot voice, assigned companion, impression).
+  const conversation = session.deviceId ? null : getConversation(session.viewer, session.conversationId);
+  const companionId = conversation?.ok ? conversation.value.companion_id : null;
+  const companionVoice = companionId ? companionOwnVoice(companionId) : undefined;
+  return voiceForSpeech({ actor: session.viewer, ...(session.deviceId ? { deviceId: session.deviceId } : {}), ...(companionVoice ? { companionVoice } : {}) });
 }
 
 /** WHISPER-01: the conversation an in-flight turn belongs to (the speech route asks whether it is in whisper mode). */

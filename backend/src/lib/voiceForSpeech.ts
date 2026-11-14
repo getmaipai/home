@@ -13,6 +13,14 @@ export function isPresetVoice(id: string): boolean {
   return id === VOICE_ENGINE_DEFAULT || VOICE_PRESET_NAMES.some((name) => id === name || voicePresetName(id) === name);
 }
 
+/** The voice a synth or companion has chosen for itself: the household voice setting first, then the voice in its own details; undefined when it has none. */
+export function companionOwnVoice(id: string): string | undefined {
+  const value = getHouseholdSettingValue(companionVoiceKey(id));
+  if (typeof value === "string" && value && value !== VOICE_ENGINE_DEFAULT) return value;
+  const own = getHouseholdCompanion(id)?.companion?.voice_id;
+  return typeof own === "string" && own && own !== VOICE_ENGINE_DEFAULT ? own : undefined;
+}
+
 export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; companionVoice?: string; band?: AgeBand }): string {
   const personVoice = String(getPersonSettingValue(input.actor, "tts.voice_id") ?? VOICE_ENGINE_DEFAULT);
   let selected = input.companionVoice ?? personVoice;
@@ -24,13 +32,7 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
     // When the guise does not apply to this speaker, the layers are the assigned companion's and the order above holds.
     const layers = companionLayersOf(input.deviceId, input.actor, input.band ?? "child");
     const guiseSynth = layers.guise ? layers.synth : null;
-    const synthVoice = (id: string) => {
-      // The household voice setting for the synth wins; the voice chosen in the synth's own details (its voice_id) is next.
-      const value = getHouseholdSettingValue(companionVoiceKey(id));
-      if (typeof value === "string" && value && value !== VOICE_ENGINE_DEFAULT) return value;
-      const own = getHouseholdCompanion(id)?.companion?.voice_id;
-      return typeof own === "string" && own ? own : VOICE_ENGINE_DEFAULT;
-    };
+    const synthVoice = (id: string) => companionOwnVoice(id) ?? VOICE_ENGINE_DEFAULT;
     if (guiseSynth) selected = synthVoice(guiseSynth.id);
     else if (typeof robotVoice === "string" && robotVoice !== VOICE_ENGINE_DEFAULT) selected = robotVoice;
     else if (layers.customization) selected = input.companionVoice ?? synthVoice(layers.customization.id);
