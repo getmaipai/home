@@ -31,6 +31,8 @@ Open the robot in **Settings**, **Apps and devices**, **Devices** and look under
 
 Home records the firmware version when the robot checks in. It also shows whether the robot is online, when it last checked in, its network address, Wi-Fi signal and battery level. A check-in arrives about once a minute. If the robot is offline, check that it is on and joined to the same Wi-Fi network as the Home computer.
 
+An owner or admin can see saved Wi-Fi names on the robot page, forget a network, or add one when the robot reports a secure link. Home sends the password only over that secure link. If the link is not secure, join the robot's own Wi-Fi and use its setup page.
+
 ## A robot's settings
 
 Open the robot from **Settings**, **Apps and devices**, **Devices**. The **This robot** card holds its name, voice, face color and night mode. It also sets how long the robot listens for a follow-up and how much its camera watches. The **Companion and controls** card sets how it talks and what it may say.

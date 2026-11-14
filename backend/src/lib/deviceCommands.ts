@@ -162,6 +162,33 @@ export function issueDeviceCommand(
   return command;
 }
 
+/** Validate and send a command to the current live connection without creating a replayable database row. */
+export function sendEphemeralDeviceCommand(
+  deviceId: string,
+  kind: DeviceCommandKind,
+  payload: DeviceCommandPayload,
+  expiresInMs = DEVICE_COMMAND_RETENTION_MS,
+): boolean {
+  const connection = connections.get(deviceId);
+  if (!connection || connection.ws.readyState !== 1) return false;
+  const issuedAt = new Date().toISOString();
+  const hlc = nextHlc();
+  const command = DeviceCommand.parse({
+    id: `${hlc}:${randomUUID()}`,
+    kind,
+    payload,
+    issued_at: issuedAt,
+    expires_at: new Date(Date.parse(issuedAt) + expiresInMs).toISOString(),
+    hlc,
+  }) as DeviceCommandShape;
+  try {
+    connection.ws.send(JSON.stringify({ type: "device-command", ...command }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The robot ids paired under one person, shared by settings notifications and derived asset refreshes. */
 export function listRobotsPairedUnderPerson(personId: string): string[] {
   return db.select({ id: devices.id }).from(devices)

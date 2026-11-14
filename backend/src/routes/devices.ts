@@ -24,7 +24,7 @@ import { rotateRobotPassword, readRobotHostKey } from "@/lib/robotSsh";
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getRobotCredentialForHostKey } from "@/lib/robotCredentials";
 import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
 import { readRobotClipBundle, readVerifiedRobotClipAsset, robotClipAssetForDevice, robotClipBundleExists } from "@/lib/robotClips";
-import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
+import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand, sendEphemeralDeviceCommand } from "@/lib/deviceCommands";
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -186,6 +186,7 @@ const robotCheckinSchema = z.object({
   boot_reason: loose(z.number().int()), crash_resets: loose(z.number().int().nonnegative()),
   battery_level: loose(z.number().int().min(0).max(100)), charging: loose(z.boolean()),
   updating: loose(z.boolean()), update_progress: loose(z.number().int().min(0).max(100)),
+  wifi_saved: loose(z.array(z.string().max(32)).max(10)), link_encrypted: loose(z.boolean()),
 });
 const robotCheckinRoute = createRoute({
   method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",
@@ -535,6 +536,36 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const payload = kind === "find_me" ? { seconds } : kind === "music_test" ? (fast === undefined ? {} : { fast }) : kind === "announce" ? { text: text!, ...(urgent === undefined ? {} : { urgent }) } : {};
   const command = issueDeviceCommand(device.id, kind, payload, kind === "announce" ? 60_000 : kind === "dance" || kind === "music_test" ? 120_000 : undefined);
   return c.json({ id: command.id }, 202);
+});
+
+const wifiLinkRefusal = "For safety, a Wi-Fi password is not sent to the robot over your home network's plain link. Join the robot's own Wi-Fi (its screen shows the name when it cannot connect) and use its setup page, or scan a Wi-Fi QR code once the new firmware is installed.";
+const robotWifiRoute = createRoute({
+  method: "post", path: "/{id}/wifi", tags: ["Devices"], summary: "Add or forget a saved Wi-Fi network on a robot",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: z.object({
+    action: z.enum(["add", "forget"]), ssid: z.string().min(1).max(32), password: z.string().max(63).optional(),
+  }) } } } },
+  responses: { 202: { content: { "application/json": { schema: z.object({ sent: z.literal(true) }) } }, description: "The requested Wi-Fi action was sent." }, ...errorResponses({ 400: "Invalid Wi-Fi request", 401: "Not signed in", 403: "Only an admin can change a robot's Wi-Fi.", 404: "No such robot or the network is not saved", 409: "The robot cannot safely accept this request or is offline" }) },
+});
+devicesRoutes.openapi(robotWifiRoute, (c) => {
+  const actor = c.get("person");
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only an admin can change a robot's Wi-Fi." }, 403);
+  const { id } = c.req.valid("param");
+  const device = getDeviceById(id);
+  if (!device || device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
+  const { action, ssid, password } = c.req.valid("json");
+  const report = getRobotCheckin(id);
+  if (action === "forget") {
+    if (!report?.wifi_saved?.includes(ssid)) return c.json({ error: "That network is not saved on this robot." }, 404);
+    issueDeviceCommand(device.id, "wifi_forget", { ssid }, 60_000);
+    return c.json({ sent: true as const }, 202);
+  }
+  if (report?.link_encrypted !== true) return c.json({ error: wifiLinkRefusal }, 409);
+  if ((report.wifi_saved?.length ?? 0) >= 10 && !report.wifi_saved?.includes(ssid)) return c.json({ error: "This robot already holds 10 Wi-Fi networks. Forget one first." }, 409);
+  if (!report?.online) return c.json({ error: "The robot is offline, so it cannot take a network now." }, 409);
+  if (password === undefined) return c.json({ error: "Add a password, then try again." }, 400);
+  if (!sendEphemeralDeviceCommand(device.id, "wifi_add", { ssid, password }, 60_000)) return c.json({ error: "The robot is offline, so it cannot take a network now." }, 409);
+  return c.json({ sent: true as const }, 202);
 });
 
 // MOTOR-REBOOT-CARD: the robot offers to reboot a latched motor (state frame `motors_reboot_offer`); an adult answers

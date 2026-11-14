@@ -28,6 +28,8 @@ export type RobotCheckin = {
   mic_level?: number | null;
   updating?: boolean | null;
   update_progress?: number | null;
+  wifi_saved?: string[] | null;
+  link_encrypted?: boolean | null;
 };
 
 const latest = new Map<string, { value: RobotCheckin; receivedAt: number }>();

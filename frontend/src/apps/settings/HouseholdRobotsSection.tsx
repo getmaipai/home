@@ -16,10 +16,11 @@ import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import areasFile from "@maipai/spec/settings/areas.json";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { api, type DeviceInfo } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type DeviceInfo } from "@/lib/api";
 import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { RobotActions } from "@/apps/settings/RobotActions";
+import { RobotWifi } from "@/apps/settings/RobotWifi";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -55,7 +56,7 @@ function robotLastSeen(device: DeviceInfo): string {
 }
 
 /** ROBOT-ADMIN-PLACE-01: Home settings, Devices. The list opens a robot's route detail. Admin only; the section's area gate and the hub enforce it. */
-export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; tab?: string }) {
+export function HouseholdRobotsSection({ detailId, tab, role }: { detailId?: string; tab?: string; role?: string }) {
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
   const query = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices(), refetchInterval: 5000 });
@@ -73,7 +74,7 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
           navigate("/settings/apps?tab=robot", { replace: true });
           return null;
         }
-        if (open) return <RobotDetail key={open.id} device={open} tab={tab} onClose={() => {}} />;
+        if (open) return <RobotDetail key={open.id} device={open} tab={tab} role={role} onClose={() => {}} />;
         return (
           <Card>
             <CardHeader><CardTitle>{i18n._({ id: "Robots", message: "Robots" })}</CardTitle><CardAction><Button size="lg" onClick={() => setParams((p) => { const n = new URLSearchParams(p); n.set("addRobot", "1"); return n; })}>{i18n._({ id: "Add a robot", message: "Add a robot" })}</Button></CardAction></CardHeader>
@@ -97,7 +98,7 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
   );
 }
 
-function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: string; onClose: () => void }) {
+function RobotDetail({ device, tab, role, onClose }: { device: DeviceInfo; tab?: string; role?: string; onClose: () => void }) {
   useTabItem(device.name);
   const queryClient = useQueryClient();
   const [name, setName] = useState(device.name);
@@ -164,6 +165,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
         <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? i18n._({ id: "Online", message: "Online" }) : device.lastSeenAt ? i18n._({ id: "Offline", message: "Offline" }) : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <>{" "}{i18n._(softwareQuery.data.checkin.ip ? { id: "Last seen {format} · IP address {ip}", message: "Last seen {format} · IP address {ip}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }), ip: softwareQuery.data.checkin.ip } } : { id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(softwareQuery.data.checkin.lastSeen, { dateStyle: "medium", timeStyle: "short" }) } })}</> : device.lastSeenAt ? <>{" "}{i18n._({ id: "Last seen {format}", message: "Last seen {format}", values: { format: formatDate(device.lastSeenAt, { dateStyle: "medium", timeStyle: "short" }) } })}</> : null}</p>
         <RobotSelfTests device={device} />
         <RobotActions device={device} />
+        {role && isOwnerOrAdminRole(role) ? <RobotWifi deviceId={device.id} checkin={softwareQuery.data?.checkin} /> : null}
         {hostedInstall && softwareQuery.data ? <Section heading={i18n._({ id: "Software", message: "Software" })}>
           <ItemGroup variant="card" aria-label={i18n._({ id: "Robot software", message: "Robot software" })}>
             <Item size="setting">

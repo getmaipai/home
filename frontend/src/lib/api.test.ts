@@ -53,6 +53,20 @@ test("findRobot posts find_me with optional seconds", async () => {
   expect(requests).toEqual([{ url: "/api/devices/robot%2F1/commands", body: { kind: "find_me", seconds: 8 } }]);
 });
 
+test("robotWifi posts add and forget to the dedicated Wi-Fi route", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+    return Response.json({ sent: true });
+  }) as typeof fetch;
+  await api.robotWifi("robot/1", { action: "add", ssid: "Home", password: "Not a real credential" });
+  await api.robotWifi("robot/1", { action: "forget", ssid: "Guest" });
+  expect(requests).toEqual([
+    { url: "/api/devices/robot%2F1/wifi", body: { action: "add", ssid: "Home", password: "Not a real credential" } },
+    { url: "/api/devices/robot%2F1/wifi", body: { action: "forget", ssid: "Guest" } },
+  ]);
+});
+
 test("a caller's lowercase content-type does not double the JSON header (the server answered 415 and Apply on AI and models did nothing)", async () => {
   let sent: Headers | null = null;
   globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
