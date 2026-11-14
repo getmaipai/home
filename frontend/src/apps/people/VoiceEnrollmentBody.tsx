@@ -2,12 +2,16 @@ import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { requestJson, type Roster } from "@/lib/api";
+import { api, requestJson, type ResolvedSetting, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { audioBlobToWav16k } from "@/apps/people/voiceEnrollment";
 import { errorLine } from "@/lib/hubReachability";
+import { settingLabel } from "@/lib/settingCopy";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 
 interface VoicePrint { id: string; created_at: string }
 
@@ -25,6 +29,10 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
     queryFn: () => requestJson<VoicePrint[]>(`/api/voice-prints?person_id=${encodeURIComponent(profile.id)}`),
     enabled: allowed,
   });
+  const settingQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", `person:${profile.id}`], queryFn: () => api.settingsValues(`person:${profile.id}`), enabled: allowed });
+  const matchSetting = settingQuery.data?.find((item) => item.key === "person.voice.match");
+  const [matchSaving, setMatchSaving] = useState(false);
+  const [matchError, setMatchError] = useState(false);
   useEffect(() => () => { streamRef.current?.getTracks().forEach((track) => track.stop()); }, []);
 
   async function startRecording() {
@@ -54,6 +62,18 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
   }
 
   function stopRecording() { recorderRef.current?.stop(); setRecording(false); }
+  async function setVoiceMatch(value: boolean, sampleCount: number) {
+    if (sampleCount === 0 || matchSaving) return;
+    setMatchSaving(true); setMatchError(false);
+    try {
+      const result = await api.setSetting(`person:${profile.id}`, "person.voice.match", value);
+      queryClient.setQueryData<ResolvedSetting[]>(["settings-values", `person:${profile.id}`], (old) => {
+        const rows = old ?? [];
+        return rows.some((item) => item.key === result.key) ? rows.map((item) => item.key === result.key ? result : item) : [...rows, result];
+      });
+    } catch { setMatchError(true); }
+    finally { setMatchSaving(false); }
+  }
   async function deletePrint(id?: string) {
     setBusy(true); setMessage("");
     try {
@@ -74,6 +94,14 @@ export function VoiceEnrollmentBody({ viewer, profile }: { viewer: Roster; profi
         <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={i18n._({ id: "Could not load voice samples.", message: "Could not load voice samples." })} loadingLabel={i18n._({ id: "Loading voice samples", message: "Loading voice samples" })}>
           {(prints) => <>
             <p aria-live="polite" className="text-sm">{i18n._({ id: "{count, plural, one {# voice sample saved} other {# voice samples saved}}", message: "{count, plural, one {# voice sample saved} other {# voice samples saved}}", values: { count: prints.length } })}</p>
+            {viewer.id === profile.id ? <>
+              <Item>
+                <ItemContent><ItemTitle>{settingLabel({ key: "person.voice.match", label: "Match my voice when I talk to Home" })}</ItemTitle><ItemDescription clamp={false}>{i18n._({ id: "Home only checks your voice against the samples you recorded, and keeps nothing about the check.", message: "Home only checks your voice against the samples you recorded, and keeps nothing about the check." })}</ItemDescription></ItemContent>
+                <ItemActions><Switch checked={matchSetting?.value === true} disabled={prints.length === 0 || matchSaving || settingQuery.isLoading} aria-label={settingLabel({ key: "person.voice.match", label: "Match my voice when I talk to Home" })} onCheckedChange={(value) => void setVoiceMatch(value, prints.length)} /></ItemActions>
+              </Item>
+              {prints.length === 0 ? <p className="text-supporting text-muted-foreground">{i18n._({ id: "Record a few samples first.", message: "Record a few samples first." })}</p> : null}
+              {matchError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not save the voice matching setting. Try again.", message: "Could not save the voice matching setting. Try again." })} /> : null}
+            </> : null}
             {prints.map((print, index) => <div key={print.id} className="flex items-center justify-between gap-3"><span className="text-sm">{i18n._({ id: "Sample {number}", message: "Sample {number}", values: { number: index + 1 } })}</span><Button type="button" variant="ghost" disabled={busy || recording} onClick={() => void deletePrint(print.id)}>{i18n._({ id: "Delete", message: "Delete" })}</Button></div>)}
             {prints.length ? <Button type="button" variant="outline" disabled={busy || recording} onClick={() => void deletePrint()}>{i18n._({ id: "Delete all samples", message: "Delete all samples" })}</Button> : null}
           </>}

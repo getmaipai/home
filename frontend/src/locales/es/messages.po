@@ -353,7 +353,7 @@ msgid "{count, plural, one {# video} other {# videos}}"
 msgstr "{count, plural, one {# video} other {# videos}}"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:76
+#: src/apps/people/VoiceEnrollmentBody.tsx:96
 #, needs-review
 msgid "{count, plural, one {# voice sample saved} other {# voice samples saved}}"
 msgstr "{count, plural, one {# muestra de voz guardada} other {# muestras de voz guardadas}}"
@@ -3205,7 +3205,7 @@ msgid "All synths"
 msgstr "Todos los synths"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:63
+#: src/apps/people/VoiceEnrollmentBody.tsx:83
 #, needs-review
 msgid "All voice samples deleted."
 msgstr "Todas las muestras de voz se eliminaron."
@@ -7743,7 +7743,7 @@ msgid "Could not delete the quick timer."
 msgstr "No se pudo eliminar el temporizador rápido."
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:64
+#: src/apps/people/VoiceEnrollmentBody.tsx:84
 #, needs-review
 msgid "Could not delete the voice sample."
 msgstr "No se pudo eliminar la muestra de voz."
@@ -8129,7 +8129,7 @@ msgid "Could not load updates."
 msgstr "No se pudieron cargar las actualizaciones."
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:74
+#: src/apps/people/VoiceEnrollmentBody.tsx:94
 #, needs-review
 msgid "Could not load voice samples."
 msgstr "No se pudieron cargar las muestras de voz."
@@ -8520,6 +8520,11 @@ msgid "Could not save the quick timer."
 msgstr "No se pudo guardar el temporizador rápido."
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:103
+msgid "Could not save the voice matching setting. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:329
 #: src/shell/pages/ChatPage.tsx:369
 #: src/shell/pages/ChatPage.tsx:520
@@ -8533,7 +8538,7 @@ msgid "Could not save this robot. Check the connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:49
+#: src/apps/people/VoiceEnrollmentBody.tsx:57
 #, needs-review
 msgid "Could not save this sample."
 msgstr "No se pudo guardar esta muestra."
@@ -9289,7 +9294,7 @@ msgstr "Grados Fahrenheit, como 72 F."
 #: src/apps/chat/chatHeaderBar.tsx:313
 #: src/apps/clock/AlarmEditor.tsx:115
 #: src/apps/clock/TimersTab.tsx:165
-#: src/apps/people/VoiceEnrollmentBody.tsx:77
+#: src/apps/people/VoiceEnrollmentBody.tsx:105
 #: src/apps/reminders/ListMenu.tsx:38
 #: src/apps/settings/CommandsSection.tsx:203
 #: src/apps/settings/VoiceManagerSection.tsx:123
@@ -9332,7 +9337,7 @@ msgid "Delete alarm"
 msgstr "Eliminar alarma"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:78
+#: src/apps/people/VoiceEnrollmentBody.tsx:106
 #, needs-review
 msgid "Delete all samples"
 msgstr "Eliminar todas las muestras"
@@ -13378,6 +13383,11 @@ msgid "Home never quits these, even if they are also on the Always close list."
 msgstr "Home nunca cierra estas, aunque también estén en la lista Cerrar siempre."
 
 #. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:99
+msgid "Home only checks your voice against the samples you recorded, and keeps nothing about the check."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:98
 #, needs-review
 msgid "Home only downloads what fits here."
@@ -16692,7 +16702,7 @@ msgid "Loading updates"
 msgstr "Cargando actualizaciones"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:74
+#: src/apps/people/VoiceEnrollmentBody.tsx:94
 #, needs-review
 msgid "Loading voice samples"
 msgstr "Cargando muestras de voz"
@@ -17153,7 +17163,7 @@ msgid "area.Maintenance"
 msgstr "Mantenimiento"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:70
+#: src/apps/people/VoiceEnrollmentBody.tsx:90
 #, needs-review
 msgid "MaiPai can use numbers derived from your voice to recognize you. Your recordings are not kept."
 msgstr "MaiPai puede usar números derivados de tu voz para reconocerte. No se conservan tus grabaciones."
@@ -18090,7 +18100,7 @@ msgid "Microphone {number}"
 msgstr "Micrófono {number}"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:53
+#: src/apps/people/VoiceEnrollmentBody.tsx:61
 #, needs-review
 msgid "Microphone access is unavailable. Check your browser permission and try again."
 msgstr "El acceso al micrófono no está disponible. Revisa el permiso de tu navegador e inténtalo de nuevo."
@@ -23315,12 +23325,17 @@ msgid "Reconnecting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:73
+#: src/apps/people/VoiceEnrollmentBody.tsx:102
+msgid "Record a few samples first."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/people/VoiceEnrollmentBody.tsx:93
 msgid "Record a few short samples. Say a number or read a sentence in your usual voice. Recording is used to make the voice print, then discarded. The server checks that the person being enrolled can consent. A child cannot consent for themself. A teen must consent for themself. Guests cannot enroll."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:81
+#: src/apps/people/VoiceEnrollmentBody.tsx:109
 #, needs-review
 msgid "Record a sample"
 msgstr "Grabar una muestra"
@@ -24798,7 +24813,7 @@ msgid "same time"
 msgstr "misma hora"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:77
+#: src/apps/people/VoiceEnrollmentBody.tsx:105
 #, needs-review
 msgid "Sample {number}"
 msgstr "Muestra {number}"
@@ -25008,7 +25023,7 @@ msgid "Saving"
 msgstr "Guardando"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:81
+#: src/apps/people/VoiceEnrollmentBody.tsx:109
 #, needs-review
 msgid "Saving sample…"
 msgstr "Guardando muestra…"
@@ -27945,7 +27960,7 @@ msgid "Stop live view"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:81
+#: src/apps/people/VoiceEnrollmentBody.tsx:109
 #, needs-review
 msgid "Stop recording"
 msgstr "Detener grabación"
@@ -28790,6 +28805,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/people/FaceEnrollmentPage.tsx:781
 #: src/apps/people/ProfileForm.tsx:176
 #: src/apps/people/ProfileForm.tsx:187
+#: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/AddVoiceForm.tsx:83
 #: src/apps/settings/AiGlance.tsx:226
@@ -32960,19 +32976,19 @@ msgid "area.Voice print enrollment"
 msgstr "Registro de huella de voz"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:70
+#: src/apps/people/VoiceEnrollmentBody.tsx:90
 #, needs-review
 msgid "Voice recognition"
 msgstr "Reconocimiento de voz"
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:63
+#: src/apps/people/VoiceEnrollmentBody.tsx:83
 #, needs-review
 msgid "Voice sample deleted."
 msgstr "Muestra de voz eliminada."
 
 #. js-lingui-explicit-id
-#: src/apps/people/VoiceEnrollmentBody.tsx:48
+#: src/apps/people/VoiceEnrollmentBody.tsx:56
 #, needs-review
 msgid "Voice sample saved."
 msgstr "Muestra de voz guardada."
