@@ -14,8 +14,7 @@ When `music.identify.online` is On, or Ask each time was confirmed, a local miss
 The first real match returns immediately. Other providers keep running through the shared deadline and every answer is kept as a
 candidate. A candidate agreeing on normalized title and artist is marked as agreeing; a different answer remains available for the
 person to discuss. A failed provider does not block another provider. With the online setting Off, only a local library match runs.
-Shazam has a separate `music.identify.shazam` switch in the Home code; registering it in the user settings awaits the next shared spec
-pin because settings keys are spec-owned. The memory cache is keyed by a hash and stores only the result.
+Shazam has its own `music.identify.shazam` switch (shared spec 0.1.397, on by default), shown on the Name songs online card.
 
 The signature encoder follows SongRec's reverse-engineered Shazam format. Attribution: SongRec by Marin Maillard and contributors,
 GPL-3.0; Home is AGPL-3.0, compatible under AGPL section 13. This is an independent implementation, not vendored code.

@@ -36,6 +36,17 @@ The owner's exception of 2026-10-25 permits the Music app to look a single song 
 
 The privacy table lists this traffic as `platform:music-lyrics-lookup` only while the setting is on.
 
+## MUSIC-ID-05: naming a song (Shazam and AcoustID)
+
+The owner chose on 2026-11-14 (question box, option "Add a snippet service", after being told it is an unofficial service, a new outside connection that sends only a small audio signature and may stop working) to add Shazam as a snippet lookup beside AcoustID. `music.identify.shazam` is a household switch, on by default; `music.identify.online` (On, Ask each time, Off) still decides whether any online lookup happens. Both lookups run only when someone asks (a person or the model asks the robot to listen, or a robot's own music listening names a song), never for a child's content, and never for a song made at home.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| MUSIC-ID-05 (Shazam) | One POST of the signature and the clip length to amp.shazam.com, plain `MaiPai-Home` user agent, neutral location, no household, person or device identity | None; an answer is cached by signature | One at a time, one a second across the household, 6 s timeout, no retry | None beyond the pace | A 429 pauses Shazam lookups for 10 minutes; Shazam being unavailable never fails an answer (AcoustID and the library remain) |
+| MUSIC-ID-01 (AcoustID) | One lookup of the Chromaprint fingerprint and the clip length on api.acoustid.org with the household's own key | None; an answer is cached by fingerprint | One at a time, at most 3 a second (the service's published limit) | The service's own | A refusal pauses lookups; no key means no AcoustID lookup |
+
+The privacy table lists each destination (`platform:music-identify-shazam`, `platform:music-identify`) only while the settings allow it. Titles and artists never appear on a status or admin page (RULES.md 6a).
+
 ## PODCAST-PORT-01: finding new podcasts
 
 The owner's request of 2026-10-27 permits Podcasts to search Apple's public podcast directory (iTunes Search, Apple's top list and its id lookup). `podcasts.directory.enabled` is a household switch, on by default since the owner's decision of 2026-10-28 (spec 0.1.267); `podcasts.directory.teens` (off by default) adds teens. A child never reaches it, and a minor's search words pass the household-name check first. Only a person's own search or opening the top list makes a request; nothing runs in the background.

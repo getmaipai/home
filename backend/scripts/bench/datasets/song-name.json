@@ -1,0 +1,45 @@
+{
+  "about": "Song naming tool (bench_row song-name). Persona names only.",
+  "rows": [
+    {
+      "id": "name-this",
+      "label": "song_name",
+      "text": "What song is this?"
+    },
+    {
+      "id": "name-who-sings",
+      "label": "song_name",
+      "text": "Who sings the song that is playing right now?"
+    },
+    {
+      "id": "name-tune",
+      "label": "song_name",
+      "text": "Can you name that tune?"
+    },
+    {
+      "id": "name-listen",
+      "label": "song_name",
+      "text": "Listen to the music and tell me what it is."
+    },
+    {
+      "id": "negative-make-song",
+      "label": "N",
+      "text": "Make me a song about summer."
+    },
+    {
+      "id": "negative-play-song",
+      "label": "N",
+      "text": "Play something by the band I like."
+    },
+    {
+      "id": "negative-lyrics",
+      "label": "N",
+      "text": "Write the lyrics for a happy birthday song for Marlow."
+    },
+    {
+      "id": "negative-history",
+      "label": "N",
+      "text": "Who invented the piano?"
+    }
+  ]
+}
