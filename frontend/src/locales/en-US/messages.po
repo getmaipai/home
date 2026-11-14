@@ -1442,7 +1442,7 @@ msgid "setting.generation.kids_daily_videos.help"
 msgstr "0 means none."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:107
+#: src/apps/settings/AddVoiceForm.tsx:110
 msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "0.1 to 2. Higher is livelier and also raises the pitch."
 
@@ -2230,7 +2230,7 @@ msgid "Add music"
 msgstr "Add music"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:61
+#: src/apps/settings/RobotWifi.tsx:66
 msgid "Add network"
 msgstr "Add network"
 
@@ -2663,7 +2663,7 @@ msgid "area.AI settings"
 msgstr "AI settings"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:83
+#: src/apps/settings/AddVoiceForm.tsx:84
 msgid "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one."
 msgstr "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one."
 
@@ -3068,7 +3068,7 @@ msgid "An update is ready"
 msgstr "An update is ready"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:86
+#: src/apps/settings/AddVoiceForm.tsx:100
 msgid "Angry recording (optional)"
 msgstr "Angry recording (optional)"
 
@@ -3530,17 +3530,22 @@ msgid "Asked {name} to dance."
 msgstr "Asked {name} to dance."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:30
+#: src/apps/settings/RobotWifi.tsx:31
 msgid "Asked the robot to forget {name}."
 msgstr "Asked the robot to forget {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:30
+#: src/apps/settings/RobotWifi.tsx:34
+msgid "Asked the robot to forget {name}. It drops it within a minute if it is online."
+msgstr "Asked the robot to forget {name}. It drops it within a minute if it is online."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:31
 msgid "Asked the robot to join {name} now. If it cannot reach the hub within 3 minutes it goes back by itself."
 msgstr "Asked the robot to join {name} now. If it cannot reach the hub within 3 minutes it goes back by itself."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:41
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "Asked the robot to reach the hub over the tailnet for 10 minutes."
 msgstr "Asked the robot to reach the hub over the tailnet for 10 minutes."
 
@@ -4094,8 +4099,8 @@ msgid "Bio must be 160 characters or less."
 msgstr "Bio must be 160 characters or less."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:102
-#: src/apps/settings/AddVoiceForm.tsx:103
+#: src/apps/settings/AddVoiceForm.tsx:92
+#: src/apps/settings/AddVoiceForm.tsx:93
 msgid "Blend with (optional)"
 msgstr "Blend with (optional)"
 
@@ -4539,7 +4544,7 @@ msgstr "Can someone reach into your house?"
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
-#: src/apps/settings/AddVoiceForm.tsx:115
+#: src/apps/settings/AddVoiceForm.tsx:120
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/CodingSettings.tsx:173
@@ -5933,7 +5938,7 @@ msgid "Claude Code · same key"
 msgstr "Claude Code · same key"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:93
+#: src/apps/settings/AddVoiceForm.tsx:107
 msgid "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best."
 msgstr "Cleans every recording above before the voice is made. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best."
 
@@ -6680,7 +6685,7 @@ msgid "Could not change the pause setting."
 msgstr "Could not change the pause setting."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:34
+#: src/apps/settings/RobotWifi.tsx:39
 msgid "Could not change the robot's Wi-Fi. Try again."
 msgstr "Could not change the robot's Wi-Fi. Try again."
 
@@ -7598,7 +7603,7 @@ msgid "Could not start the downloads. Check that the engine is running, then try
 msgstr "Could not start the downloads. Check that the engine is running, then try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:43
+#: src/apps/settings/RobotWifi.tsx:48
 msgid "Could not start the tailnet test. Try again."
 msgstr "Could not start the tailnet test. Try again."
 
@@ -8458,7 +8463,7 @@ msgid "Different"
 msgstr "Different"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:98
+#: src/apps/settings/AddVoiceForm.tsx:88
 msgid "Different sounds like a relative of the voice. Very different sounds like someone else with a similar feel. Lower and Much lower make the voice deeper."
 msgstr "Different sounds like a relative of the voice. Very different sounds like someone else with a similar feel. Lower and Much lower make the voice deeper."
 
@@ -9166,7 +9171,7 @@ msgid "Engine computer: {state}"
 msgstr "Engine computer: {state}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:107
+#: src/apps/settings/AddVoiceForm.tsx:110
 msgid "Engine default"
 msgstr "Engine default"
 
@@ -10092,13 +10097,13 @@ msgid "For example: slower, acoustic, with a warm piano"
 msgstr "For example: slower, acoustic, with a warm piano"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 #: src/shell/pages/CompanionsPage.tsx:344
 msgid "Forget"
 msgstr "Forget"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "Forget {name} on this robot?"
 msgstr "Forget {name} on this robot?"
 
@@ -10123,7 +10128,7 @@ msgid "Forget everything MaiPai remembers about {personName}?"
 msgstr "Forget everything MaiPai remembers about {personName}?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "Forget network"
 msgstr "Forget network"
 
@@ -11867,8 +11872,8 @@ msgid "setting.robot.brightness.help"
 msgstr "How bright this robot's screen is by default, from 10 to 100 percent. You can also tell it 'brightness to 50'. At night it dims and goes back to this level in the morning."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:96
-#: src/apps/settings/AddVoiceForm.tsx:97
+#: src/apps/settings/AddVoiceForm.tsx:86
+#: src/apps/settings/AddVoiceForm.tsx:87
 msgid "How different from the original"
 msgstr "How different from the original"
 
@@ -12795,7 +12800,7 @@ msgid "Is this style for adults only?"
 msgstr "Is this style for adults only?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:90
+#: src/apps/settings/AddVoiceForm.tsx:104
 msgid "Isolate the voice (remove music and other sounds)"
 msgstr "Isolate the voice (remove music and other sounds)"
 
@@ -13024,7 +13029,7 @@ msgid "Keep key"
 msgstr "Keep key"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "Keep network"
 msgstr "Keep network"
 
@@ -14212,7 +14217,7 @@ msgid "Live view stops by itself after 10 minutes. Nothing is recorded."
 msgstr "Live view stops by itself after 10 minutes. Nothing is recorded."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:107
+#: src/apps/settings/AddVoiceForm.tsx:110
 msgid "Liveliness (optional)"
 msgstr "Liveliness (optional)"
 
@@ -15196,7 +15201,7 @@ msgid "Make caption track"
 msgstr "Make caption track"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:116
+#: src/apps/settings/AddVoiceForm.tsx:121
 msgid "Make Inspired voice"
 msgstr "Make Inspired voice"
 
@@ -15284,7 +15289,7 @@ msgid "Make transcript"
 msgstr "Make transcript"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:116
+#: src/apps/settings/AddVoiceForm.tsx:121
 msgid "Make voice"
 msgstr "Make voice"
 
@@ -15382,12 +15387,12 @@ msgid "Making the sound"
 msgstr "Making the sound"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:113
+#: src/apps/settings/AddVoiceForm.tsx:118
 msgid "Making the voice"
 msgstr "Making the voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:113
+#: src/apps/settings/AddVoiceForm.tsx:118
 msgid "Making the voice. This can take up to a minute the first time."
 msgstr "Making the voice. This can take up to a minute the first time."
 
@@ -15894,7 +15899,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.mix"
 msgstr "Mix"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:104
+#: src/apps/settings/AddVoiceForm.tsx:94
 msgid "Mixes the new voice with a voice already made at home."
 msgstr "Mixes the new voice with a voice already made at home."
 
@@ -16485,7 +16490,7 @@ msgid "setting.coding.person.network_hosts.label"
 msgstr "Network hosts"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:55
+#: src/apps/settings/RobotWifi.tsx:60
 msgid "Network name"
 msgstr "Network name"
 
@@ -17082,7 +17087,7 @@ msgid "No robots yet. An admin adds one in Settings, Home, Devices."
 msgstr "No robots yet. An admin adds one in Settings, Home, Devices."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "No saved networks reported."
 msgstr "No saved networks reported."
 
@@ -18424,7 +18429,7 @@ msgid "Only this computer will be able to reach Home."
 msgstr "Only this computer will be able to reach Home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:111
+#: src/apps/settings/AddVoiceForm.tsx:116
 msgid "Only use your own voice, or the voice of someone who said yes."
 msgstr "Only use your own voice, or the voice of someone who said yes."
 
@@ -19535,7 +19540,7 @@ msgid "Pitch"
 msgstr "Pitch"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:108
+#: src/apps/settings/AddVoiceForm.tsx:111
 msgid "Pitch (optional)"
 msgstr "Pitch (optional)"
 
@@ -19629,7 +19634,7 @@ msgid "Playful"
 msgstr "Playful"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:99
+#: src/apps/settings/AddVoiceForm.tsx:89
 msgid "Playing a sample"
 msgstr "Playing a sample"
 
@@ -19851,7 +19856,7 @@ msgid "Pretend the next Tailscale step is done"
 msgstr "Pretend the next Tailscale step is done"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:99
+#: src/apps/settings/AddVoiceForm.tsx:89
 #: src/shell/library/TranscriptFindReplace.tsx:107
 #: src/shell/pages/companionFlow/AnimateStep.tsx:115
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:144
@@ -20592,12 +20597,12 @@ msgid "Remove and apply"
 msgstr "Remove and apply"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:91
+#: src/apps/settings/AddVoiceForm.tsx:105
 msgid "Remove background noise"
 msgstr "Remove background noise"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:92
+#: src/apps/settings/AddVoiceForm.tsx:106
 msgid "Remove echo and room sound (uses the echo remover model)"
 msgstr "Remove echo and room sound (uses the echo remover model)"
 
@@ -21412,7 +21417,7 @@ msgid "setting.robot.volume.label"
 msgstr "Robot volume"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:48
+#: src/apps/settings/RobotWifi.tsx:53
 msgid "Robot Wi-Fi"
 msgstr "Robot Wi-Fi"
 
@@ -21702,7 +21707,7 @@ msgid "Save audience"
 msgstr "Save audience"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:116
+#: src/apps/settings/AddVoiceForm.tsx:121
 msgid "Save changes"
 msgstr "Save changes"
 
@@ -22336,7 +22341,7 @@ msgid "SearXNG is a search service you run yourself. It searches many sites at o
 msgstr "SearXNG is a search service you run yourself. It searches many sites at once and keeps no record of who asked."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:82
+#: src/apps/settings/AddVoiceForm.tsx:83
 msgid "Second recording (optional)"
 msgstr "Second recording (optional)"
 
@@ -22475,7 +22480,7 @@ msgid "setting.chat.model_id.label"
 msgstr "Selected chat model"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:108
+#: src/apps/settings/AddVoiceForm.tsx:111
 msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr "Semitones, -12 to 12. A negative number lowers the voice."
 
@@ -22502,7 +22507,7 @@ msgstr "Send time-sensitive notifications to a robot"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotActions.tsx:55
-#: src/apps/settings/RobotWifi.tsx:61
+#: src/apps/settings/RobotWifi.tsx:66
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -23028,7 +23033,7 @@ msgid "setting.ui.rail_expanded.help"
 msgstr "Show names beside the menu icons. The menu still folds away by itself in apps that have their own side panel."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:59
+#: src/apps/settings/RobotWifi.tsx:64
 msgid "Show password"
 msgstr "Show password"
 
@@ -25040,7 +25045,7 @@ msgid "Test music detection"
 msgstr "Test music detection"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:52
+#: src/apps/settings/RobotWifi.tsx:57
 msgid "Test the tailnet path for 10 minutes"
 msgstr "Test the tailnet path for 10 minutes"
 
@@ -25160,7 +25165,7 @@ msgstr "That did not send. Try again."
 #: src/apps/people/ProfileForm.tsx:187
 #: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
-#: src/apps/settings/AddVoiceForm.tsx:112
+#: src/apps/settings/AddVoiceForm.tsx:117
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
 #: src/apps/settings/AssistantKeysSettings.tsx:74
@@ -26252,7 +26257,7 @@ msgid "The robot is trying the laptop relay"
 msgstr "The robot is trying the laptop relay"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:50
+#: src/apps/settings/RobotWifi.tsx:55
 msgid "The robot joins the strongest saved network in range for now."
 msgstr "The robot joins the strongest saved network in range for now."
 
@@ -26267,7 +26272,7 @@ msgid "setting.robot.vision.option.on_demand"
 msgstr "The robot looks only when someone asks it to, for example 'what do you see?'."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "The robot will no longer join this network."
 msgstr "The robot will no longer join this network."
 
@@ -26671,7 +26676,7 @@ msgid "Thinking:"
 msgstr "Thinking:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:82
+#: src/apps/settings/AddVoiceForm.tsx:83
 msgid "Third recording (optional)"
 msgstr "Third recording (optional)"
 
@@ -26857,7 +26862,7 @@ msgid "This frees {sizeWords}. You can install it again later."
 msgstr "This frees {sizeWords}. You can install it again later."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:60
+#: src/apps/settings/RobotWifi.tsx:65
 msgid "This is my own home network"
 msgstr "This is my own home network"
 
@@ -26902,7 +26907,7 @@ msgid "This MaiPai Home itself."
 msgstr "This MaiPai Home itself."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:110
+#: src/apps/settings/AddVoiceForm.tsx:115
 msgid "This makes a new voice based on the recording. It is not a copy of the voice."
 msgstr "This makes a new voice based on the recording. It is not a copy of the voice."
 
@@ -26927,7 +26932,7 @@ msgid "api.error.passkey_not_registered_here"
 msgstr "This passkey isn't registered to this profile. Sign in another way, or add the passkey again in Settings."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:62
+#: src/apps/settings/RobotWifi.tsx:67
 msgid "This password would cross a network that is not your home network or your tailnet, so the form is off. Add networks while the robot is at home or connected through your tailnet."
 msgstr "This password would cross a network that is not your home network or your tailnet, so the form is off. Add networks while the robot is at home or connected through your tailnet."
 
@@ -26997,7 +27002,7 @@ msgid "This revokes its enrollment code and deletes its saved firmware backup."
 msgstr "This revokes its enrollment code and deletes its saved firmware backup."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:53
+#: src/apps/settings/RobotWifi.tsx:58
 msgid "This robot already holds 10 Wi-Fi networks. Forget one to add another."
 msgstr "This robot already holds 10 Wi-Fi networks. Forget one to add another."
 
@@ -27022,7 +27027,7 @@ msgid "This role requires a PIN or password. Enter one above, then try again."
 msgstr "This role requires a PIN or password. Enter one above, then try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:54
+#: src/apps/settings/RobotWifi.tsx:59
 msgid "This sends the password across your home network to the robot. OK on your own home network. Use the tailnet for networks away from home."
 msgstr "This sends the password across your home network to the robot. OK on your own home network. Use the tailnet for networks away from home."
 
@@ -28392,7 +28397,7 @@ msgid "Use this model"
 msgstr "Use this model"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "Use this network now"
 msgstr "Use this network now"
 
@@ -28961,7 +28966,7 @@ msgid "Waiting for the robot to check in."
 msgstr "Waiting for the robot to check in."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 msgid "Waiting for the robot to report its networks."
 msgstr "Waiting for the robot to report its networks."
 
@@ -29541,12 +29546,12 @@ msgid "setting.voice.speculative_start.help"
 msgstr "While you are still finishing a sentence, Home begins working out its answer from what it has heard so far. If the words change, the early start is thrown away and nothing is kept. Adults only. Off until it is measured."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:87
+#: src/apps/settings/AddVoiceForm.tsx:101
 msgid "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you."
 msgstr "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:85
+#: src/apps/settings/AddVoiceForm.tsx:99
 msgid "Whisper recording (optional)"
 msgstr "Whisper recording (optional)"
 
@@ -29643,12 +29648,12 @@ msgid "Wi-Fi {signal}"
 msgstr "Wi-Fi {signal}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:30
+#: src/apps/settings/RobotWifi.tsx:31
 msgid "Wi-Fi network sent to the robot."
 msgstr "Wi-Fi network sent to the robot."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:57
+#: src/apps/settings/RobotWifi.tsx:62
 msgid "Wi-Fi password"
 msgstr "Wi-Fi password"
 
@@ -29771,7 +29776,7 @@ msgstr "Working on the picture"
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
-#: src/apps/settings/RobotWifi.tsx:51
+#: src/apps/settings/RobotWifi.tsx:56
 #: src/shell/library/TranscriptCaptionTracks.tsx:71
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60
@@ -29960,7 +29965,7 @@ msgid "You also accept the licences of the AI models and tools Home installs for
 msgstr "You also accept the licences of the AI models and tools Home installs for you. Each is listed with its terms on the Plan page and in Models and storage."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddVoiceForm.tsx:111
+#: src/apps/settings/AddVoiceForm.tsx:116
 msgid "You are responsible for having the right to use this voice."
 msgstr "You are responsible for having the right to use this voice."
 
