@@ -76,22 +76,12 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     }
   }
 
-  return <form id="add-voice-form" onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
-    <div className={FIELD}><label htmlFor="add-voice-name" className="text-base">{i18n._({ id: "Name", message: "Name" })}</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy || !!edit} /></div>
+  return <form id="add-voice-form" onSubmit={(event) => void submit(event)} className={inspired ? "flex flex-col gap-4" : "grid gap-x-8 gap-y-4 md:grid-cols-2"}>
+    <div className={`${FIELD} md:col-span-2`}><label htmlFor="add-voice-name" className="text-base">{i18n._({ id: "Name", message: "Name" })}</label><Input id="add-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} disabled={busy || !!edit} /></div>
+    <div className="flex flex-col gap-4">
     <div className={FIELD}><label htmlFor="add-voice-recording" className="text-base">{i18n._({ id: edit ? "Replace recording (optional)" : "Recording", message: edit ? "Replace recording (optional)" : "Recording" })}</label><Input id="add-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} disabled={busy} /></div>
     {!inspired ? [0, 1].map((slot) => <div key={slot} className={FIELD}><label htmlFor={`add-voice-recording-${slot + 2}`} className="text-base">{slot === 0 ? i18n._({ id: "Second recording (optional)", message: "Second recording (optional)" }) : i18n._({ id: "Third recording (optional)", message: "Third recording (optional)" })}</label><Input id={`add-voice-recording-${slot + 2}`} type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setExtraClips((old) => old.map((item, index) => index === slot ? event.target.files?.[0] : item))} disabled={busy} /></div>) : null}
     {!inspired ? <p className={HELP}>{i18n._({ id: "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one.", message: "Aim for 20 to 28 seconds of clear speech in total, with no music. Up to 3 normal clips are joined into one." })}</p> : null}
-    {!inspired ? <>
-      <div className={FIELD}><label htmlFor="add-voice-whisper" className="text-body">{i18n._({ id: "Whisper recording (optional)", message: "Whisper recording (optional)" })}</label><Input id="add-voice-whisper" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setWhisperClip(event.target.files?.[0])} disabled={busy} /></div>
-      <div className={FIELD}><label htmlFor="add-voice-anger" className="text-body">{i18n._({ id: "Angry recording (optional)", message: "Angry recording (optional)" })}</label><Input id="add-voice-anger" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setAngerClip(event.target.files?.[0])} disabled={busy} /></div>
-      <p className={HELP}>{i18n._({ id: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you.", message: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you." })}</p>
-    </> : null}
-    {!inspired ? <div className={FIELD}>
-      <label className="flex items-center gap-2 text-body"><Checkbox checked={isolateVoice} onCheckedChange={(value) => setIsolateVoice(value === true)} disabled={busy} />{i18n._({ id: "Isolate the voice (remove music and other sounds)", message: "Isolate the voice (remove music and other sounds)" })}</label>
-      <label className="flex items-center gap-2 text-body"><Checkbox checked={reduceNoise} onCheckedChange={(value) => setReduceNoise(value === true)} disabled={busy} />{i18n._({ id: "Remove background noise", message: "Remove background noise" })}</label>
-      <label className="flex items-center gap-2 text-body"><Checkbox checked={reduceEcho} onCheckedChange={(value) => setReduceEcho(value === true)} disabled={busy} />{i18n._({ id: "Remove echo and room sound (uses the echo remover model)", message: "Remove echo and room sound (uses the echo remover model)" })}</label>
-      <p className={HELP}>{i18n._({ id: "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best.", message: "Cleans every recording above before the voice is made. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best." })}</p>
-    </div> : null}
     {inspired ? <div className={FIELD}>
       <span className="text-body">{i18n._({ id: "How different from the original", message: "How different from the original" })}</span>
       <Select aria-label={i18n._({ id: "How different from the original", message: "How different from the original" })} value={level} options={INSPIRED_LEVELS} getLabel={(id) => inspiredLevelLabel(id as InspiredLevel)} onValueChange={(id) => setLevel(id as InspiredLevel)} disabled={busy} />
@@ -103,10 +93,25 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
       <Select aria-label={i18n._({ id: "Blend with (optional)", message: "Blend with (optional)" })} value={baseId} options={["none", ...baseVoices.map((voice) => voice.id)]} getLabel={baseLabel} onValueChange={setBaseId} disabled={busy} />
       <p className={HELP}>{i18n._({ id: "Mixes the new voice with a voice already made at home.", message: "Mixes the new voice with a voice already made at home." })}</p>
     </div> : null}
+    </div>
+    <div className="flex flex-col gap-4">
+    {!inspired ? <>
+      <div className={FIELD}><label htmlFor="add-voice-whisper" className="text-body">{i18n._({ id: "Whisper recording (optional)", message: "Whisper recording (optional)" })}</label><Input id="add-voice-whisper" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setWhisperClip(event.target.files?.[0])} disabled={busy} /></div>
+      <div className={FIELD}><label htmlFor="add-voice-anger" className="text-body">{i18n._({ id: "Angry recording (optional)", message: "Angry recording (optional)" })}</label><Input id="add-voice-anger" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setAngerClip(event.target.files?.[0])} disabled={busy} /></div>
+      <p className={HELP}>{i18n._({ id: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you.", message: "Whisper and angry recordings, 10 to 25 seconds each, are the voice's own styles. Without a whisper one, Home makes it for you." })}</p>
+    </> : null}
+    {!inspired ? <div className={FIELD}>
+      <label className="flex items-center gap-2 text-body"><Checkbox checked={isolateVoice} onCheckedChange={(value) => setIsolateVoice(value === true)} disabled={busy} />{i18n._({ id: "Isolate the voice (remove music and other sounds)", message: "Isolate the voice (remove music and other sounds)" })}</label>
+      <label className="flex items-center gap-2 text-body"><Checkbox checked={reduceNoise} onCheckedChange={(value) => setReduceNoise(value === true)} disabled={busy} />{i18n._({ id: "Remove background noise", message: "Remove background noise" })}</label>
+      <label className="flex items-center gap-2 text-body"><Checkbox checked={reduceEcho} onCheckedChange={(value) => setReduceEcho(value === true)} disabled={busy} />{i18n._({ id: "Remove echo and room sound (uses the echo remover model)", message: "Remove echo and room sound (uses the echo remover model)" })}</label>
+      <p className={HELP}>{i18n._({ id: "Cleans every recording above before the voice is made. When you edit a voice and add no new recording, it cleans the one it has. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best.", message: "Cleans every recording above before the voice is made. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best." })}</p>
+    </div> : null}
     {canTune && !inspired ? <>
     <div className={FIELD}><label htmlFor="add-voice-liveliness" className="text-base">{i18n._({ id: "Liveliness (optional)", message: "Liveliness (optional)" })}</label><Input id="add-voice-liveliness" type="number" min={0.1} max={2} step={0.05} placeholder={i18n._({ id: "Engine default", message: "Engine default" })} value={temperature} onChange={(event) => setTemperature(event.target.value)} disabled={busy} /><p className={HELP}>{i18n._({ id: "0.1 to 2. Higher is livelier and also raises the pitch.", message: "0.1 to 2. Higher is livelier and also raises the pitch." })}</p></div>
     <div className={FIELD}><label htmlFor="add-voice-pitch" className="text-base">{i18n._({ id: "Pitch (optional)", message: "Pitch (optional)" })}</label><Input id="add-voice-pitch" type="number" min={-12} max={12} step={0.5} placeholder="0" value={pitch} onChange={(event) => setPitch(event.target.value)} disabled={busy} /><p className={HELP}>{i18n._({ id: "Semitones, -12 to 12. A negative number lowers the voice.", message: "Semitones, -12 to 12. A negative number lowers the voice." })}</p></div>
     </> : null}
+    </div>
+    <div className="flex flex-col gap-4 md:col-span-2">
     {inspired ? <p className={HELP}>{i18n._({ id: "This makes a new voice based on the recording. It is not a copy of the voice.", message: "This makes a new voice based on the recording. It is not a copy of the voice." })}</p> : null}
     <p className={HELP}>{minor ? i18n._({ id: "Only use your own voice, or the voice of someone who said yes.", message: "Only use your own voice, or the voice of someone who said yes." }) : i18n._({ id: "You are responsible for having the right to use this voice.", message: "You are responsible for having the right to use this voice." })}</p>
     {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
@@ -114,6 +119,7 @@ export function AddVoiceForm({ onCancel, onMade, onBusyChange, canTune = true, m
     <div className="flex justify-end gap-2">
       <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
       <Button type="submit" disabled={!name.trim() || (!clip && !edit) || busy}>{edit ? i18n._({ id: "Save changes", message: "Save changes" }) : inspired ? i18n._({ id: "Make Inspired voice", message: "Make Inspired voice" }) : i18n._({ id: "Make voice", message: "Make voice" })}</Button>
+    </div>
     </div>
   </form>;
 }

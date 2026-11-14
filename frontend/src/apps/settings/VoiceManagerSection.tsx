@@ -131,9 +131,9 @@ export function VoiceManagerSection() {
         </div>}
       </AsyncState>}
     <Dialog open={editing !== null} onOpenChange={(open) => { if (!open && !editBusy) setEditing(null); }}>
-      <DialogContent>
+      <DialogContent variant="flow" size="xl" scroll="viewport">
         <DialogHeader>
-          <DialogTitle>{i18n._({ id: "Edit {value}", message: "Edit {value}", values: { value: editing?.label ?? "" } })}</DialogTitle>
+          <DialogTitle size="xl">{i18n._({ id: "Edit {value}", message: "Edit {value}", values: { value: editing?.label ?? "" } })}</DialogTitle>
           <DialogDescription>{i18n._({ id: "Add or replace recordings, add a whisper or angry one, or clean the sound. The voice keeps its name and everyone and every robot using it keeps it.", message: "Add or replace recordings, add a whisper or angry one, or clean the sound. The voice keeps its name and everyone and every robot using it keeps it." })}</DialogDescription>
         </DialogHeader>
         {editing ? <AddVoiceForm key={editing.id} edit={editing} canTune onBusyChange={setEditBusy} onCancel={() => setEditing(null)} onMade={(name) => { setEditing(null); setNotice(i18n._({ id: "{name} is updated.", message: "{name} is updated.", values: { name } })); }} /> : null}
