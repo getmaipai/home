@@ -1092,7 +1092,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/scene.ts` | SCENE_TTL, weatherCacheLease, getWeatherCue, setWeatherCue, setWeatherFailure, dropWeatherCue |
 | `backend/src/lib/sceneSuppression.ts` | dismiss, isSuppressed, shouldReAlert, resume, listActive, clearAll |
 | `backend/src/lib/sceneTool.ts` | SCENE_TOOL_ID, sceneToolStreamArgs, cleanSceneLabel, sceneObservations, runSceneTool |
-| `backend/src/lib/sceneWeather.ts` | fetchSceneWeatherForContext, fetchSceneWeather |
+| `backend/src/lib/sceneWeather.ts` | fetchSceneWeatherForContext, fetchSceneWeatherAlertsForContext, fetchSceneWeather |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, SCHEDULE_PRUNE_DAYS |
 | `backend/src/lib/schedules/executor.ts` | HUB_FIRE_JOB, nextRunOf, queueHubRun, ONCE_GRACE_MS, pauseTask, fireHubDeviceTask |
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
@@ -1382,7 +1382,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
 | `backend/src/lib/wallClock.ts` | wallClockParts, wallClockMinutes, validTimeZone |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
-| `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome |
+| `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, __setWeatherAlertsFetcherForTests, isUsAlertCoordinate, weatherAlerts, notifyWeatherAlertsForHome, weatherAlertsEnabled |
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile, cardMoon |
 | `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __weatherSummaryCacheKeysForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, __setWebSearchToolDeadlineForTests, webSearchToolDeadlineMs |
