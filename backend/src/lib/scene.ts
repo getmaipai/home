@@ -11,7 +11,7 @@ const MAX_SCENES = 200;
 const IDLE_TTL = 30 * 60_000;
 const store = new Map<string, FusedScene>();
 type Person = Scene["people"][number];
-export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null };
+export type FusedScene = Scene & { alone_observed: boolean; alone_observed_until: number | null; weather_alerts?: WeatherAlertCue[] };
 
 export type WeatherCue = {
   temp_f?: number;
@@ -24,9 +24,11 @@ export type WeatherCue = {
   expires_at: number;
   source: "current" | "saved" | "home" | "device";
 };
+export type WeatherAlertCue = { id: string; event: string; severity: string; headline: string; ends: string };
 
 const weatherCache = new Map<string, { cue: WeatherCue | null; point: { lat: number; lon: number }; source: WeatherCue["source"]; expires_at: number }>();
 const weatherGenerations = new Map<string, number>();
+const alertCache = new Map<string, { point: { lat: number; lon: number }; alerts: WeatherAlertCue[]; expires_at: number }>();
 /** A late weather lookup may only fill the cache while its conversation still exists. */
 export function weatherCacheLease(conversationId: string): () => boolean {
   const generation = weatherGenerations.get(conversationId) ?? 0;
@@ -44,9 +46,20 @@ export function setWeatherFailure(conversationId: string, point: { lat: number; 
   setBounded(weatherCache, conversationId, { cue: null, point, source, expires_at: now + 30 * 60_000 }, MAX_SCENES);
 }
 export function dropWeatherCue(conversationId: string): void { weatherCache.delete(conversationId); weatherGenerations.set(conversationId, (weatherGenerations.get(conversationId) ?? 0) + 1); }
-export function clearWeatherCues(): void { weatherCache.clear(); weatherGenerations.clear(); }
+export function getWeatherAlertCues(conversationId: string, point: { lat: number; lon: number }, now = Date.now()): WeatherAlertCue[] | null {
+  const entry = alertCache.get(conversationId);
+  if (!entry || entry.expires_at <= now || Math.abs(point.lat - entry.point.lat) >= 0.02 || Math.abs(point.lon - entry.point.lon) >= 0.02) { alertCache.delete(conversationId); return null; }
+  return entry.alerts.filter((alert) => Date.parse(alert.ends) > now);
+}
+export function setWeatherAlertCues(conversationId: string, point: { lat: number; lon: number }, alerts: WeatherAlertCue[], now = Date.now()): void {
+  const active = alerts.filter((alert) => Date.parse(alert.ends) > now);
+  const expires_at = Math.min(now + 5 * 60_000, ...active.map((alert) => Date.parse(alert.ends)));
+  setBounded(alertCache, conversationId, { point, alerts: active, expires_at }, MAX_SCENES);
+}
+export function dropWeatherAlertCues(conversationId: string): void { alertCache.delete(conversationId); }
+export function clearWeatherCues(): void { weatherCache.clear(); alertCache.clear(); weatherGenerations.clear(); }
 
-export function sceneForTests(scene: Partial<Scene> & Pick<Scene, "conversation_id"> = { conversation_id: "test" }): FusedScene {
+export function sceneForTests(scene: Partial<Scene> & { weather_alerts?: WeatherAlertCue[] } & Pick<Scene, "conversation_id"> = { conversation_id: "test" }): FusedScene {
   return {
     conversation_id: scene.conversation_id,
     people: scene.people ?? [],
@@ -54,6 +67,7 @@ export function sceneForTests(scene: Partial<Scene> & Pick<Scene, "conversation_
     place: scene.place ?? null,
     ambient: scene.ambient ?? null,
     weather: scene.weather ?? null,
+    weather_alerts: scene.weather_alerts ?? [],
     alone: scene.alone ?? true,
     alone_observed: false,
     alone_observed_until: null,

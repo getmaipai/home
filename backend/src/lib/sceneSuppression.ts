@@ -3,7 +3,7 @@ import { setBounded } from "@/lib/boundedMap";
 export type SuppressionScope = "self" | "device" | "room" | "household";
 export type SuppressionKind =
   | "glass_breaking" | "dog_bark" | "baby_cry" | "doorbell" | "music_or_tv" | "shouting"
-  | "smoke" | "co" | "gas" | "water_leak" | "temperature" | "intrusion";
+  | "smoke" | "co" | "gas" | "water_leak" | "temperature" | "intrusion" | "weather_alert";
 export type DismissReason = "media" | "handled" | "false_alarm" | "party" | "other";
 
 const MINUTE = 60_000;
@@ -12,7 +12,7 @@ const kinds: Record<SuppressionKind, { tier: "notable" | "emergency" | "sensor" 
   glass_breaking: { tier: "emergency" }, dog_bark: { tier: "notable" }, baby_cry: { tier: "notable" },
   doorbell: { tier: "notable" }, music_or_tv: { tier: "notable" }, shouting: { tier: "notable" },
   smoke: { tier: "sensor" }, co: { tier: "sensor" }, gas: { tier: "sensor" }, water_leak: { tier: "sensor" },
-  temperature: { tier: "sensor" }, intrusion: { tier: "sensor" },
+  temperature: { tier: "sensor" }, intrusion: { tier: "sensor" }, weather_alert: { tier: "notable" },
 };
 
 type Hold = {
@@ -49,6 +49,7 @@ export type DismissInput = {
   kind: SuppressionKind; scope: SuppressionScope; deviceId?: string | null; room?: string | null;
   personId?: string | null; reason: DismissReason; now: number;
   byBand: "child" | "teen" | "adult" | "unknown"; byConfirmedAdult: boolean;
+  untilOverrideMs?: number;
 };
 export function dismiss(input: DismissInput): { ok: boolean; until: number | null; extendedTo?: number; refusal?: "adult_required" | "person_required" } {
   if (input.scope === "self" && !input.personId) return { ok: false, until: null, refusal: "person_required" };
@@ -62,8 +63,10 @@ export function dismiss(input: DismissInput): { ok: boolean; until: number | nul
   const count = repeated ? previous.count + 1 : 1;
   const span = duration(input.kind, input.reason, count);
   const startedAt = repeated ? previous.startedAt : input.now;
-  const ceilingUntil = startedAt + span.ceiling;
-  const requestedUntil = input.now + span.ms;
+  const ceilingUntil = input.kind === "weather_alert" && input.untilOverrideMs !== undefined
+    ? input.now + 24 * 60 * MINUTE : startedAt + span.ceiling;
+  const requestedUntil = input.untilOverrideMs !== undefined && input.kind === "weather_alert"
+    ? input.now + Math.min(Math.max(0, input.untilOverrideMs), 24 * 60 * MINUTE) : input.now + span.ms;
   const until = Math.min(requestedUntil, ceilingUntil);
   const value: Hold = { ...target, count, startedAt, until, ceilingUntil, reAlerted: false };
   setBounded(holds, id, value, MAX_ENTRIES);

@@ -33,6 +33,7 @@ import { autoLeadImageAllowed } from "@/lib/answerImages/turn";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { gateBand, memoryBand } from "@/lib/certainty";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { isSuppressed } from "@/lib/sceneSuppression";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { promptNow } from "@/lib/benchSampling";
@@ -64,7 +65,7 @@ import { heardSongFor, heardSongContextLine } from "@/lib/music/heardSong";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { composerHintItem } from "@/lib/composerHint";
 import { fuseScene, getScene, setScene, observationsForTurn, type FusedScene } from "@/lib/scene";
-import { fetchSceneWeatherForContext } from "@/lib/sceneWeather";
+import { fetchSceneWeatherForContext, fetchSceneWeatherAlertsForContext } from "@/lib/sceneWeather";
 import { sensitiveAllowed } from "@/lib/turnContext";
 import { listActivePeople } from "@/lib/access";
 import { homeAssistantEventsHealth, readHomeAssistantEntityState, subscribeHomeAssistantEntities } from "@/lib/integrations/homeAssistant";
@@ -95,12 +96,18 @@ export async function fitSceneBlock(text: string, required: string, count: (valu
 }
 async function fitSceneBlockMeasured(text: string, required: string, count: (value: string) => Promise<number | null>, limit = SCENE_RENDER_TOKEN_LIMIT): Promise<{ text: string; tokens: number }> {
   let candidate = text;
-  const optional = [/ Ambient events:[^.]*\./, / Weather change:[^.]*\./, / Weather here:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
+  const optional = [/ Ambient events:[^.]*\./, / Weather alert:.*?\./, / Weather change:[^.]*\./, / Weather here:[^.]*\./, / Light:[^.]*\./, / Temperature:[^.]*\./, / Place:[^.]*\./];
   for (const pattern of optional) {
     const measured = await count(candidate);
     if (measured === null) return { text: required, tokens: 0 };
     if (measured <= limit) return { text: candidate, tokens: measured };
     candidate = candidate.replace(pattern, "");
+  }
+  while (candidate.match(/ Weather alert:.*?\./g)?.length) {
+    const measured = await count(candidate);
+    if (measured === null) return { text: required, tokens: 0 };
+    if (measured <= limit) return { text: candidate, tokens: measured };
+    candidate = candidate.replace(/ Weather alert:.*?\./, "");
   }
   while (true) {
     const measured = await count(candidate);
@@ -148,10 +155,18 @@ export function renderScene(scene: FusedScene, now: number, actor: PersonRow, ho
     lines.push(`Weather here: ${temperature}, ${weather.precipitation}, wind ${Math.round(weather.wind_mph)} mph (checked ${checked}).`);
     if (scene.place?.setting === "outdoor") lines.push("Setting: outdoors.");
   }
+  const alerts = (scene as FusedScene & { weather_alerts?: import("@/lib/scene").WeatherAlertCue[] }).weather_alerts ?? [];
+  for (const alert of alerts.filter((item) => Date.parse(item.ends) > now).sort((a, b) => severityRank(b.severity) - severityRank(a.severity))) {
+    if (isSuppressed({ kind: "weather_alert", personId: actor.id, now })) continue;
+    const line = `Weather alert: ${alert.event}, until ${new Date(alert.ends).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} (${alert.severity}).`;
+    if (weatherTokenShare(lines) + line.split(/\s+/).length <= 60) lines.push(line);
+  }
   const place = scene.place;
   if (place && (place.where !== "unknown" || place.area)) lines.push(`Place: ${place.where === "home" ? "at home" : place.where === "away" ? "away" : ""}${place.setting !== "unknown" ? `${place.where !== "unknown" ? ", " : ""}${place.setting === "indoor" ? "indoors" : place.setting}` : ""}${place.area ? `${place.where !== "unknown" || place.setting !== "unknown" ? ", " : ""}${place.area}` : ""}.`);
   return lines.join(" ");
 }
+function severityRank(value: string): number { return ({ extreme: 4, severe: 3, moderate: 2, minor: 1 } as Record<string, number>)[value.toLowerCase()] ?? 0; }
+function weatherTokenShare(lines: string[]): number { return lines.filter((line) => line.startsWith("Weather ")).join(" ").split(/\s+/).filter(Boolean).length; }
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
  * here, from the age band and the surface - "a minor's turn never
@@ -293,7 +308,10 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const currentScene = fuseScene(getScene(conversation.id, sceneNow), observationsForTurn({ surface: state.surface, deviceId: state.deviceId, deviceArea: roomDevice?.area, deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, actorId: state.actor.id, actorBand: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), speakerEvidence: state.speakerEvidence, present: state.present, lookPeople: lookCount, haStates: ownHaState ? [ownHaState] : [], ownHaEntityId: typeof ownHaEntityId === "string" ? ownHaEntityId : null, now: sceneNow }), sceneNow, conversation.id, speakerForScene);
   currentScene.weather = null;
   if (!state.bare) {
-    currentScene.weather = await fetchSceneWeatherForContext({ conversationId: conversation.id, actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, now: sceneNow });
+    const weatherInput = { conversationId: conversation.id, actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(sceneNow), state.deviceId), deviceKind: roomDevice?.kind, currentLocation: state.currentLocation, now: sceneNow };
+    const [weatherCue, alertCues] = await Promise.all([fetchSceneWeatherForContext(weatherInput), fetchSceneWeatherAlertsForContext(weatherInput)]);
+    currentScene.weather = weatherCue;
+    currentScene.weather_alerts = alertCues;
   }
   setScene(currentScene, sceneNow);
 

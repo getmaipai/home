@@ -1,7 +1,9 @@
 import type { PersonRow } from "@/types";
 import { householdHomePlaceName, resolveWeatherPlace } from "@/lib/places";
 import { runPlugin } from "@/lib/plugins";
-import { getWeatherCue, setWeatherCue, setWeatherFailure, weatherCacheLease, type WeatherCue } from "@/lib/scene";
+import { getWeatherCue, setWeatherCue, setWeatherFailure, weatherCacheLease, type WeatherCue, getWeatherAlertCues, setWeatherAlertCues, type WeatherAlertCue } from "@/lib/scene";
+import { isUsAlertCoordinate, notifySevereWeatherAlerts, weatherAlerts, weatherAlertsEnabled } from "@/lib/weatherAlerts";
+import { isSuppressed } from "@/lib/sceneSuppression";
 
 type SceneWeatherInput = {
   conversationId: string;
@@ -20,6 +22,34 @@ export async function fetchSceneWeatherForContext(input: SceneWeatherInput, wait
   try { return await Promise.race([fetch, budget]); }
   finally { if (timer) clearTimeout(timer); }
 }
+
+export async function fetchSceneWeatherAlertsForContext(input: SceneWeatherInput, waitMs = 250): Promise<WeatherAlertCue[]> {
+  const task = fetchSceneWeatherAlerts(input).catch(() => [] as WeatherAlertCue[]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([task, new Promise<WeatherAlertCue[]>((resolve) => { timer = setTimeout(() => resolve([]), waitMs); })]); }
+  finally { if (timer) clearTimeout(timer); }
+}
+
+async function fetchSceneWeatherAlerts(input: SceneWeatherInput): Promise<WeatherAlertCue[]> {
+  if (!weatherAlertsEnabled()) return [];
+  const fixed = input.deviceKind === "robot" || input.deviceKind === "pod" || input.deviceKind === "tv";
+  const place = await resolveWeatherPlace({ person: fixed ? null : input.actor, current: fixed ? null : input.currentLocation, preferCurrent: !fixed && !!input.currentLocation, band: input.band }).catch(() => null);
+  if (!place || typeof place.hostInputs.latitude !== "number" || typeof place.hostInputs.longitude !== "number") return [];
+  const point = { lat: place.hostInputs.latitude, lon: place.hostInputs.longitude };
+  if (!isUsAlertCoordinate(point.lat, point.lon)) return [];
+  const cached = getWeatherAlertCues(input.conversationId, point, input.now);
+  if (cached) return cached;
+  const fetched = await weatherAlerts(point.lat, point.lon);
+  const alerts = fetched.flatMap((alert) => {
+    const ends = alert.ends && Number.isFinite(Date.parse(alert.ends)) ? new Date(alert.ends).toISOString() : "";
+    if (!alert.id || !alert.event || !ends || Date.parse(ends) <= input.now) return [];
+    return [{ id: alert.id, event: alert.event.slice(0, 100), severity: alert.severity.toLowerCase(), headline: alert.headline.trim().slice(0, 200), ends }];
+  });
+  setWeatherAlertCues(input.conversationId, point, alerts, input.now);
+  await notifySevereWeatherAlerts(fetched);
+  return alerts.filter((alert) => !isSuppressed({ kind: "weather_alert", personId: input.actor.id, now: input.now }));
+}
+
 
 const num = (value: unknown): number | null => {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;

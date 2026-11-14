@@ -10,7 +10,7 @@ import { owner } from "../../tests/support/testAuth";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetWeatherAlertsForTests, weatherAlerts } from "@/lib/weatherAlerts";
 
-const feature = { id: "https://api.weather.gov/alerts/urn:oid:one", properties: { event: "Flood Warning", headline: "Flooding is expected", severity: "Severe", areaDesc: "King County", ends: "2026-10-28T20:00:00-07:00" } };
+const feature = { id: "https://api.weather.gov/alerts/urn:oid:one", properties: { event: "Flood Warning", headline: "Flooding is expected", severity: "Severe", areaDesc: "King County", ends: "2026-11-14T20:00:00-07:00" } };
 const weatherNotifications = { id: "weather", notifications: [{ id: "weather.alert", level: "time_sensitive" as const, audience: "household" as const, template: "{event}: {headline}", configurable: true, default_channels: ["in_app"] as const }] };
 beforeEach(async () => { await resetDb(); registerPackageNotificationTypes(weatherNotifications); __resetWeatherAlertsForTests(); __resetRateLimiterForTests(); });
 afterEach(() => { __resetWeatherAlertsForTests(); __resetRateLimiterForTests(); setHouseholdSettingValue("weather.alerts", false); __setWeatherAlertsFetcherForTests(null); });
@@ -18,7 +18,7 @@ afterEach(() => { __resetWeatherAlertsForTests(); __resetRateLimiterForTests(); 
 describe("WEATHER-PORT-05 alerts", () => {
   test("fixture alert JSON becomes a compact banner payload", async () => {
     const fetcher = (async () => new Response(JSON.stringify({ features: [feature] }), { status: 200 })) as unknown as typeof fetch;
-    expect(await weatherAlerts(47.6, -122.3, { fetch: fetcher, nowMs: () => 1000 })).toEqual([{ id: "https://api.weather.gov/alerts/urn:oid:one", event: "Flood Warning", headline: "Flooding is expected", severity: "Severe", area: "King County", ends: "2026-10-28T20:00:00-07:00" }]);
+    expect(await weatherAlerts(47.6, -122.3, { fetch: fetcher, nowMs: () => 1000 })).toEqual([{ id: "https://api.weather.gov/alerts/urn:oid:one", event: "Flood Warning", headline: "Flooding is expected", severity: "Severe", area: "King County", ends: "2026-11-14T20:00:00-07:00" }]);
   });
   test("non-US coordinates never fetch", async () => {
     let calls = 0;
@@ -45,7 +45,7 @@ describe("WEATHER-PORT-05 alerts", () => {
     await owner();
     setHouseholdSettingValue("weather.alerts", true);
     expect(getHouseholdSettingValue("weather.alerts")).toBe(true);
-    const feed = (ids: string[]) => (async () => new Response(JSON.stringify({ features: ids.map((id, index) => ({ id, properties: { event: `Alert ${index + 1}`, headline: `Headline ${index + 1}`, areaDesc: "Sensitive place" } })) }), { status: 200 })) as unknown as typeof fetch;
+    const feed = (ids: string[]) => (async () => new Response(JSON.stringify({ features: ids.map((id, index) => ({ id, properties: { event: `Alert ${index + 1}`, headline: `Headline ${index + 1}`, severity: "Severe", areaDesc: "Sensitive place", ends: "2026-11-14T20:00:00-07:00" } })) }), { status: 200 })) as unknown as typeof fetch;
     __setWeatherAlertsFetcherForTests(feed(["alert-1"]));
     await notifyWeatherAlertsForHome({ lat: 47.6, lon: -122.3 });
     await notifyWeatherAlertsForHome({ lat: 47.6, lon: -122.3 });

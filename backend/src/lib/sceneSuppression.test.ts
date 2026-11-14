@@ -68,6 +68,18 @@ describe("scene suppression", () => {
     expect(resume({ kind: "dog_bark", byConfirmedAdult: true })).toBe(1);
     expect(listActive(70 * minute)).toEqual([]);
   });
+  test("weather alert holds use their bounded alert expiry and self scope", () => {
+    const end = 5 * 60 * minute;
+    const self = dismiss({ kind: "weather_alert", scope: "self", personId: "p1", reason: "handled", now: 0, untilOverrideMs: end, ...child });
+    expect(self.until).toBe(end);
+    expect(isSuppressed({ kind: "weather_alert", personId: "p1", now: 1 })).toBe(true);
+    expect(isSuppressed({ kind: "weather_alert", personId: "p2", now: 1 })).toBe(false);
+    const household = dismiss({ kind: "weather_alert", scope: "household", reason: "handled", now: 0, untilOverrideMs: end, ...adult });
+    expect(household.until).toBe(end);
+    expect(isSuppressed({ kind: "weather_alert", personId: "p2", now: end - 1 })).toBe(true);
+    expect(isSuppressed({ kind: "weather_alert", personId: "p2", now: end })).toBe(false);
+    expect(dismiss({ kind: "weather_alert", scope: "household", reason: "handled", now: 0, untilOverrideMs: 48 * 60 * minute, ...adult }).until).toBe(24 * 60 * minute);
+  });
   test("audit exposes one count only and clearAll resets process state", () => {
     dismiss({ kind: "glass_breaking", scope: "device", deviceId: "opaque-device", reason: "other", now: Date.UTC(2026, 10, 14, 12), ...adult });
     expect(auditCount()).toBe(1);

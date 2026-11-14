@@ -2,7 +2,8 @@
 import { tryConsume } from "@/lib/rateLimiter";
 import { HOME_USER_AGENT } from "@/lib/outbound";
 import { trigger } from "@/lib/notifications";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
+import { householdHomeSkyInput } from "@/lib/places";
 
 export interface WeatherAlert { id: string; event: string; headline: string; severity: string; area: string; ends: string | null }
 export interface WeatherAlertsDeps { fetch?: typeof fetch; nowMs?: () => number }
@@ -64,9 +65,20 @@ export async function weatherAlerts(lat: number, lon: number, deps: WeatherAlert
  * The switch is checked before any network access; coordinates are never
  * included in notification text or persisted with the notification. */
 export async function notifyWeatherAlertsForHome(point: { lat: number; lon: number }): Promise<void> {
-  if (getHouseholdSettingValue("weather.alerts") !== true) return;
+  if (!weatherAlertsEnabled()) return;
   const alerts = await weatherAlerts(point.lat, point.lon);
-  for (const alert of alerts) {
+  await notifySevereWeatherAlerts(alerts);
+}
+
+export function weatherAlertsEnabled(): boolean {
+  const explicit = getHouseholdSettingSource("weather.alerts");
+  if (explicit !== undefined) return getHouseholdSettingValue("weather.alerts") === true;
+  const home = householdHomeSkyInput();
+  return !!home && isUsAlertCoordinate(home.lat, home.lon);
+}
+
+export async function notifySevereWeatherAlerts(alerts: readonly WeatherAlert[]): Promise<void> {
+  for (const alert of alerts) if (["extreme", "severe"].includes(alert.severity.toLowerCase())) {
     await trigger("weather.alert", { event: alert.event, headline: alert.headline }, { repeatKey: alert.id });
   }
 }

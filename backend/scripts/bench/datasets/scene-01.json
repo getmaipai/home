@@ -209,7 +209,11 @@
       "kind": "place",
       "prompt": "A signed-in device has no GPS.",
       "expected": "Place remains unknown"
-    }
+    },
+    { "id": "alert-extreme", "kind": "weather_alert", "prompt": "Extreme alert at caller place", "expected": "Weather alert line; notify once" },
+    { "id": "alert-severe", "kind": "weather_alert", "prompt": "Severe alert at caller place", "expected": "Weather alert line; notify once" },
+    { "id": "alert-moderate", "kind": "weather_alert", "prompt": "Moderate alert at caller place", "expected": "Weather alert line; no notification" },
+    { "id": "alert-minor", "kind": "weather_alert", "prompt": "Minor alert at caller place", "expected": "Weather alert line; no notification" }
   ],
   "items": [
     {

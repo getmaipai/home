@@ -77,7 +77,9 @@ export function runSceneTool(input: { actor: PersonRow; args: Record<string, unk
       // A heard-sound dismissal never touches a sounding hardware alarm.
       const requested = input.args.scope as SuppressionScope | undefined;
       const scope: SuppressionScope = !confirmedAdult ? "self" : requested ?? (room ? "room" : "device");
-      const result = suppressScene({ kind: input.args.kind as SuppressionKind, reason: input.args.reason as "media" | "handled" | "false_alarm" | "party" | "other", scope, personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult });
+      const kind = input.args.kind as SuppressionKind;
+      const result = suppressScene({ kind, reason: "handled", scope, personId: speakerPerson, deviceId: input.deviceId, room, now, byBand: input.actorBand, byConfirmedAdult: confirmedAdult,
+        ...(kind === "weather_alert" ? { untilOverrideMs: Math.max(0, Math.min(24 * 60 * 60_000, Number(input.args.until_ms) || 60 * 60_000)) } : {}) });
       if (result.ok && result.until) line = `Done: I will ignore that until ${new Date(result.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, ${scope === "self" ? "for you only" : scope === "household" ? "for everyone here" : scope === "room" ? "in this room" : "on this device"}.`;
       else line = "I can't set that dismissal for this speaker.";
     } else {
