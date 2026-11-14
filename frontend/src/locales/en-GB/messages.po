@@ -13930,6 +13930,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
+#: src/shell/music/MusicPlayerBar.tsx:137
 msgid "Like"
 msgstr ""
 
@@ -14773,6 +14774,8 @@ msgstr ""
 #: src/apps/chat/MusicCardView.tsx:86
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
+#: src/shell/music/MusicPlayerBar.tsx:182
+#: src/shell/music/MusicPlayerBar.tsx:182
 #: src/shell/pages/MusicComposer.tsx:191
 #: src/shell/pages/MusicComposer.tsx:195
 #: src/shell/pages/MusicSongDetails.tsx:105
@@ -16098,7 +16101,7 @@ msgid "mute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:89
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Mute"
 msgstr ""
 
@@ -16907,7 +16910,7 @@ msgid "No places yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:32
+#: src/shell/music/MusicPlayerBar.tsx:36
 msgid "No playable songs are left. Check the song files and try again."
 msgstr ""
 
@@ -17629,7 +17632,7 @@ msgid "Now all ages."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:166
+#: src/shell/music/MusicPlayerBar.tsx:189
 msgid "Now playing"
 msgstr ""
 
@@ -18373,8 +18376,8 @@ msgid "Open in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:73
-#: src/shell/music/MusicPlayerBar.tsx:73
+#: src/shell/music/MusicPlayerBar.tsx:77
+#: src/shell/music/MusicPlayerBar.tsx:77
 #: src/shell/pages/MakeSongPage.tsx:97
 #: src/shell/pages/MusicLibrary.tsx:98
 #: src/shell/pages/MusicSongDetails.tsx:147
@@ -19914,7 +19917,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
-#: src/shell/music/MusicPlayerBar.tsx:143
+#: src/shell/music/MusicPlayerBar.tsx:161
 msgid "Queue"
 msgstr ""
 
@@ -20667,7 +20670,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:78
+#: src/shell/music/MusicPlayerBar.tsx:82
 msgid "Repeat all songs"
 msgstr ""
 
@@ -20683,7 +20686,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:78
+#: src/shell/music/MusicPlayerBar.tsx:82
 msgid "Repeat off"
 msgstr ""
 
@@ -20694,7 +20697,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:78
+#: src/shell/music/MusicPlayerBar.tsx:82
 msgid "Repeat one song"
 msgstr ""
 
@@ -22267,7 +22270,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:98
+#: src/shell/music/MusicPlayerBar.tsx:111
 msgid "Seek"
 msgstr ""
 
@@ -23010,7 +23013,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:80
+#: src/shell/music/MusicPlayerBar.tsx:84
 msgid "Shuffle"
 msgstr ""
 
@@ -24967,6 +24970,11 @@ msgid "api.error.companion_unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:179
+msgid "That could not be saved. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicSongDetails.tsx:84
 msgid "That could not start. Try again."
 msgstr ""
@@ -26137,7 +26145,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:167
+#: src/shell/music/MusicPlayerBar.tsx:190
 msgid "The song, its words and the player controls."
 msgstr ""
 
@@ -26822,7 +26830,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:135
+#: src/shell/music/MusicPlayerBar.tsx:153
 msgid "This song could not be played. Check the file and try again."
 msgstr ""
 
@@ -27741,6 +27749,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
+#: src/shell/music/MusicPlayerBar.tsx:137
 msgid "Unlike"
 msgstr ""
 
@@ -27795,7 +27804,7 @@ msgid "unmute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:89
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Unmute"
 msgstr ""
 
@@ -28666,7 +28675,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:90
+#: src/shell/music/MusicPlayerBar.tsx:103
 #: src/shell/pages/MusicStudioView.tsx:35
 msgid "Volume"
 msgstr ""
