@@ -59,7 +59,7 @@ describe("computeVoiceVerdict", () => {
     expect(decryptVoicePrintEmbeddingsForPerson("speaker-db")).toEqual([unit]);
   });
   test("a stalled embed is bounded by the verdict consumer's 500 ms wait", async () => {
-    setVoiceMatchVerdict(speaker.id, call(deps({ embed: () => new Promise(() => {}) })));
-    expect(await consumeVoiceMatchVerdict(speaker.id, 500)).toBeNull();
+    setVoiceMatchVerdict(`session:${speaker.id}`, call(deps({ embed: () => new Promise(() => {}) })));
+    expect(await consumeVoiceMatchVerdict(`session:${speaker.id}`, 500)).toBeNull();
   });
 });

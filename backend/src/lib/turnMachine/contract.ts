@@ -501,7 +501,7 @@ export interface NodeExecution {
    * "so the replay bench and the weekly report can prove a minor's row
    * never carried a reasoning event." Absent on every other node. */
   reasoning?: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] };
-  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number; matched: number; disagreed: number; unavailable: number; skipped: number };
+  scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number };
 }
 
 /** A node reads TurnState and its own typed input, and returns its typed

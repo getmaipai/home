@@ -98,9 +98,10 @@ import type { GateDecision } from "@/lib/gate/types";
 import { composerHintAllowed, resolveComposerHint } from "@/lib/composerHint";
 import { getScene } from "@/lib/scene";
 import { countTokens } from "@/lib/tokenCount";
-import { consumeVoiceMatchVerdict } from "@/lib/voiceMatchVerdict";
+import { consumeVoiceMatchVerdict, voiceMatchSessionKey } from "@/lib/voiceMatchVerdict";
 
 export interface RunTurnNextOpts {
+  voiceMatchSessionId?: string;
   robotName?: string;
   deviceId?: string;
   replyVoiceId?: string;
@@ -494,7 +495,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const startedAt = Date.now();
   // Only a signed-in person's spoken chat/phone turn may consume the one-shot result.
   const voiceVerdict = opts.spoken === true && (surface === "chat" || surface === "phone")
-    ? await consumeVoiceMatchVerdict(actor.id, 500) : null;
+    ? await consumeVoiceMatchVerdict(voiceMatchSessionKey(opts.voiceMatchSessionId ?? "", actor.id), 500) : null;
   // THIN-7C: "a child's turn can never run bare, whoever flips the switch".
   // speakerAgeBand() !== "adult" covers both minor bands (child and teen).
   if (opts.bare === true) {

@@ -15,12 +15,14 @@ import { robotsEnabled } from "@/lib/robots";
 import { getDeviceById } from "@/lib/devices";
 import { getCookie } from "hono/cookie";
 import { resolveSessionDeviceId } from "@/middleware/auth";
+import { getPersonSettingValue } from "@/lib/settings";
+import { countLiveVoicePrintsForPerson } from "@/lib/biometricPrints";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
 import { scoreEdgePartial, talkOverDecision } from "@/lib/talkOver";
 import { noteListeningActivity } from "@/lib/turnActivity";
 import { computeVoiceVerdict } from "@/lib/voiceMatch";
-import { setVoiceMatchVerdict } from "@/lib/voiceMatchVerdict";
+import { setVoiceMatchVerdict, voiceMatchSessionKey } from "@/lib/voiceMatchVerdict";
 
 export const sttRoutes = apiRouter();
 
@@ -68,12 +70,13 @@ sttRoutes.get(
             ? { ...base, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
             : base;
           const person = c.get("person");
-          const onSpeechClip = person.role !== "child" && person.role !== "guest" ? (clip: Float32Array, sampleRate: number) => {
+          const shouldCaptureClip = person.role !== "child" && person.role !== "guest" ? () => getPersonSettingValue(person, "person.voice.match") === true && countLiveVoicePrintsForPerson(person.id) > 0 : undefined;
+          const onSpeechClip = shouldCaptureClip ? (clip: Float32Array, sampleRate: number) => {
             // This is intentionally fire-and-forget: STT and the person-facing turn never fail on matching.
             const pending = computeVoiceVerdict({ person, clip, sampleRate });
-            setVoiceMatchVerdict(person.id, pending);
+            setVoiceMatchVerdict(voiceMatchSessionKey(c.get("sessionId"), person.id), pending);
           } : undefined;
-          session = new SttSession({ ...config, ...(onSpeechClip ? { onSpeechClip } : {}) }, (msg) => {
+          session = new SttSession({ ...config, ...(onSpeechClip ? { onSpeechClip, shouldCaptureClip } : {}) }, (msg) => {
             // LISTEN-GATE-01: the person is talking in an open call, so background model work (the memory judge) waits.
             if ((msg.t === "vad" && msg.speaking) || msg.t === "final") noteListeningActivity();
             ws.send(JSON.stringify(msg));

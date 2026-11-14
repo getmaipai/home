@@ -230,6 +230,22 @@ describe("SttSession speech clip callback", () => {
     expect(clips[0]!.clip.length).toBeGreaterThanOrEqual(SAMPLE_RATE);
   });
 
+  test("setting off skips eligibility and makes no capture copy", async () => {
+    scriptTranscript("hello there");
+    let predicateCalls = 0, callbackCalls = 0;
+    const flattenSpy = spyOn(SttSession.prototype as any, "flatten");
+    const session = new SttSession({ ...config(), onSpeechClip: () => { callbackCalls++; }, shouldCaptureClip: () => { predicateCalls++; return false; } }, () => {});
+    for (let i = 0; i < 110; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 80; i++) session.pushPcm(silenceFrame());
+    await flush(); await flush();
+    expect(predicateCalls).toBe(1);
+    expect(callbackCalls).toBe(0);
+    expect(flattenSpy).toHaveBeenCalledTimes(1); // transcription flatten only; capture adds no flatten
+    flattenSpy.mockRestore();
+    session.close();
+  });
+
   test("does not call when unset or when voiced speech is shorter than one second", async () => {
     scriptTranscript("hello there");
     let calls = 0;

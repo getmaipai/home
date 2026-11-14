@@ -287,6 +287,12 @@ export function decryptVoicePrintEmbeddingsForPerson(personId: string): number[]
   return rows.flatMap((row) => row.embeddingEncrypted ? [JSON.parse(decryptSecret(row.embeddingEncrypted)) as number[]] : []);
 }
 
+/** Fresh count of this person's live voice prints; does not read embeddings. */
+export function countLiveVoicePrintsForPerson(personId: string): number {
+  return db.select({ id: biometricPrints.id }).from(biometricPrints)
+    .where(and(eq(biometricPrints.personId, personId), eq(biometricPrints.modality, "voice"), isNull(biometricPrints.deletedAt))).all().length;
+}
+
 /** Store one newly consented voice sample, reusing the same consent rules as face enrollment. */
 export function enrollVoiceSample(actor: PersonRow, personId: string, embedding: number[]): OpResult<BiometricPrintSummary> {
   const target = findTarget(personId);

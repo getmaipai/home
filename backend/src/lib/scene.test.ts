@@ -100,9 +100,8 @@ describe("scene fusion", () => {
     const trace = new TraceRecorder();
     trace.record("context", "context", "v1", 1, 2, { ok: true });
     trace.setSceneCounts("context", { people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
-    expect(trace.nodes()[0]?.scene).toEqual({ people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37, matched: 0, disagreed: 0, unavailable: 0, skipped: 0 });
+    expect(trace.nodes()[0]?.scene).toEqual({ people: 2, strong: 1, typed: 1, place_known: false, child_present: false, events: 0, scene_tokens: 37 });
     expect(typeof trace.nodes()[0]?.scene?.scene_tokens).toBe("number");
-    for (const key of ["matched", "disagreed", "unavailable", "skipped"] as const) expect(typeof trace.nodes()[0]?.scene?.[key]).toBe("number");
     expect(JSON.stringify(trace.nodes()[0]?.scene)).not.toMatch(/name|label|room|person.?id/i);
   });
 

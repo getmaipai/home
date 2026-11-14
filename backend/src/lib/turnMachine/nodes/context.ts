@@ -84,8 +84,8 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 export const TOOL_ROUND_SHARE = 0.25;
 const SCENE_RENDER_TOKEN_LIMIT = 320;
 const SCENE_PROLOGUE = "Right now (background data, may be out of date; state only what it says; never name or identify anyone from how they look):";
-function sceneCountsForTrace(scene: FusedScene, sceneTokens: number, voiceMatch: "matched" | "disagreed" | "unavailable" | "skipped") {
-  return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens, matched: Number(voiceMatch === "matched"), disagreed: Number(voiceMatch === "disagreed"), unavailable: Number(voiceMatch === "unavailable"), skipped: Number(voiceMatch === "skipped") };
+function sceneCountsForTrace(scene: FusedScene, sceneTokens: number) {
+  return { people: scene.people.length, strong: scene.people.filter((p) => p.basis.some((b) => b === "face" || b === "voice" || b === "signed_in")).length, typed: scene.people.filter((p) => p.basis.includes("typed")).length, place_known: !!scene.place && scene.place.where !== "unknown", child_present: scene.child_present, events: scene.ambient?.events.length ?? 0, scene_tokens: sceneTokens };
 }
 export function sceneSpeakerForTurn(surface: Surface, actorId: string, evidence: SpeakerEvidence | null | undefined): FusedScene["speaker"] {
   if (evidence) return { ...evidence };
@@ -642,7 +642,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const requiredSpeakerLine = voiceMatchLine || speakerLine(currentScene.speaker, state.surface, state.actor, listActivePeople(), getPersonSettingValue(state.actor, "person.robot.greet_by_name"), currentScene.people.filter((person) => !person.person_id || !listActivePeople().some((member) => member.id === person.person_id)).length);
   const fittedScene = await fitSceneBlockMeasured(sceneItem.text, `${SCENE_PROLOGUE} ${requiredSpeakerLine} ${aloneLine} ${childLine} Whoever this scene lists is in the room; engage them when they speak to you, and decide whether a line is aimed at you.`, sceneTokenCount);
   sceneItem.text = fittedScene.text;
-  const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens, state.voiceMatchAgreed ? "matched" : state.voiceMatchDisagreed ? "disagreed" : "skipped");
+  const sceneCounts = sceneCountsForTrace(currentScene, fittedScene.tokens);
   items.push(sceneItem);
 
   // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries

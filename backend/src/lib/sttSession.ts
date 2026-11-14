@@ -30,6 +30,8 @@ export interface SttSessionConfig {
   turnEnd?: (text: string) => TurnEndMark;
   /** Optional private voice-match input. Called once at finalization with a copy of voiced audio only. */
   onSpeechClip?: (clip: Float32Array, sampleRate: number) => void;
+  /** Fresh eligibility gate, checked before any audio buffer is flattened or copied. */
+  shouldCaptureClip?: () => boolean;
 }
 
 export type TurnEndLevel = "none" | "gentle" | "natural";
@@ -476,7 +478,7 @@ export class SttSession {
     // Keep only the last ten seconds of voiced speech. This copy is handed
     // to the optional matcher before the transcription buffer is discarded;
     // partials never reach the callback.
-    if (this.cfg.onSpeechClip && this.lastVoicedLen >= this.cfg.sampleRate) {
+    if (this.cfg.onSpeechClip && this.lastVoicedLen >= this.cfg.sampleRate && (this.cfg.shouldCaptureClip?.() ?? true)) {
       const voiced = this.flatten().subarray(0, this.lastVoicedLen);
       const clip = voiced.slice(Math.max(0, voiced.length - 10 * this.cfg.sampleRate));
       try { this.cfg.onSpeechClip(clip, this.cfg.sampleRate); } catch { /* matching must never fail transcription */ }
