@@ -4,6 +4,15 @@ import { HOME_USER_AGENT } from "@/lib/outbound";
 import { trigger } from "@/lib/notifications";
 import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
 import { householdHomeSkyInput } from "@/lib/places";
+import { db } from "@/db";
+import { devices, people } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { issueDeviceCommand, listRobotsPairedUnderPerson } from "@/lib/deviceCommands";
+import { quietHours } from "@/lib/notifications";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { evaluateSafety } from "@/lib/safety";
+import { weatherAlertDismissal } from "@/lib/sceneSuppression";
+import type { PersonRow } from "@/types";
 
 export interface WeatherAlert { id: string; event: string; headline: string; severity: string; area: string; ends: string | null }
 export interface WeatherAlertsDeps { fetch?: typeof fetch; nowMs?: () => number }
@@ -16,7 +25,7 @@ let fetcher: typeof fetch | undefined;
 let pausedUntil = 0;
 let hasBackedOff = false;
 
-export function __resetWeatherAlertsForTests(): void { cache.clear(); pausedUntil = 0; hasBackedOff = false; }
+export function __resetWeatherAlertsForTests(): void { cache.clear(); pausedUntil = 0; hasBackedOff = false; spokenAlerts.clear(); }
 export function __setWeatherAlertsFetcherForTests(value: typeof fetch | null): void { fetcher = value ?? undefined; }
 
 function text(value: unknown): string { return typeof value === "string" ? value.trim().slice(0, 300) : ""; }
@@ -77,8 +86,62 @@ export function weatherAlertsEnabled(): boolean {
   return !!home && isUsAlertCoordinate(home.lat, home.lon);
 }
 
+const spokenAlerts = new Map<string, number>();
+const SPOKEN_ALERT_LIMIT = 500;
+const CHILD_ALERT_LINE = "There is a weather warning. Please go to a safe place and find a grown-up.";
+
+function alertTimePhrase(ends: string | null): string | null {
+  if (!ends) return null;
+  const at = new Date(ends);
+  if (!Number.isFinite(at.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(at).toLowerCase().replace(":00", "");
+}
+
+function cleanEvent(event: string): string {
+  return event.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").replace(/[^\p{L}\p{N} .,!?;:'()\-]/gu, "").trim().slice(0, 60).toLowerCase() || "weather alert";
+}
+
+function robotLine(alert: WeatherAlert): string {
+  const time = alertTimePhrase(alert.ends);
+  if (!time) return "A severe weather alert is in effect here.";
+  const text = `A ${cleanEvent(alert.event)} is in effect here until ${time}.`;
+  return evaluateSafety(text, "child").flagged ? "A severe weather alert is in effect here." : text;
+}
+
+function shouldSpeak(alert: WeatherAlert, robotId: string, severity: string, now: number): boolean {
+  for (const [key, expiry] of spokenAlerts) if (expiry <= now) spokenAlerts.delete(key);
+  const key = `${alert.id}\u0000${severity}\u0000${robotId}`;
+  if (spokenAlerts.has(key)) return false;
+  return true;
+}
+
+async function announceSevereWeatherAlert(alert: WeatherAlert, severity: string): Promise<void> {
+  const now = new Date();
+  const endsAt = alertTimePhrase(alert.ends) ? Date.parse(alert.ends!) : now.getTime() + 60 * 60_000;
+  const adultTeenLine = robotLine(alert);
+  for (const robot of db.select({ id: devices.id, personId: devices.personId }).from(devices).where(eq(devices.kind, "robot")).all()) {
+    const owner = db.select().from(people).where(eq(people.id, robot.personId)).get() as PersonRow | undefined;
+    if (!owner || !listRobotsPairedUnderPerson(owner.id).includes(robot.id)) continue;
+    const band = speakerAgeBand(owner, now);
+    if (band === "child" && severity !== "extreme") continue;
+    if (weatherAlertDismissal(alert.id, owner.id, now.getTime()) !== "none") continue;
+    if (severity !== "extreme" && quietHours(owner, now).active) continue;
+    if (!shouldSpeak(alert, robot.id, severity, now.getTime())) continue;
+    const text = band === "child" ? CHILD_ALERT_LINE : adultTeenLine;
+    const key = `${alert.id}\u0000${severity}\u0000${robot.id}`;
+    issueDeviceCommand(robot.id, "announce", { text, urgent: severity === "extreme" });
+    if (spokenAlerts.size >= SPOKEN_ALERT_LIMIT) spokenAlerts.delete(spokenAlerts.keys().next().value!);
+    // This is intentionally in-memory: a restart may repeat an active alert once.
+    spokenAlerts.set(key, endsAt);
+  }
+}
+
 export async function notifySevereWeatherAlerts(alerts: readonly WeatherAlert[]): Promise<void> {
-  for (const alert of alerts) if (["extreme", "severe"].includes(alert.severity.toLowerCase())) {
+  if (!weatherAlertsEnabled()) return;
+  for (const alert of alerts) {
+    const severity = alert.severity.toLowerCase();
+    if (!["extreme", "severe"].includes(severity)) continue;
     await trigger("weather.alert", { event: alert.event, headline: alert.headline }, { repeatKey: alert.id });
+    await announceSevereWeatherAlert(alert, severity);
   }
 }
