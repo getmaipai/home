@@ -92,3 +92,30 @@ test("ephemeral sender transmits a validated add to the live socket without a co
   expect(db.select().from(deviceCommands).all().some((row) => row.kind === "wifi_add")).toBe(false);
   __resetDeviceCommandsForTests();
 });
+test("use sends a durable wifi_use command for a saved network, not an unknown one, and only for an admin", async () => {
+  checkin({ wifi_saved: ["Home", "Hotspot"], online: true });
+  expect((await send(ownerToken, { action: "use", ssid: "Missing" })).status).toBe(404);
+  const child = person("wifi-use-child", "child");
+  expect((await send(child, { action: "use", ssid: "Hotspot" })).status).toBe(403);
+  expect((await send(ownerToken, { action: "use", ssid: "Hotspot" })).status).toBe(202);
+  const rows = db.select().from(deviceCommands).all();
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.kind).toBe("wifi_use");
+  expect(JSON.parse(rows[0]!.payload)).toEqual({ ssid: "Hotspot" });
+});
+test("use needs no encrypted link (it carries no password) but needs an online robot", async () => {
+  checkin({ wifi_saved: ["Hotspot"], link_encrypted: false, online: false });
+  expect((await send(ownerToken, { action: "use", ssid: "Hotspot" })).status).toBe(409);
+  checkin({ wifi_saved: ["Hotspot"], link_encrypted: false, online: true });
+  expect((await send(ownerToken, { action: "use", ssid: "Hotspot" })).status).toBe(202);
+});
+test("prefer_tailnet is an admin command with a minutes payload", async () => {
+  const post = (token: string, body: unknown) => app.request(`http://localhost/api/devices/${robotId}/commands`, { method: "POST", headers: { cookie: `session=${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const adult = person("wifi-tailnet-adult", "adult");
+  expect((await post(adult, { kind: "prefer_tailnet", minutes: 10 })).status).toBe(404);
+  expect((await post(ownerToken, { kind: "prefer_tailnet", minutes: 10 })).status).toBe(202);
+  const rows = db.select().from(deviceCommands).all();
+  expect(rows[0]?.kind).toBe("prefer_tailnet");
+  expect(JSON.parse(rows[0]!.payload)).toEqual({ minutes: 10 });
+  expect((await post(ownerToken, { kind: "prefer_tailnet", minutes: 500 })).status).toBe(400);
+});

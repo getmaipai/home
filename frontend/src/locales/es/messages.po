@@ -2573,7 +2573,7 @@ msgid "Add music"
 msgstr "Añadir música"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:43
+#: src/apps/settings/RobotWifi.tsx:53
 msgid "Add network"
 msgstr "Añadir red"
 
@@ -4034,6 +4034,16 @@ msgstr ""
 #: src/apps/settings/RobotWifi.tsx:26
 msgid "Asked the robot to forget {name}."
 msgstr "Se pidió al robot que olvidara {name}."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:26
+msgid "Asked the robot to join {name} now. If it cannot reach the hub within 3 minutes it goes back by itself."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:37
+msgid "Asked the robot to reach the hub over the tailnet for 10 minutes."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1660
@@ -8699,6 +8709,11 @@ msgid "Could not start the downloads. Check that the engine is running, then try
 msgstr "No se pudieron iniciar las descargas. Comprueba que el motor está en ejecución e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:39
+msgid "Could not start the tailnet test. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:112
 #, needs-review
 msgid "Could not start this install."
@@ -11578,18 +11593,18 @@ msgid "For example: slower, acoustic, with a warm piano"
 msgstr "Por ejemplo: más lento, acústico, con un piano cálido"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:44
+#: src/apps/settings/RobotWifi.tsx:54
 msgid "For safety, a Wi-Fi password is not sent to the robot over your home network's plain link. Join the robot's own Wi-Fi (its screen shows the name when it cannot connect) and use its setup page, or scan a Wi-Fi QR code once the new firmware is installed."
 msgstr "Por seguridad, la contraseña del Wi-Fi no se envía al robot por el enlace sin cifrar de la red de casa. Conéctate al Wi-Fi propio del robot (la pantalla muestra el nombre cuando no puede conectarse) y usa su página de configuración, o escanea un código QR de Wi-Fi cuando esté instalado el nuevo firmware."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 #: src/shell/pages/CompanionsPage.tsx:343
 msgid "Forget"
 msgstr "Olvidar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "Forget {name} on this robot?"
 msgstr "¿Olvidar {name} en este robot?"
 
@@ -11616,7 +11631,7 @@ msgid "Forget everything MaiPai remembers about {personName}?"
 msgstr "¿Olvidar todo lo que MaiPai recuerda sobre {personName}?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "Forget network"
 msgstr "Olvidar red"
 
@@ -14971,7 +14986,7 @@ msgid "Keep key"
 msgstr "Mantener clave"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "Keep network"
 msgstr "Conservar red"
 
@@ -18920,7 +18935,7 @@ msgid "setting.coding.person.network_hosts.label"
 msgstr "Hosts de red"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:39
+#: src/apps/settings/RobotWifi.tsx:49
 msgid "Network name"
 msgstr "Nombre de la red"
 
@@ -19607,7 +19622,7 @@ msgid "No robots yet. An admin adds one in Settings, Home, Devices."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "No saved networks reported."
 msgstr "No se han indicado redes guardadas."
 
@@ -24577,7 +24592,7 @@ msgid "setting.robot.volume.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:34
+#: src/apps/settings/RobotWifi.tsx:43
 msgid "Robot Wi-Fi"
 msgstr "Wi-Fi del robot"
 
@@ -25810,7 +25825,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotActions.tsx:55
-#: src/apps/settings/RobotWifi.tsx:43
+#: src/apps/settings/RobotWifi.tsx:53
 msgid "Sending…"
 msgstr "Enviando…"
 
@@ -28706,6 +28721,11 @@ msgid "Test music detection"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:47
+msgid "Test the tailnet path for 10 minutes"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotSelfTests.tsx:34
 msgid "Test this robot"
 msgstr ""
@@ -30087,7 +30107,7 @@ msgid "The robot is trying the laptop relay"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:36
+#: src/apps/settings/RobotWifi.tsx:45
 msgid "The robot joins the strongest saved network in range for now."
 msgstr "Por ahora, el robot se conecta a la red guardada con la señal más fuerte que tenga cerca."
 
@@ -30102,7 +30122,7 @@ msgid "setting.robot.vision.option.on_demand"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "The robot will no longer join this network."
 msgstr "El robot ya no se conectará a esta red."
 
@@ -30928,7 +30948,7 @@ msgid "This revokes its enrollment code and deletes its saved firmware backup."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:38
+#: src/apps/settings/RobotWifi.tsx:48
 msgid "This robot already holds 10 Wi-Fi networks. Forget one to add another."
 msgstr ""
 
@@ -32518,6 +32538,11 @@ msgid "Use this model"
 msgstr "Usar este modelo"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/RobotWifi.tsx:46
+msgid "Use this network now"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicSongDetails.tsx:175
 msgid "Use this one"
 msgstr ""
@@ -33171,7 +33196,7 @@ msgid "Waiting for the robot to check in."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 msgid "Waiting for the robot to report its networks."
 msgstr "Esperando a que el robot indique sus redes."
 
@@ -33956,7 +33981,7 @@ msgid "Wi-Fi network sent to the robot."
 msgstr "Se envió la red Wi-Fi al robot."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/RobotWifi.tsx:41
+#: src/apps/settings/RobotWifi.tsx:51
 msgid "Wi-Fi password"
 msgstr "Contraseña del Wi-Fi"
 
@@ -34096,7 +34121,7 @@ msgstr "Trabajando en la imagen"
 #: src/apps/settings/DevicesSection.tsx:138
 #: src/apps/settings/DevicesSection.tsx:219
 #: src/apps/settings/HouseholdRobotsSection.tsx:210
-#: src/apps/settings/RobotWifi.tsx:37
+#: src/apps/settings/RobotWifi.tsx:46
 #: src/shell/library/TranscriptCaptionTracks.tsx:71
 #: src/shell/library/TranscriptFindReplace.tsx:45
 #: src/shell/library/TranscriptFindReplace.tsx:60

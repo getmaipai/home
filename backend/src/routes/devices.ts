@@ -507,8 +507,9 @@ const sendCommandRoute = createRoute({
   request: {
     params: idParamSchema("id", "device-a1b2c3"),
     body: { content: { "application/json": { schema: z.object({
-      kind: z.enum(["mute", "unmute", "find_me", "dance", "music_test", "announce"]),
+      kind: z.enum(["mute", "unmute", "find_me", "dance", "music_test", "announce", "prefer_tailnet"]),
       seconds: z.number().int().min(1).max(30).optional(),
+      minutes: z.number().int().min(0).max(120).optional().openapi({ description: "prefer_tailnet only: how long the robot prefers its tailnet path to the hub (0 turns it off)." }),
       fast: z.boolean().optional().openapi({ description: "music_test only: a shorter run, about 40 seconds." }),
       text: z.string().trim().min(1).max(400).optional().openapi({ description: "announce only: what the robot says." }),
       urgent: z.boolean().optional().openapi({ description: "announce only: the robot says it even when it would hold a normal one back." }),
@@ -523,7 +524,7 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  const { kind, seconds = 5, fast, text, urgent } = c.req.valid("json");
+  const { kind, seconds = 5, fast, text, urgent, minutes } = c.req.valid("json");
   // ROBOT-ADMIN-PLACE-01: a robot is the household's. Anyone but a child or guest may ask it to mute (the privacy-safe
   // direction); unmuting stays with the person who paired it and admins.
   const mayMuteAnyRobot = kind === "mute" && actor.role !== "child" && actor.role !== "guest";
@@ -539,17 +540,19 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const adultOwnerOrAdmin = actor.role !== "child" && actor.role !== "guest" && (device.personId === actor.id || isOwnerOrAdmin(actor));
   if ((kind === "music_test" || kind === "announce") && !adultOwnerOrAdmin) return c.json({ error: "Only an adult who owns this robot, or an admin, can do that." }, 403);
   if (kind === "announce" && !text) return c.json({ error: "Type what the robot should say, then send it." }, 400);
-  const payload = kind === "find_me" ? { seconds } : kind === "music_test" ? (fast === undefined ? {} : { fast }) : kind === "announce" ? { text: text!, ...(urgent === undefined ? {} : { urgent }) } : {};
+  // ANYWHERE-08: the tailnet test is an admin's, like the robot's Wi-Fi.
+  if (kind === "prefer_tailnet" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only an admin can test a robot's tailnet path." }, 403);
+  const payload = kind === "find_me" ? { seconds } : kind === "music_test" ? (fast === undefined ? {} : { fast }) : kind === "announce" ? { text: text!, ...(urgent === undefined ? {} : { urgent }) } : kind === "prefer_tailnet" ? { minutes: minutes ?? 10 } : {};
   const command = issueDeviceCommand(device.id, kind, payload, kind === "announce" ? 60_000 : kind === "dance" || kind === "music_test" ? 120_000 : undefined);
   return c.json({ id: command.id }, 202);
 });
 
 const wifiLinkRefusal = "For safety, a Wi-Fi password is not sent to the robot over your home network's plain link. Join the robot's own Wi-Fi (its screen shows the name when it cannot connect) and use its setup page, or scan a Wi-Fi QR code once the new firmware is installed.";
 const robotWifiRoute = createRoute({
-  method: "post", path: "/{id}/wifi", tags: ["Devices"], summary: "Add or forget a saved Wi-Fi network on a robot",
+  method: "post", path: "/{id}/wifi", tags: ["Devices"], summary: "Add, forget or switch to a saved Wi-Fi network on a robot",
   middleware: [requireAuth] as const,
   request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: z.object({
-    action: z.enum(["add", "forget"]), ssid: z.string().min(1).max(32), password: z.string().max(63).optional(),
+    action: z.enum(["add", "forget", "use"]), ssid: z.string().min(1).max(32), password: z.string().max(63).optional(),
   }) } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ sent: z.literal(true) }) } }, description: "The requested Wi-Fi action was sent." }, ...errorResponses({ 400: "Invalid Wi-Fi request", 401: "Not signed in", 403: "Only an admin can change a robot's Wi-Fi.", 404: "No such robot or the network is not saved", 409: "The robot cannot safely accept this request or is offline" }) },
 });
@@ -564,6 +567,14 @@ devicesRoutes.openapi(robotWifiRoute, (c) => {
   if (action === "forget") {
     if (!report?.wifi_saved?.includes(ssid)) return c.json({ error: "That network is not saved on this robot." }, 404);
     issueDeviceCommand(device.id, "wifi_forget", { ssid }, 60_000);
+    return c.json({ sent: true as const }, 202);
+  }
+  if (action === "use") {
+    // ANYWHERE-08: "Use this network now" is an away test without carrying the robot out of range. The robot holds the choice in
+    // memory only and goes back to its saved networks by itself when it cannot reach the hub in 3 minutes; the saved list is not changed.
+    if (!report?.wifi_saved?.includes(ssid)) return c.json({ error: "That network is not saved on this robot." }, 404);
+    if (!report.online) return c.json({ error: "The robot is offline, so it cannot switch networks now." }, 409);
+    issueDeviceCommand(device.id, "wifi_use", { ssid }, 60_000);
     return c.json({ sent: true as const }, 202);
   }
   if (report?.link_encrypted !== true) return c.json({ error: wifiLinkRefusal }, 409);

@@ -41,3 +41,28 @@ test("a full list of 10 networks says so and shows no add form", () => {
   expect(view.queryByLabelText("Wi-Fi password")).toBeNull();
   expect(view.getAllByRole("button", { name: "Forget" }).length).toBe(10);
 });
+
+test("Use this network now sends the use action for that network only", async () => {
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(String(init?.body));
+    return Response.json({ sent: true }, { status: 202 });
+  }) as typeof fetch;
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: ["Home", "Hotspot"], link_encrypted: true }} />);
+  fireEvent.click(view.getAllByRole("button", { name: "Use this network now" })[1]!);
+  await waitFor(() => expect(bodies).toHaveLength(1));
+  expect(JSON.parse(bodies[0]!)).toEqual({ action: "use", ssid: "Hotspot" });
+  await waitFor(() => expect(view.getByText(/goes back by itself/)).toBeTruthy());
+});
+
+test("the tailnet test asks for 10 minutes", async () => {
+  const bodies: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(String(init?.body));
+    return Response.json({ id: "c1" }, { status: 202 });
+  }) as typeof fetch;
+  const view = render(<RobotWifi deviceId="r1" checkin={{ wifi_saved: ["Home"], link_encrypted: true }} />);
+  fireEvent.click(view.getByRole("button", { name: "Test the tailnet path for 10 minutes" }));
+  await waitFor(() => expect(bodies).toHaveLength(1));
+  expect(JSON.parse(bodies[0]!)).toEqual({ kind: "prefer_tailnet", minutes: 10 });
+});
