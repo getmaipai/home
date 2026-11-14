@@ -1090,7 +1090,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
 | `backend/src/lib/scene.ts` | SCENE_TTL, weatherCacheLease, getWeatherCue, setWeatherCue, setWeatherFailure, dropWeatherCue |
-| `backend/src/lib/sceneSuppression.ts` | dismiss, isSuppressed, shouldReAlert, resume, listActive, clearAll |
+| `backend/src/lib/sceneSuppression.ts` | dismiss, isSuppressed, shouldReAlert, resume, listActive, weatherAlertDismissal |
 | `backend/src/lib/sceneTool.ts` | SCENE_TOOL_ID, sceneToolStreamArgs, cleanSceneLabel, sceneObservations, runSceneTool |
 | `backend/src/lib/sceneWeather.ts` | fetchSceneWeatherForContext, fetchSceneWeatherAlertsForContext, fetchSceneWeather |
 | `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, SCHEDULE_PRUNE_DAYS |
