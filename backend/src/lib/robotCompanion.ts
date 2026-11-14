@@ -72,6 +72,16 @@ export function robotCompanionOf(deviceId: string): CompanionInfo | null {
   return persona && companionFits(robotControlsOf(deviceId), persona.floor) ? persona : null;
 }
 
+// Rule 0: a robot's speech requests (the filler and the reply sentences) carry no speaker evidence, so the band of the speaker of the robot's latest turn is
+// remembered here for a few minutes. With none (or an old one) the band is child, which never lets a guise apply.
+const RECENT_TURN_BAND_MS = 5 * 60_000;
+const recentTurnBand = new Map<string, { band: AgeBand; at: number }>();
+export function noteRobotTurnBand(deviceId: string, band: AgeBand, now = Date.now()): void { recentTurnBand.set(deviceId, { band, at: now }); }
+export function recentRobotTurnBand(deviceId: string, now = Date.now()): AgeBand | null {
+  const found = recentTurnBand.get(deviceId);
+  return found && now - found.at < RECENT_TURN_BAND_MS ? found.band : null;
+}
+
 // synths.ts registers who may see a synth at load (a hook like registerCastSynthGate), so this module and voiceForSpeech never import it (an import cycle crashed module start-up).
 let guiseVisible: ((actor: import("@/types").PersonRow, synthId: string) => boolean) | null = null;
 export function registerGuiseVisibility(fn: (actor: import("@/types").PersonRow, synthId: string) => boolean): void { guiseVisible = fn; }

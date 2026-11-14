@@ -11,6 +11,7 @@ import { runImpressionTool, IMPRESSION_UNKNOWN_LINE } from "@/lib/impressionTool
 import { setHouseholdSettingValue, setValue, getDeviceSettingValue } from "@/lib/settings";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { voiceForSpeech, companionOwnVoice } from "@/lib/voiceForSpeech";
+import { noteRobotTurnBand } from "@/lib/robotCompanion";
 import { ROBOT_GUISE_KEY, robotCompanionOf } from "@/lib/robotCompanion";
 import { __reloadRegistryForTests } from "@/lib/settingsRegistry";
 import { issueDeviceToken } from "@/lib/deviceTokens";
@@ -128,5 +129,17 @@ describe("held robot synth guise", () => {
     const made = createConversation(owner, { surface: "chat", companionId: id });
     expect(made.ok).toBe(true);
     expect(voiceForActiveChat(owner)).toBe("synth-voice");
+  });
+  test("the robot's own speech requests (no band passed) speak the guise voice after an adult turn, and the robot voice after an unknown speaker's turn", async () => {
+    const owner = await household(), id = synth(owner), device = issueDeviceToken(owner.id, "robot", "StackChan");
+    setValue(owner, `device:${device.deviceId}`, "robot.controls", "adult");
+    setValue(owner, `device:${device.deviceId}`, "robot.voice.id", "robot-voice");
+    setHouseholdSettingValue(companionVoiceKey(id), "vera");
+    await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "adult", args: { action: "start", synth: id } });
+    expect(voiceForSpeech({ actor: owner, deviceId: device.deviceId })).toBe("robot-voice");
+    noteRobotTurnBand(device.deviceId, "adult");
+    expect(voiceForSpeech({ actor: owner, deviceId: device.deviceId })).toBe("vera");
+    noteRobotTurnBand(device.deviceId, "child");
+    expect(voiceForSpeech({ actor: owner, deviceId: device.deviceId })).toBe("robot-voice");
   });
 });

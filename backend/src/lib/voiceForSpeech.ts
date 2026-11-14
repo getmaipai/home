@@ -2,7 +2,7 @@ import type { PersonRow } from "@/types";
 import { getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getDeviceById } from "@/lib/devices";
 import { mayUseClipVoices } from "@/lib/access";
-import { companionLayersOf } from "@/lib/robotCompanion";
+import { companionLayersOf, recentRobotTurnBand } from "@/lib/robotCompanion";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { voicePresetName } from "@/lib/voiceResolve";
@@ -30,7 +30,7 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
     const robotVoice = getDeviceSettingValue(input.deviceId, "robot.voice.id");
     // Layers (robotCompanion.ts companionLayersOf): a guise is the synth layer without the customization layer, so its voice outranks the robot's own.
     // When the guise does not apply to this speaker, the layers are the assigned companion's and the order above holds.
-    const layers = companionLayersOf(input.deviceId, input.actor, input.band ?? "child");
+    const layers = companionLayersOf(input.deviceId, input.actor, input.band ?? recentRobotTurnBand(input.deviceId) ?? "child");
     const guiseSynth = layers.guise ? layers.synth : null;
     const synthVoice = (id: string) => companionOwnVoice(id) ?? VOICE_ENGINE_DEFAULT;
     if (guiseSynth) selected = synthVoice(guiseSynth.id);

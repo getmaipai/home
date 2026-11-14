@@ -47,7 +47,7 @@ import { existsSync } from "node:fs";
 import { loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { companionAreaOn, mayUseCompanion } from "@/lib/companionsApp";
-import { companionFits, companionLayersOf, robotControlsOf, robotCompanionOf } from "@/lib/robotCompanion";
+import { companionFits, companionLayersOf, noteRobotTurnBand, robotControlsOf, robotCompanionOf } from "@/lib/robotCompanion";
 import { synthById, maySeeSynth, synthFloor } from "@/lib/synths";
 import { canHaveTemporaryChat, isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -634,6 +634,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const bare = opts.bare === true;
   // ROBOT-COMPANION-01: a robot with a companion assigned talks as that companion, whoever is signed in; the person's own pick and the household
   // companions switch are theirs, not the robot's (an admin chose this robot's companion).
+  if (surface === "robot" && opts.deviceId && !bare) noteRobotTurnBand(opts.deviceId, band);
   const robotLayers = surface === "robot" && opts.deviceId && !bare ? companionLayersOf(opts.deviceId, actor, band) : null;
   const robotAssigned = robotLayers?.customization ? resolvePersona(robotLayers.customization.id) : null;
   const robotCompanion = robotLayers?.synth ? resolvePersona(robotLayers.synth.id) : null;
