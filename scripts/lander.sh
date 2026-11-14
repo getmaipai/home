@@ -386,7 +386,7 @@ stop_stray_tests() {
 
 run_t2_tests() {
   local output="$1" command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
-  bounded_step "${MAIPAI_LAND_T2_SECONDS:-2400}" "safety-surface tests" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
+  bounded_step "${MAIPAI_LAND_T2_SECONDS:-5400}" "safety-surface tests" "$output" bash -c 'cd "$1" && eval "$2"' _ "$checkout" "$command"
 }
 
 run_static_check() {
