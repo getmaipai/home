@@ -980,7 +980,7 @@ msgid "{name} restarted."
 msgstr "{name} restarted."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:304
+#: src/shell/pages/PackageAppPage.tsx:286
 msgid "{name} sections"
 msgstr "{name} sections"
 
@@ -1133,17 +1133,17 @@ msgid "{pictures} and {videos}"
 msgstr "{pictures} and {videos}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:328
+#: src/shell/pages/PackageAppPage.tsx:310
 msgid "{place} is already in your list."
 msgstr "{place} is already in your list."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:339
+#: src/shell/pages/PackageAppPage.tsx:321
 msgid "{place} is your home place. Change it in Settings, Weather."
 msgstr "{place} is your home place. Change it in Settings, Weather."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:346
+#: src/shell/pages/PackageAppPage.tsx:328
 msgid "{place} removed from your list."
 msgstr "{place} removed from your list."
 
@@ -3236,7 +3236,7 @@ msgid "setting.coding.person.api_keys.label"
 msgstr "Api keys"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:304
+#: src/shell/pages/PackageAppPage.tsx:286
 msgid "App"
 msgstr "App"
 
@@ -3369,7 +3369,7 @@ msgstr "Approved. Waiting for the robot to finish pairing on its own end…"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
-#: src/shell/pages/PackageAppPage.tsx:218
+#: src/shell/pages/PackageAppPage.tsx:200
 #: src/shell/pages/status/StatusApps.tsx:114
 #: src/shell/phoneMenuLinks.tsx:31
 msgid "Apps"
@@ -3428,7 +3428,7 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr "Articles picked at random from the Wikipedia on this computer."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:91
+#: src/shell/pages/dashboard/AskBox.tsx:95
 msgid "Ask"
 msgstr "Ask"
 
@@ -3763,8 +3763,8 @@ msgstr "Azelma"
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:199
 #: src/shell/pages/packageAppHeaderBar.tsx:94
-#: src/shell/pages/PackageAppPage.tsx:303
-#: src/shell/pages/PackageAppPage.tsx:304
+#: src/shell/pages/PackageAppPage.tsx:285
+#: src/shell/pages/PackageAppPage.tsx:286
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:188
@@ -7314,7 +7314,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:311
+#: src/shell/pages/PackageAppPage.tsx:293
 msgid "Could not open this app. Check your connection and try again."
 msgstr "Could not open this app. Check your connection and try again."
 
@@ -7373,7 +7373,7 @@ msgid "Could not remove this piece."
 msgstr "Could not remove this piece."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:347
+#: src/shell/pages/PackageAppPage.tsx:329
 msgid "Could not remove this place."
 msgstr "Could not remove this place."
 
@@ -14657,7 +14657,7 @@ msgid "Loading voices"
 msgstr "Loading voices"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:321
+#: src/shell/pages/PackageAppPage.tsx:303
 msgid "Loading weather"
 msgstr "Loading weather"
 
@@ -18716,7 +18716,7 @@ msgid "OpenCode · same key"
 msgstr "OpenCode · same key"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:312
+#: src/shell/pages/PackageAppPage.tsx:294
 msgid "Opening the app"
 msgstr "Opening the app"
 
@@ -19649,7 +19649,7 @@ msgid "Pitch {value}"
 msgstr "Pitch {value}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:346
+#: src/shell/pages/PackageAppPage.tsx:328
 msgid "Place"
 msgstr "Place"
 
@@ -22207,7 +22207,7 @@ msgstr "Search"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/packageAppHeaderBar.tsx:107
-#: src/shell/pages/PackageAppPage.tsx:303
+#: src/shell/pages/PackageAppPage.tsx:285
 msgid "Search {name}"
 msgstr "Search {name}"
 
@@ -22466,9 +22466,9 @@ msgid "seconds"
 msgstr "seconds"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PackageAppPage.tsx:369
 #: src/shell/pages/PackageAppPage.tsx:387
-#: src/shell/pages/PackageAppPage.tsx:405
-#: src/shell/pages/PackageAppPage.tsx:420
+#: src/shell/pages/PackageAppPage.tsx:402
 msgid "Sections"
 msgstr "Sections"
 
@@ -25362,7 +25362,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/MusicStudioView.tsx:156
 #: src/shell/pages/MusicStudioView.tsx:157
 #: src/shell/pages/MusicStudioView.tsx:160
-#: src/shell/pages/PackageAppPage.tsx:320
+#: src/shell/pages/PackageAppPage.tsx:302
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:283
@@ -26829,7 +26829,7 @@ msgid "This app is also on the Never close list, so it stays open."
 msgstr "This app is also on the Never close list, so it stays open."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:122
+#: src/shell/pages/PackageAppPage.tsx:121
 msgid "This app's page is not valid."
 msgstr "This app's page is not valid."
 
@@ -27090,7 +27090,7 @@ msgid "setting.storage.person_quota_gb.label"
 msgstr "This person's storage quota (GB)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:339
+#: src/shell/pages/PackageAppPage.tsx:321
 msgid "This place"
 msgstr "This place"
 
