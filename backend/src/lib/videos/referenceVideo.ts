@@ -19,8 +19,8 @@ import { readAttachment, storeFile } from "@/lib/attachments";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, jobTier, tierArgument, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE } from "@/lib/tiers";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
-import { householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
-import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, videoSizeFor } from "./quality";
+import { endAnchorEnabled, householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
+import { LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25EndPictureReady, ltx25MaxReady, videoSizeFor } from "./quality";
 import { videoEngineStatus, videoMaxNotReadyReason, videoNotReadyReason, videoStatusReady } from "./ready";
 import { videoAudienceOf, type GenerateVideoState } from "./tool";
 import { VIDEO_FAILED_PREFIX, activeVideoJobsFor, doneVideoJobsFor, getVideoJobFor, startVideoEditJob, markAnotherTake, type EditRun, type ReferenceProgress, type ReferenceRecipe, type VideoJob } from "./jobs";
@@ -296,8 +296,10 @@ function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: 
     const [width, height] = plan.size.split("x").map(Number) as [number, number];
     let image: string;
     try { image = Buffer.from(await sharp(Buffer.from(picture)).resize(width, height, { fit: "cover" }).png().toBuffer()).toString("base64"); } catch { return failed("The first picture could not be read. Try again."); }
+    const anchor = endAnchorEnabled() && (plan.model === LTX25_MAX_MODEL ? ltx25EndPictureReady(engine, true) : plan.model === LTX25_MODEL && ltx25EndPictureReady(engine));
     const made = await stackClipRun(actor, "Sending the first picture to the video model", () => submitVideo({
       prompt: recipe.prompt, size: plan.size, seconds: plan.seconds, ...(recipe.seed !== null ? { seed: recipe.seed } : {}), image, image_source: "uploaded", audience: "adult",
+      ...(anchor ? { end_image: image } : {}),
       ...(plan.model ? { model: plan.model } : {}), ...(plan.tier === "boost" || plan.tier === "max" ? { tier: plan.tier } : {}), timeout_ms: 1,
     }))(signal, onProgress, hooks);
     if (!made.ok) return made;
@@ -305,6 +307,8 @@ function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: 
     const known = recipe.firstPicture;
     const match = known ? await measureClipFaces(made.clip.video, made.clip.seconds, known.people).catch(() => null) : null;
     const sentences = [...(known?.notes ?? []), ...(match?.low ? [LOOK_ALIKE_LINE] : [])];
+    const measuredRecipe = match ? { ...recipe, faceMatch: match } : recipe;
+    hooks?.request({ reference: measuredRecipe });
     const { faceMatch: _earlier, ...kept } = recipe;
     hooks?.recipe({ ...kept, seconds: plan.seconds, ...(match ? { faceMatch: match } : {}) });
     return { ok: true, clip: { ...made.clip, ...(sentences.length ? { note: sentences.join(" ") } : {}) } };

@@ -4,7 +4,7 @@
 // with the Stack; this module has grown to evaluate that series too, and never says a clip is fine, only what it saw.
 import sharp from "sharp";
 
-export type ClipFinding = { code: "black" | "frozen" | "soft" | "jump" | "camera_not_seen" | "loop_seam"; level: "serious" | "warning"; message: string; at_s?: number };
+export type ClipFinding = { code: "black" | "frozen" | "soft" | "jump" | "face_drift" | "camera_not_seen" | "loop_seam"; level: "serious" | "warning"; message: string; at_s?: number };
 export type ClipCheck = { checked: boolean; frames: number; findings: ClipFinding[] };
 
 export type ClipSeries = { fps: number; duration_s?: number; frames?: number; luma: number[]; diff: number[]; sharpness: number[]; flow?: Array<{ at_s: number; dx: number; dy: number; zoom: number }> };
@@ -18,6 +18,7 @@ export const CLIP_RULES = {
   softMedianRatio: 0.35, softWarningSeconds: 0.5, softSeriousSeconds: 1.5, softMedianMinimum: 20,
   cameraMotionPerSecond: 8,
   loopSeamSsim: 0.9,
+  faceMedian: 0.363,
 } as const;
 
 const frozenMessage = "Nothing seems to move in this clip. Make it again, or describe the movement.";

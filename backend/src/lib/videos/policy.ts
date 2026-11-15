@@ -16,6 +16,11 @@ import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, laneOf, type Lane } from "@/lib/
 
 export const VIDEO_ENABLED_KEY = "generation.video.enabled";
 export const VIDEO_TIER_KEY = "generation.video_tier";
+export const VIDEO_END_ANCHOR_KEY = "video.end_anchor";
+
+export function endAnchorEnabled(): boolean {
+  try { return getHouseholdSettingValue(VIDEO_END_ANCHOR_KEY) === true; } catch { return false; }
+}
 
 export type VideoAudience = PictureAudience;
 export type VideoDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off";

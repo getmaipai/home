@@ -5,6 +5,7 @@
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({ key: "video.end_anchor", scope: "household", selector: "boolean", default: false, label: "End on the first picture", help: "When enabled, eligible videos made from a first picture will try to finish on that picture.", level: "advanced", lives_in: "household.media_videos", honoured_by: ["home"] }),
   SettingsKey.parse({
     key: "generation.video.enabled",
     scope: "household",

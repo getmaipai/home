@@ -347,7 +347,7 @@ videosRoutes.openapi(animatedRoute, async (c) => {
 const checkClipRoute = createRoute({
   method: "get", path: "/jobs/{id}/check", tags: ["Videos"], summary: "A quick measured check of a finished clip", middleware: [requireAuth] as const,
   request: { params: idParams },
-  responses: { 200: { content: { "application/json": { schema: z.object({ checked: z.boolean().describe("False when the frames could not be read on this computer; then there are no findings and nothing is claimed."), frames: z.number(), findings: z.array(z.object({ code: z.enum(["black", "frozen", "soft", "jump", "camera_not_seen", "loop_seam"]), level: z.enum(["serious", "warning"]), message: z.string() })) }) } }, description: "The check" }, ...errorResponses({ 401: "Not signed in", 404: "No such finished video" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ checked: z.boolean().describe("False when the frames could not be read on this computer; then there are no findings and nothing is claimed."), frames: z.number(), findings: z.array(z.object({ code: z.enum(["black", "frozen", "soft", "jump", "face_drift", "camera_not_seen", "loop_seam"]), level: z.enum(["serious", "warning"]), message: z.string() })) }) } }, description: "The check" }, ...errorResponses({ 401: "Not signed in", 404: "No such finished video" }) },
 });
 videosRoutes.openapi(checkClipRoute, async (c) => {
   const actor = c.get("person");

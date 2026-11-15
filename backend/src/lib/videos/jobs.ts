@@ -798,18 +798,23 @@ async function runStoredClipCheck(job: VideoJob, actor: PersonRow): Promise<void
     const result: ClipCheck = await clipCheck(attachmentFilePath(row.storagePath), {});
     if (!result.checked) return;
     updateCreationReview(actor.id, file.id, { checks: { clip: { findings: result.findings, frames: result.frames, checked_at: new Date().toISOString() } } });
-    if (result.findings.length) job.request.create = { ...(job.request.create ?? {}), note: [...new Set([job.request.create?.note, ...result.findings.map((f) => f.message)].filter(Boolean))].join(" ") };
+    const faceMatch = job.request.reference?.faceMatch;
+    const sheetFaceDrift = job.request.reference?.route !== "first_frame" && !!job.request.subject_ids?.length && !!faceMatch?.low;
+    const findings = sheetFaceDrift && !result.findings.some((f) => f.code === "face_drift")
+      ? [...result.findings, { code: "face_drift" as const, level: "warning" as const, message: "The faces in this clip may not match the pictures." }]
+      : result.findings;
+    if (findings.length || sheetFaceDrift) job.request.create = { ...(job.request.create ?? {}), note: [...new Set([job.request.create?.note, ...(sheetFaceDrift ? ["Made again from a first picture because the face drifted."] : []), ...findings.map((f) => f.message)].filter(Boolean))].join(" ") };
     saveVideoJob(job);
     if (job.request.retake_of) {
       const firstJob = getVideoJobFor(actor, job.request.retake_of);
       const first = firstJob?.files[0] ? creationOfFile(actor.id, firstJob.files[0].id) : null;
       const prior = (first?.checks as { clip?: { findings?: ClipCheck["findings"] } } | null)?.clip?.findings ?? [];
-      const winner = keepBetter(prior, result.findings);
+      const winner = keepBetter(prior, findings);
       if (firstJob?.files[0]) updateCreationReview(actor.id, firstJob.files[0].id, { review: winner === "first" ? "kept" : "rejected" });
       updateCreationReview(actor.id, file.id, { review: winner === "second" ? "kept" : "rejected" });
       return;
     }
-    if (!shouldRetake({ findings: result.findings, isRetake: false })) return;
+    if (job.request.retake_of || !shouldRetake({ findings, isRetake: false })) return;
     const savedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     if (!savedBody) return;
     const body = { ...savedBody, seed: randomInt(1, 2_147_483_647) };
