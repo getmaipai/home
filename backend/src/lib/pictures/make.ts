@@ -1,6 +1,8 @@
 // CREATOR-15 slice A: Create enters the same generate_image definition as chat, on the person's own written screen.
 import type { PersonRow } from "@/types";
 import { runGenerateImage, type RunGenerateImageInput } from "./tool";
+import { getTemplate } from "@/lib/media/templates";
+import { PICTURE_WORD_BLANKS } from "./quality";
 
 export interface PictureMakeBody {
   prompt: string;
@@ -94,8 +96,34 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
 }
 
 export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): Promise<PictureMakeResult> {
+  let submitted: PictureMakeBody = body;
+  if (body.template) {
+    const template = getTemplate(body.template);
+    if (template?.kind === "picture") {
+      const blankSpecs = [...template.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((match) => ({ name: match[1]!, example: match[3]!.trim() }));
+      if (blankSpecs.length) {
+        const blanks = { ...(body.blanks ?? {}) };
+        const castSlots = blankSpecs.filter((blank) => blank.name.startsWith("cast_"));
+        let castIndex = 0;
+        let promptUsed = false;
+        for (const blank of blankSpecs) {
+          if (typeof blanks[blank.name] === "string" && blanks[blank.name]!.trim()) continue;
+          if (blank.name.startsWith("cast_")) {
+            const castId = body.cast?.[castIndex++];
+            if (castId) blanks[blank.name] = castId;
+          } else if (!promptUsed && body.prompt.trim()) {
+            blanks[blank.name] = body.prompt.trim();
+            promptUsed = true;
+          } else blanks[blank.name] = blank.example;
+        }
+        if (castSlots.some((blank) => !String(blanks[blank.name] ?? "").trim())) return { ok: false, status: 422, error: "This template needs a person from your cast. Pick one in Cast, then try again.", code: "cast" };
+        const wordBlanks = blankSpecs.filter((blank) => PICTURE_WORD_BLANKS.has(blank.name)).map((blank) => String(blanks[blank.name] ?? "").trim()).filter(Boolean);
+        submitted = { ...body, prompt: "", blanks, ...(wordBlanks.length ? { words: [...(body.words ?? []), ...wordBlanks].slice(0, 6) } : {}) };
+      }
+    }
+  }
   const state = { actor, persona: null, conversationId: null, turnId: null, temporary: false, ephemeral: false, surface: "chat", speakerEvidence: null, deviceId: null, planBasis: { surfaceClass: "written" }, plan: null } as unknown as RunGenerateImageInput["state"];
-  const outcome = await runGenerateImage({ state, args: { ...body, ...(body.shape ? { size: body.shape } : {}) }, callId: "make", spoken: false });
+  const outcome = await runGenerateImage({ state, args: { ...submitted, ...(submitted.shape ? { size: submitted.shape } : {}) }, callId: "make", spoken: false });
   const data = outcome.result?.data as { pictureJobId?: string; pictureJobIds?: string[]; refused?: string; locked?: boolean } | undefined;
   if (outcome.status === "succeeded" && (data?.pictureJobId || data?.pictureJobIds?.length)) {
     const ids = data.pictureJobIds ?? [data.pictureJobId!];

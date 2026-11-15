@@ -9,6 +9,8 @@ export const QUICK_MODEL = "flux2-klein-4b";
 export const ERNIE_MODEL = "ernie-image-turbo";
 export const DETAILED_MODEL = "z-image-turbo";
 export const TEXT_CAPABLE_MODELS = new Set([ERNIE_MODEL]);
+/** Until media_template.words_blanks ships in the spec, these blank names mark exact picture text. */
+export const PICTURE_WORD_BLANKS = new Set(["headline", "title", "text", "caption", "tagline", "words", "name_text"]);
 export const modelCanSpell = (model: string | null | undefined): boolean => Boolean(model && TEXT_CAPABLE_MODELS.has(model));
 
 export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL || model === ERNIE_MODEL ? "quick" : null);

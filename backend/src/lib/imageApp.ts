@@ -87,6 +87,10 @@ registerAppPageFill("image", "create", (person, page) => {
   const reference = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).find((item) => item.state === "reference") : undefined;
   if (reference) reference.max = 3;
   const templates = listTemplates({ actor: person, kind: "picture" });
+  const templateState = page.state && typeof page.state === "object" ? (page.state as Record<string, unknown>).template : undefined;
+  const selectedTemplate = typeof templateState === "string" ? templates.find((item) => item.id === templateState) : undefined;
+  const firstBlank = selectedTemplate?.prompt.match(/\{\{[a-z][a-z0-9_]*\|([^|}]+)\|[^}]*\}\}/)?.[1]?.toLowerCase();
+  if (selectedTemplate && firstBlank) bar.placeholder = `Describe your ${firstBlank}. Other fields use the template's example.`;
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   const templateChip = {
     state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true,
