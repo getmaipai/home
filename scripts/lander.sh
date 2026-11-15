@@ -84,10 +84,18 @@ fi
 refresh_snapshot() {
   local script="$1" src="${2:-scripts/$1}" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
-  [[ -n "${REFRESH_SKIP_FETCH:-}" ]] || GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
-  if ! git -C "$main" show "origin/main:$src" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
-    rm -f "$tmp"
-    return 1
+  local interval="${MAIPAI_REFRESH_FETCH_SECONDS:-1800}" now last_fetch ref fetch_rc
+  [[ "$interval" =~ ^[0-9]+$ ]] || interval=1800
+  now="$(date +%s)"
+  last_fetch="$(cat "$bin/.last-refresh-fetch" 2>/dev/null || true)"
+  if [[ -z "${REFRESH_SKIP_FETCH:-}" ]] && { [[ "${REFRESH_FETCH:-0}" == 1 ]] || [[ ! "$last_fetch" =~ ^[0-9]+$ ]] || (( now < last_fetch || now - last_fetch >= interval )); }; then
+    GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 && fetch_rc=0 || fetch_rc=$?
+    printf '%s\n' "$now" > "$bin/.last-refresh-fetch"
+  fi
+  ref="$(pipeline_main_sha "$main" 2>/dev/null || true)"
+  [[ -n "$ref" ]] || ref=origin/main
+  if ! git -C "$main" show "$ref:$src" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+    if ! git -C "$main" show "origin/main:$src" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then rm -f "$tmp"; return 1; fi
   fi
   if [[ ! -f "$current" ]] || ! cmp -s "$tmp" "$current"; then
     mv -f "$tmp" "$current" || { rm -f "$tmp"; return 1; }

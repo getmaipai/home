@@ -89,10 +89,18 @@ fi
 refresh_snapshot() {
   local script="$1" current="$bin/$1" tmp="$bin/$1.new"
   mkdir -p "$bin"
-  GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 || true
-  if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
-    rm -f "$tmp"
-    return 1
+  local interval="${MAIPAI_REFRESH_FETCH_SECONDS:-1800}" now last_fetch ref fetch_rc
+  [[ "$interval" =~ ^[0-9]+$ ]] || interval=1800
+  now="$(date +%s)"
+  last_fetch="$(cat "$bin/.last-refresh-fetch" 2>/dev/null || true)"
+  if [[ -z "${REFRESH_SKIP_FETCH:-}" ]] && { [[ "${REFRESH_FETCH:-0}" == 1 ]] || [[ ! "$last_fetch" =~ ^[0-9]+$ ]] || (( now < last_fetch || now - last_fetch >= interval )); }; then
+    GITNET_TRIES=1 GITNET_TIMEOUT=30 GITNET_LABEL="refresh fetch" gitnet -C "$main" fetch -q origin main >/dev/null 2>&1 && fetch_rc=0 || fetch_rc=$?
+    printf '%s\n' "$now" > "$bin/.last-refresh-fetch"
+  fi
+  ref="$(pipeline_main_sha "$main" 2>/dev/null || true)"
+  [[ -n "$ref" ]] || ref=origin/main
+  if ! git -C "$main" show "$ref:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+    if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then rm -f "$tmp"; return 1; fi
   fi
   if [[ ! -f "$current" ]] || ! cmp -s "$tmp" "$current"; then
     mv -f "$tmp" "$current" || { rm -f "$tmp"; return 1; }
@@ -556,13 +564,24 @@ run_once_body() {
   local bisect_started bisect_budget bisect_spent
   mkdir -p "$data/t2-wanted" "$data/t2-green"
   if [[ -n "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]]; then run_t2_wanted; return 0; fi
-  # OUTBOX-01: the watcher tests the pipeline's main, which is a landing ahead of GitHub's while the outbox is still pushing, so a slow
-  # or failed fetch only gets a log line; the landed commits are tested all the same.
-  GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"
+  # OUTBOX-01: check the local landed main first, then check origin on the refresh interval.
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
+  local refresh_interval="${MAIPAI_REFRESH_FETCH_SECONDS:-1800}" last_refresh_fetch refresh_now refresh_fetch_rc
+  [[ "$refresh_interval" =~ ^[0-9]+$ ]] || refresh_interval=1800
+  refresh_now="$(date +%s)"
+  last_refresh_fetch="$(cat "$bin/.last-refresh-fetch" 2>/dev/null || true)"
+  if [[ ! "$last_refresh_fetch" =~ ^[0-9]+$ ]] || (( refresh_now < last_refresh_fetch || refresh_now - last_refresh_fetch >= refresh_interval )); then
+    GITNET_LABEL="watcher fetch" gitnet -C "$checkout" fetch origin && refresh_fetch_rc=0 || refresh_fetch_rc=$?
+    printf '%s\n' "$refresh_now" > "$bin/.last-refresh-fetch"
+    if (( refresh_fetch_rc != 0 )); then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"; fi
+    head="$(pipeline_main_sha "$checkout")"
+    last_run="$(cat "$data/last-run" 2>/dev/null || true)"
+    last_green="$(cat "$data/last-green" 2>/dev/null || true)"
+  fi
   if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
+  head="$(pipeline_main_sha "$checkout")"
   # HOST-GUARD-09: no suite starts under memory pressure or while the host guard paused heavy work; the next tick tries again.
   local hostmem_lib="$main/scripts/lib/hostmem.sh" gate_line=""
   if [[ -f "$hostmem_lib" ]]; then
@@ -574,7 +593,14 @@ run_once_body() {
     fi
   fi
   if ! wait_for_quiet; then return 0; fi
-  GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin || echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"
+  refresh_now="$(date +%s)"
+  last_refresh_fetch="$(cat "$bin/.last-refresh-fetch" 2>/dev/null || true)"
+  if [[ ! "$last_refresh_fetch" =~ ^[0-9]+$ ]] || (( refresh_now < last_refresh_fetch || refresh_now - last_refresh_fetch >= refresh_interval )); then
+    GITNET_LABEL="watcher fetch (after quiet wait)" gitnet -C "$checkout" fetch origin && refresh_fetch_rc=0 || refresh_fetch_rc=$?
+    printf '%s\n' "$refresh_now" > "$bin/.last-refresh-fetch"
+    if (( refresh_fetch_rc != 0 )); then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) watcher.sh: fetch failed after quiet wait$( ((GITNET_TIMED_OUT)) && echo ' (timed out)'); testing the landed main" >> "$data/watcher.log"; fi
+  fi
+  # A landing may have arrived or been tested during the quiet wait: always re-read the local landed main (no network).
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"

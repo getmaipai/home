@@ -23,6 +23,34 @@ describe("main watcher", () => {
     expect(run(f, "pipeline.sh", ["status"]).stdout).toContain("watcher code: older than origin/main");
   }, 60_000);
 
+  test("refresh and an up-to-date tick fetch once, then not again until the interval passes", () => {
+    const f = fixture();
+    const calls = join(f.scratch, "git-network.calls");
+    const wrapper = join(f.scratch, "git-wrapper");
+    mkdirSync(wrapper, { recursive: true });
+    const realGit = Bun.which("git")!;
+    writeFileSync(join(wrapper, "git"), `#!/bin/sh\nfor a in "$@"; do case "$a" in fetch|ls-remote|push) echo "$a" >> '${calls}'; break;; esac; done\nexec '${realGit}' "$@"\n`);
+    chmodSync(join(wrapper, "git"), 0o755);
+    const env = { ...f.env, PATH: `${wrapper}:${process.env.PATH}` };
+    expect(run(f, "watcher.sh", ["checkout"], env).status).toBe(0);
+    writeFileSync(calls, "");
+    expect(run(f, "watcher.sh", ["refresh"], env).status).toBe(0);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual(["fetch"]);
+    expect(run(f, "watcher.sh", ["refresh"], env).status).toBe(0);
+    const sha = git(f.main, "rev-parse", "HEAD");
+    mkdirSync(join(f.data, "green"), { recursive: true });
+    writeFileSync(join(f.data, "last-run"), `${sha}\n`);
+    writeFileSync(join(f.data, "last-green"), `${sha}\n`);
+    const tick = run(f, "watcher.sh", ["run-once"], env);
+    expect(tick.status).toBe(0);
+    expect(tick.stdout).toContain("up to date");
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual(["fetch"]);
+    writeFileSync(join(f.pipelineBin, ".last-refresh-fetch"), `${Math.floor(Date.now() / 1000) - 1801}\n`);
+    const expiredRefresh = run(f, "watcher.sh", ["refresh"], env);
+    expect(expiredRefresh.status).toBe(0);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual(["fetch", "fetch"]);
+  }, 60_000);
+
   test("waits for a queued landing, then runs and records the suite after the cap", () => {
     const f = fixture();
     mkdirSync(join(f.env.MAIPAI_LAND_DATA!, "queue"), { recursive: true });
