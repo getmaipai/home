@@ -41,6 +41,7 @@ import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { isReshape, startReshape, startSharpen } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
+import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
 import { meetsMinRole } from "@/lib/plugins";
 import { adultMarkJobBody } from "@/lib/adultMarkRoute";
@@ -243,6 +244,21 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "export")) return next();
     const started = await startStudioExport(person, await jsonBody(c));
     return started.ok ? c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200) : c.json({ error: started.line, code: started.code }, started.status);
+  });
+
+  routes.post("/actions/export-nle", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "export")) return next();
+    const result = await makeStudioNleExport(person, await jsonBody(c));
+    if (!result.ok) return c.json({ error: result.line, code: result.code }, result.status);
+    c.header("content-type", "application/zip");
+    c.header("content-disposition", `attachment; filename="${result.filename}"`);
+    c.header("cache-control", "private, no-store");
+    c.header("x-content-type-options", "nosniff");
+    c.header("x-maipai-made-audience", result.mark.madeAudience);
+    c.header("x-maipai-lock", result.mark.lock);
+    return c.body(result.bytes as never, 200);
   });
 
   // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.

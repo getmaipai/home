@@ -19,7 +19,7 @@ export const STUDIO_VOICE_GONE_LINE = "A voice line is gone (it is kept for two 
 export type StudioExportResult = { ok: true; job: VideoJob } | { ok: false; status: 403 | 404 | 409 | 422; line: string; code: string };
 const no = (status: 403 | 404 | 409 | 422, code: string, line: string): StudioExportResult => ({ ok: false, status, code, line });
 
-interface Resolved {
+export interface ResolvedStudioPlan {
   plan: StudioPlan;
   jobs: VideoJob[];
   videoFiles: EditFile[];
@@ -31,7 +31,7 @@ interface Resolved {
 
 /** Reads the posted body into a checked plan and every file it names. A refusal is one plain line; nothing has started and nothing is read for a plan that
  * names something the person may not use. */
-async function resolvePlan(person: PersonRow, body: Record<string, unknown>): Promise<{ ok: true; value: Resolved } | { ok: false; status: 403 | 404 | 422; line: string; code: string }> {
+export async function resolveStudioPlan(person: PersonRow, body: Record<string, unknown>): Promise<{ ok: true; value: ResolvedStudioPlan } | { ok: false; status: 403 | 404 | 422; line: string; code: string }> {
   const parsed = studioPlanSchema.safeParse(body.plan);
   if (!parsed.success) return { ok: false, status: 422, code: "bad_plan", line: STUDIO_PLAN_LINE };
   const plan = parsed.data;
@@ -79,7 +79,7 @@ async function resolvePlan(person: PersonRow, body: Record<string, unknown>): Pr
     if (!track || !track.fileId) return { ok: false, status: 404, code: "no_track", line: STUDIO_NO_SONG_LINE };
     const row = db.select().from(attachments).where(eq(attachments.id, track.fileId)).get();
     if (lockState(row ? lockItemOfProvenance(row.ownerPersonId, row.provenance) : null, person) !== "open") return { ok: false, status: 403, code: "locked", line: STUDIO_LOCKED_LINE };
-    if (track.mark.madeAudience === "adult-only") marks.push(track.mark);
+    marks.push(track.mark);
     musicFiles.push(track.file);
     musicSeconds.push(songSeconds(person, track.fileId, track.file.bytes));
   }
@@ -99,7 +99,7 @@ const fileOf = (bytes: Uint8Array): EditFile => ({ bytes, ext: "mp4" });
 const NO_SOUND = /no sound/i;
 
 /** The work of one export: each piece on its own, the joins in order, then everything laid over, as a chain of Stack steps. Never throws; a failure is one line. */
-export function studioRun(resolved: Resolved): EditRun {
+export function studioRun(resolved: ResolvedStudioPlan): EditRun {
   const { compiled } = resolved;
   return async (signal) => {
     const started = Date.now();
@@ -155,7 +155,7 @@ export function studioRun(resolved: Resolved): EditRun {
  * of every source, the audience floor), then `startVideoEditJob` like trim, join and mix. The first clip of the plan is the job's source; the old clips stay.
  */
 export async function startStudioExport(person: PersonRow, body: Record<string, unknown>): Promise<StudioExportResult> {
-  const read = await resolvePlan(person, body);
+  const read = await resolveStudioPlan(person, body);
   if (!read.ok) return no(read.status, read.code, read.line);
   const resolved = read.value;
   const first = resolved.jobs[0]!;
