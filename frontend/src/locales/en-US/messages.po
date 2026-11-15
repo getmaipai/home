@@ -29545,6 +29545,11 @@ msgid "What would help?"
 msgstr "What would help?"
 
 #. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:162
+msgid "What you asked for"
+msgstr "What you asked for"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:83
 msgid "setting.chat.pick_up_threads.help"
 msgstr "When a chat opens with a hello, the assistant may ask once about something you mentioned last time, like an event that has now passed. Adults are on by default; teens are off until they turn it on; children never get it. Nothing is asked in a private chat."
@@ -29993,7 +29998,6 @@ msgid "Word meanings, origins and translations."
 msgstr "Word meanings, origins and translations."
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:162
 #: src/shell/pages/musicComposerMode.ts:162
 msgid "Words"
 msgstr "Words"

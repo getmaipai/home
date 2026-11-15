@@ -69,3 +69,13 @@ export const QUALITY_NOTE_LINE: Record<Exclude<QualityNote, null>, string> = {
   style_needs_detailed: "That style only works with Detailed pictures, so this one is Detailed and takes a little longer. Say so in one short sentence.",
   style_needs_quick: "That style only works with Quick pictures, so this one was made Quick.",
 };
+
+/** The person's own request, without the sentences the picture tool adds to what it sends (TEXT-PIC-01 words, TEXT-PIC-02 no-text line). */
+export function plainPrompt(prompt: string): string {
+  return prompt
+    .replace(/\s*Show this text on the picture, spelled exactly as written:(?:\s*"[^"]*"\s*,?)+\.?/g, "")
+    .replace(/\s*No text, no letters, no words, no logos anywhere in the picture\.?/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\.{2,}/g, ".")
+    .trim();
+}

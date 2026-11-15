@@ -29532,6 +29532,11 @@ msgid "What would help?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/library/LibraryViewer.tsx:162
+msgid "What you asked for"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:83
 msgid "setting.chat.pick_up_threads.help"
 msgstr ""
@@ -29980,7 +29985,6 @@ msgid "Word meanings, origins and translations."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/library/LibraryViewer.tsx:162
 #: src/shell/pages/musicComposerMode.ts:162
 msgid "Words"
 msgstr ""

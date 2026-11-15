@@ -159,7 +159,7 @@ function HowMade({ creation, mine, onClone }: { creation: CreationByFile; mine: 
       {styles.length ? row(i18n._({ id: "Styles", message: "Styles" }), styles.map((style) => style.style_id).filter(Boolean).join(", ")) : null}
       {cast.length ? row(i18n._({ id: "Cast", message: "Cast" }), cast.map((member) => member.subject_id).join(", ")) : null}
       {sources.length ? row(i18n._({ id: "Made from", message: "Made from" }), sources.map((source) => source.file_id).join(", ")) : null}
-      {mine && creation.words?.written ? row(i18n._({ id: "Words", message: "Words" }), creation.words.written) : null}
+      {mine && creation.words?.written ? row(i18n._({ id: "What you asked for", message: "What you asked for" }), creation.words.written) : null}
     </dl>
     {mine ? <Button type="button" variant="secondary" onClick={onClone}>{i18n._({ id: "Clone settings", message: "Clone settings" })}</Button> : null}
   </section>;

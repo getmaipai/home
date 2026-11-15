@@ -1,6 +1,7 @@
 // CREATOR-02: what each finished-job writer hands to `recordCreation`. Each builder reads only what the job already knows (its request, its prompt, the files it
 // stored); nothing is asked of the Stack and nothing is guessed. The cast stays empty until CREATOR-04 (`resolveCast`) fills it from the job.
 // The builders are shared by the writers and the back-fill, so a record made later from an old job row has the same shape as one made on the day.
+import { plainPrompt } from "@/lib/pictures/quality";
 import { creationIdOfFile, creationIdOfJob, FILE_ID, recordCreation, type Creation, type CreationInput } from "./store";
 import type { PictureJob } from "@/lib/pictures/jobStore";
 import type { VideoJob, VideoFile } from "@/lib/videos/jobs";
@@ -57,7 +58,7 @@ export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: {
     ...(creationId ? { id: creationId } : {}),
     kind: "picture", fileIds: [file.id], jobIds: [job.id],
     recipe: { tool: "pictures", route: source ? "picture" : "text" },
-    words: words(job.prompt, job.prompt),
+    words: words(plainPrompt(job.prompt), job.prompt),
     cast: castOfSubjects(job.request.subject_ids, "subject"),
     sources: source && FILE_ID.test(source) ? [{ file_id: source, role: "reference" }] : [],
     generation: generationBlock({ kind: "picture", jobId: job.stackJob ?? job.id, task: "generate", model: file.model, seed: file.seed, seconds: null, tier: job.request.tier, madeAt: job.updatedAt }),

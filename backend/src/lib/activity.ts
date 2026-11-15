@@ -2,6 +2,7 @@
 // apps as one list, read from the job records that already exist (picture_jobs, video_jobs, music_jobs and the unified jobs table). No new
 // table, no new poller. Rule 6a: only the viewer's own rows, an admin included. A locked or adult-only item is left out entirely (the same
 // lock checks as the Library), so this list never names one. A child's titles are the child-safe label, never the prompt.
+import { plainPrompt } from "@/lib/pictures/quality";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { activityDismissals, attachments, musicJobs, pictureJobs, videoJobs } from "@/db/schema";
@@ -97,7 +98,7 @@ export function pictureActivityItem(actor: PersonRow, job: NonNullable<ReturnTyp
   const audience = audienceOf(actor);
   if (job.state === "cancelled" || pictureJobLockState(actor, job) !== "open") return null;
   const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/files";
-  const title = titleFor(actor, "picture", job.prompt, "A picture");
+  const title = titleFor(actor, "picture", plainPrompt(job.prompt), "A picture");
   const base = { id: `picture:${job.id}`, source: "picture" as const, title, at: job.updatedAt, href };
   if (job.state === "queued") return { ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null };
   if (job.state === "running") return { ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture };
