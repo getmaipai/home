@@ -74698,6 +74698,162 @@
         }
       }
     },
+    "/api/creations/by-file/{fileId}": {
+      "get": {
+        "tags": [
+          "Creations"
+        ],
+        "summary": "Read how a picture was made",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The creation record, with private fields only for its maker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "file_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "recipe": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tool": {
+                          "type": "string"
+                        },
+                        "route": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tool",
+                        "route"
+                      ]
+                    },
+                    "words": {
+                      "nullable": true
+                    },
+                    "plan": {
+                      "nullable": true
+                    },
+                    "cast": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "generation": {
+                      "nullable": true
+                    },
+                    "settings": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "checks": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "file_ids",
+                    "recipe",
+                    "cast",
+                    "sources",
+                    "settings"
+                  ],
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File is not visible",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The file is locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "locked": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "making": {
+                      "type": "boolean"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "locked"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "locked",
+                    "making",
+                    "code"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/films/{id}": {
       "get": {
         "tags": [
