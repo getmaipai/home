@@ -26,6 +26,8 @@ export interface Track {
   state?: "queued" | "running" | "done" | "failed" | "cancelled";
   hasFile?: boolean;
   mediaType?: string;
+  /** Optional measured integrated loudness in LUFS, when available from ingest metadata. */
+  loudnessLufs?: number;
 }
 
 const MEDIA_TYPE_CANDIDATES: Record<string, readonly string[]> = {

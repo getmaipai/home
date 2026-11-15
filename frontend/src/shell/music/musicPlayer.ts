@@ -6,6 +6,8 @@ import type { AudioHandle, AudioSession } from "@/shell/audioSession";
 import { getPlayMode } from "@/shell/media/playMode";
 import { appendToQueue, clearPlayNext, clearUpcoming, insertNext, moveUpcoming, pickNext, pickPrevious, queueFor, removeUpcoming, trackIsPlayable, type QueueEdit, type QueueSource, type Track } from "./musicQueue";
 import { reportPlayerError } from "@/lib/clientErrors";
+import { analyserFor, hasPlayerAudioGraph, setPlayerTransport, setPlayerVolume } from "@/lib/media/audioGraph";
+import { applyEqSettings, loadEqSettings } from "./musicEq";
 
 export type { QueueSource, Track } from "./musicQueue";
 
@@ -117,11 +119,26 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   const ensure = (): HTMLAudioElement => {
     if (el) return el;
     const made = makeElement();
+    const pauseImmediately = made.pause.bind(made);
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+    made.pause = () => {
+      if (!hasPlayerAudioGraph(made) || made.paused) { pauseImmediately(); return; }
+      if (pauseTimer) clearTimeout(pauseTimer);
+      setPlayerTransport(made, 0);
+      pauseTimer = setTimeout(() => { pauseTimer = null; pauseImmediately(); }, 50);
+    };
     made.preload = "metadata";
     made.crossOrigin = "anonymous";
-    made.volume = vol.volume; made.muted = vol.muted;
-    made.addEventListener("play", () => { set({ playing: true, failed: false }); startFrames(); });
-    made.addEventListener("pause", () => { set({ playing: false }); clockTick(); });
+    made.volume = 1; made.muted = vol.muted;
+    made.addEventListener("play", () => {
+      if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+      analyserFor(made);
+      applyEqSettings(loadEqSettings(), snap.track?.loudnessLufs);
+      setPlayerVolume(made, vol.muted ? 0 : vol.volume);
+      made.volume = hasPlayerAudioGraph(made) ? 1 : vol.volume;
+      setPlayerTransport(made, 1); set({ playing: true, failed: false }); startFrames();
+    });
+    made.addEventListener("pause", () => { setPlayerTransport(made, 0); set({ playing: false }); clockTick(); });
     made.addEventListener("ended", () => {
       if (stopping) return;
       if (!reallyPlayed()) { noPlayback(); return; }
@@ -137,7 +154,8 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     // The kit Player's own M key and the session's sleep fade change the element directly; follow it so the bar's volume stays true.
     made.addEventListener("volumechange", () => {
       if (vol.volume === made.volume && vol.muted === made.muted) return;
-      vol = { volume: made.volume, muted: made.muted };
+      if (made.volume !== 1) { vol = { volume: made.volume, muted: made.muted }; setPlayerVolume(made, made.muted ? 0 : made.volume); made.volume = 1; }
+      else vol = { ...vol, muted: made.muted };
       try { localStorage.setItem(VOLUME_KEY, JSON.stringify(vol)); } catch { /* the level lasts until reload */ }
       notify(listeners);
     });
@@ -264,13 +282,15 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     seek(seconds) {
       if (!el) return;
       const length = Number.isFinite(el.duration) ? el.duration : seconds;
+      setPlayerTransport(el, 0);
       el.currentTime = Math.min(Math.max(0, seconds), length);
+      setTimeout(() => { if (el && !el.paused) setPlayerTransport(el, 1); }, 50);
       clockTick();
     },
     seekBy(seconds) { if (el) store.seek(el.currentTime + seconds); },
     setVolume(volume) {
       vol = { volume: Math.min(1, Math.max(0, volume)), muted: false };
-      if (el) { el.volume = vol.volume; el.muted = false; }
+      if (el) { if (hasPlayerAudioGraph(el)) { setPlayerVolume(el, vol.volume); el.volume = 1; } else el.volume = vol.volume; el.muted = false; }
       try { localStorage.setItem(VOLUME_KEY, JSON.stringify(vol)); } catch { /* the level lasts until reload */ }
       notify(listeners);
     },

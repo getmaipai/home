@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@maipai/ui/src/ui/drawer";
 import { Slider } from "@maipai/ui/src/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@maipai/ui/src/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { useIsPhoneLayout } from "@maipai/ui/src/hooks/useIsPhoneLayout";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -29,6 +31,8 @@ import { useMediaAnalyser } from "@/shell/media/useMediaAnalyser";
 import { createSpectrum } from "./musicSpectrum";
 import { useLike } from "./musicLike";
 import { useLyricsFollow } from "./useLyricsFollow";
+import { EQ_PRESETS, playerAudioAvailable } from "@/lib/media/audioGraph";
+import { applyEqSettings, boundedBandGains, EQ_FREQUENCIES, loadEqSettings, saveEqSettings, type EqSettings } from "./musicEq";
 
 const icon = (name: string, className?: string) => { const One = getIcon(name); return <One aria-hidden="true" {...(className ? { className } : {})} />; };
 
@@ -104,6 +108,13 @@ function VolumeControl() {
   </span>;
 }
 
+const EQ_NAMES: Record<keyof typeof EQ_PRESETS, string> = {
+  flat: i18n._({ id: "Flat", message: "Flat" }), bass: i18n._({ id: "Bass boost", message: "Bass boost" }),
+  treble: i18n._({ id: "Treble boost", message: "Treble boost" }), vocal: i18n._({ id: "Vocal", message: "Vocal" }),
+  loud: i18n._({ id: "Loud", message: "Loud" }), acoustic: i18n._({ id: "Acoustic", message: "Acoustic" }),
+  dance: i18n._({ id: "Dance", message: "Dance" }), jazz: i18n._({ id: "Jazz", message: "Jazz" }), rock: i18n._({ id: "Rock", message: "Rock" }),
+};
+
 /** Elapsed time, the waveform and the length. Its own component so the frame clock re-draws only this. */
 function SeekRow({ track, wide }: { track: Track; wide: string }) {
   const { time, duration } = useMusicClock();
@@ -125,6 +136,9 @@ export function MusicPlayerBar() {
   const phone = useIsPhoneLayout();
   const snap = useMusicPlayer();
   const mode = usePlayMode();
+  const [eqSettings, setEqSettings] = useState<EqSettings>(() => loadEqSettings());
+  const eqSupported = playerAudioAvailable();
+  useEffect(() => { applyEqSettings(eqSettings, snap.track?.loudnessLufs); saveEqSettings(eqSettings); }, [eqSettings, snap.track?.loudnessLufs]);
   const [expanded, setExpanded] = useState(false);
   const pane = useMusicPane();
   const [drawer, setDrawer] = useState<MusicPaneTab | null>(null);
@@ -161,6 +175,20 @@ export function MusicPlayerBar() {
   const queueLabel = i18n._({ id: "Queue", message: "Queue" });
 
   if (!track) return null;
+  const eqReason = i18n._({ id: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support.", message: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support." });
+  const equalizer = <Popover>
+    <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Equalizer", message: "Equalizer" })} title={eqSupported ? i18n._({ id: "Equalizer", message: "Equalizer" }) : eqReason} disabled={!eqSupported}>{icon("sliders-horizontal")}</Button></PopoverTrigger>
+    <PopoverContent align="end" aria-label={i18n._({ id: "Equalizer settings", message: "Equalizer settings" })}>
+      <div className="flex flex-col gap-3">
+        <Select value={eqSettings.preset} onValueChange={(value) => { const preset = value as keyof typeof EQ_PRESETS; setEqSettings({ preset, gains: [...EQ_PRESETS[preset]], preampDb: eqSettings.preampDb }); }}>
+          <SelectTrigger aria-label={i18n._({ id: "Equalizer preset", message: "Equalizer preset" })}><SelectValue /></SelectTrigger>
+          <SelectContent>{Object.keys(EQ_PRESETS).map((preset) => <SelectItem key={preset} value={preset}>{EQ_NAMES[preset as keyof typeof EQ_PRESETS]}</SelectItem>)}</SelectContent>
+        </Select>
+        <label className="flex items-center gap-3 text-supporting">{i18n._({ id: "Preamp", message: "Preamp" })}<Slider aria-label={i18n._({ id: "Preamp", message: "Preamp" })} min={-12} max={12} step={1} value={[eqSettings.preampDb]} onValueChange={(value) => { const n = Array.isArray(value) ? value[0] : value; if (typeof n === "number") setEqSettings({ ...eqSettings, preset: "flat", preampDb: n }); }} /><span>{eqSettings.preampDb} dB</span></label>
+        {EQ_FREQUENCIES.map((frequency, index) => <label key={frequency} className="flex items-center gap-3 text-supporting"><span className="w-10">{frequency >= 1000 ? `${frequency / 1000}k` : frequency}</span><Slider aria-label={i18n._({ id: "{frequency} Hz", message: "{frequency} Hz", values: { frequency } })} min={-12} max={12} step={1} value={[eqSettings.gains[index] ?? 0]} onValueChange={(value) => { const n = Array.isArray(value) ? value[0] : value; if (typeof n === "number") { const gains = [...eqSettings.gains]; gains[index] = n; setEqSettings({ ...eqSettings, preset: "flat", gains: boundedBandGains(gains) }); } }} /><span className="w-9 text-end">{eqSettings.gains[index] ?? 0}</span></label>)}
+      </div>
+    </PopoverContent>
+  </Popover>;
   const poster = track.artworkUrl ?? undefined;
   const lyrics = track.timed?.length ? { lines: track.timed } : track.lyrics?.trim() && track.lyrics.trim() !== "[Instrumental]" ? { text: track.lyrics } : undefined;
   const common = {
@@ -171,7 +199,7 @@ export function MusicPlayerBar() {
   const body = (
     <Player key={`${track.key}-${expanded ? "full" : "bar"}`} {...common} layout={expanded ? "audio" : "mini"}
       {...(expanded
-        ? { shuffle: mode.shuffle, repeat: mode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }), lyricsBlur: true, artSpring: true, ...(lyrics ? { lyrics } : {}), actionsSlot: studioButton(track) }
+        ? { shuffle: mode.shuffle, repeat: mode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }), lyricsBlur: true, artSpring: true, ...(lyrics ? { lyrics } : {}), actionsSlot: <>{equalizer}{studioButton(track)}</> }
         : { placement: "dock" as const, onClose: () => musicPlayer.stop(), onExpand: () => setExpanded(true), swipeUpToExpand: true, swipeToSkip: true,
           spectrum: { levels: spectrum.levels },
           actionsSlot: <>

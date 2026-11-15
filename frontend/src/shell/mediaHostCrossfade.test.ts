@@ -35,11 +35,11 @@ test("a primed element for another song is dropped, and an unprimed one is relea
   expect(third.hasAttribute("src")).toBe(false);
 });
 
-test("the Equalizer presets are flat, bass, treble and vocal; the choice applies and is saved once", () => {
-  expect(Object.keys(EQ_PRESETS)).toEqual(["flat", "bass", "treble", "vocal"]);
-  expect(EQ_PRESETS.flat).toEqual([0, 0, 0]);
+test("the Equalizer presets provide ten bands; the choice applies and is saved once", () => {
+  expect(Object.keys(EQ_PRESETS)).toEqual(["flat", "bass", "treble", "vocal", "loud", "acoustic", "dance", "jazz", "rock"]);
+  expect(EQ_PRESETS.flat).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   expect(eqPresetOf("treble")).toBe("treble");
-  expect(eqPresetOf("loud")).toBe("flat");
+  expect(eqPresetOf("loud")).toBe("loud");
   const saved: string[] = [];
   setEqWriter((preset) => saved.push(preset));
   seedEqPreset("vocal");
