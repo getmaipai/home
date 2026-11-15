@@ -78958,6 +78958,10 @@
                     "maxLength": 200,
                     "description": "The id of a picture in your own Library; the video starts from it (404 when it is not yours)."
                   },
+                  "loop": {
+                    "type": "boolean",
+                    "description": "End on the starting picture; needs a picture and a model that supports end pictures."
+                  },
                   "styles": {
                     "type": "array",
                     "items": {
