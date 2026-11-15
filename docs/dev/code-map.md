@@ -435,7 +435,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | File | Exported names |
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, COMPANION_BAND_LINE, canMakeCompanion, canHaveTemporaryChat, mayUseClipVoices, rolesById |
-| `backend/src/lib/activity.ts` | ACTIVITY_SEEN_KEY, activityDot, activitySeenAt, markActivitySeen, activityForViewer, isClearable |
+| `backend/src/lib/activity.ts` | ACTIVITY_SEEN_KEY, pictureActivityItem, activityDot, activitySeenAt, markActivitySeen, activityForViewer |
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
