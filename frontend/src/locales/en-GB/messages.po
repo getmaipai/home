@@ -34,6 +34,11 @@ msgid " · Pinned"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:50
+msgid " {count} {pictures} changed since."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:161
 msgid " A reply being written right now will be cut off."
 msgstr ""
@@ -2460,6 +2465,11 @@ msgid "Adult controls"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:61
+msgid "Adult lock"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1110
 msgid "setting.search.blocklists.option_label.blp-porn"
 msgstr ""
@@ -4555,6 +4565,7 @@ msgstr ""
 #: src/apps/settings/AddVoiceForm.tsx:120
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
+#: src/apps/settings/AutoLocksSection.tsx:83
 #: src/apps/settings/CodingSettings.tsx:173
 #: src/apps/settings/CodingSettings.tsx:232
 #: src/apps/settings/CodingSettings.tsx:234
@@ -5959,6 +5970,16 @@ msgid "Clear"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:82
+msgid "Clear {count} automatic locks? You can undo this right after."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:72
+msgid "Clear {count} locks"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:194
 msgid "Clear {name}"
 msgstr ""
@@ -5990,6 +6011,11 @@ msgid "Clear all saved online data?"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:65
+msgid "Clear automatic locks"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/reminders/ListMain.tsx:72
 msgid "Clear done"
 msgstr ""
@@ -5997,6 +6023,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:335
 msgid "Clear filters"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:83
+msgid "Clear locks"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6390,6 +6421,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/UpdatesPage.tsx:194
 msgid "Confirm rollback."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:82
+msgid "Confirm this change to make the automatically locked pictures visible again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6904,6 +6940,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:59
 msgid "Could not load assistant keys."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:77
+msgid "Could not load automatic locks. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13498,6 +13539,11 @@ msgid "Last checked just now"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:68
+msgid "Last cleared {date}: {pictures}."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusApps.tsx:37
 msgid "Last error: {error}"
 msgstr ""
@@ -13539,7 +13585,7 @@ msgid "Last success: {last_success_at}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/MediaCardViews.tsx:87
+#: src/shell/pages/settings/MediaCardViews.tsx:88
 #: src/shell/pages/status/StatusComponents.tsx:143
 msgid "Last try {when}: {line}"
 msgstr ""
@@ -16178,7 +16224,7 @@ msgstr ""
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:113
 #: src/shell/pages/ActivityPage.tsx:43
-#: src/shell/pages/settings/MediaCardViews.tsx:82
+#: src/shell/pages/settings/MediaCardViews.tsx:83
 msgid "Music"
 msgstr ""
 
@@ -17650,6 +17696,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:38
 msgid "Nothing listed."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:67
+msgid "Nothing needs clearing. No picture was locked by Home on its own."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19400,6 +19451,11 @@ msgid "setting.engines.stack.where.does"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:13
+msgid "picture"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:260
 #: src/shell/pages/FilesPage.tsx:165
 msgid "Picture"
@@ -19426,6 +19482,7 @@ msgid "area.Picture tools"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:13
 #: src/shell/pages/PersonProfilePage.tsx:192
 msgid "pictures"
 msgstr ""
@@ -19435,7 +19492,7 @@ msgstr ""
 #: src/apps/settings/performanceModel.ts:9
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/pages/ActivityPage.tsx:41
-#: src/shell/pages/settings/MediaCardViews.tsx:59
+#: src/shell/pages/settings/MediaCardViews.tsx:60
 msgid "Pictures"
 msgstr ""
 
@@ -19678,6 +19735,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:54
 msgid "setting.audio.speed.video.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:69
+msgid "Please wait for this change to finish."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23627,6 +23689,11 @@ msgid "Some parts are starting up"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:66
+msgid "Some pictures were locked by Home on its own, not by you. Clearing them makes them visible again. Pictures you locked yourself, and adult-style pictures, are never changed."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:129
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr ""
@@ -23743,7 +23810,7 @@ msgid "setting.generation.music.length.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/MediaCardViews.tsx:87
+#: src/shell/pages/settings/MediaCardViews.tsx:88
 #: src/shell/pages/status/StatusComponents.tsx:143
 msgid "Song naming"
 msgstr ""
@@ -24633,7 +24700,7 @@ msgstr ""
 #: src/shell/pages/MusicComposer.tsx:202
 #: src/shell/pages/MusicComposer.tsx:203
 #: src/shell/pages/MusicStudioPages.tsx:145
-#: src/shell/pages/settings/MediaCardViews.tsx:91
+#: src/shell/pages/settings/MediaCardViews.tsx:92
 msgid "Styles"
 msgstr ""
 
@@ -25202,6 +25269,8 @@ msgstr ""
 #: src/apps/settings/AiGlance.tsx:226
 #: src/apps/settings/AiGlance.tsx:271
 #: src/apps/settings/AssistantKeysSettings.tsx:74
+#: src/apps/settings/AutoLocksSection.tsx:77
+#: src/apps/settings/AutoLocksSection.tsx:78
 #: src/apps/settings/AwaySessionsSection.tsx:39
 #: src/apps/settings/BackupsSection.tsx:96
 #: src/apps/settings/BackupsSection.tsx:205
@@ -25702,6 +25771,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/UiShowcasePage.tsx:167
 msgid "The Chat showcase is for owners and admins."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:37
+msgid "The cleanup could not be saved. Look again and try once more."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26648,6 +26722,11 @@ msgid "them"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:69
+msgid "There are no automatic locks to clear."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:33
 msgid "There are no folders in here. Use this folder, or make a new one."
 msgstr ""
@@ -27533,6 +27612,8 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:111
 #: src/apps/people/FaceEnrollmentPage.tsx:690
+#: src/apps/settings/AutoLocksSection.tsx:77
+#: src/apps/settings/AutoLocksSection.tsx:78
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/apps/settings/StackChanInstallDialog.tsx:152
@@ -27957,11 +28038,17 @@ msgid "Understood the request"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:73
 #: src/shell/library/TranscriptPanel.tsx:428
 #: src/shell/pages/FilesPage.tsx:189
 #: src/shell/pages/MusicLibrary.tsx:167
 #: src/shell/pages/MusicStudioView.tsx:183
 msgid "Undo"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AutoLocksSection.tsx:55
+msgid "Undo could not be completed. Look again and try once more."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28687,7 +28774,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/pages/ActivityPage.tsx:42
-#: src/shell/pages/settings/MediaCardViews.tsx:66
+#: src/shell/pages/settings/MediaCardViews.tsx:67
 msgid "Videos"
 msgstr ""
 
