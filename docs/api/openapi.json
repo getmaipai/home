@@ -58761,7 +58761,8 @@
                                         "creator_passcode",
                                         "creator",
                                         "admin",
-                                        "auto"
+                                        "auto",
+                                        "cleanup"
                                       ]
                                     },
                                     "at": {
@@ -67604,7 +67605,8 @@
                                       "creator_passcode",
                                       "creator",
                                       "admin",
-                                      "auto"
+                                      "auto",
+                                      "cleanup"
                                     ]
                                   },
                                   "at": {
@@ -68059,7 +68061,8 @@
                                       "creator_passcode",
                                       "creator",
                                       "admin",
-                                      "auto"
+                                      "auto",
+                                      "cleanup"
                                     ]
                                   },
                                   "at": {
@@ -68495,7 +68498,8 @@
                                   "creator_passcode",
                                   "creator",
                                   "admin",
-                                  "auto"
+                                  "auto",
+                                  "cleanup"
                                 ]
                               },
                               "at": {
@@ -77065,7 +77069,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -77965,7 +77970,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -78570,7 +78576,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -79107,7 +79114,8 @@
                                                 "creator_passcode",
                                                 "creator",
                                                 "admin",
-                                                "auto"
+                                                "auto",
+                                                "cleanup"
                                               ]
                                             },
                                             "at": {
@@ -80189,7 +80197,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -80707,7 +80716,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -81335,7 +81345,8 @@
                                             "creator_passcode",
                                             "creator",
                                             "admin",
-                                            "auto"
+                                            "auto",
+                                            "cleanup"
                                           ]
                                         },
                                         "at": {
@@ -82411,6 +82422,371 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/auto-locks": {
+      "get": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "Count pictures Home locked automatically that the owner can clear",
+        "responses": {
+          "200": {
+            "description": "Counts only. No item identifiers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "candidates": {
+                      "type": "number"
+                    },
+                    "left_alone": {
+                      "type": "object",
+                      "properties": {
+                        "notLocked": {
+                          "type": "number"
+                        },
+                        "otherKind": {
+                          "type": "number"
+                        },
+                        "minorOwner": {
+                          "type": "number"
+                        },
+                        "personSet": {
+                          "type": "number"
+                        },
+                        "adultStyle": {
+                          "type": "number"
+                        },
+                        "labelledSource": {
+                          "type": "number"
+                        },
+                        "notSure": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "notLocked",
+                        "otherKind",
+                        "minorOwner",
+                        "personSet",
+                        "adultStyle",
+                        "labelledSource",
+                        "notSure"
+                      ]
+                    },
+                    "last_run": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "string"
+                        },
+                        "changed": {
+                          "type": "number"
+                        },
+                        "undone": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "at",
+                        "changed",
+                        "undone"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "candidates",
+                    "left_alone",
+                    "last_run"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Household owner only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/auto-locks/clear": {
+      "post": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "Clear automatic locks after confirming the count",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expected": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "expected"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cleanup complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "run_id": {
+                      "type": "string"
+                    },
+                    "changed": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "run_id",
+                    "changed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Household owner only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Count changed or nothing needs clearing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Cleanup could not be completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/adult-lock/auto-locks/undo": {
+      "post": {
+        "tags": [
+          "Adult lock"
+        ],
+        "summary": "Undo one automatic lock cleanup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "run_id": {
+                    "type": "string",
+                    "pattern": "^cleanup-[a-f0-9-]{36}$"
+                  }
+                },
+                "required": [
+                  "run_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restoration counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "restored": {
+                      "type": "number"
+                    },
+                    "changed_since": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "restored",
+                    "changed_since"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Household owner only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run already undone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Undo could not be completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
                 }
               }
             }

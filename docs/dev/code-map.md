@@ -210,6 +210,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AiModelDialog.tsx` | AiModelChoices |
 | `frontend/src/apps/settings/AiSlotDialog.tsx` | AiSlotChoices |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
+| `frontend/src/apps/settings/AutoLocksSection.tsx` | AutoLocksSection |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
 | `frontend/src/apps/settings/CapabilityTable.tsx` | capabilityWords, CapabilityTable |
@@ -439,6 +440,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
 | `backend/src/lib/adultLock.ts` | PROOF_IDLE_MS, PROOF_ABSOLUTE_MS, TICKET_MS, PROOF_HEADER, LOCKED_WRITERS, __setAdultLockClockForTests |
+| `backend/src/lib/adultLockCleanup.ts` | scanAutoLocks, clearAutoLocks, applyClearAutoLocks, revertClearAutoLocks, undoCleanup, latestCleanup |
 | `backend/src/lib/adultMarkRoute.ts` | adultMarkJobBody |
 | `backend/src/lib/adultMarks.ts` | SHARED_SCREEN_MARK_LINE, NEED_PASSCODE_LINE, NOT_FOUND_LINE, NOT_READY_LINE, TEMPORARY_LINE, NOT_MARKED_LINE |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
