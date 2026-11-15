@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { seedToursDisabledForCapture } from "./screenshotTourSeed";
 import { DEMO_ALBUMS, writeDemoMusic } from "./seedMusic";
 
@@ -32,6 +32,9 @@ async function requireOk(response: Response, label: string): Promise<void> {
 }
 
 export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResult> {
+  const liveRoot = resolve(process.env.MAIPAI_LIVE_INSTALL_ROOT ?? "/usr/local/maipai-home");
+  const target = resolve(options.dataDir);
+  if (target === liveRoot || target.startsWith(`${liveRoot}/`)) throw new Error("Dev seed refuses to use the live install data directory");
   const secret = options.secret ?? "correcthorsebattery";
   const setup = await request(options.baseUrl, "/api/auth/setup", {
     method: "POST", body: JSON.stringify({ displayName: "Sage", secret }),
@@ -60,6 +63,9 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
   const nova = roster.find((person) => person.display_name === "Nova");
   if (!sage || !marlow || !nova) throw new Error("the seeded roster is missing Sage, Marlow, or Nova");
   const people = { sage: sage.id, marlow: marlow.id, nova: nova.id };
+
+  const clips = Bun.spawnSync(["bun", "run", "backend/scripts/devDemoClips.ts", "--data-dir", options.dataDir, "--sage", sage.id, "--marlow", marlow.id], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", env: process.env });
+  if (clips.exitCode !== 0) throw new Error(`seeding demo clips failed: ${clips.stderr.toString().trim() || clips.stdout.toString().trim()}`);
 
   await requireOk(await request(options.baseUrl, "/api/settings", {
     method: "PUT", cookie, body: JSON.stringify({ scope: "household", key: "home.robots.enabled", value: true }),

@@ -102,10 +102,13 @@ if ((workbench)) && [[ -f "$(dirname "${BASH_SOURCE[0]}")/lib/mode.sh" ]]; then
   source "$(dirname "${BASH_SOURCE[0]}")/lib/mode.sh"
   [[ "$(mode_get)" != gated ]] || { echo "GATED: checked first, then run. The workbench hub is off in gated mode; use bun run dev, or switch with bash scripts/mode.sh direct." >&2; exit 2; }
 fi
+live_resolved="$(resolved_path "$live_root")"
+state_resolved="$(resolved_path "$state")"
+if [[ "$state_resolved/" == "$live_resolved/"* || "$state_resolved/" == "$live_root/"* ]]; then
+  echo "Dev data refuses to use the live install ($live_root)." >&2; exit 2
+fi
 if ((workbench)); then
   [[ -n "$port_override" ]] || port_override="${MAIPAI_WORKBENCH_PORT:-8780}"
-  live_resolved="$(resolved_path "$live_root")"
-  state_resolved="$(resolved_path "$state")"
   if [[ "$state_resolved/" == "$live_resolved/"* || "$state_resolved/" == "$live_root/"* ]]; then
     echo "The workbench refuses to use $state: it is inside the live install ($live_root), whose data the family's hub owns. Run it from a worktree instead." >&2; exit 2
   fi
