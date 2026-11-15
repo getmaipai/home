@@ -122,6 +122,7 @@ export interface VideoRequest {
   /** The generated picture a clip starts from (an attachment id in this conversation), or null. */
   source_file_id: string | null;
   end_file_id?: string | null;
+  loop?: boolean;
   production_id?: string;
   shot_id?: string;
   /** CREATOR-05: the saved subjects (cast) the clip shows. */
@@ -530,6 +531,7 @@ export interface StartVideoInput {
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
   endFileId?: string | null;
+  loop?: boolean;
   productionId?: string;
   shotId?: string;
   /** CREATOR-05: the saved subjects (cast) this clip shows; kept on the request so the clip's creation record lists its cast. */
@@ -565,7 +567,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.retakeOf ? { retake_of: input.retakeOf, anotherOf: input.retakeOf } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.loop ? { loop: true } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.retakeOf ? { retake_of: input.retakeOf, anotherOf: input.retakeOf } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -800,9 +802,10 @@ async function runStoredClipCheck(job: VideoJob, actor: PersonRow): Promise<void
     updateCreationReview(actor.id, file.id, { checks: { clip: { findings: result.findings, frames: result.frames, checked_at: new Date().toISOString() } } });
     const faceMatch = job.request.reference?.faceMatch;
     const sheetFaceDrift = job.request.reference?.route !== "first_frame" && !!job.request.subject_ids?.length && !!faceMatch?.low;
-    const findings = sheetFaceDrift && !result.findings.some((f) => f.code === "face_drift")
+    const seam = job.request.loop && result.checked ? { code: "loop_seam" as const, level: "warning" as const, message: result.findings.some((f) => f.code === "loop_seam") ? "visible jump" : "loops cleanly" } : null;
+    const findings = [...(seam ? [seam] : []), ...(sheetFaceDrift && !result.findings.some((f) => f.code === "face_drift")
       ? [...result.findings, { code: "face_drift" as const, level: "warning" as const, message: "The faces in this clip may not match the pictures." }]
-      : result.findings;
+      : result.findings)];
     if (findings.length || sheetFaceDrift) job.request.create = { ...(job.request.create ?? {}), note: [...new Set([job.request.create?.note, ...(sheetFaceDrift ? ["Made again from a first picture because the face drifted."] : []), ...findings.map((f) => f.message)].filter(Boolean))].join(" ") };
     saveVideoJob(job);
     if (job.request.retake_of) {

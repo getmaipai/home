@@ -168,6 +168,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
   const ending = typeof args.end_frame === "string" ? args.end_frame.trim() : "";
+  const loop = args.loop === true;
+  if (loop && ending) return styleRefusal(callId, args, "A loop uses its starting picture as the ending picture, so leave end_frame empty.", "loop_with_end_frame");
   if (ending && kid) return refused(callId, args, { kind: "child", why: "photos", line: CHILD_NO_PHOTOS_LINE });
   const refuseWith = (line: string) => refused(callId, args, { kind: "child", why: "photos", line });
   if (input.prepared) {
@@ -228,6 +230,13 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, ref.id)).get();
     endAudience = row?.provenance?.includes('"audience":"adult-only"') ? "adult-only" : null;
   }
+  if (loop) {
+    if (!image) return styleRefusal(callId, args, "A loop needs a starting picture. Choose a picture first.", "loop_needs_start");
+    const supported = ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true || ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true;
+    if (!supported) return styleRefusal(callId, args, "This computer's video model cannot make a loop yet.", "loop_unavailable");
+    endImage = image;
+    endFileId = sourceFileId;
+  }
 
   // Only a style this person may use right now can match; the model never sees the library. VIDEO-LORA-09: one resolver for names (chat) and ids (Create, a stored clip).
   const picked = kid ? { ok: true as const, adapters: [], unmatched: [] } : await resolveStyles({ audience, names: styleNamesOf(args), ids: input.styleIds, ...(typeof state.utterance === "string" ? { utterance: state.utterance } : {}) });
@@ -247,7 +256,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
   const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
-  if (ending) {
+  if (ending || loop) {
     const endMaker = maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
     if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });
     choice.maker = endMaker; choice.quality = "quick"; choice.seconds = Math.min(choice.seconds, endMaker === "ltx25max" ? 10 : 10); choice.note = null;
@@ -305,6 +314,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       ...(resolvedSubjects.length ? { subjectIds: resolvedSubjects.map(({ subject }) => subject.id) } : {}),
       ...(productionId && shotId ? { productionId, shotId } : {}),
       endFileId,
+      ...(loop ? { loop: true } : {}),
       ...(endAudience === "adult-only" || castAdult || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? { adultOnly: true } : {}),
       tier: maxMade ? "max" : jobTier("video", tierAsked.tier, choice.quality),
       ...(create ? { create } : {}),

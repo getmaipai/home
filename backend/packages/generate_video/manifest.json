@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make one short clip from words or a picture; films and ads use make_film; call before saying it exists.",
+  "description": "Make a clip from words or a picture; films use make_film.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",
@@ -36,19 +36,23 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "Scene; lines in quotes, one speaker at a time."
+        "description": "Scene; quoted lines, one speaker at a time."
       },
       "from_picture": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Latest or attached picture."
+        "description": "Latest or attached."
       },
       "end_frame": {
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Requires from_picture."
+        "description": "Needs from_picture."
+      },
+      "loop": {
+        "type": "boolean",
+        "description": "End on start; needs end_image."
       },
       "orientation": {
         "type": "string",
@@ -66,7 +70,7 @@
           "3d-animated",
           "film"
         ],
-        "description": "Cartoons: name character, era, style."
+        "description": "Cartoons: character, era, style."
       },
       "camera": {
         "type": "string",
@@ -92,7 +96,7 @@
         "type": "integer",
         "minimum": 1,
         "maximum": 10,
-        "description": "Default 5; picture max 5."
+        "description": "Default 5; pictures max 5."
       },
       "tier": {
         "type": "string",
