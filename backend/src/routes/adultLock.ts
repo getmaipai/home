@@ -15,6 +15,8 @@ import { getClientIp, throttleCheck } from "@/lib/secretThrottle";
 import { PROOF_HEADER, countUnlock, issueProof, issueTicket, revokeProof, sessionKeyOf } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
 import { authenticationOptions, verifyAuthentication } from "@/lib/passkeys";
+import { scanAutoLocks, clearAutoLocks, undoCleanup, latestCleanup } from "@/lib/adultLockCleanup";
+import { randomUUID } from "node:crypto";
 
 export const adultLockRoutes = apiRouter();
 
@@ -158,4 +160,63 @@ adultLockRoutes.openapi(confirmRoute, async (c) => {
   if (!verified.ok) { countUnlock(verified.status === 429 ? "locked_out" : "wrong"); return c.json(verified.body, verified.status); }
   clearFailedAttempts(actor.id, "adult_unlock");
   return c.json(issueTicket(actor.id, screen.sessionKey, item), 200);
+});
+
+const CleanupError = z.object({ error: z.string(), code: z.string() });
+const cleanupDenied = { error: "Only the household owner can clear automatic locks. Ask the owner to open Settings and try again.", code: "owner_only" };
+const cleanupOwner = (actor: PersonRow) => actor.role === "owner";
+const autoLocksRoute = createRoute({
+  method: "get", path: "/auto-locks", tags: ["Adult lock"], summary: "Count pictures Home locked automatically that the owner can clear", middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ candidates: z.number(), left_alone: z.object({ notLocked: z.number(), otherKind: z.number(), minorOwner: z.number(), personSet: z.number(), adultStyle: z.number(), labelledSource: z.number(), notSure: z.number() }), last_run: z.object({ id: z.string(), at: z.string(), changed: z.number(), undone: z.boolean() }).nullable() }) } }, description: "Counts only. No item identifiers." }, 403: { content: { "application/json": { schema: CleanupError } }, description: "Household owner only." } },
+});
+adultLockRoutes.openapi(autoLocksRoute, async (c) => {
+  if (!cleanupOwner(c.get("person"))) return c.json(cleanupDenied, 403);
+  const scan = await scanAutoLocks();
+  return c.json({ candidates: scan.candidates.length, left_alone: scan.counts, last_run: latestCleanup() }, 200);
+});
+
+const ClearBody = z.object({ expected: z.number().int().nonnegative() });
+const clearAutoLocksRoute = createRoute({
+  method: "post", path: "/auto-locks/clear", tags: ["Adult lock"], summary: "Clear automatic locks after confirming the count", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: ClearBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ run_id: z.string(), changed: z.number() }) } }, description: "Cleanup complete." }, 403: { content: { "application/json": { schema: CleanupError } }, description: "Household owner only." }, 409: { content: { "application/json": { schema: CleanupError } }, description: "Count changed or nothing needs clearing." }, 500: { content: { "application/json": { schema: CleanupError } }, description: "Cleanup could not be completed." } },
+});
+adultLockRoutes.openapi(clearAutoLocksRoute, async (c) => {
+  const actor = c.get("person");
+  if (!cleanupOwner(actor)) return c.json(cleanupDenied, 403);
+  const { expected } = c.req.valid("json");
+  try {
+    const scan = await scanAutoLocks();
+    if (scan.candidates.length !== expected) return c.json({ error: "The number changed. Look again and confirm.", code: "count_changed" }, 409);
+    if (!scan.candidates.length) return c.json({ error: "Nothing needs clearing. No picture was locked by the app on its own.", code: "nothing_to_clear" }, 409);
+    const runId = `cleanup-${randomUUID()}`;
+    const result = await clearAutoLocks({ runId, byPersonId: actor.id, expected });
+    return c.json({ run_id: runId, changed: result.changed }, 200);
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    const code = (error as { code?: string }).code;
+    if (status === 409 && code === "count_changed") return c.json({ error: "The number changed. Look again and confirm.", code }, 409);
+    if (status === 409 && code === "nothing_to_clear") return c.json({ error: "Nothing needs clearing. No picture was locked by the app on its own.", code }, 409);
+    return c.json({ error: "The cleanup could not be saved. Look again and try once more.", code: "cleanup_failed" }, 500);
+  }
+});
+
+const UndoBody = z.object({ run_id: z.string().regex(/^cleanup-[a-f0-9-]{36}$/) });
+const undoAutoLocksRoute = createRoute({
+  method: "post", path: "/auto-locks/undo", tags: ["Adult lock"], summary: "Undo one automatic lock cleanup", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: UndoBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ restored: z.number(), changed_since: z.number() }) } }, description: "Restoration counts." }, 403: { content: { "application/json": { schema: CleanupError } }, description: "Household owner only." }, 404: { content: { "application/json": { schema: CleanupError } }, description: "Run not found." }, 409: { content: { "application/json": { schema: CleanupError } }, description: "Run already undone." }, 500: { content: { "application/json": { schema: CleanupError } }, description: "Undo could not be completed." } },
+});
+adultLockRoutes.openapi(undoAutoLocksRoute, async (c) => {
+  if (!cleanupOwner(c.get("person"))) return c.json(cleanupDenied, 403);
+  const { run_id } = c.req.valid("json");
+  try {
+    const result = await undoCleanup(run_id);
+    return c.json({ restored: result.restored, changed_since: result.changed_since }, 200);
+  } catch (error) {
+    const status = (error as { status?: number }).status ?? 500;
+    const code = (error as { code?: string }).code ?? "undo_failed";
+    const message = error instanceof Error ? error.message : "Undo could not be completed. Look again and try once more.";
+    return c.json({ error: message, code }, status as 404 | 409 | 500);
+  }
 });

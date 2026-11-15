@@ -760,6 +760,14 @@ export class ApiError extends Error {
   }
 }
 
+export type AutoLocksSnapshot = {
+  candidates: number;
+  left_alone: { notLocked: number; otherKind: number; minorOwner: number; personSet: number; adultStyle: number; labelledSource: number; notSure: number };
+  last_run: { id: string; at: string; changed: number; undone: boolean } | null;
+};
+export type AutoLocksClearResult = { run_id: string; changed: number };
+export type AutoLocksUndoResult = { restored: number; changed_since: number };
+
 // `timeoutMs` is opt-in, not a default: most calls here (download-job
 // polling, a multi-GB select) are legitimately long-running by design, so
 // a global fetch timeout would be wrong for them. It exists for calls
@@ -1841,6 +1849,9 @@ export const api = {
   trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
   recheckLibraryAudience: (id: string) => request<{ audience: "all-ages" }>(`/api/files/${encodeURIComponent(id)}/recheck-audience`, { method: "POST" }),
   confirmLibraryUnmark: (id: string, credential: string | { passkey_assertion: unknown }) => request<{ ticket: string }>("/api/adult-lock/confirm", { method: "POST", body: JSON.stringify({ ...(typeof credential === "string" ? { secret: credential } : credential), action: "unmark", item: id }) }),
+  autoLocks: () => request<AutoLocksSnapshot>("/api/adult-lock/auto-locks"),
+  clearAutoLocks: (expected: number) => request<AutoLocksClearResult>("/api/adult-lock/auto-locks/clear", { method: "POST", body: JSON.stringify({ expected }) }),
+  undoAutoLocks: (runId: string) => request<AutoLocksUndoResult>("/api/adult-lock/auto-locks/undo", { method: "POST", body: JSON.stringify({ run_id: runId }) }),
   libraryAdultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => request<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/library/files/${encodeURIComponent(id)}/adult-mark`, { method: "POST", body: JSON.stringify(body) }),
   libraryTrash: () => request<{ rows: LibraryTrashItem[] }>("/api/trash"),
   restoreLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}/restore`, { method: "POST" }),

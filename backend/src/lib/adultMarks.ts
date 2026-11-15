@@ -22,7 +22,7 @@ import { libraryProvenance } from "@/lib/libraryProvenance";
 import type { PersonRow } from "@/types";
 
 export type MarkAction = "clear" | "mark";
-export type MarkVia = "creator_passcode" | "creator" | "admin" | "auto";
+export type MarkVia = "creator_passcode" | "creator" | "admin" | "auto" | "cleanup";
 
 export const SHARED_SCREEN_MARK_LINE = "Change this on your own screen. Open Home on your own phone or computer and try again.";
 export const NEED_PASSCODE_LINE = "Enter your passcode again to remove the lock. It only works for the item you just chose.";

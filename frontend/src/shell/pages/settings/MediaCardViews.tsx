@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { StylesTab } from "@/apps/settings/styles/StylesTab";
+import { AutoLocksSection } from "@/apps/settings/AutoLocksSection";
 import { useTabItem } from "@/shell/tabIdentity";
 import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
@@ -59,7 +60,7 @@ export function MediaPicturesView(props: SettingsViewProps) {
   useTabItem(i18n._({ id: "Pictures", message: "Pictures" }));
   const copy = copyOf(props.card);
   const navigate = useNavigate();
-  return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}</>;
+  return <><MediaKeysList person={props.person} card={props.card} />{linkRows([{ title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS }], navigate)}{props.person.role === "owner" ? <AutoLocksSection person={props.person} /> : null}</>;
 }
 
 export function MediaVideosView(props: SettingsViewProps) {

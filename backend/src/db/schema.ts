@@ -2047,7 +2047,7 @@ export const creationCast = sqliteTable(
 
 // ADULT-LOCK-06 (docs/design/video-loras-2026-11-02.md 3.10): the record of every change to an item's Adult lock: who, when, which item, and how. It holds no
 // content (no title, prompt, words or file name). It is a record, not a log: no admin page or Status page shows it, and only the creator sees their own
-// rows, in the item's menu. `item_id` is the Library file (attachments.id). `action` is `clear` or `mark`; `via` is `creator_passcode`, `creator`, `admin` or `auto`.
+// rows, in the item's menu. `item_id` is the Library file (attachments.id). `action` is `clear` or `mark`; `via` records the creator, admin, automatic or cleanup source.
 export const adultMarkLog = sqliteTable(
   "adult_mark_log",
   {
@@ -2055,7 +2055,7 @@ export const adultMarkLog = sqliteTable(
     itemId: text("item_id").notNull(),
     action: text("action", { enum: ["clear", "mark"] }).notNull(),
     actorId: text("actor_id").notNull(),
-    via: text("via", { enum: ["creator_passcode", "creator", "admin", "auto"] }).notNull(),
+    via: text("via", { enum: ["creator_passcode", "creator", "admin", "auto", "cleanup"] }).notNull(),
     at: text("at").notNull(),
     hlc: text("hlc").notNull(),
     provenance: text("provenance").notNull(),

@@ -108,7 +108,7 @@ const ItemSchema = z.object({
     can_clear: z.boolean().describe("Show 'Remove lock': the creator, the item is adult-only and locked. Needs the confirm dialog and a fresh passcode (POST /api/adult-lock/confirm, then adult-mark)."),
     can_mark: z.boolean().describe("Show 'Lock': the creator, the item is not locked."),
     line: z.string().nullable().describe("The state in plain words, for an adult-only item."),
-    history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto"]), at: z.string() })).describe("The creator's own audit rows for this item (no content)."),
+    history: z.array(z.object({ action: z.enum(["clear", "mark"]), via: z.enum(["creator_passcode", "creator", "admin", "auto", "cleanup"]), at: z.string() })).describe("The creator's own audit rows for this item (no content)."),
   }).nullable().describe("ADULT-LOCK-06: the item's Adult lock state for its creator, once it is shown (null for a clip still being made, a minor or a temporary chat)."),
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), can_edit: z.boolean().describe("SPATIAL-05: this person may edit a finished clip (adults on their own screen), so the clip's More menu offers Spatial sound."), limits: z.string() });
