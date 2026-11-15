@@ -219,6 +219,65 @@
               }
             },
             {
+              "label": "Make it portrait",
+              "icon": "smartphone",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshape",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "shape": "portrait"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Make it square",
+              "icon": "image",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshape",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "shape": "square"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Make it widescreen",
+              "icon": "monitor",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshape",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "shape": "wide"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Sharpen 2x",
+              "icon": "sparkles",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/sharpen",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
+            },
+            {
               "label": "Spatial sound",
               "icon": "headphones",
               "starts": "video",
@@ -291,6 +350,21 @@
                   "args": {
                     "id": "{id}",
                     "action": "mark"
+                  }
+                }
+              }
+            },
+            {
+              "label": "How it was made",
+              "icon": "info",
+              "when": [
+                "ready"
+              ],
+              "action": {
+                "navigate": {
+                  "to": "/apps/video/how-made",
+                  "state": {
+                    "id": "{id}"
                   }
                 }
               }
