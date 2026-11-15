@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { decide } from "@/lib/gate/decide";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -103,8 +106,19 @@ describe("held robot synth guise", () => {
     expect(getDeviceSettingValue(device.deviceId, ROBOT_GUISE_KEY)).toBe("");
     expect(await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "child", args: { action: "start", synth: all } })).toBe("Impression started.");
     setValue(owner, `device:${device.deviceId}`, ROBOT_GUISE_KEY, id);
-    expect(await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "child", identified: false, args: { action: "stop" } })).toBe("That synth cannot be used for this speaker or device.");
+    expect(await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "child", identified: false, args: { action: "stop" } })).toBe("Impression stopped.");
+    expect(getDeviceSettingValue(device.deviceId, ROBOT_GUISE_KEY)).toBe("");
+  });
+  test("an unidentified speaker on an adult robot starts an adult synth; the tool declares no memory permission and writes no memory", async () => {
+    const owner = await household(), id = synth(owner), device = issueDeviceToken(owner.id, "robot", "StackChan");
+    setValue(owner, `device:${device.deviceId}`, "robot.controls", "adult");
+    // The gate denies any tool that declares memory:* to an anonymous speaker (gate/decide.ts), which refused this tool on the real robot (2026-11-15).
+    const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages/impression/manifest.json"), "utf8"));
+    expect(manifest.permissions).toEqual([]);
+    expect(decide({ who: { personId: owner.id, role: "owner", band: "adult", anonymous: true }, what: { capabilities: manifest.permissions, consequential: manifest.consequential, minRole: manifest.min_role }, context: { crisis: false, temporary: false } }).kind).not.toBe("deny");
+    expect(await runImpressionTool({ actor: owner, deviceId: device.deviceId, band: "adult", identified: false, args: { action: "start", synth: id } })).toBe("Impression started.");
     expect(getDeviceSettingValue(device.deviceId, ROBOT_GUISE_KEY)).toBe(id);
+    expect(db.select().from(memoryRecords).all().some((row) => row.source === "robot.guise")).toBe(false);
   });
   test("tool result is a fixed status without voice or setting values and private synths use the unknown line", async () => {
     const owner = await household(), id = synth(owner), device = issueDeviceToken(owner.id, "robot", "StackChan");

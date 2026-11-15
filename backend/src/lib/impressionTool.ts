@@ -12,8 +12,9 @@ import type { AgeBand } from "@/lib/ageBand";
 
 export const IMPRESSION_UNKNOWN_LINE = "That synth could not be found. Check its ID and try again.";
 const REFUSAL = "That synth cannot be used for this speaker or device.";
-function rememberGuise(actor: PersonRow, synthId: string, text: string): void {
-  if (!canWritePersonMemory(actor, actor.id)) return;
+function rememberGuise(actor: PersonRow, identified: boolean | undefined, text: string): void {
+  // Rule 0: an unidentified speaker reaches none of the signed-in person's memories, so nothing is written into them either.
+  if (identified === false || !canWritePersonMemory(actor, actor.id)) return;
   try { remember(actor, { text, category: "event", tier: "observation", scope: "person", person: actor.id, source: "robot.guise", importance: 0.5, skip_dedupe: true }); } catch { /* The guise succeeds even when its optional memory record cannot be saved. */ }
 }
 export function impressionAvailable(actor: PersonRow, band: AgeBand, deviceId: string): boolean {
@@ -30,12 +31,11 @@ export async function runImpressionTool(input: { actor: PersonRow; args: Record<
   if (!deviceId || getDeviceById(deviceId)?.kind !== "robot") return "This impression is available on the robot only.";
   const current = getDeviceSettingValue(deviceId, ROBOT_GUISE_KEY);
   if (action === "stop") {
-    if (input.identified === false) return REFUSAL;
     const saved = setValue(input.actor, `device:${deviceId}`, ROBOT_GUISE_KEY, "");
     if (!saved.ok) return "The impression could not be stopped. Try again.";
     if (typeof current === "string" && current) {
       const synth = synthById(current), name = synth?.persona.display_name ?? current, date = localDayKey(new Date(), hubTimeZone());
-      if (synth) rememberGuise(input.actor, synth.id, `I had the robot stop appearing as ${name} on ${date}.`);
+      if (synth) rememberGuise(input.actor, input.identified, `I had the robot stop appearing as ${name} on ${date}.`);
     }
     publishSettingsChanged(`device:${deviceId}`, ROBOT_GUISE_KEY, ""); void renderClipBundle(deviceId);
     return "Impression stopped.";
@@ -49,7 +49,7 @@ export async function runImpressionTool(input: { actor: PersonRow; args: Record<
   publishSettingsChanged(`device:${deviceId}`, ROBOT_GUISE_KEY, synth.id);
   void renderClipBundle(deviceId);
   const date = localDayKey(new Date(), hubTimeZone());
-  rememberGuise(input.actor, synth.id, `I had the robot take on ${synth.persona.display_name} on ${date}.`);
+  rememberGuise(input.actor, input.identified, `I had the robot take on ${synth.persona.display_name} on ${date}.`);
   return "Impression started.";
 }
 

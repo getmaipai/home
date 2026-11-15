@@ -12,6 +12,6 @@
   "args": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["start", "stop"] }, "synth": { "type": "string", "minLength": 1, "maxLength": 120 } }, "additionalProperties": false },
   "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"],
   "min_role": "child", "consequential": false, "offline": "full", "config": [], "data_sources": [],
-  "permissions": ["memory:write"], "notifications": [], "backup": "hot", "background": false, "contributes": {},
+  "permissions": [], "notifications": [], "backup": "hot", "background": false, "contributes": {},
   "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze"
 }
