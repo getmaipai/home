@@ -4,7 +4,7 @@ import { i18n } from "@lingui/core";
 // the karaoke lyrics, shuffle and repeat. This file adds what Music needs beside them: the waveform seek bar, time, volume, shuffle and
 // repeat on the bar, Open in Studio, and the keys. The song list, the details and the Studio all press play on `musicPlayer`; the bar only draws it.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Player } from "@maipai/ui/src/primitives/Player";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -48,7 +48,17 @@ export function keyBelongsToControl(target: EventTarget | null, key: string): bo
 }
 
 /** Space, Left, Right, Up, Down, M, N and P for the song that is loaded. */
-export function useMusicKeys(enabled: boolean, ask: { next: () => void }) {
+export interface MusicShortcutActions {
+  next: () => void;
+  previous: () => void;
+  like: () => void;
+  shuffle: () => void;
+  repeat: () => void;
+  equalizer: () => void;
+  shortcuts: () => void;
+}
+
+export function useMusicKeys(enabled: boolean, actions: MusicShortcutActions) {
   useEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
@@ -57,23 +67,28 @@ export function useMusicKeys(enabled: boolean, ask: { next: () => void }) {
       if (keyBelongsToControl(event.target, key)) return;
       // Inside the kit Player its own handler already takes Space, the arrows and M.
       const inPlayer = !!(event.target as HTMLElement | null)?.closest?.('[data-slot="player"]');
-      const ownByKit = inPlayer && (key === " " || key === "ArrowLeft" || key === "ArrowRight" || key === "m");
+      const ownByKit = inPlayer && !event.shiftKey && (key === " " || key === "ArrowLeft" || key === "ArrowRight" || key === "m");
       if (ownByKit) return;
       const volume = musicPlayer.volume();
       if (key === " ") musicPlayer.playPause();
+      else if (event.shiftKey && key === "ArrowLeft") actions.previous();
+      else if (event.shiftKey && key === "ArrowRight") actions.next();
       else if (key === "ArrowLeft") musicPlayer.seekBy(-5);
       else if (key === "ArrowRight") musicPlayer.seekBy(5);
       else if (key === "ArrowUp") musicPlayer.setVolume(volume.volume + 0.05);
       else if (key === "ArrowDown") musicPlayer.setVolume(volume.volume - 0.05);
       else if (key === "m") musicPlayer.toggleMute();
-      else if (key === "n") ask.next();
-      else if (key === "p") musicPlayer.previous();
+      else if (key === "l") actions.like();
+      else if (key === "s") actions.shuffle();
+      else if (key === "r") actions.repeat();
+      else if (key === "e") actions.equalizer();
+      else if (key === "?") actions.shortcuts();
       else return;
       event.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, ask]);
+  }, [enabled, actions]);
 }
 
 /** The Open in Studio button for a song (a value, not a component: the Button is drawn where it is used). */
@@ -95,9 +110,22 @@ function LyricsFollow({ track }: { track: Track }) {
   const { time } = useMusicClock();
   const [root, setRoot] = useState<HTMLElement | null>(null);
   useEffect(() => { setRoot(document.querySelector<HTMLElement>("[data-music-expanded]")); }, []);
-  useLyricsFollow(root, track.timed, time, (seconds) => musicPlayer.seek(seconds));
-  return null;
+  const follow = useLyricsFollow(root, track.timed, time, (seconds) => musicPlayer.seek(seconds));
+  return follow.following ? null : <Button type="button" variant="secondary" size="sm" data-testid="music-lyrics-follow" onClick={follow.resume}>{i18n._({ id: "Back to current line", message: "Back to current line" })}</Button>;
 }
+
+const SHORTCUTS = [
+  ["Space", i18n._({ id: "Play or pause", message: "Play or pause" })],
+  ["← / →", i18n._({ id: "Seek 5 seconds", message: "Seek 5 seconds" })],
+  ["Shift + ← / →", i18n._({ id: "Previous or next song", message: "Previous or next song" })],
+  ["↑ / ↓", i18n._({ id: "Raise or lower volume", message: "Raise or lower volume" })],
+  ["M", i18n._({ id: "Mute or unmute", message: "Mute or unmute" })],
+  ["L", i18n._({ id: "Like or unlike", message: "Like or unlike" })],
+  ["S", i18n._({ id: "Toggle shuffle", message: "Toggle shuffle" })],
+  ["R", i18n._({ id: "Change repeat", message: "Change repeat" })],
+  ["E", i18n._({ id: "Open equalizer", message: "Open equalizer" })],
+  ["?", i18n._({ id: "Show keyboard shortcuts", message: "Show keyboard shortcuts" })],
+] as const;
 
 function VolumeControl() {
   const { volume, muted } = useMusicVolume();
@@ -130,6 +158,7 @@ function SeekRow({ track, wide }: { track: Track; wide: string }) {
 }
 
 export function MusicPlayerBar() {
+  const location = useLocation();
   const session = useAudioSession();
   const dock = useMediaDock();
   const { push } = useToast();
@@ -137,9 +166,11 @@ export function MusicPlayerBar() {
   const snap = useMusicPlayer();
   const mode = usePlayMode();
   const [eqSettings, setEqSettings] = useState<EqSettings>(() => loadEqSettings());
+  const [eqOpen, setEqOpen] = useState(false);
   const eqSupported = playerAudioAvailable();
   useEffect(() => { applyEqSettings(eqSettings, snap.track?.loudnessLufs); saveEqSettings(eqSettings); }, [eqSettings, snap.track?.loudnessLufs]);
   const [expanded, setExpanded] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const pane = useMusicPane();
   const [drawer, setDrawer] = useState<MusicPaneTab | null>(null);
   // The spectrum behind the bar: the analyser is made lazily on the one player element, and read only while a song plays and the page shows.
@@ -168,15 +199,31 @@ export function MusicPlayerBar() {
   }, [snap.notice, push]);
 
   const askNext = () => { if (musicPlayer.canNext()) musicPlayer.next(); else push(LAST_SONG_LINE()); };
-  const latest = useRef(askNext); latest.current = askNext;
-  const keys = useRef({ next: () => latest.current() }).current;
-  useMusicKeys(!!track, keys);
+  const shortcutsActions = useRef<MusicShortcutActions>({ next: askNext, previous: () => musicPlayer.previous(), like: () => {}, shuffle: () => {}, repeat: () => {}, equalizer: () => {}, shortcuts: () => {} }).current;
+  shortcutsActions.next = askNext;
+  shortcutsActions.previous = () => musicPlayer.previous();
+  shortcutsActions.like = () => { if (track?.mediaId) void toggleLike().then((kept) => { if (!kept) push(i18n._({ id: "That could not be saved. Try again.", message: "That could not be saved. Try again." })); }); };
+  shortcutsActions.shuffle = () => setPlayMode({ shuffle: !getPlayMode().shuffle });
+  shortcutsActions.repeat = () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) });
+  shortcutsActions.equalizer = () => setEqOpen(true);
+  shortcutsActions.shortcuts = () => setShortcutsOpen(true);
+  useMusicKeys(location.pathname.startsWith("/apps/audio"), shortcutsActions);
   const queueTabs = musicPaneTabs();
   const queueLabel = i18n._({ id: "Queue", message: "Queue" });
 
-  if (!track) return null;
+  const shortcutsDialog = <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+    <DialogContent size="sm" aria-label={i18n._({ id: "Music keyboard shortcuts", message: "Music keyboard shortcuts" })}>
+      <DialogHeader><DialogTitle>{i18n._({ id: "Keyboard shortcuts", message: "Keyboard shortcuts" })}</DialogTitle><DialogDescription>{i18n._({ id: "Use these keys while Music is active and focus is outside a text field.", message: "Use these keys while Music is active and focus is outside a text field." })}</DialogDescription></DialogHeader>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3">
+        {SHORTCUTS.map(([keys, action]) => <div key={keys} className="col-span-2 grid grid-cols-subgrid items-center">
+          <dt><kbd>{keys}</kbd></dt><dd className="text-supporting text-muted-foreground">{action}</dd>
+        </div>)}
+      </dl>
+    </DialogContent>
+  </Dialog>;
+  if (!track) return shortcutsDialog;
   const eqReason = i18n._({ id: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support.", message: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support." });
-  const equalizer = <Popover>
+  const equalizer = <Popover open={eqOpen} onOpenChange={setEqOpen}>
     <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "Equalizer", message: "Equalizer" })} title={eqSupported ? i18n._({ id: "Equalizer", message: "Equalizer" }) : eqReason} disabled={!eqSupported}>{icon("sliders-horizontal")}</Button></PopoverTrigger>
     <PopoverContent align="end" aria-label={i18n._({ id: "Equalizer settings", message: "Equalizer settings" })}>
       <div className="flex flex-col gap-3">
@@ -242,6 +289,7 @@ export function MusicPlayerBar() {
           {body}{follow}
         </DialogContent>
       </Dialog> : null}
+      {shortcutsDialog}
     </>
   );
 }

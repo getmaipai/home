@@ -577,7 +577,7 @@ msgid "{free} free of {total}"
 msgstr "{free} libres de {total}"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:188
+#: src/shell/music/MusicPlayerBar.tsx:235
 msgid "{frequency} Hz"
 msgstr ""
 
@@ -2376,7 +2376,7 @@ msgid "Access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:114
+#: src/shell/music/MusicPlayerBar.tsx:142
 msgid "Acoustic"
 msgstr ""
 
@@ -4329,6 +4329,11 @@ msgid "Back 10 seconds"
 msgstr "Retroceder 10 segundos"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:114
+msgid "Back to current line"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:79
 #, needs-review
 msgid "Back to draft"
@@ -4527,7 +4532,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:10
-#: src/shell/music/MusicPlayerBar.tsx:112
+#: src/shell/music/MusicPlayerBar.tsx:140
 #: src/shell/pages/MusicStudioView.tsx:40
 msgid "Bass boost"
 msgstr ""
@@ -5499,6 +5504,11 @@ msgstr "Cambiar la imagen"
 #, needs-review
 msgid "Change PIN"
 msgstr "Cambiar PIN"
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:125
+msgid "Change repeat"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:152
@@ -9253,7 +9263,7 @@ msgstr "Minutos diarios de Servicios"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotActions.tsx:44
-#: src/shell/music/MusicPlayerBar.tsx:115
+#: src/shell/music/MusicPlayerBar.tsx:143
 msgid "Dance"
 msgstr ""
 
@@ -10816,18 +10826,18 @@ msgid "EQ preset"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:180
-#: src/shell/music/MusicPlayerBar.tsx:180
+#: src/shell/music/MusicPlayerBar.tsx:227
+#: src/shell/music/MusicPlayerBar.tsx:227
 msgid "Equalizer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:184
+#: src/shell/music/MusicPlayerBar.tsx:231
 msgid "Equalizer preset"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:181
+#: src/shell/music/MusicPlayerBar.tsx:228
 msgid "Equalizer settings"
 msgstr ""
 
@@ -11558,7 +11568,7 @@ msgstr "Anulación de atención flash"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:13
-#: src/shell/music/MusicPlayerBar.tsx:112
+#: src/shell/music/MusicPlayerBar.tsx:140
 msgid "Flat"
 msgstr ""
 
@@ -14980,7 +14990,7 @@ msgid "setting.tts.voice_id.option_label.javert"
 msgstr "Javert"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:115
+#: src/shell/music/MusicPlayerBar.tsx:143
 msgid "Jazz"
 msgstr ""
 
@@ -15398,6 +15408,7 @@ msgid "Key: {value}"
 msgstr "Clave: {value}"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:216
 #: src/shell/pages/ChatShortcutReference.tsx:24
 #: src/shell/pages/settings/ChatShortcutsView.tsx:11
 #, needs-review
@@ -16273,10 +16284,15 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:151
+#: src/shell/music/MusicPlayerBar.tsx:182
 #: src/shell/pages/MusicLibrary.tsx:96
 #: src/shell/pages/MusicSongDetails.tsx:129
 msgid "Like"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:123
+msgid "Like or unlike"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17183,7 +17199,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:127
-#: src/shell/music/MusicPlayerBar.tsx:114
+#: src/shell/music/MusicPlayerBar.tsx:142
 #, needs-review
 msgid "Loud"
 msgstr "Fuerte"
@@ -17256,8 +17272,8 @@ msgstr "LTX-2.5"
 #: src/apps/chat/MusicCardView.tsx:86
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
-#: src/shell/music/MusicPlayerBar.tsx:210
-#: src/shell/music/MusicPlayerBar.tsx:210
+#: src/shell/music/MusicPlayerBar.tsx:257
+#: src/shell/music/MusicPlayerBar.tsx:257
 #: src/shell/pages/MusicComposer.tsx:191
 #: src/shell/pages/MusicComposer.tsx:195
 #: src/shell/pages/MusicSongDetails.tsx:108
@@ -18774,6 +18790,11 @@ msgid "setting.music.dj.label"
 msgstr "DJ musical"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:215
+msgid "Music keyboard shortcuts"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:637
 msgid "setting.music.library_sort.label"
 msgstr ""
@@ -18790,7 +18811,7 @@ msgid "mute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:106
+#: src/shell/music/MusicPlayerBar.tsx:134
 msgid "Mute"
 msgstr ""
 
@@ -18799,6 +18820,11 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:270
 #: src/shell/AmbientCompanionPane.tsx:270
 msgid "Mute microphone"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:122
+msgid "Mute or unmute"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20551,7 +20577,7 @@ msgid "Now all ages."
 msgstr "Ahora todas las edades."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:217
+#: src/shell/music/MusicPlayerBar.tsx:264
 msgid "Now playing"
 msgstr ""
 
@@ -21378,6 +21404,11 @@ msgid "Open DNS settings"
 msgstr "Abrir la configuración de DNS"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:126
+msgid "Open equalizer"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:40
 #, needs-review
 msgid "failure.voice.microphone_insecure.adult"
@@ -21398,8 +21429,8 @@ msgid "Open in Library"
 msgstr "Abrir en Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:81
-#: src/shell/music/MusicPlayerBar.tsx:81
+#: src/shell/music/MusicPlayerBar.tsx:96
+#: src/shell/music/MusicPlayerBar.tsx:96
 #: src/shell/pages/MakeSongPage.tsx:97
 #: src/shell/pages/MusicLibrary.tsx:102
 #: src/shell/pages/MusicSongDetails.tsx:155
@@ -22710,6 +22741,11 @@ msgid "Play in the player"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:118
+msgid "Play or pause"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1493
 #, needs-review
 msgid "setting.ui.enrollment_sounds.help"
@@ -22864,8 +22900,8 @@ msgid "Powered by Stability AI"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:187
-#: src/shell/music/MusicPlayerBar.tsx:187
+#: src/shell/music/MusicPlayerBar.tsx:234
+#: src/shell/music/MusicPlayerBar.tsx:234
 msgid "Preamp"
 msgstr ""
 
@@ -23029,6 +23065,11 @@ msgstr "Vista previa. No se descarga, instala ni guarda nada."
 #, needs-review
 msgid "Previous"
 msgstr "Anterior"
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:120
+msgid "Previous or next song"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:185
@@ -23206,7 +23247,7 @@ msgstr "Preguntas y respuestas sobre cocina, Reparaciones, jardines y ordenadore
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
-#: src/shell/music/MusicPlayerBar.tsx:175
+#: src/shell/music/MusicPlayerBar.tsx:212
 #, needs-review
 msgid "Queue"
 msgstr "Cola"
@@ -23332,6 +23373,11 @@ msgstr "Qwen-Image (mejores imágenes)"
 #, needs-review
 msgid "setting.tts.voice_id.option_label.rafael"
 msgstr "Rafael"
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:121
+msgid "Raise or lower volume"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:221
@@ -24082,7 +24128,7 @@ msgstr "Repetir"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:86
+#: src/shell/music/MusicPlayerBar.tsx:101
 msgid "Repeat all songs"
 msgstr ""
 
@@ -24100,7 +24146,7 @@ msgstr "Fin de la repetición"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:86
+#: src/shell/music/MusicPlayerBar.tsx:101
 msgid "Repeat off"
 msgstr ""
 
@@ -24112,7 +24158,7 @@ msgstr "Repetir en"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:86
+#: src/shell/music/MusicPlayerBar.tsx:101
 msgid "Repeat one song"
 msgstr ""
 
@@ -24843,7 +24889,7 @@ msgid "Robots: {list}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:115
+#: src/shell/music/MusicPlayerBar.tsx:143
 msgid "Rock"
 msgstr ""
 
@@ -25920,10 +25966,15 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:122
+#: src/shell/music/MusicPlayerBar.tsx:150
 #, needs-review
 msgid "Seek"
 msgstr "Buscar"
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:119
+msgid "Seek 5 seconds"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
@@ -26619,6 +26670,11 @@ msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:127
+msgid "Show keyboard shortcuts"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/Routes.tsx:416
 #, needs-review
 msgid "Show me around"
@@ -26788,7 +26844,7 @@ msgstr "Muestra a tu compañero arriba a la derecha de cada página. Pasa el cur
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:88
+#: src/shell/music/MusicPlayerBar.tsx:103
 msgid "Shuffle"
 msgstr ""
 
@@ -29041,7 +29097,8 @@ msgid "api.error.companion_unavailable"
 msgstr "Esa compañía no está disponible para ti. Elige otra de la lista."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:207
+#: src/shell/music/MusicPlayerBar.tsx:205
+#: src/shell/music/MusicPlayerBar.tsx:254
 #: src/shell/pages/MusicSongDetails.tsx:130
 msgid "That could not be saved. Try again."
 msgstr ""
@@ -30418,7 +30475,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:218
+#: src/shell/music/MusicPlayerBar.tsx:265
 msgid "The song, its words and the player controls."
 msgstr ""
 
@@ -30857,7 +30914,7 @@ msgid "this book"
 msgstr "este libro"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:178
+#: src/shell/music/MusicPlayerBar.tsx:225
 msgid "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support."
 msgstr ""
 
@@ -31250,7 +31307,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr "No se pudo crear esta canción. Ábrela para intentarlo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:167
+#: src/shell/music/MusicPlayerBar.tsx:198
 msgid "This song could not be played. Check the file and try again."
 msgstr ""
 
@@ -31486,6 +31543,11 @@ msgstr "Tablero de hoy"
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/TodaySection.tsx:197
 msgid "Today's items"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:124
+msgid "Toggle shuffle"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31739,7 +31801,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:11
-#: src/shell/music/MusicPlayerBar.tsx:113
+#: src/shell/music/MusicPlayerBar.tsx:141
 #: src/shell/pages/MusicStudioView.tsx:40
 msgid "Treble boost"
 msgstr ""
@@ -32321,7 +32383,7 @@ msgstr "Navegador desconocido"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:151
+#: src/shell/music/MusicPlayerBar.tsx:182
 #: src/shell/pages/MusicLibrary.tsx:96
 #: src/shell/pages/MusicSongDetails.tsx:129
 msgid "Unlike"
@@ -32386,7 +32448,7 @@ msgid "unmute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:106
+#: src/shell/music/MusicPlayerBar.tsx:134
 msgid "Unmute"
 msgstr ""
 
@@ -32795,6 +32857,11 @@ msgid "Use the starter list"
 msgstr "Usar la lista inicial"
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:216
+msgid "Use these keys while Music is active and focus is outside a text field."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/PackSection.tsx:101
 msgid "Use this character"
 msgstr ""
@@ -33195,7 +33262,7 @@ msgstr "Visualizador: {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:12
-#: src/shell/music/MusicPlayerBar.tsx:113
+#: src/shell/music/MusicPlayerBar.tsx:141
 msgid "Vocal"
 msgstr ""
 
@@ -33397,7 +33464,7 @@ msgstr "Las voces aún se están preparando. Esto toma un minuto después de la 
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:107
+#: src/shell/music/MusicPlayerBar.tsx:135
 #: src/shell/pages/MusicStudioView.tsx:35
 #, needs-review
 msgid "Volume"

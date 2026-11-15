@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { activeLineIndex, followScrollTop, fpsStops, frameGapMs, levelsFromBytes, LYRIC_FOLLOW_AT, nextFollow, SPECTRUM_BARS } from "./musicBarMath";
 import { createSpectrum } from "./musicSpectrum";
+import { LYRIC_FOLLOW_RESUME_MS } from "./useLyricsFollow";
 
 describe("spectrum level math", () => {
   test("gives 64 bars, all between 0 and 1", () => {
@@ -82,5 +83,6 @@ describe("lyric follow math", () => {
     expect(nextFollow(true, "user-scroll")).toBe(false);
     expect(nextFollow(false, "line-click")).toBe(true);
     expect(nextFollow(false, "resume")).toBe(true);
+    expect(LYRIC_FOLLOW_RESUME_MS).toBe(3_000);
   });
 });
