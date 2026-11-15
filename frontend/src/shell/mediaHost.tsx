@@ -37,6 +37,9 @@ import { analyserFor, eqSupported, isIos } from "@/lib/media/audioGraph";
 import { offlineIdOf, reportKeptSongs, toggleKeptSong } from "@/shell/media/keptTracks";
 import { seedEqPreset, setEqWriter, useEqPreset } from "@/shell/media/eqPreset";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { musicPlayer } from "@/shell/music/musicPlayer";
+import { trackIsPlayable } from "@/shell/music/musicQueue";
+import { musicListOf, musicTrackOf, type AudioItemView } from "@/shell/music/musicHandoff";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -251,9 +254,30 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
         if (offline !== null) { pushRef.current(await toggleKeptSong(offline)); return; }
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
+        // Music playback has one owner. Resolve the clicked row and its visible source list into the Music store instead of
+        // opening the legacy Audio player page; deep links from cards take this same path.
         if (kind === "track") {
-          const queued = await request<{ id: string }>("/api/plugins/audio/queue", { method: "POST", body: JSON.stringify({ id: mediaId, mode: item.queue_mode ?? "track", shuffle: item.shuffle, seed_kind: item.seed_kind }) });
-          mediaId = queued.id;
+          const selectedId = mediaId.startsWith("shuffle:") ? mediaId.slice("shuffle:".length) : mediaId;
+          const context = musicListOf({ pathname: pathRef.current, search: location.search, pageState: (location.state as { pageState?: Record<string, unknown> } | null)?.pageState, item, mediaId });
+          const rows = context ? await api.appData<Array<Record<string, unknown>>>("audio", context.dataId, { ...(context.id ? { id: context.id } : {}), ...(context.query ? { q: context.query } : {}), ...(context.scope ? { scope: context.scope } : {}), ...(context.sort ? { sort: context.sort } : {}), ...(context.kind ? { kind: context.kind } : {}) }) : [];
+          const rowIds = Array.isArray(rows) ? rows.map((row) => typeof row.id === "string" ? row.id : "").filter(Boolean) : [];
+          const targetId = item.queue_mode && !mediaId.startsWith("shuffle:") ? rowIds[0] : selectedId;
+          const ids = [...new Set([targetId, ...rowIds])].filter(Boolean);
+          const views = await Promise.all(ids.map(async (id) => {
+            const view = await api.appData<AudioItemView | []>("audio", "item", { id });
+            return Array.isArray(view) ? null : musicTrackOf(view);
+          }));
+          const queue = views.filter((track): track is NonNullable<typeof track> => !!track && trackIsPlayable(track));
+          const target = queue.find((track) => track.mediaId === selectedId) ?? (item.queue_mode ? queue[0] : undefined);
+          if (!target) throw new Error(i18n._({ id: "This song is not available. Go back to Music and choose another.", message: "This song is not available. Go back to Music and choose another." }));
+          const shuffled = mediaId.startsWith("shuffle:");
+          const playQueue = [...queue];
+          if (shuffled) for (let index = playQueue.length - 1; index > 0; index -= 1) {
+            const other = Math.floor(Math.random() * (index + 1));
+            [playQueue[index], playQueue[other]] = [playQueue[other]!, playQueue[index]!];
+          }
+          musicPlayer.toggle(shuffled ? playQueue[0]! : target, playQueue, context?.name ? { name: context.name } : null);
+          return;
         }
         const to = playRoute(kind, mediaId);
         if (!to) throw new Error("This item cannot be played from here. Open it from its app.");
@@ -274,7 +298,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
       ...(composer ? { composer } : {}),
       mediaFor: (ref) => (!refuseAdultOnly(ref) && appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
-    [navigate, store, listener, personId, pickMedia, makingNotice, composer],
+    [navigate, store, listener, personId, pickMedia, makingNotice, composer, location.search, location.state],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   const djFor = useMusicDj(current ? { id: current.id, appId: current.appId, live: liveStationIdOf(current.src) !== null } : null);

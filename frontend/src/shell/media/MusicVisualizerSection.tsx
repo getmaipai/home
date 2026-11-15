@@ -58,7 +58,7 @@ export function MusicVisualizerSection({ id }: { id: string }) {
   const FullIcon = getIcon("maximize"), MuteIcon = volume === 0 ? getIcon("volume-x") : getIcon("volume-2");
   return (
     <>
-      <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-13 z-0 overflow-hidden md:start-14">
+      <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.25} className="absolute inset-0 size-full grayscale" /> : null}
       </div>
       <section aria-label={i18n._({ id: "Player options", message: "Player options" })} data-testid="music-visualizer-section" className="relative z-10 flex w-full shrink-0 items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&>*]:shrink-0">
