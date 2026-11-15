@@ -116367,13 +116367,18 @@
                                   "type": "number",
                                   "nullable": true,
                                   "description": "The seed this version was made with."
+                                },
+                                "media_id": {
+                                  "type": "string",
+                                  "nullable": true
                                 }
                               },
                               "required": [
                                 "id",
                                 "label",
                                 "url",
-                                "seed"
+                                "seed",
+                                "media_id"
                               ]
                             }
                           },
@@ -116867,13 +116872,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -117364,13 +117374,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -117879,13 +117894,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -118402,13 +118422,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -118975,13 +119000,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -119511,13 +119541,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -120352,13 +120387,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -120904,13 +120944,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -121422,13 +121467,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -121944,13 +121994,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -122504,13 +122559,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -123199,13 +123259,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -123724,13 +123789,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -124253,13 +124323,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
@@ -124835,13 +124910,18 @@
                                 "type": "number",
                                 "nullable": true,
                                 "description": "The seed this version was made with."
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "nullable": true
                               }
                             },
                             "required": [
                               "id",
                               "label",
                               "url",
-                              "seed"
+                              "seed",
+                              "media_id"
                             ]
                           }
                         },
