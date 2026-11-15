@@ -6,13 +6,13 @@
     {
       "type": "empty_state",
       "icon": "user-round",
-      "text": "Characters will be here. This page is coming soon.",
+      "text": "Your cast lives here: the people and pets you reuse in pictures.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Make a picture"
     }
   ]
 }

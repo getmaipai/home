@@ -6,13 +6,13 @@
     {
       "type": "empty_state",
       "icon": "file-text",
-      "text": "Drafts will be here. This page is coming soon.",
+      "text": "Pictures you started and have not finished wait here.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Make a picture"
     }
   ]
 }

@@ -5,14 +5,14 @@
   "body": [
     {
       "type": "empty_state",
-      "icon": "package",
-      "text": "Collections will be here. This page is coming soon.",
+      "icon": "folder",
+      "text": "Group pictures into named collections, like a trip or a project.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Make a picture"
     }
   ]
 }

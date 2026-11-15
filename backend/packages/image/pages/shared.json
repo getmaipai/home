@@ -6,13 +6,13 @@
     {
       "type": "empty_state",
       "icon": "users",
-      "text": "Shared with home will be here. This page is coming soon.",
+      "text": "Pictures other people at home chose to share with you will show up here.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Make a picture"
     }
   ]
 }

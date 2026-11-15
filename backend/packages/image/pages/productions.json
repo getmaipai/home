@@ -6,13 +6,13 @@
     {
       "type": "empty_state",
       "icon": "clapperboard",
-      "text": "Productions will be here. This page is coming soon.",
+      "text": "Longer projects built from many pictures, like a comic or a storyboard, will live here.",
       "action": {
         "navigate": {
-          "to": "/apps/image/templates"
+          "to": "/apps/image/create"
         }
       },
-      "action_label": "Browse templates"
+      "action_label": "Make a picture"
     }
   ]
 }

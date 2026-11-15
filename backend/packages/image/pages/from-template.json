@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "rectangle-horizontal",
-      "text": "From a template will be here. This page is coming soon.",
+      "text": "From a template is not available yet.",
       "action": {
         "navigate": {
           "to": "/apps/image/create"

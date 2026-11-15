@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "palette",
-      "text": "Character sheet will be here. This page is coming soon.",
+      "text": "Character sheet is not available yet.",
       "action": {
         "navigate": {
           "to": "/apps/image/create"

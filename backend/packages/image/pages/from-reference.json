@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "camera",
-      "text": "From a reference will be here. This page is coming soon.",
+      "text": "From a reference is not available yet.",
       "action": {
         "navigate": {
           "to": "/apps/image/create"

@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "layers",
-      "text": "Combine pictures will be here. This page is coming soon.",
+      "text": "Combine pictures is not available yet.",
       "action": {
         "navigate": {
           "to": "/apps/image/create"
