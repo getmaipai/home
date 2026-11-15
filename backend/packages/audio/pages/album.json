@@ -139,7 +139,8 @@
             }
           }
         }
-      ]
+      ],
+      "play_label": "Play {title}"
     },
     {
       "type": "creation_header",
