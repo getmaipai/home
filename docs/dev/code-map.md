@@ -1321,7 +1321,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/beatCut.ts` | planBeatCut |
 | `backend/src/lib/videos/chapters.ts` | chaptersForMadeClip |
 | `backend/src/lib/videos/clearerLevels.ts` | BEST_VIDEO_NOT_YET, STACK_HAS_VIDEO_RESTORE, videoClearerLevels |
-| `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen |
+| `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen, NEXT_SHOTS |
 | `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkNow, clipMarkOf |
