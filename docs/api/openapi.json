@@ -77613,6 +77613,7 @@
                               "frozen",
                               "soft",
                               "jump",
+                              "face_drift",
                               "camera_not_seen",
                               "loop_seam"
                             ]

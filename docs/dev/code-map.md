@@ -1348,7 +1348,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, FIRST_FRAME_PHASE, phaseLabel |
 | `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
 | `backend/src/lib/videos/playlists.ts` | GONE, VIDEO_GONE, ownVideoPlaylists, memberVideoPlaylists, videoPlaylistFor, resolveEntries |
-| `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo, householdVideoQuality |
+| `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_END_ANCHOR_KEY, endAnchorEnabled, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE |
 | `backend/src/lib/videos/promptCheck.ts` | checkVideoPrompt |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
 | `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
