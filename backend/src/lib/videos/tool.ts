@@ -298,7 +298,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const voices = choice.maker !== "wan" ? voicesChosen : null;
   const detailedOffered = ltx25 && allowedQuality(actor, "video", "detailed", audience.band) === "detailed";
   const note = choice.shortened ? `${choice.quality === "quick" ? "Standard" : "This level"} makes ${seconds} seconds at most, so this video is ${seconds} seconds.${choice.quality === "quick" && detailedOffered ? ` Choose Boost for up to ${DETAILED_MAX_SECONDS}.` : ""}` : undefined;
-  const create = !kid && (recipe || look || voicesChosen || note || (adapters.length > 0 && styleStrength)) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(adapters.length > 0 && styleStrength ? { strength: styleStrength } : {}), ...(note ? { note } : {}) } : undefined;
+  const create = !kid && (recipe || look || voicesChosen || note || (adapters.length > 0 && styleStrength) || (typeof args.template === "string" && args.template)) ? { ...(recipe ? { recipe: recipe.id } : {}), ...(look && look.wording ? { look: look.id } : {}), ...(voicesChosen ? { voices: voicesChosen.id } : {}), ...(adapters.length > 0 && styleStrength ? { strength: styleStrength } : {}), ...(note ? { note } : {}), ...(typeof args.template === "string" && args.template ? { template: args.template } : {}) } : undefined;
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
   if (kid && !slot) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
   try {

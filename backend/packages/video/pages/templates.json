@@ -2,17 +2,16 @@
   "type": "page",
   "id": "video-templates",
   "title": "Templates",
-  "body": [
-    {
-      "type": "empty_state",
-      "icon": "rectangle-horizontal",
-      "text": "Start from a ready-made video template here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/video/create"
-        }
-      },
-      "action_label": "Make a video"
-    }
-  ]
+  "body": [{
+    "type": "media_shelf",
+    "heading": "Start with a template",
+    "bind": { "source": "package", "path": "recipes", "params": { "scope": "templates" } },
+    "item_key_field": "id",
+    "item_label_field": "title",
+    "item_subtitle_field": "{subtitle}",
+    "item_media_field": "thumbnail",
+    "aspect": "wide",
+    "layout": "grid",
+    "on_select": { "navigate": { "to": "/apps/video/create", "state": { "template": "{id}" } } }
+  }]
 }

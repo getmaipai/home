@@ -230,7 +230,7 @@ describe("the Create page and the make action", () => {
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     // five page chips plus the seven shot-card chips (CREATOR-20b): a second request gets the same set, not a doubled one
-    expect(promptBarOf(again.body)!.chips).toHaveLength(12);
+    expect(promptBarOf(again.body)!.chips).toHaveLength(13);
     // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
@@ -255,7 +255,7 @@ describe("the Create page and the make action", () => {
     const feedNode = section.children[0] as Record<string, any>;
     expect(feedNode.type).toBe("result_feed");
     expect(feedNode.heading_style).toBeUndefined(); // sentence-case headings, no all-caps eyebrow (pro look)
-    expect((page.body[1] as Record<string, any>)).toMatchObject({ type: "media_shelf", heading: "Inspiration", aspect: "wide", bind: { params: { limit: 4 } } });
+    expect((page.body[2] as Record<string, any>)).toMatchObject({ type: "media_shelf", heading: "Inspiration", aspect: "wide", bind: { params: { limit: 4 } } });
     expect((page.body[1] as Record<string, any>).heading_style).toBeUndefined();
     expect(feedNode).toMatchObject({ look: "media", filters_presentation: "popover" });
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });

@@ -24,7 +24,8 @@ import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { getLoraRecord } from "@/lib/loras/store";
-import { listFragments } from "@/lib/media/templates";
+import { listFragments, listTemplates } from "@/lib/media/templates";
+import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
@@ -114,6 +115,16 @@ registerAppPageFill("video", "create", (person, page) => {
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
+  const templates = listTemplates({ actor: person, kind: "video" });
+  const templateChip = { state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "No template" }, ...templates.map((row) => ({ value: row.id, label: row.title }))] };
+  const selectedTemplate = templates.find((row) => row.id === (page.state as Record<string, unknown> | undefined)?.template);
+  if (selectedTemplate) {
+    templateChip.default = selectedTemplate.id;
+    const state = page.state as Record<string, unknown> | undefined;
+    if (state) state.template = selectedTemplate.id;
+  }
+  const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
+  if (call?.args) call.args.template = "{template}";
   const lengths = lengthOptions();
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   // Owner rule (2026-11-13): every chip is icon-only (the dropdown names the choices, the tooltip says "Label: value"). Orientation comes from the page JSON, so it gets its icons here.
@@ -126,6 +137,7 @@ registerAppPageFill("video", "create", (person, page) => {
     if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
   }
   bar.chips = [
+    templateChip,
     ...chips,
     { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
     { state: "look", label: "Look", icon: "palette", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
@@ -303,6 +315,7 @@ registerMediaAppData("video", (person, dataId, params) => {
   // (the Create pages' feed, jobs, Studio): they answer nothing unless the person holds the Create pages' adult floor.
   if (params.scope !== "short" && !meetsMinRole(person.role, "adult")) return null;
   switch (params.scope) {
+    case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
     case "showcase": return showcaseRows(params.limit);

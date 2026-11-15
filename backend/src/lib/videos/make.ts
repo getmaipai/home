@@ -15,10 +15,11 @@ import { resolveStyles, strengthWord } from "./styleChoice";
 import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
+import { getTemplate, videoTemplateSettings } from "@/lib/media/templates";
 
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off"; parent?: VideoJob }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
@@ -34,11 +35,13 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   const notGiven = (value: unknown): boolean => typeof value === "string" && (/^\{[a-z_]+\}$/.test(value.trim()) || value.trim().toLowerCase() === "none");
   raw = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, notGiven(value) ? "" : value]));
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
+  const template = typeof raw.template === "string" ? raw.template.trim() : "";
   const line = typeof raw.line === "string" ? raw.line : "";
   const effectivePrompt = prompt.length >= 3 ? prompt : line ? "A close-up of the person talking to the camera, looking natural." : prompt;
   if (effectivePrompt.length < 3 || effectivePrompt.length > 1200) return { ok: false, error: "Describe the video in 3 to 1200 characters, then try again." };
   const text = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
   const body: MakeVideoBody = { prompt: effectivePrompt };
+  if (template) body.template = template;
   if (raw.loop === true || raw.loop === "true") body.loop = true;
   if (line) { if (line.length > 1200) return { ok: false, error: "Type a line up to 1200 characters, then try again." }; body.line = line; }
   const castValue = raw.cast;
@@ -108,6 +111,15 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   const denial = videoDenial(audience);
   if (denial === "minor" || (denial === null && laneOf(audience) !== "adult")) return { ok: false, status: 403, error: MINOR_MAKE_LINE, code: "minor" };
   if (denial) return { ok: false, status: 403, error: VIDEO_DENIAL_LINE[denial], code: denial };
+  let templateStyles: string[] = [];
+  if (body.template) {
+    const template = getTemplate(body.template);
+    if (!template || template.kind !== "video" || (template.audience !== "all-ages" && audience.band !== "adult")) return { ok: false, status: 422, error: "That video template is not available. Choose another template or make a video without one.", code: "template_unavailable" };
+    const settings = videoTemplateSettings()[template.id];
+    if (!settings) return { ok: false, status: 422, error: "That video template is not available. Choose another template or make a video without one.", code: "template_unavailable" };
+    templateStyles = template.styles;
+    body = { ...body, prompt: `${template.prompt}${body.prompt.trim() && body.prompt !== template.prompt ? `\n\nAdditional direction: ${body.prompt.trim()}` : ""}`, seconds: body.seconds && body.seconds !== 5 && body.seconds !== 10 ? body.seconds : settings.seconds, look: body.look && body.look !== "natural" && body.look !== "warm" ? body.look : settings.look ?? body.look, recipe: body.recipe && body.recipe !== "none" ? body.recipe : settings.camera ?? body.recipe, orientation: body.orientation && body.orientation !== "landscape" ? body.orientation : settings.orientation ?? body.orientation, tier: body.tier && body.tier !== "standard" ? body.tier : settings.tier ?? body.tier, styles: [...new Set([...(body.styles ?? []), ...templateStyles])] };
+  }
   // A level this person may not use is refused with one plain line (the chat tool lowers it and says so instead).
   if (body.tier && tierArgument({ person: actor, category: "video", arg: body.tier, band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) {
     return { ok: false, status: 422, error: MAX_NEEDS_ADMIN_LINE, code: "max_needs_admin" };
@@ -134,7 +146,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   const outcome = await runGenerateVideo({
     ...(body.styles && body.styles.length > 0 ? { styleIds: body.styles } : {}),
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.loop ? { loop: true } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}) },
+    args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.loop ? { loop: true } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}), ...(body.styles?.length ? { styles: body.styles } : {}), ...(body.template ? { template: body.template } : {}) },
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;

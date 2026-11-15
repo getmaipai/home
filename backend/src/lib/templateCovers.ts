@@ -1,6 +1,12 @@
 // The example picture shown on each template card: files in frontend/public/template-covers, one per template id.
 // A template without a file here shows the plain gradient tile; backend/tests/templateCovers.test.ts keeps this list and the files in step.
 export const TEMPLATE_COVER_IDS: readonly string[] = [
+  "mtpl-shotstarterquietportrait",
+  "mtpl-shotstarterkitefield",
+  "mtpl-shotstarterrainwindow",
+  "mtpl-shotstarterbicycleride",
+  "mtpl-shotstartercoastaerial",
+  "mtpl-shotstarterhandscooking",
   "mtpl-adpack",
   "mtpl-afterhourslaunch",
   "mtpl-artcomic",
@@ -24,6 +30,23 @@ export const TEMPLATE_COVER_IDS: readonly string[] = [
   "mtpl-scenelaunch",
   "mtpl-sticker",
   "mtpl-tryonoutfit",
+  "mtpl-shotstarterquietportrait",
+  "mtpl-shotstarterkitefield",
+  "mtpl-shotstarterrainwindow",
+  "mtpl-shotstarterbicycleride",
+  "mtpl-shotstartercoastaerial",
+  "mtpl-shotstarterhandscooking",
+  "mtpl-vtproductspin",
+  "mtpl-vttravelpostcard",
+  "mtpl-vtbirthdaygreeting",
+  "mtpl-vtpetmoment",
+  "mtpl-vttimelapsesky",
+  "mtpl-vtdanceloop",
+  "mtpl-vtstoryintro",
+  "mtpl-vtrealestatewalkthrough",
+  "mtpl-vtunboxing",
+  "mtpl-vtsportshighlight",
+  "mtpl-vtcozyrain",
 ];
 
 export function templateCoverUrl(id: string): string | null {

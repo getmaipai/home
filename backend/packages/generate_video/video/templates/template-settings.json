@@ -1,0 +1,121 @@
+{
+  "mtpl-shotstarterquietportrait": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "none",
+    "orientation": "portrait",
+    "tier": "standard"
+  },
+  "mtpl-shotstarterkitefield": {
+    "seconds": 5,
+    "look": "classic-cartoon",
+    "camera": "dolly-in",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-shotstarterrainwindow": {
+    "seconds": 5,
+    "look": "anime",
+    "camera": "slow-orbit",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-shotstarterbicycleride": {
+    "seconds": 5,
+    "look": "3d-animated",
+    "camera": "handheld",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-shotstartercoastaerial": {
+    "seconds": 5,
+    "look": "film",
+    "camera": "slow-motion",
+    "orientation": "portrait",
+    "tier": "standard"
+  },
+  "mtpl-shotstarterhandscooking": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "time-lapse",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtproductspin": {
+    "seconds": 5,
+    "look": "classic-cartoon",
+    "camera": "aerial",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vttravelpostcard": {
+    "seconds": 5,
+    "look": "anime",
+    "camera": "close-up",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtbirthdaygreeting": {
+    "seconds": 5,
+    "look": "3d-animated",
+    "camera": "still",
+    "orientation": "portrait",
+    "tier": "standard"
+  },
+  "mtpl-vtpetmoment": {
+    "seconds": 5,
+    "look": "film",
+    "camera": "none",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vttimelapsesky": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "dolly-in",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtdanceloop": {
+    "seconds": 5,
+    "look": "classic-cartoon",
+    "camera": "slow-orbit",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtstoryintro": {
+    "seconds": 5,
+    "look": "anime",
+    "camera": "handheld",
+    "orientation": "portrait",
+    "tier": "standard"
+  },
+  "mtpl-vtrealestatewalkthrough": {
+    "seconds": 5,
+    "look": "3d-animated",
+    "camera": "slow-motion",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtunboxing": {
+    "seconds": 5,
+    "look": "film",
+    "camera": "time-lapse",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtsportshighlight": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "aerial",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-vtcozyrain": {
+    "seconds": 5,
+    "look": "classic-cartoon",
+    "camera": "close-up",
+    "orientation": "portrait",
+    "tier": "standard"
+  }
+}

@@ -52,6 +52,7 @@
           "method": "POST",
           "args": {
             "prompt": "{prompt}",
+            "template": "{template}",
             "orientation": "{orientation}",
             "seconds": "{seconds}",
             "tier": "{tier}",
@@ -73,6 +74,22 @@
           "placement": "in_field"
         }
       ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Templates",
+      "bind": { "source": "package", "path": "recipes", "params": { "scope": "templates", "limit": 8 } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "rail",
+      "variant": "plain",
+      "card_radius": "tight",
+      "press_scale": true,
+      "hide_when_empty": true,
+      "on_select": { "navigate": { "to": "/apps/video/create", "state": { "template": "{id}" } } }
     },
     {
       "type": "media_shelf",

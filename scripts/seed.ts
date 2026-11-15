@@ -64,7 +64,7 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
   if (!sage || !marlow || !nova) throw new Error("the seeded roster is missing Sage, Marlow, or Nova");
   const people = { sage: sage.id, marlow: marlow.id, nova: nova.id };
 
-  const clips = Bun.spawnSync(["bun", "run", "backend/scripts/devDemoClips.ts", "--data-dir", options.dataDir, "--sage", sage.id, "--marlow", marlow.id], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", env: process.env });
+  const clips = Bun.spawnSync(["bun", "run", "scripts/devDemoClips.ts", "--data-dir", options.dataDir, "--sage", sage.id, "--marlow", marlow.id], { cwd: join(import.meta.dir, "..", "backend"), stdout: "pipe", stderr: "pipe", env: { ...process.env, MAIPAI_DATA_DIR: options.dataDir } });
   if (clips.exitCode !== 0) throw new Error(`seeding demo clips failed: ${clips.stderr.toString().trim() || clips.stdout.toString().trim()}`);
 
   await requireOk(await request(options.baseUrl, "/api/settings", {
