@@ -44,7 +44,7 @@ import { refusePrompt } from "@/lib/pictures/policy";
 import { consumeDjLine, deleteCachedDjLine, ensureDjLines, type DjPosition } from "@/lib/music/djLines";
 import { getPersonSettingValue } from "@/lib/settings";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
-import { promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
+import { promoteMadeMusicFile, promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
@@ -116,7 +116,7 @@ const musicCardSchema = z.object({
   takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().describe("Set when this song was asked for as several takes: the card's versions are the takes."),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable(), secondary: z.string().optional(), words: z.array(z.object({ t: z.number(), end: z.number(), text: z.string() })).optional().describe("Each word with its start and end in seconds, when the song's words were timed (MUSIC-GEN-20b); absent on a line without word timing.") })).nullable(),
-  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
+  versions: z.array(versionSchema.extend({ media_id: z.string().nullable() })), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), quality: z.enum(["quick", "detailed", "max"]), boost_offered: z.boolean(), max_offered: z.boolean().describe("Whether this person is shown Max on the Quality control: the engine offers a Max maker, they hold Max and the age band reaches it."), max_installed: z.boolean().describe("Whether the Max music models are installed. A Max song made without them runs as Boost, so the card disables Max until they are."), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
 });
 const cardSchema = z.union([musicCardSchema, lockedCardSchema]);
 const NO_STORE = { "cache-control": "private, no-store" } as const;
@@ -237,7 +237,11 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     fit_ask: root.state === "queued" && laneOf(musicRouteAudience(actor)) !== "child" ? answerableFitAsk(actor, root.id) : null,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
-    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job), has_file: !!job.fileId && !!openMusicFile(actor, job, job.fileId), media_type: "audio/mp4", seed: job.seed ?? null })),
+    versions: versions.map((job, index) => {
+      const open = !!job.fileId && !!openMusicFile(actor, job, job.fileId);
+      const mediaId = open && job.fileId ? promoteMadeMusicFile(actor, job.fileId)?.id ?? null : null;
+      return { id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job), has_file: open, media_type: "audio/mp4", seed: job.seed ?? null, media_id: mediaId };
+    }),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS),
     quality: (current ?? root).request.quality === "max" ? "max" as const : (current ?? root).request.quality === "detailed" ? "detailed" as const : "quick" as const, boost_offered: boostOffered, max_offered: maxShown, max_installed: musicMaxInstalled(engine), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,

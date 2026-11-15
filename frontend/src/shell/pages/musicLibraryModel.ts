@@ -63,7 +63,7 @@ export function trackOf(card: MusicCard, takeId: string | null | undefined, unti
   const take = takeStrip(card).find((one) => one.id === version.id);
   const lyrics = card.lyrics?.trim() && card.lyrics.trim() !== "[Instrumental]" ? card.lyrics : undefined;
   return {
-    key: version.id, url: version.url, title: `${card.title ?? untitled}${take ? ` (${take.label})` : ""}`,
+    key: version.id, url: version.url, ...(version.media_id ? { mediaId: version.media_id } : {}), title: `${card.title ?? untitled}${take ? ` (${take.label})` : ""}`,
     ...(styleTags(card.description, 3).length ? { subtitle: styleTags(card.description, 3).join(", ") } : {}),
     artworkUrl: card.cover_url, songId: card.id, jobId: card.id, duration: card.duration_s,
     state: card.state, hasFile: version.has_file ?? false, mediaType: version.media_type ?? "audio/mp4",

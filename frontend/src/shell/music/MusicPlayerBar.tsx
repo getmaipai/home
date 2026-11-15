@@ -203,8 +203,8 @@ export function MusicPlayerBar() {
         : { placement: "dock" as const, onClose: () => musicPlayer.stop(), onExpand: () => setExpanded(true), swipeUpToExpand: true, swipeToSkip: true,
           spectrum: { levels: spectrum.levels },
           actionsSlot: <>
-            <Button type="button" variant="ghost" size="icon" data-testid="music-bar-like" aria-label={likeLabel} title={likeLabel} aria-pressed={liked}
-              onClick={() => { void toggleLike().then((kept) => { if (!kept) push(i18n._({ id: "That could not be saved. Try again.", message: "That could not be saved. Try again." })); }); }}>{icon("heart", liked ? "fill-primary text-primary" : undefined)}</Button>
+            {track.mediaId ? <Button type="button" variant="ghost" size="icon" data-testid="music-bar-like" aria-label={likeLabel} title={likeLabel} aria-pressed={liked}
+              onClick={() => { void toggleLike().then((kept) => { if (!kept) push(i18n._({ id: "That could not be saved. Try again.", message: "That could not be saved. Try again." })); }); }}>{icon("heart", liked ? "fill-primary text-primary" : undefined)}</Button> : null}
             <SeekRow track={track} wide="w-24 lg:w-48 xl:w-72" />
             <PlayModeButtons />
             {lyrics ? <Button type="button" variant="ghost" size="icon" data-testid="music-bar-lyrics" aria-label={i18n._({ id: "Lyrics", message: "Lyrics" })} title={i18n._({ id: "Lyrics", message: "Lyrics" })} onClick={() => setExpanded(true)}>{icon("mic")}</Button> : null}

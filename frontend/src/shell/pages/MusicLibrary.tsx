@@ -31,6 +31,7 @@ import { clockOf, isLockedTile, isMaking, libraryRows, playableVersion, queueOf,
 import { SongDetails, useBedPicker } from "./MusicSongDetails";
 import { useMusicPlayer, type MusicPlayer } from "@/shell/music/musicPlayer";
 import { trackIsPlayable, trackUnavailableLine, type Track } from "@/shell/music/musicQueue";
+import { useLike } from "@/shell/music/musicLike";
 
 const WIDE = "(min-width: 960px)";
 const subscribeWide = (onChange: () => void) => { const list = window.matchMedia?.(WIDE); list?.addEventListener?.("change", onChange); return () => list?.removeEventListener?.("change", onChange); };
@@ -57,6 +58,7 @@ function SongRow({ card, selected, player, queue, take, onTake, actions }: { car
   const title = card.title ?? i18n._({ id: "Untitled song", message: "Untitled song" });
   const version = playableVersion(card, take);
   const selectedTrack = trackOf(card, version?.id, i18n._({ id: "Untitled song", message: "Untitled song" }));
+  const { liked, toggle: toggleLike } = useLike(selectedTrack);
   const unavailable = selectedTrack ? trackUnavailableLine(selectedTrack) : i18n._({ id: "This song's file is missing. Make it again.", message: "This song's file is missing. Make it again." });
   const strip = takeStrip(card);
   const here = !!version && player.track?.key === version.id;
@@ -91,6 +93,8 @@ function SongRow({ card, selected, player, queue, take, onTake, actions }: { car
     <div className="flex shrink-0 flex-col items-end gap-1">
       {length ? <span className="text-muted-foreground font-mono text-badge tabular-nums">{length}</span> : null}
       <div className="flex items-center">
+        {selectedTrack?.mediaId ? <Button type="button" variant="ghost" size="icon-sm" data-testid="music-song-like" aria-label={liked ? i18n._({ id: "Unlike", message: "Unlike" }) : i18n._({ id: "Like", message: "Like" })} aria-pressed={liked}
+          onClick={() => { void toggleLike(); }}>{icon("heart", liked ? "fill-primary text-primary" : undefined)}</Button> : null}
         <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "Share {title}", message: "Share {title}", values: { title } })} disabled={!version} onClick={() => { if (version) actions.onShare(version); }}>{icon("share")}</Button>
         <DropdownMenu>
             <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label={i18n._({ id: "More about {title}", message: "More about {title}", values: { title } })}>{icon("more-horizontal")}</Button></DropdownMenuTrigger>

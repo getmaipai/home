@@ -14,7 +14,9 @@ const shellRequest: Ask = async (path, init) => (await import("@/lib/api")).requ
 
 export function createLikeStore(ask: Ask = shellRequest) {
   let liked = new Set<string>();
+  const overrides = new Map<string, boolean>();
   let loaded = false;
+  let loading: Promise<void> | null = null;
   const listeners = new Set<() => void>();
   let version = 0;
   const publish = () => { version++; listeners.forEach((listener) => listener()); };
@@ -23,28 +25,36 @@ export function createLikeStore(ask: Ask = shellRequest) {
     version: () => version,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     /** Reads the person's liked titles once. A failure leaves every heart empty and is tried again next time. */
-    async load(): Promise<void> {
-      if (loaded) return;
-      try {
-        const lists = await ask<Array<{ kind: string; items: Array<{ media_id: string }> }>>("/api/media/collections?kind=liked");
-        liked = new Set(lists.flatMap((list) => (list.kind === "liked" ? list.items.map((item) => item.media_id) : [])));
-        loaded = true;
-        publish();
-      } catch { /* hearts stay empty */ }
+    load(): Promise<void> {
+      if (loaded) return Promise.resolve();
+      if (loading) return loading;
+      loading = (async () => {
+        try {
+          const lists = await ask<Array<{ kind: string; items: Array<{ media_id: string }> }>>("/api/media/collections?kind=liked");
+          liked = new Set(lists.flatMap((list) => (list.kind === "liked" ? list.items.map((item) => item.media_id) : [])));
+          for (const [id, on] of overrides) { if (on) liked.add(id); else liked.delete(id); }
+          loaded = true;
+          publish();
+        } catch { /* hearts stay empty */ }
+        finally { loading = null; }
+      })();
+      return loading;
     },
     /** Flips the heart for `track`. Resolves true when the hub kept it, false when it was rolled back. */
     async toggle(track: Track): Promise<boolean> {
       const id = likeIdOf(track);
+      const wasOn = liked.has(id);
       const on = !liked.has(id);
       const set = (value: boolean) => { liked = new Set(liked); if (value) liked.add(id); else liked.delete(id); publish(); };
+      overrides.set(id, on);
       set(on);
       try {
         await ask("/api/plugins/audio/like", { method: "POST", body: JSON.stringify({ media_id: id, on }) });
         return true;
-      } catch { set(!on); return false; }
+      } catch { overrides.set(id, wasOn); set(wasOn); return false; }
     },
     /** Test seam. */
-    _reset() { liked = new Set(); loaded = false; publish(); },
+    _reset() { liked = new Set(); overrides.clear(); loaded = false; loading = null; publish(); },
   };
   return store;
 }

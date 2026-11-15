@@ -8,6 +8,7 @@ import { appendToQueue, clearPlayNext, clearUpcoming, insertNext, moveUpcoming, 
 import { reportPlayerError } from "@/lib/clientErrors";
 import { analyserFor, hasPlayerAudioGraph, setPlayerTransport, setPlayerVolume } from "@/lib/media/audioGraph";
 import { applyEqSettings, loadEqSettings } from "./musicEq";
+import { createMusicHistoryTracker } from "./musicHistory";
 
 export type { QueueSource, Track } from "./musicQueue";
 
@@ -88,6 +89,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
   const clockListeners = new Set<() => void>();
   let silentEnds = 0;
   let loadStartedAt = 0;
+  const historyTracker = createMusicHistoryTracker();
   let lastNextAt = -Infinity;
   let stopping = false;
   const notify = (setOf: Set<() => void>) => {
@@ -108,7 +110,18 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     const time = el?.currentTime ?? 0, duration = el && Number.isFinite(el.duration) ? el.duration : snap.track?.duration ?? 0;
     if (time !== clockNow.time || duration !== clockNow.duration) clockNow = { time, duration };
   };
-  const clockTick = () => { readClock(); notify(clockListeners); };
+  const clockTick = () => {
+    readClock();
+    if (historyTracker.observe(clockNow.time, clockNow.duration, snap.playing) && snap.track?.mediaId) {
+      const mediaId = snap.track.mediaId;
+      const seconds = clockNow.time;
+      const duration = clockNow.duration || null;
+      void import("@/lib/api").then(({ request }) => request(`/api/media/progress/${encodeURIComponent(mediaId)}`, {
+        method: "PUT", body: JSON.stringify({ position: { seconds }, duration_s: duration, event: "play", immediate: true }),
+      })).catch(() => { /* history never interrupts playback */ });
+    }
+    notify(clockListeners);
+  };
   // A smooth clock for the waveform and the karaoke wipe: the element's own timeupdate is about four a second. Runs only while sound plays and someone watches.
   const startFrames = () => {
     if (frame || typeof requestAnimationFrame !== "function" || !snap.playing || clockListeners.size === 0) return;
@@ -180,6 +193,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     audio.dataset.key = track.key;
     audio.src = track.url;
     loadStartedAt = audio.currentTime;
+    historyTracker.reset(audio.currentTime);
     stopping = false;
     audio.loop = track.loop === true;
     set({ track, queue, index, failed: false, notice: null, ...(fresh ? { manual: [], source: null } : {}) });
@@ -283,6 +297,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       if (!el) return;
       const length = Number.isFinite(el.duration) ? el.duration : seconds;
       setPlayerTransport(el, 0);
+      historyTracker.skipNextObservation();
       el.currentTime = Math.min(Math.max(0, seconds), length);
       setTimeout(() => { if (el && !el.paused) setPlayerTransport(el, 1); }, 50);
       clockTick();

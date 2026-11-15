@@ -29,6 +29,7 @@ import { stemsAddress, studioAddress } from "./musicAddresses";
 import { clockOf, isLockedTile, isMaking, playableVersion, styleTags } from "./musicLibraryModel";
 import { useMusicClock, type MusicPlayer } from "@/shell/music/musicPlayer";
 import { trackOf } from "./musicLibraryModel";
+import { useLike } from "@/shell/music/musicLike";
 
 const problemText = (error: unknown, fallback: string): string => errorLine(error, fallback);
 const SECONDS_OR_MS = (value: number): number => (value < 1e12 ? value * 1000 : value);
@@ -78,6 +79,8 @@ export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, 
   const song = locked ? undefined : raw;
   const reason = locked ? songReason(raw) : songReason(song);
   const ready = reason === "";
+  const detailTrack = song ? trackOf(song, playableVersion(song)?.id ?? null, i18n._({ id: "Untitled song", message: "Untitled song" })) : null;
+  const { liked, toggle: toggleLike } = useLike(detailTrack);
   const version = song ? playableVersion(song) : undefined;
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["music-song", id] }); void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); };
   const fail = (error: unknown, fallback: string) => push(problemText(error, fallback));
@@ -105,6 +108,7 @@ export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, 
     ? <LyricsList lines={timed} currentTime={liveTime} onSeek={(seconds) => { if (version && player.track?.key !== version.id) playCurrent(); player.seek(seconds); }} labels={{ label: i18n._({ id: "Lyrics", message: "Lyrics" }), empty: i18n._({ id: "Instrumental. No lyrics were written.", message: "Instrumental. No lyrics were written." }) }} />
     : <LyricsList {...(lyricsText ? { text: lyricsText } : {})} labels={{ label: i18n._({ id: "Lyrics", message: "Lyrics" }), empty: i18n._({ id: "Instrumental. No lyrics were written.", message: "Instrumental. No lyrics were written." }) }} />;
   const Icon = (name: string) => { const One = getIcon(name); return <One aria-hidden="true" />; };
+  const Heart = getIcon("heart");
 
   return <div className="flex flex-col gap-5 p-4 pb-8" data-testid="music-song-details">
     <div className="group relative aspect-square w-full shrink-0 overflow-hidden rounded-2xl">
@@ -122,6 +126,10 @@ export function SongDetails({ id, player, remix, onClose, onDelete, onLikeThis, 
         <p className="text-muted-foreground text-supporting">{me.data?.display_name ? i18n._({ id: "By {name}", message: "By {name}", values: { name: me.data.display_name } }) : i18n._({ id: "Made on this Home", message: "Made on this Home" })}{made ? ` · ${made}` : ""}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {detailTrack?.mediaId ? <Button type="button" variant="ghost" size="icon" data-testid="music-details-like" aria-label={liked ? i18n._({ id: "Unlike", message: "Unlike" }) : i18n._({ id: "Like", message: "Like" })} aria-pressed={liked}
+          onClick={() => { void toggleLike().then((kept) => { if (!kept) push(i18n._({ id: "That could not be saved. Try again.", message: "That could not be saved. Try again." })); }); }}>
+          <Heart aria-hidden="true" className={liked ? "fill-primary text-primary" : undefined} />
+        </Button> : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label={i18n._({ id: "More about {title}", message: "More about {title}", values: { title } })}>{Icon("more-horizontal")}</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">

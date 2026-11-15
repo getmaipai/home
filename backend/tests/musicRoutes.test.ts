@@ -131,6 +131,21 @@ describe("music routes", () => {
     const other = new TestClient();
     expect((await other.get("/api/music/jobs")).status).toBe(401);
   });
+  test("a generated music file uses its gated media item for likes, Library rows, and history", async () => {
+    const { actor, client } = await owner(); const { job } = await song(actor);
+    const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { versions: Array<{ id: string; media_id: string | null }> };
+    const mediaId = card.versions[0]!.media_id;
+    expect(mediaId).toMatch(/^media-/);
+    if (!mediaId) throw new Error("The readable song version should have a media item id.");
+    expect((await client.post("/api/plugins/audio/like", { media_id: mediaId, on: true })).status).toBe(200);
+    const liked = await (await client.get("/api/media/collections?kind=liked")).json() as Array<{ items: Array<{ media_id: string }> }>;
+    expect(liked[0]!.items.map((item) => item.media_id)).toContain(mediaId);
+    const likedRows = await (await client.post("/api/plugins/audio/data/liked", {})).json() as Array<{ id: string }>;
+    expect(likedRows.map((row) => row.id)).toContain(mediaId);
+    expect((await client.put(`/api/media/progress/${mediaId}`, { position: { seconds: 30 }, duration_s: 120, event: "play", immediate: true })).status).toBe(200);
+    const historyRows = await (await client.post("/api/plugins/audio/data/history", {})).json() as Array<{ id: string }>;
+    expect(historyRows.map((row) => row.id)).toContain(mediaId);
+  });
   test("deleting a song moves it to Trash, drops it from the list, and another person cannot", async () => {
     const { actor, client } = await owner(); const { job } = await song(actor);
     const stranger = new TestClient();

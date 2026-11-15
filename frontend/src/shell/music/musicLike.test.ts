@@ -39,4 +39,14 @@ describe("like heart", () => {
     await store.toggle(track);
     expect(heard).toBe(2);
   });
+  test("an in-flight collection read does not erase an optimistic like from another Music control", async () => {
+    let finishLoad!: (value: typeof collections) => void;
+    const store = createLikeStore((async (path: string) => path.includes("collections") ? new Promise<typeof collections>((resolve) => { finishLoad = resolve; }) : {}) as never);
+    const loading = store.load();
+    const toggled = store.toggle({ ...track, mediaId: "media-9" });
+    finishLoad([]);
+    await loading;
+    await toggled;
+    expect(store.isLiked("media-9")).toBe(true);
+  });
 });
