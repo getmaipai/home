@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
-import { attachments, conversationTurns, creationCast, creations } from "@/db/schema";
+import { attachments, conversationTurns, creationCast, creations, shares } from "@/db/schema";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { purgeFileRecord } from "@/lib/attachments";
 import { __resetAdultLockForTests, __unlockedForTests, withMark } from "@/lib/adultLock";
@@ -181,6 +181,19 @@ describe("CREATOR-02 writing", () => {
 });
 
 describe("CREATOR-02 reading and locks", () => {
+  test("a household member with a shared picture sees the record without private words or plan", async () => {
+    const h = await household(); const actor = h.row("Marlow");
+    const picture = await makePicture(actor, "all-ages", "boat");
+    recordCreation(actor, { kind: "picture", fileIds: [picture.id], recipe: { tool: "pictures", route: "text" }, words: { written: "private words" }, plan: { shots: [] } as never, generation: { kind: "picture", job_id: "job", task: "generate", model: { id: "flux2-klein", revision: "r1", licence: "Apache-2.0" }, engine: { id: "stack", version: "1" }, seed: 9, duration_s: 0, bpm: null, key: null, parent_file_id: null, source_kind: "none", commercial_use: "unknown", commercial_basis: "unknown", made_at: new Date().toISOString(), tier: "standard" } as never });
+    db.insert(shares).values({ id: "shr-howmade", fileId: picture.id, fromPersonId: actor.id, to: h.row("Quill").id, provenance: "person", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    const response = await h.other.client.get(`/api/creations/by-file/${picture.id}`);
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).not.toHaveProperty("words");
+    expect(body).not.toHaveProperty("plan");
+    expect(body).toMatchObject({ kind: "picture", generation: { model: { id: "flux2-klein" } } });
+  });
+
   test("only the maker reads a record: another adult, the owner account and a signed-out caller get the not-found answer", async () => {
     const h = await household(); const actor = h.row("Marlow");
     const picture = await makePicture(actor, "all-ages", "boat");

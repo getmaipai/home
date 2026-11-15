@@ -23,6 +23,7 @@ function mount(item: LibraryItem) {
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/api/auth/passkeys") || url.includes("/api/people")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/creations/by-file/")) return Promise.resolve(Response.json({ id: "crt-1", kind: "picture", file_ids: [item.id], recipe: { tool: "pictures", route: "text" }, words: { written: "A red sailboat" }, cast: [], sources: [], generation: { model: { id: "flux2-klein", licence: "Apache-2.0" }, seed: 42, tier: "boost" }, settings: { width: 1024, height: 768, styles: [] } }));
     if (url === `/api/files/${item.id}`) return Promise.resolve(Response.json(item));
     return Promise.resolve(Response.json({ items: [], next_cursor: null }));
   }) as unknown as typeof fetch;
@@ -49,5 +50,14 @@ describe("LibraryViewer picture actions", () => {
     await waitFor(() => expect(view.queryByRole("button", { name: "Rename" })).toBeTruthy());
     expect(view.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(view.queryByRole("button", { name: "Make a video from this" })).toBeNull();
+  });
+
+  test("shows known picture details and seeds Clone settings in Create", async () => {
+    const view = mount(base);
+    await waitFor(() => expect(view.getByText("How it was made")).toBeTruthy());
+    expect(view.getByText("flux2-klein")).toBeTruthy();
+    expect(view.getByText("Apache-2.0")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Clone settings" }));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toContain('/apps/image/create|{"prompt":"A red sailboat","shape":"landscape","tier":"boost"}'));
   });
 });

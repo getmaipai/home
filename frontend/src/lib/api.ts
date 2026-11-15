@@ -654,6 +654,12 @@ export interface LibraryQuery {
   shared?: "with-me" | "by-me" | "none"; search?: string;
   sort?: "newest" | "oldest" | "name" | "size";
 }
+export interface CreationByFile {
+  id: string; kind: string; file_ids: string[]; recipe: { tool: string; route: string } | null;
+  words?: { written?: string; composed?: string } | null; plan?: unknown; cast: Array<{ subject_id: string; synth_id?: string | null; role: string }>;
+  sources: Array<{ file_id: string; role: string }>; generation?: { model?: { id?: string; licence?: string }; seed?: number | null; tier?: string } | null;
+  settings: Record<string, unknown>; checks?: Record<string, unknown> | null;
+}
 export interface LibraryItem {
   id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file";
   name: string; media_type: string; size_bytes: number; created_at: string;
@@ -1845,6 +1851,7 @@ export const api = {
     return request<LibrarySummary>(`/api/library/summary?${libraryParams(filters)}`);
   },
   libraryFile: (id: string) => request<FileRecordWithChat>(`/api/files/${encodeURIComponent(id)}`),
+  creationByFile: (id: string) => request<CreationByFile>(`/api/creations/by-file/${encodeURIComponent(id)}`),
   updateLibraryFile: (id: string, change: { name?: string | null; keep?: boolean }) => request<{ id: string; name: string | null; retention: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(change) }),
   trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
   recheckLibraryAudience: (id: string) => request<{ audience: "all-ages" }>(`/api/files/${encodeURIComponent(id)}/recheck-audience`, { method: "POST" }),

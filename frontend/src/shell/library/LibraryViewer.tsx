@@ -12,7 +12,7 @@ import { SharePanel } from "@maipai/ui/src/elements/share-panel";
 import { Button } from "@maipai/ui/src/ui/button";
 import { formatBytes } from "@maipai/ui/src/format";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type LibraryItem, type Roster } from "@/lib/api";
+import { api, type CreationByFile, type LibraryItem, type Roster } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { useCutToBeatDialog } from "./CutToBeatDialog";
@@ -59,6 +59,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const seeds: Record<string, string> = Object.fromEntries((people.data ?? []).map((person) => [person.id, person.avatar_seed]));
   seeds[me.id] ??= me.avatar_seed;
   const creation = creationOf(item, me, sharedWith, seeds);
+  const howMade = useQuery({ queryKey: ["creation-by-file", item.id], queryFn: () => api.creationByFile(item.id), enabled: item.kind === "image", retry: false });
   const [panelOpen, setPanelOpen] = useState(false);
   const navigate = useNavigate();
   const [splitting, setSplitting] = useState(false);
@@ -93,6 +94,17 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         {item.version_count > 1 ? row("Versions", `${item.version_count} versions. The newest one shows.`) : null}
         {item.audience === "adult-only" ? row("Audience", "Adults only. Teens and children never see this picture.") : null}
       </dl>
+      {item.kind === "image" && howMade.data ? <HowMade creation={howMade.data} mine={mine} onClone={() => {
+        const value = howMade.data!;
+        const settings = value.settings ?? {};
+        const styles = Array.isArray(settings.styles) ? settings.styles as Array<{ style_id?: string }> : [];
+        navigate("/apps/image/create", { state: { pageState: {
+          ...(mine && value.words?.written ? { prompt: value.words.written } : {}),
+          ...(typeof settings.width === "number" && typeof settings.height === "number" ? { shape: settings.width > settings.height ? "landscape" : settings.width < settings.height ? "portrait" : "square" } : {}),
+          ...(value.generation?.tier ? { tier: value.generation.tier } : {}),
+          ...(styles[0]?.style_id ? { look: styles[0].style_id } : {}),
+        } } });
+      }} /> : null}
       {mine ? (
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</Button>
@@ -127,6 +139,30 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
       </div>
     </>
   );
+}
+
+function HowMade({ creation, mine, onClone }: { creation: CreationByFile; mine: boolean; onClone: () => void }) {
+  const model = creation.generation?.model;
+  const settings = creation.settings ?? {};
+  const styles = Array.isArray(settings.styles) ? settings.styles as Array<{ style_id?: string }> : [];
+  const cast = creation.cast ?? [];
+  const sources = creation.sources ?? [];
+  const row = (name: string, value: ReactNode) => <div><dt className="text-muted-foreground">{name}</dt><dd>{value}</dd></div>;
+  return <section className="flex flex-col gap-3 border-t pt-4" aria-label={i18n._({ id: "How it was made", message: "How it was made" })}>
+    <h3 className="font-semibold">{i18n._({ id: "How it was made", message: "How it was made" })}</h3>
+    <dl className="grid gap-3">
+      {model?.id && model.id !== "unknown" ? row(i18n._({ id: "Model", message: "Model" }), model.id) : null}
+      {model?.licence && model.licence !== "unknown" ? row(i18n._({ id: "Licence", message: "Licence" }), model.licence) : null}
+      {creation.generation?.seed !== null && creation.generation?.seed !== undefined ? row(i18n._({ id: "Seed", message: "Seed" }), String(creation.generation.seed)) : null}
+      {typeof settings.width === "number" && typeof settings.height === "number" ? row(i18n._({ id: "Size", message: "Size" }), `${settings.width} × ${settings.height}`) : null}
+      {creation.generation?.tier ? row(i18n._({ id: "Level", message: "Level" }), creation.generation.tier === "boost" ? i18n._({ id: "Boost", message: "Boost" }) : creation.generation.tier === "max" ? i18n._({ id: "Max", message: "Max" }) : i18n._({ id: "Standard", message: "Standard" })) : null}
+      {styles.length ? row(i18n._({ id: "Styles", message: "Styles" }), styles.map((style) => style.style_id).filter(Boolean).join(", ")) : null}
+      {cast.length ? row(i18n._({ id: "Cast", message: "Cast" }), cast.map((member) => member.subject_id).join(", ")) : null}
+      {sources.length ? row(i18n._({ id: "Made from", message: "Made from" }), sources.map((source) => source.file_id).join(", ")) : null}
+      {mine && creation.words?.written ? row(i18n._({ id: "Words", message: "Words" }), creation.words.written) : null}
+    </dl>
+    {mine ? <Button type="button" variant="secondary" onClick={onClone}>{i18n._({ id: "Clone settings", message: "Clone settings" })}</Button> : null}
+  </section>;
 }
 
 export function LibraryViewer({ items, me, currentId, onCurrentIdChange, onClose, actions, phone }: { phone: boolean; items: readonly LibraryItem[]; me: Roster; currentId: string | null; onCurrentIdChange: (id: string) => void; onClose: () => void; actions: ItemActions }) {
