@@ -119,6 +119,7 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   expect(bar.chips!.slice(3).every((chip) => chip.group === "Style" && chip.icon_only)).toBe(true);
   expect(bar.chips![0]?.icon).toBe("rectangle-horizontal");
   expect(bar.submit).toMatchObject({ call: { target: "/api/plugins/image/actions/make", method: "POST", args: { prompt: "{prompt}", shape: "{shape}", count: "{count}", tier: "{tier}", reference: "{reference}" } } });
+  expect((bar as unknown as { references: Array<Record<string, unknown>> }).references[0]).toMatchObject({ state: "reference", max: 3 });
   const args = (bar.submit as { call: { args: Record<string, unknown> } }).call.args;
   expect(args.look_art).toBe("{look_art}");
   expect(args.light).toBe("{light}");
@@ -128,7 +129,7 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   expect(templateChip.options).toEqual([{ value: "none", label: "No template" }, ...templatesResponse.map((template) => ({ value: template.id, label: template.title }))]);
   expect(args.template).toBe("{template}");
   expect(filledPage.body[1]).toMatchObject({ type: "media_shelf", heading: "Templates", bind: { source: "package", path: "templates" }, item_media_field: "thumbnail", item_label_field: "title", aspect: "square", on_select: { navigate: { to: "/apps/image/create", state: { template: "{id}" } } } });
-  expect(filledPage.body[2]).toMatchObject({ type: "media_shelf", heading: "My creations", bind: { source: "package", path: "recent" }, item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta" });
+  expect(filledPage.body[2]).toMatchObject({ type: "media_shelf", heading: "My creations", bind: { source: "package", path: "recent" }, item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", item_progress_field: "progress", making_field: "making", poll_while: { field: "making", values: ["yes"] } });
   const manifest = loadManifestOnly("image");
   expect(manifest.ok && (manifest.value.contributes as { data: Array<{ id: string }> }).data.some((item) => item.id === "recent")).toBe(true);
   expect(appRouteAllowed(row, "image", "data", "recent")).toBe(true);
@@ -143,7 +144,7 @@ test("My creations is a schema-valid media shelf bound to recent creations", asy
   const doc = page.value as { body: Array<Record<string, unknown>> };
   const ajv = new Ajv2020({ strict: false });
   expect(ajv.validate(UI_SCHEMA as object, page.value)).toBe(true);
-  expect(doc.body[0]).toMatchObject({ type: "media_shelf", heading: "My creations", bind: { source: "package", path: "recent" }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", aspect: "square", layout: "grid", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } } });
+  expect(doc.body[0]).toMatchObject({ type: "media_shelf", heading: "My creations", bind: { source: "package", path: "recent" }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", making_field: "making", poll_while: { field: "making", values: ["yes"] }, aspect: "square", layout: "grid", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } } });
 });
 
 test("Recently made is a schema-valid shelf of recent creations", async () => {
@@ -151,5 +152,5 @@ test("Recently made is a schema-valid shelf of recent creations", async () => {
   const page = getAppPage(row, "image", "recent");
   expect(page.ok).toBe(true);
   if (!page.ok) return;
-  expect((page.value as { body: unknown[] }).body[0]).toMatchObject({ type: "media_shelf", heading: "Recently made", bind: { source: "package", path: "recent" }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", aspect: "square", layout: "grid", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } } });
+  expect((page.value as { body: unknown[] }).body[0]).toMatchObject({ type: "media_shelf", heading: "Recently made", bind: { source: "package", path: "recent" }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", making_field: "making", poll_while: { field: "making", values: ["yes"] }, aspect: "square", layout: "grid", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } } });
 });

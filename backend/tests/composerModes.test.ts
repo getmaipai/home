@@ -52,7 +52,7 @@ describe("composer modes by band", () => {
     expect(picture.chips.find((c) => c.id === "count")).toMatchObject({ icon: "layers", iconOnly: true });
     expect(presetChips.every((c) => c.iconOnly)).toBe(true);
     expect(picture.chips.find((c) => c.id === "look_art")?.icon).toBe("palette");
-    expect(picture.references).toEqual([{ id: "reference", label: "Image reference", kind: "picture", max: 1 }, { id: "cast", label: "Cast", kind: "character" }]);
+    expect(picture.references).toEqual([{ id: "reference", label: "Image reference", kind: "picture", max: 3 }, { id: "cast", label: "Cast", kind: "character" }]);
     // CREATOR-14: a cast blank reads "this person" in the words a template pick puts in the box; the person is chosen with the Cast slot.
     const tryOn = picture.presets!.chips[0]!.options.find((o) => o.value === "mtpl-tryonoutfit")!;
     expect(tryOn.text).toContain("this person");

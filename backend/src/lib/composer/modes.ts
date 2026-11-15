@@ -148,7 +148,7 @@ function buildModes(person: PersonRow, health: EngineHealth | null): { band: Age
       if (!page.ok) continue;
       const bar = findPromptBar(page.value) ?? {};
       const row = health?.[d.engine];
-      const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture", ...(ref.placement === "in_field" ? { max: 1 } : typeof ref.max === "number" ? { max: ref.max } : {}) }] : []);
+      const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture", ...(typeof ref.max === "number" ? { max: ref.max } : ref.placement === "in_field" ? { max: 1 } : {}) }] : []);
       const notice = row?.notice;
       descriptors.set(d.id, d);
       modes.push({

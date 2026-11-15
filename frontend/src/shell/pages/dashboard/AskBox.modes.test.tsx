@@ -69,18 +69,24 @@ describe("the Home ask box reads its modes from the hub", () => {
   });
 
   test("the picture mode's Image reference is picked in the ask box and its id travels to Create", async () => {
-    const withReference: ComposerModesResponse = { band: "adult", modes: [ASK, mode({ ...PICTURE, references: [{ id: "reference", label: "Image reference", kind: "picture" }] })] };
+    const withReference: ComposerModesResponse = { band: "adult", modes: [ASK, mode({ ...PICTURE, references: [{ id: "reference", label: "Image reference", kind: "picture", max: 3 }] })] };
     spies.push(spyOn(api, "composerModes").mockResolvedValue(withReference));
-    const host = { onPlay: () => {}, pickMedia: () => Promise.resolve({ id: "file-9", thumb: "/t/9.png" }) } as unknown as MediaHost;
+    let picks = 0;
+    const host = { onPlay: () => {}, pickMedia: () => Promise.resolve({ id: `file-${++picks}`, thumb: `/t/${picks}.png` }) } as unknown as MediaHost;
     const view = renderWithQueryClient(<MemoryRouter><MediaHostContext.Provider value={host}><AskBox /><Where /></MediaHostContext.Provider></MemoryRouter>);
     view.queryClient.setQueryData(COMPOSER_MODES_KEY, withReference);
     fireEvent.click(await pill(view));
     fireEvent.click(await view.findByText("Picture"));
     fireEvent.click(await waitFor(() => { const el = view.container.querySelector('[data-slot="composer-add"]'); expect(el).toBeTruthy(); return el!; }));
     await waitFor(() => expect(view.container.querySelector('[data-slot="prompt-bar"] img')).toBeTruthy());
+    const add = view.container.querySelector('[data-slot="composer-add"]')!;
+    fireEvent.click(add);
+    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="prompt-bar"] img')).toHaveLength(2));
+    fireEvent.click(add);
+    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="prompt-bar"] img')).toHaveLength(3));
     fireEvent.change(view.getByLabelText("Ask") as HTMLTextAreaElement, { target: { value: "a red fox" } });
     fireEvent.click(view.getByLabelText("Make picture"));
-    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1&reference=file-9"));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/create?prompt=a+red+fox&shape=square&count=1&reference=file-1%2Cfile-2%2Cfile-3"));
   });
 
   test("a chip whose start value is quiet reads as its group name until a value is picked (CREATOR-13)", async () => {

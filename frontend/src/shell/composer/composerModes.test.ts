@@ -4,7 +4,7 @@ import { composerHostFor, type ComposerModesResponse } from "@/shell/composer/co
 const response: ComposerModesResponse = {
   band: "adult",
   modes: [{
-    id: "picture", label: "Picture", icon: "image", route: "/apps/image/create", engine: "image", placeholder: "Describe it", references: [],
+    id: "picture", label: "Picture", icon: "image", route: "/apps/image/create", engine: "image", placeholder: "Describe it", references: [{ id: "reference", label: "Image reference", kind: "picture", max: 3 }],
     chips: [{ id: "shape", label: "Shape", group: "Shape", icon: "crop", iconOnly: true, default: "square", options: [{ value: "square", label: "Square", icon: "square" }] }],
     presets: { label: "Presets", chips: [{ id: "template", label: "Templates", default: "", options: [{ value: "cat", label: "Cat", text: "A cat" }] }] },
     tools: [], primary: { label: "Make picture" }, quality: null, availability: "ready", disabledReason: null,
@@ -16,6 +16,7 @@ test("Create host maps chip icons and its template presets into the kit composer
   const host = composerHostFor(response, "/apps/image/create", (to) => destinations.push(to));
   expect(host?.modes).toHaveLength(2);
   expect(host?.modes[1]).toBeTruthy();
+  expect(host?.modes).toHaveLength(2);
   expect(host?.presets?.chips[0]?.options).toEqual([{ value: "cat", label: "Cat" }]);
   expect(host?.presets?.chips[0]?.options).toEqual([{ value: "cat", label: "Cat" }]);
   host?.presets?.chips[0]?.onValueChange("cat");

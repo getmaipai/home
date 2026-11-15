@@ -44,7 +44,7 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
   const composer = useComposerState(response, setText);
   // A reference slot of the chosen mode (the picture's Image reference) is filled here the same way a Create page fills it: the host's picker, then the id travels to that page.
   const mediaHost = useContext(MediaHostContext);
-  const [picked, setPicked] = useState<Record<string, { id: string; thumb?: string }>>({});
+  const [picked, setPicked] = useState<Record<string, Array<{ id: string; thumb?: string }>>>({});
   const availability = useChatAvailability();
   const down = engineDownReason(availability);
   const install = useQuery({
@@ -62,12 +62,16 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
     const words = text.trim();
     if (!words) return;
     // The mode survives the trip: a Create mode opens its own Create page with the words and every chip value, Ask opens Chat (ONE-COMPOSER-2026-11-13).
-    const carried = Object.fromEntries(composer.current.references.flatMap((ref) => (picked[ref.id] ? [[ref.id, picked[ref.id]!.id]] : [])));
+    const carried = Object.fromEntries(composer.current.references.flatMap((ref) => (picked[ref.id]?.length ? [[ref.id, picked[ref.id]!.map((choice) => choice.id).join(",")]] : [])));
     navigate(composerHref(composer.current.route, words, composer.current.route === null ? {} : { ...composer.settings, ...carried }));
   };
   const pickInto = (refId: string, kind: "picture" | "character" | "place" | "audio" | "video") => {
     if (!mediaHost?.pickMedia) return;
-    void mediaHost.pickMedia(kind).then((got) => { if (got) setPicked((all) => ({ ...all, [refId]: got })); }, () => {});
+    const ref = composer.current.references.find((item) => item.id === refId);
+    const max = ref?.max ?? 1;
+    const current = picked[refId] ?? [];
+    if (current.length >= max) return;
+    void mediaHost.pickMedia(kind).then((got) => { if (got && !current.some((choice) => choice.id === got.id)) setPicked((all) => ({ ...all, [refId]: [...(all[refId] ?? []), got].slice(0, max) })); }, () => {});
   };
   const first = composer.current.references[0];
   const modes = composer.kitModes.map((item) => {
@@ -78,9 +82,9 @@ export function AskBox({ focusOnRequest }: { focusOnRequest?: number }) {
       onAdd: () => pickInto(first.id, first.kind),
       references: composer.current.references.map((ref) => ({
         id: ref.id, label: ref.label, kind: ref.kind, ...(ref.max ? { max: ref.max } : {}),
-        value: picked[ref.id]?.id ?? null, ...(picked[ref.id]?.thumb ? { thumb: picked[ref.id]!.thumb } : {}),
+        value: picked[ref.id]?.map((choice) => choice.id).join(",") ?? null, thumbs: picked[ref.id]?.map((choice) => choice.thumb),
         onPick: () => pickInto(ref.id, ref.kind),
-        onRemove: () => setPicked((all) => { const next = { ...all }; delete next[ref.id]; return next; }),
+        onRemove: (id?: string) => setPicked((all) => { const next = { ...all }; const remaining = id ? (all[ref.id] ?? []).filter((choice) => choice.id !== id) : []; if (remaining.length) next[ref.id] = remaining; else delete next[ref.id]; return next; }),
       })),
     };
   });

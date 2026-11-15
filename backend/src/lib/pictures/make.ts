@@ -64,7 +64,8 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
     body.blanks = Object.fromEntries(Object.entries(raw.blanks).map(([key, value]) => [key, notGiven(value) ? "" : String(value).trim()]));
   }
   for (const key of ["cast", "references"] as const) {
-    const value = key === "references" && raw.reference !== undefined && raw.reference !== "" ? [raw.reference] : raw[key];
+    const referenceValues = key === "references" ? [raw.reference, raw.references].filter((entry) => entry !== undefined && entry !== "") : [];
+    const value = key === "references" ? referenceValues.flatMap((entry) => Array.isArray(entry) ? entry : typeof entry === "string" ? entry.split(",") : [entry]) : raw[key];
     if (value === undefined || value === "") continue;
     const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
     if (!list || list.some((item) => typeof item !== "string")) return { ok: false, error: key === "cast" ? "Choose people from the cast list." : "Choose pictures from your Library." };

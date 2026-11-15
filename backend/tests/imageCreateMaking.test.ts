@@ -27,10 +27,10 @@ test("Create shelf shows own queued and running jobs before finished pictures wi
   job("conversation", row.id, { conversationId: "chat-1", prompt: "A chat picture" });
   job("purpose", row.id, { purpose: "cover", prompt: "A cover picture" });
   const list = imageAppData(row, "recent", {}) as Array<Record<string, unknown>>;
-  expect(list.slice(0, 3)).toMatchObject([
-    { id: "picture-job:failed-create", title: "A red paper kite", subtitle: "I couldn't make that picture. Try again or change the request." },
-    { id: "picture-job:running-create", title: "A blue paper kite", subtitle: "loading", badge: "37%" },
-    { id: "picture-job:queued-create", title: "A bright paper kite", subtitle: "You are next." },
+  expect(list.slice(0, 3).map(({ id, title, subtitle, badge, making }) => ({ id, title, subtitle, badge, making }))).toMatchObject([
+    { id: "picture-job:failed-create", title: "A red paper kite", subtitle: "I couldn't make that picture. Try again or change the request.", badge: "Failed", making: false },
+    { id: "picture-job:running-create", title: "A blue paper kite", subtitle: "loading", badge: "Making", making: true },
+    { id: "picture-job:queued-create", title: "A bright paper kite", subtitle: "You are next.", badge: "Waiting", making: true },
   ]);
   expect(list.map((item) => item.id)).not.toContain("picture-job:conversation");
   expect(list.map((item) => item.id)).not.toContain("picture-job:purpose");
@@ -57,10 +57,10 @@ test("Create shelf draws locked queued, running and finished pictures as one con
   const list = imageAppData(row, "recent", {}) as Array<Record<string, unknown>>;
   const locked = list.filter((item) => item.title === "Locked picture");
   expect(locked).toHaveLength(3);
-  expect(locked).toMatchObject([
-    { id: "picture-job:secret-finished", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "" },
-    { id: "picture-job:secret-running", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "" },
-    { id: "picture-job:secret-queued", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "" },
+  expect(locked.map(({ id, title, subtitle, thumbnail, badge, meta, making }) => ({ id, title, subtitle, thumbnail, badge, meta, making }))).toMatchObject([
+    { id: "picture-job:secret-finished", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "", making: false },
+    { id: "picture-job:secret-running", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "", making: true },
+    { id: "picture-job:secret-queued", title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", badge: "Locked", meta: "", making: true },
   ]);
   const serialized = JSON.stringify(locked);
   for (const secret of ["QUEUED SECRET PROMPT", "RUNNING SECRET PROMPT", "FINISHED SECRET PROMPT", "FINISHED SECRET FILE", "secret-file-id"]) expect(serialized).not.toContain(secret);

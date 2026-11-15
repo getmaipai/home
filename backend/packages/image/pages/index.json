@@ -14,6 +14,11 @@
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
+      "item_badge_field": "badge",
+      "item_meta_field": "meta",
+      "item_progress_field": "progress",
+      "making_field": "making",
+      "poll_while": { "field": "making", "values": ["yes"] },
       "aspect": "square",
       "on_select": {
         "navigate": {

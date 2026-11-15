@@ -93,22 +93,27 @@ function fileIsOpenFor(actor: PersonRow, fileId: string): boolean {
   return lockState(item, actor) === "open";
 }
 
-function pictureItems(actor: PersonRow): ActivityItem[] {
+export function pictureActivityItem(actor: PersonRow, job: NonNullable<ReturnType<typeof getPictureJob>>): ActivityItem | null {
   const audience = audienceOf(actor);
+  if (job.state === "cancelled" || pictureJobLockState(actor, job) !== "open") return null;
+  const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/files";
+  const title = titleFor(actor, "picture", job.prompt, "A picture");
+  const base = { id: `picture:${job.id}`, source: "picture" as const, title, at: job.updatedAt, href };
+  if (job.state === "queued") return { ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null };
+  if (job.state === "running") return { ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture };
+  if (job.state === "failed") return { ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The picture did not finish. Try again.", percent: null, typicalMinutes: null };
+  return { ...base, state: "done", line: null, percent: null, typicalMinutes: null };
+}
+
+function pictureItems(actor: PersonRow): ActivityItem[] {
   const ids = db.select({ id: pictureJobs.id }).from(pictureJobs)
     .where(and(eq(pictureJobs.personId, actor.id), isNull(pictureJobs.purpose))).orderBy(desc(pictureJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
   const out: ActivityItem[] = [];
   for (const { id } of ids) {
     const job = getPictureJob(actor, id);
-    if (!job || job.state === "cancelled" || !recent(job.updatedAt)) continue;
-    if (pictureJobLockState(actor, job) !== "open") continue;
-    const href = job.conversationId ? `/chat?conversation=${encodeURIComponent(job.conversationId)}` : "/files";
-    const title = titleFor(actor, "picture", job.prompt, "A picture");
-    const base = { id: `picture:${job.id}`, source: "picture" as const, title, at: job.updatedAt, href };
-    if (job.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null });
-    else if (job.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture });
-    else if (job.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The picture did not finish. Try again.", percent: null, typicalMinutes: null });
-    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+    if (!job || !recent(job.updatedAt)) continue;
+    const item = pictureActivityItem(actor, job);
+    if (item) out.push(item);
   }
   return out;
 }

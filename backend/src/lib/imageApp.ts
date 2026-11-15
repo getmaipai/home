@@ -11,8 +11,7 @@ import { db } from "@/db";
 import { getPictureJob } from "@/lib/pictures/jobStore";
 import { pictureJobLockState } from "@/lib/pictures/lock";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
-import { jobQueueCopy, plainStageLabel } from "@/lib/jobQueueCopy";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { pictureActivityItem } from "@/lib/activity";
 import type { PersonRow } from "@/types";
 
 const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
@@ -28,15 +27,11 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
     if (!job || job.conversationId) return [];
     const lock = pictureJobLockState(person, job);
     if (lock === "hidden") return [];
-    if (lock === "locked") return [{ id: `picture-job:${id}`, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: job.updatedAt, progress: null, badge: "Locked", meta: "" }];
+    if (lock === "locked") return [{ id: `picture-job:${id}`, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: job.updatedAt, progress: null, badge: "Locked", meta: "", making: job.state === "queued" || job.state === "running" }];
     if (job.state === "done" && job.files.length) return [];
-    const audience = speakerAgeBand(person, new Date()) === "child" ? "child" : "adult";
-    const line = job.state === "queued" ? jobQueueCopy("queued", "queue", job.position, null, audience)
-      : job.state === "running" ? plainStageLabel(job.phase, audience) ?? "Making your picture."
-      : job.state === "failed" ? job.error ?? "The picture did not finish. Try again."
-      : "";
-    const percent = job.state === "running" && job.percent > 0 ? Math.max(1, Math.min(99, Math.round(job.percent))) : null;
-    return [{ id: `picture-job:${id}`, title: job.prompt, subtitle: line, thumbnail: "", kind: "image", created_at: job.updatedAt, progress: null, badge: percent === null ? "" : `${percent}%`, meta: "" }];
+    const activity = pictureActivityItem(person, job);
+    if (!activity) return [];
+    return [{ id: `picture-job:${id}`, title: activity.title, subtitle: activity.line ?? (activity.state === "done" ? "Done" : ""), thumbnail: "", kind: "image", created_at: job.updatedAt, progress: activity.percent === null ? null : activity.percent / 100, badge: activity.state === "waiting" ? "Waiting" : activity.state === "making" ? "Making" : activity.state === "failed" ? "Failed" : activity.state === "done" ? "Done" : "", meta: "", making: activity.state === "waiting" || activity.state === "making" }];
   });
   making.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   const lockedFinished = db.select({ id: attachments.id, owner: attachments.ownerPersonId, provenance: attachments.provenance, createdAt: attachments.createdAt }).from(attachments)
@@ -51,7 +46,7 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
     })
     .map((file) => {
       const note = JSON.parse(file.provenance.slice(file.provenance.indexOf(":") + 1)) as { job: string };
-      return { id: `picture-job:${note.job}`, fileId: file.id, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: file.createdAt, progress: null, badge: "Locked", meta: "" };
+      return { id: `picture-job:${note.job}`, fileId: file.id, title: "Locked picture", subtitle: "Unlock your adult items to see it.", thumbnail: "", kind: "image", created_at: file.createdAt, progress: null, badge: "Locked", meta: "", making: false };
     });
   const lockedIds = new Set(lockedFinished.map((file) => String(file.fileId)));
   const visibleFinished = finished.filter((file) => !lockedIds.has(String(file.id)));
@@ -83,6 +78,8 @@ registerAppData("image", imageAppData);
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
+  const reference = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).find((item) => item.state === "reference") : undefined;
+  if (reference) reference.max = 3;
   const templates = listTemplates({ actor: person, kind: "picture" });
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   const templateChip = {
@@ -91,6 +88,14 @@ registerAppPageFill("image", "create", (person, page) => {
     options: [{ value: "none", label: "No template" }, ...templates.map((template) => ({ value: template.id, label: template.title }))],
   };
   const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
+  const shelf = findRecentShelf(page.body);
+  if (shelf) {
+    shelf.item_badge_field = "badge";
+    shelf.item_meta_field = "meta";
+    shelf.item_progress_field = "progress";
+    shelf.making_field = "making";
+    shelf.poll_while = { field: "making", values: ["yes"] };
+  }
   if (call?.args) call.args.template = "{template}";
   const chips = pictureFragmentChips(person);
   if (chips.length === 0) { bar.chips = [...existing, templateChip]; return; }
@@ -108,6 +113,42 @@ registerAppPageFill("image", "create", (person, page) => {
   bar.chips = [...existing, templateChip, ...chips.map((chip) => ({ state: chip.id, label: chip.label, group: "Style", icon: chip.id.startsWith("look_") ? "palette" : "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: chip.options }))];
   if (call?.args) for (const chip of chips) call.args[chip.id] = `{${chip.id}}`;
 });
+registerAppPageFill("image", "index", (_person, page) => {
+  const shelf = findRecentShelf(page.body);
+  if (!shelf) return;
+  shelf.item_badge_field = "badge";
+  shelf.item_meta_field = "meta";
+  shelf.item_progress_field = "progress";
+  shelf.making_field = "making";
+  shelf.making_field = "making";
+  shelf.poll_while = { field: "making", values: ["yes"] };
+});
+registerAppPageFill("image", "recent", (_person, page) => {
+  const shelf = findRecentShelf(page.body);
+  if (!shelf) return;
+  shelf.item_badge_field = "badge";
+  shelf.item_meta_field = "meta";
+  shelf.item_progress_field = "progress";
+  shelf.making_field = "making";
+  shelf.poll_while = { field: "making", values: ["yes"] };
+});
+registerAppPageFill("image", "creations", (_person, page) => {
+  const shelf = findRecentShelf(page.body);
+  if (!shelf) return;
+  shelf.item_badge_field = "badge";
+  shelf.item_meta_field = "meta";
+  shelf.item_progress_field = "progress";
+  shelf.making_field = "making";
+  shelf.poll_while = { field: "making", values: ["yes"] };
+});
+function findRecentShelf(value: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(value)) { for (const item of value) { const hit = findRecentShelf(item); if (hit) return hit; } return undefined; }
+  if (!value || typeof value !== "object") return undefined;
+  const node = value as Record<string, unknown>;
+  if (node.type === "media_shelf" && (node.bind as { path?: unknown } | undefined)?.path === "recent") return node;
+  for (const child of Object.values(node)) { const hit = findRecentShelf(child); if (hit) return hit; }
+  return undefined;
+}
 function findPromptBar(value: unknown): Record<string, unknown> | undefined {
   if (Array.isArray(value)) { for (const item of value) { const hit = findPromptBar(item); if (hit) return hit; } return undefined; }
   if (!value || typeof value !== "object") return undefined;

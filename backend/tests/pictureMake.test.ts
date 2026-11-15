@@ -71,6 +71,11 @@ describe("Images Create make", () => {
     expect(readPictureMakeBody({ prompt: "a boat", shape: "wide", count: 8, tier: "boost", look_oil: "look-oil", light: "none", angle: "angle-high", format: "format-square", reference: "file-one" })).toMatchObject({ ok: true, body: { prompt: "a boat", count: 8, tier: "boost", presets: { look: "look-oil", angle: "angle-high", format: "format-square" }, references: ["file-one"] } });
   });
 
+  test("accepts comma-joined reference ids, merges references, and keeps three distinct pictures", () => {
+    expect(readPictureMakeBody({ prompt: "a boat", reference: " file-one, none, {reference},file-two,file-one ", references: ["file-three", "file-two"] })).toMatchObject({ ok: true, body: { references: ["file-one", "file-two", "file-three"] } });
+    expect(readPictureMakeBody({ prompt: "a boat", reference: "one,two,three,four" })).toMatchObject({ ok: false, error: "Choose up to 3 reference pictures, then try again." });
+  });
+
   test("submits a prompt-only Create job without a conversation and stores the finished image in Library", async () => {
     const read = readPictureMakeBody({ prompt: "a blue boat" });
     expect(read.ok).toBe(true);
