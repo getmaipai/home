@@ -4,7 +4,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { fileLockState, lockedView } from "@/lib/adultLock";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
-import { creationOfFile, readCreationByFile, updateCreationReview } from "@/lib/creations/store";
+import { creationOfFile, readCreationByFile, syncCreationMarkForFile, updateCreationReview } from "@/lib/creations/store";
 import { attachments } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -21,6 +21,8 @@ const byFileRoute = createRoute({ method: "get", path: "/by-file/{fileId}", tags
 creationsRoutes.openapi(byFileRoute, (c) => {
   const actor = c.get("person");
   const fileId = c.req.param("fileId");
+  // Records written before the lane fix could carry an adult-only mark the file never had: bring this one in line with its file first.
+  syncCreationMarkForFile(fileId);
   const read = readCreationByFile(actor, fileId, undefined, backfillCreationForFile);
   if (read.state === "locked") return c.json({ ...lockedView(), code: "locked" as const }, 423);
   if (read.state === "none") {

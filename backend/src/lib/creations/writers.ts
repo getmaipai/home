@@ -63,7 +63,8 @@ export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: {
     generation: generationBlock({ kind: "picture", jobId: job.stackJob ?? job.id, task: "generate", model: file.model, seed: file.seed, seconds: null, tier: job.request.tier, madeAt: job.updatedAt }),
     settings: { width: file.width, height: file.height, ...(job.request.quality ? { quality: job.request.quality } : {}), styles: job.request.loras.map((style_id) => ({ style_id })), takes: job.request.n },
     parentId: creationIdOfFile(actor.id, source),
-    adult: job.request.audience === "adult" || job.request.adultLock !== undefined,
+    // request.audience is the lane an adult asked on, not the content: the made file's own mark (and adultLock, set only for adult-only content) decides.
+    adult: job.request.adultLock !== undefined,
   });
 }
 

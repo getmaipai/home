@@ -49,12 +49,12 @@ beforeEach(() => {
 });
 afterEach(() => { fakeImages?.restore(); fakeVideo?.restore(); fakeImages = null; fakeVideo = null; setBudgetReader(null); __resetAdultLockForTests(); });
 
-async function makeJob(actor: PersonRow, prompt = "a quiet landscape") {
+async function makeJob(actor: PersonRow, prompt = "a quiet landscape", audience: "all-ages" | "adult" = "all-ages") {
   const conversation = resolveOrCreateConversation(actor, "chat");
   if (!conversation.ok) throw new Error(conversation.error);
   const conversationId = conversation.value.id; const turnId = newConversationTurnId();
   db.insert(conversationTurns).values({ id: turnId, personId: actor.id, surface: "chat", conversationId, userText: prompt, replyText: "making", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
-  const job = await startPictureJob({ actor, conversationId, turnId, temporary: false, kind: "generate", prompt, body: { prompt, size: "1024x1024", audience: "all-ages", n: 1 } as never });
+  const job = await startPictureJob({ actor, conversationId, turnId, temporary: false, kind: "generate", prompt, body: { prompt, size: "1024x1024", audience, n: 1 } as never });
   return { job, conversationId, turnId };
 }
 const finished = async (actor: PersonRow, id: string) => { await until(() => getPictureJob(actor, id)?.state === "done"); return getPictureJob(actor, id)!; };
@@ -74,6 +74,16 @@ describe("CREATOR-02 writing", () => {
     expect(noteOf(fileId)).toContain(`"creation":"${record.id}"`);
     expect(record).toMatchObject({ kind: "picture", file_ids: [fileId], job_ids: [job.id], recipe: { tool: "pictures", route: "text" }, words: { written: "a quiet landscape" }, cast: [], parent_id: null, review: "pending", made_audience: "all-ages", lock: "off" });
     expect(record.generation).toMatchObject({ kind: "picture", job_id: expect.any(String), commercial_use: "unknown" });
+  });
+
+  test("an adult's plain picture is not marked adult-only or locked just because an adult asked for it, so its maker can read how it was made", async () => {
+    fakeImages = installFakeImageStack({ pollsToFinish: 3 });
+    const h = await household(); const actor = h.row("Sage");
+    const { job } = await makeJob(actor, "a quiet landscape", "adult");
+    const done = await finished(actor, job.id);
+    const fileId = done.files[0]!.id;
+    expect(creationOfFile(actor.id, fileId)).toMatchObject({ made_audience: "all-ages", lock: "off" });
+    expect(readCreationByFile(actor, fileId).state).toBe("ok");
   });
 
   test("a job that fails or is stopped writes nothing", async () => {
