@@ -20,6 +20,10 @@ import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
+import { readCreationByFile } from "@/lib/creations/store";
+import { backfillCreationForFile } from "@/lib/creations/backfill";
+import { getVideoJobFor } from "@/lib/videos/jobs";
+import { getLoraRecord } from "@/lib/loras/store";
 import { listFragments } from "@/lib/media/templates";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
@@ -180,6 +184,39 @@ registerAppPageFill("video", "clips-feed", (person, page) => {
   if (actions) delete actions.remake;
 });
 
+/** Only labels and values already held by the maker's guarded creation record are returned. */
+export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ label: string; value: string }> {
+  // The feed row id is the job id; a file id also works.
+  const job = getVideoJobFor(person, fileId);
+  const fileOf = job ? (job.files.find((f) => f.id && !f.poster_id) ?? job.files[0])?.id ?? fileId : fileId;
+  const read = readCreationByFile(person, fileOf, undefined, backfillCreationForFile);
+  if (read.state !== "ok" || read.creation.kind !== "video") return [];
+  const creation = read.creation;
+  const rows: Array<{ label: string; value: string }> = [];
+  const add = (label: string, value: string | null | undefined) => { if (value) rows.push({ label, value }); };
+  add("Prompt", creation.words?.written ?? creation.words?.composed);
+  const engine = creation.generation?.engine.id;
+  const model = creation.generation?.model.id;
+  const modelWords = model === "unknown" || !model ? null : model === "ltx25-q8" ? "LTX-2.5" : model === "ltx25-max" ? "LTX-2.5 Max" : model.toLowerCase().includes("wan") ? "Wan" : null;
+  add("Engine and model", engine && engine !== "unknown" && modelWords ? `${engine}, ${modelWords}` : modelWords ?? (engine && engine !== "unknown" ? engine : null));
+  add("Length", creation.generation?.duration_s ? `${creation.generation.duration_s} seconds` : creation.settings?.seconds ? `${creation.settings.seconds} seconds` : null);
+  const { width, height } = creation.settings ?? {};
+  add("Size", width && height ? `${width} × ${height}` : null);
+  const seed = creation.generation?.seed;
+  add("Seed", seed === null || seed === undefined ? null : String(seed));
+  const styles = (creation.settings?.styles ?? []).map((style) => getLoraRecord(style.style_id)?.name).filter((name): name is string => Boolean(name));
+  if (styles.length) add("LoRAs and styles", styles.join(", "));
+  if (creation.sources.length) add("Started from", creation.sources.map((source) => source.role === "start" ? "source picture" : source.role === "sheet" ? "reference sheet" : source.role === "reference" ? "reference picture" : source.role === "edit_source" ? "source clip" : "source clip").join(", "));
+  if (creation.cast.length) add("Cast", creation.cast.length === 1 ? "1 person or character" : `${creation.cast.length} people or characters`);
+  if (creation.parent_id) add("Made from", "another clip (a take or an edit)");
+  const checks = creation.checks;
+  if (checks && typeof checks === "object") {
+    const findings = (checks as { findings?: unknown }).findings;
+    if (Array.isArray(findings) && findings.length) add("Clip checks", findings.filter((item): item is string => typeof item === "string").join("; ") || null);
+  }
+  return rows;
+}
+
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
  * where the person acts (the page shows it beside the button), never a raw error after a press. */
 registerAppPageFill("video", "studio", (person, page) => {
@@ -275,6 +312,7 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
+    case "how-made": return params.id ? creationDetailsFor(person, params.id) : [];
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));
     // VIDEO-STUDIO-07: the Studio page. `studio` is the opened clip as the TrackStudio's row, `studio-header` its header row, `studio-picker` the clips to
     // pick from while none is open (no rows once one is, so the shelf under the Studio is not drawn).

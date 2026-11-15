@@ -196,6 +196,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
   });
 
+  // CREATOR-30: a read-only view of the maker's own finished clip record. The store applies the same not-found and Adult lock rules as GET /api/creations/by-file.
+  routes.post("/actions/how-made", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "how-made")) return next();
+    const body = await jsonBody(c);
+    const id = typeof body.id === "string" ? body.id : "";
+    const { creationDetailsFor } = await import("@/lib/media/videoCreateApp");
+    const rows = creationDetailsFor(person, id);
+    if (!rows.length) return c.json({ error: "There is no record of how that was made. Open the item from your Library and try again.", code: "not_found" }, 404);
+    return c.json(rows, 200);
+  });
+
   // VIDEO-CREATE-01 (V1b): Another take on the newest Create clip: the same words and choices, a new seed.
   routes.post("/actions/another", requireAuth, async (c, next) => {
     const person = c.get("person");

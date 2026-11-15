@@ -258,6 +258,14 @@
         "min_role": "adult"
       },
       {
+        "id": "how-made",
+        "label": "How it was made",
+        "icon": "info",
+        "nav": false,
+        "kind": "schema",
+        "module": "how-made"
+      },
+      {
         "id": "new-uploads",
         "label": "New uploads",
         "icon": "sparkles",
