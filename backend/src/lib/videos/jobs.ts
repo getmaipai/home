@@ -497,13 +497,19 @@ export function loadLibraryPicture(actor: PersonRow, fileId: string): PhotoResul
 }
 
 /** VIDEO-CHAT-01 (continue): keeps the last frame of a clip as this chat's own picture (the same kind of file a clip's poster is), so the new clip starts from a stored file that Make another can load again. Memory only in a temporary chat. */
-export function storeContinueFrame(actor: PersonRow, input: { conversationId: string; turnId: string | null; temporary: boolean; jpeg: Uint8Array; width: number; height: number; adultOnly: boolean; lock?: "on" | "off"; sourceJobId: string }): { ok: true; id: string } | { ok: false; line: string } {
+export function storeContinueFrame(actor: PersonRow, input: { conversationId: string | null; turnId: string | null; temporary: boolean; jpeg: Uint8Array; width: number; height: number; adultOnly: boolean; lock?: "on" | "off"; sourceJobId: string }): { ok: true; id: string } | { ok: false; line: string } {
   if (input.temporary) {
+    if (!input.conversationId) return { ok: false, line: "A temporary video needs its chat. Ask again in that chat." };
     const id = newFileId();
     storeTemporaryClip({ id, conversationId: input.conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: input.jpeg });
     return { ok: true, id };
   }
-  if (!input.turnId) return { ok: false, line: "A video can only be continued from a chat message. Ask again in a chat." };
+  if (!input.conversationId && !input.turnId) {
+    const provenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markFields({ madeAudience: input.adultOnly ? "adult-only" : "all-ages", lock: input.lock ?? (input.adultOnly ? "on" : "off") }), job: input.sourceJobId, width: input.width, height: input.height, frame: "last" })}`;
+    const made = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: input.jpeg, provenance, deduplicate: false, retention: "kept" });
+    return made.ok ? { ok: true, id: made.value.id } : { ok: false, line: saveFailureLine(made.status) };
+  }
+  if (!input.turnId || !input.conversationId) return { ok: false, line: "A video can only be continued from a chat message. Ask again in a chat." };
   const provenance = `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, ...markFields({ madeAudience: input.adultOnly ? "adult-only" : "all-ages", lock: input.lock ?? (input.adultOnly ? "on" : "off") }), job: input.sourceJobId, width: input.width, height: input.height, frame: "last" })}`;
   const made = createAttachment(actor, { conversationId: input.conversationId, turnId: input.turnId, mediaType: "image/jpeg", bytes: input.jpeg, provenance, deduplicate: false, retention: "conversation" });
   return made.ok ? { ok: true, id: made.value.id } : { ok: false, line: saveFailureLine(made.status) };

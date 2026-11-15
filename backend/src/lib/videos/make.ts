@@ -20,7 +20,7 @@ export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. 
 
 export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
-export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off" }
+export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off"; parent?: VideoJob }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
 
 /** The audience of the Create page: the signed-in person on their own written screen. */
@@ -140,7 +140,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
   if (outcome.status === "succeeded" && data?.videoJobId) {
     const job = getVideoJobFor(actor, data.videoJobId);
-    if (job) return { ok: true, job, notice: job.request.create?.note ?? null };
+    if (job) { if (context.parent) markAnotherTake(job, context.parent); return { ok: true, job, notice: job.request.create?.note ?? null }; }
   }
   if (outcome.status === "succeeded") {
     // A refusal keeps its own line in the reply, after the instruction to the model; the person reads the line alone.

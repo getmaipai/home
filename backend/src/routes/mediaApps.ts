@@ -38,7 +38,7 @@ import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
-import { isReshape, startReshape, startSharpen } from "@/lib/videos/clipEditStart";
+import { isReshape, startReshape, startSharpen, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
@@ -224,6 +224,23 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (videoJobLockState(person, source) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
     const made = await anotherTakeFor(person, source);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+  });
+
+  routes.post("/actions/reshoot", requireAuth, async (c, next) => {
+    const person = c.get("person"); if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "reshoot")) return next();
+    const body = await jsonBody(c), id = typeof body.id === "string" ? body.id : "", change = typeof body.change === "string" ? body.change.trim() : "";
+    if (change.length > 600) return c.json({ error: "Keep the changed instruction under 600 characters.", code: "bad_arguments" }, 422);
+    const result = await startClipCreation(person, id, "reshoot", change || undefined);
+    return result.ok ? c.json({ ok: true as const, id: result.job.id, state: result.job.state }, 200) : c.json({ error: result.error, code: result.code, ...(result.locked ? { locked: true } : {}) }, result.status as never);
+  });
+
+  routes.post("/actions/next-shot", requireAuth, async (c, next) => {
+    const person = c.get("person"); if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "next-shot")) return next();
+    const body = await jsonBody(c), id = typeof body.id === "string" ? body.id : "", shot = typeof body.shot === "string" && Object.hasOwn(NEXT_SHOTS, body.shot) ? body.shot as keyof typeof NEXT_SHOTS : undefined;
+    const result = await startClipCreation(person, id, "next-shot", undefined, shot);
+    return result.ok ? c.json({ ok: true as const, id: result.job.id, state: result.job.state }, 200) : c.json({ error: result.error, code: result.code, ...(result.locked ? { locked: true } : {}) }, result.status as never);
   });
 
   // VIDEO-STUDIO-07: the Studio's Add a clip, Add a voice and Add music. What the person picked comes back as a piece (`{ ref, src, label, duration_s }`);

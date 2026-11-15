@@ -307,6 +307,18 @@
               }
             },
             {
+              "label": "Re-shoot",
+              "icon": "rotate-ccw",
+              "starts": "video",
+              "action": { "call": { "target": "/api/plugins/video/actions/reshoot", "method": "POST", "args": { "id": "{id}" } } }
+            },
+            {
+              "label": "Next shot",
+              "icon": "video",
+              "starts": "video",
+              "action": { "call": { "target": "/api/plugins/video/actions/next-shot", "method": "POST", "args": { "id": "{id}", "shot": "push_in" } } }
+            },
+            {
               "label": "Open in Studio",
               "icon": "audio-waveform",
               "action": {
