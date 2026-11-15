@@ -17,6 +17,10 @@ export interface PictureMakeBody {
 export type PictureMakeResult = { ok: true; ids: string[]; notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
 
 const notGiven = (value: unknown) => typeof value === "string" && (/^\{[a-z_]+\}$/.test(value.trim()) || value.trim().toLowerCase() === "none");
+/** Quoted phrases are the exact words Create should place in the picture. Quotes remain part of the prompt sent to the model. */
+export function wordsFromPrompt(prompt: string): string[] {
+  return [...prompt.matchAll(/"([^"]*)"|“([^”]*)”/g)].map((match) => (match[1] ?? match[2] ?? "").trim()).filter((word) => word.length >= 1 && word.length <= 80).slice(0, 6);
+}
 export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; body: PictureMakeBody } | { ok: false; error: string } {
   raw = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, notGiven(value) ? "" : value]));
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
@@ -24,6 +28,10 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
   const hasTemplate = typeof raw.template === "string" && raw.template.trim() !== "";
   if ((prompt.length < 3 && !(hasTemplate && prompt.length === 0)) || prompt.length > 1200) return { ok: false, error: "Describe the picture in 3 to 1200 characters, then try again." };
   const body: PictureMakeBody = { prompt };
+  if (raw.words === undefined) {
+    const quoted = wordsFromPrompt(prompt);
+    if (quoted.length) body.words = quoted;
+  }
   const shape = typeof raw.shape === "string" && !notGiven(raw.shape) ? raw.shape.trim().toLowerCase() : "";
   if (shape) {
     if (!["square", "landscape", "portrait", "wide", "tall"].includes(shape)) return { ok: false, error: "Choose square, landscape, portrait, wide or tall for the shape, or leave it empty." };
@@ -92,7 +100,10 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
   if (outcome.status === "succeeded" && (data?.pictureJobId || data?.pictureJobIds?.length)) {
     const ids = data.pictureJobIds ?? [data.pictureJobId!];
     // The reply text is written for the chat model; the only line a person needs is that extra references were left out.
-    const notice = /Some extra reference pictures were not used\./.test(outcome.result?.reply?.text ?? "") ? "Some extra reference pictures were not used." : null;
+    const extras = /Some extra reference pictures were not used\./.test(outcome.result?.reply?.text ?? "") ? "Some extra reference pictures were not used." : null;
+    // TEXT-PIC-07: one plain line when the picture has words (the spelling check is added with TEXT-PIC-05).
+    const wordsLine = body.words?.length ? "This picture has words, so Home used its text picture model." : null;
+    const notice = [extras, wordsLine].filter(Boolean).join(" ") || null;
     return { ok: true, ids, notice };
   }
   const rawLine = (outcome.result?.reply?.text ?? "").replace(/^No picture was (?:made|changed)\. Say this to the person in your own words(?: and keep its meaning)?:\s*/, "").trim();

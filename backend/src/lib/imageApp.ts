@@ -78,6 +78,12 @@ registerAppData("image", imageAppData);
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
+  bar.placeholder = 'Describe the picture. Put exact words in quotes, like "Summer Fair". Type @ to add someone from your cast.';
+  const tier = bar.tier as { tiers?: Array<{ id?: string; hint?: string }> } | undefined;
+  for (const item of tier?.tiers ?? []) {
+    if (item.id === "standard") item.hint = "Fast. Shows no words on the picture.";
+    if (item.id === "boost" || item.id === "max") item.hint = "More detail. Shows no words unless you ask for them.";
+  }
   const reference = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).find((item) => item.state === "reference") : undefined;
   if (reference) reference.max = 3;
   const templates = listTemplates({ actor: person, kind: "picture" });

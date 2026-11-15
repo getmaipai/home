@@ -10,7 +10,7 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 import { __setImageToolsForTests } from "@/lib/imageEdit";
 import { __setPicturePollMsForTests, __resetPictureJobsForTests, getPictureJob } from "@/lib/pictures/jobs";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
-import { readPictureMakeBody, makePictureFor } from "@/lib/pictures/make";
+import { readPictureMakeBody, makePictureFor, wordsFromPrompt } from "@/lib/pictures/make";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
@@ -42,6 +42,15 @@ beforeEach(async () => {
   const setup = await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   owner = db.select().from(people).where(eq(people.id, ((await setup.json()) as { person: { id: string } }).person.id)).get()!;
   allowPhotos(owner.id);
+});
+
+describe("wordsFromPrompt", () => {
+  test("reads up to six short quoted phrases and leaves prompt wording intact", () => {
+    expect(wordsFromPrompt('Poster: "Summer Fair", “June 8”')).toEqual(["Summer Fair", "June 8"]);
+    expect(wordsFromPrompt(`"${"x".repeat(81)}" "ok"`)).toEqual(["ok"]);
+    expect(wordsFromPrompt(Array.from({ length: 7 }, (_, i) => `"word ${i}"`).join(" "))).toHaveLength(6);
+    expect(readPictureMakeBody({ prompt: 'Poster says "Summer Fair"' })).toMatchObject({ ok: true, body: { words: ["Summer Fair"] } });
+  });
 });
 afterEach(() => { fake.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __setPicturePollMsForTests(null); __resetPictureJobsForTests(); });
 
