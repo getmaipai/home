@@ -497,6 +497,11 @@ msgid "{free} free of {total}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:188
+msgid "{frequency} Hz"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:139
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
@@ -2035,6 +2040,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 msgid "Access"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:114
+msgid "Acoustic"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3924,6 +3934,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:10
+#: src/shell/music/MusicPlayerBar.tsx:112
 #: src/shell/pages/MusicStudioView.tsx:40
 msgid "Bass boost"
 msgstr ""
@@ -7988,6 +7999,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotActions.tsx:44
+#: src/shell/music/MusicPlayerBar.tsx:115
 msgid "Dance"
 msgstr ""
 
@@ -9333,6 +9345,22 @@ msgid "EQ preset"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:180
+#: src/shell/music/MusicPlayerBar.tsx:180
+msgid "Equalizer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:184
+msgid "Equalizer preset"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:181
+msgid "Equalizer settings"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:20
 msgid "Equalizer: {name}"
 msgstr ""
@@ -9960,6 +9988,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:13
+#: src/shell/music/MusicPlayerBar.tsx:112
 msgid "Flat"
 msgstr ""
 
@@ -12910,6 +12939,11 @@ msgid "setting.tts.voice_id.option_label.javert"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:115
+msgid "Jazz"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1462
 msgid "setting.tts.voice_id.option_label.jean"
 msgstr ""
@@ -14022,7 +14056,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:137
+#: src/shell/music/MusicPlayerBar.tsx:151
 msgid "Like"
 msgstr ""
 
@@ -14808,6 +14842,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:115
+#: src/shell/music/MusicPlayerBar.tsx:114
 msgid "Loud"
 msgstr ""
 
@@ -14871,8 +14906,8 @@ msgstr ""
 #: src/apps/chat/MusicCardView.tsx:86
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
-#: src/shell/music/MusicPlayerBar.tsx:182
-#: src/shell/music/MusicPlayerBar.tsx:182
+#: src/shell/music/MusicPlayerBar.tsx:210
+#: src/shell/music/MusicPlayerBar.tsx:210
 #: src/shell/pages/MusicComposer.tsx:191
 #: src/shell/pages/MusicComposer.tsx:195
 #: src/shell/pages/MusicSongDetails.tsx:105
@@ -16203,7 +16238,7 @@ msgid "mute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:102
+#: src/shell/music/MusicPlayerBar.tsx:106
 msgid "Mute"
 msgstr ""
 
@@ -17012,7 +17047,7 @@ msgid "No places yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:36
+#: src/shell/music/MusicPlayerBar.tsx:40
 msgid "No playable songs are left. Check the song files and try again."
 msgstr ""
 
@@ -17734,7 +17769,7 @@ msgid "Now all ages."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:189
+#: src/shell/music/MusicPlayerBar.tsx:217
 msgid "Now playing"
 msgstr ""
 
@@ -18484,8 +18519,8 @@ msgid "Open in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:77
-#: src/shell/music/MusicPlayerBar.tsx:77
+#: src/shell/music/MusicPlayerBar.tsx:81
+#: src/shell/music/MusicPlayerBar.tsx:81
 #: src/shell/pages/MakeSongPage.tsx:97
 #: src/shell/pages/MusicLibrary.tsx:98
 #: src/shell/pages/MusicSongDetails.tsx:147
@@ -19737,6 +19772,12 @@ msgid "Powered by Stability AI"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:187
+#: src/shell/music/MusicPlayerBar.tsx:187
+msgid "Preamp"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:139
 #: src/apps/settings/StackChanInstallDialog.tsx:139
 msgid "Preparing"
@@ -20025,7 +20066,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
-#: src/shell/music/MusicPlayerBar.tsx:161
+#: src/shell/music/MusicPlayerBar.tsx:175
 msgid "Queue"
 msgstr ""
 
@@ -20788,7 +20829,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:82
+#: src/shell/music/MusicPlayerBar.tsx:86
 msgid "Repeat all songs"
 msgstr ""
 
@@ -20804,7 +20845,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:82
+#: src/shell/music/MusicPlayerBar.tsx:86
 msgid "Repeat off"
 msgstr ""
 
@@ -20815,7 +20856,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:82
+#: src/shell/music/MusicPlayerBar.tsx:86
 msgid "Repeat one song"
 msgstr ""
 
@@ -21466,6 +21507,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:370
 msgid "Robots: {list}."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:115
+msgid "Rock"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22403,7 +22449,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:111
+#: src/shell/music/MusicPlayerBar.tsx:122
 msgid "Seek"
 msgstr ""
 
@@ -23151,7 +23197,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:84
+#: src/shell/music/MusicPlayerBar.tsx:88
 msgid "Shuffle"
 msgstr ""
 
@@ -25118,7 +25164,7 @@ msgid "api.error.companion_unavailable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:179
+#: src/shell/music/MusicPlayerBar.tsx:207
 msgid "That could not be saved. Try again."
 msgstr ""
 
@@ -26324,7 +26370,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:190
+#: src/shell/music/MusicPlayerBar.tsx:218
 msgid "The song, its words and the player controls."
 msgstr ""
 
@@ -26698,6 +26744,11 @@ msgid "this book"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/music/MusicPlayerBar.tsx:178
+msgid "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsSectionContent.tsx:39
 msgid "This browser cannot show system alerts."
 msgstr ""
@@ -27034,7 +27085,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:153
+#: src/shell/music/MusicPlayerBar.tsx:167
 msgid "This song could not be played. Check the file and try again."
 msgstr ""
 
@@ -27459,6 +27510,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:11
+#: src/shell/music/MusicPlayerBar.tsx:113
 #: src/shell/pages/MusicStudioView.tsx:40
 msgid "Treble boost"
 msgstr ""
@@ -27953,7 +28005,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:137
+#: src/shell/music/MusicPlayerBar.tsx:151
 msgid "Unlike"
 msgstr ""
 
@@ -28008,7 +28060,7 @@ msgid "unmute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:102
+#: src/shell/music/MusicPlayerBar.tsx:106
 msgid "Unmute"
 msgstr ""
 
@@ -28708,6 +28760,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:12
+#: src/shell/music/MusicPlayerBar.tsx:113
 msgid "Vocal"
 msgstr ""
 
@@ -28884,7 +28937,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:103
+#: src/shell/music/MusicPlayerBar.tsx:107
 #: src/shell/pages/MusicStudioView.tsx:35
 msgid "Volume"
 msgstr ""
