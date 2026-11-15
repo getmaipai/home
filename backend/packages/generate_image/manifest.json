@@ -102,6 +102,13 @@
         "maxLength": 40,
         "grounded": false,
         "description": "With change: second picture, same words."
+      },
+      "words": {
+        "type": "array",
+        "maxItems": 6,
+        "items": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "grounded": false,
+        "description": "words: the exact text to show on the picture, spelled exactly; leave out when the picture must show no words."
       }
     }
   },

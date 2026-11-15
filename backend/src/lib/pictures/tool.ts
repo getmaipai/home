@@ -18,7 +18,7 @@ import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
-import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL } from "./quality";
+import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL, ERNIE_MODEL, modelCanSpell } from "./quality";
 import { StackPicturesError } from "./stack";
 import { getTemplate } from "@/lib/media/templates";
 import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
@@ -212,6 +212,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (!engine || engine.state === "unsupported" || engine.state === "off" || engine.state === "not-installed" || engine.available === false) {
     return failed(callId, args, "no_engine", "unavailable", "no picture model is installed on the Stack");
   }
+  if (args.words !== undefined && (!Array.isArray(args.words) || args.words.some((word) => typeof word !== "string"))) return failed(callId, args, "bad_arguments", "bad_arguments");
+  const words = Array.isArray(args.words) ? (args.words as string[]).map((word) => word.trim()).filter((word) => word.length > 0) : [];
+  if (words.length > 6 || words.some((word) => word.length > 80)) return failed(callId, args, "bad_arguments", "bad_arguments");
   const maxN = engine.limits?.max_n ?? 4;
   const wantedCount = typeof args.count === "number" && Number.isFinite(args.count) ? Math.max(1, Math.min(8, Math.round(args.count))) : 1;
   const totalCount = createPage ? (laneOf(audience) === "child" ? Math.min(wantedCount, KID_MAX_COUNT) : wantedCount) : clampCount(wantedCount, maxN);
@@ -241,7 +244,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     ? buildPromptPlan({ words: prompt, styles: [record], strength: undefined, negativePrompt: "none", media: "picture" })
     : null;
   const sentPrompt = plan?.ok ? plan.prompt : fallbackPrompt;
-  const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), sentPrompt].join(". ");
+  const subjectPromptBase = [...resolvedSubjects.map(({ subject }) => subject.look), sentPrompt].join(". ");
   const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
     .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
     .slice(0, Math.max(1, 1 + (engine.edit?.references ?? 0)));
@@ -250,14 +253,20 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const usedLibraryRefs = libraryRefs.filter((ref) => combinedRefs.some((used) => used.id === ref.id));
   const droppedReferences = libraryRefs.length + subjectRefs.length > combinedRefs.length;
   const strictAudience = usedLibraryRefs.some((ref) => ref.adultMark.madeAudience !== "all-ages" || ref.adultMark.lock === "on") || subjectRefs.some((ref) => ref.audience === "adult-only") || castIsAdultOnly(castChosen) ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
-  const second = refusePrompt(`${subjectPrompt} ${adapter?.name ?? ""}`, { lane });
+  const second = refusePrompt(`${subjectPromptBase} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   if (plan && !plan.ok) return refused(callId, args, { kind: "plan", why: "style_plan", line: plan.line });
   // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "image", arg: args.tier, band: audience.band });
-  const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: QUICK_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
+  const regularChoice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: QUICK_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
+  const ernie = engine.models?.find((model) => model.id === ERNIE_MODEL);
+  if (words.length && (!ernie?.installed || ernie.available === false)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: Words on a picture need the text picture model. Turn on ERNIE-Image-Turbo in Settings, AI and models, then try again." }, data: { refused: "text_model_missing" }, actions: [] } });
+  const choice = words.length ? { quality: "quick" as const, model: ERNIE_MODEL, note: null, announce: false } : regularChoice;
+  const textPrompt = words.length ? `${subjectPromptBase}. Show this text on the picture, spelled exactly as written: ${words.map((word) => `"${word}"`).join(", ")}.` : subjectPromptBase;
+  const addNoText = !words.length && !modelCanSpell(choice.model);
+  const subjectPrompt = addNoText ? `${textPrompt}. No text, no letters, no words, no logos anywhere in the picture.` : textPrompt;
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.
@@ -285,7 +294,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
         ...(plan?.ok ? { loras: plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength })) } : adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
-        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
+        ...((kid || addNoText) ? { negative_prompt: [kid ? CHILD_NEGATIVE_PROMPT : "", addNoText ? "text, letters, words, logos, watermark" : ""].filter(Boolean).join(", ") } : {}),
       },
       ...(combinedRefs.length ? { submit: async () => {
         const form = new FormData();

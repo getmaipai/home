@@ -140,6 +140,41 @@ describe("the chat tool", () => {
     await until(() => fake.jobs.length > 0);
   });
 
+  test("words force ERNIE for Standard and Detailed requests and append the exact words after the prompt", async () => {
+    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
+    writeChoiceSetting("engines.image.tier.standard", "klein");
+    await run({ words: ["  Hello  ", "World"], quality: "detailed" });
+    expect(fake.submitted[0]!.model).toBe(ERNIE_MODEL);
+    expect(fake.submitted[0]!.prompt).toContain('Show this text on the picture, spelled exactly as written: "Hello", "World".');
+    expect(fake.submitted[0]!.prompt).not.toContain("No text, no letters");
+    await until(() => fake.jobs.length > 0);
+  });
+
+  test("words with ERNIE unavailable are refused before a picture job starts", async () => {
+    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE] }));
+    const told = await run({ words: ["Hello"] });
+    expect(told).toContain("No picture was made");
+    expect(told).toContain("Words on a picture need the text picture model. Turn on ERNIE-Image-Turbo in Settings, AI and models, then try again.");
+    expect(fake.submitted).toHaveLength(0);
+    expect(fake.jobs).toHaveLength(0);
+  });
+
+  test("a no-words Klein request gets one no-text addendum and negative prompt; ERNIE does not", async () => {
+    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
+    writeChoiceSetting("engines.image.tier.standard", "klein");
+    await run({});
+    const prompt = String(fake.submitted.at(-1)!.prompt);
+    expect(prompt.match(/No text, no letters, no words, no logos anywhere in the picture\./g)).toHaveLength(1);
+    expect(fake.submitted.at(-1)!.negative_prompt).toContain("text, letters, words, logos, watermark");
+    await until(() => fake.jobs.length > 0);
+    await run({ words: [] });
+    // Restore ERNIE as household Standard's model, where it is text-capable and needs no no-text prompt.
+    writeChoiceSetting("engines.image.tier.standard", "ernie");
+    await run({});
+    expect(fake.submitted.at(-1)!.model).toBe(ERNIE_MODEL);
+    expect(fake.submitted.at(-1)!.prompt).not.toContain("No text, no letters");
+  });
+
   test("the model asking for Detailed makes a Detailed picture and is told to say so in one sentence, without a model name", async () => {
     const told = await run({ quality: "detailed" }, "the most detailed, photoreal fox you can");
     expect(fake.submitted[0]!.model).toBe("z-image-turbo");

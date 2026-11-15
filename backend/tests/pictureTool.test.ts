@@ -129,7 +129,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       // One job, submitted for an id at once (timeout_ms 1), with the model's description and the defaults.
       expect(fake.submitted).toHaveLength(1);
       const sent = fake.submitted[0]!;
-      expect(sent.prompt).toBe("a red fox in the snow, soft morning light");
+      expect(sent.prompt).toBe("a red fox in the snow, soft morning light. No text, no letters, no words, no logos anywhere in the picture.");
       expect(sent.timeout_ms).toBe(1);
       expect(sent.size).toBe("1024x1024");
       expect(sent.n).toBe(1);
@@ -229,7 +229,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     await withStub(script(call), async () => {
       await streamValue(people.owner, "a castle on a hill in my pixel style");
       const sent = fake.submitted[0]!;
-      expect(sent.prompt).toBe("pixelart, a castle on a hill, soft pastel shading");
+      expect(sent.prompt).toBe("pixelart, a castle on a hill, soft pastel shading. No text, no letters, no words, no logos anywhere in the picture.");
       expect(sent.loras).toEqual([{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }]);
     });
   });
@@ -239,7 +239,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a castle", style: "pixel art" }) };
     await withStub(script(call), async () => {
       await streamValue(people.owner, "a castle in pixel art style");
-      expect(fake.submitted[0]!.prompt).toBe("a castle, pixelart");
+      expect(fake.submitted[0]!.prompt).toBe("a castle, pixelart. No text, no letters, no words, no logos anywhere in the picture.");
       expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }]);
     });
   });

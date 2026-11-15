@@ -12,6 +12,7 @@ export interface PictureMakeBody {
   blanks?: Record<string, string>;
   cast?: string[];
   references?: string[];
+  words?: string[];
 }
 export type PictureMakeResult = { ok: true; ids: string[]; notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
 
@@ -37,6 +38,12 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
   if (tier) {
     if (!["standard", "boost", "max"].includes(tier)) return { ok: false, error: "Choose Standard, Boost or Max for the level, or leave it empty." };
     body.tier = tier as PictureMakeBody["tier"];
+  }
+  if (raw.words !== undefined && raw.words !== "") {
+    if (!Array.isArray(raw.words) || raw.words.some((word) => typeof word !== "string")) return { ok: false, error: "Words must be a list of up to 6 phrases, each 1 to 80 characters." };
+    const words = raw.words.map((word) => word.trim()).filter(Boolean);
+    if (words.length > 6 || words.some((word) => word.length > 80)) return { ok: false, error: "Words must be a list of up to 6 phrases, each 1 to 80 characters." };
+    if (words.length) body.words = words;
   }
   if (raw.presets !== undefined && raw.presets !== "") {
     if (!raw.presets || typeof raw.presets !== "object" || Array.isArray(raw.presets)) return { ok: false, error: "Choose picture presets from the list, or leave them empty." };

@@ -8,6 +8,8 @@ export type PictureQuality = "quick" | "detailed";
 export const QUICK_MODEL = "flux2-klein-4b";
 export const ERNIE_MODEL = "ernie-image-turbo";
 export const DETAILED_MODEL = "z-image-turbo";
+export const TEXT_CAPABLE_MODELS = new Set([ERNIE_MODEL]);
+export const modelCanSpell = (model: string | null | undefined): boolean => Boolean(model && TEXT_CAPABLE_MODELS.has(model));
 
 export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL || model === ERNIE_MODEL ? "quick" : null);
 export const isPictureQuality = (value: unknown): value is PictureQuality => value === "quick" || value === "detailed";
