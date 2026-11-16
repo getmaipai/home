@@ -40,7 +40,6 @@ import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
-import { isReshape, startReshape, startSharpen, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
