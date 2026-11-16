@@ -168,7 +168,7 @@ export const RESTYLE_SOURCE_TOO_LONG_LINE = `Colour works on clips up to ${RESTY
 export const RESTYLE_LORA_MISSING_LINE = "The colorize style is not installed on this computer. An admin can add it in Settings, Styles, then try again.";
 export const MAX_EDIT_RANGE_LINE = "That time is outside the range this computer can use. Pick a time in range, then try again.";
 
-export interface RunEditVideoInput { state: GenerateVideoState; args: Record<string, unknown>; callId: string; spoken: boolean }
+export interface RunEditVideoInput { state: GenerateVideoState; args: Record<string, unknown>; callId: string; spoken: boolean; /** Called once with the new clip's file id when an edit started here has been saved (the Trim page's Split starts its second part from it). */ onSaved?: (fileId: string) => void }
 
 const packageId = EDIT_VIDEO_TOOL_ID;
 
@@ -764,7 +764,7 @@ async function editFinishedClips(input: RunEditVideoInput, value: EditArgs, acto
     return { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms, ...spatial } };
   };
   const mark = newItemMark(marks, false);
-  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? (clarity === "quick" ? "cleaning up" : "sharpening") : value.change === "remove_background" ? "cutting out the subject" : value.change === "spatial_sound" ? "placing the sound" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
+  const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, source: first, edit, run, background: value.change === "remove_background" ? background : undefined, phase: value.change === "upscale" ? (clarity === "quick" ? "cleaning up" : "sharpening") : value.change === "remove_background" ? "cutting out the subject" : value.change === "spatial_sound" ? "placing the sound" : "editing", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock, ...(input.onSaved ? { onSaved: input.onSaved } : {}), ...(film && actor.id === film.production.owner_person_id ? { onSaved: (fileId: string) => { const current = getMediaProduction(actor, film.production.id); if (current) updateMediaProduction(actor, current.id, { finished_cut_file_ids: [...current.finished_cut_file_ids, fileId] }); } } : {}) });
   if (!started.ok) return refused(callId, args, started.line, "already_making");
   return outcomeOf({
     callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0,

@@ -9,7 +9,7 @@ import { videoJobLockState, LOCKED_START_LINE } from "./lock";
 import { makeAudienceOf } from "./make";
 import { clipFileOf, clipMarkOf } from "./editGate";
 import { runStackEdit } from "./stackEdit";
-import { frameOps, lastFrameAt } from "./editPlan";
+import { frameOps, lastFrameAt, trimRange } from "./editPlan";
 import sharp from "sharp";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { newItemMark } from "@/lib/adultLock";
@@ -19,14 +19,14 @@ export type ClipEditStart =
   | { ok: true; job: VideoJob }
   | { ok: false; status: 403 | 404 | 422 | 423 | 502 | 503; error: string; code: string; locked?: true };
 
-export async function startClipEdit(actor: PersonRow, id: string, args: Record<string, unknown>, failedLine: string, failedCode: string): Promise<ClipEditStart> {
+export async function startClipEdit(actor: PersonRow, id: string, args: Record<string, unknown>, failedLine: string, failedCode: string, onSaved?: (fileId: string) => void): Promise<ClipEditStart> {
   const gate = editRefusal(makeAudienceOf(actor), "");
   if (gate) return { ok: false, status: gate.kind === "denied" ? 403 : 422, error: gate.line, code: gate.kind === "denied" ? gate.why : "minor" };
   const source = getVideoJobFor(actor, id) ?? getVideoJobByFileFor(actor, id);
   if (!source || source.state !== "done") return { ok: false, status: 404, error: "That video isn't available any more. Ask for it again.", code: "not_found" };
   if (videoJobLockState(actor, source) !== "open") return { ok: false, status: 423, error: LOCKED_START_LINE, code: "locked", locked: true };
   const state = { actor, surface: "chat", conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, planBasis: { surfaceClass: "written" }, context: [], utterance: "", persona: null, crisis: false } as unknown as RunEditVideoInput["state"];
-  const outcome = await runEditVideo({ state, args: { clip: source.id, ...args }, callId: `route-${String(args.change)}`, spoken: false });
+  const outcome = await runEditVideo({ state, args: { clip: source.id, ...args }, callId: `route-${String(args.change)}`, spoken: false, ...(onSaved ? { onSaved } : {}) });
   const started = (outcome.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
   if (!started) return { ok: false, status: 422, error: refusalLineOf(outcome) ?? failedLine, code: String((outcome.result?.data as { refused?: string } | undefined)?.refused ?? failedCode) };
   const job = getVideoJobFor(actor, started);
@@ -88,4 +88,35 @@ export async function startClipCreation(actor: PersonRow, id: string, mode: "res
   }
   const made = await makeVideoFor(actor, body, context);
   return made.ok ? { ok: true, job: made.job } : { ok: false, status: made.status, error: made.error, code: made.code };
+}
+
+/** The least a part of a split may be, in seconds: the Studio's own smallest piece. */
+const SPLIT_MIN_PART_S = 0.5;
+export const SPLIT_POINT_LINE = "Type the time to split at, in seconds from the start, for example 4.5.";
+const splitOutsideLine = (seconds: number) => `That clip is ${seconds} seconds long. Pick a split time at least half a second from each end.`;
+
+/**
+ * Trim and join page, Split: one finished clip becomes two new clips, the part before `at` and the part after it. The Stack makes one clip per edit job
+ * and a person may run one video job at a time, so the first part starts now and the second starts when the first has been saved (the same edit gate,
+ * lock check and trim as any other: `startClipEdit`). The original is kept. If the second part cannot start, the first is still a finished clip and
+ * the failure is in the second job's own line in the clips feed.
+ */
+export async function startSplit(actor: PersonRow, id: string, at: unknown): Promise<ClipEditStart> {
+  const point = typeof at === "number" ? at : typeof at === "string" && /^\s*\d+(\.\d+)?\s*$/.test(at) ? Number(at) : NaN;
+  if (!Number.isFinite(point)) return { ok: false, status: 422, error: SPLIT_POINT_LINE, code: "bad_split" };
+  const gate = editRefusal(makeAudienceOf(actor), "");
+  if (gate) return { ok: false, status: gate.kind === "denied" ? 403 : 422, error: gate.line, code: gate.kind === "denied" ? gate.why : "minor" };
+  const source = getVideoJobFor(actor, id) ?? getVideoJobByFileFor(actor, id);
+  if (!source || source.state !== "done") return { ok: false, status: 404, error: "That video isn't available any more. Ask for it again.", code: "not_found" };
+  if (videoJobLockState(actor, source) !== "open") return { ok: false, status: 423, error: LOCKED_START_LINE, code: "locked", locked: true };
+  const length = source.files[0]?.seconds ?? null;
+  if (length === null) return { ok: false, status: 422, error: "I can't tell how long that clip is, so I can't split it. Use Trim instead.", code: "unknown_length" };
+  if (point < SPLIT_MIN_PART_S || point > length - SPLIT_MIN_PART_S) return { ok: false, status: 422, error: splitOutsideLine(length), code: "bad_split" };
+  const first = trimRange({ from_s: 0, to_s: point }, length);
+  const second = trimRange({ from_s: point, to_s: length }, length);
+  if (!first.ok || !second.ok) return { ok: false, status: 422, error: splitOutsideLine(length), code: "bad_split" };
+  const sourceId = source.id;
+  return startClipEdit(actor, sourceId, { change: "trim", from_s: first.from, to_s: first.to }, "I couldn't split that video. Try again.", "split_failed", () => {
+    void startClipEdit(actor, sourceId, { change: "trim", from_s: second.from, to_s: second.to }, "I couldn't make the second part. Try again.", "split_failed");
+  });
 }

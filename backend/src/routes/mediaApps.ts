@@ -38,6 +38,7 @@ import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
+import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { isReshape, startReshape, startSharpen, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
@@ -357,6 +358,17 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await jsonBody(c);
     if (!isReshape(body.shape)) return c.json({ error: "Choose vertical, portrait, square or wide.", code: "bad_shape" }, 400);
     const started = await startReshape(person, typeof body.id === "string" ? body.id : "", body.shape);
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  // Trim and join page, Split: one clip into two new ones (clipEditStart startSplit). `at` is seconds from the start, typed in the page's field.
+  routes.post("/actions/split", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "split")) return next();
+    const body = await jsonBody(c);
+    const started = await startSplit(person, typeof body.id === "string" ? body.id : "", body.at);
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });
