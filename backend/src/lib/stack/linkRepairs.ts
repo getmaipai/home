@@ -52,7 +52,19 @@ export class StackLinkRepairs {
 
   stateChanged(state: EngineLinkState): void {
     if (isUp(state)) {
-      if (!this.incident) return;
+      if (!this.incident) {
+        const issue = this.deps.readIssue();
+        if (!issue || issue.resolved_at != null) return;
+        if (this.recoveryTimer) this.deps.clearTimeout(this.recoveryTimer);
+        const generation = ++this.generation;
+        this.recoveryTimer = this.deps.setTimeout(() => {
+          if (generation !== this.generation) return;
+          const current = this.deps.readIssue();
+          if (current && current.resolved_at == null) this.deps.resolve(STACK_LINK_ISSUE_SOURCE, STACK_LINK_ISSUE_KEY, { suppressNotification: true });
+          this.recoveryTimer = null;
+        }, STACK_LINK_RECOVERY_MS);
+        return;
+      }
       this.clearOutageTimer();
       if (this.recoveryTimer) this.deps.clearTimeout(this.recoveryTimer);
       const generation = this.generation;

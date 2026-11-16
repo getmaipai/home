@@ -90,12 +90,12 @@ function fakeWorkerPage(controlled: boolean, visibility: DocumentVisibilityState
   const listeners = new Map<string, EventListener[]>();
   const on = (type: string, fn: EventListener) => listeners.set(type, [...(listeners.get(type) ?? []), fn]);
   const fire = (type: string) => { for (const fn of listeners.get(type) ?? []) fn(new Event(type)); };
-  const state = { reloads: 0, visibility };
+  const state: { reloads: number; visibility: DocumentVisibilityState; assign?: string } = { reloads: 0, visibility };
   const container = { controller: controlled ? ({} as ServiceWorker) : null, addEventListener: on } as unknown as ServiceWorkerContainer;
   const doc = { get visibilityState() { return state.visibility; }, addEventListener: on } as unknown as Document;
-  const win = { location: { reload: () => state.reloads++ } } as unknown as Window;
+  const win = { history: { pushState: () => {} }, location: { href: "https://home.test/settings", reload: () => state.reloads++, assign: (url: string) => { state.assign = url; state.reloads++; } } } as unknown as Window;
   installHiddenReloadOnNewServiceWorker(container, doc, win);
-  return { state, fire };
+  return { state, fire, win };
 }
 
 describe("a new service worker taking control", () => {
@@ -103,6 +103,22 @@ describe("a new service worker taking control", () => {
     const { state, fire } = fakeWorkerPage(true, "visible");
     fire("controllerchange");
     expect(state.reloads).toBe(0);
+  });
+
+  test("the next pushState after an update assigns its destination once", () => {
+    const { state, fire, win } = fakeWorkerPage(true, "visible");
+    fire("controllerchange");
+    win.history.pushState({}, "", "/settings/people");
+    win.history.pushState({}, "", "/settings/apps");
+    expect(state.assign).toBe("/settings/people");
+  });
+
+  test("does not wrap pushState without a pending update or on first load", () => {
+    const idle = fakeWorkerPage(true, "visible");
+    const original = idle.win.history.pushState;
+    expect(idle.win.history.pushState).toBe(original);
+    const first = fakeWorkerPage(false, "visible");
+    expect(first.win.history.pushState).toBe(first.win.history.pushState);
   });
 
   test("reloads a tab left open across the update once, when it is hidden", () => {

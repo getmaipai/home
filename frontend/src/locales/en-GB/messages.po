@@ -29,12 +29,12 @@ msgid " · Household voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:85
+#: ../backend/src/routes/settings.ts:86
 msgid "settings.attention.backups.key_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:84
+#: ../backend/src/routes/settings.ts:85
 msgid "settings.attention.backups.key_saved"
 msgstr ""
 
@@ -59,7 +59,7 @@ msgid " A reply being written right now will be cut off."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:93
+#: ../backend/src/routes/settings.ts:94
 msgid "settings.attention.robots.connected"
 msgstr ""
 
@@ -74,7 +74,7 @@ msgid " Plan for about {needGb} GB free there."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:94
+#: ../backend/src/routes/settings.ts:95
 msgid "settings.attention.robots.waiting"
 msgstr ""
 
@@ -401,7 +401,7 @@ msgid "{count} alarms"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:83
+#: ../backend/src/routes/settings.ts:84
 msgid "settings.attention.backups.many"
 msgstr ""
 
@@ -436,7 +436,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:62
+#: ../backend/src/routes/settings.ts:63
 msgid "settings.attention.repairs.many"
 msgstr ""
 
@@ -446,7 +446,7 @@ msgid "{count} restored"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:92
+#: ../backend/src/routes/settings.ts:93
 msgid "settings.attention.robots.many"
 msgstr ""
 
@@ -1096,7 +1096,7 @@ msgid "{name} will stay closed when the job is done."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:55
+#: src/shell/pages/settings/SettingsHomePage.tsx:56
 msgid "{name}, {role} · checked just now"
 msgstr ""
 
@@ -1498,7 +1498,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:82
+#: ../backend/src/routes/settings.ts:83
 msgid "settings.attention.backups.one"
 msgstr ""
 
@@ -1520,12 +1520,12 @@ msgid "1 hour"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:61
+#: ../backend/src/routes/settings.ts:62
 msgid "settings.attention.repairs.one"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:91
+#: ../backend/src/routes/settings.ts:92
 msgid "settings.attention.robots.one"
 msgstr ""
 
@@ -2754,6 +2754,16 @@ msgid "setting.companions.allowed.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/UsersSection.tsx:360
+msgid "AI companions for {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/UsersSection.tsx:234
+msgid "AI companions for everyone"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1601
 msgid "area.AI developer settings"
 msgstr ""
@@ -2774,17 +2784,17 @@ msgid "area.AI settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:75
+#: ../backend/src/routes/settings.ts:76
 msgid "settings.attention.ai.setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:70
+#: ../backend/src/routes/settings.ts:71
 msgid "settings.attention.install.running.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:68
+#: ../backend/src/routes/settings.ts:69
 msgid "settings.attention.install.title"
 msgstr ""
 
@@ -4716,7 +4726,7 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:427
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:169
+#: src/shell/pages/settings/SettingsRenderer.tsx:170
 #: src/shell/pages/status/StatusBoard.tsx:72
 #: src/shell/pages/status/StatusComponents.tsx:161
 #: src/shell/pages/StoragePage.tsx:205
@@ -5154,7 +5164,7 @@ msgid "Chat is down"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:76
+#: ../backend/src/routes/settings.ts:77
 msgid "settings.attention.health.title"
 msgstr ""
 
@@ -5372,7 +5382,7 @@ msgid "Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:58
+#: src/shell/pages/settings/SettingsHomePage.tsx:59
 msgid "Checked just now."
 msgstr ""
 
@@ -6535,7 +6545,7 @@ msgstr ""
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:179
+#: src/shell/pages/settings/SettingsRenderer.tsx:180
 #: src/shell/pages/UpdatesPage.tsx:202
 msgid "Confirm"
 msgstr ""
@@ -7180,7 +7190,7 @@ msgid "Could not load routing stats."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:192
+#: src/shell/pages/settings/SettingsRenderer.tsx:193
 msgid "Could not load settings."
 msgstr ""
 
@@ -7597,8 +7607,8 @@ msgid "Could not save that answer. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:120
-#: src/shell/pages/settings/SettingsRenderer.tsx:177
+#: src/shell/pages/settings/SettingsRenderer.tsx:121
+#: src/shell/pages/settings/SettingsRenderer.tsx:178
 msgid "Could not save that change."
 msgstr ""
 
@@ -9656,7 +9666,7 @@ msgid "Everything installed is in use."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:58
+#: src/shell/pages/settings/SettingsHomePage.tsx:59
 msgid "Everything is fine."
 msgstr ""
 
@@ -10020,7 +10030,7 @@ msgid "Find"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:46
+#: src/shell/pages/settings/SettingsHomePage.tsx:47
 msgid "Find a setting"
 msgstr ""
 
@@ -10102,7 +10112,7 @@ msgid "Finish"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:67
+#: ../backend/src/routes/settings.ts:68
 msgid "settings.attention.setup.todo"
 msgstr ""
 
@@ -11296,7 +11306,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:97
+#: ../backend/src/routes/settings.ts:98
 msgid "settings.attention.search.line"
 msgstr ""
 
@@ -11955,7 +11965,7 @@ msgid "setting.voice.talk_over.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:71
+#: ../backend/src/routes/settings.ts:72
 msgid "settings.attention.install.running.line"
 msgstr ""
 
@@ -12667,7 +12677,7 @@ msgid "setting.person.vision.watch.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:64
+#: ../backend/src/routes/settings.ts:65
 msgid "settings.attention.backup_key.line"
 msgstr ""
 
@@ -12682,7 +12692,7 @@ msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:80
+#: ../backend/src/routes/settings.ts:81
 msgid "settings.attention.backups.empty.line"
 msgstr ""
 
@@ -14759,7 +14769,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:67
 #: src/shell/pages/settings/SettingsAreaPage.tsx:180
-#: src/shell/pages/settings/SettingsRenderer.tsx:193
+#: src/shell/pages/settings/SettingsRenderer.tsx:194
 msgid "Loading settings"
 msgstr ""
 
@@ -16740,7 +16750,7 @@ msgid "Needs attention"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:56
+#: src/shell/pages/settings/SettingsHomePage.tsx:57
 msgid "Needs attention · {count}"
 msgstr ""
 
@@ -17125,17 +17135,17 @@ msgid "No assistant keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:63
+#: ../backend/src/routes/settings.ts:64
 msgid "settings.attention.backup_key.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:86
+#: ../backend/src/routes/settings.ts:87
 msgid "settings.attention.backups.empty.summary"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:79
+#: ../backend/src/routes/settings.ts:80
 msgid "settings.attention.backups.empty.title"
 msgstr ""
 
@@ -17263,7 +17273,7 @@ msgid "No files yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:74
+#: ../backend/src/routes/settings.ts:75
 msgid "settings.attention.ai.no_install"
 msgstr ""
 
@@ -17400,12 +17410,12 @@ msgid "No robot found on your network yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:87
+#: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.robots.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:95
+#: ../backend/src/routes/settings.ts:96
 msgid "settings.attention.robots.empty"
 msgstr ""
 
@@ -17440,7 +17450,7 @@ msgid "No settings match that search."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:208
+#: src/shell/pages/settings/SettingsRenderer.tsx:209
 msgid "No settings yet."
 msgstr ""
 
@@ -18813,12 +18823,12 @@ msgid "Open a song from your list, then choose Studio."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:72
+#: ../backend/src/routes/settings.ts:73
 msgid "settings.attention.ai.open"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:89
+#: ../backend/src/routes/settings.ts:90
 msgid "settings.attention.apps.open"
 msgstr ""
 
@@ -18911,7 +18921,7 @@ msgid "Open one to play it and see everything you can do."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:78
+#: ../backend/src/routes/settings.ts:79
 msgid "settings.attention.repairs.open"
 msgstr ""
 
@@ -20636,7 +20646,7 @@ msgid "Reading the details…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:73
+#: ../backend/src/routes/settings.ts:74
 msgid "settings.attention.ai.ready"
 msgstr ""
 
@@ -21873,7 +21883,7 @@ msgid "setting.robot.initiative.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:90
+#: ../backend/src/routes/settings.ts:91
 msgid "settings.attention.robots.off"
 msgstr ""
 
@@ -22115,7 +22125,7 @@ msgid "Save audience"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:65
+#: ../backend/src/routes/settings.ts:66
 msgid "settings.attention.backup_key.action"
 msgstr ""
 
@@ -23044,7 +23054,7 @@ msgid "Set up away access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:81
+#: ../backend/src/routes/settings.ts:82
 msgid "settings.attention.backups.open"
 msgstr ""
 
@@ -23079,12 +23089,12 @@ msgid "Set up standard coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:98
+#: ../backend/src/routes/settings.ts:99
 msgid "settings.attention.search.open"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:100
+#: ../backend/src/routes/settings.ts:101
 msgid "settings.attention.search.setup"
 msgstr ""
 
@@ -23240,9 +23250,9 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
 #: src/shell/pages/settings/SettingsAreaPage.tsx:293
-#: src/shell/pages/settings/SettingsHomePage.tsx:45
 #: src/shell/pages/settings/SettingsHomePage.tsx:46
 #: src/shell/pages/settings/SettingsHomePage.tsx:47
+#: src/shell/pages/settings/SettingsHomePage.tsx:48
 #: src/shell/Routes.tsx:510
 msgid "Settings"
 msgstr ""
@@ -23268,7 +23278,7 @@ msgid "setting.setup.checklist_dismissed.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:66
+#: ../backend/src/routes/settings.ts:67
 msgid "settings.attention.setup.complete"
 msgstr ""
 
@@ -23404,7 +23414,7 @@ msgid "Show {count} more"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:238
+#: src/shell/pages/settings/SettingsRenderer.tsx:239
 msgid "Show {length} advanced settings"
 msgstr ""
 
@@ -23735,6 +23745,11 @@ msgstr ""
 #: src/shell/pages/EnginesPage.tsx:93
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
 msgid "Since"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/settings/SettingsHomePage.tsx:60
+msgid "Since {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25703,7 +25718,7 @@ msgstr ""
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:283
-#: src/shell/pages/settings/SettingsRenderer.tsx:183
+#: src/shell/pages/settings/SettingsRenderer.tsx:184
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82
 #: src/shell/pages/status/StatusBoard.tsx:41
@@ -26052,12 +26067,12 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:77
+#: ../backend/src/routes/settings.ts:78
 msgid "settings.attention.health.line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:69
+#: ../backend/src/routes/settings.ts:70
 msgid "settings.attention.install.failed"
 msgstr ""
 
@@ -26328,7 +26343,7 @@ msgid "The helper works only when Home runs on a Mac, so Close apps stays Off on
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:37
+#: src/shell/pages/settings/SettingsHomePage.tsx:38
 msgid "The home"
 msgstr ""
 
@@ -28188,7 +28203,7 @@ msgid "setting.news.shelf.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:165
+#: src/shell/pages/settings/SettingsRenderer.tsx:166
 msgid "Turn this feature off?"
 msgstr ""
 
@@ -29694,17 +29709,17 @@ msgid "area.Web search and memory settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:96
+#: ../backend/src/routes/settings.ts:97
 msgid "settings.attention.search.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:99
+#: ../backend/src/routes/settings.ts:100
 msgid "settings.attention.search.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:101
+#: ../backend/src/routes/settings.ts:102
 msgid "settings.attention.search.ready"
 msgstr ""
 
@@ -31020,12 +31035,12 @@ msgid "api.error.upload_profile_gone"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:88
+#: ../backend/src/routes/settings.ts:89
 msgid "settings.attention.robots.line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:60
+#: ../backend/src/routes/settings.ts:61
 msgid "settings.attention.personal.summary"
 msgstr ""
 
@@ -31164,7 +31179,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:157
-#: src/shell/pages/settings/SettingsHomePage.tsx:36
+#: src/shell/pages/settings/SettingsHomePage.tsx:37
 msgid "Yours"
 msgstr ""
 

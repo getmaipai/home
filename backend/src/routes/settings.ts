@@ -32,11 +32,11 @@ import { closeRobotSttSockets } from "@/routes/stt";
 import { startRobotHosts, stopRobotHosts } from "@/lib/robotHost";
 import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
-import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { raiseIssue } from "@/lib/issues";
 import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
 import { apiError } from "@/lib/apiErrorCopy";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { listIssues } from "@/lib/issues";
+import { listIssues, resolveIssue } from "@/lib/issues";
 import { cachedInstallStatus } from "@/lib/installStatus";
 import { cachedRoleHealth } from "@/lib/roleHealth";
 import { listBackups } from "@/lib/backup";
@@ -46,12 +46,13 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
 import { getSettingsAreas } from "@/lib/settingsAreas";
 import { formatMessage, type MessageDescriptor } from "@/lib/failureCopy";
+import { issueStillTrue } from "@/lib/issueStillTrue";
 
 export const settingsRoutes = apiRouter();
 
 const AttentionItemSchema = z.object({
   id: z.string(), kind: z.enum(["problem", "missing", "not_set_up"]), area: z.string(), title: z.string(), line: z.string(),
-  action: z.object({ label: z.string(), href: z.string() }),
+  since: z.string().nullable().optional(), action: z.object({ label: z.string(), href: z.string() }),
 });
 const AttentionStateSchema = z.object({ state: z.enum(["ok", "missing", "problem", "off", "not_set_up"]), summary: z.string() });
 const AttentionSchema = z.object({ items: z.array(AttentionItemSchema), areas: z.record(z.string(), AttentionStateSchema) });
@@ -126,9 +127,13 @@ settingsRoutes.openapi(attentionRoute, async (c) => {
   const areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> = {};
   const source = async <T,>(read: () => T | Promise<T>, apply: (value: T) => void) => { try { apply(await read()); } catch { /* A failed source has no item and cannot fail the page. */ } };
 
-  await source(() => listIssues(), (issues) => {
+  await source(async () => {
+    const issues = await Promise.all(listIssues().map(async (issue) => ({ issue, stillTrue: await issueStillTrue(issue) })));
+    for (const { issue, stillTrue } of issues) if (!stillTrue) resolveIssue(issue.source, issue.key, { suppressNotification: true });
+    return issues.filter((row) => row.stillTrue).map((row) => row.issue);
+  }, (issues) => {
     if (issues.length) {
-      for (const issue of issues) items.push({ id: `repair-${issue.id}`, kind: "problem", area: "advanced", title: issue.title, line: issue.detail, action: { label: attentionCopy("repairsOpen"), href: "/repairs" } });
+      for (const issue of issues) items.push({ id: `repair-${issue.id}`, kind: "problem", area: "advanced", title: issue.title, line: issue.detail, since: issue.created_at ?? null, action: { label: attentionCopy("repairsOpen"), href: "/repairs" } });
       areas.advanced = { state: "problem", summary: issues.length === 1 ? attentionCopy("repairsOne") : attentionCopy("repairsMany", { count: issues.length }) };
     }
   });

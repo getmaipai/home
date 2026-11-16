@@ -86,13 +86,28 @@ export function installHiddenReloadOnNewServiceWorker(container: ServiceWorkerCo
   if (!container.controller) return;
   let pending = false;
   let reloaded = false;
+  const originalPushState = win.history.pushState;
+  let pushStateInstalled = false;
+  const installNavigationReload = () => {
+    if (pushStateInstalled || reloaded) return;
+    pushStateInstalled = true;
+    win.history.pushState = function (...args: Parameters<History["pushState"]>) {
+      win.history.pushState = originalPushState;
+      pushStateInstalled = false;
+      reloaded = true;
+      const url = args[2];
+      win.location.assign(url == null ? win.location.href : String(url));
+    };
+  };
   const reloadIfHidden = () => {
     if (!pending || reloaded || doc.visibilityState !== "hidden") return;
     reloaded = true;
+    if (pushStateInstalled) win.history.pushState = originalPushState;
     win.location.reload();
   };
   container.addEventListener("controllerchange", () => {
     pending = true;
+    installNavigationReload();
     reloadIfHidden();
   });
   doc.addEventListener("visibilitychange", reloadIfHidden);

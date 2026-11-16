@@ -16,6 +16,7 @@ import { baseViewer } from "@/shell/pages/settings/settingsViewer";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { settingsArea } from "@/shell/pages/settings/settingsAreas";
 import { Fragment, useState } from "react";
+import { formatDate } from "@/lib/format";
 
 const emptyArea: SettingsAreaDef = { id: "settings", title: "Settings", audience: { min_role: "child" }, groups: [], sections: [] };
 
@@ -56,7 +57,7 @@ export function SettingsHomePage({ person }: { person: Roster }) {
       <Card><CardHeader><CardTitle>{i18n._({ id: "Needs attention · {count}", message: "Needs attention · {count}", values: { count: summary?.items.length ?? 0 } })}</CardTitle></CardHeader><CardContent><ItemGroup>
         {attention.isLoading ? null : (summary?.items.length ?? 0) === 0
           ? <StatusCard kind="done" title={i18n._({ id: "Everything is fine.", message: "Everything is fine." })} line={i18n._({ id: "Checked just now.", message: "Checked just now." })} />
-          : summary!.items.map((item) => <StatusCard key={item.id} kind={item.kind === "problem" ? "problem" : "attention"} title={item.title} line={item.line} action={{ label: item.action.label, onSelect: () => navigate(item.action.href) }} />)}
+          : summary!.items.map((item) => <StatusCard key={item.id} kind={item.kind === "problem" ? "problem" : "attention"} title={item.title} line={item.since ? `${item.line} · ${i18n._({ id: "Since {date}", message: "Since {date}", values: { date: formatDate(item.since, { month: "short", day: "numeric" }) } })}` : item.line} action={{ label: item.action.label, onSelect: () => navigate(item.action.href) }} />)}
       </ItemGroup></CardContent></Card>
       {shownGroups.map(([title, sections]) => sections.length ? <section key={title} className="flex flex-col gap-2"><h2 className="text-section font-semibold">{title}</h2><ItemGroup variant="card" role="list" aria-label={title}>
         {sections.map((section, index) => {

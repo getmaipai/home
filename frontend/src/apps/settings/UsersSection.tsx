@@ -231,7 +231,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
         {(loadedRoster) => (
         <PlainSection {...(headed ? { heading: i18n._({ id: "Users", message: "Users" }) } : {})}>
           {companionKey ? <Field>
-            <FieldLabel htmlFor="household-companions-allowed"><Switch size="md" id="household-companions-allowed" checked={Boolean(householdCompanionsAllowed)} disabled={companionsSaving} onCheckedChange={(checked) => setHouseholdCompanionsAllowed(checked === true)} />{companionKey.label}</FieldLabel>
+            <FieldLabel htmlFor="household-companions-allowed"><Switch size="md" id="household-companions-allowed" checked={Boolean(householdCompanionsAllowed)} disabled={companionsSaving} onCheckedChange={(checked) => setHouseholdCompanionsAllowed(checked === true)} />{i18n._({ id: "AI companions for everyone", message: "AI companions for everyone" })}</FieldLabel>
             <FieldDescription>{companionKey.help}</FieldDescription>
           </Field> : null}
           {deletable.length > 0 ? (
@@ -357,7 +357,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
                       <span className="text-sm text-muted-foreground">{ROLE_LABELS[p.role]}</span>
                     </div>
                   </div>
-                  <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
+                  <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows labelOverrides={{ "companions.allowed": i18n._({ id: "AI companions for {name}", message: "AI companions for {name}", values: { name: p.display_name } }) }} />
                 </div>
               );
             }}

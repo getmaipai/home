@@ -36,9 +36,8 @@ test("the add form's companions box defaults to the household value", async () =
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
-    await waitFor(() => expect(view.getAllByRole("checkbox", { name: "AI companions" }).length).toBe(1));
-    expect(view.getByRole("checkbox", { name: "AI companions" }).getAttribute("aria-checked")).toBe("false");
-    expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(2);
+    await waitFor(() => expect(view.getByRole("checkbox", { name: "AI companions" }).getAttribute("aria-checked")).toBe("false"));
+    expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy();
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 
@@ -60,7 +59,8 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
     for (const role of ["owner", "admin"] as const) {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: `${role}-id`, role, display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
-      await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" }).length).toBe(rows.length + 1));
+    await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
+    expect(view.getByRole("switch", { name: "AI companions for Jordan" })).toBeTruthy();
       view.unmount();
     }
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
@@ -79,7 +79,8 @@ test("preview shells does not appear on the Users card", async () => {
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
-    await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(rows.length + 1));
+    await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
+    expect(view.getByRole("switch", { name: "AI companions for Sage" })).toBeTruthy();
     expect(view.queryByRole("switch", { name: previewShellKey.label })).toBeNull();
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });

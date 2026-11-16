@@ -26,7 +26,7 @@ function addPerson(id: string, role: string) {
 async function attention(token: string) {
   const response = await app.request("http://localhost/api/settings/attention", { headers: { cookie: `session=${token}` } });
   expect(response.status).toBe(200);
-  return await response.json() as { items: Array<{ id: string; kind: string; area: string; title: string; line: string; action: { label: string; href: string } }>; areas: Record<string, { state: string; summary: string }> };
+  return await response.json() as { items: Array<{ id: string; kind: string; area: string; title: string; line: string; since: string | null; action: { label: string; href: string } }>; areas: Record<string, { state: string; summary: string }> };
 }
 
 beforeEach(() => resetDb());
@@ -68,11 +68,34 @@ describe("GET /api/settings/attention", () => {
     db.insert(devices).values({ id: "robot-attnsource", kind: "robot", name: "Kitchen robot", personId: person.id, createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
     const result = await attention(token);
     expect(result.items.some((item) => item.title === "Search service stopped" && item.area === "advanced")).toBe(true);
+    expect(result.items.find((item) => item.title === "Search service stopped")?.since).toMatch(/^\d{4}-\d\d-\d\dT/);
     expect(result.items.some((item) => item.id === "backup-key")).toBe(true);
     expect(result.items.some((item) => item.id === "install" && item.line === "The model download stopped.")).toBe(true);
     expect(result.items.some((item) => item.id === "engine-health")).toBe(true);
     expect(result.items.some((item) => item.id === "backups-empty")).toBe(true);
     expect(result.items.some((item) => item.id === "robots-never-connected")).toBe(true);
+  });
+
+  test("resolves recognized stale engine causes and keeps unknown issues visible", async () => {
+    const { token } = addPerson("person-attnstale", "owner");
+    await raiseIssue({ source: "video-engine", key: "died", severity: "error", title: "No engine can be started for video on this machine yet", detail: "old", suppressNotification: true });
+    await raiseIssue({ source: "unknown-source", key: "old", severity: "warning", title: "Unknown repair", detail: "keep", suppressNotification: true });
+    __setRoleHealthForTests({ video: { availability: "ready", reason: null } });
+    const result = await attention(token);
+    expect(result.items.some((item) => item.title === "No engine can be started for video on this machine yet")).toBe(false);
+    expect(result.items.find((item) => item.title === "Unknown repair")?.since).toMatch(/^\d{4}-\d\d-\d\dT/);
+    expect(issueStore.listIssues({ includeResolved: true }).find((issue) => issue.source === "video-engine")?.resolved_at).not.toBeNull();
+  });
+
+  test("resolves recognized stale engine causes and keeps unknown issues visible", async () => {
+    const { token } = addPerson("person-attnstale", "owner");
+    await raiseIssue({ source: "video-engine", key: "died", severity: "error", title: "No engine can be started for video on this machine yet", detail: "old", suppressNotification: true });
+    await raiseIssue({ source: "unknown-source", key: "old", severity: "warning", title: "Unknown repair", detail: "keep", suppressNotification: true });
+    __setRoleHealthForTests({ video: { availability: "ready", reason: null } });
+    const result = await attention(token);
+    expect(result.items.some((item) => item.title === "No engine can be started for video on this machine yet")).toBe(false);
+    expect(result.items.find((item) => item.title === "Unknown repair")?.since).toMatch(/^\d{4}-\d\d-\d\dT/);
+    expect(issueStore.listIssues({ includeResolved: true }).find((issue) => issue.source === "video-engine")?.resolved_at).not.toBeNull();
   });
 
   test("disabled web search is an empty ok attention shape for that source", async () => {
