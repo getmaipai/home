@@ -80,7 +80,14 @@
     {
       "type": "media_shelf",
       "heading": "Templates",
-      "bind": { "source": "package", "path": "recipes", "params": { "scope": "templates", "limit": 8 } },
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "limit": 8
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
@@ -91,7 +98,14 @@
       "card_radius": "tight",
       "press_scale": true,
       "hide_when_empty": true,
-      "on_select": { "navigate": { "to": "/apps/video/create", "state": { "template": "{id}" } } }
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      }
     },
     {
       "type": "media_shelf",
@@ -335,19 +349,72 @@
               "label": "Re-shoot",
               "icon": "rotate-ccw",
               "starts": "video",
-              "action": { "call": { "target": "/api/plugins/video/actions/reshoot", "method": "POST", "args": { "id": "{id}" } } }
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshoot",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
             },
             {
               "label": "Next shot",
               "icon": "video",
               "starts": "video",
-              "action": { "call": { "target": "/api/plugins/video/actions/next-shot", "method": "POST", "args": { "id": "{id}", "shot": "push_in" } } }
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/next-shot",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "shot": "push_in"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Extend",
+              "icon": "arrow-right",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/extend",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Colorize",
+              "icon": "palette",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/colorize",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
             },
             {
               "label": "Hide or show again",
               "icon": "eye-off",
               "show_when": "can_hide",
-              "action": { "call": { "target": "/api/plugins/video/actions/hide", "method": "POST", "args": { "id": "{id}" } } }
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/hide",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
             },
             {
               "label": "Open in Studio",
