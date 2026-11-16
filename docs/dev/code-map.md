@@ -45,7 +45,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/audio/pages/studio.json` | audio | Studio |
 | `backend/packages/audio/pages/styles.json` | audio | Styles |
 | `backend/packages/audio/pages/voice-library.json` | audio | Voices |
-| `backend/packages/audio/pages/voices.json` | audio | Voices |
+| `backend/packages/audio/pages/voices.json` | audio | Speech |
 | `backend/packages/books/pages/audiobooks.json` | books | Audiobooks |
 | `backend/packages/books/pages/books.json` | books | Books |
 | `backend/packages/books/pages/detail.json` | books | Book detail |
@@ -153,7 +153,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
-| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, soundHintOf, soundCardCopy, useMusicTrackProps |
+| `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, soundHintOf, soundCardCopy, speechCardCopy, useMusicTrackProps |
 | `frontend/src/apps/chat/branchInNewChatMenuItem.tsx` | BranchInNewChatMenuItem |
 | `frontend/src/apps/chat/chatActionBar.tsx` | useFeedbackFormStore, createChatFeedbackAdapter, clearSubmittedFeedback |
 | `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, textWithAnswerParts, AnswerBlockDataRender |
@@ -344,6 +344,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MusicLikeThisPage.tsx` | BAND_PROMPT, SONG_PROMPT, likeThisMessage, MusicLikeThisPage |
 | `frontend/src/shell/pages/MusicRemix.tsx` | remixRequest, RemixSong |
 | `frontend/src/shell/pages/MusicSongDetails.tsx` | useBedPicker, songReason, SongDetails |
+| `frontend/src/shell/pages/MusicSpeechPage.tsx` | MusicSpeechPage |
 | `frontend/src/shell/pages/MusicStudioPages.tsx` | STUDIO_PAGE_IDS, isStudioPage, COLLECTION, createBody, CreatePage, MusicStudioPage |
 | `frontend/src/shell/pages/MusicStudioView.tsx` | STEMS_UNAVAILABLE_LINE, EFFECT_FAILED_LINE, NO_AUDIO_TOOL_LINE, timeLabel, MusicStudioView |
 | `frontend/src/shell/pages/MusicVoiceCreate.tsx` | VOICE_UNAVAILABLE_LINE, tagsOf, withTag, useVoiceMode, VoiceResults |
@@ -1162,6 +1163,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
 | `backend/src/lib/speculation.ts` | SPECULATIVE_START_KEY, SPECULATION_HOLD_MS, SPECULATION_MAX_WORDS, newSpeculationHold, speculationCounters, noteSpeculation |
 | `backend/src/lib/speechDictionary.ts` | speechDictionary |
+| `backend/src/lib/speechJobs.ts` | tagsForDelivery, startSpeechJob, resumeSpeechJob |
 | `backend/src/lib/spokenArg.ts` | wantsSpoken |
 | `backend/src/lib/spokenText.ts` | toSpokenText |
 | `backend/src/lib/spokenTextEs.ts` | spanishNumber, spanishSpoken, SPOKEN_LINES_ES |
@@ -1387,7 +1389,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceSamples.ts` | __enhanceForTests, ECHO_FALLBACK_NOTICE, removeEcho, __isolateForTests, isolateVoice, cleanFilter |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
-| `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, voiceoverToolSpec, changeVoiceToolSpec, makeInspiredVoiceToolSpec |
+| `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, voiceoverToolSpec, makeSpeechToolSpec |
 | `backend/src/lib/voiceTrace.ts` | VOICE_TRACE_EVENTS, TraceEntrySchema, VoiceTraceUploadSchema, storeVoiceTrace, voiceTraces, formatVoiceTrace |
 | `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
