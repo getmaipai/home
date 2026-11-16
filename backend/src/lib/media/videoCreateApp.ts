@@ -17,7 +17,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
 import { syncLoras } from "@/lib/loras/sync";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
-import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, h3EndPictureReady, h3VideoReady, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason, videoStatusReady } from "@/lib/videos/ready";
 import { MAX_TAKE_SECONDS } from "@/lib/videos/longTake";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
@@ -202,7 +202,7 @@ registerAppPageFill("video", "create", (person, page) => {
   // VIDEO-INPUTS-03: a second picture slot (the clip ends on it) only where the maker reports `end_image`; the kit's `row` slot sits beside the Start picture's field slot.
   const engineNow = peekVideoEngineStatus();
   const refs = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).filter((ref) => ref.state !== "end_frame") : [];
-  if (ltx25EndPictureReady(engineNow) || ltx25EndPictureReady(engineNow, true)) refs.push({ state: "end_frame", label: "End image", kind: "picture" });
+  if (h3EndPictureReady(engineNow) || ltx25EndPictureReady(engineNow) || ltx25EndPictureReady(engineNow, true)) refs.push({ state: "end_frame", label: "End image", kind: "picture" });
   bar.references = refs;
   // Make it Max shows only when this person holds Max and the Stack reports the Max model ready (the same offer the level segment makes); otherwise the
   // action is not drawn, so nobody presses a button whose answer is a refusal.
@@ -297,7 +297,7 @@ export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ l
   add("Prompt", creation.words?.written ?? creation.words?.composed);
   const engine = creation.generation?.engine.id;
   const model = creation.generation?.model.id;
-  const modelWords = model === "unknown" || !model ? null : model === "ltx25-q8" ? "LTX-2.5" : model === "ltx25-max" ? "LTX-2.5 Max" : model.toLowerCase().includes("wan") ? "Wan" : null;
+  const modelWords = model === "unknown" || !model ? null : model === "minimax-h3" ? "MiniMax H3" : model === "ltx25-q8" ? "LTX-2.5" : model === "ltx25-max" ? "LTX-2.5 Max" : model.toLowerCase().includes("wan") ? "Wan" : null;
   add("Engine and model", engine && engine !== "unknown" && modelWords ? `${engine}, ${modelWords}` : modelWords ?? (engine && engine !== "unknown" ? engine : null));
   add("Length", creation.generation?.duration_s ? `${creation.generation.duration_s} seconds` : creation.settings?.seconds ? `${creation.settings.seconds} seconds` : null);
   const { width, height } = creation.settings ?? {};

@@ -5,7 +5,7 @@
 import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { videoStatus, type StackVideoStatus } from "./stack";
-import { ltx25MaxReady, ltx25VideoReady, quickVideoReady } from "./quality";
+import { h3VideoReady, ltx25MaxReady, ltx25VideoReady, quickVideoReady } from "./quality";
 
 let cached: { at: number; status: StackVideoStatus | null } | null = null;
 let forTests: StackVideoStatus | null | undefined;
@@ -41,7 +41,7 @@ export function dropVideoStatusCache(): void { cached = null; }
 export function videoStatusReady(status: StackVideoStatus | null, adult = false): boolean {
   if (!status) return false;
   if (status.available === false) return false;
-  return quickVideoReady(status) || (adult && (ltx25VideoReady(status) || ltx25MaxReady(status)));
+  return quickVideoReady(status) || (adult && (h3VideoReady(status) || ltx25VideoReady(status) || ltx25MaxReady(status)));
 }
 
 export async function videoEngineReady(adult = false): Promise<boolean> {

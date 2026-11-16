@@ -26,7 +26,7 @@ import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
-import { DETAILED_MAX_SECONDS, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
+import { DETAILED_MAX_SECONDS, H3_MODEL, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, h3EndPictureReady, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
 import { StackVideoError } from "./stack";
 import { videoLookFor, videoRecipeFor, videoVoicesFor, withVideoLook, withVideoRecipe, withVideoVoices } from "./recipes";
 import { subjectsForNames } from "@/lib/mediaSubjects";
@@ -234,7 +234,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   }
   if (loop) {
     if (!image) return styleRefusal(callId, args, "A loop needs a starting picture. Choose a picture first.", "loop_needs_start");
-    const supported = ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true || ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true;
+    const supported = h3EndPictureReady(engine) || ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true || ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true;
     if (!supported) return styleRefusal(callId, args, "This computer's video model cannot make a loop yet.", "loop_unavailable");
     endImage = image;
     endFileId = sourceFileId;
@@ -259,7 +259,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
   const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
   if (ending || loop) {
-    const endMaker = maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
+    const endMaker = h3EndPictureReady(engine) ? "h3" : maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
     if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });
     choice.maker = endMaker; choice.quality = "quick"; choice.seconds = Math.min(choice.seconds, endMaker === "ltx25max" ? 10 : 10); choice.note = null;
   }
@@ -268,7 +268,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. That style is no longer available. Choose another style or leave it out." }, data: { refused: "retired_style_base" }, actions: [] } });
   }
   // VIDEO-LORA-09: every chosen style must be made for the kind of video this clip is; a style is never dropped to make a clip start. (Design 6.4.)
-  const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx25: "ltx-2.5", ltx25max: "ltx-2.5" } as const)[choice.maker];
+  if (choice.maker === "h3" && adapters.length > 0) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
+  const makerBase = ({ wan: "wan2.2-ti2v-5b", ltx25: "ltx-2.5", ltx25max: "ltx-2.5", h3: "minimax-h3" } as const)[choice.maker];
   if (adapters.length > 0) {
     if (adapter?.base_model === "ltx-2.5" && choice.maker === "wan") return styleRefusal(callId, args, "That style needs the newer video model, which is not ready here. An admin can add it in Settings, Models and storage.", "style_needs_model");
     if (adapters.some((a) => !runsOn(a.lora, makerBase))) {
@@ -284,6 +285,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const seconds = kid ? Math.min(choice.seconds, KID_MAX_SECONDS) : choice.seconds;
   const size = videoSizeFor(choice.maker, choice.quality, portrait, engine);
   const ltx25 = choice.maker === "ltx25" || choice.maker === "ltx25max";
+  const h3 = choice.maker === "h3";
   const maxMade = choice.maker === "ltx25max";
   // Max asked for and ready, but this clip uses a style, or starts from a picture this Stack cannot start a Max clip from (VIDEO-INPUTS-01): say it was not made at Max.
   const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || (adapters.length > 0 && !ltx25Route)) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
@@ -328,7 +330,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         seed: typeof args.seed === "number" && Number.isInteger(args.seed) && args.seed > 0 && args.seed < 2_147_483_647 ? args.seed : Math.floor(Math.random() * 2_147_483_647),
         size,
         seconds,
-        ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : {}),
+        ...(maxMade ? { model: LTX25_MAX_MODEL } : ltx25 ? { model: LTX25_MODEL } : h3 ? { model: H3_MODEL } : {}),
         audience: endAudience === "adult-only" || castAdult || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
@@ -341,7 +343,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second ${ltx25 ? "" : choice.quality === "detailed" ? "Detailed " : ""}video${ltx25 ? ", with sound," : ""} is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds, choice.maker)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${maxWordsOnly}${lengthNote}${soundNote}` },
+        reply: { text: `A ${seconds} second ${ltx25 ? "" : choice.quality === "detailed" ? "Detailed " : ""}video${ltx25 || h3 ? ", with sound," : ""} is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds, choice.maker)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${qualityNote}${maxWordsOnly}${lengthNote}${soundNote}` },
         data: { videoJobId: job.id },
         actions: [],
       },

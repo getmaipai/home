@@ -74,6 +74,14 @@ export interface StackLtx25Profile {
   admit_gb?: number;
   short_peak_gb?: number;
 }
+export interface StackH3Quality {
+  id: string; installed: boolean; available: boolean; ready: boolean; audio: boolean;
+  image_to_video: boolean; end_image: boolean; video_to_video: false;
+  reference_pictures: boolean; reference_videos: boolean; reference_audio: boolean;
+  memory: { fits: boolean; reason: string | null; peak_gb: number };
+  limits: Record<string, number | string>; loras: { supported: boolean };
+  licence: { id: string; name: string; url: string } | null;
+}
 
 /** VIDEO-TIERS-01: LTX-2.5 (sound, adults only), as `GET /stack/v1/video` reports it. Absent on a Stack that does not serve it. */
 export interface StackLtx25Quality {
@@ -111,7 +119,7 @@ export interface StackVideoStatus {
   audio: boolean;
   reference_images?: { generated: boolean; uploaded: boolean; reason: string };
   /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
-  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality; /** LTX25-MAX-01: the Max profile, the same shape as `ltx25` with one `max` profile; absent on a Stack that lacks it. */ ltx25max?: StackLtx25Quality & { extend?: boolean; retake?: boolean; extend_seconds?: { min: number; max: number }; retake_from_seconds?: { min: number; max: number } } };
+  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality; ltx25?: StackLtx25Quality; /** LTX25-MAX-01: the Max profile, the same shape as `ltx25` with one `max` profile; absent on a Stack that lacks it. */ ltx25max?: StackLtx25Quality & { extend?: boolean; retake?: boolean; extend_seconds?: { min: number; max: number }; retake_from_seconds?: { min: number; max: number } }; h3?: StackH3Quality };
 }
 
 export interface StackVideoLora {

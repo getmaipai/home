@@ -19,7 +19,9 @@ export const LTX25_MAX_MODEL = "ltx25-max";
 /** The Max size and ceiling used until the Stack's own `max` profile says otherwise (a profile can only lower the ceiling). */
 export const LTX25_MAX_DEFAULTS = { landscape: "1024x576", portrait: "576x1024", max_seconds: 10 };
 /** Which model makes a clip: Wan (silent), LTX-2.5 (sound) or LTX-2.5 Max (sound). */
-export type VideoMaker = "wan" | "ltx25" | "ltx25max";
+export type VideoMaker = "wan" | "ltx25" | "ltx25max" | "h3";
+export const H3_MODEL = "minimax-h3";
+export const H3_DEFAULTS = { landscape: "864x480", portrait: "480x864", max_seconds: 5 };
 /** The true LTX-2.5 sizes (the engine rounds heights to a multiple of 64; docs/design/video-tiers-2026-11-02.md section 3) and ceilings, used when the Stack's own `profiles` are missing. Standard is 512x256 for 10 s; Boost 768x448 for 5 s (640x320 is the smaller Boost size). */
 export const LTX25_DEFAULTS: Record<"standard" | "boost", { landscape: string; portrait: string; max_seconds: number }> = {
   standard: { landscape: "512x256", portrait: "256x512", max_seconds: 10 },
@@ -31,6 +33,7 @@ export const qualityOfBase = (base: string | null | undefined): VideoQuality | n
 /** The ceiling of each level. Wan: 5 s. LTX-2.5: Standard 10 s, Boost 5 s. A Stack profile's own `max_seconds` lowers it. */
 export function maxSecondsFor(quality: VideoQuality, maker: VideoMaker = quality === "detailed" ? "ltx25" : "wan", engine?: Pick<StackVideoStatus, "qualities"> | null): number {
   if (maker === "wan") return QUICK_MAX_SECONDS;
+  if (maker === "h3") return H3_DEFAULTS.max_seconds;
   if (maker === "ltx25max") return Math.min(LTX25_MAX_DEFAULTS.max_seconds, ltx25MaxProfile(engine ?? null)?.max_seconds ?? Infinity);
   const level = quality === "detailed" ? "boost" : "standard";
   return Math.min(LTX25_DEFAULTS[level].max_seconds, ltx25Profile(engine ?? null, level)?.max_seconds ?? Infinity);
@@ -50,6 +53,9 @@ export function ltx25VideoReady(engine: Pick<StackVideoStatus, "qualities"> | nu
 export function ltx25MaxReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
   return engine?.qualities?.ltx25max?.ready === true;
 }
+export function h3VideoReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean { return engine?.qualities?.h3?.ready === true; }
+export function h3PictureReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean { return h3VideoReady(engine) && engine?.qualities?.h3?.image_to_video === true; }
+export function h3EndPictureReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean { return h3PictureReady(engine) && engine?.qualities?.h3?.end_image === true; }
 /** VIDEO-INPUTS-01: the Stack says an LTX-2.5 Standard or Boost clip can start from a picture (`qualities.ltx25.image_to_video` exactly `true`). Read from the Stack, never assumed. */
 export function ltx25PictureReady(engine: Pick<StackVideoStatus, "qualities"> | null): boolean {
   return ltx25VideoReady(engine) && engine?.qualities?.ltx25?.image_to_video === true;
@@ -73,6 +79,7 @@ export function ltx25Profile(engine: Pick<StackVideoStatus, "qualities"> | null,
 }
 /** The size to ask for: LTX-2.5's true size from the Stack's profile (else the table above); the older makers keep their own. */
 export function videoSizeFor(maker: VideoMaker, quality: VideoQuality, portrait: boolean, engine?: Pick<StackVideoStatus, "qualities"> | null): string {
+  if (maker === "h3") return H3_DEFAULTS[portrait ? "portrait" : "landscape"];
   if (maker === "ltx25max") {
     const profile = ltx25MaxProfile(engine ?? null);
     if (profile) return portrait ? `${profile.height}x${profile.width}` : `${profile.width}x${profile.height}`;
@@ -120,6 +127,7 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
   const base = qualityOfBase(input.style?.base_model);
   const quickOk = quickVideoReady(input.engine);
   const detailedOk = input.adultLane === true && ltx25VideoReady(input.engine);
+  const h3Ok = input.adultLane === true && h3VideoReady(input.engine);
   // VIDEO-TIERS-01: LTX-2.5 serves an adult's clip made from words (no style; no picture unless the Stack says it can start from one) when the Stack says it is ready. Standard is then
   // 10 s with sound and Boost 5 s with sound; anything else keeps today's models exactly.
   // VIDEO-INPUTS-01: a picture start rides the same models once the Stack reports `image_to_video` for them; an older Stack keeps pictures on the old makers.
@@ -133,6 +141,7 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
   if (ltx25MaxOk) return fit("detailed", null, true, "ltx25max");
   if (input.quickOnly) return fit("quick", null, false);
   if (input.style && input.style.base_model === "ltx-2.3") return fit("quick", null, false);
+  if (h3Ok && input.requested === "detailed" && (!input.hasPicture || h3PictureReady(input.engine))) return fit("detailed", null, true, "h3");
   if (input.style && base) {
     if (base === "detailed") return ltx25Ok ? fit("detailed", input.requested === "quick" ? "style_needs_quick" : null, input.requested === "quick", "ltx25") : fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
     return fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);

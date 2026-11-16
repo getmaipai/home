@@ -7,7 +7,7 @@ import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import type { AgeBand } from "@/lib/ageBand";
 import { slotRun, type Tier } from "@/lib/tiers";
-import { LTX25_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
+import { H3_MODEL, LTX25_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
 import type { StackVideoStatus, VideoBody } from "@/lib/videos/stack";
 
 type Body = Omit<VideoBody, "timeout_ms">;
@@ -63,6 +63,14 @@ export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lan
     base = { ...base, model: LTX25_MODEL, size: portrait ? LTX25_DEFAULTS.standard.portrait : LTX25_DEFAULTS.standard.landscape };
     body.model = base.model;
     body.size = base.size;
+  }
+  if (base.model === H3_MODEL) {
+    const [w = 864, h = 480] = (base.size ?? "864x480").split("x").map(Number);
+    const portrait = h > w;
+    body.size = videoSizeFor("h3", "detailed", portrait, engine);
+    if (body.seconds !== undefined) body.seconds = Math.max(1, Math.min(body.seconds, maxSecondsFor("detailed", "h3", engine)));
+    body.tier = "boost";
+    return { body, tier: run.tier, quality: "detailed" };
   }
   if (base.model === LTX25_MODEL && lane === "adult" && (!slotModel || !qualityOfSlotModel(slotModel) || slotModel.startsWith("ltx25"))) {
     const level: VideoQuality = run.tier === "standard" ? "quick" : "detailed";
