@@ -122,6 +122,7 @@ const MediaSearchPage = lazyNamed(() => import("@/shell/pages/MediaSearchPage"),
 const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
 const MicTestPage = lazyNamed(() => import("@/shell/pages/MicTestPage"), "MicTestPage");
 const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/SettingsAreaPage"), "SettingsAreaPage");
+const SettingsHomePage = lazyNamed(() => import("@/shell/pages/settings/SettingsHomePage"), "SettingsHomePage");
 const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), "SetupReviewPage");
 
 // NOTIF-ROUTE-01: the thirty-day history page, reached from the bell's
@@ -258,6 +259,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   // On a phone the chat header already shows the companion's picture; a second round avatar at the top right repeats it.
   const onPhone = useBreakpoint().tier === "phone";
   const phoneChat = onChatPage && onPhone;
+  const legacySettingsQuery = new URLSearchParams(location.search).has("tab") || new URLSearchParams(location.search).has("section");
   const ambient = useAmbientCompanion(person);
   const [ring, setRing] = useState<AmbientRing>(null);
   const [findProblem, setFindProblem] = useState("");
@@ -519,7 +521,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
               PageHeaderLayout. `/settings` and every old `?tab=` link
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="storage/trash" element={<TrashPage person={person} />} />
-          <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
+          <Route path="settings" element={legacySettingsQuery ? <SettingsEntryRedirect person={person} /> : <Suspense fallback={<RouteSkeleton />}><SettingsHomePage person={person} /></Suspense>} />
           <Route path="settings/home/robot/:robotId" element={<LegacySettingsRedirect person={person} />} />
           <Route path="settings/home" element={<LegacySettingsRedirect person={person} />} />
           <Route path="settings/account" element={<LegacySettingsRedirect person={person} />} />

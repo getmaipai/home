@@ -153,6 +153,15 @@ export function summarizeInstall(allJobs: StackJob[]): InstallStatus {
 let cache: { at: number; value: InstallStatus } | null = null;
 const CACHE_MS = 1500;
 
+/** The last already-read install summary. Settings attention uses this view
+ * without causing another Stack job-list request. */
+export function cachedInstallStatus(): InstallStatus | null {
+  return cache && Date.now() - cache.at < CACHE_MS ? cache.value : null;
+}
+export function __setInstallStatusForTests(value: InstallStatus | null): void {
+  cache = value ? { at: Date.now(), value } : null;
+}
+
 export function resetInstallStatusCache(): void { cache = null; }
 
 /** The live summary. A Stack that cannot be reached reads as "none" for the

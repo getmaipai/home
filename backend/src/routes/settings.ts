@@ -36,8 +36,134 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
 import { apiError } from "@/lib/apiErrorCopy";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { listIssues } from "@/lib/issues";
+import { cachedInstallStatus } from "@/lib/installStatus";
+import { cachedRoleHealth } from "@/lib/roleHealth";
+import { listBackups } from "@/lib/backup";
+import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
+import { setupState as setupStateTable } from "@/db/schema";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { effectiveMode } from "@/lib/retrieval/sourceMode";
+import { getSettingsAreas } from "@/lib/settingsAreas";
+import { formatMessage, type MessageDescriptor } from "@/lib/failureCopy";
 
 export const settingsRoutes = apiRouter();
+
+const AttentionItemSchema = z.object({
+  id: z.string(), kind: z.enum(["problem", "missing", "not_set_up"]), area: z.string(), title: z.string(), line: z.string(),
+  action: z.object({ label: z.string(), href: z.string() }),
+});
+const AttentionStateSchema = z.object({ state: z.enum(["ok", "missing", "problem", "off", "not_set_up"]), summary: z.string() });
+const AttentionSchema = z.object({ items: z.array(AttentionItemSchema), areas: z.record(z.string(), AttentionStateSchema) });
+type AttentionItem = z.infer<typeof AttentionItemSchema>;
+const ATTENTION_COPY = {
+  personal: /*i18n*/ { id: "settings.attention.personal.summary", message: "Your settings" },
+  repairsOne: /*i18n*/ { id: "settings.attention.repairs.one", message: "1 repair needs attention" },
+  repairsMany: /*i18n*/ { id: "settings.attention.repairs.many", message: "{count} repairs need attention" },
+  backupKeyTitle: /*i18n*/ { id: "settings.attention.backup_key.title", message: "No backup key saved." },
+  backupKeyLine: /*i18n*/ { id: "settings.attention.backup_key.line", message: "If this computer breaks, nothing comes back." },
+  backupKeyAction: /*i18n*/ { id: "settings.attention.backup_key.action", message: "Save backup key" },
+  setupComplete: /*i18n*/ { id: "settings.attention.setup.complete", message: "Setup complete" },
+  setupTodo: /*i18n*/ { id: "settings.attention.setup.todo", message: "Finish setting up" },
+  installTitle: /*i18n*/ { id: "settings.attention.install.title", message: "AI setup needs attention." },
+  installFailed: /*i18n*/ { id: "settings.attention.install.failed", message: "The AI setup did not finish." },
+  installRunningTitle: /*i18n*/ { id: "settings.attention.install.running.title", message: "AI setup is still running." },
+  installRunningLine: /*i18n*/ { id: "settings.attention.install.running.line", message: "Home will finish setting up when it can." },
+  aiOpen: /*i18n*/ { id: "settings.attention.ai.open", message: "Open AI and models" },
+  aiReady: /*i18n*/ { id: "settings.attention.ai.ready", message: "Ready" },
+  aiNoInstall: /*i18n*/ { id: "settings.attention.ai.no_install", message: "No install in progress" },
+  aiSetup: /*i18n*/ { id: "settings.attention.ai.setup", message: "AI setup" },
+  healthTitle: /*i18n*/ { id: "settings.attention.health.title", message: "Chat is not ready." },
+  healthLine: /*i18n*/ { id: "settings.attention.health.line", message: "The AI service needs attention before it can answer." },
+  repairsOpen: /*i18n*/ { id: "settings.attention.repairs.open", message: "Open Repairs" },
+  backupsEmptyTitle: /*i18n*/ { id: "settings.attention.backups.empty.title", message: "No backups yet." },
+  backupsEmptyLine: /*i18n*/ { id: "settings.attention.backups.empty.line", message: "If this computer breaks, your family has nothing to restore." },
+  backupsOpen: /*i18n*/ { id: "settings.attention.backups.open", message: "Set up backups" },
+  backupsOne: /*i18n*/ { id: "settings.attention.backups.one", message: "1 backup" },
+  backupsMany: /*i18n*/ { id: "settings.attention.backups.many", message: "{count} backups" },
+  backupsKeySaved: /*i18n*/ { id: "settings.attention.backups.key_saved", message: " · key saved" },
+  backupsKeyMissing: /*i18n*/ { id: "settings.attention.backups.key_missing", message: " · key not saved" },
+  backupsEmptySummary: /*i18n*/ { id: "settings.attention.backups.empty.summary", message: "No backups yet" },
+  robotsTitle: /*i18n*/ { id: "settings.attention.robots.title", message: "No robots connected yet." },
+  robotsLine: /*i18n*/ { id: "settings.attention.robots.line", message: "Your robots have not checked in with this home." },
+  appsOpen: /*i18n*/ { id: "settings.attention.apps.open", message: "Open apps and devices" },
+  robotsOff: /*i18n*/ { id: "settings.attention.robots.off", message: "Robots off" },
+  robotsOne: /*i18n*/ { id: "settings.attention.robots.one", message: "1 robot" },
+  robotsMany: /*i18n*/ { id: "settings.attention.robots.many", message: "{count} robots" },
+  robotsConnected: /*i18n*/ { id: "settings.attention.robots.connected", message: " connected" },
+  robotsWaiting: /*i18n*/ { id: "settings.attention.robots.waiting", message: " waiting" },
+  robotsEmpty: /*i18n*/ { id: "settings.attention.robots.empty", message: "No robots yet" },
+  searchTitle: /*i18n*/ { id: "settings.attention.search.title", message: "Web search has no address." },
+  searchLine: /*i18n*/ { id: "settings.attention.search.line", message: "Home cannot reach your search service yet." },
+  searchOpen: /*i18n*/ { id: "settings.attention.search.open", message: "Set up web search" },
+  searchOff: /*i18n*/ { id: "settings.attention.search.off", message: "Web search off" },
+  searchSetup: /*i18n*/ { id: "settings.attention.search.setup", message: "Set up web search" },
+  searchReady: /*i18n*/ { id: "settings.attention.search.ready", message: "Web search ready" },
+};
+const attentionCopy = (key: keyof typeof ATTENTION_COPY, values?: Record<string, string | number>) => formatMessage(ATTENTION_COPY[key], values);
+
+const attentionRoute = createRoute({
+  method: "get", path: "/attention", tags: ["Settings"], summary: "Settings status summary",
+  description: "A read-only view of existing setup, repair, install, health, backup, robot, and search state.",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: AttentionSchema } }, description: "Settings items needing attention and area summaries." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+
+settingsRoutes.openapi(attentionRoute, async (c) => {
+  const actor = c.get("person");
+  const band = speakerAgeBand(actor, new Date());
+  // Apply the age and role gates before touching any household source.
+  if (band === "child") return c.json({ items: [], areas: {} }, 200);
+  const personalAreas = () => {
+    const settings = getSettingsAreas().areas.find((area) => area.id === "settings");
+    const personalIds = settings?.groups.find((group) => group.label === "Yours")?.sections ?? [];
+    return Object.fromEntries(personalIds.map((id) => [id, { state: "ok" as const, summary: attentionCopy("personal") }]));
+  };
+  if (band === "teen" || actor.role === "guest") return c.json({ items: [], areas: personalAreas() }, 200);
+  if (!isOwnerOrAdmin(actor)) return c.json({ items: [], areas: personalAreas() }, 200);
+
+  const items: AttentionItem[] = [];
+  const areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> = {};
+  const source = async <T,>(read: () => T | Promise<T>, apply: (value: T) => void) => { try { apply(await read()); } catch { /* A failed source has no item and cannot fail the page. */ } };
+
+  await source(() => listIssues(), (issues) => {
+    if (issues.length) {
+      for (const issue of issues) items.push({ id: `repair-${issue.id}`, kind: "problem", area: "advanced", title: issue.title, line: issue.detail, action: { label: attentionCopy("repairsOpen"), href: "/repairs" } });
+      areas.advanced = { state: "problem", summary: issues.length === 1 ? attentionCopy("repairsOne") : attentionCopy("repairsMany", { count: issues.length }) };
+    }
+  });
+  await source(() => {
+    const row = db.select({ value: setupStateTable.value }).from(setupStateTable).limit(1).get();
+    return row ? SetupState.parse(JSON.parse(row.value)) : null;
+  }, (setup) => {
+    const step = setup?.steps.find((row) => row.id === "backup_key");
+    if (step && step.status !== "done") items.push({ id: "backup-key", kind: "not_set_up", area: "backups", title: attentionCopy("backupKeyTitle"), line: attentionCopy("backupKeyLine"), action: { label: attentionCopy("backupKeyAction"), href: "/settings/backups?tab=storage" } });
+    areas.household = { state: step?.status === "done" ? "ok" : "not_set_up", summary: step?.status === "done" ? attentionCopy("setupComplete") : attentionCopy("setupTodo") };
+  });
+  await source(() => cachedInstallStatus(), (install) => {
+    if (!install) return;
+    if (["engine_failed", "failed", "stalled", "out_of_space"].includes(install.state)) items.push({ id: "install", kind: "problem", area: "ai", title: attentionCopy("installTitle"), line: install.problem ?? attentionCopy("installFailed"), action: { label: attentionCopy("aiOpen"), href: "/settings/ai?tab=models" } });
+    else if (install.state === "installing_engine" || install.state === "downloading") items.push({ id: "install-progress", kind: "not_set_up", area: "ai", title: attentionCopy("installRunningTitle"), line: attentionCopy("installRunningLine"), action: { label: attentionCopy("aiOpen"), href: "/settings/ai?tab=models" } });
+    areas.ai = { state: install.state === "failed" || install.state === "engine_failed" || install.state === "stalled" || install.state === "out_of_space" ? "problem" : install.state === "none" || install.state === "ready" ? "ok" : "not_set_up", summary: install.state === "ready" ? attentionCopy("aiReady") : install.state === "none" ? attentionCopy("aiNoInstall") : attentionCopy("aiSetup") };
+  });
+  await source(() => cachedRoleHealth("chat"), (health) => {
+    if (health?.availability === "unavailable") items.push({ id: "engine-health", kind: "problem", area: "ai", title: attentionCopy("healthTitle"), line: attentionCopy("healthLine"), action: { label: attentionCopy("repairsOpen"), href: "/repairs" } });
+  });
+  await source(() => ({ backups: listBackups(), saved: getHouseholdSettingValue("backups.emergency_kit_saved_at") }), ({ backups, saved }) => {
+    if (backups.length === 0) items.push({ id: "backups-empty", kind: "missing", area: "backups", title: attentionCopy("backupsEmptyTitle"), line: attentionCopy("backupsEmptyLine"), action: { label: attentionCopy("backupsOpen"), href: "/settings/backups?tab=storage" } });
+    areas.backups = { state: backups.length ? "ok" : "missing", summary: backups.length ? `${backups.length === 1 ? attentionCopy("backupsOne") : attentionCopy("backupsMany", { count: backups.length })}${saved ? attentionCopy("backupsKeySaved") : attentionCopy("backupsKeyMissing")}` : attentionCopy("backupsEmptySummary") };
+  });
+  await source(() => ({ robots: listDevicesByKind("robot"), enabled: getHouseholdSettingValue("home.robots.enabled") === true }), ({ robots, enabled }) => {
+    const connected = robots.filter((robot) => Boolean(robot.lastSeenAt));
+    if (enabled && robots.length && !connected.length) items.push({ id: "robots-never-connected", kind: "not_set_up", area: "apps", title: attentionCopy("robotsTitle"), line: attentionCopy("robotsLine"), action: { label: attentionCopy("appsOpen"), href: "/settings/apps?tab=robot" } });
+    areas.apps = { state: !enabled ? "off" : robots.length && !connected.length ? "not_set_up" : "ok", summary: !enabled ? attentionCopy("robotsOff") : robots.length ? `${robots.length === 1 ? attentionCopy("robotsOne") : attentionCopy("robotsMany", { count: robots.length })}${connected.length ? attentionCopy("robotsConnected") : attentionCopy("robotsWaiting")}` : attentionCopy("robotsEmpty") };
+  });
+  await source(() => ({ address: String(getHouseholdSettingValue("search.searxng_url") ?? "").trim(), enabled: effectiveMode("web", "adult") !== "offline" }), ({ address, enabled }) => {
+    if (!address && enabled) items.push({ id: "search-address", kind: "missing", area: "search", title: attentionCopy("searchTitle"), line: attentionCopy("searchLine"), action: { label: attentionCopy("searchOpen"), href: "/settings/search?tab=search" } });
+    areas.search = { state: !enabled ? "off" : !address ? "missing" : "ok", summary: !enabled ? attentionCopy("searchOff") : !address ? attentionCopy("searchSetup") : attentionCopy("searchReady") };
+  });
+  return c.json({ items, areas }, 200);
+});
 
 async function applySettingSideEffects(scope: string, key: string, value: unknown, actor: PersonRow, preflight = false): Promise<{ status: 400 | 409; error: string } | null> {
   // Only a household owner or admin reaches the checks that touch the machine; anyone else falls through to setValue's own 403.

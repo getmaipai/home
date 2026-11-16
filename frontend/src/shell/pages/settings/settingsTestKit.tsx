@@ -45,7 +45,7 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, robotsEnabled = robots, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; robotsEnabled?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
+export function mockHome({ robots = false, robotsEnabled = robots, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [], attention = { items: [], areas: {} } }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; robotsEnabled?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[]; attention?: { items: Array<{ id: string; kind: "problem" | "missing" | "not_set_up"; area: string; title: string; line: string; action: { label: string; href: string } }>; areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> } } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
@@ -80,6 +80,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route.endsWith("/api/grants")) return Promise.resolve(Response.json([]));
     if (route === "/api/house/test" && init?.method === "POST") return Promise.resolve(Response.json({ ok: true, rooms: 2, devices: 4 }));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
+    if (route.endsWith("/api/settings/attention")) return Promise.resolve(Response.json(attention));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));
     if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));

@@ -962,6 +962,7 @@ export type StatusMemoryLedger = { reserved_bytes: number; warm_bytes: number; b
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[]; /** CHAT-PAUSE-01: how often chat stopped answering today, and why (counts only). */ chat_pauses?: { count: number; causes: Record<string, number>; line: string }; /** ROBUST-01: engines that stopped on their own today, and how many the Stack restarted. */ engine_crashes?: { count: number; healed: number; gave_up: number; line: string; days: Array<{ day: string; crashes: number; healed: number; gave_up: number }> }; /** MEMMGMT-2026-10-25: admin-only Stack ledger totals, absent on older Stacks. */ memory_ledger?: StatusMemoryLedger; resource_day?: { date: string; text: string }; host_guard?: { state: "ok" | "watching" | "failing" | "stale" | "off" | "dry"; title: string; text: string; fix?: { label: string } } };
 
 export type StatusAppsResponse = StatusAppsWire;
+export type SettingsAttention = { items: Array<{ id: string; kind: "problem" | "missing" | "not_set_up"; area: string; title: string; line: string; action: { label: string; href: string } }>; areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> };
 export type AppRow = AppRowWire;
 /** GET /api/media/home: one row of the Media home's shelves (backend/src/routes/mediaHome.ts). */
 export interface MediaHomeRow {
@@ -1412,6 +1413,7 @@ export const api = {
   // WEB-TAB-03: one explicit web search for the palette's Web tab, run only when the person presses Enter on it.
   searchWebResults: (q: string) => request<WebSearchResponse>(`/api/search/web-results?q=${encodeURIComponent(q)}`),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
+  settingsAttention: () => request<SettingsAttention>("/api/settings/attention"),
   settingsCapabilities: () => request<{ robotsEnabled: boolean }>("/api/settings/capabilities"),
   codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),
   codingPieces: () => request<CodingPiecesView>("/api/coding/pieces"),
