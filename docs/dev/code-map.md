@@ -996,6 +996,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/lock.ts` | isAdultPictureStyle, LOCKED_PICTURE_STYLE_LINE, lockedPictureStyleOutcome, pictureJobLockItem, pictureJobLockState, pictureJobGroupLockState |
 | `backend/src/lib/pictures/make.ts` | wordsFromPrompt, readPictureMakeBody, makePictureFor |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
+| `backend/src/lib/pictures/nextShot.ts` | NEXT_SHOT_UNAVAILABLE_LINE, NEXT_SHOT_BAD_SCENE_LINE, NEXT_SHOT_NO_DESCRIPTION_LINE, NEXT_SHOT_STYLE_LINE, NEXT_SHOT_SCENE_MAX, __setNextShotCompleterForTests |
 | `backend/src/lib/pictures/people.ts` | runPictureTool |
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
