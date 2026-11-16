@@ -1,4 +1,4 @@
-// VIDEO-SETTINGS-05 (settings-media-2026-11-02 section 12, test 1): the words of Settings, Pictures, videos and music. Quick, Detailed and Wan are retired for adults (the
+// VIDEO-SETTINGS-05 (settings-media-2026-11-02 section 12, test 1): the words of Settings, Media. Quick, Detailed and Wan are retired for adults (the
 // levels are Standard, Boost and Max), and people never see resource words (memory, RAM, swap, room, GB pressure). Model names and sizes may appear only where the design
 // allows: the Styles tab's browse tiles, confirm panel, failure lines and Details (LTX base names, sizes and the 4 GB limit), and Models and storage (not scanned here).
 import { describe, expect, test } from "bun:test";
@@ -26,7 +26,7 @@ const sourceOf = (dir: string, only: (name: string) => boolean): Array<{ file: s
   readdirSync(dir).filter((name) => /\.tsx?$/.test(name) && !/\.test\./.test(name) && only(name)).map((name) => ({ file: name, text: readFileSync(join(dir, name), "utf8") }));
 const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-describe("the words of Pictures, videos and music", () => {
+describe("the words of Media", () => {
   test("the area has the four tabs and no Media library", () => {
     expect(area.tabs?.map((tab) => tab.id)).toEqual(["pictures", "videos", "music", "styles"]);
   });

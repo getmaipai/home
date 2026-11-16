@@ -131,8 +131,8 @@ describe("the settings route", () => {
   test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/household"));
-    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice, sound and robot", "Notifications", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voices and commands", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
-    expect(view.getByRole("heading", { level: 1, name: /^Household and people$/ })).toBeTruthy();
+    expect(rows(view)).toEqual(["Profile", "Look and ease", "Chat", "Voice and robot", "Notifications", "Your data", "Household", "Privacy and safety", "AI and models", "Media", "Voices", "Search and web", "Apps and devices", "Backups and updates", "Advanced"]);
+    expect(view.getByRole("heading", { level: 1, name: /^Household$/ })).toBeTruthy();
   });
 
   test("robot detail uses the spec tabs and the URL selects the active shell tab", async () => {
@@ -277,7 +277,7 @@ describe("the settings route", () => {
 
   test("on a phone /settings/<area> shows the column alone, with its search and rows", async () => {
     const view = open(makePerson("adult"), "/settings/chat", {}, 390);
-    await waitFor(() => expect(rows(view)).toContain("Chat and AI"));
+    await waitFor(() => expect(rows(view)).toContain("Chat"));
     expect(where(view)).toBe("/settings/chat");
     expect(view.getByRole("searchbox", { name: "Search" })).toBeTruthy();
     expect(column(view).inert).toBe(false);
@@ -343,7 +343,7 @@ describe("the settings route", () => {
     fireEvent.keyDown(window, { key: "b", metaKey: true });
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
     expect(column(view).getAttribute("data-state")).toBe(before);
-    expect(view.getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+    expect(within(column(view)).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
     expect(view.getByRole("button", { name: /Open profile menu/ }).getAttribute("aria-current")).toBeNull();
   });
 });
@@ -365,7 +365,7 @@ describe("what a band is shown", () => {
     expect(rows(view)).not.toContain("Parental controls");
   });
 
-  test("Chat and AI no longer carries link rows: Parental controls moved to the Family app in the rail (spec legacy map)", async () => {
+  test("Chat no longer carries link rows: Parental controls moved to the Family app in the rail (spec legacy map)", async () => {
     const withChild = open(makePerson("adult"), "/settings/chat", { hasChild: true });
     await waitFor(() => expect(withChild.getByText("Send photos in chat")).toBeTruthy());
     expect(withChild.queryByRole("link", { name: "Parental controls" })).toBeNull();
@@ -377,7 +377,7 @@ describe("what a band is shown", () => {
 
   test("an adult sees the wake word device tab only once its assets are installed", async () => {
     const without = open(makePerson("adult"), "/settings/voice");
-    await waitFor(() => expect(without.getByRole("heading", { level: 1, name: "Voice, sound and robot" })).toBeTruthy());
+    await waitFor(() => expect(without.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
     expect(without.queryByRole("tab", { name: "This device" })).toBeNull();
     cleanup();
     fixture!.restore();
@@ -396,7 +396,7 @@ describe("what a band is shown", () => {
     fixture!.restore();
     fixture = null;
     const teen = open(makePerson("teen"), "/settings/voice", { robots: true });
-    await waitFor(() => expect(teen.getByRole("heading", { level: 1, name: "Voice, sound and robot" })).toBeTruthy());
+    await waitFor(() => expect(teen.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
     expect(teen.queryByRole("tab", { name: "Robot" })).toBeNull();
   });
 });
@@ -434,7 +434,7 @@ describe("what the page asks for", () => {
     await waitFor(() => expect(view.getByText("Send photos in chat")).toBeTruthy());
     fireEvent.change(view.getByRole("searchbox", { name: "Search" }), { target: { value: "safe" } });
     await waitFor(() => expect(where(view)).toContain("q=safe"));
-    await waitFor(() => expect(view.getByText("Chat and AI / Search")).toBeTruthy());
+    await waitFor(() => expect(view.getByText("Chat / Search")).toBeTruthy());
     fireEvent.keyDown(view.getByRole("searchbox", { name: "Search" }), { key: "Escape" });
     await waitFor(() => expect(where(view)).not.toContain("q="));
   });
@@ -452,7 +452,8 @@ describe("the rail on a settings route (RULES S1 and S3)", () => {
     const view = open(makePerson("adult"), "/settings/chat?tab=general", {}, 1440);
     const rail = view.getByRole("navigation", { name: "Primary navigation" });
     expect(rail.className).toContain("w-[var(--rail-width,56px)]");
-    for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
+    for (const label of ["Home", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
+    await waitFor(() => expect(within(rail).getByRole("link", { name: "Chat" })).toBeTruthy());
     expect(view.getByRole("button", { name: /Open profile menu for Adult/ })).toBeTruthy();
     await waitFor(() => expect(column(view)).toBeTruthy());
   });

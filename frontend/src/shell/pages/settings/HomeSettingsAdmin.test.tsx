@@ -77,7 +77,7 @@ describe("the sections that had no entry draw inside Home settings", () => {
   test("tab views retain the old household page content", () => {
     const tabViews = Object.fromEntries(homeArea().sections.map((section) => [section.id, Object.fromEntries((section.tabs ?? []).filter((tab) => tab.view).map((tab) => [tab.id, tab.view]))]));
     expect(tabViews.ai).toMatchObject({ overview: "home.engine_admin" });
-    // VIDEO-SETTINGS-04: the four tabs of Pictures, videos and music have no tab view; their cards carry the views (see the next test).
+    // VIDEO-SETTINGS-04: the four tabs of Media have no tab view; their cards carry the views (see the next test).
     expect(Object.keys(tabViews.media ?? {})).toEqual([]);
     expect(homeArea().sections.find((section) => section.id === "media")?.tabs?.map((tab) => tab.id)).toEqual(["pictures", "videos", "music", "styles"]);
     expect(tabViews.apps).toMatchObject({ robot: "home.devices_admin" });
@@ -152,7 +152,7 @@ describe("Home settings holds household scope only", () => {
   });
 });
 
-describe("Pictures, videos and music cards (VIDEO-SETTINGS-04)", () => {
+describe("Media cards (VIDEO-SETTINGS-04)", () => {
   const specCards = () => homeArea().sections.find((section) => section.id === "media")!.cards ?? [];
 
   test("every card the spec names by view has a view that draws, and none is left blank", () => {

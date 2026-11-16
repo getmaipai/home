@@ -27,7 +27,7 @@ test("Settings home shows attention items and the empty state, with spec area li
 
 test("non-admin sees personal areas without the household group", async () => {
   const view = open("adult");
-  await waitFor(() => expect(view.getAllByRole("link", { name: "Profile and sign-in" }).length).toBeGreaterThan(0));
+  await waitFor(() => expect(view.getAllByRole("link", { name: "Profile" }).length).toBeGreaterThan(0));
   expect(view.queryByRole("heading", { name: "The home" })).toBeNull();
-  expect(view.queryByRole("link", { name: "Household and people" })).toBeNull();
+  expect(view.queryByRole("link", { name: "Household" })).toBeNull();
 });
