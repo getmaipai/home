@@ -45,6 +45,7 @@ import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, planExpand, type ExpandShape } from "@/lib/pictures/expand";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { StackError } from "@/lib/stack/errors";
@@ -750,10 +751,15 @@ export function regionForStack(region: CommentRegion | null | undefined): string
 }
 
 /** A Comment: the person describes a change, optionally pointing at an area, and the picture engine changes only that area (the rest of the picture stays as it was). The result is a preview the person applies as a new version, exactly like Erase. Gates run first: only a person who may make pictures, and the two absolute lines on the words. */
-export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat" | "file"; id: string; conversationId?: string }>; styles?: string[]; subjectIds?: string[] }): Promise<EditProgress> {
+export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; maskPng?: Uint8Array | null; referenceId?: string | null; references?: Array<{ kind: "picture"; via: "chat" | "file"; id: string; conversationId?: string }>; styles?: string[]; subjectIds?: string[]; /** CREATOR-17 Expand: fill a bigger canvas of this shape around the picture (the mask is made here, not painted by the person). */ expand?: ExpandShape }): Promise<EditProgress> {
   const source = loadSource(actor, conversationId, id, true);
   const denial = pictureDenial(editorAudience(actor));
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
+  // Expand needs the engine's masked fill: without it nothing is started.
+  const engine = input.expand ? await pictureEngineStatus().catch(() => null) : null;
+  if (input.expand && !engine?.edit?.masked) throw new ImageEditError(503, EXPAND_NEEDS_ENGINE, "expand_needs_engine");
+  const expansion = input.expand ? await planExpand(source.bytes, input.expand, { maxSide: engine?.limits?.max_side, maxMegapixels: engine?.limits?.max_edit_megapixels, step: engine?.limits?.size_step }) : null;
+  if (expansion && !expansion.grows) throw new ImageEditError(422, EXPAND_SAME_SHAPE, "expand_same_shape");
   const prompt = input.prompt.trim();
   if (!prompt) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
   // A child changes their own cartoons in words only: no painted area from outside, no second picture, no person named.
@@ -805,8 +811,8 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     }
   }
   const form = new FormData();
-  form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
-  const painted = input.maskPng && input.maskPng.byteLength > 0 ? input.maskPng : null;
+  form.append("image", new File([new Uint8Array(expansion ? expansion.canvas : source.bytes)], "picture", { type: expansion ? "image/png" : source.mediaType }));
+  const painted = expansion ? expansion.mask : input.maskPng && input.maskPng.byteLength > 0 ? input.maskPng : null;
   form.append("operation", region || painted ? "edit_masked" : "edit");
   form.append("instruction", laneOf(editorAudience(actor)) === "child" ? `${prompt}. Keep it a friendly children's cartoon drawing, not a photograph.` : prompt);
   if (painted) form.append("mask", new File([new Uint8Array(painted)], "mask.png", { type: "image/png" }));

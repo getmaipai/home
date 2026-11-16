@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import { listFragments } from "@/lib/media/templates";
 import { composePicturePrompt, resolvePicks } from "@/lib/media/pictureFragments";
 import { PICTURE_COVERAGE } from "./coverage";
+import { EXPAND_BASE_PROMPT, EXPAND_SHAPES } from "@/lib/pictures/expand";
 
 const empty = z.object({});
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
@@ -169,6 +170,26 @@ registerMediaOp({
   needs: "image",
   minBand: "child",
   run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof coverageArgs> }) => startWordsEdit(actor, source, PICTURE_COVERAGE[args.coverage]),
+});
+
+const expandArgs = z.object({ shape: z.enum(EXPAND_SHAPES).describe("The new shape of the picture: 16:9 (wide), 9:16 (tall), 4:5 or 1:1 (square)."), words: z.string().max(500).optional().describe("Optional: what belongs in the new area.") });
+
+/** CREATOR-17: a bigger canvas of a chosen shape; the picture engine fills only the new area (and a thin overlap), so the original stays as it was. It shares picture.change's gates (lock, age, audience) because it runs through startComment. */
+registerMediaOp({
+  id: "picture.expand",
+  label: "Expand",
+  summary: "Make the picture wider or taller (16:9, 9:16, 4:5 or 1:1) and fill the new area to match the scene.",
+  input: "picture",
+  output: "picture",
+  args: expandArgs,
+  controls: [{ kind: "choice", name: "shape", label: "Shape", options: EXPAND_SHAPES }, { kind: "words", name: "words", label: "What belongs in the new area (optional)" }],
+  needs: "image",
+  minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof expandArgs> }) => {
+    const words = args.words?.trim();
+    const result = await startComment(actor, chatSource(source).conversationId, source.id, { prompt: `${EXPAND_BASE_PROMPT}${words ? `: ${words}` : ""}.`, expand: args.shape });
+    return "job" in result ? { job: result } : { file: result };
+  },
 });
 
 registerMediaOp({

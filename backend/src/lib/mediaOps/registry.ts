@@ -56,7 +56,14 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
   if (health.availability !== "ready") return { ready: false, reason: health.detail ?? health.reason ?? "Picture creation isn't set up yet." };
   // Describing a change is also refused to a profile that may not make pictures (the editor's own picture gate): say so here, so the button is off with the reason.
   const comment = (await editToolsStatus(actor)).tools.comment;
-  return comment.enabled ? { ready: true } : { ready: false, reason: comment.reason ?? "Picture creation isn't available for this profile." };
+  if (!comment.enabled) return { ready: false, reason: comment.reason ?? "Picture creation isn't available for this profile." };
+  // CREATOR-17: Expand needs the engine's masked fill; off with one plain line when the engine has none.
+  if (op.id === "picture.expand") {
+   const { pictureEngineStatus } = await import("@/lib/pictures/ready");
+   const { EXPAND_NEEDS_ENGINE } = await import("@/lib/pictures/expand");
+   if (!(await pictureEngineStatus().catch(() => null))?.edit?.masked) return { ready: false, reason: EXPAND_NEEDS_ENGINE };
+  }
+  return { ready: true };
  }
  const status = await editToolsStatus(actor);
  if (op.id === "picture.make_clearer") {
