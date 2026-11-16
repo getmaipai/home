@@ -65907,7 +65907,7 @@
                       "minLength": 1,
                       "maxLength": 80
                     },
-                    "maxItems": 3,
+                    "maxItems": 5,
                     "description": "Other Library pictures a described change draws on (only for picture.change)."
                   }
                 },

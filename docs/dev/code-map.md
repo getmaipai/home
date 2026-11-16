@@ -1003,9 +1003,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/pose.ts` | __setPoseVisionForTests, parsePose, parseSeatBox, readPose, readSeatBox |
-| `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
+| `backend/src/lib/pictures/quality.ts` | PICTURE_MODEL, isRemovedPictureModel, REMOVED_MODEL_LINE, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
 | `backend/src/lib/pictures/readWords.ts` | READ_WORDS_SCHEMA, parseWordLines, __setReadWordsRunnerForTests, readPictureWords, normalizeWords, compareWords |
-| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureReferenceLimit |
+| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, MAX_REFERENCE_PICTURES |
 | `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
 | `backend/src/lib/pictures/slotBody.ts` | pictureBodyForSlot |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
