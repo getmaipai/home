@@ -54,3 +54,20 @@ test("the served page schema is valid for adult, teen and child", async () => {
     expect(PageNodeSchema.safeParse(await response.json()).success).toBe(true);
   }
 });
+
+test("the watch page item carries the shot notes for the maker only", async () => {
+  const { mediaAppDataRaw } = await import("@/lib/media/appHost");
+  const h = await household();
+  const maker = h.row("Marlow");
+  const clip = await clipFixture(maker);
+  recordCreation(maker, {
+    kind: "video", fileIds: [clip.fileId], recipe: { tool: "video", route: "text" }, words: { written: "A red kite" },
+    generation: { kind: "video", job_id: "vjob-notes", task: "generate", model: { id: "ltx25-q8", revision: "unknown", licence: "unknown" }, engine: { id: "unknown", version: "unknown" }, seed: 71, duration_s: 6, bpm: null, key: null, parent_file_id: null, source_kind: "none", commercial_use: "unknown", commercial_basis: "unknown", made_at: new Date().toISOString(), tier: "standard" },
+    settings: { width: 768, height: 448, seconds: 6, styles: [] },
+  });
+  const mine = mediaAppDataRaw(maker, "video", "item", { id: clip.fileId }) as { facts?: string } | null;
+  expect(mine?.facts).toContain("Seed: 71");
+  expect(mine?.facts).toContain("Length: 6 seconds");
+  const other = mediaAppDataRaw(h.row("Quill"), "video", "item", { id: clip.fileId }) as { facts?: string } | [] | null;
+  expect((Array.isArray(other) ? "" : other?.facts) ?? "").not.toContain("Seed");
+});

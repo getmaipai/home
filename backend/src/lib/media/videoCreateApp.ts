@@ -37,7 +37,7 @@ import { captionEditRows, captionLineRows, captionMakeRows } from "@/lib/videos/
 import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
 import { listClonedVoices } from "@/lib/clonedVoices";
 import { getOfferedVoices, peekOfferedVoices } from "@/lib/voiceResolve";
-import { madeFiles, registerMediaAppData } from "./appHost";
+import { madeFiles, registerMadeFileView, registerMediaAppData } from "./appHost";
 
 /** LTX25-MAX-01: the Max entry of the level segment. Offered only when the Stack reports the Max model ready AND this person holds Max (an adult, by grant or role). A person who holds Max, on a Stack that has the Max engine but not its pack ready, sees it
  * disabled with the one status line (`videoMaxNotReadyReason`; the pack installs from Settings, Models and storage, which carries the size and the licence prompt). A Stack without the engine, or a person who does not hold Max, sees nothing. */
@@ -316,6 +316,16 @@ export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ l
   }
   return rows;
 }
+
+/** Shot notes on the watch page: the maker's own clip adds its engine, length, size, seed and styles under the facts line. The same rows as How it was made;
+ * a clip made by someone else, or one with no record, adds nothing. */
+registerMadeFileView("video", (person, file, view) => {
+  const notes = creationDetailsFor(person, file.id).filter((row) => row.label !== "Prompt" && row.label !== "Clip checks");
+  if (notes.length === 0) return view;
+  const lines = notes.map((row) => `${row.label}: ${row.value}`).join("\n");
+  const existing = (view as { facts?: string }).facts;
+  return { ...view, facts: existing ? `${existing}\n${lines}` : lines } as typeof view;
+});
 
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
  * where the person acts (the page shows it beside the button), never a raw error after a press. */

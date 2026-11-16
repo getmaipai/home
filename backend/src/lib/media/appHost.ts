@@ -547,6 +547,10 @@ export function registerMediaAppData(appId: MediaAppId, hook: AppDataHook): void
 /** A hook that adds fields to an item view for its app (stream address, saved, queued, per-show skips). */
 export type ItemViewHook = (person: PersonRow, item: MediaItem, view: MediaItemView) => MediaItemView;
 const itemViewHooks = new Map<MediaAppId, ItemViewHook[]>();
+/** A made file (a clip or song from the Library) is not a media item, so its play view has its own hook list. */
+export type MadeFileViewHook = (person: PersonRow, file: MadeLibraryFile, view: MediaItemView) => MediaItemView;
+const madeFileViewHooks = new Map<MediaAppId, MadeFileViewHook[]>();
+export function registerMadeFileView(appId: MediaAppId, hook: MadeFileViewHook): void { madeFileViewHooks.set(appId, [...(madeFileViewHooks.get(appId) ?? []), hook]); }
 export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, [...(itemViewHooks.get(appId) ?? []), hook]); }
 
 export function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
@@ -697,7 +701,7 @@ export function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: st
       }
       if (params.id && (appId === "audio" || appId === "video")) {
         const file = madeFileFor(person, appId, params.id);
-        if (file) { const view = madeFileItemView(person, file, appId); return appId === "video" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; }
+        if (file) { const view = madeFileItemView(person, file, appId); const withChapters = appId === "video" ? { ...view, chapters: chaptersForMadeClip(person, file.id) } : view; return (madeFileViewHooks.get(appId) ?? []).reduce((current, hook) => hook(person, file, current) ?? current, withChapters); }
       }
       const item = params.id ? readableIn(person, appId, params.id) : null;
       return item ? (appId === "books" ? bookItemView(person, item) : itemView(person, appId, item)) : [];
