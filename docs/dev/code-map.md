@@ -625,7 +625,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
-| `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
+| `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording, waitedForRoomLine |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
 | `backend/src/lib/forgetCommand.ts` | FORGET_COMMAND_ID, parseForgetCommand, forgetFromConversation |
@@ -708,7 +708,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobs/closeApps.ts` | realHelper, closeSettingsFrom, closableApps, pickSmallestSet, closeForJob, reopenForJob |
 | `backend/src/lib/jobs/householdQueue.ts` | PERSISTED_HOLDS, activeProfileLine, resetActivePlanForTests, openMaxWindow, currentMaxWindow, endMaxWindow |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
-| `backend/src/lib/jobs/liveFit.ts` | needGb, liveFit, askLine, askLevels, appliedProfile, stagesFor |
+| `backend/src/lib/jobs/liveFit.ts` | BOOST_CAP_SHARE, needDetail, needGb, liveFit, askLine, askLevels |
 | `backend/src/lib/jobs/profileSource.ts` | hardwareFromBudget, rowsFromSetting, weightsFromPriority, profileSourceFromSettings |
 | `backend/src/lib/jobs/profileTable.ts` | validateProfileTable |
 | `backend/src/lib/jobs/queuePolicy.ts` | STRICT_BONUS, queuePolicyFromSettings, wireQueuePolicy |
@@ -1005,6 +1005,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/readWords.ts` | READ_WORDS_SCHEMA, parseWordLines, __setReadWordsRunnerForTests, readPictureWords, normalizeWords, compareWords |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureReferenceLimit |
 | `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
+| `backend/src/lib/pictures/slotBody.ts` | pictureBodyForSlot |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
