@@ -5845,6 +5845,119 @@
         }
       }
     },
+    "/api/settings/attention": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Settings status summary",
+        "description": "A read-only view of existing setup, repair, install, health, backup, robot, and search state.",
+        "responses": {
+          "200": {
+            "description": "Settings items needing attention and area summaries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "problem",
+                              "missing",
+                              "not_set_up"
+                            ]
+                          },
+                          "area": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "href": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "href"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "area",
+                          "title",
+                          "line",
+                          "action"
+                        ]
+                      }
+                    },
+                    "areas": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "missing",
+                              "problem",
+                              "off",
+                              "not_set_up"
+                            ]
+                          },
+                          "summary": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "summary"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "areas"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/registry": {
       "get": {
         "tags": [

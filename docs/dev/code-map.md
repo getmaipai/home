@@ -410,6 +410,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/SettingField.tsx` | SettingField |
 | `frontend/src/shell/pages/settings/SettingsAreaPage.tsx` | SettingsAreaPage |
 | `frontend/src/shell/pages/settings/SettingsEntryRedirect.tsx` | SettingsEntryRedirect, LegacySettingsRedirect, CustomizeRedirect |
+| `frontend/src/shell/pages/settings/SettingsHomePage.tsx` | SettingsHomePage |
 | `frontend/src/shell/pages/settings/SettingsLinks.tsx` | SettingsLinks |
 | `frontend/src/shell/pages/settings/SettingsRenderer.tsx` | SettingsRenderer |
 | `frontend/src/shell/pages/settings/SettingsSectionContent.tsx` | beforeSettingChange, SettingsSectionContent |
@@ -694,7 +695,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, withoutUnfitJobs |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |
-| `backend/src/lib/installStatus.ts` | setRobotReleaseInstall, EMPTY_INSTALL, summarizeBackground, summarizeInstall, resetInstallStatusCache, getInstallStatus |
+| `backend/src/lib/installStatus.ts` | setRobotReleaseInstall, EMPTY_INSTALL, summarizeBackground, summarizeInstall, cachedInstallStatus, __setInstallStatusForTests |
 | `backend/src/lib/instanceLock.ts` | LEGACY_LOCK_FILE_NAME, OPT_OUT_ENV, hubLockPath, HubAlreadyRunningError, DataDirPlacementError, readProcessFacts |
 | `backend/src/lib/integrations/homeAssistant.ts` | isLanHomeAssistantUrl, subscribeHomeAssistantEntities, homeAssistantEventsHealth, readHomeAssistantEntityState, refreshHomeAssistantEvents, __resetHomeAssistantEventsForTests |
 | `backend/src/lib/internetProbe.ts` | classifyInternetFailures, probeInternet, runConfiguredInternetProbe, __resetInternetProbeForTests |
