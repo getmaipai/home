@@ -191,3 +191,11 @@ and the GPU contention beside a running Max job.
 Jesse's judgement of v5 (2026-11-16): the voice is a tiny bit robotic and the mouth has a tiny sign of tearing, "but not as bad as originally" (v3). So the 24
 GB streaming preset is good enough for the Standard and Reduced video tiers, with the 8-bit build at Boost as the quality step up; the robotic voice is the
 next thing to measure (the H3 audio path, and Chatterbox as a dubbing alternative, are the candidates).
+
+## 7. Licence territory (found 2026-11-16, owner chose private testing)
+
+Both MiniMax H3 licences (video and H3-Image, Community License) define "Excluded Territories" as the European Union, the United Kingdom, the Republic of Korea and the United States of America, and grant rights "solely within the Applicable Territory" (worldwide minus those). MiniMax grants a licence on request. Until MiniMax grants one or the owner decides otherwise in writing:
+
+- H3 clips and pictures stay private (tailnet only), never published, never in releases, docs or marketing.
+- H3 is not a default or recommended slot in a shipped product. H3-IMAGE-STACK-01 is already on the live household hub as the family picture model: a US use outside the licence that needs an owner decision (request a licence, or return to a model licensed for the US).
+- H3-VIDEO-STACK-01, H3-SLOTS-HOME-01 and H3-MAX-01 carry the same flag.
