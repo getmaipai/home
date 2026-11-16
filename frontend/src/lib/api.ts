@@ -1851,6 +1851,7 @@ export const api = {
     return request<LibrarySummary>(`/api/library/summary?${libraryParams(filters)}`);
   },
   libraryFile: (id: string) => request<FileRecordWithChat>(`/api/files/${encodeURIComponent(id)}`),
+  saveAsCharacter: (fileId: string, name: string) => request<{ subject: { id: string; name: string }; capture: "started" | "waiting"; job_id: string | null; line: string }>("/api/media-subjects/from-picture", { method: "POST", body: JSON.stringify({ file_id: fileId, name }) }),
   creationByFile: (id: string) => request<CreationByFile>(`/api/creations/by-file/${encodeURIComponent(id)}`),
   updateLibraryFile: (id: string, change: { name?: string | null; keep?: boolean }) => request<{ id: string; name: string | null; retention: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(change) }),
   trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),

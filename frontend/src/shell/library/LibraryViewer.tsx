@@ -33,6 +33,7 @@ import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
 import { formatDate } from "@/lib/format";
 import { errorLine } from "@/lib/hubReachability";
 import { referenceHandoff } from "./useAsReference";
+import { canSaveAsCharacter, useSaveAsCharacter } from "./useSaveAsCharacter";
 
 const ShareIcon = getIcon("users");
 const CaptionsIcon = getIcon("captions");
@@ -69,6 +70,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const cut = useCutToBeatDialog({ open: cutOpen, onOpenChange: setCutOpen, me, seed: item.kind === "audio" ? { trackId: item.id } : { clipId: item.id } });
   const [musicOpen, setMusicOpen] = useState(false);
   const addMusic = useAddMusicDialog({ open: musicOpen, onOpenChange: setMusicOpen, me, clipId: item.id });
+  const saveCharacter = useSaveAsCharacter(item);
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
@@ -112,6 +114,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
           {item.kind === "image" ? <Button type="button" variant="secondary" onClick={() => navigate("/apps/image/studio", { state: { pageState: { file: item.id } } })}>{i18n._({ id: "Edit", message: "Edit" })}</Button> : null}
           {item.kind === "image" ? <Button type="button" variant="secondary" onClick={() => navigate("/apps/video/create", { state: { pageState: { start_frame: item.id } } })}>{i18n._({ id: "Make a video from this", message: "Make a video from this" })}</Button> : null}
           {item.kind === "image" && !(item.audience === "adult-only" && item.unlocked !== true) ? <Button type="button" variant="secondary" onClick={() => { const next = referenceHandoff(item.id); if (next.ok) navigate(next.to, { state: next.state }); }}>{i18n._({ id: "Use as a reference", message: "Use as a reference" })}</Button> : null}
+          {canSaveAsCharacter(item, me) ? <Button type="button" variant="secondary" onClick={saveCharacter.openDialog}>{i18n._({ id: "Save as a character", message: "Save as a character" })}</Button> : null}
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</Button> : null}
           {adultMark.actions}
           {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); setStemsProblem(""); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => setStemsProblem(errorLine(error, i18n._({ id: "The stems could not be made. Try again in a minute.", message: "The stems could not be made. Try again in a minute." })))).finally(() => setSplitting(false)); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button> : null}
@@ -121,6 +124,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         </div>
       ) : null}
       {adultMark.dialog}
+      {saveCharacter.dialog}
       {stemsProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={stemsProblem} /> : null}
       {mine && isAdultRole(me) && item.kind === "audio" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Cuts your videos on the beat of this song. Everything stays on this home server.", message: "Cuts your videos on the beat of this song. Everything stays on this home server." })}</p> : null}
       <Dialog open={musicOpen} onOpenChange={setMusicOpen}><DialogContent><DialogHeader><DialogTitle>{i18n._({ id: "Add music", message: "Add music" })}</DialogTitle></DialogHeader>
