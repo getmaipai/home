@@ -1,5 +1,5 @@
 // CREATOR-16: the carousel planner. One structured chat-model call turns a theme (and an optional anchor) into a set of
-// scene prompts that share ONE look sentence, stated first in every prompt. The film planner's pattern (lib/films/plan.ts):
+// scene prompts that share ONE look sentence, stated after the scene in every prompt. The film planner's pattern (lib/films/plan.ts):
 // the model's own background helper, one repair try, a plain line when it is down. Nothing here starts a picture.
 import { z } from "zod";
 import { completeBackground, type LlmCompleteOptions, type LlmMessage } from "@/lib/llm";
@@ -47,7 +47,7 @@ function stripFence(text: string): string {
   return (fenced ? fenced[1]! : text).trim();
 }
 
-/** Pure: the model's reply to a plan, or why it cannot be used. Every prompt is "look scene", at most 400 characters; duplicates and empty scenes are dropped. */
+/** Pure: the model's reply to a plan, or why it cannot be used. Every prompt is "scene. look", at most 400 characters; duplicates and empty scenes are dropped. */
 export function parseCarouselPlan(text: string, size: number): { ok: true; plan: CarouselPlan } | { ok: false; problem: string } {
   let raw: unknown;
   try { raw = JSON.parse(stripFence(text)); } catch { return { ok: false, problem: "the reply is not valid JSON" }; }
@@ -66,7 +66,8 @@ export function parseCarouselPlan(text: string, size: number): { ok: true; plan:
   }
   if (scenes.length < size) return { ok: false, problem: `only ${scenes.length} different scenes; ${size} are needed` };
   const lead = look.length > 200 ? look.slice(0, 200).trim() : look;
-  const prompts = scenes.slice(0, size).map((scene) => `${lead} ${scene}`.slice(0, CAROUSEL_PROMPT_MAX).trim());
+  // The scene leads so each picture's title reads as its own scene; the shared look follows in every prompt.
+  const prompts = scenes.slice(0, size).map((scene) => `${scene.replace(/[.\s]+$/, "").slice(0, Math.max(40, CAROUSEL_PROMPT_MAX - lead.length - 2)).trim()}. ${lead}`.slice(0, CAROUSEL_PROMPT_MAX).trim());
   return { ok: true, plan: { look: lead, prompts } };
 }
 

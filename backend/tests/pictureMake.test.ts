@@ -124,7 +124,7 @@ describe("Images Create make", () => {
     expect(made.ids).toHaveLength(3);
     await until(() => fake.submitted.length === 3);
     const bodies = fake.submitted as Array<{ prompt: string; seed?: number; model?: string; n?: number }>;
-    expect(bodies.every((body) => body.prompt.startsWith(look) && body.n === 1)).toBe(true);
+    expect(bodies.every((body) => body.prompt.includes(look) && body.n === 1)).toBe(true);
     expect(new Set(bodies.map((body) => body.seed)).size).toBe(1);
     expect(typeof bodies[0]!.seed).toBe("number");
     expect(new Set(bodies.map((body) => body.model)).size).toBe(1);
