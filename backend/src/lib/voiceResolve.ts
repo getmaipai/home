@@ -56,6 +56,12 @@ export async function getOfferedVoices(): Promise<StackVoice[] | null> {
   return voices;
 }
 
+/** The offered list as last read, without asking the Stack (a page fill is synchronous; its warm-up calls getOfferedVoices first). */
+export function peekOfferedVoices(): StackVoice[] | null {
+  if (override !== undefined) return override;
+  return cached ? cached.voices : null;
+}
+
 /** Test hook: pins the offered list (null = unreadable); `undefined` returns to the real Stack. */
 export function __setOfferedVoicesForTests(voices: StackVoice[] | null | undefined): void {
   override = voices;

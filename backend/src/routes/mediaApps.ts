@@ -38,6 +38,7 @@ import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
+import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { isReshape, startReshape, startSharpen, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { startStudioExport } from "@/lib/videos/studioExport";
@@ -330,6 +331,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "spatial-sound")) return next();
     const body = await jsonBody(c);
     const started = await startSpatialSound(person, typeof body.id === "string" ? body.id : "", { surround: body.surround === true || body.surround === "true", side: body.side });
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  // VOICEOVER-PAGE: the Voiceover page. A typed line, spoken in the chosen voice, laid over a finished clip of the person's own. The same start as the chat
+  // tool (`edit_video` change `mix`, sound `voice`): the edit gate (adults only), the screening of the line, the lock check and the speech normalizer are
+  // written once, in clipEditStart and the edit tool. The new clip is an edit row of the same feed; the original is kept.
+  routes.post("/actions/voiceover", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "voiceover")) return next();
+    const body = await jsonBody(c);
+    const started = await startVoiceover(person, typeof body.id === "string" ? body.id : typeof body.clip === "string" ? body.clip : "", { line: body.line, voice: body.voice, level: body.level });
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });

@@ -29,6 +29,9 @@ import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
+import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
+import { listClonedVoices } from "@/lib/clonedVoices";
+import { getOfferedVoices, peekOfferedVoices } from "@/lib/voiceResolve";
 import { madeFiles, registerMediaAppData } from "./appHost";
 
 /** LTX25-MAX-01: the Max entry of the level segment. Offered only when the Stack reports the Max model ready AND this person holds Max (an adult, by grant or role). A person who holds Max, on a Stack that has the Max engine but not its pack ready, sees it
@@ -159,6 +162,30 @@ registerAppPageFill("video", "create", (person, page) => {
   } else {
     delete bar.submit_detail;
   }
+});
+
+// VOICEOVER-PAGE: the voices the Voiceover page offers are the ones the edit tool accepts (voiceChoice): the person's usual voice, the household's own voices, then the
+// voices the engine in use offers. The engine's list is read in the warm-up (cached 30 s); the fill only peeks.
+registerAppPageWarm("video", "voiceover", async () => { await getOfferedVoices(); });
+
+const LEVEL_WORDS: Record<(typeof MIX_LEVEL_IDS)[number], string> = { quiet: "Quiet", soft: "Soft", balanced: "Balanced", loud: "Loud", very_loud: "Very loud" };
+const clip40 = (text: string): string => text.length > 40 ? `${text.slice(0, 39).trimEnd()}\u2026` : text;
+
+export function voiceoverVoiceOptions(): Array<{ value: string; label: string; icon: string }> {
+  const seen = new Set<string>(["default"]);
+  const options = [{ value: "default", label: "My usual voice", icon: "mic" }];
+  for (const voice of listClonedVoices()) if (!seen.has(voice.id)) { seen.add(voice.id); options.push({ value: voice.id, label: clip40(voice.label), icon: "mic" }); }
+  for (const voice of peekOfferedVoices() ?? []) if (!seen.has(voice.id)) { seen.add(voice.id); options.push({ value: voice.id, label: clip40(voice.name), icon: "mic" }); }
+  return options.slice(0, 24);
+}
+
+registerAppPageFill("video", "voiceover", (_person, page) => {
+  const bar = findNode(page.body, "prompt_bar");
+  if (!bar) return;
+  bar.chips = [
+    { state: "voice", label: "Voice", icon: "mic", icon_only: true, presentation: "popover", group: "Voice", default: "default", quiet_value: "default", options: voiceoverVoiceOptions() },
+    { state: "level", label: "Loudness", icon: "volume-2", icon_only: true, presentation: "popover", group: "Voice", default: "balanced", quiet_value: "balanced", options: MIX_LEVEL_IDS.map((id) => ({ value: id, label: LEVEL_WORDS[id] })) },
+  ];
 });
 
 // CREATOR-26: reuse Create's own Shape and Quality fill so the option lists and icons have one definition.

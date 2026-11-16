@@ -9,14 +9,46 @@
       "layout": "chat",
       "chat_distribution": "start_end",
       "label": "What should be said",
-      "placeholder": "Type what you want said.",
-      "prompt_state": "prompt",
-      "max_length": 1200,
-      "submit_label": "Make voice",
+      "placeholder": "Pick a clip, then type what the voice should say.",
+      "prompt_state": "line",
+      "max_length": 600,
+      "submit_label": "Make voiceover",
       "starts": "video",
+      "chips": [
+        {
+          "state": "voice",
+          "label": "Voice",
+          "icon": "mic",
+          "icon_only": true,
+          "default": "default",
+          "options": [
+            { "value": "default", "label": "My usual voice" }
+          ]
+        }
+      ],
+      "references": [
+        {
+          "state": "clip",
+          "label": "Clip",
+          "kind": "video",
+          "placement": "row"
+        }
+      ],
       "submit": {
-        "navigate": {
-          "to": "/apps/video/create"
+        "call": {
+          "target": "/api/plugins/video/actions/voiceover",
+          "method": "POST",
+          "args": {
+            "id": "{clip}",
+            "line": "{line}",
+            "voice": "{voice}",
+            "level": "{level}"
+          },
+          "then": {
+            "navigate": {
+              "to": "/apps/video/create"
+            }
+          }
         }
       }
     }
