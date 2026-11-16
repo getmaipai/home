@@ -187,7 +187,8 @@
         "navigate": {
           "to": "/apps/image/create",
           "state": {
-            "template": "{id}"
+            "template": "{id}",
+            "prompt": "{starter}"
           }
         }
       }

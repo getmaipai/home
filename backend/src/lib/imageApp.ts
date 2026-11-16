@@ -78,8 +78,14 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
   return [...lockRows, ...visibleFinished];
 };
 
+/** What a picked template puts in the box: the example for its first plain blank, so Make picture works at once and the person edits words, not a blank form. */
+export function templateStarter(prompt: string): string {
+  for (const match of prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)) if (!match[1]!.startsWith("cast_")) return match[3]!.trim();
+  return "";
+}
+
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
-  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: templateCoverUrl(template.id) }));
+  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, starter: templateStarter(template.prompt), thumbnail: templateCoverUrl(template.id) }));
   if (dataId === "characters") return characterRows(person);
   if (dataId === "library") return rows(person, body);
   if (dataId === "recent") return rows(person, body, true);

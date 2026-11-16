@@ -92,7 +92,12 @@ test("Image launcher, sidebar groups and template rows are available to the hous
   expect(sidebarGroups.find((group) => group.id === "create-edit")?.pages?.map((page) => page.page)).toEqual(["studio"]);
   const templates = await client.post("/api/plugins/image/data/templates", {});
   expect(templates.status).toBe(200);
-  expect((await templates.json() as Array<{ id: string; title: string }>).some((item) => item.id && item.title)).toBe(true);
+  const templateRows = await templates.json() as Array<{ id: string; title: string; starter?: string }>;
+  expect(templateRows.some((item) => item.id && item.title)).toBe(true);
+  // Picking a template tile fills the box: every row carries the example words the page puts there, and the page asks for them.
+  expect(templateRows.some((item) => typeof item.starter === "string" && item.starter.length > 0)).toBe(true);
+  const createPage = await client.get("/api/plugins/image/pages/create");
+  expect(JSON.stringify(await createPage.json())).toContain('"template":"{id}","prompt":"{starter}"');
 });
 
 test("Image library rows match Library visibility for owner, teen and child", async () => {
