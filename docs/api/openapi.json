@@ -31250,6 +31250,351 @@
         }
       }
     },
+    "/api/ai/overview": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "A household view of AI features, their model levels and any attention needed",
+        "responses": {
+          "200": {
+            "description": "The feature overview assembled from current Stack candidates, installed components, saved slots and current health.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "used_by": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "levels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "tier": {
+                                  "type": "string",
+                                  "enum": [
+                                    "reduced",
+                                    "standard",
+                                    "boost",
+                                    "max"
+                                  ]
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ready",
+                                    "missing",
+                                    "problem",
+                                    "off",
+                                    "waits",
+                                    "same"
+                                  ]
+                                },
+                                "word": {
+                                  "type": "string"
+                                },
+                                "model_label": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "size_bytes_missing": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "detail": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "action": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "download",
+                                        "fix",
+                                        "open"
+                                      ]
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "job": {
+                                      "type": "string"
+                                    },
+                                    "level": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "label"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "tier",
+                                "state",
+                                "word",
+                                "model_label",
+                                "size_bytes_missing",
+                                "detail",
+                                "action"
+                              ]
+                            }
+                          },
+                          "ready_count": {
+                            "type": "number"
+                          },
+                          "level_count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "used_by",
+                          "levels",
+                          "ready_count",
+                          "level_count"
+                        ]
+                      }
+                    },
+                    "helpers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "model_label": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "used_by": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "ready",
+                              "missing",
+                              "problem",
+                              "off",
+                              "waits",
+                              "same"
+                            ]
+                          },
+                          "action": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "download",
+                                  "fix",
+                                  "open"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "job": {
+                                "type": "string"
+                              },
+                              "level": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "model_label",
+                          "used_by",
+                          "state",
+                          "action"
+                        ]
+                      }
+                    },
+                    "attention": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "problem",
+                                  "missing"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "download",
+                                      "fix",
+                                      "open"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "job": {
+                                    "type": "string"
+                                  },
+                                  "level": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "label"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "title",
+                              "line",
+                              "action"
+                            ]
+                          }
+                        },
+                        "download_all": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "bytes": {
+                              "type": "number"
+                            },
+                            "count": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "bytes",
+                            "count"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "download_all"
+                      ]
+                    },
+                    "right_now": {
+                      "type": "object",
+                      "properties": {
+                        "engine": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "problem"
+                          ]
+                        },
+                        "waiting": {
+                          "type": "number"
+                        },
+                        "memory_free_bytes": {
+                          "type": "number"
+                        },
+                        "models_bytes": {
+                          "type": "number"
+                        },
+                        "disk_free_bytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "engine",
+                        "waiting",
+                        "memory_free_bytes",
+                        "models_bytes",
+                        "disk_free_bytes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "features",
+                    "helpers",
+                    "attention",
+                    "right_now"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai/choices": {
       "get": {
         "tags": [
