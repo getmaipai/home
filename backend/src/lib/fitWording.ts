@@ -58,3 +58,9 @@ export function fitNotFoundWording(): { verdict: "unknown"; headline: string; de
     detail: "Check the link and try again.",
   };
 }
+
+/** TIER-BOOST-HOLD-01: the card line for a job that waited for room and was then made at Standard. */
+export function waitedForRoomLine(minutes: number): string {
+  const n = Math.max(1, Math.round(minutes));
+  return `Waited ${n} ${n === 1 ? "minute" : "minutes"} for room, made at Standard.`;
+}

@@ -91,6 +91,8 @@ picturesRoutes.openapi(adultMarkRoute, (c) => {
 
 export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult"): string {
   const hold = (job as PictureJob & { riseReason?: string }).riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
+  const waited = (job.request as { waited_note?: string }).waited_note;
+  if (waited && !hold && (job.state === "queued" || job.state === "running")) return waited;
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
   if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   if (job.state === "queued") return job.position && job.position > 1 ? jobQueueCopy("queued", "picture_line", job.position, null, audience).replace("N", String(job.position)) : jobQueueCopy("queued", "picture_engine", null, null, audience);

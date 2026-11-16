@@ -4,8 +4,10 @@ import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
+import { waitedForRoomLine } from "../fitWording";
 import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { chatMayGoReduced, MAX_NEEDS_REDUCED_OFF_LINE } from "@/lib/tiers";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -18,7 +20,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -29,15 +31,19 @@ export interface QueueJob {
   resourcePaused?: boolean;
   childDailyCapReached?: boolean;
   headOfClass?: boolean;
+  /** One sentence for the person when the queue lowered the job (TIER-REDUCED-01). */
+  tierNote?: string;
   fit?: { outcome: "run" | "ask" | "queue" | "refuse"; profile: { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number }; askLine: string | null };
 }
 
 /** Waits a job store keeps on the card across a restart (the phase or stage reads `held:<reason>`), and the card words for them. One list for the three kinds of job. */
-const HOLD_LIST = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
+const HOLD_LIST = ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
 export type PersistedHold = typeof HOLD_LIST[number];
 export const PERSISTED_HOLDS: readonly string[] = HOLD_LIST;
 export interface QueuePosition { id: string; position: number }
-export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat";
+/** The Stack's `backfillMaxWaitMs` (10 minutes): how long a big job waits while smaller ones pass it, unless the household set `resources.max_wait_before_aging`. */
+const BACKFILL_MAX_WAIT_MINUTES = 10;
+export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat" | "aged_guard";
 export interface TierState {
   windowOpenFor: string | null;
   startedSinceMax: readonly string[];
@@ -45,7 +51,7 @@ export interface TierState {
   /** TIER-HOME-05: a Max chat lease is up; Boost and Max generator jobs wait with `max_chat`, Standard jobs go on. */
   chatLeaseHeld?: boolean;
 }
-export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; /** TIER-REDUCED-01: the store lowers its own record from Max to Boost. */ lowerTier?: () => void; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void; /** TIER-BOOST-HOLD-01: remake the request at Standard and keep the card line. */ lowerToStandard?: (note: string) => void }
 type QueueProvider = () => QueueStoreEntry[];
 
 /** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
@@ -192,33 +198,37 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
     return { start, holds };
   }
 
-  const firstMaxIndex = ordered.findIndex((job) => job.tier === "max");
-  const firstMax = firstMaxIndex < 0 ? undefined : ordered[firstMaxIndex];
+  const firstMax = ordered.find((job) => job.tier === "max");
   const otherWaitingPeople = new Set(ordered.filter((job) => job.tier !== "max" && job.personId !== firstMax?.personId)
     .map((job) => job.personId).filter((personId) => !state.startedSinceMax.includes(personId)));
   const fairnessApplies = !!firstMax && state.lastMaxPersonId !== null && otherWaitingPeople.size > 0;
-  const draining = !!firstMax && running.length > 0;
-  const heavyRunning = running.some((job) => job.tier === "boost" || job.tier === "max");
+  const policy = queuePolicy();
+  /** QUEUE-FIT-01: how long a big job may wait while others pass it (`resources.max_wait_before_aging.<kind>`, else the Stack's 10 minutes). */
+  const aged = (job: QueueJob) => now - createdAt(job) > (policy.maxWaitBeforeAgingMinutes?.[category(job)] ?? BACKFILL_MAX_WAIT_MINUTES) * 60_000;
+  const heavyBusy = running.some((job) => job.tier === "boost" || job.tier === "max");
+  let maxDoor: "open" | "closed" = "open";
+  let agedBoostGuard = false;
 
-  let maxWaiting = false;
-  for (let index = 0; index < ordered.length; index += 1) {
-    const job = ordered[index]!;
-    if (firstMax && job.id === firstMax.id) {
-      if (draining) holds[job.id] = "max_drain";
-      else if (fairnessApplies) holds[job.id] = "fairness_wait";
-      else if (index > 0) holds[job.id] = "max_drain";
-      else { start.push(job.id); break; }
-      maxWaiting = true;
+  for (const job of ordered) {
+    if (job.tier === "max") {
+      if (running.length === 0 && fairnessApplies && job.id === firstMax!.id) holds[job.id] = "fairness_wait";
+      else if (running.length > 0 || start.length > 0) {
+        holds[job.id] = "max_drain";
+        if (aged(job)) maxDoor = "closed";
+      } else { start.push(job.id); break; }
       continue;
     }
-    if ((draining || maxWaiting) && index > firstMaxIndex) { holds[job.id] = "max_drain"; continue; }
+    if (maxDoor === "closed") { holds[job.id] = "max_drain"; continue; }
+    if (job.tier === "boost" && heavyBusy) {
+      holds[job.id] = "heavy_slot";
+      if (aged(job)) agedBoostGuard = true;
+      continue;
+    }
+    if (agedBoostGuard) { holds[job.id] = "aged_guard"; continue; }
     if (fairnessApplies && otherWaitingPeople.has(job.personId)) {
       // Only the first queued non-Max job for each waiting person is admitted.
-      if (!start.some((id) => queued.get(id)?.personId === job.personId)) start.push(job.id);
-      else holds[job.id] = "fairness_wait";
-      continue;
+      if (start.some((id) => queued.get(id)?.personId === job.personId)) { holds[job.id] = "fairness_wait"; continue; }
     }
-    if ((job.tier === "boost" || job.tier === "max") && heavyRunning) { holds[job.id] = "heavy_slot"; continue; }
     start.push(job.id);
   }
   return { start, holds };
@@ -420,10 +430,13 @@ const providers = new Set<QueueProvider>();
 let releasing = false;
 let releaseAgain = false;
 const lastFit = new Map<string, string>();
+/** TIER-BOOST-HOLD-01: when a Boost job first sat held as `tier_no_room`; the wait is bounded by `resources.quiet_max_wait`. */
+const noRoomSince = new Map<string, number>();
 const LAST_FIT_LIMIT = 200;
 function forgetFinishedFits(jobs: readonly QueueJob[]): void {
   const active = new Set(jobs.filter((job) => job.state === "queued" || job.state === "running").map((job) => job.id));
   for (const id of lastFit.keys()) if (!active.has(id)) lastFit.delete(id);
+  for (const id of noRoomSince.keys()) if (!active.has(id)) noRoomSince.delete(id);
   for (const id of fitAsks.keys()) if (!active.has(id)) fitAsks.delete(id);
 }
 function rememberFit(id: string, key: string): void {
@@ -433,7 +446,7 @@ function rememberFit(id: string, key: string): void {
 }
 export function rememberFitForTests(id: string, key: string): void { rememberFit(id, key); }
 export function fitMemorySizeForTests(): number { return lastFit.size; }
-export function resetFitMemoryForTests(): void { lastFit.clear(); resetFitHysteresisForTests(); }
+export function resetFitMemoryForTests(): void { lastFit.clear(); noRoomSince.clear(); resetFitHysteresisForTests(); }
 let budgetReader: (() => Promise<BudgetNow>) | null = null;
 export function setBudgetReader(fn: (() => Promise<BudgetNow>) | null): void { budgetReader = fn; }
 async function stackBudget(): Promise<BudgetNow> {
@@ -500,7 +513,9 @@ export async function releaseHouseholdQueue(): Promise<void> {
         if (held && entry.job.riseReason !== "profile_lowered") { entry.job.riseReason = "profile_lowered"; entry.save(); }
         else if (!held && entry.job.riseReason === "profile_lowered") { entry.job.riseReason = null; entry.save(); }
       }
-      if (runningMax && runningMax.id === reducedChatJobId) {
+      // TIER-REDUCED-01: with the switch off Home never renews Reduced: it leaves what it entered, and what the Stack entered by itself.
+      const reducedSwitchOn = chatMayGoReduced();
+      if (runningMax && runningMax.id === reducedChatJobId && reducedSwitchOn) {
         setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
         // TIER-WIRE-02: the Stack leaves Reduced by itself after 30 minutes without a renewing `{on:true}`, so a long Max job renews it.
         if (now - lastReducedRenewAt >= REDUCED_RENEW_MS) { lastReducedRenewAt = now; await enterStackReducedChat(); }
@@ -513,7 +528,10 @@ export async function releaseHouseholdQueue(): Promise<void> {
           else { downshiftMemory.restoredAt = now; downshiftMemory.lastJobEndedAt = now; reducedChatJobId = null; setReducedChat(null); }
           // A failed leave is not retried forever: renewals stop, so the Stack leaves Reduced by itself, and the composer line follows the Stack.
         } else { setReducedChat({ minutesLeft: null }); scheduleDownshiftRecheck(); }
-      } else setReducedChat(null);
+      } else {
+        if (runningMax && !reducedSwitchOn && await stackReducedChat()) await leaveStackReducedChat();
+        setReducedChat(null);
+      }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
       const admission = admit(jobs, now, tierState);
       const admitted = new Set(admission.start);
@@ -522,7 +540,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
         const hold = admission.holds[entry.job.id] ?? null;
         const specific = entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room" || entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
         if (hold && !specific && entry.job.riseReason !== hold) { entry.job.riseReason = hold; entry.save(); }
-        else if (!hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
+        else if (!hold && ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
       }
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
@@ -557,7 +575,22 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 if (entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room") { entry.job.riseReason = null; entry.save(); }
               } else if (fit.outcome !== "run") {
                 if (entry.job.riseReason !== "tier_no_room") { entry.job.riseReason = "tier_no_room"; entry.save(); }
-                scheduleNoRoomRecheck();
+                const since = noRoomSince.get(entry.job.id) ?? now;
+                noRoomSince.set(entry.job.id, since);
+                const maxWait = (quietConfigSource?.() ?? DEFAULT_QUIET).quietMaxWaitSeconds;
+                if (entry.job.tier === "boost" && entry.lowerToStandard && maxWait !== "never" && now - since >= maxWait * 1000) {
+                  // TIER-BOOST-HOLD-01: the bounded wait is over; make it at Standard, the lowest level this person may have, and say so on the card.
+                  noRoomSince.delete(entry.job.id);
+                  entry.lowerToStandard(waitedForRoomLine((now - since) / 60_000));
+                  entry.job.tier = "standard"; entry.job.riseReason = null; entry.save();
+                } else { scheduleNoRoomRecheck(); continue; }
+              }
+              // TIER-REDUCED-01: a `chat: reduced` cell is permission. Max asks the Stack for Reduced only on a real shortfall, and never with the switch off.
+              if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced" && !((fit.shortfallGb ?? 0) > 0)) {
+                delete (fit.applied.cells as Record<string, unknown>).chat;
+              } else if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced" && !chatMayGoReduced()) {
+                entry.job.tier = "boost"; entry.job.tierNote = MAX_NEEDS_REDUCED_OFF_LINE; entry.lowerTier?.(); entry.save();
+                lastFit.delete(entry.job.id); releaseAgain = true;
                 continue;
               }
               if (fit.applied?.cells.chat?.state === "reduced") {

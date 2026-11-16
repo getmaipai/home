@@ -12,6 +12,8 @@ export const FIRST_FRAME_PHASE = "making from the first picture";
 
 export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
+  const waited = (job.request as { waited_note?: string }).waited_note;
+  if (waited && !hold && (job.state === "queued" || job.state === "running")) return waited;
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
   if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   const stackWait = videoWaitLine(job.phase, audience);

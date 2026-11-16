@@ -7,6 +7,8 @@ export interface Hardware {
   budgetGb: number; marginGb: number;
   residentGb: Partial<Record<Category, Partial<Record<"reduced" | Tier, number>>>>;
   peakGb: Partial<Record<Category, Partial<Record<Tier, number>>>>;
+  /** The Stack says this level can never run on this computer (`fits_ever` false): a missing figure is then not guessed. */
+  neverFits?: Partial<Record<Category, Partial<Record<Tier, true>>>>;
 }
 export interface RowError { lead: Category; tier: Tier; message: string; needGb?: number; haveGb?: number }
 const categories: Category[] = ["chat", "voice", "picture", "video", "music", "tools"];

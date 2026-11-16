@@ -86,6 +86,8 @@ export interface GenerationBody {
   init_image?: string;
   image_source?: "generated" | "uploaded";
   strength?: number;
+  /** TIER-PIC-01: the level the picture runs at (absent: Standard). The Stack opens a Max window for "max". */
+  tier?: "boost" | "max";
   timeout_ms: number;
 }
 

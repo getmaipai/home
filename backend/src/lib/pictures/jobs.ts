@@ -13,6 +13,9 @@ import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, SPELLING_PHASE, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
+import { pictureBodyForSlot } from "./slotBody";
+import { pictureEngineStatus } from "./ready";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { compareWords, readPictureWords } from "./readWords";
 import { gateFinished } from "./laneGate";
@@ -39,19 +42,38 @@ registerQueueProvider(() => unfinishedJobs().map((job) => {
     position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason ?? phaseHold, typicalSeconds: job.kind === "edit" ? 20 : 44 };
   return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
     applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; savePictureJob(job); },
+    lowerToStandard: (note) => { delete (job.request as { tier?: unknown }).tier; Object.assign(job.request as object, { waited_note: note }); savePictureJob(job); },
     stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelPictureJob(owner as PersonRow, job.id); } : undefined,
     release: job.state === "queued" && !job.stackJob ? () => releasePicture(job) : undefined,
     save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.phase = `held:${queued.riseReason}`; else if (job.phase?.startsWith("held:")) job.phase = "queued"; saveJob(job); } };
 }));
 
+/**
+ * TIER-PIC-01: the Stack body of a generated picture at the level it was queued at, with that level's saved slot read now (`pictureBodyForSlot`). The job
+ * record keeps what it really ran as: `request.tier` (absent for Standard), `lowered`, the Max line and the quality, so the card and provenance tell the
+ * truth, and the stored body is the one sent so a spelling re-make asks for the same maker and level.
+ */
+async function slotBodyOf(job: PictureJob): Promise<Omit<GenerationBody, "timeout_ms">> {
+  const request = job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> };
+  const base: Omit<GenerationBody, "timeout_ms"> = request.stackBody ?? {
+    prompt: job.prompt, size: job.request.size, n: job.request.n, audience: job.request.audience,
+    ...(job.request.seed !== null ? { seed: job.request.seed } : {}),
+  };
+  const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
+  const run = pictureBodyForSlot(base, requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child", await pictureEngineStatus());
+  if (run.tier === "standard") delete request.tier; else request.tier = run.tier;
+  if (run.lowered) request.lowered = true; else delete request.lowered;
+  if (run.line) request.line = run.line; else delete request.line;
+  request.quality = run.quality;
+  request.stackBody = run.body;
+  return run.body;
+}
+
 async function releasePicture(job: PictureJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
     const submit = queuedPictureSubmits.get(job.id);
-    const submitted = submit ? await submit() : await submitGeneration({ ...((job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody ?? {
-      prompt: job.prompt, size: job.request.size, n: job.request.n, audience: job.request.audience,
-      ...(job.request.seed !== null ? { seed: job.request.seed } : {}),
-    }), timeout_ms: 1 });
+    const submitted = submit ? await submit() : await submitGeneration({ ...(await slotBodyOf(job)), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDelete(submitted.job); return; }
     job.stackJob = submitted.job;
     queuedPictureSubmits.delete(job.id);

@@ -8,6 +8,7 @@ import { collectHealth, __resetChatPauseTrackingForTests } from "@/lib/healthSna
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { reducedChatState, resetReducedTruthForTests, setReducedChat } from "@/lib/reducedChat";
 import { noteChatInFlight, registerQueueProvider, releaseHouseholdQueue, resetActivePlanForTests, isolateQueueProvidersForTests, resetChatActivityForTests, resetDownshiftForTests, resetFitMemoryForTests, resetTierStateForTests, setBudgetReader, activeProfileLine, type QueueJob } from "@/lib/jobs/householdQueue";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import type { ProfileRow } from "@/lib/jobs/profileTable";
 
@@ -19,6 +20,7 @@ let calls: boolean[];
 let restoreProviders: () => void = () => undefined;
 
 beforeEach(() => {
+  setHouseholdSettingValue("engines.chat.tier.reduced", { model: "recommended", options: {}, who: "everyone" });
   restoreProviders = isolateQueueProvidersForTests();
   mode = "ok"; reduced = false; calls = [];
   server = Bun.serve({
@@ -41,8 +43,8 @@ beforeEach(() => {
   __setStackClientForTests(createStackClient({ baseUrl: `http://127.0.0.1:${server.port}` }));
   resetChatActivityForTests(); resetDownshiftForTests(); resetTierStateForTests(); resetFitMemoryForTests(); resetActivePlanForTests(); resetReducedTruthForTests();
   const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
-  setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
-  setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+  setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5, standard: 20 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+  setBudgetReader(async () => ({ freeMemoryBytes: 40e9, loaded: [] }));
 });
 afterEach(() => {
   restoreProviders();

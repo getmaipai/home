@@ -50,6 +50,7 @@ registerQueueProvider(() => {
       position: job.position, estimateSeconds: job.etaSeconds, riseReason: phaseHold, typicalSeconds: job.request.sound?.engine === "sfx" ? 20 : 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
       applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveMusicJob(job); },
+      lowerToStandard: (note) => { delete (job.request as { tier?: unknown }).tier; Object.assign(job.request as object, { waited_note: note }); saveMusicJob(job); },
       stop: job.state === "running" ? async () => { const owner = db.select().from(people).where(eq(people.id, job.personId)).get(); if (owner) await cancelMusicJob(owner as PersonRow, job.id); } : undefined,
       release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,
       save: () => { job.position = queued.position ?? null; if (queued.riseReason && PERSISTED_HOLDS.includes(queued.riseReason)) job.stage = `held:${queued.riseReason}`; else if (job.stage?.startsWith("held:")) job.stage = "queued"; persistMusicJob(job); } };

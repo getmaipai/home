@@ -14,6 +14,7 @@ import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { releaseHouseholdQueue, resetTierStateForTests, setBudgetReader, setNoRoomRecheckForTests } from "@/lib/jobs/householdQueue";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import { setReducedChat } from "@/lib/reducedChat";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { installFakeVideoStack, testMp4, type FakeVideoStack } from "./videoFixture";
@@ -81,7 +82,7 @@ describe("an edit joins the household queue", () => {
     await until(() => !["queued", "running"].includes(stateOf(marlow, b.id).state));
   });
 
-  test("a queued Max edit is a Max video job to the queue: it holds a following video job (max_drain)", async () => {
+  test("a queued Max edit is a Max video job to the queue: a following job backfills beside it (QUEUE-FIT-01)", async () => {
     // Other names than the test above: the queue weighs each person's recent use, which would reorder the three.
     const sage = person("Iris"); const marlow = person("Quill"); const nova = person("Raven");
     const running = gate(); let maxRuns = 0; let thirdRuns = 0;
@@ -93,17 +94,18 @@ describe("an edit joins the household queue", () => {
     await releaseHouseholdQueue();
     await Bun.sleep(50);
     expect(stateOf(marlow, b.id).phase).toBe("held:max_drain");
-    expect(stateOf(nova, c.id).phase).toBe("held:max_drain");
-    expect(maxRuns + thirdRuns).toBe(0);
+    await until(() => thirdRuns === 1);
+    expect(maxRuns).toBe(0);
     running.open();
     await until(() => maxRuns === 1);
   });
 
-  test("a Max edit asks the Stack to take chat to Reduced before it starts when the fit plan says so", async () => {
+  test("a Max edit asks the Stack to take chat to Reduced before it starts when the fit plan says so and there is a real shortfall (TIER-REDUCED-01: 32 GB free against a 40 GB peak plus 2 GB margin)", async () => {
+    setHouseholdSettingValue("engines.chat.tier.reduced", { model: "recommended", options: {}, who: "everyone" }); // TIER-REDUCED-01: the switch must be on
     const calls: boolean[] = []; let reduced = false;
     __setStackClientForTests({ setReducedChat: async (on: boolean) => { calls.push(on); reduced = on; return { state: "ok", reduced }; }, memory: async () => ({ reduced_chat: reduced }) } as never);
-    setProfileSource({ table: [{ lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } }], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
-    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    setProfileSource({ table: [{ lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } }], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5, standard: 20 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 32e9, loaded: [] }));
     const sage = person("Sage"); const hold = gate(); let runs = 0;
     const job = startEdit(sage, async () => { runs += 1; await hold.wait; return { ok: true, clip: clip() }; }, "max");
     await until(() => runs === 1);

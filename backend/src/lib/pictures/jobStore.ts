@@ -40,6 +40,10 @@ export interface PictureRequest {
   quality?: "quick" | "detailed";
   /** TIER-WIRE-01: the resource tier the job is queued at (absent: Standard). The household queue reads it with `requestTier`. */
   tier?: "boost" | "max";
+  /** TIER-PIC-01: the job ran at a lower level than it was queued at (the level's slot is off, or Max has no model here). `tier` then names the level it really ran at. */
+  lowered?: boolean;
+  /** TIER-PIC-01: the plain sentence for a Max request that ran at Boost because Max is not on this computer. */
+  line?: string;
   /** IMGEDIT-01: an edit of a picture already in this chat. The result is saved as the next version of that picture (so the editor shows Original and Undo), and its source is never changed. */
   edit?: { source_id: string; label: string; method: "instruct" | "tool" };
   /** IMG-SUBJECT-01: ids whose private saved description or references shaped this output. */

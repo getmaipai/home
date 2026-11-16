@@ -11,6 +11,7 @@ import { personIsGranted } from "@/lib/grants";
 import { getHouseholdSettingSource, getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { peekPictureEngineStatus } from "@/lib/pictures/ready";
 
 export type Tier = "standard" | "boost" | "max";
 export type TierCategory = "chat" | "image" | "video" | "music" | "voice";
@@ -135,12 +136,27 @@ export function allowedQuality(person: PersonRow, category: TierCategory, qualit
   return authorizeTier({ person, category, requested: "boost", ...(band ? { band } : {}) }).tier === "standard" ? "quick" : "detailed";
 }
 
-/** Max exists for a category only when an admin pointed its Max slot at a model of its own (the recommended Max is empty until the evaluations fill it). */
+/** The Stack's recommended Max picture model (Stack catalog, `GET /stack/v1/tiers/candidates?category=pictures`): Max's `recommended` slot resolves to it while it is installed. */
+export const RECOMMENDED_MAX_IMAGE_MODEL = "qwen-image-2512-q8";
+const imageModelInstalled = (id: string): boolean => Boolean(peekPictureEngineStatus()?.models.find((m) => m.id === id && m.installed && m.available !== false));
+
+/**
+ * The model the Max slot resolves to, or null when Max does not exist on this computer: an admin pinned a model of its own, or (pictures only)
+ * the slot is `recommended` and the Stack's recommended Max model is installed. A slot equal to Boost's model is not a Max.
+ */
+export function maxModel(category: TierCategory): string | null {
+  const slot = readSlot(category, "max");
+  if (slot.model === "off") return null;
+  if (slot.model === "recommended") return category === "image" && imageModelInstalled(RECOMMENDED_MAX_IMAGE_MODEL) ? RECOMMENDED_MAX_IMAGE_MODEL : null;
+  return slot.model === readSlot(category, "boost").model ? null : slot.model;
+}
+/** Max exists for a category only when its Max slot resolves to a model (`maxModel`); the recommended Max is empty until the evaluations fill it, except pictures with Qwen-Image installed. */
 export function maxAvailable(category: TierCategory, capabilityFits?: boolean): boolean {
   if (capabilityFits === false) return false;
-  const slot = readSlot(category, "max");
-  return slot.model !== "off" && slot.model !== "recommended" && slot.model !== readSlot(category, "boost").model;
+  return maxModel(category) !== null;
 }
+/** The chat Reduced switch (`engines.chat.tier.reduced`); off is its default. */
+export const chatMayGoReduced = (): boolean => readSlot("chat", "reduced").model !== "off";
 /** Whether this person is shown a Max control on a card: they hold Max, their band reaches it, the slot is on and a Max model exists. */
 export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand, available: boolean = maxAvailable(category)): boolean {
   return available && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
@@ -156,6 +172,8 @@ export function jobTier(category: TierCategory, tier: Tier | undefined, quality:
 }
 
 export const MAX_NEEDS_ADMIN_LINE = "Max needs an admin's OK. Ask an admin.";
+/** TIER-REDUCED-01: a Max job whose peak needs the room chat holds, while the "Let big jobs simplify chat" switch is off. */
+export const MAX_NEEDS_REDUCED_OFF_LINE = "Max would need to simplify chat, which is switched off, so this one is made at Boost.";
 export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this computer yet, so this one is made at Boost.";
 
 /**

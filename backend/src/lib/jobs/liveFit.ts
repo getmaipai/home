@@ -11,6 +11,7 @@ export interface FitInput {
   pickedTier: Tier;
   lowerWithoutAsking: Partial<Record<Category, boolean>>;
 }
+export type FitBasis = "exact" | "partial" | "cap_guess";
 export interface FitResult {
   outcome: "run" | "ask" | "queue" | "refuse";
   applied: ProfileRow | null;
@@ -22,11 +23,15 @@ export interface FitResult {
   /** What the profile as written would have needed, for the ask line. */
   requestedNeedGb: number;
   haveGb: number;
+  /** TIER-BOOST-HOLD-01: how sure the need is. A guess or a partial figure never refuses; the Stack's governor decides at admission. */
+  basis?: FitBasis;
   reason: "fits" | "profile_lowered" | "lead_lowered" | "no_room_now" | "never_fits";
   /** Internal comparison baseline used by appliedProfile; contains no app or person data. */
   requested?: ProfileRow;
   /** MEM-SPACE-10: counts and bytes of the apps the close step quit for this job; never names. */
   closed?: { apps: number; bytes: number };
+  /** TIER-REDUCED-01: how much more room (GB) the applied row needs than is live now, chat's Reduced cell left out. Above 0 is the only reason Home asks the Stack for Reduced chat. */
+  shortfallGb?: number;
 }
 
 const categories: Category[] = ["chat", "voice", "picture", "video", "music", "tools"];
@@ -34,21 +39,32 @@ const ranks: Record<CellState, number> = { off: 0, queued: 0, reduced: 1, standa
 const tierDown: Partial<Record<Tier, Tier>> = { max: "boost", boost: "standard" };
 const stateDown: Partial<Record<CellState, CellState>> = { max: "boost", boost: "standard", standard: "reduced" };
 
-/** Mirrors validateProfileTable's lead peak plus resident support arithmetic. */
-export function needGb(row: ProfileRow, hw: Hardware): number {
-  const peak = hw.peakGb[row.lead]?.[row.tier];
-  if (peak === undefined) return Infinity;
+/** Share of the room a Boost job with no known peak is assumed to need (TIER-BOOST-HOLD-01). */
+export const BOOST_CAP_SHARE = 0.85;
+const basisRank: Record<FitBasis, number> = { exact: 0, partial: 1, cap_guess: 2 };
+const worse = (a: FitBasis, b: FitBasis): FitBasis => (basisRank[b] > basisRank[a] ? b : a);
+
+/** Mirrors validateProfileTable's lead peak plus resident support arithmetic. A Boost lead with no known peak uses the Standard peak, else the cap; an unknown resident cell counts 0. */
+export function needDetail(row: ProfileRow, hw: Hardware): { need: number; basis: FitBasis } {
+  let basis: FitBasis = "exact";
+  let peak = hw.peakGb[row.lead]?.[row.tier];
+  if (peak === undefined) {
+    if (row.tier !== "boost" || hw.neverFits?.[row.lead]?.boost) return { need: Infinity, basis };
+    peak = hw.peakGb[row.lead]?.standard ?? BOOST_CAP_SHARE * Math.max(0, hw.budgetGb - hw.marginGb);
+    basis = "cap_guess";
+  }
   let need = peak;
   for (const category of categories) {
     if (category === row.lead) continue;
     const cell = row.cells[category];
     if (!cell || cell.phase === "before" || cell.state === "queued" || cell.state === "off") continue;
     const resident = hw.residentGb[category]?.[cell.state as "reduced" | Tier];
-    if (resident === undefined) return Infinity;
+    if (resident === undefined) { if (row.tier === "max" || cell.state === "max") return { need: Infinity, basis }; basis = worse(basis, "partial"); continue; } // the Max path keeps its exact rule
     need += resident;
   }
-  return need;
+  return { need, basis };
 }
+export function needGb(row: ProfileRow, hw: Hardware): number { return needDetail(row, hw).need; }
 
 function cloneRow(row: ProfileRow, cells: Partial<Record<Category, ProfileCell>> = row.cells): ProfileRow {
   return { ...row, cells: Object.fromEntries(Object.entries(cells).map(([category, cell]) => [category, cell && { ...cell }])) as ProfileRow["cells"] };
@@ -62,18 +78,19 @@ export function liveFit(input: FitInput): FitResult {
   const haveGb = input.memory.freeGb;
   const steps: string[] = [];
   if (input.memory.evictableGb > 0) steps.push("cleared waste");
-  const initialNeed = needGb(input.row, input.hw);
+  const initial = needDetail(input.row, input.hw);
+  const initialNeed = initial.need;
   const noRow: FitResult = { outcome: "run", applied: null, steps, lowered: [], leadTier: "standard", belowPick: false, needGb: 0, requestedNeedGb: 0, haveGb, reason: "fits" };
   if (!input.table.some((row) => row.lead === input.row.lead && row.tier === input.row.tier)) return noRow;
   const pinBroken = (row: ProfileRow): boolean => categories.some((category) => { const pin = input.pins[category]; const cell = row.cells[category]; return pin !== undefined && cell !== undefined && ranks[cell.state] < ranks[pin]; });
   const pinConflict = pinBroken(input.row);
-  if (initialNeed <= room && !pinConflict) return { outcome: "run", applied: cloneRow(input.row), steps, lowered: [], leadTier: input.row.tier, belowPick: false, needGb: initialNeed, requestedNeedGb: initialNeed, haveGb, reason: "fits", requested: cloneRow(input.row) };
+  if (initialNeed <= room && !pinConflict) return { outcome: "run", applied: cloneRow(input.row), steps, lowered: [], leadTier: input.row.tier, belowPick: false, needGb: initialNeed, requestedNeedGb: initialNeed, haveGb, reason: "fits", basis: initial.basis, requested: cloneRow(input.row) };
 
   const requested = cloneRow(input.row);
   let current = cloneRow(input.row);
   // Supporting cells belong to the stage before the lead; they yield before ordinary cells.
   // Pinned cells are immutable; a conflicting table row cannot be selected.
-  if (pinConflict) return { ...noRow, outcome: "queue", applied: null, needGb: initialNeed, reason: "no_room_now", requested };
+  if (pinConflict) return { ...noRow, outcome: "queue", applied: null, needGb: initialNeed, reason: "no_room_now", basis: initial.basis, requested };
   let changed = false;
   const moved = new Set<Category>();
   // The phase order is a strict preference: ordinary categories, supporting cells, then lead tier.
@@ -120,7 +137,7 @@ export function liveFit(input: FitInput): FitResult {
     if (needGb(current, input.hw) <= room && !pinBroken(current)) {
       const belowPick = current.tier !== input.pickedTier;
       const outcome = belowPick && !input.lowerWithoutAsking[current.lead] ? "ask" : "run";
-      return { outcome, applied: current, steps, lowered: [...moved], leadTier: current.tier, belowPick, needGb: needGb(current, input.hw), requestedNeedGb: initialNeed, haveGb,
+      return { outcome, applied: current, basis: needDetail(current, input.hw).basis, steps, lowered: [...moved], leadTier: current.tier, belowPick, needGb: needGb(current, input.hw), requestedNeedGb: initialNeed, haveGb,
         reason: belowPick ? "lead_lowered" : changed ? "profile_lowered" : "fits", requested };
     }
   }
@@ -129,8 +146,13 @@ export function liveFit(input: FitInput): FitResult {
   const everNeed = Math.min(lowest ? needGb(lowest, input.hw) : initialNeed, changed ? needGb(current, input.hw) : initialNeed);
   const fitsEver = everNeed <= input.hw.budgetGb - input.hw.marginGb;
   const currentNeed = changed ? needGb(current, input.hw) : initialNeed;
-  return { outcome: fitsEver ? "queue" : "refuse", applied: null, steps, lowered: [...moved], leadTier: current.tier, belowPick: current.tier !== input.pickedTier,
-    needGb: fitsEver ? everNeed : currentNeed, requestedNeedGb: initialNeed, haveGb, reason: fitsEver ? "no_room_now" : "never_fits", requested };
+  const basis = [initial.basis, needDetail(current, input.hw).basis].reduce(worse);
+  // A guessed or partial need never refuses: Home sends the job and the Stack's governor decides on its own numbers (unless the Stack said the level never fits).
+  // A partial figure is a lower bound (unknown cells count 0): if even that cannot fit, refusing is exact. A cap guess is only a guess.
+  const guessed = Number.isFinite(currentNeed) && (basis === "cap_guess" || (basis === "partial" && currentNeed <= input.hw.budgetGb - input.hw.marginGb));
+  const queueIt = fitsEver || guessed;
+  return { outcome: queueIt ? "queue" : "refuse", applied: null, steps, lowered: [...moved], leadTier: current.tier, belowPick: current.tier !== input.pickedTier,
+    needGb: fitsEver ? everNeed : currentNeed, requestedNeedGb: initialNeed, haveGb, basis, reason: queueIt ? "no_room_now" : "never_fits", requested };
 }
 
 const tierName: Record<Tier, string> = { standard: "Standard", boost: "Boost", max: "Max" };

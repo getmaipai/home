@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, setSystemTime } from "bu
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
 import { fitMemorySizeForTests, rememberFitForTests, resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, resetDownshiftForTests, setQuietConfigSource, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { setHouseholdSettingValue } from "../src/lib/settings";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
 import { __setStackClientForTests } from "../src/lib/stackEngine";
@@ -16,7 +17,7 @@ function job(id: string, personId: string, jobClass: QueueJob["jobClass"], creat
 
 describe("household queue", () => {
   // TIER-WIRE-02: the queue now asks the Stack to swap chat; this scripted Stack accepts every swap (tests/reducedChatWiring.test.ts covers the HTTP shapes and the failures).
-  beforeEach(() => { resetChatActivityForTests(); resetDownshiftForTests(); let reduced = false; __setStackClientForTests({ setReducedChat: async (on: boolean) => { reduced = on; return { state: "ok", reduced }; }, memory: async () => ({ reduced_chat: reduced }) } as never); });
+  beforeEach(() => { setHouseholdSettingValue("engines.chat.tier.reduced", { model: "recommended", options: {}, who: "everyone" }); resetChatActivityForTests(); resetDownshiftForTests(); let reduced = false; __setStackClientForTests({ setReducedChat: async (on: boolean) => { reduced = on; return { state: "ok", reduced }; }, memory: async () => ({ reduced_chat: reduced }) } as never); });
   afterEach(() => { __setStackClientForTests(null); });
 
   test("fit admission gates Max release, persists counts, and leaves Standard unchanged", async () => {
@@ -179,11 +180,12 @@ describe("household queue", () => {
     expect(admit([runningBoost, queuedBoost, standard], now, emptyTierState)).toEqual({ start: ["s"], holds: { qb: "heavy_slot" } });
   });
 
-  test("T2 drains running work for the first Max and holds admissions behind it", () => {
+  // QUEUE-FIT-01: jobs behind a waiting Max keep starting until the Max has aged past the limit (tests/queueBackfill.test.ts).
+  test("T2 drains running work for the first Max and backfills the jobs behind it", () => {
     const running = job("run", "A", "other", now, { state: "running" });
     const max = job("max", "B", "video", now, { tier: "max" });
     const after = job("after", "C", "other", now + 1);
-    expect(admit([running, max, after], now, emptyTierState)).toEqual({ start: [], holds: { max: "max_drain", after: "max_drain" } });
+    expect(admit([running, max, after], now, emptyTierState)).toEqual({ start: ["after"], holds: { max: "max_drain" } });
   });
 
   test("T3 open Max window holds every other queued job", () => {
@@ -197,7 +199,7 @@ describe("household queue", () => {
     const max = job("max", "B", "video", now, { tier: "max" });
     expect(admit([ahead, max], now, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain" } });
     const behind = job("behind", "C", "other", now + 1);
-    expect(admit([ahead, max, behind], now + 1, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain", behind: "max_drain" } });
+    expect(admit([ahead, max, behind], now + 1, emptyTierState)).toEqual({ start: ["ahead", "behind"], holds: { max: "max_drain" } });
   });
 
   test("T4b waits for other people's first queued non-Max jobs before another Max", () => {
@@ -406,8 +408,8 @@ describe("household queue", () => {
   test("a Max job that runs with chat Reduced shows the chat line with its minutes, Stop ends it, and the line clears (TIER-HOME-03)", async () => {
     resetTierStateForTests(); resetFitMemoryForTests();
     const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
-    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
-    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 40 } }, residentGb: { chat: { reduced: 5, standard: 20 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 40e9, loaded: [] }));
     const j = job("max-win", "p-win", "video", now, { tier: "max" });
     let stopped = 0;
     const remove = registerQueueProvider(() => [{ job: j, save: () => undefined, applyFit: () => undefined, release: async () => { j.state = "running"; j.remainingSeconds = 600; }, stop: async () => { stopped += 1; j.state = "done" as QueueJob["state"]; } }]);
@@ -427,8 +429,8 @@ describe("household queue", () => {
   test("while a Max video runs, a music job its plan queues waits with profile_lowered, and the admin line names each category (TIER-PRIO-05)", async () => {
     resetTierStateForTests(); resetFitMemoryForTests(); resetActivePlanForTests();
     const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" }, picture: { state: "boost" }, music: { state: "queued" } } };
-    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5 }, picture: { boost: 10 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
-    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5, standard: 20 }, picture: { boost: 10 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 40e9, loaded: [] }));
     const video = job("v-plan", "p-plan-a", "video", now, { tier: "max" });
     const song = job("m-plan", "p-plan-b", "other", now + 1000, { category: "music" });
     let songReleased = 0; let saves = 0;
@@ -456,8 +458,8 @@ describe("household queue", () => {
   test("a second person chatting at second 50 delays the swap to Reduced chat, at second 61 it proceeds (TIER-PRIO-03)", async () => {
     resetTierStateForTests(); resetFitMemoryForTests(); resetActivePlanForTests(); resetDownshiftForTests(); resetChatActivityForTests();
     const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
-    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
-    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5, standard: 20 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 25e9, loaded: [] }));
     setQuietConfigSource(() => ({ quietSeconds: 60, quietMaxWaitSeconds: 600, cooldownSeconds: 300 }));
     const t0 = 1_900_000_000_000;
     const video = job("v-quiet", "p-quiet-a", "video", t0, { tier: "max" });
