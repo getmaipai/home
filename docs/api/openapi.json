@@ -31314,6 +31314,52 @@
                                   "type": "string",
                                   "nullable": true
                                 },
+                                "automatic": {
+                                  "type": "boolean"
+                                },
+                                "model_id": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "can_choose": {
+                                  "type": "boolean"
+                                },
+                                "options": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "installed": {
+                                        "type": "boolean"
+                                      },
+                                      "size_bytes": {
+                                        "type": "number",
+                                        "nullable": true
+                                      },
+                                      "good_at": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "suggested": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "installed",
+                                      "size_bytes",
+                                      "good_at",
+                                      "suggested"
+                                    ]
+                                  }
+                                },
                                 "size_bytes_missing": {
                                   "type": "number",
                                   "nullable": true
@@ -31355,6 +31401,10 @@
                                 "state",
                                 "word",
                                 "model_label",
+                                "automatic",
+                                "model_id",
+                                "can_choose",
+                                "options",
                                 "size_bytes_missing",
                                 "detail",
                                 "action"
@@ -31388,6 +31438,17 @@
                           },
                           "name": {
                             "type": "string"
+                          },
+                          "parent": {
+                            "type": "string"
+                          },
+                          "component_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "size_bytes_missing": {
+                            "type": "number",
+                            "nullable": true
                           },
                           "model_label": {
                             "type": "string",
@@ -31441,6 +31502,9 @@
                         "required": [
                           "id",
                           "name",
+                          "parent",
+                          "component_id",
+                          "size_bytes_missing",
                           "model_label",
                           "used_by",
                           "state",
@@ -32946,6 +33010,7 @@
             "schema": {
               "type": "string",
               "enum": [
+                "reduced",
                 "standard",
                 "boost",
                 "max"
