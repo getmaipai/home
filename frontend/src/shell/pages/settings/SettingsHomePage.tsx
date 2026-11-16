@@ -1,10 +1,9 @@
 import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
-import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button"
 import { SettingsShell } from "@maipai/ui/src/settings/SettingsShell";
 import { sectionVisible, type SettingsAreaDef, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -52,11 +51,23 @@ export function SettingsHomePage({ person }: { person: Roster }) {
   >
     <div className="flex flex-col gap-6">
       <header><p className="text-supporting text-muted-foreground">{i18n._({ id: "{name}, {role} · checked just now", message: "{name}, {role} · checked just now", values: { name: person.display_name, role: person.role } })}</p></header>
-      <Card><CardHeader><CardTitle>{i18n._({ id: "Needs attention · {count}", message: "Needs attention · {count}", values: { count: summary?.items.length ?? 0 } })}</CardTitle></CardHeader><CardContent><ItemGroup>
-        {attention.isLoading ? null : (summary?.items.length ?? 0) === 0
-          ? <StatusCard kind="done" title={i18n._({ id: "Everything is fine.", message: "Everything is fine." })} line={i18n._({ id: "Checked just now.", message: "Checked just now." })} />
-          : summary!.items.map((item) => <StatusCard key={item.id} kind={item.kind === "problem" ? "problem" : "attention"} title={item.title} line={item.since ? `${item.line} · ${i18n._({ id: "Since {date}", message: "Since {date}", values: { date: formatDate(item.since, { month: "short", day: "numeric" }) } })}` : item.line} action={{ label: item.action.label, onSelect: () => navigate(item.action.href) }} />)}
-      </ItemGroup></CardContent></Card>
+      <section aria-labelledby="settings-attention" className="flex flex-col gap-2">
+        <h2 id="settings-attention" className="text-section font-semibold">{i18n._({ id: "Needs attention · {count}", message: "Needs attention · {count}", values: { count: summary?.items.length ?? 0 } })}</h2>
+        <ItemGroup variant="card">
+          {attention.isLoading ? null : (summary?.items.length ?? 0) === 0
+            ? <Item size="setting"><ItemContent><ItemTitle>{i18n._({ id: "Everything is fine.", message: "Everything is fine." })}</ItemTitle><ItemDescription>{i18n._({ id: "Checked just now.", message: "Checked just now." })}</ItemDescription></ItemContent></Item>
+            : summary!.items.map((item, index) => <Fragment key={item.id}>
+              {index > 0 ? <ItemSeparator variant="inset" /> : null}
+              <Item size="setting">
+                <ItemContent>
+                  <ItemTitle>{item.title}</ItemTitle>
+                  <ItemDescription clamp={false}>{item.since ? `${item.line} · ${i18n._({ id: "Since {date}", message: "Since {date}", values: { date: formatDate(item.since, { month: "short", day: "numeric" }) } })}` : item.line}</ItemDescription>
+                </ItemContent>
+                <ItemActions><Button variant="outline" size="row" onClick={() => navigate(item.action.href)}>{item.action.label}</Button></ItemActions>
+              </Item>
+            </Fragment>)}
+        </ItemGroup>
+      </section>
       {shownGroups.map(([title, sections]) => sections.length ? <section key={title} className="flex flex-col gap-2"><h2 className="text-section font-semibold">{title}</h2><ItemGroup variant="card" role="list" aria-label={title}>
         {sections.map((section, index) => {
           const state = rows[section.id];
