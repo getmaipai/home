@@ -92,7 +92,8 @@ describe("GET /api/ai/overview", () => {
     const fetcher=(async(input:Parameters<typeof fetch>[0])=>{const url=new URL(String(input),"http://stack");if(url.pathname==="/stack/v1/components")return Response.json(componentList);if(url.pathname==="/stack/v1/tiers/candidates"){const category=url.searchParams.get("category")??"chat";const id=category==="pictures"?"minimax-h3-image":category==="chat"?"chat-model":`${category}-model`;return Response.json({category,profile:"fixture",room_bytes:20e9,levels:["standard","boost","max"].map(tier=>({tier,cap_bytes:20e9,recommended:id,candidates:[{id,label:id==="minimax-h3-image"?"MiniMax H3-Image":id,family:id,peak_bytes:2e9,verified:true,fits:true,refusal:null},...(category==="pictures"&&tier==="boost"?[{id:"problem-model",label:"Problem model",family:"x",peak_bytes:2e9,verified:true,fits:false,refusal:"This model cannot fit."}]:[])]}))});}return new Response("not found",{status:404});}) as unknown as typeof fetch;
     __setComponentsFetchForTests(fetcher);
     setValue(person,"household","engines.image.tier.boost",{model:"problem-model",options:{}});
-    setValue(person,"household","engines.image.tier.max",{model:"recommended",options:{}});
+    setValue(person,"household","engines.image.choice","minimax-h3-image");
+    setValue(person,"household","engines.image.tier.max",{model:"minimax-h3-image",options:{}});
     const response=await app.request("http://localhost/api/ai/overview",{headers:{cookie:`session=${token}`}});
     const body=await response.json() as {attention:{items:Array<{title:string;line:string;action:unknown}>;download_all:{bytes:number;count:number}|null}};
     expect(body.attention.items).toContainEqual(expect.objectContaining({title:"MiniMax H3-Image is missing.",line:"Pictures Standard and Pictures Max use it."}));
@@ -124,8 +125,9 @@ describe("GET /api/ai/overview", () => {
     maxRecommended=null;
     const second=await (await get()).json() as typeof first;
     const level=(body:typeof first,tier:string)=>body.features.find(row=>row.id==="chat")!.levels.find(row=>row.tier===tier)!;
-    expect(level(first,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
-    expect(level(second,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
+    // An automatic Standard is "Automatic" (not the Stack's momentary recommendation), identical on both reads.
+    expect(level(first,"standard")).toMatchObject({state:"ready",model_label:"Automatic"});
+    expect(level(second,"standard")).toMatchObject({state:"ready",model_label:"Automatic"});
     expect(level(second,"boost")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
     expect(level(second,"max")).toMatchObject({state:"unset",model_label:null});
   });

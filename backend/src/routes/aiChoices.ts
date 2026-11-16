@@ -11,7 +11,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
-import { holdsMax, writeSlotModel } from "@/lib/tiers";
+import { holdsMax, RECOMMENDED_MAX_IMAGE_MODEL, writeSlotModel } from "@/lib/tiers";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
 import { rowHasModel, type DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
@@ -79,12 +79,30 @@ aiChoicesRoutes.openapi(overviewRoute, async (c) => {
       const candidateTier = tier === "reduced" ? "standard" : tier;
       const level = candidates.find((item) => item.tier === candidateTier);
       const offered = level?.candidates ?? [];
-      // Standard follows the role's own choice, as slotRun does for every category; `auto` resolves to that level's Stack recommendation.
+      // What a level really uses (tiers.ts slotRun / maxModel): Standard is the role's own choice, Boost and Max are their slot's pinned model.
+      // A slot or choice that is `auto`/`recommended` is NOT a model: the Stack's per-level `recommended` comes and goes with its live budget, so it is
+      // never read as an assignment (that made cells flap). An automatic Standard or Boost reads "Automatic" and is Ready when something installed fits;
+      // an automatic Max exists only for pictures with the recommended Max installed (maxModel), else it is "No model chosen".
       const role = row.role;
       const roleChoice = getHouseholdSettingValue(`engines.${role}.choice`);
-      const modelId = tier === "standard" ? (typeof roleChoice === "string" && roleChoice !== "auto" && roleChoice !== "off" ? roleChoice : level?.recommended) : slot.model === "recommended" ? level?.recommended : slot.model;
-      const chosen = modelId ? offered.find((item) => item.id === modelId) : undefined;
+      const pinnedId = tier === "standard" ? (typeof roleChoice === "string" && roleChoice !== "auto" && roleChoice !== "off" ? roleChoice : null) : slot.model !== "recommended" ? slot.model : null;
+      let chosen = pinnedId ? offered.find((item) => item.id === pinnedId) : undefined;
+      let automatic = false;
+      if (!pinnedId) {
+        if (tier === "max") {
+          chosen = row.id === "pictures" ? offered.find((item) => item.id === RECOMMENDED_MAX_IMAGE_MODEL) : undefined;
+        } else {
+          automatic = true;
+          const installedIds = new Set(components.filter((item) => item.state === "installed").map((item) => item.id));
+          const fitting = offered.filter((item) => item.fits);
+          const installedFit = fitting.filter((item) => installedIds.has(item.id));
+          if (installedFit.length > 0) return { tier, state: "ready" as const, word: "Ready", model_label: "Automatic", size_bytes_missing: null, detail: null, action: null };
+          if (fitting.length === 0) return { tier, state: "problem" as const, word: "Problem", model_label: null, size_bytes_missing: null, detail: "No model fits this level on this computer.", action: null };
+          chosen = fitting[0];
+        }
+      }
       if (!chosen) return { tier, state: "unset" as const, word: "No model chosen", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      void automatic;
       const component = componentList?.components.find((item) => item.id === chosen.id);
       if (!componentList) return { tier, state: "waits" as const, word: "Waits", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: null };
       if (!chosen.fits) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal ?? "Too big for this level.", action: null };
