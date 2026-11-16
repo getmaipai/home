@@ -844,6 +844,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/mediaOps/coverage.ts` | PICTURE_COVERAGE |
 | `backend/src/lib/mediaOps/http.ts` | MediaOpRequest, withAttachments, startLibraryOp |
 | `backend/src/lib/mediaOps/ids.ts` | BACKGROUND_REMOVAL_OP, VIDEO_CLEARER_OP |
+| `backend/src/lib/mediaOps/pictureWords.ts` | FIX_WORDS_LABEL, promptWithoutPrintedWords, pictureWordsForFix |
 | `backend/src/lib/mediaOps/registry.ts` | registerMediaOp, getMediaOp, registeredMediaOps, listMediaOps, runMediaOp, getMediaOpJob |
 | `backend/src/lib/mediaOps/studio.ts` | PICTURES_NOT_READY_LINE, STUDIO_SAVED_LOCKED_NOTE, studioRows, studioOperationRows, studioPickerRows, pngBase64 |
 | `backend/src/lib/mediaOps/studioReference.ts` | REFERENCE_UNSUPPORTED_LINE, studioReference |
@@ -1011,6 +1012,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/slotBody.ts` | pictureBodyForSlot |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
+| `backend/src/lib/pictures/wordsQuestion.ts` | PICTURE_WORDS_UNAVAILABLE_LINE, __setWordsQuestionCompleterForTests, PICTURE_WORDS_RESPONSE_FORMAT, picturePromptNeedsWordsQuestion, askPictureWords |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, homeOrAway, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable |
