@@ -8,7 +8,7 @@
       "bind": { "source": "package", "path": "recipes", "params": { "scope": "how-made", "id": "$state.id" } },
       "item_key_field": "label",
       "item_label_field": "label",
-      "item_subtitle_field": "value",
+      "item_subtitle_field": "{value}",
       "hide_when_empty": true,
       "empty_state": { "type": "empty_state", "icon": "info", "text": "No saved making details are available." }
     }
