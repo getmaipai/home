@@ -6,6 +6,7 @@ import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackRedu
 import { stackMaxWindow } from "./stackWindow";
 import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { chatMayGoReduced, MAX_NEEDS_REDUCED_OFF_LINE } from "@/lib/tiers";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -29,6 +30,8 @@ export interface QueueJob {
   resourcePaused?: boolean;
   childDailyCapReached?: boolean;
   headOfClass?: boolean;
+  /** One sentence for the person when the queue lowered the job (TIER-REDUCED-01). */
+  tierNote?: string;
   fit?: { outcome: "run" | "ask" | "queue" | "refuse"; profile: { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number }; askLine: string | null };
 }
 
@@ -45,7 +48,7 @@ export interface TierState {
   /** TIER-HOME-05: a Max chat lease is up; Boost and Max generator jobs wait with `max_chat`, Standard jobs go on. */
   chatLeaseHeld?: boolean;
 }
-export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; /** TIER-REDUCED-01: the store lowers its own record from Max to Boost. */ lowerTier?: () => void; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
 type QueueProvider = () => QueueStoreEntry[];
 
 /** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
@@ -500,7 +503,9 @@ export async function releaseHouseholdQueue(): Promise<void> {
         if (held && entry.job.riseReason !== "profile_lowered") { entry.job.riseReason = "profile_lowered"; entry.save(); }
         else if (!held && entry.job.riseReason === "profile_lowered") { entry.job.riseReason = null; entry.save(); }
       }
-      if (runningMax && runningMax.id === reducedChatJobId) {
+      // TIER-REDUCED-01: with the switch off Home never renews Reduced: it leaves what it entered, and what the Stack entered by itself.
+      const reducedSwitchOn = chatMayGoReduced();
+      if (runningMax && runningMax.id === reducedChatJobId && reducedSwitchOn) {
         setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
         // TIER-WIRE-02: the Stack leaves Reduced by itself after 30 minutes without a renewing `{on:true}`, so a long Max job renews it.
         if (now - lastReducedRenewAt >= REDUCED_RENEW_MS) { lastReducedRenewAt = now; await enterStackReducedChat(); }
@@ -513,7 +518,10 @@ export async function releaseHouseholdQueue(): Promise<void> {
           else { downshiftMemory.restoredAt = now; downshiftMemory.lastJobEndedAt = now; reducedChatJobId = null; setReducedChat(null); }
           // A failed leave is not retried forever: renewals stop, so the Stack leaves Reduced by itself, and the composer line follows the Stack.
         } else { setReducedChat({ minutesLeft: null }); scheduleDownshiftRecheck(); }
-      } else setReducedChat(null);
+      } else {
+        if (runningMax && !reducedSwitchOn && await stackReducedChat()) await leaveStackReducedChat();
+        setReducedChat(null);
+      }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
       const admission = admit(jobs, now, tierState);
       const admitted = new Set(admission.start);
@@ -558,6 +566,14 @@ export async function releaseHouseholdQueue(): Promise<void> {
               } else if (fit.outcome !== "run") {
                 if (entry.job.riseReason !== "tier_no_room") { entry.job.riseReason = "tier_no_room"; entry.save(); }
                 scheduleNoRoomRecheck();
+                continue;
+              }
+              // TIER-REDUCED-01: a `chat: reduced` cell is permission. Max asks the Stack for Reduced only on a real shortfall, and never with the switch off.
+              if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced" && !((fit.shortfallGb ?? 0) > 0)) {
+                delete (fit.applied.cells as Record<string, unknown>).chat;
+              } else if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced" && !chatMayGoReduced()) {
+                entry.job.tier = "boost"; entry.job.tierNote = MAX_NEEDS_REDUCED_OFF_LINE; entry.lowerTier?.(); entry.save();
+                lastFit.delete(entry.job.id); releaseAgain = true;
                 continue;
               }
               if (fit.applied?.cells.chat?.state === "reduced") {

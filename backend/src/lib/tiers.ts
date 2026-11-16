@@ -141,6 +141,8 @@ export function maxAvailable(category: TierCategory, capabilityFits?: boolean): 
   const slot = readSlot(category, "max");
   return slot.model !== "off" && slot.model !== "recommended" && slot.model !== readSlot(category, "boost").model;
 }
+/** The chat Reduced switch (`engines.chat.tier.reduced`); off is its default. */
+export const chatMayGoReduced = (): boolean => readSlot("chat", "reduced").model !== "off";
 /** Whether this person is shown a Max control on a card: they hold Max, their band reaches it, the slot is on and a Max model exists. */
 export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand, available: boolean = maxAvailable(category)): boolean {
   return available && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
@@ -156,6 +158,8 @@ export function jobTier(category: TierCategory, tier: Tier | undefined, quality:
 }
 
 export const MAX_NEEDS_ADMIN_LINE = "Max needs an admin's OK. Ask an admin.";
+/** TIER-REDUCED-01: a Max job whose peak needs the room chat holds, while the "Let big jobs simplify chat" switch is off. */
+export const MAX_NEEDS_REDUCED_OFF_LINE = "Max would need to simplify chat, which is switched off, so this one is made at Boost.";
 export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this computer yet, so this one is made at Boost.";
 
 /**

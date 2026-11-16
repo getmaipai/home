@@ -27,6 +27,8 @@ export interface FitResult {
   requested?: ProfileRow;
   /** MEM-SPACE-10: counts and bytes of the apps the close step quit for this job; never names. */
   closed?: { apps: number; bytes: number };
+  /** TIER-REDUCED-01: how much more room (GB) the applied row needs than is live now, chat's Reduced cell left out. Above 0 is the only reason Home asks the Stack for Reduced chat. */
+  shortfallGb?: number;
 }
 
 const categories: Category[] = ["chat", "voice", "picture", "video", "music", "tools"];

@@ -1,4 +1,4 @@
-import { appliedProfile, askLevels, askLine, liveFit, type FitResult, type MemoryNow } from "./liveFit";
+import { appliedProfile, askLevels, askLine, liveFit, needGb, type FitResult, type MemoryNow } from "./liveFit";
 import { closableApps, closeForJob, realHelper, type CloseHelper, type CloseSettings } from "./closeApps";
 import type { Category, CellState, Hardware, ProfileRow, Tier } from "./profileTable";
 
@@ -35,6 +35,9 @@ export function memoryNowFromBudget(b: BudgetNow): MemoryNow {
 
 const kindWords = (lead: Category) => lead === "picture" ? "picture" : lead === "video" ? "video" : lead === "music" ? "song" : "job";
 
+/** TIER-REDUCED-01: the row as it needs room before chat's Reduced cell, which is the thing a shortfall would trigger. */
+const withoutChat = (row: ProfileRow): ProfileRow => { const { chat: _chat, ...cells } = row.cells; return { ...row, cells }; };
+
 const rank = { run: 3, ask: 2, queue: 1, refuse: 0 } as const;
 
 export async function fitForAdmission(job: { id?: string; jobClass: "picture" | "video" | "other"; category?: string; tier: Tier }, readBudget: () => Promise<BudgetNow>, helper: CloseHelper = realHelper): Promise<FitResult | null> {
@@ -50,8 +53,11 @@ export async function fitForAdmission(job: { id?: string; jobClass: "picture" | 
     let marginGb = configured.hw.marginGb;
     let band = job.id && notCleanLastTime.has(job.id) ? FIT_HYSTERESIS_GB : 0;
     const usableFree = (freeGb: number) => Math.max(0, Math.min(freeGb - marginGb - band, configured.hw.budgetGb));
-    const fitWith = (memory: MemoryNow) => liveFit({ row, table: configured.table, hw: configured.hw, memory: { ...memory, freeGb: usableFree(memory.freeGb) }, pins: configured.pins, priorityWeight: configured.priorityWeight, pickedTier: job.tier, lowerWithoutAsking: configured.lowerWithoutAsking });
-    const remember = (result: FitResult): FitResult => { if (job.id) { if (result.outcome === "run" && result.lowered.length === 0 && !result.belowPick) notCleanLastTime.delete(job.id); else { notCleanLastTime.add(job.id); while (notCleanLastTime.size > 500) notCleanLastTime.delete(notCleanLastTime.values().next().value!); } } return result; };
+    const roomOf = new WeakMap<FitResult, number>();
+    // TIER-REDUCED-01: a Max row with a `chat: reduced` cell may use the room chat's Reduced swap would free (its Standard footprint less its Reduced one); whether Home may ask for the swap is decided at the queue, from `shortfallGb` and the switch.
+    const chatFreedGb = job.tier === "max" && row.cells.chat?.state === "reduced" ? Math.max(0, (configured.hw.residentGb.chat?.standard ?? 0) - (configured.hw.residentGb.chat?.reduced ?? 0)) : 0;
+    const fitWith = (memory: MemoryNow) => { const result = liveFit({ row, table: configured.table, hw: configured.hw, memory: { evictableGb: memory.evictableGb + chatFreedGb, freeGb: usableFree(memory.freeGb) }, pins: configured.pins, priorityWeight: configured.priorityWeight, pickedTier: job.tier, lowerWithoutAsking: configured.lowerWithoutAsking }); roomOf.set(result, usableFree(memory.freeGb) + memory.evictableGb); return result; };
+    const remember = (result: FitResult): FitResult => { const room = roomOf.get(result); if (room !== undefined) result.shortfallGb = Math.max(0, needGb(withoutChat(result.applied ?? row), configured.hw) - room); if (job.id) { if (result.outcome === "run" && result.lowered.length === 0 && !result.belowPick) notCleanLastTime.delete(job.id); else { notCleanLastTime.add(job.id); while (notCleanLastTime.size > 500) notCleanLastTime.delete(notCleanLastTime.values().next().value!); } } return result; };
     const budget = await readBudget();
     if (budget.readingDegraded) return null; // no live reading: Home gives no opinion and the Stack's governor decides
     if (budget.marginBytes !== undefined) marginGb = budget.marginBytes / 1e9;
@@ -73,7 +79,9 @@ export async function fitForAdmission(job: { id?: string; jobClass: "picture" | 
     const result = await closeForJob(job.id, kindWords(lead), shortfallGb, close, helper);
     if (result.closedApps === 0) return remember(plain);
     const after = fitWith(memoryNowFromBudget(await readBudget()));
-    return remember({ ...after, steps: [...after.steps, "closed apps"], closed: { apps: result.closedApps, bytes: result.closedBytes } });
+    const closedFit: FitResult = { ...after, steps: [...after.steps, "closed apps"], closed: { apps: result.closedApps, bytes: result.closedBytes } };
+    const afterRoom = roomOf.get(after); if (afterRoom !== undefined) roomOf.set(closedFit, afterRoom);
+    return remember(closedFit);
   } catch { return null; }
 }
 
