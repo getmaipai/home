@@ -155,3 +155,19 @@ vision model.
 Bench scripts, prompts, raw times and the full comparison page are in the owner's `data-scratch/bakeoff/` (`RESULTS.md`, `prompts.tsv`,
 `results.txt`, `compare.html`, `edit/`, `real/`). The pictures kept in this repository are in
 [assets/image-bakeoff-2026-10-25/](assets/image-bakeoff-2026-10-25/) (six JPEG contact sheets, about 1.7 MB in all).
+
+## 8. Added 2026-11-15: MiniMax H3-Image (owner: "add MiniMax to the bakeoff")
+
+Same 22 prompts, seed 7, 1024 by 1024, one process per picture. Runtime `h3-image-mlx` 0.1.0a8 (MLX 0.32.4), INT8 ConvRot weights
+(`Comfy-Org/MiniMax-H3-Image` at `b8ebf14`, 49.3 GB on disk: 21 GB DiT, 27 GB Qwen3-VL-32B text encoder, 1.2 GB VAE), 6 steps, no CFG.
+Studio load average 5 to 7 during the run, against 25 to 50 in October, so times are not a race; the pictures are the comparison
+(`data-scratch/bakeoff/compare.html`, first column).
+
+| Model | Mean time | Peak memory | Text | Notes |
+|---|---:|---:|---|---|
+| MiniMax H3-Image INT8 | 13.3 s (9 to 23 s), load included | resident about 21 GB, streaming about 3 GB (community figures; our sampler's numbers are in the eval record) | 5 of 5 right | photoreal portraits; Vader, Pikachu, Batman, Mario, Spider-Man known; "the Terminator" became an anime woman; 33B model |
+
+Reading (Jesse judges): the text prompts are as clean as Z-Image and ERNIE and better than Klein; photos are the most photoreal of the set;
+anime and cartoon are clean. It takes up to 16 reference pictures and edits in the same model, so it is a candidate for both the new-picture
+slots and the edit slot. Numbers, the edit set, the streaming mode and the licence facts are in
+[minimax-h3-eval-2026-11-15.md](minimax-h3-eval-2026-11-15.md). Nothing in sections 4 to 6 changes until Jesse rules on the pictures.
