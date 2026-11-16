@@ -10,6 +10,9 @@ import type { PersonRow } from "@/types";
 import { fetchScoreFile, getScore, scoreEngineReady, submitScore } from "@/lib/music/scoreStack";
 export type ScoreStart = { ok: true; job: MusicJob } | { ok: false; status: 400 | 404 | 409 | 503; line: string };
 function failed(job: MusicJob, line: string) { job.state = "failed"; job.stage = "failed"; job.errorCode = "score_failed"; job.errorLine = line; saveMusicJob(job); liveJobs.delete(job.id); }
+type ScoreNote = { start: number; end: number; pitch: number; velocity: number };
+/** The Stack writes the note file as a bare list; an older shape wrapped it in { notes }. */
+export const scoreNotesOf = (parsed: unknown): ScoreNote[] => Array.isArray(parsed) ? parsed as ScoreNote[] : Array.isArray((parsed as { notes?: unknown } | null)?.notes) ? (parsed as { notes: ScoreNote[] }).notes : [];
 const scoreState = (job: MusicJob): MusicJob["state"] => job.state;
 async function run(job: MusicJob, actor: PersonRow) {
   const score = job.request.score!; job.state = "running"; job.stage = "transcribing"; job.progress = .1; saveMusicJob(job);
@@ -34,11 +37,11 @@ async function run(job: MusicJob, actor: PersonRow) {
       if (state.state === "failed") return failed(job, "Home could not get the score. Check the song and try again.");
       if (state.state === "done") {
         const [midi, noteBytes] = await Promise.all([fetchScoreFile(stackId, "midi"), fetchScoreFile(stackId, "notes")]);
-        const parsed = JSON.parse(new TextDecoder().decode(noteBytes)) as { notes?: Array<{ start: number; end: number; pitch: number; velocity: number }>; tempo_bpm?: number };
-        const notes = Array.isArray(parsed.notes) ? parsed.notes : [];
+        const parsed = JSON.parse(new TextDecoder().decode(noteBytes)) as Array<{ start: number; end: number; pitch: number; velocity: number }> | { notes?: Array<{ start: number; end: number; pitch: number; velocity: number }>; tempo_bpm?: number };
+        const notes = scoreNotesOf(parsed);
         const result = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/midi", bytes: midi, retention: "kept", deduplicate: false, name: `Score for ${score.sourceTitle}`, provenance: `score:${JSON.stringify({ kind: "score", made_here: true, engine: "score-gen", source_file_id: score.sourceFileId })}` });
         if (!result.ok) return failed(job, "Home could not save the MIDI file. Check your Library storage and try again.");
-        job.fileId = result.value.id; score.notes = notes; score.tempoBpm = parsed.tempo_bpm ?? state.result?.tempo_bpm ?? 120; score.noteCount = notes.length;
+        job.fileId = result.value.id; score.notes = notes; score.tempoBpm = (Array.isArray(parsed) ? undefined : parsed.tempo_bpm) ?? state.result?.tempo_bpm ?? 120; score.noteCount = notes.length;
         job.state = "done"; job.stage = "ready"; job.progress = 1; job.errorCode = null; job.errorLine = null; saveMusicJob(job); liveJobs.delete(job.id); return;
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
