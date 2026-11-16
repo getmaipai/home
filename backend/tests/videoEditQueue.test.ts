@@ -81,7 +81,7 @@ describe("an edit joins the household queue", () => {
     await until(() => !["queued", "running"].includes(stateOf(marlow, b.id).state));
   });
 
-  test("a queued Max edit is a Max video job to the queue: it holds a following video job (max_drain)", async () => {
+  test("a queued Max edit is a Max video job to the queue: a following job backfills beside it (QUEUE-FIT-01)", async () => {
     // Other names than the test above: the queue weighs each person's recent use, which would reorder the three.
     const sage = person("Iris"); const marlow = person("Quill"); const nova = person("Raven");
     const running = gate(); let maxRuns = 0; let thirdRuns = 0;
@@ -93,8 +93,8 @@ describe("an edit joins the household queue", () => {
     await releaseHouseholdQueue();
     await Bun.sleep(50);
     expect(stateOf(marlow, b.id).phase).toBe("held:max_drain");
-    expect(stateOf(nova, c.id).phase).toBe("held:max_drain");
-    expect(maxRuns + thirdRuns).toBe(0);
+    await until(() => thirdRuns === 1);
+    expect(maxRuns).toBe(0);
     running.open();
     await until(() => maxRuns === 1);
   });

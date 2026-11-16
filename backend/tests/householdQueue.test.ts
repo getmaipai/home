@@ -179,11 +179,12 @@ describe("household queue", () => {
     expect(admit([runningBoost, queuedBoost, standard], now, emptyTierState)).toEqual({ start: ["s"], holds: { qb: "heavy_slot" } });
   });
 
-  test("T2 drains running work for the first Max and holds admissions behind it", () => {
+  // QUEUE-FIT-01: jobs behind a waiting Max keep starting until the Max has aged past the limit (tests/queueBackfill.test.ts).
+  test("T2 drains running work for the first Max and backfills the jobs behind it", () => {
     const running = job("run", "A", "other", now, { state: "running" });
     const max = job("max", "B", "video", now, { tier: "max" });
     const after = job("after", "C", "other", now + 1);
-    expect(admit([running, max, after], now, emptyTierState)).toEqual({ start: [], holds: { max: "max_drain", after: "max_drain" } });
+    expect(admit([running, max, after], now, emptyTierState)).toEqual({ start: ["after"], holds: { max: "max_drain" } });
   });
 
   test("T3 open Max window holds every other queued job", () => {
@@ -197,7 +198,7 @@ describe("household queue", () => {
     const max = job("max", "B", "video", now, { tier: "max" });
     expect(admit([ahead, max], now, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain" } });
     const behind = job("behind", "C", "other", now + 1);
-    expect(admit([ahead, max, behind], now + 1, emptyTierState)).toEqual({ start: ["ahead"], holds: { max: "max_drain", behind: "max_drain" } });
+    expect(admit([ahead, max, behind], now + 1, emptyTierState)).toEqual({ start: ["ahead", "behind"], holds: { max: "max_drain" } });
   });
 
   test("T4b waits for other people's first queued non-Max jobs before another Max", () => {

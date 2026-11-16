@@ -18,7 +18,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -33,11 +33,13 @@ export interface QueueJob {
 }
 
 /** Waits a job store keeps on the card across a restart (the phase or stage reads `held:<reason>`), and the card words for them. One list for the three kinds of job. */
-const HOLD_LIST = ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
+const HOLD_LIST = ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
 export type PersistedHold = typeof HOLD_LIST[number];
 export const PERSISTED_HOLDS: readonly string[] = HOLD_LIST;
 export interface QueuePosition { id: string; position: number }
-export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat";
+/** The Stack's `backfillMaxWaitMs` (10 minutes): how long a big job waits while smaller ones pass it, unless the household set `resources.max_wait_before_aging`. */
+const BACKFILL_MAX_WAIT_MINUTES = 10;
+export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat" | "aged_guard";
 export interface TierState {
   windowOpenFor: string | null;
   startedSinceMax: readonly string[];
@@ -192,33 +194,37 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
     return { start, holds };
   }
 
-  const firstMaxIndex = ordered.findIndex((job) => job.tier === "max");
-  const firstMax = firstMaxIndex < 0 ? undefined : ordered[firstMaxIndex];
+  const firstMax = ordered.find((job) => job.tier === "max");
   const otherWaitingPeople = new Set(ordered.filter((job) => job.tier !== "max" && job.personId !== firstMax?.personId)
     .map((job) => job.personId).filter((personId) => !state.startedSinceMax.includes(personId)));
   const fairnessApplies = !!firstMax && state.lastMaxPersonId !== null && otherWaitingPeople.size > 0;
-  const draining = !!firstMax && running.length > 0;
-  const heavyRunning = running.some((job) => job.tier === "boost" || job.tier === "max");
+  const policy = queuePolicy();
+  /** QUEUE-FIT-01: how long a big job may wait while others pass it (`resources.max_wait_before_aging.<kind>`, else the Stack's 10 minutes). */
+  const aged = (job: QueueJob) => now - createdAt(job) > (policy.maxWaitBeforeAgingMinutes?.[category(job)] ?? BACKFILL_MAX_WAIT_MINUTES) * 60_000;
+  const heavyBusy = running.some((job) => job.tier === "boost" || job.tier === "max");
+  let maxDoor: "open" | "closed" = "open";
+  let agedBoostGuard = false;
 
-  let maxWaiting = false;
-  for (let index = 0; index < ordered.length; index += 1) {
-    const job = ordered[index]!;
-    if (firstMax && job.id === firstMax.id) {
-      if (draining) holds[job.id] = "max_drain";
-      else if (fairnessApplies) holds[job.id] = "fairness_wait";
-      else if (index > 0) holds[job.id] = "max_drain";
-      else { start.push(job.id); break; }
-      maxWaiting = true;
+  for (const job of ordered) {
+    if (job.tier === "max") {
+      if (running.length === 0 && fairnessApplies && job.id === firstMax!.id) holds[job.id] = "fairness_wait";
+      else if (running.length > 0 || start.length > 0) {
+        holds[job.id] = "max_drain";
+        if (aged(job)) maxDoor = "closed";
+      } else { start.push(job.id); break; }
       continue;
     }
-    if ((draining || maxWaiting) && index > firstMaxIndex) { holds[job.id] = "max_drain"; continue; }
+    if (maxDoor === "closed") { holds[job.id] = "max_drain"; continue; }
+    if (job.tier === "boost" && heavyBusy) {
+      holds[job.id] = "heavy_slot";
+      if (aged(job)) agedBoostGuard = true;
+      continue;
+    }
+    if (agedBoostGuard) { holds[job.id] = "aged_guard"; continue; }
     if (fairnessApplies && otherWaitingPeople.has(job.personId)) {
       // Only the first queued non-Max job for each waiting person is admitted.
-      if (!start.some((id) => queued.get(id)?.personId === job.personId)) start.push(job.id);
-      else holds[job.id] = "fairness_wait";
-      continue;
+      if (start.some((id) => queued.get(id)?.personId === job.personId)) { holds[job.id] = "fairness_wait"; continue; }
     }
-    if ((job.tier === "boost" || job.tier === "max") && heavyRunning) { holds[job.id] = "heavy_slot"; continue; }
     start.push(job.id);
   }
   return { start, holds };
@@ -522,7 +528,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
         const hold = admission.holds[entry.job.id] ?? null;
         const specific = entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room" || entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
         if (hold && !specific && entry.job.riseReason !== hold) { entry.job.riseReason = hold; entry.save(); }
-        else if (!hold && ["heavy_slot", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
+        else if (!hold && ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
       }
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));

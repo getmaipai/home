@@ -5,7 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "memory_stopped_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
-  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
+  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "aged_guard" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -93,6 +93,7 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     child: "Waiting for its turn.",
   },
   heavy_slot: { adult: "Another job is running; this one starts when it finishes.", child: "Another job is running. Yours starts when it finishes." },
+  aged_guard: { adult: "Waiting for a big job that has been in line a while.", child: "Waiting for a big job that has been in line a while." },
   fairness_wait: { adult: "Other people's jobs go first this round; this one is next.", child: "Other people's jobs go first this round. Yours is next." },
   picture_line: { adult: "Waiting in line, number N", child: "Waiting in line, number N" },
   picture_engine: { adult: "Waiting for its turn", child: "Waiting for its turn" },
