@@ -129,3 +129,7 @@ export function setPlayerVolume(el: HTMLMediaElement, target: number): void {
 }
 export const hasPlayerAudioGraph = (el: HTMLMediaElement): boolean => taps.has(el);
 export const playerAudioAvailable = (): boolean => typeof window !== "undefined" && !!audioContextClass() && !isIos();
+
+/** A paused player holds the audio hardware open for nothing; suspend the shared context (resume on the next play). */
+export function suspendPlayerAudio(): void { try { if (context && context.state === "running") void context.suspend(); } catch { /* the context stays as it is */ } }
+export function resumePlayerAudio(): void { try { if (context && context.state === "suspended") void context.resume(); } catch { /* the next tap resumes it */ } }

@@ -6,7 +6,7 @@ import type { AudioHandle, AudioSession } from "@/shell/audioSession";
 import { getPlayMode } from "@/shell/media/playMode";
 import { appendToQueue, clearPlayNext, clearUpcoming, insertNext, moveUpcoming, pickNext, pickPrevious, queueFor, removeUpcoming, trackIsPlayable, type QueueEdit, type QueueSource, type Track } from "./musicQueue";
 import { reportPlayerError } from "@/lib/clientErrors";
-import { analyserFor, hasPlayerAudioGraph, setPlayerTransport, setPlayerVolume } from "@/lib/media/audioGraph";
+import { analyserFor, hasPlayerAudioGraph, resumePlayerAudio, setPlayerTransport, setPlayerVolume, suspendPlayerAudio } from "@/lib/media/audioGraph";
 import { applyEqSettings, loadEqSettings } from "./musicEq";
 import { createMusicHistoryTracker } from "./musicHistory";
 
@@ -143,15 +143,18 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     made.preload = "metadata";
     made.crossOrigin = "anonymous";
     made.volume = 1; made.muted = vol.muted;
+    let suspendTimer: ReturnType<typeof setTimeout> | null = null;
     made.addEventListener("play", () => {
       if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+      if (suspendTimer) { clearTimeout(suspendTimer); suspendTimer = null; }
+      resumePlayerAudio();
       analyserFor(made);
       applyEqSettings(loadEqSettings(), snap.track?.loudnessLufs);
       setPlayerVolume(made, vol.muted ? 0 : vol.volume);
       made.volume = hasPlayerAudioGraph(made) ? 1 : vol.volume;
       setPlayerTransport(made, 1); set({ playing: true, failed: false }); startFrames();
     });
-    made.addEventListener("pause", () => { setPlayerTransport(made, 0); set({ playing: false }); clockTick(); });
+    made.addEventListener("pause", () => { setPlayerTransport(made, 0); set({ playing: false }); clockTick(); if (suspendTimer) clearTimeout(suspendTimer); suspendTimer = setTimeout(() => { suspendTimer = null; if (made.paused) suspendPlayerAudio(); }, 10000); });
     made.addEventListener("ended", () => {
       if (stopping) return;
       if (!reallyPlayed()) { noPlayback(); return; }
