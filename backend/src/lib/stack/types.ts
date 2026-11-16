@@ -277,7 +277,10 @@ export interface BudgetResponse {
   pressure: "normal" | "warn" | "critical";
   margin_bytes?: number;
   profile?: string | null;
-  slots?: Array<{ category: "chat" | "pictures" | "video" | "music"; tier: "reduced" | "standard" | "boost" | "max"; model: string; peak_bytes: number; verified: boolean }>;
+  slots?: Array<{ category: "chat" | "pictures" | "video" | "music" | "voice" | "stems"; tier: "reduced" | "standard" | "boost" | "max"; model: string | null; peak_bytes: number | null; verified: boolean; basis?: string; resident_bytes?: number | null; fits_ever?: boolean }>;
+  /** TIER-BUDGET-01: what is free now and the room a job may use, in bytes. Absent on an older Stack. */
+  free_now_bytes?: number;
+  room_bytes?: number;
   memoryReadingDegraded: boolean;
   loaded: Array<{
     id: string;

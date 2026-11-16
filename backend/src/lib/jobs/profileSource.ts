@@ -11,10 +11,13 @@ export function hardwareFromBudget(budget: BudgetResponse): Hardware | null {
   if (!budget.slots?.length || budget.margin_bytes === undefined) return null;
   const residentGb: Hardware["residentGb"] = {};
   const peakGb: Hardware["peakGb"] = {};
-  const categoryMap = { chat: "chat", pictures: "picture", video: "video", music: "music" } as const;
+  const neverFits: NonNullable<Hardware["neverFits"]> = {};
+  const categoryMap: Partial<Record<string, Category>> = { chat: "chat", pictures: "picture", video: "video", music: "music" };
   for (const slot of budget.slots) {
-    if (!slot.verified) continue;
     const category = categoryMap[slot.category];
+    if (!category) continue; // voice and stems have no Home category
+    if (slot.fits_ever === false && slot.tier !== "reduced") (neverFits[category] ??= {})[slot.tier] = true;
+    if (slot.peak_bytes === null || slot.peak_bytes === undefined || !slot.verified) continue;
     (residentGb[category] ??= {})[slot.tier] = gb(slot.peak_bytes);
     if (slot.tier !== "reduced") (peakGb[category] ??= {})[slot.tier] = gb(slot.peak_bytes);
   }
@@ -23,7 +26,7 @@ export function hardwareFromBudget(budget: BudgetResponse): Hardware | null {
     (residentGb.tools ??= {}).standard = gb(tools.peakBytes);
     (peakGb.tools ??= {}).standard = gb(tools.peakBytes);
   }
-  return { budgetGb: gb(budget.capBytes), marginGb: gb(budget.margin_bytes), residentGb, peakGb };
+  return { budgetGb: gb(budget.capBytes), marginGb: gb(budget.margin_bytes), residentGb, peakGb, ...(Object.keys(neverFits).length ? { neverFits } : {}) };
 }
 
 const LEADS: Record<string, Category> = { image: "picture", video: "video", chat: "chat", music: "music", tools: "tools" };

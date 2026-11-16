@@ -4,6 +4,7 @@ import type { Category, CellState } from "./profileTable";
 import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { enterStackReducedChat, leaveStackReducedChat, setReducedChat, stackReducedChat } from "@/lib/reducedChat";
 import { stackMaxWindow } from "./stackWindow";
+import { waitedForRoomLine } from "../fitWording";
 import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 import { isOwnerOrAdmin } from "@/lib/access";
 export type QueueClass = "picture" | "video" | "other";
@@ -45,7 +46,7 @@ export interface TierState {
   /** TIER-HOME-05: a Max chat lease is up; Boost and Max generator jobs wait with `max_chat`, Standard jobs go on. */
   chatLeaseHeld?: boolean;
 }
-export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; stop?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void; /** TIER-BOOST-HOLD-01: remake the request at Standard and keep the card line. */ lowerToStandard?: (note: string) => void }
 type QueueProvider = () => QueueStoreEntry[];
 
 /** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
@@ -420,10 +421,13 @@ const providers = new Set<QueueProvider>();
 let releasing = false;
 let releaseAgain = false;
 const lastFit = new Map<string, string>();
+/** TIER-BOOST-HOLD-01: when a Boost job first sat held as `tier_no_room`; the wait is bounded by `resources.quiet_max_wait`. */
+const noRoomSince = new Map<string, number>();
 const LAST_FIT_LIMIT = 200;
 function forgetFinishedFits(jobs: readonly QueueJob[]): void {
   const active = new Set(jobs.filter((job) => job.state === "queued" || job.state === "running").map((job) => job.id));
   for (const id of lastFit.keys()) if (!active.has(id)) lastFit.delete(id);
+  for (const id of noRoomSince.keys()) if (!active.has(id)) noRoomSince.delete(id);
   for (const id of fitAsks.keys()) if (!active.has(id)) fitAsks.delete(id);
 }
 function rememberFit(id: string, key: string): void {
@@ -433,7 +437,7 @@ function rememberFit(id: string, key: string): void {
 }
 export function rememberFitForTests(id: string, key: string): void { rememberFit(id, key); }
 export function fitMemorySizeForTests(): number { return lastFit.size; }
-export function resetFitMemoryForTests(): void { lastFit.clear(); resetFitHysteresisForTests(); }
+export function resetFitMemoryForTests(): void { lastFit.clear(); noRoomSince.clear(); resetFitHysteresisForTests(); }
 let budgetReader: (() => Promise<BudgetNow>) | null = null;
 export function setBudgetReader(fn: (() => Promise<BudgetNow>) | null): void { budgetReader = fn; }
 async function stackBudget(): Promise<BudgetNow> {
@@ -557,8 +561,15 @@ export async function releaseHouseholdQueue(): Promise<void> {
                 if (entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room") { entry.job.riseReason = null; entry.save(); }
               } else if (fit.outcome !== "run") {
                 if (entry.job.riseReason !== "tier_no_room") { entry.job.riseReason = "tier_no_room"; entry.save(); }
-                scheduleNoRoomRecheck();
-                continue;
+                const since = noRoomSince.get(entry.job.id) ?? now;
+                noRoomSince.set(entry.job.id, since);
+                const maxWait = (quietConfigSource?.() ?? DEFAULT_QUIET).quietMaxWaitSeconds;
+                if (entry.job.tier === "boost" && entry.lowerToStandard && maxWait !== "never" && now - since >= maxWait * 1000) {
+                  // TIER-BOOST-HOLD-01: the bounded wait is over; make it at Standard, the lowest level this person may have, and say so on the card.
+                  noRoomSince.delete(entry.job.id);
+                  entry.lowerToStandard(waitedForRoomLine((now - since) / 60_000));
+                  entry.job.tier = "standard"; entry.job.riseReason = null; entry.save();
+                } else { scheduleNoRoomRecheck(); continue; }
               }
               if (fit.applied?.cells.chat?.state === "reduced") {
                 // PRIO-03 (S1 to S4): chat is lowered only after a quiet moment, outside the cooldown; chat is never paused, so the wait is bounded.

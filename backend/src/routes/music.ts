@@ -163,6 +163,8 @@ const warnedMusicStages = new Set<string>();
 export function musicStageLabel(job: MusicJob, audience: "adult" | "child" = "adult"): string {
   if (job.stage == null || job.stage === "") return "";
   const hold = job.stage.startsWith("held:") ? job.stage.slice(5) : null;
+  const waited = (job.request as { waited_note?: string }).waited_note;
+  if (waited && !hold && (job.state === "queued" || job.state === "running")) return waited;
   if (hold === "tier_ask" && audience === "adult") { const line = pendingFitAsk(job.id)?.line; if (line) return line; }
   if (hold && PERSISTED_HOLDS.includes(hold)) return jobQueueCopy("queued", hold as PersistedHold, job.position, null, audience);
   if (job.state === "queued" && job.stage === "queued") return jobQueueCopy("queued", "queue", job.position, null, audience);
