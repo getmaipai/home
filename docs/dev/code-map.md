@@ -977,6 +977,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
+| `backend/src/lib/pictures/expand.ts` | EXPAND_SHAPES, EXPAND_BASE_PROMPT, EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, isExpandShape, expandGeometry |
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
 | `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, cancelPictureJob, resumePictureJobs |
