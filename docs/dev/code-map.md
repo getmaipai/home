@@ -1321,6 +1321,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/adultStyle.ts` | usesAdultOnlyStyle |
 | `backend/src/lib/videos/audioLength.ts` | wavSeconds, mp4Seconds, mp3Seconds, audioSeconds |
 | `backend/src/lib/videos/beatCut.ts` | planBeatCut |
+| `backend/src/lib/videos/captionsPage.ts` | MAX_CAPTION_LINES, MAX_CREDIT_LINES, NO_CLIP_LINE, NO_SPEECH_LINE, captionClip, captionLineRows |
 | `backend/src/lib/videos/chapters.ts` | chaptersForMadeClip |
 | `backend/src/lib/videos/clearerLevels.ts` | BEST_VIDEO_NOT_YET, STACK_HAS_VIDEO_RESTORE, videoClearerLevels |
 | `backend/src/lib/videos/clipEditStart.ts` | startClipEdit, RESHAPES, isReshape, startReshape, startSharpen, NEXT_SHOTS |
