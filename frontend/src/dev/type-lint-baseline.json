@@ -90,7 +90,6 @@
     "apps/settings/AddVoiceForm.tsx": 7,
     "apps/settings/HuggingFaceTokenSection.tsx": 3,
     "apps/settings/VoiceManagerSection.tsx": 8,
-    "apps/settings/AiGlance.tsx": 7,
     "apps/settings/styles/StyleEditor.tsx": 7,
     "apps/settings/styles/StylesTab.tsx": 5,
     "apps/settings/styles/StyleConfirm.tsx": 7,

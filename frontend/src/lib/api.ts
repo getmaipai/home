@@ -1065,13 +1065,22 @@ export type HealthChecks = {
 
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
+export type AiOverviewAction = { kind: "download" | "fix" | "open"; label: string; job?: string; level?: string };
+export type AiOverviewState = "ready" | "missing" | "problem" | "off" | "unset" | "waits" | "same";
+export type AiLevelOption = { id: string; label: string; installed: boolean; size_bytes: number | null; good_at: string | null; suggested: boolean };
+export type AiOverviewLevel = { tier: "reduced" | "standard" | "boost" | "max"; state: AiOverviewState; word: string; model_label: string | null; automatic: boolean; model_id: string | null; can_choose: boolean; options: AiLevelOption[]; size_bytes_missing: number | null; detail: string | null; action: AiOverviewAction | null };
+export type AiOverviewFeature = { id: string; name: string; used_by: string[]; levels: AiOverviewLevel[]; ready_count: number; level_count: number };
+export type AiOverviewHelper = { id: string; name: string; parent: string; component_id: string | null; size_bytes_missing: number | null; model_label: string | null; used_by: string[]; state: AiOverviewState; action: AiOverviewAction | null };
+export type AiOverview = {
+  features: AiOverviewFeature[];
+  helpers: AiOverviewHelper[];
+  attention: { items: Array<{ id: string; kind: "problem" | "missing"; title: string; line: string; action: AiOverviewAction | null }>; download_all: { bytes: number; count: number } | null };
+  right_now: { engine: "ready" | "problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };
+};
+
 export const api = {
-  aiFeaturesOverview: () => request<{
-    features: Array<{ id: string; name: string; used_by: string[]; levels: Array<{ tier: "reduced"|"standard"|"boost"|"max"; state: "ready"|"missing"|"problem"|"off"|"unset"|"waits"|"same"; word: string; model_label: string|null; size_bytes_missing: number|null; detail: string|null; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; ready_count: number; level_count: number }>;
-    helpers: Array<{ id: string; name: string; model_label: string|null; used_by: string[]; state: "ready"|"missing"|"problem"|"off"|"waits"|"same"; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>;
-    attention: { items: Array<{ id: string; kind: "problem"|"missing"; title: string; line: string; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; download_all: { bytes: number; count: number }|null };
-    right_now: { engine: "ready"|"problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };
-  }>("/api/ai/overview"),
+  aiFeaturesOverview: () => request<AiOverview>("/api/ai/overview"),
+  installComponent: (id: string) => request<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", body: JSON.stringify({}) }),
   aiTierCandidates: (job: string) => request<{ levels: Array<{ tier: string; recommended: string | null; candidates: Array<{ id: string; label: string; fits: boolean; refusal: string | null }> }> }>(`/api/ai/tiers/${encodeURIComponent(job)}`),
   aiInstallLevel: (job: string, tier: string, model: string) => request<{ job: string | null; component: string }>(`/api/ai/level/${encodeURIComponent(job)}/${encodeURIComponent(tier)}/install`, { method: "POST", body: JSON.stringify({ model }) }),
   aiSaveSlot: (job: string, tier: string, model: string) => request<{ ok: true }>(`/api/ai/slot/${encodeURIComponent(job)}/${encodeURIComponent(tier)}`, { method: "PUT", body: JSON.stringify({ model }) }),

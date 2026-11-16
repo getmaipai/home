@@ -5,7 +5,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { db } from "@/db";
 import { people, sessions } from "@/db/schema";
 import { setValue } from "@/lib/settings";
-import { aiChoicesRoutes } from "@/routes/aiChoices";
+import { aiChoicesRoutes, __setOverviewBudgetForTests } from "@/routes/aiChoices";
 import { __setComponentsFetchForTests } from "@/lib/stackComponents";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { resetDb } from "../../tests/reset-db";
@@ -25,8 +25,8 @@ function stackResponse(path: string): Response {
   return new Response("not found", { status: 404 });
 }
 
-beforeEach(() => { resetDb(); __setRoleHealthForTests({ chat: { availability: "ready", reason: null } }); __setComponentsFetchForTests((async (input) => stackResponse(new URL(String(input), "http://stack").pathname)) as typeof fetch); });
-afterEach(() => { resetDb(); __setComponentsFetchForTests(null); __setRoleHealthForTests({}); });
+beforeEach(() => { __setOverviewBudgetForTests(null); resetDb(); __setRoleHealthForTests({ chat: { availability: "ready", reason: null } }); __setComponentsFetchForTests((async (input) => stackResponse(new URL(String(input), "http://stack").pathname)) as typeof fetch); });
+afterEach(() => { __setOverviewBudgetForTests(undefined); resetDb(); __setComponentsFetchForTests(null); __setRoleHealthForTests({}); });
 
 describe("GET /api/ai/overview", () => {
   test("rejects a teen before reading AI state", async () => {
@@ -75,13 +75,13 @@ describe("GET /api/ai/overview", () => {
     expect(level("chat","boost")).toMatchObject({state:"ready",model_label:"Chat boost Model",size_bytes_missing:null});
     expect(level("chat","max")).toMatchObject({state:"ready",model_label:"Chat max Model"});
     expect(level("chat","reduced").state).toBe("off");
-    expect(level("pictures","reduced").state).toBe("waits");
+    expect(body.features.find((row)=>row.id==="pictures")!.levels.find((row)=>row.tier==="reduced")).toBeUndefined();
     expect(level("pictures","standard").state).toBe("missing");
     expect(level("pictures","standard").size_bytes_missing).toBe(49e9);
     expect(level("pictures","boost")).toMatchObject({state:"problem",detail:"This model needs more memory than this computer has."});
     expect(level("pictures","max").state).toBe("off");
     expect(level("voice","boost")).toMatchObject({state:"same",word:"Same as Standard"});
-    expect(level("music","boost").state).toBe("unset");
+    expect(level("music","boost")).toMatchObject({state:"problem",detail:expect.stringContaining("not offered")});
     expect(body.attention.download_all).toEqual({bytes:56e9,count:2});
   });
 
@@ -109,7 +109,7 @@ describe("GET /api/ai/overview", () => {
     expect(response.status).toBe(200);
     const body = await response.json() as { features: Array<{ id: string; levels: Array<{ state: string }> }>; right_now: { engine: string } };
     expect(body.features.map((feature) => feature.id)).toEqual(["chat", "pictures", "videos", "music", "voice"]);
-    expect(body.features.every((feature) => feature.levels.length === 4)).toBe(true);
+    expect(body.features.map((feature) => feature.levels.length)).toEqual([4, 3, 3, 3, 4]);
     expect(body.right_now.engine).toBe("ready");
   });
 
@@ -126,8 +126,8 @@ describe("GET /api/ai/overview", () => {
     const second=await (await get()).json() as typeof first;
     const level=(body:typeof first,tier:string)=>body.features.find(row=>row.id==="chat")!.levels.find(row=>row.tier===tier)!;
     // An automatic Standard is "Automatic" (not the Stack's momentary recommendation), identical on both reads.
-    expect(level(first,"standard")).toMatchObject({state:"ready",model_label:"Automatic"});
-    expect(level(second,"standard")).toMatchObject({state:"ready",model_label:"Automatic"});
+    expect(level(first,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer",automatic:true});
+    expect(level(second,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer",automatic:true});
     expect(level(second,"boost")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
     expect(level(second,"max")).toMatchObject({state:"unset",model_label:null});
   });
@@ -145,5 +145,38 @@ describe("GET /api/ai/overview", () => {
     const video=body.features.find(row=>row.id==="videos")!;
     expect(video.levels.find(level=>level.tier==="standard")).toMatchObject({state:"ready",model_label:"LTX-2.5"});
     expect(video.levels.find(level=>level.tier==="boost")?.state).toBe("off");
+  });
+});
+
+describe("GET /api/ai/overview resolves a level to the model the Stack really assigns", () => {
+  test("automatic levels name the Stack's own model; none-offered levels say why; Max chat stays off until picked", async () => {
+    const { token } = addPerson("person-ai-overview-budget", "owner");
+    const comp = (id: string, label: string, group: string, state: string) => ({ id, label, summary: `${label} is good at things`, group, kind: "model", state, size_bytes: 3e9, download_bytes: state === "installed" ? 0 : 3e9, full_bytes: 3e9, required_free_bytes: 3e9, plan_need: "optional", requirement: "optional", requirement_reason: null, last_used_at: null, used_by: [], depends_on: [], job: null, percent: null, failure: null, can_install: true, install_block: null, can_uninstall: true, uninstall_block: null });
+    const components = [comp("big", "Big Chat", "chat", "installed"), comp("tiny", "Tiny Chat", "chat", "installed"), comp("wan", "Wan Video", "video", "installed"), comp("pic", "Pic Model", "pictures", "notInstalled")];
+    const pick = (id: string, label: string) => ({ id, label, family: id, peak_bytes: 2e9, verified: true, fits: true, refusal: null });
+    __setComponentsFetchForTests((async (input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(String(input), "http://stack");
+      if (url.pathname === "/stack/v1/components") return Response.json({ tier: "fixture", free_disk_bytes: 100e9, disk_margin_bytes: 0, installed_bytes: 9e9, components });
+      if (url.pathname === "/stack/v1/tiers/candidates") {
+        const category = url.searchParams.get("category") ?? "chat";
+        const model = ({ chat: ["big", "Big Chat"], pictures: ["pic", "Pic Model"], video: ["wan", "Wan Video"], music: ["m", "Music"], voice: ["v", "Voice"] } as Record<string, [string, string]>)[category]!;
+        return Response.json({ category, profile: "fixture", room_bytes: 20e9, levels: ["standard", "boost", "max"].map((tier) => ({ tier, cap_bytes: 20e9, recommended: model[0], candidates: [pick(model[0], model[1])] })) });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch);
+    const slot = (category: string, tier: string, model: string | null, extra: object = {}) => ({ category, tier, model, peak_bytes: model ? 2e9 : null, verified: Boolean(model), fits_ever: model !== null, ...extra });
+    __setOverviewBudgetForTests({ slots: [slot("chat", "reduced", "tiny"), slot("chat", "standard", "big"), slot("chat", "boost", "big"), slot("chat", "max", "big"), slot("pictures", "standard", "pic"), slot("pictures", "boost", "pic"), slot("video", "standard", "wan"), slot("video", "boost", null)] } as never);
+    const { person } = addPerson("person-ai-overview-budget-owner", "owner");
+    setValue(person, "household", "engines.chat.tier.reduced", { model: "recommended", options: {} });
+    const response = await app.request("http://localhost/api/ai/overview", { headers: { cookie: `session=${token}` } });
+    const body = await response.json() as { features: Array<{ id: string; levels: Array<{ tier: string; state: string; model_label: string | null; automatic: boolean; can_choose: boolean; detail: string | null; options: Array<{ id: string; good_at: string | null }>; action: { label: string } | null }> }> };
+    const level = (feature: string, tier: string) => body.features.find((row) => row.id === feature)!.levels.find((row) => row.tier === tier)!;
+    expect(level("chat", "reduced")).toMatchObject({ state: "ready", model_label: "Tiny Chat", automatic: true });
+    expect(level("chat", "standard")).toMatchObject({ state: "ready", model_label: "Big Chat", automatic: true });
+    expect(level("chat", "boost")).toMatchObject({ state: "ready", model_label: "Big Chat", automatic: true });
+    expect(level("chat", "max")).toMatchObject({ state: "unset", model_label: null, detail: expect.stringContaining("Max has no model for Chat yet") });
+    expect(level("chat", "standard").options[0]).toMatchObject({ id: "big", good_at: "Big Chat is good at things" });
+    expect(level("pictures", "standard")).toMatchObject({ state: "missing", model_label: "Pic Model", automatic: true, action: { label: "Install" } });
+    expect(level("videos", "boost")).toMatchObject({ state: "unset", can_choose: false, detail: "Videos has no Boost model on this Mac; it uses Standard." });
   });
 });
