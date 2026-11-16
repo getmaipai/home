@@ -1,0 +1,5 @@
+{
+  "id": "make_speech",
+  "inputs": [{ "name": "script", "selector": "text" }],
+  "steps": [{ "op": "format", "as": "reply", "text": "Use the recorded speech service to make this audio." }]
+}

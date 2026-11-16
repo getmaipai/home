@@ -1,0 +1,78 @@
+{
+  "id": "make_speech",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make Speech",
+  "description": "Record the requested words as speech in a permitted voice with the described delivery.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "voiceoverAllowed",
+    "bench_row": "make-speech-tool",
+    "priority": 3,
+    "reason": "a permitted voice is available on this chat surface"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "record this script",
+      "read these words aloud",
+      "make a spoken recording",
+      "say this in a calm voice",
+      "turn this text into speech",
+      "narrate this paragraph"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "script"
+    ],
+    "properties": {
+      "script": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000,
+        "grounded": false
+      },
+      "voice": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500,
+        "grounded": false
+      },
+      "delivery": {
+        "type": "string",
+        "maxLength": 240,
+        "grounded": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "guest",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

@@ -1069,10 +1069,12 @@ export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaIt
     request = JSON.parse(job.request) as MusicJob["request"];
     musicJob = { ...job, request, task: job.task as MusicJob["task"], state: job.state as MusicJob["state"], temporary: false };
   } catch { return null; }
-  if (!request.sound || musicJobLockState(musicJob, person) !== "open") return null;
+  if ((!request.sound && !request.speech) || musicJobLockState(musicJob, person) !== "open") return null;
   const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
   if (existing) return existing.kind === "sound" ? readableItem(person, existing.id) : null;
-  const file = listLibrary(person, { type: "audio", origin: "made", sort: "newest", limit: 100 }).items.find((entry) => entry.id === fileId) ?? null;
+  const file = request.speech
+    ? (() => { const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.ownerPersonId, person.id), isNull(attachments.deletedAt))).get(); return row ? { id: row.id, media_type: row.mediaType, duration_seconds: null, size_bytes: row.size, audience: "child" as const, created_at: row.createdAt } : null; })()
+    : listLibrary(person, { type: "audio", origin: "made", sort: "newest", limit: 100 }).items.find((entry) => entry.id === fileId) ?? null;
   if (!file) return null;
   request = JSON.parse(job.request) as MusicJob["request"];
   let source = allowedSources(person).find((candidate) => candidate.id === madeSourceId(person.id) && candidate.kind === "root");
@@ -1082,8 +1084,8 @@ export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaIt
     source = allowedSources(person).find((candidate) => candidate.id === sourceId);
   }
   if (!source) return null;
-  const description = request.description?.replace(/\s+/g, " ").trim();
-  const title = description ? description.slice(0, 60).replace(/^./, (c) => c.toUpperCase()) : "Sound";
+  const description = request.speech ? "Speech recording" : request.description?.replace(/\s+/g, " ").trim();
+  const title = request.speech ? `Speech by ${request.speech.voiceName}` : description ? description.slice(0, 60).replace(/^./, (c) => c.toUpperCase()) : "Sound";
   const id = `media-${crypto.randomUUID().replace(/-/g, "")}`;
   db.insert(mediaItems).values({ id, kind: "sound", title, sourceId: source.id, locFileId: file.id, mediaType: file.media_type, durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child", addedAt: file.created_at, createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: "music:generated-sound" }).run();
   return readableItem(person, id);

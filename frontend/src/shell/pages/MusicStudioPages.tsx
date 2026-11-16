@@ -20,12 +20,13 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { MusicWorkspace, SongGallery, studioAddress, stemsAddress, remixAddress } from "./MusicWorkspacePage";
 import type { MusicCard } from "@/lib/musicApi";
 import { MusicStudioView } from "./MusicStudioView";
+import { MusicSpeechPage } from "./MusicSpeechPage";
 import { request } from "@/lib/api";
 import { bandImageSrc } from "@/apps/chat/useBandCard";
 import { musicRefOf, type MusicCardKind } from "@/apps/chat/useMusicCard";
 import { useMusicBlock } from "@/apps/chat/useMusicBlock";
 
-export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "sound-effects", "creations", "edit", "studio", "stems", "remix"] as const;
+export const STUDIO_PAGE_IDS = ["create", "make-song", "make-band", "make-album", "make-style", "sound-effects", "voices", "creations", "edit", "studio", "stems", "remix"] as const;
 export const isStudioPage = (packageId: string, pageId: string): boolean => packageId === "audio" && (STUDIO_PAGE_IDS as readonly string[]).includes(pageId);
 
 type Kind = MusicCardKind;
@@ -199,6 +200,7 @@ function songStyleProps(props: Record<string, unknown>) {
 /** The Audio app's Create and library pages. `search` is the address's query string. */
 export function MusicStudioPage({ pageId, search, adult }: { pageId: string; search: string; adult: boolean }) {
   if (pageId === "create") return <MusicWorkspace adult={adult} search={search} />;
+  if (pageId === "voices") return <MusicSpeechPage />;
   // Each Make page is a mode of the one composer on Create: the address names the mode (`make`), the rest of the query stays.
   const MODE_OF: Record<string, string> = { "make-band": "band", "make-album": "album", "make-style": "song_style", "sound-effects": "sound" };
   if (pageId === "make-song" || MODE_OF[pageId]) { const params = new URLSearchParams(search); if (MODE_OF[pageId]) params.set("make", MODE_OF[pageId]!); const query = params.toString(); return <Navigate to={`/apps/audio/create${query ? `?${query}` : ""}`} replace />; }

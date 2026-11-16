@@ -12,16 +12,21 @@ import { readAttachment } from "@/lib/attachments";
 import { saveInspiredVoice, deleteClonedVoice, listClonedVoices, MAX_BYTES as MAX_CLONED_VOICE_BYTES } from "@/lib/clonedVoices";
 import { isInspiredLevel } from "@/lib/voiceShift";
 import { renderHouseholdVoice, cacheHouseholdPreview } from "@/lib/householdVoiceCheck";
+import { startSpeechJob } from "@/lib/speechJobs";
 
 export const VOICEOVER_TOOL_ID = "voiceover";
 export const CHANGE_VOICE_TOOL_ID = "change_voice";
 export const MAKE_INSPIRED_VOICE_TOOL_ID = "make_inspired_voice";
+export const MAKE_SPEECH_TOOL_ID = "make_speech";
 const voiceoverArgs = z.object({ script: z.string().min(1).max(2000), voice: z.string().min(1).optional() }).strict();
 const changeVoiceArgs = z.object({ file: z.string().min(1), voice: z.string().min(1).optional() }).strict();
 const inspiredVoiceArgs = z.object({ clip: z.string().min(1), name: z.string().trim().min(1).max(60), level: z.enum(["much_lower", "lower", "different", "very_different"]).default("different"), blend_with: z.string().min(1).optional() }).strict();
 
 export function voiceoverToolSpec(): ToolSpec {
   return { id: VOICEOVER_TOOL_ID, description: "Record requested words as speech. Use generate_music with kind=sound for sound effects or ambience, and generate_music for songs. Never use this for a video in view; a voice over a video is an edit_video mix. Speak only the words the person asked for. The script is the exact words to speak and may include bracket tags offered by the voice list.", args: { type: "object", required: ["script"], properties: { script: { type: "string", minLength: 1, maxLength: 2000, description: "Exact words to speak, optionally with supported bracket tags." }, voice: { type: "string", minLength: 1, description: "Optional voice name or id the person named." } }, additionalProperties: false } };
+}
+export function makeSpeechToolSpec(): ToolSpec {
+  return { id: MAKE_SPEECH_TOOL_ID, description: "Record the requested words as speech in a permitted voice with the described delivery.", args: { type: "object", required: ["script"], properties: { script: { type: "string", minLength: 1, maxLength: 4000 }, voice: { type: "string", minLength: 1 }, delivery: { type: "string", maxLength: 240 } }, additionalProperties: false } };
 }
 export function changeVoiceToolSpec(): ToolSpec {
   return { id: CHANGE_VOICE_TOOL_ID, description: "Change the voice in one of the person's own Library audio or video files. Identify it by file id or exact file name. Do not use this to record typed words, translate a video, or edit a song. Never reveal the transcript.", args: { type: "object", required: ["file"], properties: { file: { type: "string", minLength: 1, description: "A Library file id or exact file name belonging to the person." }, voice: { type: "string", minLength: 1, description: "Optional voice name or id the person named." } }, additionalProperties: false } };
@@ -41,6 +46,13 @@ export async function runVoiceoverTool(actor: PersonRow, raw: Record<string, unk
   if (!parsed.success) return failed(callId, VOICEOVER_TOOL_ID, { voice: raw.voice }, "The recording request was invalid. Try again with a script from 1 to 2000 characters.");
   const result = await makeVoiceover(actor, parsed.data);
   return result.ok ? success(callId, VOICEOVER_TOOL_ID, { voice: parsed.data.voice }, result.file_id, "The voiceover") : failed(callId, VOICEOVER_TOOL_ID, { voice: parsed.data.voice }, result.line);
+}
+export async function runMakeSpeechTool(actor: PersonRow, raw: Record<string, unknown>, callId: string, ctx: { conversationId: string; turnId: string; companionId?: string | null }): Promise<ToolExecutionOutcome> {
+  const parsed = z.object({ script: z.string().trim().min(1).max(4000), voice: z.string().min(1).optional(), delivery: z.string().max(240).optional() }).strict().safeParse(raw);
+  const args = parsed.success ? { voice: parsed.data.voice, delivery: parsed.data.delivery } : {};
+  if (!parsed.success) return failed(callId, MAKE_SPEECH_TOOL_ID, args, "Write a script from 1 to 4000 characters, then try again.");
+  const started = await startSpeechJob({ actor, conversationId: ctx.conversationId, turnId: ctx.turnId, companionId: ctx.companionId, args: parsed.data });
+  return started.ok ? outcomeOf({ callId, packageId: MAKE_SPEECH_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "Your speech recording is being made." }, data: { musicJobId: started.job.id }, actions: [] } }) : failed(callId, MAKE_SPEECH_TOOL_ID, args, started.line);
 }
 export async function runChangeVoiceTool(actor: PersonRow, raw: Record<string, unknown>, callId: string): Promise<ToolExecutionOutcome> {
   const parsed = changeVoiceArgs.safeParse(raw);

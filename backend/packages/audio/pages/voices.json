@@ -1,18 +1,14 @@
 {
   "type": "page",
   "id": "music-voices",
-  "title": "Voices",
+  "title": "Speech",
   "body": [
     {
       "type": "empty_state",
       "icon": "mic",
-      "text": "Pick or make a singing voice here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/audio/create"
-        }
-      },
-      "action_label": "Make a song"
+      "text": "Turn a script into spoken audio in a voice you can use.",
+      "action": { "navigate": { "to": "/apps/audio/voices" } },
+      "action_label": "Make speech"
     }
   ]
 }

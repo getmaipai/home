@@ -149,12 +149,12 @@ function songItems(actor: PersonRow): ActivityItem[] {
     const job = getMusicJobFor(actor, row.id);
     if (job && musicJobLockState(job, actor) !== "open") continue;
     if (row.fileId && !fileIsOpenFor(actor, row.fileId)) continue;
-    let request: { title?: string; description?: string; sound?: unknown } = {};
+    let request: { title?: string; description?: string; sound?: unknown; speech?: unknown } = {};
     try { request = JSON.parse(row.request) as typeof request; } catch { request = {}; }
     // A sound is a text2music job with `request.sound`; an edit or stem split is its own row. Each says what it is (MUSIC-PORT-01 MP-01).
-    const noun = request.sound ? "sound" : row.task === "stems" ? "stems" : row.task === "text2music" ? "song" : "song edit";
-    const title = titleFor(actor, "song", request.title ?? request.description ?? "", noun === "sound" ? "A sound" : noun === "stems" ? "Song stems" : noun === "song edit" ? "A song edit" : "A song");
-    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: `/apps/audio/create?song=${encodeURIComponent(row.id)}`, ...(noun === "sound" ? { isSound: true } : {}) };
+    const noun = request.speech ? "speech" : request.sound ? "sound" : row.task === "stems" ? "stems" : row.task === "text2music" ? "song" : "song edit";
+    const title = noun === "speech" ? "A speech recording" : titleFor(actor, "song", request.title ?? request.description ?? "", noun === "sound" ? "A sound" : noun === "stems" ? "Song stems" : noun === "song edit" ? "A song edit" : "A song");
+    const base = { id: `song:${row.id}`, source: "song" as const, title, at: row.updatedAt, href: noun === "speech" ? "/apps/audio/voices" : `/apps/audio/create?song=${encodeURIComponent(row.id)}`, ...(noun === "sound" ? { isSound: true } : {}) };
     if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
     else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? `Making your ${noun}.`, percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
     else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? `The ${noun} did not finish. Open it to try again.`, percent: null, typicalMinutes: null });

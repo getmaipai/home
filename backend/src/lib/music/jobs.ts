@@ -28,6 +28,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { slotRun } from "@/lib/tiers";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, jobsForPerson, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
+import { resumeSpeechJob } from "@/lib/speechJobs";
 export { getMusicJobFor, jobsForConversation, jobsForPerson, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
 
@@ -40,8 +41,8 @@ const dropStackJob = (job: MusicJob, id: string): Promise<void> => isSfx(job) ? 
 function saveMusicJob(job: MusicJob): void { persistMusicJob(job); refreshHouseholdQueue(); }
 registerQueueProvider(() => {
   const jobs = new Map<string, MusicJob>();
-  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state) && !job.request.effect) jobs.set(job.id, job);
-  for (const job of pendingMusicJobs()) if (!jobs.has(job.id) && !job.request.effect) jobs.set(job.id, job);
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state) && !job.request.effect && !job.request.speech) jobs.set(job.id, job);
+  for (const job of pendingMusicJobs()) if (!jobs.has(job.id) && !job.request.effect && !job.request.speech) jobs.set(job.id, job);
   return [...jobs.values()].map((job) => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
     const phaseHold = PERSISTED_HOLDS.find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
@@ -512,6 +513,7 @@ export function resumeMusicJobs(): void {
     if (!person) { fail(job, "lost_job"); continue; }
     // MP-02: an effect runs inside this process; after a restart it cannot be picked up, so it ends with a line that says to ask again.
     if (job.request.effect) { job.state = "failed"; job.errorCode = "effect_failed"; job.errorLine = "The change was interrupted. Ask for it again."; saveMusicJob(job); continue; }
+    if (job.request.speech) { void resumeSpeechJob(job); continue; }
     liveJobs.set(job.id, job);
     if (job.stackJob) void watch(job, person);
   }

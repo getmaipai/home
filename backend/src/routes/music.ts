@@ -9,7 +9,7 @@ import { EFFECT_CHANGES, EFFECT_LABELS, EFFECT_UNAVAILABLE_LINE, EQ_PRESETS, che
 import { musicAudioTools } from "@/lib/music/mixParts";
 import { EXPORT_FAILED_LINE, EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, convertSong } from "@/lib/music/exportFormat";
 import { listVersions } from "@/lib/imageEdit";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, musicJobs } from "@/db/schema";
 import { trashFile } from "@/lib/libraryTrash";
@@ -46,6 +46,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { promoteMadeMusicFile, promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
+import { startSpeechJob } from "@/lib/speechJobs";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 import { writeSongLyrics } from "@/lib/music/lyricsWriter";
@@ -107,6 +108,7 @@ const musicCardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   task: z.string(),
   sound: z.object({ loop: z.boolean(), surprise: z.boolean(), engine: z.literal("sfx").optional().describe("Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."), looped: z.boolean().optional().describe("False when this computer had no audio tool to make the loop seamless."), trimTo: z.number().optional(), trimmed: z.boolean().optional().describe("False when this computer had no audio tool to cut the sound to the length asked."), takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().optional() }).nullable(),
+  speech: z.object({ voice_name: z.string() }).nullable().optional(),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
@@ -190,6 +192,11 @@ function cardLyricsOf(job: MusicJob): string | null {
 }
 export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
   const root: MusicJob = { coverJobId: null, coverFileId: null, ...input };
+  if (root.request.speech) {
+    const speech = root.request.speech;
+    const open = !!root.fileId && !!db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, root.fileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
+    return { id: root.id, task: "speech", state: root.state, stage: root.stage, stage_label: root.state === "queued" ? "Waiting to speak" : root.state === "running" ? "Speaking your script" : root.state === "done" ? "Ready" : root.errorLine ?? "The recording could not be made.", stages: [{ id: "queued", label: "Queued" }, { id: "speaking", label: "Speaking" }, { id: "ready", label: "Finishing" }], stage_index: root.state === "done" ? 2 : root.state === "running" ? 1 : 0, started_at: Date.parse(root.createdAt), cover_pending: false, cover_url: null, cover_versions: [], conversation_id: root.conversationId, made_from_file: false, progress: root.progress, eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine, sound: null, speech: { voice_name: speech.voiceName }, seed: null, takes: null, fit_ask: null, cut: null, max_seconds: null, making_version: null, versions: open && root.fileId ? [{ id: root.fileId, label: "Speech", url: `/api/files/${encodeURIComponent(root.fileId)}/content`, has_file: true, media_type: "audio/wav", seed: null, media_id: null }] : [], current_id: open ? root.fileId : null, length: "quick" as const, quality: "quick" as const, boost_offered: false, max_offered: false, max_installed: false, title: "Your speech", description: speech.voiceName, lyrics: null, timed_lyrics: null, duration_s: root.durationS };
+  }
   // A finished split is one card that steps through its tracks (vocals, drums, bass, other), each with its own Download and Share.
   const stemOrder: Record<string, number> = { vocals: 0, drums: 1, bass: 2, other: 3 };
   const stemName = (job: MusicJob) => (job.request.title?.match(/\(([^)]+)\)$/)?.[1] ?? "").toLowerCase();
@@ -277,7 +284,7 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
   const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
-  const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && !(job.request.takes && job.request.takes.index > 0) && (!job.fileId || !trashed.has(job.fileId)));
+  const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && !job.request.speech && !(job.request.takes && job.request.takes.index > 0) && (!job.fileId || !trashed.has(job.fileId)));
   const visible = jobs.filter((job) => !lockedJob(actor, job));
   const locked = jobs.filter((job) => lockedJob(actor, job));
   return c.json([...(locked.length ? [lockedMusicTile(locked[0]!)] : []), ...await Promise.all(visible.map((job) => musicCardView(actor, job)))], 200);
@@ -399,6 +406,30 @@ musicRoutes.openapi(saveSoundRoute, (c) => {
 const soundsRoute = createRoute({ method: "get", path: "/sounds", tags: ["Music"], summary: "List saved sounds", middleware: viewMiddleware,
   responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), duration_s: z.number().nullable(), file_id: z.string(), job_id: z.string().nullable(), src: z.string(), loop: z.boolean() })) } }, description: "Saved sound items." }, ...refusals } });
 musicRoutes.openapi(soundsRoute, (c) => c.json(savedMadeSounds(c.get("person")), 200));
+const makeSpeechBody = z.object({ script: z.string().trim().min(1).max(4000), voice: z.string().min(1).max(500), delivery: z.string().max(240).optional() });
+musicRoutes.openapi(createRoute({ method: "post", path: "/speeches", tags: ["Music"], summary: "Make a speech recording", middleware,
+  request: { body: { content: { "application/json": { schema: makeSpeechBody } } } }, responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The speech recording job." }, ...refusals, ...errorResponses({ 400: "Invalid script", 403: "The request is refused", 409: "A recording is already running", 422: "Unknown voice" }) } }), async (c) => {
+  const actor = c.get("person"), body = c.req.valid("json");
+  const conversation = resolveOrCreateConversation(actor, "chat", undefined, {});
+  if (!conversation.ok) return c.json({ error: "Home could not start that recording. Try again." }, 503) as never;
+  const turnId = newConversationTurnId();
+  const started = await startSpeechJob({ actor, conversationId: conversation.value.id, turnId, args: body });
+  if (!started.ok) return c.json({ error: started.line }, started.status) as never;
+  logTurn(actor, "chat", "Make a speech recording", { reply: { text: "Making your speech recording." }, source: "plugin", plugin_id: "make_speech", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, started.job), 201);
+});
+musicRoutes.openapi(createRoute({ method: "get", path: "/speeches", tags: ["Music"], summary: "List speech recordings and jobs", middleware: viewMiddleware,
+  responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "The person's speech jobs." }, ...refusals } }), async (c) => {
+  const actor = c.get("person"); const jobs = jobsForPerson(actor, 100).filter((job) => !!job.request.speech);
+  return c.json(await Promise.all(jobs.map((job) => musicCardView(actor, job))), 200);
+});
+musicRoutes.openapi(createRoute({ method: "post", path: "/speeches/{id}/save", tags: ["Music"], summary: "Save a speech recording to Audio", middleware,
+  request: { params }, responses: { 200: { content: { "application/json": { schema: z.object({ item_id: z.string() }) } }, description: "The saved speech item." }, ...refusals } }), (c) => {
+  const actor = c.get("person"), job = getMusicJobFor(actor, c.req.valid("param").id);
+  if (!job?.request.speech || job.state !== "done" || !job.fileId) return c.json({ error: "No finished speech recording with that id." }, 404);
+  const item = promoteMadeSoundFile(actor, job.fileId);
+  return item ? c.json({ item_id: item.id }, 200) : c.json({ error: "That recording cannot be saved." }, 404);
+});
 const takeSchema = z.object({ job_id: z.string(), index: z.number().int(), total: z.number().int(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), file_id: z.string().nullable(), src: z.string().nullable(), saved: z.boolean(), loop: z.boolean(), seconds: z.number().nullable() });
 const soundTakesRoute = createRoute({ method: "get", path: "/sounds/takes/{group}", tags: ["Music"], summary: "The takes one sound request made", middleware: viewMiddleware,
   request: { params: z.object({ group: z.string().regex(/^snd-[a-z0-9]{6,32}$/) }) }, responses: { 200: { content: { "application/json": { schema: z.array(takeSchema) } }, description: "The takes in order; one that was deleted is left out." }, ...refusals } });

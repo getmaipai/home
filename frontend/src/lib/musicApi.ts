@@ -33,6 +33,7 @@ export interface MusicCard {
   current_id: string | null;
   /** The kind of the version on show: quick (the hook) or full (every part). */
   sound?: { loop: boolean; surprise: boolean; engine?: "sfx"; looped?: boolean; trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } | null } | null;
+  speech?: { voice_name: string } | null;
   length: "quick" | "full";
   /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
   quality: "quick" | "detailed" | "max";
@@ -85,6 +86,9 @@ export const musicApi = {
   /** Make a song from the Make a song page: the same path the generate_music tool runs. Answers with the card, still being made. */
   makeSong: (body: MakeSongBody) => requestJson<MusicCard>("/api/music/songs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   makeSound: (body: MakeSoundBody) => requestJson<MusicCard>("/api/music/sounds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  makeSpeech: (body: { script: string; voice: string; delivery?: string }) => requestJson<MusicCard>("/api/music/speeches", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  listSpeeches: () => requestJson<MusicCard[]>("/api/music/speeches"),
+  saveSpeech: (jobId: string) => requestJson<{ item_id: string }>(`/api/music/speeches/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
   saveSound: (jobId: string) => requestJson<{ id: string }>(`/api/music/sounds/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item_id: jobId }) }),
   listSounds: () => requestJson<SavedSound[]>("/api/music/sounds"),
   /** The takes one sound request made, in order. */

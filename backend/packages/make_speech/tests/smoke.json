@@ -1,0 +1,6 @@
+{
+  "description": "The chat job path is covered by speechJobs tests.",
+  "inputs": { "script": "Hello there." },
+  "host_setup": {},
+  "expected": { "reply": { "text": "Use the recorded speech service to make this audio.", "speech": "Use the recorded speech service to make this audio." }, "actions": [], "scheduled_jobs": [], "home_calls": [], "memory_added": [] }
+}
