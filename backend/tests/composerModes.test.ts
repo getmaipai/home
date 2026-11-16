@@ -64,7 +64,7 @@ describe("composer modes by band", () => {
     expect(video.availability).toBe("ready");
   });
 
-  test("the video stub pages are modes: two hand the picture to Video Create, two say plainly they are coming soon", async () => {
+  test("the video stub pages are modes: two hand the picture to Video Create; Talking avatar, Voiceover and Film are live pages", async () => {
     stack(all);
     const { row } = await owner();
     const res = await composerModesFor(row as PersonRow);
@@ -77,7 +77,7 @@ describe("composer modes by band", () => {
     expect(mode("talking-avatar").references.map((r) => r.id)).toEqual(["cast"]);
     expect(mode("talking-avatar").chips.map((c) => c.id)).toContain("orientation");
     for (const id of ["voiceover", "film"]) {
-      expect(mode(id).comingSoon).toMatch(/coming soon\. Until then/);
+      expect(mode(id).comingSoon).toBeNull();
       expect(mode(id).primary.label.length).toBeGreaterThan(0);
       expect(mode(id).placeholder.length).toBeGreaterThan(0);
     }

@@ -71,8 +71,7 @@
       "gate": "videos",
       "tools": [
         "clear"
-      ],
-      "coming_soon": "Voiceover is coming soon. Until then, open a clip in Studio to add a voice."
+      ]
     },
     {
       "id": "film",
@@ -84,8 +83,7 @@
       "gate": "videos",
       "tools": [
         "clear"
-      ],
-      "coming_soon": "Film maker is coming soon. Until then, make one clip at a time on the Create page."
+      ]
     }
   ]
 }
