@@ -613,6 +613,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
 | `backend/src/lib/films/junkCleanup.ts` | JUNK, deriveJunkRegion, JUNK_PROMPT, cleanJunk |
+| `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmShotRows |
 | `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
@@ -621,7 +622,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, cutOutPeople, makeSheetFromPictures |
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
-| `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, runMakeFilmTurn, runMakeFilm |
+| `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
