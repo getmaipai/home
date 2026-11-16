@@ -30,6 +30,7 @@ import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, forceCar
 import { lockedPictureStyleOutcome } from "./lock";
 import { ImageEditError, isGeneratedPicture, LIBRARY_SOURCE, loadSource } from "@/lib/imageEdit";
 import { prepareEditSource } from "./editSources";
+import { carouselSize, planCarousel } from "./carouselPlan";
 
 const KID_MAX_COUNT = 2;
 let templateMediaOpRunner = runMediaOp;
@@ -82,6 +83,8 @@ export interface RunGenerateImageInput {
   callId: string;
   spoken: boolean;
   signal?: AbortSignal;
+  /** CREATOR-16: set by the set runner on one scene of a set. `seed` is shared by every scene; `detached` keeps a later scene off the chat turn (its job is its own Library file, like an extra take). */
+  scene?: { seed: number; detached: boolean };
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -96,9 +99,56 @@ function refused(callId: string, args: Record<string, unknown>, refusal: Picture
   });
 }
 
+const SET_PLAIN_REFUSAL = (callId: string, args: Record<string, unknown>, why: string, line: string): ToolExecutionOutcome => outcomeOf({
+  callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
+  result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${line}` }, data: { refused: why }, actions: [] },
+});
+
+/** CREATOR-16: `set` (2 to 8) plans the theme into scenes that share one look, then makes each through the ordinary path below, so every picture meets the same
+ *  gates. The same references and cast, one seed, one quality and style go to every scene; `words` only when given. A refusal on any scene stops the set. */
+async function runPictureSet(input: RunGenerateImageInput, size: number): Promise<ToolExecutionOutcome> {
+  const { state, callId } = input;
+  const { set: _set, count: _count, ...rest } = input.args;
+  const audience = audienceOf(state, input.spoken);
+  const theme = typeof rest.prompt === "string" ? rest.prompt.trim() : "";
+  if (theme.length < 3) return failed(callId, input.args, "bad_arguments", "bad_arguments");
+  const refusal = refusalFor(audience, rest);
+  if (refusal) return refused(callId, input.args, refusal);
+  const count = laneOf(audience) === "child" ? Math.min(size, KID_MAX_COUNT) : size;
+  const planned = await planCarousel({ theme, size: Math.max(2, count) });
+  if (!planned.ok) return SET_PLAIN_REFUSAL(callId, input.args, "planner", planned.line);
+  const scenes = planned.plan.prompts.slice(0, count);
+  // Every scene is checked before the first one starts, so a refusal never leaves half a set behind.
+  for (const scene of scenes) {
+    const stop = refusalFor(audience, { ...rest, prompt: scene });
+    if (stop) return refused(callId, input.args, stop);
+  }
+  const seed = Math.floor(Math.random() * 2_000_000_000);
+  const ids: string[] = [];
+  for (const [index, scene] of scenes.entries()) {
+    const outcome = await runGenerateImage({ ...input, args: { ...rest, prompt: scene, count: 1 }, callId: `${callId}-${index + 1}`, scene: { seed, detached: index > 0 } });
+    const data = outcome.result?.data as { pictureJobId?: string; pictureJobIds?: string[] } | undefined;
+    const started = data?.pictureJobIds ?? (data?.pictureJobId ? [data.pictureJobId] : []);
+    if (outcome.status !== "succeeded" || started.length === 0) {
+      return outcome;
+    }
+    ids.push(...started);
+  }
+  return outcomeOf({
+    callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args: input.args, durationMs: 0,
+    result: {
+      reply: { text: `Making a set of ${scenes.length} pictures. They appear below your reply when they are ready. You have not seen them: do not describe how they look. Tell the person in one short sentence that the set is on its way.` },
+      data: { pictureJobId: ids[0]!, pictureJobIds: ids, set: scenes.length },
+      actions: [],
+    },
+  });
+}
+
 export async function runGenerateImage(input: RunGenerateImageInput): Promise<ToolExecutionOutcome> {
   const { state, callId } = input;
   let args = input.args;
+  const setSize = input.scene ? null : carouselSize(args.set);
+  if (setSize !== null && !(typeof args.change === "string" && args.change.trim() !== "")) return runPictureSet(input, setSize);
   const createPage = !state.conversationId && state.temporary !== true && state.ephemeral !== true;
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
@@ -281,10 +331,10 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       sources: usedLibraryRefs.map(({ adultMark }) => adultMark),
       subjectIds: resolvedSubjects.map(({ subject }) => subject.id),
-      conversationId: extra ? null : state.conversationId,
-      turnId: extra ? null : state.turnId,
-      companionId: extra ? null : state.persona?.id ?? null,
-      temporary: extra ? false : temporary,
+      conversationId: extra || input.scene?.detached ? null : state.conversationId,
+      turnId: extra || input.scene?.detached ? null : state.turnId,
+      companionId: extra || input.scene?.detached ? null : state.persona?.id ?? null,
+      temporary: extra || input.scene?.detached ? false : temporary,
       kind: "generate",
       prompt: subjectPrompt,
       tier: jobTier("image", tierAsked.tier, choice.quality),
@@ -293,6 +343,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         size,
         n: extra ? 1 : kid ? Math.min(count, KID_MAX_COUNT) : createPage && combinedRefs.length ? 1 : count,
         ...(choice.model ? { model: choice.model } : {}),
+        ...(input.scene ? { seed: input.scene.seed } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
         ...(plan?.ok ? { loras: plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength })) } : adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),

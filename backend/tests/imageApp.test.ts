@@ -115,14 +115,15 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   if (!page.ok) return;
   const filledPage = page.value as { body: Array<{ type: string; chips?: Array<{ state: string; group?: string; icon?: string; icon_only?: boolean; options?: Array<{ value: string | number; icon?: string; label: string }> }>; styles?: Array<{ state: string; group?: string; icon?: string; icon_only?: boolean; options?: Array<{ value: string | number; icon?: string; label: string }> }>; submit?: unknown }> };
   const bar = filledPage.body[0]!;
-  expect(bar.chips!.slice(0, 2).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Shape"], ["count", "Pictures"]]);
+  expect(bar.chips!.slice(0, 3).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Shape"], ["count", "Pictures"], ["set", "Pictures"]]);
+  expect(bar.chips![2]!.options!.map((option) => [option.value, option.label])).toEqual([[0, "1 picture"], [4, "A set of 4"], [6, "A set of 6"]]);
   expect(bar).toMatchObject({ placeholder: 'Describe the picture. Put exact words in quotes, like "Summer Fair". Type @ to add someone from your cast.' });
   expect((bar as unknown as { tier: { tiers: Array<{ id: string; hint: string }> } }).tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. Shows no words on the picture."], ["boost", "More detail. Shows no words unless you ask for them."], ["max", "More detail. Shows no words unless you ask for them."]]);
   expect(bar.chips![0]).toMatchObject({ icon: "rectangle-horizontal", icon_only: true, options: [{ value: "square", icon: "square" }, { value: "landscape", icon: "rectangle-horizontal" }, { value: "portrait", icon: "rectangle-vertical" }, { value: "wide", icon: "monitor" }, { value: "tall", icon: "smartphone" }] });
   expect(bar.chips![1]).toMatchObject({ icon: "layers", icon_only: true });
-  expect(bar.chips!.slice(3).every((chip) => chip.group === "Style" && chip.icon_only)).toBe(true);
+  expect(bar.chips!.slice(4).every((chip) => chip.group === "Style" && chip.icon_only)).toBe(true);
   expect(bar.chips![0]?.icon).toBe("rectangle-horizontal");
-  expect(bar.submit).toMatchObject({ call: { target: "/api/plugins/image/actions/make", method: "POST", args: { prompt: "{prompt}", shape: "{shape}", count: "{count}", tier: "{tier}", reference: "{reference}" } } });
+  expect(bar.submit).toMatchObject({ call: { target: "/api/plugins/image/actions/make", method: "POST", args: { prompt: "{prompt}", shape: "{shape}", count: "{count}", set: "{set}", tier: "{tier}", reference: "{reference}" } } });
   expect((bar as unknown as { references: Array<Record<string, unknown>> }).references[0]).toMatchObject({ state: "reference", max: 3 });
   const args = (bar.submit as { call: { args: Record<string, unknown> } }).call.args;
   expect(args.look_art).toBe("{look_art}");

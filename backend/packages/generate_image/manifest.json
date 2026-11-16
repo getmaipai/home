@@ -53,6 +53,12 @@
         "minimum": 1,
         "maximum": 4
       },
+      "set": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 8,
+        "description": "set: make this many pictures that look like one family around the theme (2 to 8)"
+      },
       "style": {
         "type": "string",
         "maxLength": 80,

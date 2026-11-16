@@ -8,6 +8,8 @@ export interface PictureMakeBody {
   prompt: string;
   shape?: "square" | "landscape" | "portrait" | "wide" | "tall";
   count?: number;
+  /** CREATOR-16: 2 to 8 pictures that look like one family around the prompt as a theme. */
+  set?: number;
   tier?: "standard" | "boost" | "max";
   presets?: { look?: string; light?: string; angle?: string; format?: string };
   template?: string;
@@ -43,6 +45,12 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
   if (countValue !== undefined) {
     if (!Number.isInteger(countValue) || countValue < 1 || countValue > 8) return { ok: false, error: "Choose from 1 to 8 pictures, or leave it empty." };
     body.count = countValue;
+  }
+  // The Create chip sends 0 for "single pictures"; only 2 to 8 starts a set.
+  const setValue = raw.set === undefined || raw.set === "" || raw.set === 0 || raw.set === "0" ? undefined : typeof raw.set === "number" ? raw.set : typeof raw.set === "string" ? Number(raw.set) : NaN;
+  if (setValue !== undefined) {
+    if (!Number.isInteger(setValue) || setValue < 2 || setValue > 8) return { ok: false, error: "Choose a set of 2 to 8 pictures, or leave it empty." };
+    body.set = setValue;
   }
   const tier = typeof raw.tier === "string" && !notGiven(raw.tier) ? raw.tier.trim().toLowerCase() : "";
   if (tier) {
@@ -131,7 +139,8 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
     const extras = /Some extra reference pictures were not used\./.test(outcome.result?.reply?.text ?? "") ? "Some extra reference pictures were not used." : null;
     // TEXT-PIC-07: one plain line when the picture has words (the spelling check is added with TEXT-PIC-05).
     const wordsLine = body.words?.length ? "This picture has words, so Home used its text picture model." : null;
-    const notice = [extras, wordsLine].filter(Boolean).join(" ") || null;
+    const setLine = body.set ? `Making a set of ${ids.length} pictures.` : null;
+    const notice = [setLine, extras, wordsLine].filter(Boolean).join(" ") || null;
     return { ok: true, ids, notice };
   }
   const rawLine = (outcome.result?.reply?.text ?? "").replace(/^No picture was (?:made|changed)\. Say this to the person in your own words(?: and keep its meaning)?:\s*/, "").trim();

@@ -10,6 +10,7 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 import { __setImageToolsForTests } from "@/lib/imageEdit";
 import { __setPicturePollMsForTests, __resetPictureJobsForTests, getPictureJob } from "@/lib/pictures/jobs";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { __setCarouselCompleterForTests } from "@/lib/pictures/carouselPlan";
 import { readPictureMakeBody, makePictureFor, wordsFromPrompt } from "@/lib/pictures/make";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
@@ -52,7 +53,7 @@ describe("wordsFromPrompt", () => {
     expect(readPictureMakeBody({ prompt: 'Poster says "Summer Fair"' })).toMatchObject({ ok: true, body: { words: ["Summer Fair"] } });
   });
 });
-afterEach(() => { fake.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __setPicturePollMsForTests(null); __resetPictureJobsForTests(); });
+afterEach(() => { __setCarouselCompleterForTests(null); fake.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __setPicturePollMsForTests(null); __resetPictureJobsForTests(); });
 
 describe("Images Create make", () => {
   test("reads placeholders as empty and validates shape, count, presets, cast and reference limits", () => {
@@ -100,6 +101,55 @@ describe("Images Create make", () => {
     await until(() => !!db.select().from(attachments).where(eq(attachments.ownerPersonId, owner.id)).all().find((item) => item.provenance.startsWith("picture-gen:")));
     const row = db.select().from(attachments).where(eq(attachments.ownerPersonId, owner.id)).all().find((item) => item.provenance.startsWith("picture-gen:"));
     expect(row).toMatchObject({ conversationId: null, retention: "kept" });
+  });
+
+  test("CREATOR-16: set reads 2 to 8, treats 0 and a blank chip as none, and refuses the rest", () => {
+    expect(readPictureMakeBody({ prompt: "a fox", set: 4 })).toMatchObject({ ok: true, body: { set: 4 } });
+    expect(readPictureMakeBody({ prompt: "a fox", set: "6" })).toMatchObject({ ok: true, body: { set: 6 } });
+    for (const none of [0, "0", "", "{set}"]) { const read = readPictureMakeBody({ prompt: "a fox", set: none }); expect(read.ok && read.body.set).toBeFalsy(); }
+    expect(readPictureMakeBody({ prompt: "a fox", set: 1 }).ok).toBe(false);
+    expect(readPictureMakeBody({ prompt: "a fox", set: 9 }).ok).toBe(false);
+  });
+
+  test("CREATOR-16: a set plans once, starts one job per scene on one seed and one model, and says one plain line", async () => {
+    const look = "Soft watercolor, warm light.";
+    let planned = 0;
+    __setCarouselCompleterForTests(async () => { planned += 1; return { ok: true, text: JSON.stringify({ look, scenes: ["a fox at a gate", "a fox on a hill", "a fox by a stream"] }) }; });
+    const read = readPictureMakeBody({ prompt: "a fox through one day", set: 3 });
+    if (!read.ok) throw new Error(read.error);
+    const made = await makePictureFor(owner, read.body);
+    expect(made).toMatchObject({ ok: true, notice: "Making a set of 3 pictures." });
+    if (!made.ok) return;
+    expect(planned).toBe(1);
+    expect(made.ids).toHaveLength(3);
+    await until(() => fake.submitted.length === 3);
+    const bodies = fake.submitted as Array<{ prompt: string; seed?: number; model?: string; n?: number }>;
+    expect(bodies.every((body) => body.prompt.startsWith(look) && body.n === 1)).toBe(true);
+    expect(new Set(bodies.map((body) => body.seed)).size).toBe(1);
+    expect(typeof bodies[0]!.seed).toBe("number");
+    expect(new Set(bodies.map((body) => body.model)).size).toBe(1);
+    expect(new Set(bodies.map((body) => body.prompt)).size).toBe(3);
+  });
+
+  test("CREATOR-16: with the planner down nothing starts and the person gets one plain line", async () => {
+    __setCarouselCompleterForTests(async () => ({ ok: false, unavailable: true }));
+    const read = readPictureMakeBody({ prompt: "a fox through one day", set: 4 });
+    if (!read.ok) throw new Error(read.error);
+    const made = await makePictureFor(owner, read.body);
+    expect(made).toMatchObject({ ok: false, error: "The planner is not available. Try again in a minute." });
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("CREATOR-16: a refused theme stops the set before the planner runs", async () => {
+    let planned = 0;
+    __setCarouselCompleterForTests(async () => { planned += 1; return { ok: false, unavailable: true }; });
+    const kid = person("person-setkid", "child");
+    const read = readPictureMakeBody({ prompt: "a naked adult woman", set: 4 });
+    if (!read.ok) throw new Error(read.error);
+    const made = await makePictureFor(kid, read.body);
+    expect(made.ok).toBe(false);
+    expect(planned).toBe(0);
+    expect(fake.submitted).toHaveLength(0);
   });
 
   test("parses references and rejects another person's or locked Library file before submitting", async () => {
