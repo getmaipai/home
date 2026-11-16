@@ -3,7 +3,8 @@
 // into the Stack's `media.edit` steps with the ONE set of step builders the chat tool uses (editPlan.ts: trimOps, joinOps, mixOps, gainOps, fadeOps).
 // Pure functions: no file, no Stack, no person. studioExport.ts reads the files, applies the gate and runs the stages this file lists.
 import { z } from "zod";
-import { DEFAULT_CROSSFADE_S, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, crossfadeOps, fadeOps, gainOps, joinOps, overlayOp, trimOps } from "./editPlan";
+import { DEFAULT_CROSSFADE_S, JOIN_TRANSITIONS, MAX_CROSSFADE_S, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, crossfadeOps, fadeOps, gainOps, joinOps, overlayOp, trimOps } from "./editPlan";
+import type { JoinTransition } from "./editPlan";
 import type { EditOp } from "./stackEdit";
 
 /** The limits the page draws (its `limits`), and the ones Home enforces whatever the page says. */
@@ -28,7 +29,7 @@ export const studioPlanSchema = z.object({
     level_db: level,
     muted: z.boolean(),
     pieces: z.array(videoPiece).min(1).max(STUDIO_VIDEO_PIECES),
-    transitions: z.array(z.object({ kind: z.enum(["cut", "crossfade"]), seconds: seconds(0, MAX_CROSSFADE_S) })).max(STUDIO_VIDEO_PIECES - 1),
+    transitions: z.array(z.object({ kind: z.enum(JOIN_TRANSITIONS), seconds: seconds(0, MAX_CROSSFADE_S) })).max(STUDIO_VIDEO_PIECES - 1),
   }),
   voice: audioLane,
   music: audioLane,
@@ -45,7 +46,7 @@ export interface StudioSources { video: Array<number | null>; voice: Array<numbe
 /** One video piece prepared on its own: its steps (none when the whole clip is used as it is) and its length after them. */
 export interface CompiledPiece { index: number; ops: EditOp[]; seconds: number }
 /** One run of seams joined in one Stack step: the next `count` pieces onto the film so far, by a cut or a crossfade of `seconds`. */
-export interface CompiledJoin { transition: "cut" | "crossfade"; seconds: number; count: number; ops: EditOp[] }
+export interface CompiledJoin { transition: JoinTransition; seconds: number; count: number; ops: EditOp[] }
 /** A voice line or a song laid over the film. `trim` (the piece starts inside its file) is cut out first; `op.input` is 1 plus its place among the overlays. */
 export interface CompiledOverlay { lane: "voice" | "music"; index: number; trim: EditOp[]; op: EditOp }
 export interface CompiledStudio { pieces: CompiledPiece[]; joins: CompiledJoin[]; overlays: CompiledOverlay[]; filmSeconds: number; changed: boolean }
@@ -96,21 +97,21 @@ export function compileStudioPlan(plan: StudioPlan, sources: StudioSources): Com
     const seam = video.transitions[i];
     if (!seam || seam.kind === "cut" || seam.seconds <= 0) return { kind: "cut" as const, seconds: 0 };
     if (seam.seconds < MIN_CROSSFADE_S - 1e-6 || seam.seconds > MAX_CROSSFADE_S + 1e-6) return null;
-    return { kind: "crossfade" as const, seconds: round(clamp(seam.seconds, MIN_CROSSFADE_S, MAX_CROSSFADE_S), 2) };
+    return { kind: seam.kind, seconds: round(clamp(seam.seconds, MIN_CROSSFADE_S, MAX_CROSSFADE_S), 2) };
   });
   if (seams.some((s) => s === null)) return refuse("bad_crossfade", `A crossfade is between ${MIN_CROSSFADE_S} and ${MAX_CROSSFADE_S} seconds. Pick a length in that range.`);
   const joins: CompiledJoin[] = [];
   let blend = 0;
-  for (const [i, seam] of (seams as Array<{ kind: "cut" | "crossfade"; seconds: number }>).entries()) {
-    if (seam.kind === "crossfade") {
+  for (const [i, seam] of (seams as Array<{ kind: JoinTransition; seconds: number }>).entries()) {
+    if (seam.kind !== "cut") {
       blend += seam.seconds;
       // The Stack needs each clip on both sides of a seam to be longer than twice the blend.
       for (const side of [lengths[i]!, lengths[i + 1]!]) if (side <= 2 * seam.seconds) return refuse("crossfade_too_short", `A piece is too short for a ${seam.seconds} second crossfade. Use a shorter crossfade, or a cut between those pieces.`);
     }
     const last = joins[joins.length - 1];
-    const limit = seam.kind === "crossfade" ? STUDIO_VIDEO_PIECES - 1 : 23;
+    const limit = seam.kind !== "cut" ? STUDIO_VIDEO_PIECES - 1 : 23;
     if (last && last.transition === seam.kind && last.seconds === seam.seconds && last.count < limit) { last.count += 1; continue; }
-    joins.push({ transition: seam.kind, seconds: seam.seconds, count: 1, ops: seam.kind === "crossfade" ? crossfadeOps(seam.seconds || DEFAULT_CROSSFADE_S) : joinOps("cut") });
+    joins.push({ transition: seam.kind, seconds: seam.seconds, count: 1, ops: seam.kind === "crossfade" ? crossfadeOps(seam.seconds || DEFAULT_CROSSFADE_S) : joinOps(seam.kind, seam.seconds || DEFAULT_CROSSFADE_S) });
   }
   const filmSeconds = round(lengths.reduce((sum, n) => sum + n, 0) - blend, 2);
   if (filmSeconds > STUDIO_FILM_S + 1e-6) return refuse("too_long", STUDIO_TOO_LONG_LINE);

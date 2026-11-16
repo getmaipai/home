@@ -18,7 +18,7 @@ export async function makeStudioNleExport(person: PersonRow, body: Record<string
   let videoStart = 0;
   r.plan.video.pieces.forEach((piece, i) => {
     const transition = r.plan.video.transitions[i - 1];
-    if (i > 0 && transition?.kind === "crossfade") videoStart -= transition.seconds;
+    if (i > 0 && transition && transition.kind !== "cut") videoStart -= transition.seconds;
     add(`Video ${i + 1}`, r.videoFiles[i]!, piece.in_s, piece.out_s, 1, videoStart);
     videoStart += piece.out_s - piece.in_s;
   });

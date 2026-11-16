@@ -104,6 +104,18 @@ describe("the plan as Stack steps", () => {
     expect(compiled(planOf([vp("a"), vp("b")])).joins[0]!.transition).toBe("cut");
   });
 
+  test("a seam can use any Stack transition kind: its own step, its own blend, the same length rules", () => {
+    const three = [vp("a"), vp("b"), vp("c")];
+    const wipes = compiled(planOf(three, {}, [{ kind: "wipeleft", seconds: 0.5 }, { kind: "wipeleft", seconds: 0.5 }]));
+    expect(wipes.joins).toEqual([{ transition: "wipeleft", seconds: 0.5, count: 2, ops: [{ op: "transition", kind: "wipeleft", duration_s: 0.5 }] }]);
+    expect(wipes.filmSeconds).toBe(17);
+    const mixed = compiled(planOf(three, {}, [{ kind: "fadeblack", seconds: 0.4 }, { kind: "circleopen", seconds: 0.4 }]));
+    expect(mixed.joins.map((j) => [j.transition, j.count])).toEqual([["fadeblack", 1], ["circleopen", 1]]);
+    expect(refusedWith(planOf([vp("a", { out_s: 1 }), vp("b")], {}, [{ kind: "slideup", seconds: 0.6 }]))).toBe("crossfade_too_short");
+    const good = planOf(three, {}, [{ kind: "cut", seconds: 0 }, { kind: "cut", seconds: 0 }]);
+    expect(studioPlanSchema.safeParse({ ...good, video: { ...good.video, transitions: [{ kind: "nonsense", seconds: 0.5 }, { kind: "cut", seconds: 0 }] } }).success).toBe(false);
+  });
+
   test("a crossfade between pieces that are too short, or outside 0.3 to 1 second, is refused with a line", () => {
     expect(refusedWith(planOf([vp("a", { out_s: 1 }), vp("b")], {}, [{ kind: "crossfade", seconds: 0.6 }]))).toBe("crossfade_too_short");
     expect(refusedWith(planOf([vp("a"), vp("b")], {}, [{ kind: "crossfade", seconds: 0.1 }]))).toBe("bad_crossfade");
