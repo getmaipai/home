@@ -305,19 +305,23 @@ async function memoryIsCritical(): Promise<boolean> {
   }
 }
 
-async function askModel(dataUrl: string, signal: AbortSignal, reader: PictureReader): Promise<string> {
+/** One structured question to the picture reader (the age check's own is the default). TEXT-PIC-05 reuses the same transport for reading the words on a picture. */
+export interface VisionAsk { system: string; user: string; schema: { name: string; strict: boolean; schema: Record<string, unknown> }; maxTokens: number; maxSide?: number }
+const AGE_ASK: VisionAsk = { system: AGE_CHECK_SYSTEM_PROMPT, user: AGE_USER_TEXT, schema: VERDICT_SCHEMA as unknown as VisionAsk["schema"], maxTokens: 160 };
+
+async function askModel(dataUrl: string, signal: AbortSignal, reader: PictureReader, ask: VisionAsk = AGE_ASK): Promise<string> {
   if (visionForTests) return visionForTests({ dataUrl, reader });
   const messages: LlmMessage[] = [
-    { role: "system", content: AGE_CHECK_SYSTEM_PROMPT },
-    { role: "user", content: AGE_USER_TEXT, images: [{ id: "agecheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
+    { role: "system", content: ask.system },
+    { role: "user", content: ask.user, images: [{ id: "agecheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
   ];
   const result = await completeViaStackRequest(reader, {
     model: reader,
     messages,
     stream: false,
     temperature: 0,
-    max_tokens: 160, // answer-budget
-    response_format: { type: "json_schema", json_schema: VERDICT_SCHEMA },
+    max_tokens: ask.maxTokens, // answer-budget
+    response_format: { type: "json_schema", json_schema: ask.schema },
     // The smallest thinking budget there is: none. The answer is a label, not a reasoning problem.
     chat_template_kwargs: { enable_thinking: false },
   }, signal);
@@ -355,6 +359,47 @@ async function checkOne(bytes: Uint8Array, reader: PictureReader): Promise<Image
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * TEXT-PIC-05: one structured question about one picture, through the same reader choice, memory guard, one-at-a-time chain,
+ * deadline and failure kinds as the age check. Returns the model's raw text, or why it could not answer. Never throws.
+ */
+export async function askPictureModel(bytes: Uint8Array, ask: VisionAsk): Promise<{ ok: true; text: string } | { ok: false; why: CheckFailure }> {
+  return exclusive(async () => {
+    let reader: PictureReader = "chat";
+    if (!visionForTests) {
+      const found = await pictureReader();
+      if (!found) return { ok: false as const, why: "no_vision" as const };
+      reader = found;
+      if (await memoryIsCritical()) return { ok: false as const, why: "memory" as const };
+    }
+    let jpeg: Uint8Array;
+    try {
+      jpeg = ask.maxSide ? new Uint8Array(await sharp(bytes, { failOn: "error", limitInputPixels: 64_000_000 }).rotate().resize({ width: ask.maxSide, height: ask.maxSide, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 90 }).toBuffer()) : await downscaleForCheck(bytes);
+    } catch { return { ok: false as const, why: "unparsed" as const }; }
+    const dataUrl = `data:image/jpeg;base64,${Buffer.from(jpeg).toString("base64")}`;
+    const run = async (which: PictureReader) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CHECK_DEADLINE_MS);
+      try {
+        const text = await Promise.race([
+          askModel(dataUrl, controller.signal, which, ask),
+          new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error("timeout")), { once: true })),
+        ]);
+        return { ok: true as const, text };
+      } catch (error) {
+        return { ok: false as const, why: (controller.signal.aborted || (error as Error).message === "timeout" ? "timeout" : "unavailable") as CheckFailure };
+      } finally { clearTimeout(timer); }
+    };
+    let result = await run(reader);
+    if (!result.ok && result.why === "unavailable" && reader === "chat") {
+      markChatReaderUnusable();
+      const next = await pictureReader();
+      if (next && next !== "chat") result = await run(next);
+    }
+    return result;
+  });
 }
 
 /** Checks each image in order, sequentially, on the local vision model. Never throws. */

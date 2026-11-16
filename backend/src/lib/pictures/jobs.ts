@@ -10,10 +10,11 @@ import { newCreationId, newFileId, newPictureJobId } from "@/lib/id";
 import { recordPictureCreation, safely } from "@/lib/creations/writers";
 import { LIBRARY_SOURCE, loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
-import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
+import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, SPELLING_PHASE, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
+import { compareWords, readPictureWords } from "./readWords";
 import { gateFinished } from "./laneGate";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
@@ -106,6 +107,8 @@ export interface StartPictureInput {
   /** Follow-on media work for each stored generated file, through the media-op registry. */
   onDone?: (fileId: string) => Promise<void>;
   subjectIds?: string[];
+  /** TEXT-PIC-05: the exact words the picture must show; the finish step checks the spelling and re-makes up to two more times. */
+  words?: string[];
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackPicturesError` when the Stack refuses
@@ -138,7 +141,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.words?.length ? { words: input.words } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
@@ -281,6 +284,89 @@ async function adultOnly(job: PictureJob): Promise<boolean> {
   return isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allAdapters()).find((a) => a.id === id)?.classification);
 }
 
+type MadePicture = { raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } };
+
+async function fetchMade(stackJob: string | null, pics: StackPic[], view: FullView | undefined): Promise<MadePicture[]> {
+  const made: MadePicture[] = [];
+  for (let index = 0; index < pics.length; index += 1) {
+    const pic = pics[index]!;
+    const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob!, index, view);
+    // The bytes are stored exactly as the Stack made them: image-to-video checks their digest against what the engine
+    // returned, so nothing may re-encode them. They are decoded here only to prove they are a picture and read the size.
+    const info = await sharp(raw, { failOn: "error", limitInputPixels: 64_000_000 }).metadata();
+    if (!info.width || !info.height || info.format !== "png") throw new Error("not a png picture");
+    made.push({ raw, width: info.width, height: info.height, meta: { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null } });
+  }
+  return made;
+}
+
+/** TEXT-PIC-05: the same request once more with a new seed, inside this job. Null when it cannot be made again (the caller keeps what it has). */
+async function remakeWithNewSeed(job: PictureJob, view: FullView | undefined): Promise<MadePicture[] | null> {
+  const stackBody = (job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody;
+  if (!stackBody) return null;
+  let again: string | null = null;
+  try {
+    const submitted = await submitGeneration({ ...stackBody, seed: 1 + Math.floor(Math.random() * 2_000_000_000), timeout_ms: 1 });
+    again = submitted.job;
+    let pics = submitted.done;
+    const deadline = Date.now() + MAX_WATCH_MS;
+    while (!pics) {
+      if (stopped(job) || Date.now() >= deadline) return null;
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      const status = await getGenerationJob(again, view);
+      if (status.state === "done") pics = status.data;
+      else if (status.state === "failed" || status.state === "cancelled") return null;
+    }
+    return await fetchMade(again, pics, view);
+  } catch {
+    return null;
+  } finally {
+    if (again) void cancelOrDelete(again);
+  }
+}
+
+const MAX_SPELLING_RETRIES = 2;
+
+/**
+ * TEXT-PIC-05: after a picture with `words` is made, the local vision model reads the text on it and Home compares it exactly
+ * (compareWords). A miss makes the same request again with a new seed, at most two more times; the take with the fewest missing
+ * words is kept for each picture. The check never fails or blocks a picture: when the model cannot read it, the picture is kept
+ * as made and the result says `checked: no`. The age and adult-lock gates run afterward, on the pictures this returns.
+ */
+async function spellingCheck(job: PictureJob, view: FullView | undefined, made: MadePicture[], words: readonly string[]): Promise<{ made: MadePicture[]; result: NonNullable<PictureJob["request"]["wordCheck"]> }> {
+  const readAll = async (takes: readonly MadePicture[]): Promise<string[][] | null> => {
+    const out: string[][] = [];
+    for (const take of takes) {
+      const read = await readPictureWords(take.raw);
+      if (!read.ok) return null;
+      out.push(compareWords(words, read.lines));
+    }
+    return out;
+  };
+  const best = [...made];
+  let bestMissing = await readAll(best);
+  if (!bestMissing) return { made, result: { checked: "no", missing: [], takes: 1 } };
+  const canRemake = job.kind === "generate" && !job.request.edit && !queuedPictureSubmits.has(job.id) && Boolean((job.request as { stackBody?: unknown }).stackBody);
+  let takes = 1;
+  while (canRemake && bestMissing.some((missing) => missing.length > 0) && takes <= MAX_SPELLING_RETRIES && !stopped(job)) {
+    job.phase = SPELLING_PHASE; job.state = "running"; savePictureJob(job);
+    const next = await remakeWithNewSeed(job, view);
+    if (!next || stopped(job)) break;
+    takes += 1;
+    const nextMissing = await readAll(next);
+    if (!nextMissing) break;
+    for (let index = 0; index < best.length; index += 1) {
+      if (next[index] && nextMissing[index]!.length < bestMissing[index]!.length) { best[index] = next[index]!; bestMissing[index] = nextMissing[index]!; }
+    }
+  }
+  const missing = [...new Set(bestMissing.flat())];
+  return { made: best, result: { checked: "yes", missing, takes } };
+}
+
+export function misspelledNote(missing: readonly string[]): string {
+  return `These words may be misspelled: ${missing.map((word) => `"${word}"`).join(", ")}. Try again, or edit the picture.`;
+}
+
 async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Promise<void> {
   const stackJob = job.stackJob;
   const view = viewOfJob(job, actor);
@@ -291,16 +377,17 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; generatedPictureCallbacks.delete(job.id); savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
   try {
     // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
-    const made: Array<{ raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } }> = [];
-    for (let index = 0; index < pics.length; index += 1) {
+    let made = await fetchMade(stackJob, pics, view);
+    if (stopped(job)) return;
+    // TEXT-PIC-05: the spelling check comes first, so every gate below runs on the picture that is kept.
+    const words = job.request.words ?? [];
+    if (words.length > 0 && made.length > 0) {
+      const spelled = await spellingCheck(job, view, made, words);
       if (stopped(job)) return;
-      const pic = pics[index]!;
-      const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob!, index, view);
-      // The bytes are stored exactly as the Stack made them: image-to-video checks their digest against what the engine
-      // returned, so nothing may re-encode them. They are decoded here only to prove they are a picture and read the size.
-      const info = await sharp(raw, { failOn: "error", limitInputPixels: 64_000_000 }).metadata();
-      if (!info.width || !info.height || info.format !== "png") throw new Error("not a png picture");
-      made.push({ raw, width: info.width, height: info.height, meta: { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null } });
+      made = spelled.made;
+      job.request.wordCheck = spelled.result;
+      if (spelled.result.checked === "yes" && spelled.result.missing.length > 0) job.request.wordsNote = misspelledNote(spelled.result.missing);
+      else delete job.request.wordsNote;
     }
     // IMGGEN-SAFE-01: the second, independent check, on the finished pixels, before anything is stored or shown.
     const adult = await adultOnly(job) || job.request.adultLock === "on";

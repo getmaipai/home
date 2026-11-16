@@ -104,7 +104,7 @@ export function pictureActivityItem(actor: PersonRow, job: NonNullable<ReturnTyp
   if (job.state === "queued") return { ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null };
   if (job.state === "running") return { ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture };
   if (job.state === "failed") return { ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The picture did not finish. Try again.", percent: null, typicalMinutes: null };
-  return { ...base, state: "done", line: null, percent: null, typicalMinutes: null };
+  return { ...base, state: "done", line: audience === "child" ? null : job.request.wordsNote ?? null, percent: null, typicalMinutes: null };
 }
 
 function pictureItems(actor: PersonRow): ActivityItem[] {

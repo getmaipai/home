@@ -44,7 +44,16 @@ export interface PictureRequest {
   edit?: { source_id: string; label: string; method: "instruct" | "tool" };
   /** IMG-SUBJECT-01: ids whose private saved description or references shaped this output. */
   subject_ids?: string[];
+  /** TEXT-PIC-05: the exact words the picture must show (only the maker and the spelling check read them). */
+  words?: string[];
+  /** TEXT-PIC-05: the spelling check's result: `checked` is "no" when the vision model could not read the picture; `missing` lists required words not found on the kept take. */
+  wordCheck?: { checked: "yes" | "no"; missing: string[]; takes: number };
+  /** TEXT-PIC-05: one plain line shown with the finished picture when the check found misspelled words or could not run. */
+  wordsNote?: string;
 }
+
+/** The Activity line while a picture is made again to fix its spelling. */
+export const SPELLING_PHASE = "Making it again to fix the spelling";
 
 export interface PictureJob {
   id: string;

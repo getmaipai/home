@@ -8,6 +8,7 @@ import { requireAuth } from "@/middleware/auth";
 import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
+import { SPELLING_PHASE } from "@/lib/pictures/jobStore";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
@@ -100,6 +101,7 @@ export function phaseLabel(job: PictureJob, audience: "adult" | "child" = "adult
   if (job.phase === "finding people") return "Finding the people in the picture";
   if (job.phase === "removing people") return "Removing them and filling in the background";
   if (job.phase === "enlarging") return "Making the picture bigger";
+  if (job.phase === SPELLING_PHASE) return SPELLING_PHASE;
   if (job.phase === "removing background") return "Removing the background";
   if (job.phase === "starting") return "Getting ready";
   if (job.kind === "edit") return "Changing the picture";
@@ -137,6 +139,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? plainStageLabel(getLive(active.id)?.stageLabel, kid ? "child" : "adult") : null) ?? phaseLabel(active, kid ? "child" : "adult") : "", position: active ? active.position : null,
     ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
+    words_note: active ? null : last.request.wordsNote ?? null,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id, fit_ask: active && active.state === "queued" && !kid ? answerableFitAsk(actor, active.id) : null,
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
     ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),

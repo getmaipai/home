@@ -63,6 +63,8 @@ export function recordPictureCreation(actor: PersonRow, job: PictureJob, file: {
     sources: source && FILE_ID.test(source) ? [{ file_id: source, role: "reference" }] : [],
     generation: generationBlock({ kind: "picture", jobId: job.stackJob ?? job.id, task: "generate", model: file.model, seed: file.seed, seconds: null, tier: job.request.tier, madeAt: job.updatedAt }),
     settings: { width: file.width, height: file.height, ...(job.request.quality ? { quality: job.request.quality } : {}), styles: job.request.loras.map((style_id) => ({ style_id })), takes: job.request.n },
+    // TEXT-PIC-05: the exact words and the spelling check's result (the spec has no words field beyond the prompt, so they ride in `checks`, which holds findings).
+    ...(job.request.words?.length ? { checks: { picture_words: { exact: job.request.words, checked: job.request.wordCheck?.checked ?? "no", missing: job.request.wordCheck?.missing ?? [], takes: job.request.wordCheck?.takes ?? 1 } } } : {}),
     parentId: creationIdOfFile(actor.id, source),
     // request.audience is the lane an adult asked on, not the content: the made file's own mark (and adultLock, set only for adult-only content) decides.
     adult: job.request.adultLock !== undefined,

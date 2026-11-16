@@ -331,6 +331,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       sources: usedLibraryRefs.map(({ adultMark }) => adultMark),
       subjectIds: resolvedSubjects.map(({ subject }) => subject.id),
+      ...(words.length ? { words } : {}),
       conversationId: extra || input.scene?.detached ? null : state.conversationId,
       turnId: extra || input.scene?.detached ? null : state.turnId,
       companionId: extra || input.scene?.detached ? null : state.persona?.id ?? null,
