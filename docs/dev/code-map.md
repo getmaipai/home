@@ -982,6 +982,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/carouselPlan.ts` | CAROUSEL_MIN, CAROUSEL_MAX, CAROUSEL_DEFAULT, CAROUSEL_PROMPT_MAX, CAROUSEL_UNAVAILABLE_LINE, CAROUSEL_BAD_PLAN_LINE |
+| `backend/src/lib/pictures/characterFaces.ts` | CHARACTER_SCENES, CHARACTER_PROMPT_PREFIX, characterTraitsOf, characterFacesPrompt, characterScenePrompt, characterFacesForBand |
 | `backend/src/lib/pictures/combine.ts` | COMBINE_DEFAULT_WORDS, COMBINE_NEEDS_ONE_LINE, COMBINE_EXTRAS_LINE, combinePictureLimit, combineInstruction |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
