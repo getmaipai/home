@@ -995,7 +995,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/pose.ts` | __setPoseVisionForTests, parsePose, parseSeatBox, readPose, readSeatBox |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
-| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureEngineReady |
+| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureReferenceLimit |
 | `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
 | `backend/src/lib/pictures/tool.ts` | __setTemplateMediaOpRunnerForTests, __setPictureToolLoraReaderForTests, PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
