@@ -31302,6 +31302,7 @@
                                     "missing",
                                     "problem",
                                     "off",
+                                    "unset",
                                     "waits",
                                     "same"
                                   ]
@@ -32861,6 +32862,142 @@
                     "profile",
                     "room_bytes",
                     "levels"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/level/{job}/{tier}/install": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Install the selected model for one level and save that level only after install starts",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "chat",
+                "pictures",
+                "videos",
+                "music",
+                "voice"
+              ]
+            },
+            "required": true,
+            "name": "job",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "boost",
+                "max"
+              ]
+            },
+            "required": true,
+            "name": "tier",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "model"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The selected model's install job and saved level.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "job": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "job"
                   ]
                 }
               }
