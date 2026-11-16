@@ -831,7 +831,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, listTemplates, getTemplate, listFragments, getFragment |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
-| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, voiceoverVoiceOptions, creationDetailsFor, SHORT_CLIP_MAX_S |
+| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, videoEngineLine, videoTimeLine, capChips |
 | `backend/src/lib/media/videoFilters.ts` | VIDEO_FILTERED_IDS, SHORT_BELOW_S, LONG_FROM_S, videoFilterOf, videoSortOf, wantsVideoRules |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SOUND_STARTED_LINE, MEDIA_REASK_INSTRUCTION |
@@ -1347,7 +1347,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/lock.ts` | videoJobLockItem, videoJobLockState, lockedJobView, LOCKED_START_LINE, lockedVideoTile, LOCKED_RESULT_TEXT |
 | `backend/src/lib/videos/longTake.ts` | MAX_PARTS, MAX_TAKE_SECONDS, MIN_PART_SECONDS, SUMMARY_LIMIT, CONTINUITY, TAKE_TOO_MUCH_LINE |
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
-| `backend/src/lib/videos/make.ts` | MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob, anotherTakeFor |
+| `backend/src/lib/videos/make.ts` | MAX_TAKES, MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, animatedFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/moments.ts` | MOMENT_PREFIX, MOMENT_GONE_PREFIX, MOMENT_CAP, momentsOf, addMoment, removeMoment |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
