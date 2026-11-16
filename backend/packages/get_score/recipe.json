@@ -1,0 +1,1 @@
+{"id":"get_score","version":"0.1.0","steps":[{"op":"format","as":"reply","text":"Use Home's score tool to transcribe the selected song into MIDI."}]}

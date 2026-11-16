@@ -18,6 +18,7 @@ export const VOICEOVER_TOOL_ID = "voiceover";
 export const CHANGE_VOICE_TOOL_ID = "change_voice";
 export const MAKE_INSPIRED_VOICE_TOOL_ID = "make_inspired_voice";
 export const MAKE_SPEECH_TOOL_ID = "make_speech";
+export const GET_SCORE_TOOL_ID = "get_score";
 const voiceoverArgs = z.object({ script: z.string().min(1).max(2000), voice: z.string().min(1).optional() }).strict();
 const changeVoiceArgs = z.object({ file: z.string().min(1), voice: z.string().min(1).optional() }).strict();
 const inspiredVoiceArgs = z.object({ clip: z.string().min(1), name: z.string().trim().min(1).max(60), level: z.enum(["much_lower", "lower", "different", "very_different"]).default("different"), blend_with: z.string().min(1).optional() }).strict();
@@ -28,6 +29,7 @@ export function voiceoverToolSpec(): ToolSpec {
 export function makeSpeechToolSpec(): ToolSpec {
   return { id: MAKE_SPEECH_TOOL_ID, description: "Record the requested words as speech in a permitted voice with the described delivery.", args: { type: "object", required: ["script"], properties: { script: { type: "string", minLength: 1, maxLength: 4000 }, voice: { type: "string", minLength: 1 }, delivery: { type: "string", maxLength: 240 } }, additionalProperties: false } };
 }
+export function getScoreToolSpec(): ToolSpec { return { id: GET_SCORE_TOOL_ID, description: "Turn the current finished song into a MIDI score.", args: { type: "object", properties: { song_id: { type: "string", minLength: 1 }, file_id: { type: "string", minLength: 1 } }, additionalProperties: false } }; }
 export function changeVoiceToolSpec(): ToolSpec {
   return { id: CHANGE_VOICE_TOOL_ID, description: "Change the voice in one of the person's own Library audio or video files. Identify it by file id or exact file name. Do not use this to record typed words, translate a video, or edit a song. Never reveal the transcript.", args: { type: "object", required: ["file"], properties: { file: { type: "string", minLength: 1, description: "A Library file id or exact file name belonging to the person." }, voice: { type: "string", minLength: 1, description: "Optional voice name or id the person named." } }, additionalProperties: false } };
 }
@@ -53,6 +55,19 @@ export async function runMakeSpeechTool(actor: PersonRow, raw: Record<string, un
   if (!parsed.success) return failed(callId, MAKE_SPEECH_TOOL_ID, args, "Write a script from 1 to 4000 characters, then try again.");
   const started = await startSpeechJob({ actor, conversationId: ctx.conversationId, turnId: ctx.turnId, companionId: ctx.companionId, args: parsed.data });
   return started.ok ? outcomeOf({ callId, packageId: MAKE_SPEECH_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "Your speech recording is being made." }, data: { musicJobId: started.job.id }, actions: [] } }) : failed(callId, MAKE_SPEECH_TOOL_ID, args, started.line);
+}
+export async function runGetScoreTool(actor: PersonRow, raw: Record<string, unknown>, callId: string, ctx: { conversationId: string; turnId: string }): Promise<ToolExecutionOutcome> {
+  const parsed = z.object({ song_id: z.string().min(1).max(80).optional(), file_id: z.string().min(1).max(80).optional() }).strict().safeParse(raw);
+  if (!parsed.success) return failed(callId, GET_SCORE_TOOL_ID, {}, "Choose one of your finished songs, then try again.");
+  const { startScoreJob } = await import("@/lib/scoreJobs");
+  const { jobsForConversation } = await import("@/lib/music/store");
+  const { getMusicJobFor, musicVersions } = await import("@/lib/music/jobs");
+  const latest = jobsForConversation(actor, ctx.conversationId).filter((job) => job.task === "text2music" && job.state === "done" && job.fileId && !job.request.score).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const songId = parsed.data.song_id ?? latest?.id; const root = songId ? getMusicJobFor(actor, songId) : null;
+  const versions = root ? musicVersions(actor, root) : []; const fileId = parsed.data.file_id ?? (parsed.data.song_id ? versions.at(-1)?.fileId : latest?.fileId);
+  if (!songId || !fileId) return failed(callId, GET_SCORE_TOOL_ID, {}, "I could not find a finished song here. Open Music, choose a finished song and select Get the score.");
+  const started = await startScoreJob({ actor, songId, fileId, conversationId: ctx.conversationId, turnId: ctx.turnId });
+  return started.ok ? outcomeOf({ callId, packageId: GET_SCORE_TOOL_ID, status: "succeeded", via: "tool_call", args: {}, durationMs: 0, result: { reply: { text: "Your score is being made." }, data: { musicJobId: started.job.id }, actions: [] } }) : failed(callId, GET_SCORE_TOOL_ID, {}, started.line);
 }
 export async function runChangeVoiceTool(actor: PersonRow, raw: Record<string, unknown>, callId: string): Promise<ToolExecutionOutcome> {
   const parsed = changeVoiceArgs.safeParse(raw);

@@ -26,7 +26,7 @@ import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { READ_ITEM_TOOL_ID, runReadItemTool } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, runWritingFormatTool } from "@/lib/writingFormats";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, runVoiceoverTool, runChangeVoiceTool, runMakeInspiredVoiceTool, runMakeSpeechTool } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, GET_SCORE_TOOL_ID, runVoiceoverTool, runChangeVoiceTool, runMakeInspiredVoiceTool, runMakeSpeechTool, runGetScoreTool } from "@/lib/voiceTools";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
@@ -464,6 +464,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const outcome = await runMakeSpeechTool(state.actor, speechArgs, callId, { conversationId: state.conversationId, turnId: state.turnId });
       outcomes.push(outcome);
       const data = outcome.result?.data as { musicJobId?: string } | undefined;
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+    if (tool === GET_SCORE_TOOL_ID) {
+      const outcome = await runGetScoreTool(state.actor, (proposal.request.args ?? {}) as Record<string, unknown>, callId, { conversationId: state.conversationId, turnId: state.turnId });
+      outcomes.push(outcome); const data = outcome.result?.data as { musicJobId?: string } | undefined;
       if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
       else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;

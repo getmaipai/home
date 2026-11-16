@@ -1,0 +1,1 @@
+{"description":"The score job runs through Home's native tool path.","inputs":{"song_id":"song-1","file_id":"file-123456"},"host_setup":{},"expected":{"reply":{"text":"Use Home's score tool to transcribe the selected song into MIDI.","speech":"Use Home's score tool to transcribe the selected song into MIDI."},"actions":[],"scheduled_jobs":[],"home_calls":[],"memory_added":[]}}

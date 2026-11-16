@@ -1,0 +1,15 @@
+{
+  "id": "get_score",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Get the score",
+  "description": "Turn one of your finished songs into a MIDI score.",
+  "offer": { "mode": "conditional", "gate": "musicAllowed", "bench_row": "get-score-tool", "priority": 3, "reason": "a finished song is available" },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": { "examples": ["get the score for this song", "write out the notes for this song", "turn this song into sheet music", "make a MIDI score from this track", "transcribe this song into notes", "show me the notes in this song"], "patterns": [] },
+  "args": { "type": "object", "properties": { "song_id": { "type": "string", "minLength": 1, "maxLength": 80, "grounded": true }, "file_id": { "type": "string", "minLength": 1, "maxLength": 80, "grounded": true } }, "additionalProperties": false },
+  "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"], "min_role": "guest", "consequential": false, "offline": "full", "config": [], "data_sources": [], "permissions": [], "notifications": [], "backup": "exclude", "background": false, "contributes": {}, "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze", "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

@@ -29,6 +29,7 @@ import { slotRun } from "@/lib/tiers";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, jobsForPerson, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
 import { resumeSpeechJob } from "@/lib/speechJobs";
+import { resumeScoreJob } from "@/lib/scoreJobs";
 export { getMusicJobFor, jobsForConversation, jobsForPerson, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
 
@@ -41,8 +42,8 @@ const dropStackJob = (job: MusicJob, id: string): Promise<void> => isSfx(job) ? 
 function saveMusicJob(job: MusicJob): void { persistMusicJob(job); refreshHouseholdQueue(); }
 registerQueueProvider(() => {
   const jobs = new Map<string, MusicJob>();
-  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state) && !job.request.effect && !job.request.speech) jobs.set(job.id, job);
-  for (const job of pendingMusicJobs()) if (!jobs.has(job.id) && !job.request.effect && !job.request.speech) jobs.set(job.id, job);
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state) && !job.request.effect && !job.request.speech && !job.request.score) jobs.set(job.id, job);
+  for (const job of pendingMusicJobs()) if (!jobs.has(job.id) && !job.request.effect && !job.request.speech && !job.request.score) jobs.set(job.id, job);
   return [...jobs.values()].map((job) => {
     const request = job.request as MusicRequest & { memoryRequeues?: number };
     const phaseHold = PERSISTED_HOLDS.find((reason) => job.stage === `held:${reason}`) as QueueJob["riseReason"] | undefined;
@@ -309,7 +310,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   }
   const stamp = modelStampFor(job.request.sound ? "sfx" : job.task, song.model, job.parentFileId ? provenanceFor(job.parentFileId) : null);
   const provenance: GenerationProvenance = {
-    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.task === "effect" ? "trim" : job.task, ...stamp, seed: song.seed, duration_s: soundSeconds,
+    kind: job.request.sound ? "sound" : "music", job_id: job.id, task: job.request.sound ? "sfx" : job.request.score ? "text2music" : (job.task === "effect" ? "trim" : job.task) as GenerationProvenance["task"], ...stamp, seed: song.seed, duration_s: soundSeconds,
     bpm: song.bpm ?? job.request.bpm ?? null, key: song.key ?? job.request.key ?? null,
     parent_file_id: job.request.ownedFile ? null : job.parentFileId, source_kind: job.request.ownedFile ? "upload" : job.parentFileId ? "made_here" : "none",
     made_at: new Date().toISOString(),
@@ -515,6 +516,7 @@ export function resumeMusicJobs(): void {
     // MP-02: an effect runs inside this process; after a restart it cannot be picked up, so it ends with a line that says to ask again.
     if (job.request.effect) { job.state = "failed"; job.errorCode = "effect_failed"; job.errorLine = "The change was interrupted. Ask for it again."; saveMusicJob(job); continue; }
     if (job.request.speech) { void resumeSpeechJob(job); continue; }
+    if (job.request.score) { void resumeScoreJob(job); continue; }
     liveJobs.set(job.id, job);
     if (job.stackJob) void watch(job, person);
   }
@@ -582,7 +584,7 @@ function ownsMusicAttachment(actor: PersonRow, job: MusicJob): boolean {
   return row?.mediaType === "audio/mp4" && generationOf(row.provenance) !== null;
 }
 export function sourceMusicJob(actor: PersonRow, conversationId: string, track: string, temporary: boolean): MusicJob | null {
-  const songs = jobsForConversation(actor, conversationId, temporary).filter((j) => j.state === "done" && j.fileId);
+  const songs = jobsForConversation(actor, conversationId, temporary).filter((j) => j.state === "done" && j.fileId && !j.request.score);
   if (track !== "latest") return songs.find((j) => j.fileId === track && ownsMusicAttachment(actor, j)) ?? null;
   return songs.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id)).find((j) => ownsMusicAttachment(actor, j)) ?? null;
 }
@@ -592,7 +594,7 @@ export function musicVersions(actor: PersonRow, root: MusicJob): MusicJob[] {
   if (root.personId !== actor.id || !root.conversationId) return [];
   // A stem is its own track, never a version of the song it was split from: it stays out of the song's family and has none of its own.
   if (root.task === "stems") return root.fileId && ownsMusicAttachment(actor, root) ? [root] : [];
-  const songs = jobsForConversation(actor, root.conversationId, root.temporary).filter((j) => j.fileId && j.task !== "stems" && ownsMusicAttachment(actor, j));
+  const songs = jobsForConversation(actor, root.conversationId, root.temporary).filter((j) => j.fileId && j.task !== "stems" && !j.request.score && ownsMusicAttachment(actor, j));
   const ids = new Set([root.fileId, root.parentFileId].filter((id): id is string => !!id));
   // MP-05: the takes of one request are versions of one card, so the card's version stepper switches between them.
   const group = root.request.takes?.group;

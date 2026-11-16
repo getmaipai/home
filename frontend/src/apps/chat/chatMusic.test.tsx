@@ -50,6 +50,13 @@ describe("MusicToolRender", () => {
     expect(calls).toHaveLength(0);
   });
 
+  test("score jobs show note count, tempo and MIDI download", async () => {
+    card = make({ task: "score", state: "done", score: { source_title: "Pancakes", notes: [{ start: 0, end: 1, pitch: 60, velocity: 90 }], tempo_bpm: 120, note_count: 1, midi_url: "/score.mid", media_id: "media-score" } });
+    const view = mount();
+    await waitFor(() => expect(view.getByText("1 notes at 120 beats per minute")).toBeTruthy());
+    expect(view.getByRole("link", { name: "Download MIDI" }).getAttribute("href")).toBe("/score.mid");
+  });
+
   test("a pending first fetch shows the queued song card without progress", () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const view = mount();

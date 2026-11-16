@@ -74,7 +74,6 @@ export const SpecSheetToolRender: ToolCallMessagePartComponent<Record<string, ne
   if (!result) return null;
   return <SpecSheet title={result.title} subtitle={result.subtitle} rows={result.rows} visibleCount={result.rows.length} />;
 };
-
 export const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string; version: number }> = ({ result }) => {
   const openArtifact = useContext(ArtifactOpenContext);
   const navigate = useNavigate();
@@ -841,5 +840,6 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   if (!result) return null;
   if (result.locked) return <LockTile shape="card" />;
   if (!query.data) return query.isError ? <ErrorState layout="inline" title={i18n._({ id: "I couldn't check on that song", message: "I couldn't check on that song" })} detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title={i18n._({ id: "Your song", message: "Your song" })} waitingForMemory copy={{ waitingForMemory: "Waiting its turn, your song starts when there is room" }} />;
-  return <MusicTrack {...trackProps} {...(byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
+  const isScore = query.data.task === "score";
+  return <MusicTrack {...trackProps} {...(!isScore && byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
 };

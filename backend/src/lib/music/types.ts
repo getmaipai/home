@@ -3,7 +3,7 @@ import type { GenerationProvenance } from "@maipai/spec/gen/ts/generation-proven
 export type { GenerationProvenance };
 /** Quick sings the hook. Full sings every part. The length follows the words. */
 export type SongLength = "quick" | "full";
-export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "effect" | "stems";
+export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "effect" | "stems" | "score";
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; /** On a stem: the id of the split job that made it, so two splits of one song stay two sets. */ stemsOf?: string; /** On a split of an audio file the person owns: the source is theirs, not a made song. */ ownedFile?: boolean; max_seconds?: number; retried?: boolean;
@@ -11,6 +11,7 @@ export interface MusicRequest {
   sound?: { loop: boolean; /** MP-07: "sfx" when the Stack sound-effects model makes it; left out for the ACE-Step path. */ engine?: "sfx"; surprise: boolean; looped?: boolean; /** The length asked for when it is under the model's minimum: the sound is made at the minimum and cut to this. */ trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } };
   /** A recorded voice job. Script and delivery remain private to this owner's job row. */
   speech?: { script: string; voice: string; voiceName: string; delivery: string; tags: string[]; kind: "preset" | "clip"; engine?: "fish-audio-drama-3" | "chatterbox-turbo" };
+  score?: { sourceFileId: string; sourceTitle: string; notes: Array<{ start: number; end: number; pitch: number; velocity: number }>; tempoBpm: number; noteCount: number };
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed" | "max"; /** TIER-HOME-03: read by the household queue. MUSIC-MAX-01: Max is the engine's XL SFT maker. */ tier?: "standard" | "boost" | "max"; seed?: number; length?: SongLength; /** MP-05: up to three takes of one song request; `group` ties the jobs, `index` is this one (0 first). Each take is its own queue job and its own seed. */ takes?: { group: string; index: number; total: number };
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];

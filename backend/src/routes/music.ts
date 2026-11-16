@@ -47,6 +47,8 @@ import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { promoteMadeMusicFile, promoteMadeSoundFile, savedMadeSounds } from "@/lib/media/appHost";
 import { runMakeSound, makeSoundArgs } from "@/lib/music/soundMaker";
 import { startSpeechJob } from "@/lib/speechJobs";
+import { startScoreJob } from "@/lib/scoreJobs";
+import { scoreEngineReady } from "@/lib/music/scoreStack";
 import { addSoundToSong, soundTakesOf } from "@/lib/music/soundTakes";
 import { musicJobLockState, lockedMusicTile, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 import { writeSongLyrics } from "@/lib/music/lyricsWriter";
@@ -109,6 +111,7 @@ const musicCardSchema = z.object({
   task: z.string(),
   sound: z.object({ loop: z.boolean(), surprise: z.boolean(), engine: z.literal("sfx").optional().describe("Set when the sound-effects model (Stable Audio 3 Small-SFX, Powered by Stability AI) made it."), looped: z.boolean().optional().describe("False when this computer had no audio tool to make the loop seamless."), trimTo: z.number().optional(), trimmed: z.boolean().optional().describe("False when this computer had no audio tool to cut the sound to the length asked."), takes: z.object({ group: z.string(), index: z.number().int(), total: z.number().int() }).nullable().optional() }).nullable(),
   speech: z.object({ voice_name: z.string() }).nullable().optional(),
+  score: z.object({ source_title: z.string(), notes: z.array(z.object({ start: z.number(), end: z.number(), pitch: z.number(), velocity: z.number() })), tempo_bpm: z.number(), note_count: z.number(), midi_url: z.string().nullable(), media_id: z.string().nullable() }).nullable().optional(),
   fit_ask: z.object({ job_id: z.string(), picked: z.string().nullable(), actual: z.string().nullable() }).nullable().describe("Set while this card is asking whether to make it now with the level it can run at (TIER-PRIO-07; `picked` and `actual` are the level names the buttons use) and this person may answer: POST /api/ai/jobs/{job_id}/fit-answer with allow or wait. Null otherwise."),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
@@ -194,6 +197,11 @@ function cardLyricsOf(job: MusicJob): string | null {
 }
 export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
   const root: MusicJob = { coverJobId: null, coverFileId: null, ...input };
+  if (root.request.score) {
+    const score = root.request.score; const open = !!root.fileId && !!db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, root.fileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
+    const media = open && root.fileId ? promoteMadeMusicFile(actor, root.fileId) : null;
+    return { id: root.id, task: "score", state: root.state, stage: root.stage, stage_label: root.state === "queued" ? "Waiting for a turn" : root.state === "running" ? "Getting the notes" : root.state === "done" ? "Ready" : root.errorLine ?? "The score could not be made.", stages: [{ id: "queued", label: "Queued" }, { id: "transcribing", label: "Getting the notes" }, { id: "ready", label: "Ready" }], stage_index: root.state === "done" ? 2 : root.state === "running" ? 1 : 0, started_at: Date.parse(root.createdAt), cover_pending: false, cover_url: null, cover_versions: [], conversation_id: root.conversationId, made_from_file: false, progress: root.progress, eta_seconds: root.etaSeconds, position: null, error_line: root.errorLine, sound: null, speech: null, score: { source_title: score.sourceTitle, notes: score.notes, tempo_bpm: score.tempoBpm, note_count: score.noteCount, midi_url: open && root.fileId ? `/api/files/${encodeURIComponent(root.fileId)}/content` : null, media_id: media?.id ?? null }, seed: null, takes: null, fit_ask: null, cut: null, max_seconds: null, making_version: null, versions: [], current_id: null, length: "full" as const, quality: "quick" as const, boost_offered: false, max_offered: false, max_installed: false, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null };
+  }
   if (root.request.speech) {
     const speech = root.request.speech;
     const open = !!root.fileId && !!db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, root.fileId), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
@@ -299,6 +307,20 @@ musicRoutes.openapi(getRoute, async (c) => {
   if (lockedJob(actor, job)) return c.json(lockedMusicTile(job), 200) as never;
   return c.json(await musicCardOrLocked(actor, job), 200);
 });
+const scoreRoute = createRoute({ method: "post", path: "/jobs/{id}/score", tags: ["Music"], summary: "Get a MIDI score for a song version", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80) }) } } } }, responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The score card." }, ...refusals, ...errorResponses({ 404: "The song was not found", 409: "The song is still being made", 503: "Score transcription is not installed" }) } });
+musicRoutes.openapi(scoreRoute, async (c) => {
+  const actor = c.get("person"), { file_id } = c.req.valid("json"), songId = c.req.valid("param").id;
+  const song = getMusicJobFor(actor, songId); if (!song) return c.json({ error: "That song is not available any more. Ask for it again." }, 404) as never;
+  const conversation = resolveOrCreateConversation(actor, "chat", song.conversationId ?? undefined, {});
+  if (!conversation.ok) return c.json({ error: "Home could not start that score. Try again." }, 503) as never;
+  const turnId = newConversationTurnId();
+  const started = await startScoreJob({ actor, songId, fileId: file_id, conversationId: conversation.value.id, turnId });
+  if (!started.ok) return c.json({ error: started.line }, started.status) as never;
+  logTurn(actor, "chat", "Get the score", { reply: { text: "Getting the score." }, source: "plugin", plugin_id: "get_score", routing: { tier: "tool", score: 1 }, safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() }, conversation_id: conversation.value.id, turn_id: turnId });
+  return c.json(await musicCardView(actor, started.job), 201);
+});
+musicRoutes.openapi(createRoute({ method: "get", path: "/score/status", tags: ["Music"], summary: "Check score engine availability", middleware: viewMiddleware, responses: { 200: { content: { "application/json": { schema: z.object({ installed: z.boolean() }) } }, description: "Score engine availability." }, ...refusals } }), async (c) => c.json({ installed: await scoreEngineReady() }, 200));
 const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ prompt: z.string().trim().min(3).max(1200).optional() }) } } } }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
 musicRoutes.openapi(coverRoute, async (c) => {

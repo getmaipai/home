@@ -34,6 +34,7 @@ export interface MusicCard {
   /** The kind of the version on show: quick (the hook) or full (every part). */
   sound?: { loop: boolean; surprise: boolean; engine?: "sfx"; looped?: boolean; trimTo?: number; trimmed?: boolean; takes?: { group: string; index: number; total: number } | null } | null;
   speech?: { voice_name: string } | null;
+  score?: { source_title: string; notes: Array<{ start: number; end: number; pitch: number; velocity: number }>; tempo_bpm: number; note_count: number; midi_url: string | null; media_id: string | null } | null;
   length: "quick" | "full";
   /** The maker the shown version really used: quick is Standard, detailed is Boost, max is Max. A Max song made without the Max models says detailed. */
   quality: "quick" | "detailed" | "max";
@@ -72,6 +73,7 @@ export interface SongDetailChanges { title?: string; lyrics?: string; descriptio
 export interface FileEditBody { file_id: string; change: "restyle" | "instrumental" | "parts" | "stems" | "voice_swap"; voice?: string; style?: string; parts?: { keep?: string[]; drop?: string[] } }
 
 export const musicApi = {
+  scoreStatus: () => requestJson<{ installed: boolean }>("/api/music/score/status"),
   status: () => requestJson<MusicStatus>("/api/music/status"),
   card: (id: string, signal?: AbortSignal) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -87,6 +89,7 @@ export const musicApi = {
   makeSong: (body: MakeSongBody) => requestJson<MusicCard>("/api/music/songs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   makeSound: (body: MakeSoundBody) => requestJson<MusicCard>("/api/music/sounds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   makeSpeech: (body: { script: string; voice: string; delivery?: string }) => requestJson<MusicCard>("/api/music/speeches", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  score: (id: string, fileId: string) => requestJson<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/score`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   listSpeeches: () => requestJson<MusicCard[]>("/api/music/speeches"),
   saveSpeech: (jobId: string) => requestJson<{ item_id: string }>(`/api/music/speeches/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
   saveSound: (jobId: string) => requestJson<{ id: string }>(`/api/music/sounds/${encodeURIComponent(jobId)}/save`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ item_id: jobId }) }),
