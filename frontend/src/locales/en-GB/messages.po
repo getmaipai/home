@@ -3114,8 +3114,8 @@ msgid "failure.composer.gpu.more"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:170
-msgid "An owner or admin can download it in Settings, Offline data (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet."
+#: src/shell/pages/WikipediaPage.tsx:171
+msgid "An owner or admin can download it in Settings, Search, Offline books (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3469,7 +3469,7 @@ msgid "Arrange Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:80
+#: src/shell/pages/WikipediaPage.tsx:81
 msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr ""
 
@@ -5371,6 +5371,11 @@ msgid "Checking…"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1623
+msgid "area.Checks"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1190
 msgid "setting.search.page_text_cleaning.does"
 msgstr ""
@@ -5421,7 +5426,7 @@ msgid "setting.safety.alarm.child_line.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1623
+#: src/lib/settingCopy.generated.ts:1624
 msgid "area.Children and teens"
 msgstr ""
 
@@ -6089,7 +6094,7 @@ msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1624
+#: src/lib/settingCopy.generated.ts:1625
 msgid "area.Clearer songs"
 msgstr ""
 
@@ -6120,7 +6125,7 @@ msgid "Clock"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1625
+#: src/lib/settingCopy.generated.ts:1626
 msgid "area.Clock"
 msgstr ""
 
@@ -6205,7 +6210,7 @@ msgid "setting.coding.home_mode.option_label.coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1626
+#: src/lib/settingCopy.generated.ts:1627
 msgid "area.Coding"
 msgstr ""
 
@@ -6241,7 +6246,7 @@ msgid "Coding engine"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1627
+#: src/lib/settingCopy.generated.ts:1628
 msgid "area.Coding helper"
 msgstr ""
 
@@ -6363,7 +6368,7 @@ msgid "Commands"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1628
+#: src/lib/settingCopy.generated.ts:1629
 msgid "area.Commands"
 msgstr ""
 
@@ -6520,7 +6525,7 @@ msgid "Connection"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1629
+#: src/lib/settingCopy.generated.ts:1630
 msgid "area.Connections"
 msgstr ""
 
@@ -6545,8 +6550,8 @@ msgid "Continue in Chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:113
 #: src/shell/pages/WikipediaPage.tsx:114
+#: src/shell/pages/WikipediaPage.tsx:115
 msgid "Continue reading"
 msgstr ""
 
@@ -7297,7 +7302,7 @@ msgid "Could not load your robots."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:93
+#: src/shell/pages/WikipediaPage.tsx:94
 msgid "Could not load your saved articles. Check that Home is running, then try again."
 msgstr ""
 
@@ -7363,7 +7368,7 @@ msgid "Could not open this app. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:166
+#: src/shell/pages/WikipediaPage.tsx:167
 msgid "Could not open your library. Check that Home is running, then try again."
 msgstr ""
 
@@ -7826,7 +7831,7 @@ msgid "Create a Coding key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1630
+#: src/lib/settingCopy.generated.ts:1631
 msgid "area.Create a command"
 msgstr ""
 
@@ -8107,7 +8112,7 @@ msgid "setting.ui.appearance.option_label.dark"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1631
+#: src/lib/settingCopy.generated.ts:1632
 msgid "area.Data and privacy"
 msgstr ""
 
@@ -8438,7 +8443,7 @@ msgid "Describe your song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1632
+#: src/lib/settingCopy.generated.ts:1633
 msgid "area.Describing pictures"
 msgstr ""
 
@@ -8478,7 +8483,7 @@ msgid "setting.generation.picture_detailed.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1633
+#: src/lib/settingCopy.generated.ts:1634
 msgid "area.Detailed pictures"
 msgstr ""
 
@@ -8503,7 +8508,12 @@ msgid "Detect speakers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1634
+#: src/lib/settingCopy.generated.ts:1635
+msgid "area.Developer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1636
 msgid "area.Developer tools"
 msgstr ""
 
@@ -8514,7 +8524,7 @@ msgid "Device schedules"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1635
+#: src/lib/settingCopy.generated.ts:1637
 msgid "area.Devices"
 msgstr ""
 
@@ -9021,7 +9031,7 @@ msgid "Earlier"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1637
+#: src/lib/settingCopy.generated.ts:1639
 msgid "area.Ease of use"
 msgstr ""
 
@@ -9258,7 +9268,7 @@ msgid "Engines"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1638
+#: src/lib/settingCopy.generated.ts:1640
 msgid "area.Engines"
 msgstr ""
 
@@ -9429,7 +9439,7 @@ msgid "setting.generation.picture_quick_model.option_label.ernie"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1636
+#: src/lib/settingCopy.generated.ts:1638
 msgid "area.ERNIE"
 msgstr ""
 
@@ -9643,10 +9653,10 @@ msgid "setting.topics.teen.risk.option.informative"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:75
-#: src/shell/pages/WikipediaPage.tsx:77
-#: src/shell/pages/WikipediaPage.tsx:155
-#: src/shell/pages/WikipediaPage.tsx:179
+#: src/shell/pages/WikipediaPage.tsx:76
+#: src/shell/pages/WikipediaPage.tsx:78
+#: src/shell/pages/WikipediaPage.tsx:156
+#: src/shell/pages/WikipediaPage.tsx:180
 msgid "Explore"
 msgstr ""
 
@@ -9707,7 +9717,7 @@ msgid "setting.robot.face.color.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1640
+#: src/lib/settingCopy.generated.ts:1642
 msgid "area.Face enrollment"
 msgstr ""
 
@@ -9772,7 +9782,7 @@ msgid "Family"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1641
+#: src/lib/settingCopy.generated.ts:1643
 msgid "area.Family"
 msgstr ""
 
@@ -9812,7 +9822,7 @@ msgid "setting.generation.video_tier.option.standard"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1642
+#: src/lib/settingCopy.generated.ts:1644
 msgid "area.Faster on Apple chips"
 msgstr ""
 
@@ -9957,7 +9967,7 @@ msgid "Find something to watch"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:64
+#: src/shell/pages/WikipediaPage.tsx:65
 msgid "Finding articles…"
 msgstr ""
 
@@ -9987,7 +9997,7 @@ msgid "setting.generation.picture_tier.option.boost"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1643
+#: src/lib/settingCopy.generated.ts:1645
 msgid "area.Finer stem splitter"
 msgstr ""
 
@@ -10066,7 +10076,7 @@ msgid "setting.music.eq_preset.option_label.flat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1639
+#: src/lib/settingCopy.generated.ts:1641
 msgid "area.FLUX.2 Klein"
 msgstr ""
 
@@ -10479,7 +10489,7 @@ msgid "Gender"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1644
+#: src/lib/settingCopy.generated.ts:1646
 msgid "area.General"
 msgstr ""
 
@@ -10840,7 +10850,7 @@ msgid "setting.person.voice_print.enrollment.consent_guest"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1645
+#: src/lib/settingCopy.generated.ts:1647
 msgid "area.Guitar and piano parts"
 msgstr ""
 
@@ -10941,7 +10951,7 @@ msgid "Hero source"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1646
+#: src/lib/settingCopy.generated.ts:1648
 msgid "area.Hey Jarvis"
 msgstr ""
 
@@ -11040,8 +11050,8 @@ msgstr ""
 #: src/shell/pages/DashboardPage.tsx:30
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
-#: src/shell/pages/WikipediaPage.tsx:154
-#: src/shell/pages/WikipediaPage.tsx:178
+#: src/shell/pages/WikipediaPage.tsx:155
+#: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
 #: src/shell/Routes.tsx:454
 #: src/shell/Routes.tsx:508
@@ -11079,7 +11089,7 @@ msgid "setting.engines.stack.where.option.this_computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1647
+#: src/lib/settingCopy.generated.ts:1649
 msgid "area.Home Assistant"
 msgstr ""
 
@@ -11908,7 +11918,7 @@ msgid "House"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1648
+#: src/lib/settingCopy.generated.ts:1650
 msgid "area.House"
 msgstr ""
 
@@ -11918,7 +11928,7 @@ msgid "setting.person.locale.option_label.household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1649
+#: src/lib/settingCopy.generated.ts:1651
 msgid "area.Household"
 msgstr ""
 
@@ -11928,7 +11938,7 @@ msgid "Household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1650
+#: src/lib/settingCopy.generated.ts:1652
 msgid "area.Household and people"
 msgstr ""
 
@@ -12877,7 +12887,7 @@ msgid "setting.news.default_topics.teen.option.world"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1651
+#: src/lib/settingCopy.generated.ts:1653
 msgid "area.Internet check"
 msgstr ""
 
@@ -13413,7 +13423,7 @@ msgid "Keyboard shortcuts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1652
+#: src/lib/settingCopy.generated.ts:1654
 msgid "area.Keyboard shortcuts"
 msgstr ""
 
@@ -13428,7 +13438,7 @@ msgid "setting.news.default_topics.child.option_label.kids"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1653
+#: src/lib/settingCopy.generated.ts:1655
 msgid "area.Kids"
 msgstr ""
 
@@ -14194,7 +14204,7 @@ msgid "Limits"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1654
+#: src/lib/settingCopy.generated.ts:1656
 msgid "area.Limits"
 msgstr ""
 
@@ -14285,7 +14295,7 @@ msgid "Listening"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1655
+#: src/lib/settingCopy.generated.ts:1657
 msgid "area.Listening and playback"
 msgstr ""
 
@@ -14544,7 +14554,7 @@ msgstr ""
 #: src/App.tsx:75
 #: src/App.tsx:159
 #: src/App.tsx:173
-#: src/App.tsx:199
+#: src/App.tsx:200
 msgid "Loading MaiPai Home"
 msgstr ""
 
@@ -14862,7 +14872,7 @@ msgid "setting.ui.look.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1656
+#: src/lib/settingCopy.generated.ts:1658
 msgid "area.Look and ease"
 msgstr ""
 
@@ -14912,7 +14922,7 @@ msgid "Looking for parts nothing uses."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1657
+#: src/lib/settingCopy.generated.ts:1659
 msgid "area.Looking up songs online"
 msgstr ""
 
@@ -15630,7 +15640,7 @@ msgid "Man"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1658
+#: src/lib/settingCopy.generated.ts:1660
 msgid "area.Manage"
 msgstr ""
 
@@ -15794,7 +15804,7 @@ msgid "Media"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1659
+#: src/lib/settingCopy.generated.ts:1661
 msgid "area.Media minutes"
 msgstr ""
 
@@ -16071,7 +16081,7 @@ msgid "Model"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1660
+#: src/lib/settingCopy.generated.ts:1662
 msgid "area.Model per job"
 msgstr ""
 
@@ -16323,7 +16333,7 @@ msgid "Music"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1661
+#: src/lib/settingCopy.generated.ts:1663
 msgid "area.Music"
 msgstr ""
 
@@ -16486,7 +16496,7 @@ msgid "Name the album and say how it sounds. Home adds the cover and the songs i
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1662
+#: src/lib/settingCopy.generated.ts:1664
 msgid "area.Name things in a picture"
 msgstr ""
 
@@ -16648,12 +16658,12 @@ msgid "Needs your choice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1663
+#: src/lib/settingCopy.generated.ts:1665
 msgid "area.Network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1664
+#: src/lib/settingCopy.generated.ts:1666
 msgid "area.Network and access"
 msgstr ""
 
@@ -16985,7 +16995,7 @@ msgid "No apps yet, so Home closes nothing."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:182
+#: src/shell/pages/WikipediaPage.tsx:183
 msgid "No article came back. Try once more."
 msgstr ""
 
@@ -17839,7 +17849,7 @@ msgid "Nothing remembered yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:94
+#: src/shell/pages/WikipediaPage.tsx:95
 msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr ""
 
@@ -17864,8 +17874,8 @@ msgid "Nothing to pick up yet. Chats and things you play show up here."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:81
-#: src/shell/pages/WikipediaPage.tsx:123
+#: src/shell/pages/WikipediaPage.tsx:82
+#: src/shell/pages/WikipediaPage.tsx:124
 msgid "Nothing to suggest right now. Try a search."
 msgstr ""
 
@@ -17914,7 +17924,7 @@ msgid "Notifications"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1665
+#: src/lib/settingCopy.generated.ts:1667
 msgid "area.Notifications"
 msgstr ""
 
@@ -18205,7 +18215,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.offline"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1666
+#: src/lib/settingCopy.generated.ts:1668
 msgid "area.Offline books"
 msgstr ""
 
@@ -18539,7 +18549,7 @@ msgid "Online"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1667
+#: src/lib/settingCopy.generated.ts:1669
 msgid "area.Online radio and podcasts"
 msgstr ""
 
@@ -18731,8 +18741,8 @@ msgid "Open my Home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:171
-msgid "Open Offline data"
+#: src/shell/pages/WikipediaPage.tsx:172
+msgid "Open Offline books"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18822,12 +18832,12 @@ msgid "Opening the app"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:165
+#: src/shell/pages/WikipediaPage.tsx:166
 msgid "Opening Wikipedia…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:92
+#: src/shell/pages/WikipediaPage.tsx:93
 msgid "Opening your saved articles…"
 msgstr ""
 
@@ -18968,7 +18978,7 @@ msgid "Overview"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1668
+#: src/lib/settingCopy.generated.ts:1670
 msgid "area.Overview"
 msgstr ""
 
@@ -19216,7 +19226,7 @@ msgid "People"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1669
+#: src/lib/settingCopy.generated.ts:1671
 msgid "area.People"
 msgstr ""
 
@@ -19253,7 +19263,7 @@ msgid "Performance"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1670
+#: src/lib/settingCopy.generated.ts:1672
 msgid "area.Performance"
 msgstr ""
 
@@ -19291,7 +19301,7 @@ msgid "setting.persona.active_id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1671
+#: src/lib/settingCopy.generated.ts:1673
 msgid "area.Personality"
 msgstr ""
 
@@ -19301,7 +19311,7 @@ msgid "Personality notes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1672
+#: src/lib/settingCopy.generated.ts:1674
 msgid "area.Personalization"
 msgstr ""
 
@@ -19588,12 +19598,12 @@ msgid "setting.generation.picture_quality.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1673
+#: src/lib/settingCopy.generated.ts:1675
 msgid "area.Picture reader"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1674
+#: src/lib/settingCopy.generated.ts:1676
 msgid "area.Picture tools"
 msgstr ""
 
@@ -19613,7 +19623,7 @@ msgid "Pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1675
+#: src/lib/settingCopy.generated.ts:1677
 msgid "area.Pictures"
 msgstr ""
 
@@ -19673,7 +19683,7 @@ msgid "setting.storage.library.pictures.threshold_percent.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1676
+#: src/lib/settingCopy.generated.ts:1678
 msgid "area.Pictures, videos and music"
 msgstr ""
 
@@ -19919,7 +19929,7 @@ msgid "setting.topics.teen.risk.option_label.redirect"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1677
+#: src/lib/settingCopy.generated.ts:1679
 msgid "area.Port"
 msgstr ""
 
@@ -20126,7 +20136,7 @@ msgid "Privacy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1678
+#: src/lib/settingCopy.generated.ts:1680
 msgid "area.Privacy and safety"
 msgstr ""
 
@@ -20152,12 +20162,12 @@ msgid "Profile"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1679
+#: src/lib/settingCopy.generated.ts:1681
 msgid "area.Profile"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1680
+#: src/lib/settingCopy.generated.ts:1682
 msgid "area.Profile and sign-in"
 msgstr ""
 
@@ -20316,7 +20326,7 @@ msgid "setting.generation.picture_quick_model.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1681
+#: src/lib/settingCopy.generated.ts:1683
 msgid "area.Quick pictures"
 msgstr ""
 
@@ -20361,7 +20371,7 @@ msgid "setting.resources.quiet_seconds.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1682
+#: src/lib/settingCopy.generated.ts:1684
 msgid "area.Qwen-Image (best pictures)"
 msgstr ""
 
@@ -20382,8 +20392,8 @@ msgid "Random"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:157
-#: src/shell/pages/WikipediaPage.tsx:181
+#: src/shell/pages/WikipediaPage.tsx:158
+#: src/shell/pages/WikipediaPage.tsx:182
 msgid "Random article"
 msgstr ""
 
@@ -20622,7 +20632,7 @@ msgid "Reference"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1683
+#: src/lib/settingCopy.generated.ts:1685
 msgid "area.Reference library"
 msgstr ""
 
@@ -20737,13 +20747,13 @@ msgstr ""
 #: src/apps/settings/styles/StyleEditor.tsx:183
 #: src/apps/settings/styles/stylesShared.tsx:27
 #: src/shell/pages/MusicWorkspacePage.tsx:138
-#: src/shell/pages/WikipediaPage.tsx:99
-#: src/shell/pages/WikipediaPage.tsx:99
+#: src/shell/pages/WikipediaPage.tsx:100
+#: src/shell/pages/WikipediaPage.tsx:100
 msgid "Remove"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:99
+#: src/shell/pages/WikipediaPage.tsx:100
 msgid "Remove “{title}” from Saved?"
 msgstr ""
 
@@ -20793,7 +20803,7 @@ msgid "Remove {name}? It will need to be paired again to reconnect."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:99
+#: src/shell/pages/WikipediaPage.tsx:100
 msgid "Remove {title} from Saved"
 msgstr ""
 
@@ -20917,7 +20927,7 @@ msgstr ""
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
 #: src/apps/settings/UsersSection.tsx:264
 #: src/apps/settings/UsersSection.tsx:387
-#: src/shell/pages/WikipediaPage.tsx:99
+#: src/shell/pages/WikipediaPage.tsx:100
 msgid "Removing…"
 msgstr ""
 
@@ -21000,7 +21010,7 @@ msgid "Repairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1684
+#: src/lib/settingCopy.generated.ts:1686
 msgid "area.Repairs"
 msgstr ""
 
@@ -21516,7 +21526,7 @@ msgid "Robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1685
+#: src/lib/settingCopy.generated.ts:1687
 msgid "area.Robot"
 msgstr ""
 
@@ -21673,7 +21683,7 @@ msgid "setting.home.robots.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1686
+#: src/lib/settingCopy.generated.ts:1688
 msgid "area.Robots"
 msgstr ""
 
@@ -21969,10 +21979,10 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicSpeechPage.tsx:80
 #: src/shell/pages/settings/HouseSettings.tsx:47
-#: src/shell/pages/WikipediaPage.tsx:90
 #: src/shell/pages/WikipediaPage.tsx:91
-#: src/shell/pages/WikipediaPage.tsx:156
-#: src/shell/pages/WikipediaPage.tsx:180
+#: src/shell/pages/WikipediaPage.tsx:92
+#: src/shell/pages/WikipediaPage.tsx:157
+#: src/shell/pages/WikipediaPage.tsx:181
 msgid "Saved"
 msgstr ""
 
@@ -22322,7 +22332,7 @@ msgid "Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1687
+#: src/lib/settingCopy.generated.ts:1689
 msgid "area.Search"
 msgstr ""
 
@@ -22343,12 +22353,12 @@ msgid "setting.engines.embed.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1688
+#: src/lib/settingCopy.generated.ts:1690
 msgid "area.Search and memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1689
+#: src/lib/settingCopy.generated.ts:1691
 msgid "area.Search and web"
 msgstr ""
 
@@ -22481,7 +22491,7 @@ msgid "Search voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:176
+#: src/shell/pages/WikipediaPage.tsx:177
 msgid "Search Wikipedia"
 msgstr ""
 
@@ -22764,7 +22774,7 @@ msgid "setting.health.keep_warm.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1690
+#: src/lib/settingCopy.generated.ts:1692
 msgid "area.Sensitive subjects with teen controls"
 msgstr ""
 
@@ -22779,7 +22789,7 @@ msgid "Service, e.g. turn_off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1691
+#: src/lib/settingCopy.generated.ts:1693
 msgid "area.Session lock"
 msgstr ""
 
@@ -23040,7 +23050,7 @@ msgid "Settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1692
+#: src/lib/settingCopy.generated.ts:1694
 msgid "area.Settings"
 msgstr ""
 
@@ -23139,7 +23149,7 @@ msgid "api.minor.share_children_off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1693
+#: src/lib/settingCopy.generated.ts:1695
 msgid "area.Sharing the computer"
 msgstr ""
 
@@ -23233,8 +23243,8 @@ msgid "Show details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:78
-#: src/shell/pages/WikipediaPage.tsx:121
+#: src/shell/pages/WikipediaPage.tsx:79
+#: src/shell/pages/WikipediaPage.tsx:122
 msgid "Show different articles"
 msgstr ""
 
@@ -23479,7 +23489,7 @@ msgid "Signed in away from home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1694
+#: src/lib/settingCopy.generated.ts:1696
 msgid "area.Signed-in devices"
 msgstr ""
 
@@ -23624,7 +23634,7 @@ msgid "Skill"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1695
+#: src/lib/settingCopy.generated.ts:1697
 msgid "area.Skills"
 msgstr ""
 
@@ -23934,8 +23944,8 @@ msgid "Something needs fixing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:118
-#: src/shell/pages/WikipediaPage.tsx:120
+#: src/shell/pages/WikipediaPage.tsx:119
+#: src/shell/pages/WikipediaPage.tsx:121
 msgid "Something to read"
 msgstr ""
 
@@ -24240,7 +24250,7 @@ msgid "Split into stems (done)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1696
+#: src/lib/settingCopy.generated.ts:1698
 msgid "area.Split songs into stems"
 msgstr ""
 
@@ -24386,7 +24396,7 @@ msgid "setting.generation.video_tier.option_label.standard"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1697
+#: src/lib/settingCopy.generated.ts:1699
 msgid "area.Standard chat AI"
 msgstr ""
 
@@ -24396,7 +24406,7 @@ msgid "setting.generation.picture_tier.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1698
+#: src/lib/settingCopy.generated.ts:1700
 msgid "area.Standard voice"
 msgstr ""
 
@@ -24598,7 +24608,7 @@ msgid "Status"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1699
+#: src/lib/settingCopy.generated.ts:1701
 msgid "area.Status"
 msgstr ""
 
@@ -24616,7 +24626,7 @@ msgid "Stems"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1700
+#: src/lib/settingCopy.generated.ts:1702
 msgid "area.Stems"
 msgstr ""
 
@@ -24809,7 +24819,7 @@ msgid "Storage"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1701
+#: src/lib/settingCopy.generated.ts:1703
 msgid "area.Storage"
 msgstr ""
 
@@ -24819,7 +24829,7 @@ msgid "Storage & hardware"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1702
+#: src/lib/settingCopy.generated.ts:1704
 msgid "area.Storage and backups"
 msgstr ""
 
@@ -24921,7 +24931,7 @@ msgid "Styles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1703
+#: src/lib/settingCopy.generated.ts:1705
 msgid "area.Styles"
 msgstr ""
 
@@ -25002,7 +25012,7 @@ msgid "Synth actions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1704
+#: src/lib/settingCopy.generated.ts:1706
 msgid "area.Synth controls"
 msgstr ""
 
@@ -25024,7 +25034,7 @@ msgid "Synths"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1705
+#: src/lib/settingCopy.generated.ts:1707
 msgid "area.Synths"
 msgstr ""
 
@@ -25173,7 +25183,7 @@ msgid "Teen protections apply, whichever companion is chosen. Still no adult con
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1706
+#: src/lib/settingCopy.generated.ts:1708
 msgid "area.Teens"
 msgstr ""
 
@@ -25189,7 +25199,7 @@ msgid "Teens and children"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1707
+#: src/lib/settingCopy.generated.ts:1709
 msgid "area.Telegram"
 msgstr ""
 
@@ -25307,7 +25317,7 @@ msgid "Testing…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:125
+#: src/shell/pages/WikipediaPage.tsx:126
 msgid "Text from Wikipedia under CC BY-SA 4.0, kept on this computer. Pictures keep their own licences, shown on Wikipedia."
 msgstr ""
 
@@ -26105,7 +26115,7 @@ msgid "The helper works only when Home runs on a Mac, so Close apps stays Off on
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1708
+#: src/lib/settingCopy.generated.ts:1710
 msgid "area.The home"
 msgstr ""
 
@@ -27089,7 +27099,7 @@ msgid "This counts only what the Stack has loaded. Home's own engines still run:
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1709
+#: src/lib/settingCopy.generated.ts:1711
 msgid "area.This device"
 msgstr ""
 
@@ -28178,7 +28188,7 @@ msgid "Uncensored"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1710
+#: src/lib/settingCopy.generated.ts:1712
 msgid "area.Uncensored chat AI"
 msgstr ""
 
@@ -28473,12 +28483,12 @@ msgid "Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1711
+#: src/lib/settingCopy.generated.ts:1713
 msgid "area.Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1712
+#: src/lib/settingCopy.generated.ts:1714
 msgid "area.Updates and repairs"
 msgstr ""
 
@@ -28790,7 +28800,7 @@ msgid "Users"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1713
+#: src/lib/settingCopy.generated.ts:1715
 msgid "area.Users"
 msgstr ""
 
@@ -28988,7 +28998,7 @@ msgid "Videos"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1714
+#: src/lib/settingCopy.generated.ts:1716
 msgid "area.Videos"
 msgstr ""
 
@@ -29013,7 +29023,7 @@ msgid "setting.storage.library.videos.threshold_percent.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1715
+#: src/lib/settingCopy.generated.ts:1717
 msgid "area.Videos with sound"
 msgstr ""
 
@@ -29107,12 +29117,12 @@ msgid "setting.robot.voice.id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1716
+#: src/lib/settingCopy.generated.ts:1718
 msgid "area.Voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1717
+#: src/lib/settingCopy.generated.ts:1719
 msgid "area.Voice & speaking"
 msgstr ""
 
@@ -29178,7 +29188,7 @@ msgid "setting.person.voice_print.enrollment.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1718
+#: src/lib/settingCopy.generated.ts:1720
 msgid "area.Voice print enrollment"
 msgstr ""
 
@@ -29208,7 +29218,7 @@ msgid "Voice source"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1719
+#: src/lib/settingCopy.generated.ts:1721
 msgid "area.Voice, sound and robot"
 msgstr ""
 
@@ -29227,12 +29237,12 @@ msgid "Voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1720
+#: src/lib/settingCopy.generated.ts:1722
 msgid "area.Voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1721
+#: src/lib/settingCopy.generated.ts:1723
 msgid "area.Voices and commands"
 msgstr ""
 
@@ -29368,12 +29378,12 @@ msgid "setting.engines.wakeword.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1723
+#: src/lib/settingCopy.generated.ts:1725
 msgid "area.Wake word"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1722
+#: src/lib/settingCopy.generated.ts:1724
 msgid "area.Wake Word"
 msgstr ""
 
@@ -29456,12 +29466,12 @@ msgid "Web search"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1724
+#: src/lib/settingCopy.generated.ts:1726
 msgid "area.Web search"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1725
+#: src/lib/settingCopy.generated.ts:1727
 msgid "area.Web search and memory settings"
 msgstr ""
 
@@ -29532,7 +29542,7 @@ msgid "What Coding needs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1726
+#: src/lib/settingCopy.generated.ts:1728
 msgid "area.What connects to the internet"
 msgstr ""
 
@@ -29918,7 +29928,7 @@ msgid "Whisper recording (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1727
+#: src/lib/settingCopy.generated.ts:1729
 msgid "area.Who can code"
 msgstr ""
 
@@ -30026,9 +30036,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:18
-#: src/shell/pages/WikipediaPage.tsx:133
-#: src/shell/pages/WikipediaPage.tsx:161
-#: src/shell/pages/WikipediaPage.tsx:184
+#: src/shell/pages/WikipediaPage.tsx:134
+#: src/shell/pages/WikipediaPage.tsx:162
+#: src/shell/pages/WikipediaPage.tsx:185
 msgid "Wikipedia"
 msgstr ""
 
@@ -30038,17 +30048,17 @@ msgid "Wikipedia in plain, simple English."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:169
+#: src/shell/pages/WikipediaPage.tsx:170
 msgid "Wikipedia is not in your library yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:168
+#: src/shell/pages/WikipediaPage.tsx:169
 msgid "Wikipedia is not installed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/WikipediaPage.tsx:177
+#: src/shell/pages/WikipediaPage.tsx:178
 msgid "Wikipedia sections"
 msgstr ""
 
@@ -30605,12 +30615,12 @@ msgid "Your current PIN or password is not right. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1728
+#: src/lib/settingCopy.generated.ts:1730
 msgid "area.Your data"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1729
+#: src/lib/settingCopy.generated.ts:1731
 msgid "area.Your data and apps"
 msgstr ""
 
@@ -30915,7 +30925,7 @@ msgid "Yours"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1730
+#: src/lib/settingCopy.generated.ts:1732
 msgid "area.Yours"
 msgstr ""
 
@@ -30925,7 +30935,7 @@ msgid "Yours, from {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1731
+#: src/lib/settingCopy.generated.ts:1733
 msgid "area.Z-Image Turbo"
 msgstr ""
 
