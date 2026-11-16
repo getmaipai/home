@@ -369,6 +369,7 @@ export interface DataParams {
   type?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: only the clips the person marked as favorites. */
   favorites?: boolean;
+  hidden?: boolean;
   limit?: number;
 }
 

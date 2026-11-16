@@ -21,6 +21,23 @@ export const CLIP_RULES = {
   faceMedian: 0.363,
 } as const;
 
+/** The one plain line the Create feed's card shows for a finding, by code (what went wrong, what to do). The checker's own `message` stays for the notes and the retake. */
+export const CLIP_FINDING_WORDS: Record<ClipFinding["code"], string> = {
+  black: "Part of this clip is black. Try another take.",
+  frozen: "Nothing seems to move in this clip. Try another take, or describe the movement.",
+  soft: "This clip looks soft. Try Sharpen 2x or another take.",
+  jump: "The picture jumps in this clip. Try another take.",
+  face_drift: "The faces in this clip may not match the pictures. Try another take.",
+  camera_not_seen: "The camera does not seem to move as asked. Try another take.",
+  loop_seam: "The loop seam may be visible. Try another take.",
+};
+
+/** The card line for a clip's findings: the most serious one first, or null when the clip passed. */
+export function clipFindingLine(findings: ReadonlyArray<Pick<ClipFinding, "code" | "level">> | null | undefined): string | null {
+  const pick = findings?.find((f) => f.level === "serious") ?? findings?.[0];
+  return pick ? CLIP_FINDING_WORDS[pick.code] ?? null : null;
+}
+
 const frozenMessage = "Nothing seems to move in this clip. Make it again, or describe the movement.";
 const medianOf = (values: number[]): number => { const sorted = [...values].sort((a, b) => a - b); const m = sorted.length >> 1; return sorted.length % 2 ? sorted[m]! : ((sorted[m - 1] ?? 0) + sorted[m]!) / 2; };
 function longestRun(values: number[], matches: (value: number) => boolean): { count: number; start: number } {

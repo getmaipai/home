@@ -141,6 +141,11 @@ export interface VideoRequest {
   adultLock?: "on" | "off";
   /** CREATOR-02: set on an Another take: the job it repeats. The finished clip's creation record takes that job's record as its parent. */
   anotherOf?: string;
+  /** FEED-HIDE-01: the owner hid this clip from the Create feed (soft and reversible; the file and its Library entry are untouched). */
+  hidden?: boolean;
+  /** FEED-HIDE-01: when the job first ran, and the real seconds it took from then to done (what the card shows as "Made in 42 s"). */
+  ranAt?: string;
+  madeSeconds?: number;
   /** CREATOR-10: this take was automatically made from a checked clip. */
   retake_of?: string;
   /** REFVIDEO-01: set on a clip made from reference sheets (see `ReferenceRecipe`). */
@@ -232,6 +237,7 @@ function fromRow(row: Row): VideoJob {
 
 function persistVideoJob(job: VideoJob): void {
   job.updatedAt = new Date().toISOString();
+  if (job.state === "running" && !job.request.ranAt) job.request.ranAt = job.updatedAt;
   if (job.temporary) { memory.set(job.id, job); return; }
   const values = {
     personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
@@ -782,6 +788,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.percent = 100;
   job.phase = "ready";
   job.error = null;
+  job.request.madeSeconds = Math.max(0, Math.round((Date.now() - new Date(job.request.ranAt ?? job.createdAt).getTime()) / 1000));
   saveVideoJob(job);
   // CREATOR-02: the record of how this clip was made, written only now that the job has finished (a temporary chat stores no file, so it keeps no record).
   if (!job.temporary) safely(() => recordClipCreation(actor, job, job.files, writer, creationId));
@@ -1012,3 +1019,13 @@ async function resume(job: VideoJob): Promise<void> {
 /** The address of a job's clip or poster for its owner (Range-capable, see routes/videos.ts). */
 export function clipUrl(job: VideoJob, file: VideoFile): string { return `/api/videos/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(file.id)}`; }
 export function posterUrl(job: VideoJob, file: VideoFile): string { return `/api/videos/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(file.poster_id)}`; }
+
+/** FEED-HIDE-01: hide or show again a finished Create clip for its owner. Only the flag on the job changes; false means the job is not this person's, not finished, or has no stored change to make. */
+export function setVideoJobHidden(actor: PersonRow, id: string, hidden: boolean): VideoJob | null {
+  const job = getVideoJobFor(actor, id);
+  if (!job || job.conversationId !== null || job.state === "queued" || job.state === "running") return null;
+  if (!!job.request.hidden === hidden) return job;
+  if (hidden) job.request.hidden = true; else delete job.request.hidden;
+  saveVideoJob(job);
+  return job;
+}

@@ -355,7 +355,7 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "header": return [{ title: "Make any video" }];
     // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).
     case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));
-    case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
+    case "feed": return feedRows(person, { favorites: params.favorites === true, hidden: params.hidden === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
     // FILM-PAGE-01: the Film maker page (lib/films/pageFilm.ts): the newest film, and its shots as cards.
     case "film": return filmRows(person, params.id);

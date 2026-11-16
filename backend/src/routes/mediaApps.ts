@@ -50,7 +50,7 @@ import { setFavoriteFile } from "@/lib/videos/favorites";
 import { meetsMinRole } from "@/lib/plugins";
 import { adultMarkJobBody } from "@/lib/adultMarkRoute";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
-import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
+import { cancelVideoJob, getVideoJobByFileFor, getVideoJobFor, setVideoJobHidden } from "@/lib/videos/jobs";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -89,6 +89,7 @@ function paramsOf(body: Body): DataParams {
     sort: typeof body.sort === "string" && body.sort !== "" ? body.sort : undefined,
     kind: typeof body.kind === "string" && body.kind !== "" ? body.kind : undefined,
     favorites: body.favorites === true || body.favorites === "true",
+    hidden: body.hidden === true || body.hidden === "true",
     limit: coerceNumber(body.limit),
   };
 }
@@ -445,6 +446,24 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const asked = body.favorite === true || body.favorite === "true" ? true : body.favorite === false || body.favorite === "false" ? false : undefined;
     return c.json({ ok: true as const, id, favorite: setFavoriteFile(person, fileId, asked) }, 200);
   });
+
+  // FEED-HIDE-01: Hide a clip from the Create feed, and Show again (the undo). `hide` with no `hidden` flips the flag (the one card entry "Hide or show again": the
+  // feed holds 16 actions at most, so one entry serves both; `unhide` always shows). Soft: one flag on the owner's own job; the file, the Library entry and the clip's record stay.
+  for (const name of ["hide", "unhide"] as const) {
+    routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (appId !== "video") return next();
+      if (!appRouteAllowed(person, appId, "actions", name)) return next();
+      const body = await jsonBody(c);
+      const id = typeof body.id === "string" ? body.id : "";
+      const job = id ? getVideoJobFor(person, id) : null;
+      if (job && videoJobLockState(person, job) !== "open") return c.json({ error: LOCKED_START_LINE, code: "locked", locked: true }, 423 as never);
+      const hidden = name === "unhide" ? false : body.hidden === true || body.hidden === "true" ? true : body.hidden === false || body.hidden === "false" ? false : !(job?.request.hidden === true);
+      const changed = id ? setVideoJobHidden(person, id, hidden) : null;
+      if (!changed) return c.json({ error: "That video isn't available any more, or it is still being made. Wait for it to finish and try again.", code: "gone" }, 404);
+      return c.json({ ok: true as const, id, hidden }, 200);
+    });
+  }
 
   routes.post("/actions/lyrics", requireAuth, async (c, next) => {
     const person = c.get("person");

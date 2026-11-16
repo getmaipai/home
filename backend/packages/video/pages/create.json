@@ -137,6 +137,7 @@
             "params": {
               "scope": "feed",
               "favorites": "$state.favorites_only",
+              "hidden": "$state.hidden_only",
               "type": "$state.type"
             }
           },
@@ -145,6 +146,11 @@
               "kind": "toggle",
               "state": "favorites_only",
               "label": "Favorites only"
+            },
+            {
+              "kind": "toggle",
+              "state": "hidden_only",
+              "label": "Hidden"
             },
             {
               "kind": "toggle",
@@ -334,6 +340,12 @@
               "icon": "video",
               "starts": "video",
               "action": { "call": { "target": "/api/plugins/video/actions/next-shot", "method": "POST", "args": { "id": "{id}", "shot": "push_in" } } }
+            },
+            {
+              "label": "Hide or show again",
+              "icon": "eye-off",
+              "show_when": "can_hide",
+              "action": { "call": { "target": "/api/plugins/video/actions/hide", "method": "POST", "args": { "id": "{id}" } } }
             },
             {
               "label": "Open in Studio",
