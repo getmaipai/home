@@ -14,8 +14,8 @@ import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
 import { listMediaOps } from "@/lib/mediaOps/registry";
 import type { PersonRow } from "@/types";
 
-/** Operations the editor's own tool rail already draws. Everything else the registry lists goes under More. */
-const BUILT_IN = new Set(["picture.remove_background", "picture.erase", "picture.resize", "picture.crop", "picture.adjust", "picture.rotate", "picture.flip", "picture.change"]);
+/** Operations the editor's own tool rail already draws (picture.combine needs a picture picker the rail cannot draw: Studio people use "Add a reference picture" under Describe the change). Everything else the registry lists goes under More. */
+const BUILT_IN = new Set(["picture.remove_background", "picture.erase", "picture.resize", "picture.crop", "picture.adjust", "picture.rotate", "picture.flip", "picture.change", "picture.combine"]);
 /** The editor's own tools and the registry operation each one needs: the readiness rows `studio-tools` answers with, so a tool whose engine is not ready is drawn disabled before a click (EDITOR-TOOLS-READY). */
 const TOOL_OF: Record<string, string> = { "picture.remove_background": "remove_background", "picture.erase": "erase", "picture.resize": "resize", "picture.crop": "crop", "picture.adjust": "adjust", "picture.change": "comment" };
 /** The one line shown when a tool is off and the reason the registry kept is a machine word ("failed_start"), not a sentence: the same words the Make pages use while pictures are not ready (RULES S6). */

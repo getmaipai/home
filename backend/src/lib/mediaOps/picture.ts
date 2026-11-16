@@ -15,6 +15,8 @@ import { listFragments } from "@/lib/media/templates";
 import { composePicturePrompt, resolvePicks } from "@/lib/media/pictureFragments";
 import { PICTURE_COVERAGE } from "./coverage";
 import { EXPAND_BASE_PROMPT, EXPAND_SHAPES } from "@/lib/pictures/expand";
+import { COMBINE_EXTRAS_LINE, COMBINE_NEEDS_ONE_LINE, combineInstruction, combinePictureLimit } from "@/lib/pictures/combine";
+import { pictureEngineStatus } from "@/lib/pictures/ready";
 
 const empty = z.object({});
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
@@ -189,6 +191,38 @@ registerMediaOp({
     const words = args.words?.trim();
     const result = await startComment(actor, chatSource(source).conversationId, source.id, { prompt: `${EXPAND_BASE_PROMPT}${words ? `: ${words}` : ""}.`, expand: args.shape });
     return "job" in result ? { job: result } : { file: result };
+  },
+});
+
+const combineArgs = z.object({
+  references: z.array(z.union([z.string(), referenceSchema])).describe("The other pictures to combine with the base picture (Picture 1): Library or chat picture ids, as many as the picture engine takes."),
+  words: z.string().max(500).optional().describe("Optional: how to combine them, for example put the man in the street."),
+});
+
+/** Combine pictures: the base picture (Picture 1) and the references become one picture. It runs through startComment, so it shares picture.change's gates (lock, age, audience, adult marks, version, Activity). The count it takes is the engine's own reference count plus the base. */
+registerMediaOp({
+  id: "picture.combine",
+  label: "Combine",
+  summary: "Combine this picture (Picture 1) with one or more other pictures into one picture, using words to say how.",
+  input: "picture",
+  output: "picture",
+  args: combineArgs,
+  // The Studio rail draws only number, choice and words controls and has no picture picker, so this op stays out of More (studio.ts BUILT_IN); Studio people combine through "Add a reference picture" under Describe the change.
+  controls: [{ kind: "words", name: "words", label: "How to combine them (optional)" }],
+  needs: "image",
+  minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof combineArgs> }) => {
+    const chat = chatSource(source);
+    const asRef = (value: z.infer<typeof combineArgs>["references"][number]) => typeof value === "string"
+      ? { kind: "picture" as const, via: source.via, id: value.trim(), ...(source.via === "chat" && source.conversationId ? { conversationId: source.conversationId } : {}) }
+      : value;
+    const chosen = args.references.map(asRef).filter((reference) => reference.id !== "" && reference.id !== chat.id);
+    if (chosen.length < 1) throw new ImageEditError(422, COMBINE_NEEDS_ONE_LINE, "combine_needs_picture");
+    const limit = combinePictureLimit(await pictureEngineStatus().catch(() => null)) - 1;
+    const used = chosen.slice(0, limit);
+    const result = await startComment(actor, chat.conversationId, chat.id, { prompt: combineInstruction(used.length + 1, args.words), references: used });
+    const note = chosen.length > used.length ? { note: COMBINE_EXTRAS_LINE } : {};
+    return "job" in result ? { job: { ...result, ...note } } : { file: { ...(result as object), ...note } };
   },
 });
 

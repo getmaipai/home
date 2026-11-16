@@ -260,7 +260,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
         const resultData = "people" in result || "subjects" in result ? result : null;
         const payload = "job" in result ? result.job : result.file;
         const job = typeof payload === "object" && payload !== null && "job" in payload ? String((payload as { job: string }).job) : null;
-        const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: proposal.request.args, durationMs: 0, result: { reply: { text: job ? "The picture edit is on its way." : resultData ? "I found the numbered picture subjects." : "The picture edit is ready as a new version." }, data: { ...(job ? { pictureJobId: job } : {}), ...(resultData ?? {}) }, actions: [] } });
+        const note = typeof payload === "object" && payload !== null && typeof (payload as { note?: unknown }).note === "string" ? ` ${(payload as { note: string }).note}` : "";
+        const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: proposal.request.args, durationMs: 0, result: { reply: { text: job ? `The picture edit is on its way.${note}` : resultData ? "I found the numbered picture subjects." : "The picture edit is ready as a new version." }, data: { ...(job ? { pictureJobId: job } : {}), ...(resultData ?? {}) }, actions: [] } });
         outcomes.push(outcome);
         toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(job ? { pictureJobId: job } : {}) } });
       } catch (error) {
