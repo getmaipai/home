@@ -3,6 +3,7 @@ import type { PersonRow } from "@/types";
 import { runGenerateImage, type RunGenerateImageInput } from "./tool";
 import { getTemplate } from "@/lib/media/templates";
 import { PICTURE_WORD_BLANKS } from "./quality";
+import { characterFacesPrompt, characterTraitsOf } from "./characterFaces";
 import { askPictureWords, picturePromptNeedsWordsQuestion } from "./wordsQuestion";
 
 export interface PictureMakeBody {
@@ -105,6 +106,8 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
 }
 
 export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): Promise<PictureMakeResult> {
+  const traits = characterTraitsOf(body.prompt);
+  if (traits !== null && traits.length > 0) body = { ...body, prompt: characterFacesPrompt(traits), count: body.count && body.count > 1 ? body.count : 4 };
   let wordNotice: string | null = null;
   if (picturePromptNeedsWordsQuestion(body.prompt, body)) {
     const asked = await askPictureWords(body.prompt);

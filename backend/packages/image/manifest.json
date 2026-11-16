@@ -226,7 +226,7 @@
       {
         "id": "creations",
         "label": "My creations",
-        "icon": "image",
+        "icon": "sparkles",
         "nav": true,
         "kind": "schema",
         "module": "creations"

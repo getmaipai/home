@@ -20,10 +20,27 @@
         "navigate": {
           "to": "/apps/image/create",
           "state": {
-            "cast": "{id}"
+            "cast": "{cast}",
+            "prompt": "{start_prompt}"
           }
         }
       },
+      "row_actions": [
+        {
+          "icon": "image",
+          "label": "Make pictures of them",
+          "action": {
+            "navigate": {
+              "to": "/apps/image/create",
+              "state": {
+                "cast": "{id}",
+                "prompt": "{scene_prompt}",
+                "set": "8"
+              }
+            }
+          }
+        }
+      ],
       "empty_state": {
         "type": "empty_state",
         "icon": "user-round",
@@ -32,7 +49,7 @@
           "navigate": {
             "to": "/apps/image/create",
             "state": {
-              "prompt": "A character: "
+              "prompt": "Character: "
             }
           }
         },
