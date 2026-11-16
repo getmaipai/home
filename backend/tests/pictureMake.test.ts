@@ -169,3 +169,41 @@ describe("Images Create make", () => {
     expect(rows.some((row) => row.id === `picture:${made.id}` && row.kind === "picture" && row.title.length > 0)).toBe(true);
   });
 });
+
+describe("USE-AS-REFERENCE: how many reference pictures a call keeps", () => {
+  test("the limit is the engine's own count, at least 1 and at most 3", async () => {
+    const { pictureReferenceLimit, readyStatusForTests } = await import("@/lib/pictures/ready");
+    const withRefs = (references: number | undefined) => readyStatusForTests({ edit: { generative: true, masked: true, ...(references === undefined ? {} : { references }) } });
+    expect(pictureReferenceLimit(withRefs(3))).toBe(3);
+    expect(pictureReferenceLimit(withRefs(1))).toBe(1);
+    expect(pictureReferenceLimit(withRefs(2))).toBe(2);
+    expect(pictureReferenceLimit(withRefs(7))).toBe(3);
+    expect(pictureReferenceLimit(withRefs(0))).toBe(1);
+    expect(pictureReferenceLimit(withRefs(undefined))).toBe(1);
+    expect(pictureReferenceLimit(null)).toBe(1);
+  });
+
+  test("more references than the engine takes make one plain line, not a failure", async () => {
+    const { __setPictureStatusForTests, readyStatusForTests } = await import("@/lib/pictures/ready");
+    __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 1 } }));
+    try {
+      const refs = [file(owner, await png()), file(owner, await png()), file(owner, await png())];
+      const read = readPictureMakeBody({ prompt: "a boat at sunset", references: refs.map((ref) => ref.id) });
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+      const made = await makePictureFor(owner, read.body);
+      expect(made.ok).toBe(true);
+      if (made.ok) expect(made.notice).toBe("Some extra reference pictures were not used.");
+    } finally { __setPictureStatusForTests(undefined); }
+  });
+});
+
+describe("USE-AS-REFERENCE: the chat tool says how many references it takes", () => {
+  test("generate_image offers references and says up to 3", async () => {
+    const manifest = JSON.parse(await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text()) as { args: { properties: Record<string, { type: string; maxItems?: number; description?: string }> } };
+    const references = manifest.args.properties.references;
+    expect(references?.type).toBe("array");
+    expect(references?.maxItems).toBe(3);
+    expect(references?.description).toBe("references: ids of pictures to use as references, up to 3.");
+  });
+});

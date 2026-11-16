@@ -353,6 +353,23 @@ describe("a painted area and second pictures reach the change", () => {
     expect(sent).toHaveLength(0);
   });
 
+  test("USE-AS-REFERENCE: an engine that takes 3 references gets three; one that takes 2 refuses a third in one plain line", async () => {
+    const sent: FormData[] = [];
+    __setPicturesFetchForTests((async (_input, init) => { sent.push(init?.body as FormData); return new Response(JSON.stringify({ job: "three-ref-job" }), { status: 202, headers: { "content-type": "application/json" } }); }) as typeof fetch);
+    const tint = async (background: string) => new Uint8Array(await sharp({ create: { width: 10, height: 10, channels: 3, background } }).png().toBuffer());
+    const base = await libraryPicture(sageActor);
+    const refs = [await libraryPicture(sageActor, ALL_AGES, await tint("#111111")), await libraryPicture(sageActor, ALL_AGES, await tint("#222222")), await libraryPicture(sageActor, ALL_AGES, await tint("#333333"))];
+    __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 3 } }));
+    const ok = await run(sage, "picture.change", { file_id: base.id, args: { prompt: "put them together" }, references: refs.map((ref) => ref.id) });
+    expect(ok.status).toBe(200);
+    expect(sent[0]?.get("reference3")).not.toBeNull();
+    sent.length = 0;
+    __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 2 } }));
+    const refused = await run(sage, "picture.change", { file_id: base.id, args: { prompt: "put them together" }, references: refs.map((ref) => ref.id) });
+    expect(refused.status).toBe(422);
+    expect(sent).toHaveLength(0);
+  });
+
   test("the words box on a Library picture picks an operation and runs it with the painted area", async () => {
     const base = await libraryPicture(sageActor);
     const stub = { imageTools: async () => READY, roles: async () => ({ roles: [] }), imageEdit: async () => ({ kind: "done", job: "j", item: { b64_json: (await sharp({ create: { width: 40, height: 30, channels: 3, background: "#000" } }).png().toBuffer()).toString("base64"), width: 40, height: 30, content_type: "image/png", operation: "erase", engine: "lama", model: "lama", ms: 5 } }),

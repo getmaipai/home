@@ -19,7 +19,7 @@ import { runPictureEdit } from "@/lib/mediaOps/registry";
 import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
 import { PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
-import { pictureEngineStatus } from "./ready";
+import { pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
 import { QUICK_MODEL } from "./quality";
 import { asStackPic, hasProtectableFace, runLikenessEdit, type LikenessScope } from "./likeness/edit";
@@ -142,21 +142,27 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const status = await pictureEngineStatus().catch(() => null);
   if (!status || status.available === false || !status.edit?.generative) return failed(callId, args, "no_engine", "unavailable", "no picture model that can change a picture is installed on the Stack");
 
-  const extraReferences = Array.isArray(args.references) ? (args.references as unknown[]).map((value) => typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String((value as { id: unknown }).id) : "").filter(Boolean).slice(0, 1) : [];
-  const ref = args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "" ? load(input, args.reference) : extraReferences.length ? load(input, extraReferences[0]) : null;
-  if (args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "" && !ref) return line(callId, args, NOT_FOUND_LINE);
-  if (ref && (status.edit.references ?? 0) < 1) return line(callId, args, REFERENCES_MISSING_LINE);
-  if (ref && ref.id === base.id) return line(callId, args, "The second picture has to be a different picture from the one you want changed.");
+  // USE-AS-REFERENCE: the second picture ("reference") plus any extras, kept up to the engine's own count (1 to 3).
+  const refLimit = pictureReferenceLimit(status);
+  const extraReferences = Array.isArray(args.references) ? (args.references as unknown[]).map((value) => typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String((value as { id: unknown }).id) : "").filter(Boolean) : [];
+  const named = args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "";
+  const refWords: unknown[] = [...(named ? [args.reference] : []), ...extraReferences.filter((id) => !named || id !== String(args.reference))].slice(0, refLimit);
+  const loaded = refWords.map((word) => load(input, word));
+  if (named && !loaded[0]) return line(callId, args, NOT_FOUND_LINE);
+  const refs = loaded.filter((entry): entry is SourcePicture => entry !== null);
+  if (refs.length && (status.edit.references ?? 0) < 1) return line(callId, args, REFERENCES_MISSING_LINE);
+  if (refs.some((entry) => entry.id === base.id)) return line(callId, args, "The second picture has to be a different picture from the one you want changed.");
+  if (new Set(refs.map((entry) => entry.id)).size !== refs.length) return line(callId, args, "Choose different reference pictures.");
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, text: instruction });
   if (!basePrep.ok) return line(callId, args, basePrep.line, { refused: basePrep.code });
-  let refPrep: Awaited<ReturnType<typeof prepareEditSource>> | null = null;
-  let refGenerated = false;
-  if (ref) {
-    refGenerated = await isGeneratedPicture(actor, ref);
-    refPrep = await prepareEditSource({ audience, bytes: ref.bytes, generated: refGenerated, text: instruction });
-    if (!refPrep.ok) return line(callId, args, refPrep.line, { refused: refPrep.code });
+  const refPreps: Array<{ ref: SourcePicture; prep: Extract<Awaited<ReturnType<typeof prepareEditSource>>, { ok: true }> }> = [];
+  for (const entry of refs) {
+    const prep = await prepareEditSource({ audience, bytes: entry.bytes, generated: await isGeneratedPicture(actor, entry), text: instruction });
+    if (!prep.ok) return line(callId, args, prep.line, { refused: prep.code });
+    refPreps.push({ ref: entry, prep });
   }
+  const ref = refs[0] ?? null;
 
   const buildForm = (baseSource: EditImageSource): FormData => {
     const form = new FormData();
@@ -165,9 +171,10 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
     nameEditModel(form);
     form.append("instruction", kid ? `${instruction}. Keep it a friendly children's cartoon drawing, not a photograph.` : instruction);
     form.append("image_source", baseSource);
-    if (ref && refPrep && refPrep.ok) {
-      form.append("reference", new File([new Uint8Array(ref.bytes)], "reference", { type: ref.mediaType }));
-      form.append("reference_source", refPrep.imageSource);
+    for (const [index, entry] of refPreps.entries()) {
+      const field = index === 0 ? "reference" : `reference${index + 1}`;
+      form.append(field, new File([new Uint8Array(entry.ref.bytes)], "reference", { type: entry.ref.mediaType }));
+      form.append(`${field}_source`, entry.prep.imageSource);
     }
     form.append("timeout_ms", "1");
     return form;

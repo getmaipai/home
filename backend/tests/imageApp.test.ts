@@ -156,3 +156,17 @@ test("Recently made is a schema-valid shelf of recent creations", async () => {
   if (!page.ok) return;
   expect((page.value as { body: unknown[] }).body[0]).toMatchObject({ type: "media_shelf", heading: "Recently made", bind: { source: "package", path: "recent" }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", making_field: "making", poll_while: { field: "making", values: ["yes"] }, aspect: "square", layout: "grid", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } } });
 });
+
+test("USE-AS-REFERENCE: the Studio top bar can send a picture to Create as its reference, and Create reads it into the make call", async () => {
+  const { row } = await owner();
+  const studio = getAppPage(row, "image", "studio");
+  const create = getAppPage(row, "image", "create");
+  expect(studio.ok && create.ok).toBe(true);
+  if (!studio.ok || !create.ok) return;
+  const editor = (studio.value as { body: Array<{ type: string; actions?: Array<{ label: string; action?: unknown; hand_off?: string }> }> }).body.find((node) => node.type === "image_editor")!;
+  expect(editor.actions).toContainEqual({ label: "Use as a reference", action: { navigate: { to: "/apps/image/create", state: { reference: "{file}" } } } });
+  expect(editor.actions!.length).toBeLessThanOrEqual(3);
+  const bar = (create.value as { body: Array<{ references?: Array<{ state: string; max: number }>; submit?: { call: { args: Record<string, unknown> } } }> }).body[0]!;
+  expect(bar.references![0]).toMatchObject({ state: "reference", max: 3 });
+  expect(bar.submit!.call.args.reference).toBe("{reference}");
+});

@@ -32,6 +32,7 @@ import { useTranscriptWorkspace } from "./TranscriptPanel";
 import { seekViewerMedia, useViewerMediaTime } from "./viewerMedia";
 import { formatDate } from "@/lib/format";
 import { errorLine } from "@/lib/hubReachability";
+import { referenceHandoff } from "./useAsReference";
 
 const ShareIcon = getIcon("users");
 const CaptionsIcon = getIcon("captions");
@@ -110,6 +111,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
           <Button type="button" variant="secondary" onClick={() => actions.rename(item)}>{i18n._({ id: "Rename", message: "Rename" })}</Button>
           {item.kind === "image" ? <Button type="button" variant="secondary" onClick={() => navigate("/apps/image/studio", { state: { pageState: { file: item.id } } })}>{i18n._({ id: "Edit", message: "Edit" })}</Button> : null}
           {item.kind === "image" ? <Button type="button" variant="secondary" onClick={() => navigate("/apps/video/create", { state: { pageState: { start_frame: item.id } } })}>{i18n._({ id: "Make a video from this", message: "Make a video from this" })}</Button> : null}
+          {item.kind === "image" && !(item.audience === "adult-only" && item.unlocked !== true) ? <Button type="button" variant="secondary" onClick={() => { const next = referenceHandoff(item.id); if (next.ok) navigate(next.to, { state: next.state }); }}>{i18n._({ id: "Use as a reference", message: "Use as a reference" })}</Button> : null}
           {!kept ? <Button type="button" variant="secondary" onClick={() => actions.keep(item)}>{i18n._({ id: "Keep", message: "Keep" })}</Button> : null}
           {adultMark.actions}
           {isAdultRole(me) && item.kind === "audio" && !record.data?.music ? <Button type="button" variant="secondary" disabled={splitting} onClick={() => { setSplitting(true); setStemsProblem(""); void musicApi.stemsFromFile(item.id).then((card) => { if (card.conversation_id) navigate(`/chat?conversation=${encodeURIComponent(card.conversation_id)}`); }).catch((error: unknown) => setStemsProblem(errorLine(error, i18n._({ id: "The stems could not be made. Try again in a minute.", message: "The stems could not be made. Try again in a minute." })))).finally(() => setSplitting(false)); }}>{i18n._({ id: "Split into stems", message: "Split into stems" })}</Button> : null}

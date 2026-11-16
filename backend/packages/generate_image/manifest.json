@@ -103,6 +103,13 @@
         "grounded": false,
         "description": "With change: second picture, same words."
       },
+      "references": {
+        "type": "array",
+        "maxItems": 3,
+        "items": { "type": "string", "maxLength": 40 },
+        "grounded": false,
+        "description": "references: ids of pictures to use as references, up to 3."
+      },
       "words": {
         "type": "array",
         "maxItems": 6,

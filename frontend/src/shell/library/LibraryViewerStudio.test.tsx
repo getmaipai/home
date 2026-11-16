@@ -45,6 +45,22 @@ describe("LibraryViewer picture actions", () => {
     await waitFor(() => expect(view.getByTestId("where").textContent).toBe('/apps/video/create|{"start_frame":"pic-1"}'));
   });
 
+  test("Use as a reference opens Create with the picture as the reference", async () => {
+    const view = mount(base);
+    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Use as a reference" })));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe('/apps/image/create|{"reference":"pic-1"}'));
+  });
+
+  test("a locked Adult picture and a video have no Use as a reference button", async () => {
+    const locked = mount({ ...base, audience: "adult-only" } as LibraryItem);
+    await waitFor(() => expect(locked.queryByRole("button", { name: "Rename" })).toBeTruthy());
+    expect(locked.queryByRole("button", { name: "Use as a reference" })).toBeNull();
+    cleanup();
+    const video = mount({ ...base, id: "vid-1", kind: "video", media_type: "video/mp4", name: "Clip" } as LibraryItem);
+    await waitFor(() => expect(video.queryByRole("button", { name: "Rename" })).toBeTruthy());
+    expect(video.queryByRole("button", { name: "Use as a reference" })).toBeNull();
+  });
+
   test("a video has neither button", async () => {
     const view = mount({ ...base, id: "vid-1", kind: "video", media_type: "video/mp4", name: "Clip" } as LibraryItem);
     await waitFor(() => expect(view.queryByRole("button", { name: "Rename" })).toBeTruthy());

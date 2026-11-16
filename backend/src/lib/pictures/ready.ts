@@ -43,6 +43,11 @@ export function peekPictureEngineStatus(): StackImageStatus | null {
 
 export function dropPictureStatusCache(): void { cached = null; }
 
+/** How many reference pictures a call keeps: the engine's own count, at least 1 and at most 3. */
+export function pictureReferenceLimit(status: StackImageStatus | null | undefined): number {
+  return Math.min(3, Math.max(1, status?.edit?.references ?? 1));
+}
+
 /** The engine is installed and able to take a job (building or running counts: the job queues). */
 export async function pictureEngineReady(): Promise<boolean> {
   const status = await pictureEngineStatus();

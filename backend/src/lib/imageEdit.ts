@@ -787,7 +787,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const references: Array<{ source: SourcePicture; prepared: Extract<Awaited<ReturnType<typeof prepareEditSource>>, { ok: true }> }> = [];
   let referenceAdult = false;
   let audience: "all-ages" | "adult-only" = source.audience ?? "all-ages";
-  const referenceFields = ["reference", "reference2"] as const;
+  const referenceFields = ["reference", "reference2", "reference3"] as const;
   if (referenceRefs.length) {
     const status = await pictureEngineStatus().catch(() => null);
     const limit = status?.edit?.references ?? 0;

@@ -41,4 +41,6 @@ Each tool shows a preview first. Press **Apply** to keep it as a new version, or
 
 In the Studio, press **Make a video from this** at the top. In the [Library](library.md), open the picture and press the same button. The Video app opens with the picture you are looking at as the first frame. Nothing starts until you press the button there.
 
+To draw on a finished picture in a new one, press **Use as a reference** in the Studio or in the Library. Images Create opens with that picture in the reference slot, which holds up to 3 pictures. Nothing starts until you press **Make picture**.
+
 See [Pictures](pictures.md) for making pictures and who can make them.

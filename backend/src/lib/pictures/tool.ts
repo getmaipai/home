@@ -16,7 +16,7 @@ import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
-import { pictureEngineStatus } from "./ready";
+import { pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL, ERNIE_MODEL, modelCanSpell } from "./quality";
 import { StackPicturesError } from "./stack";
@@ -102,6 +102,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const createPage = !state.conversationId && state.temporary !== true && state.ephemeral !== true;
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
+  // USE-AS-REFERENCE: references kept per call = the engine's own count (1 to 3); read only when the call carries references.
+  const refLimit = Array.isArray(args.references) ? pictureReferenceLimit(await pictureEngineStatus().catch(() => null)) : 1;
   let template: ReturnType<typeof getTemplate> = null;
   let promptOverride: string | null = null;
   if (typeof args.template === "string" && args.template) {
@@ -142,7 +144,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     const refs = (args.references as unknown[]).flatMap((entry) => {
       const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
       return id ? [id] : [];
-    }).slice(0, 2);
+    }).slice(0, refLimit);
     if (refs.length) normalized.reference = refs[0];
   }
   delete normalized.template;
@@ -191,7 +193,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       const refs = (normalized.references as unknown[]).flatMap((entry) => {
         const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
         return id ? [id] : [];
-      }).slice(0, 2);
+      }).slice(0, refLimit);
       if (refs.length) mapped.reference = refs[0];
       if (refs.length > 1) mapped.references = refs.slice(1).map((id) => ({ kind: "picture", via: "chat", id, conversationId: state.conversationId }));
     }
@@ -203,7 +205,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     const references = (normalized.references as unknown[]).flatMap((entry) => {
       const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
       return id ? [{ kind: "picture" as const, via: "chat" as const, id, conversationId: state.conversationId }] : [];
-    }).slice(0, 2);
+    }).slice(0, refLimit);
     return runEditPicture({ state, args: { prompt, change: sourceId, references: references.map((ref) => ref.id) }, callId, audience });
   }
 

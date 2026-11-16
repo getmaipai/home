@@ -161,6 +161,17 @@
         {
           "label": "Make a video from this",
           "hand_off": "video_create"
+        },
+        {
+          "label": "Use as a reference",
+          "action": {
+            "navigate": {
+              "to": "/apps/image/create",
+              "state": {
+                "reference": "{file}"
+              }
+            }
+          }
         }
       ]
     }
