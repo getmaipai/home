@@ -121,6 +121,26 @@ describe("the plan as Stack steps", () => {
     expect(refusedWith(planOf([vp("a"), vp("b")], {}, [{ kind: "crossfade", seconds: 0.1 }]))).toBe("bad_crossfade");
   });
 
+  test("titles compile by position and clamp to the film; cut leads mute and overlay the carried clip audio", () => {
+    const titled = planOf([vp("a"), vp("b")]);
+    titled.titles = [{ text: "Opening", from_s: 1, to_s: 4, position: "top" }, { text: "End", from_s: 10, to_s: 20, position: "top" }];
+    expect(compiled(titled).titles).toEqual([{ op: "captions", position: "top", lines: [{ from_s: 1, to_s: 4, text: "Opening" }, { from_s: 10, to_s: 12, text: "End" }] }]);
+    expect(compiled(titled).changed).toBe(true);
+    const j = compiled(planOf([vp("a"), vp("b")], {}, [{ kind: "cut", seconds: 0, audio_lead_s: 1 }]));
+    expect(j.pieces[1]!.ops).toContainEqual({ op: "mute" });
+    expect(j.overlays[0]).toMatchObject({ lane: "clip", index: 1, op: { op: "audio_overlay", start_s: 5, fade_in_s: 0.2 } });
+    const l = compiled(planOf([vp("a", { out_s: 6 }), vp("b")], {}, [{ kind: "cut", seconds: 0, audio_lead_s: -2 }]), { ...SRC6, video: [7, 6] });
+    expect(l.pieces[0]!.ops).toContainEqual({ op: "mute" });
+    expect(l.overlays[0]).toMatchObject({ lane: "clip", index: 0, trim: [{ op: "trim", in_s: 0, out_s: 7 }], op: { op: "audio_overlay", start_s: 0 } });
+  });
+
+  test("lead rules: both sides are refused, crossfade leads ignored, no lead unchanged", () => {
+    expect(refusedWith(planOf([vp("a"), vp("b"), vp("c")], {}, [{ kind: "cut", seconds: 0, audio_lead_s: 1 }, { kind: "cut", seconds: 0, audio_lead_s: -1 }]))).toBe("lead_both_sides");
+    const blend = compiled(planOf([vp("a"), vp("b")], {}, [{ kind: "crossfade", seconds: 0.5, audio_lead_s: 1 }]));
+    expect(blend.overlays).toEqual([]);
+    expect(compiled(planOf([vp("a"), vp("b")])).overlays).toEqual([]);
+  });
+
   test("a voice and a song: songs go first so a line can lower them; level, fades, start and end reach the overlay; a piece inside its file is cut out first", () => {
     const plan = planOf([vp("a"), vp("b")], {
       music: { level_db: -10, muted: false, pieces: [lp("song", { in_s: 4, out_s: 20, start_s: 0, level_db: -2, fade_in_s: 1, fade_out_s: 2, duck: true })] },
@@ -276,6 +296,21 @@ describe("export", () => {
     expect(entry.status).toBe("ready");
     expect(entry.tags).toContain("Edited");
     expect(feedRows(owner, {}).some((r) => r.id === next.id)).toBe(true);
+  });
+
+  test("titles add a final captions step and use the typed word gate", async () => {
+    const owner = person("owner"); const a = await makeClip(owner); const b = await makeClip(owner, "A red kite over a green field, clear morning");
+    const plan = planOf([vp(refOf(a), { out_s: seconds(a) }), vp(refOf(b), { out_s: seconds(b) })]);
+    plan.titles = [{ text: "Opening", from_s: 0, to_s: 1, position: "top" }, { text: "Goodbye", from_s: 2, to_s: 3, position: "bottom" }];
+    const before = stack.jobs.length; const started = await startStudioExport(owner, { clip: refOf(a), plan });
+    expect(started.ok).toBe(true); if (!started.ok) return;
+    await finished(owner, started.job.id);
+    expect(stack.jobs.slice(before).at(-1)?.input.ops).toEqual([
+      { op: "captions", position: "top", lines: [{ from_s: 0, to_s: 1, text: "Opening" }] },
+      { op: "captions", position: "bottom", lines: [{ from_s: 2, to_s: 3, text: "Goodbye" }] },
+    ]);
+    const blocked = await startStudioExport(owner, { clip: refOf(a), plan: { ...plan, titles: [{ text: "A naked child", from_s: 0, to_s: 1, position: "top" }] } });
+    expect(blocked).toMatchObject({ ok: false, status: 403 });
   });
 
   test("a single trim is one step; nothing changed is refused in a line and nothing is sent", async () => {

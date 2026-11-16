@@ -39,6 +39,23 @@ describe("NLE timeline export", () => {
     const names = new TextDecoder().decode(bytes);
     expect(names).toContain("Studio.edl"); expect(names).toContain("media/a.mp4");
   });
+  test("Studio timeline README lists each title with its range and position", async () => {
+    resetDb(); __resetAdultLockForTests(); __resetStudioVoicesForTests();
+    const makePerson = (role: string, name: string) => { const now = new Date().toISOString(); const id = `person-nle${name}`; db.insert(people).values({ id, displayName: name, role, avatarSeed: name, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run(); return db.select().from(people).all().find((p) => p.id === id)! as PersonRow; };
+    const actor = makePerson("owner", "readme"); const made = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: testMp4(), provenance: "video-gen:{}", retention: "kept" });
+    if (!made.ok) throw new Error(made.error);
+    __setVideoJobForTests({ id: "nle-readme", personId: actor.id, conversationId: null, turnId: null, companionId: null, kind: "generate", state: "done", stackJob: null, percent: 100, phase: "ready", position: null, prompt: "Clip", request: { size: "832x480", seconds: 2, seed: null, loras: [], source_file_id: null, audience: "all-ages", stackBody: {} }, error: null, files: [{ id: made.value.id, mediaType: "video/mp4", seconds: 2, width: 832, height: 480 }], temporary: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as never);
+    const result = await makeStudioNleExport(actor, { plan: { ...planOf([vp(made.value.id)]), titles: [{ text: "Hello", from_s: 0.5, to_s: 1.5, position: "middle" }] } });
+    if (!result.ok) throw new Error("NLE export refused");
+    const zip = result.bytes; let offset = 0; let readme = "";
+    while (offset + 30 < zip.length && new DataView(zip.buffer, zip.byteOffset + offset).getUint32(0, true) === 0x04034b50) {
+      const view = new DataView(zip.buffer, zip.byteOffset + offset); const size = view.getUint32(18, true); const nameLength = view.getUint16(26, true); const extraLength = view.getUint16(28, true);
+      const name = new TextDecoder().decode(zip.subarray(offset + 30, offset + 30 + nameLength)); const start = offset + 30 + nameLength + extraLength;
+      if (name === "README.txt") readme = new TextDecoder().decode(zip.subarray(start, start + size));
+      offset = start + size;
+    }
+    expect(readme).toContain("0.5-1.5s, middle, Hello");
+  });
   test("uses existing Studio gates and carries the strictest mark", async () => {
     resetDb(); __resetAdultLockForTests(); __resetStudioVoicesForTests();
     const makePerson = (role: string, name: string) => { const now = new Date().toISOString(); const id = `person-nle${name}`; db.insert(people).values({ id, displayName: name, role, avatarSeed: name, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run(); return db.select().from(people).all().find((p) => p.id === id)! as PersonRow; };

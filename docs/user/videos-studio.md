@@ -15,6 +15,8 @@ The **Studio** is a page for adults who want to cut and mix a video themselves. 
 
 You end with a new clip in **My clips**. The first clip is not changed.
 
+Add up to six titles with a start time, end time and screen position. At a cut, a sound lead moves the next clip's sound earlier for a J cut, or lets the previous sound continue for an L cut.
+
 ## Limits
 
 A film in the Studio can have 6 clips, 2 voice lines, 2 songs, and be up to 60 seconds long.

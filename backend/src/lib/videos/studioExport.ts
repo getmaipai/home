@@ -46,7 +46,7 @@ export async function resolveStudioPlan(person: PersonRow, body: Record<string, 
     voices.push(voice);
   }
   const audience = makeAudienceOf(person);
-  const refusal = editRefusal(audience, voices.map((voice) => voice.line).join(" "));
+  const refusal = editRefusal(audience, [...voices.map((voice) => voice.line), ...(plan.titles ?? []).map((title) => title.text)].join(" "));
   if (refusal) return { ok: false, status: 403, code: refusal.kind === "minor" ? "minor" : "refused", line: refusal.line };
   for (const voice of voices) { const mark = await lineMark(voice.line); if (mark) marks.push(mark); }
 
@@ -129,17 +129,23 @@ export function studioRun(resolved: ResolvedStudioPlan): EditRun {
       film = fileOf(made.bytes);
       next += join.count;
     }
-    // 3. Songs, then voice lines, over the film in one step. A piece that starts inside its sound is cut out of it first.
+    // 3. Clip leads, songs, then voice lines, over the film. A source trim is made first.
     if (compiled.overlays.length > 0) {
       const sounds: EditFile[] = [];
       for (const overlay of compiled.overlays) {
-        const source = overlay.lane === "voice" ? resolved.voiceFiles[overlay.index]! : resolved.musicFiles[overlay.index]!;
+        const source = overlay.lane === "clip" ? resolved.videoFiles[overlay.index]! : overlay.lane === "voice" ? resolved.voiceFiles[overlay.index]! : resolved.musicFiles[overlay.index]!;
         if (overlay.trim.length === 0) { sounds.push(source); continue; }
         const cut = await step([source], overlay.trim, "sound.mp4");
         if (!cut.ok) return { ok: false, line: cut.line };
         sounds.push(fileOf(cut.bytes));
       }
-      const made = await step([film, ...sounds], compiled.overlays.map((overlay) => overlay.op));
+      const made = await step([film, ...sounds], compiled.overlays.map((overlay, i) => ({ ...overlay.op, input: i + 1 })));
+      if (!made.ok) return { ok: false, line: made.line };
+      film = fileOf(made.bytes);
+    }
+    // 4. Titles are the final visual pass over the finished film.
+    if (compiled.titles.length > 0) {
+      const made = await step([film], compiled.titles);
       if (!made.ok) return { ok: false, line: made.line };
       film = fileOf(made.bytes);
     }

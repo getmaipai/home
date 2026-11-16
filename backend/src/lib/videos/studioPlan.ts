@@ -17,6 +17,7 @@ export const STUDIO_MIN_PIECE_S = 0.2;
 const seconds = (min: number, max: number) => z.number().finite().min(min).max(max);
 const ref = z.string().trim().min(1).max(160);
 const level = seconds(-24, 12);
+const typedWords = z.string().min(1).max(120).refine((text) => !/[\u0000-\u001f\u007f-\u009f]/u.test(text));
 
 const videoPiece = z.object({ ref, in_s: seconds(0, 600), out_s: seconds(0, 600), level_db: level, fade_in_s: seconds(0, 5), fade_out_s: seconds(0, 5) });
 const lanePiece = videoPiece.extend({ start_s: seconds(0, 600), duck: z.boolean() });
@@ -29,8 +30,9 @@ export const studioPlanSchema = z.object({
     level_db: level,
     muted: z.boolean(),
     pieces: z.array(videoPiece).min(1).max(STUDIO_VIDEO_PIECES),
-    transitions: z.array(z.object({ kind: z.enum(JOIN_TRANSITIONS), seconds: seconds(0, MAX_CROSSFADE_S) })).max(STUDIO_VIDEO_PIECES - 1),
+    transitions: z.array(z.object({ kind: z.enum(JOIN_TRANSITIONS), seconds: seconds(0, MAX_CROSSFADE_S), audio_lead_s: seconds(-2, 2).optional() })).max(STUDIO_VIDEO_PIECES - 1),
   }),
+  titles: z.array(z.object({ text: typedWords, from_s: seconds(0, 600), to_s: seconds(0, 600), position: z.enum(["top", "middle", "bottom"]) }).refine((title) => title.to_s > title.from_s && title.to_s <= STUDIO_FILM_S)).max(6).optional(),
   voice: audioLane,
   music: audioLane,
 });
@@ -48,8 +50,8 @@ export interface CompiledPiece { index: number; ops: EditOp[]; seconds: number }
 /** One run of seams joined in one Stack step: the next `count` pieces onto the film so far, by a cut or a crossfade of `seconds`. */
 export interface CompiledJoin { transition: JoinTransition; seconds: number; count: number; ops: EditOp[] }
 /** A voice line or a song laid over the film. `trim` (the piece starts inside its file) is cut out first; `op.input` is 1 plus its place among the overlays. */
-export interface CompiledOverlay { lane: "voice" | "music"; index: number; trim: EditOp[]; op: EditOp }
-export interface CompiledStudio { pieces: CompiledPiece[]; joins: CompiledJoin[]; overlays: CompiledOverlay[]; filmSeconds: number; changed: boolean }
+export interface CompiledOverlay { lane: "voice" | "music" | "clip"; index: number; trim: EditOp[]; op: EditOp }
+export interface CompiledStudio { pieces: CompiledPiece[]; joins: CompiledJoin[]; overlays: CompiledOverlay[]; titles: EditOp[]; filmSeconds: number; changed: boolean }
 
 export type CompileResult = { ok: true; value: CompiledStudio } | { ok: false; line: string; code: string };
 
@@ -74,6 +76,13 @@ export function compileStudioPlan(plan: StudioPlan, sources: StudioSources): Com
   const { video } = plan;
   const lengths: number[] = [];
   const pieces: CompiledPiece[] = [];
+  const leadBySeam = video.pieces.slice(1).map((_, i) => {
+    const seam = video.transitions[i];
+    return seam?.kind === "cut" ? (seam.audio_lead_s ?? 0) : 0;
+  });
+  const carried = new Set<number>();
+  for (const [i, lead] of leadBySeam.entries()) if (lead > 0) carried.add(i + 1); else if (lead < 0) carried.add(i);
+  if (leadBySeam.some((lead, i) => lead !== 0 && (i > 0 && (lead > 0 ? leadBySeam[i - 1]! < 0 : leadBySeam[i - 1]! > 0)))) return refuse("lead_both_sides", "A clip cannot carry a lead on both sides. Keep one.");
   for (const [index, piece] of video.pieces.entries()) {
     const source = sources.video[index] ?? null;
     if (piece.out_s <= piece.in_s + STUDIO_MIN_PIECE_S - 1e-6) return refuse("bad_cut", "A piece has to be at least a fifth of a second long. Make it longer or delete it.");
@@ -84,9 +93,11 @@ export function compileStudioPlan(plan: StudioPlan, sources: StudioSources): Com
     const whole = piece.in_s <= 0.01 && (source === null ? false : out >= source - 0.05);
     if (!whole) ops.push(...trimOps(round(piece.in_s), round(out)));
     // Mute drops the clip's own sound; otherwise the lane's level and the piece's level add up.
-    if (video.muted) ops.push({ op: "mute" });
+    const leadOut = leadBySeam[index] ?? 0;
+    const leadIn = index > 0 ? leadBySeam[index - 1]! : 0;
+    if (video.muted || leadOut < 0 || leadIn > 0) ops.push({ op: "mute" });
     else ops.push(...gainOps(video.level_db + piece.level_db));
-    const [fadeIn, fadeOut] = fitFades(piece.fade_in_s, piece.fade_out_s, length);
+    const [fadeIn, fadeOut] = fitFades(Math.max(piece.fade_in_s, leadIn < 0 ? -leadIn : 0), Math.max(piece.fade_out_s, leadOut > 0 ? leadOut : 0), length);
     ops.push(...fadeOps(fadeIn, fadeOut));
     lengths.push(length);
     pieces.push({ index, ops, seconds: length });
@@ -118,6 +129,17 @@ export function compileStudioPlan(plan: StudioPlan, sources: StudioSources): Com
 
   // What is laid over the film: songs first, then voice lines, so a line can lower the song under it (the Stack ducks the sound so far under an overlay).
   const overlays: CompiledOverlay[] = [];
+  for (const [i, lead] of leadBySeam.entries()) {
+    if (lead === 0 || video.muted) continue;
+    const index = lead > 0 ? i + 1 : i;
+    const piece = video.pieces[index]!;
+    const source = sources.video[index] ?? null;
+    const out = source === null ? piece.out_s : Math.min(piece.out_s + (lead < 0 ? -lead : 0), source);
+    const trim = trimOps(round(piece.in_s), round(out));
+    const start = lead > 0 ? round(lengths.slice(0, index).reduce((a, b) => a + b, 0) - lead, 2) : round(lengths.slice(0, index).reduce((a, b) => a + b, 0), 2);
+    const input = 1 + overlays.length;
+    overlays.push({ lane: "clip", index, trim, op: overlayOp(input, { gain_db: 0, clip_gain_db: 0, fade_in_s: lead > 0 ? 0.2 : 0, ...(lead < 0 ? { end_s: round(start + out - piece.in_s, 2) } : {}) }, start, false) });
+  }
   const songDucks = plan.music.pieces.some((p) => p.duck && !plan.music.muted);
   for (const lane of ["music", "voice"] as const) {
     const laneData = plan[lane];
@@ -145,8 +167,16 @@ export function compileStudioPlan(plan: StudioPlan, sources: StudioSources): Com
     }
   }
 
-  const changed = pieces.some((p) => p.ops.length > 0) || joins.length > 0 || overlays.length > 0 || video.pieces.length > 1;
-  return { ok: true, value: { pieces, joins, overlays, filmSeconds, changed } };
+  const titles: EditOp[] = [];
+  for (const position of ["top", "middle", "bottom"] as const) {
+    const lines = (plan.titles ?? []).flatMap((title) => {
+      const from_s = round(Math.max(0, title.from_s), 2), to_s = round(Math.min(filmSeconds, title.to_s), 2);
+      return title.position === position && to_s > from_s ? [{ from_s, to_s, text: title.text }] : [];
+    });
+    if (lines.length) titles.push({ op: "captions", lines, position });
+  }
+  const changed = pieces.some((p) => p.ops.length > 0) || joins.length > 0 || overlays.length > 0 || video.pieces.length > 1 || titles.length > 0;
+  return { ok: true, value: { pieces, joins, overlays, titles, filmSeconds, changed } };
 }
 
 /** The pieces of a plan that name a clip, a voice line or a song, in the order `StudioSources` lists them. */
