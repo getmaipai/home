@@ -20720,6 +20720,7 @@ msgstr "desactivado"
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/AiGlance.tsx:49
+#: src/apps/settings/AiGlance.tsx:51
 #: src/apps/settings/AiJobSummary.tsx:38
 #: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/settings/AiSlotDialog.tsx:79
@@ -23662,6 +23663,7 @@ msgid "recommended"
 msgstr "recomendado"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:51
 #: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/setup/HostTuneStep.tsx:99
 #, needs-review
