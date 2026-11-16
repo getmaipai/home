@@ -12,7 +12,22 @@ import { getPictureJob } from "@/lib/pictures/jobStore";
 import { pictureJobLockState } from "@/lib/pictures/lock";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { pictureActivityItem } from "@/lib/activity";
+import { listCast } from "@/lib/cast";
+import { getMediaSubject, isSheetReference } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
+
+/** CREATOR-19: the viewer's saved characters. `listCast` already drops adult-only entries and real-person likenesses for a minor, so the filter is the one place that rule lives. */
+function characterRows(person: PersonRow) {
+  return listCast(person).filter((entry) => entry.kind === "subject" && entry.subject_kind === "character" && entry.subject_id).map((entry) => {
+    const subject = getMediaSubject(person, entry.subject_id!);
+    const first = (subject?.reference_ids ?? []).find((id) => {
+      const file = db.select({ provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.id, id), isNull(attachments.deletedAt))).get();
+      return !!file && !isSheetReference(file.provenance);
+    });
+    const count = (subject?.reference_ids ?? []).length;
+    return { id: entry.id, title: entry.name, subtitle: count > 0 ? `Character, ${count} ${count === 1 ? "picture" : "pictures"}` : "Character", thumbnail: first ? `/api/files/${first}/thumb?w=320` : "" };
+  });
+}
 
 const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
   const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
@@ -60,6 +75,7 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
 
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
   if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: templateCoverUrl(template.id) }));
+  if (dataId === "characters") return characterRows(person);
   if (dataId === "library") return rows(person, body);
   if (dataId === "recent") return rows(person, body, true);
   // IMG-STUDIO-02: the Studio page. `studio` is the opened picture (one row, empty until a picture is chosen), `studio-tools` the registry's extra operations

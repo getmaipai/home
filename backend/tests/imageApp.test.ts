@@ -10,6 +10,9 @@ import { eq } from "drizzle-orm";
 import { appPackageProblems, appRouteAllowed, getAppData, getAppPage, sidebarFor } from "@/lib/apps";
 import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
 import { listLibrary } from "@/lib/library";
+import { imageAppData } from "@/lib/imageApp";
+import { createMediaSubject, shareMediaSubject } from "@/lib/mediaSubjects";
+import { attachments, mediaSubjects } from "@/db/schema";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
@@ -46,7 +49,6 @@ test("Image sidebar rows have distinct real icons, labels, and honest placeholde
     collections: "Group pictures into named collections, like a trip or a project.",
     shared: "Pictures other people at home chose to share with you will show up here.",
     drafts: "Pictures you started and have not finished wait here.",
-    characters: "Your cast lives here: the people and pets you reuse in pictures.",
     props: "Objects you reuse in pictures, like a favourite mug or a guitar, will live here.",
     places: "Places you reuse in pictures, like your kitchen or a beach, will live here.",
     productions: "Longer projects built from many pictures, like a comic or a storyboard, will live here.",
@@ -169,4 +171,43 @@ test("USE-AS-REFERENCE: the Studio top bar can send a picture to Create as its r
   const bar = (create.value as { body: Array<{ references?: Array<{ state: string; max: number }>; submit?: { call: { args: Record<string, unknown> } } }> }).body[0]!;
   expect(bar.references![0]).toMatchObject({ state: "reference", max: 3 });
   expect(bar.submit!.call.args.reference).toBe("{reference}");
+});
+
+test("Characters page is a shelf of the cast that opens Create with the cast chip, and says so plainly when empty", () => {
+  const doc = JSON.parse(readFileSync(join(PACKAGES_DIR, "image", "pages", "characters.json"), "utf8"));
+  expect(new Ajv2020({ strict: false }).validate(UI_SCHEMA as object, doc)).toBe(true);
+  const shelf = doc.body[0];
+  expect(shelf).toMatchObject({ type: "media_shelf", layout: "grid", item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", bind: { source: "package", path: "characters" }, on_select: { navigate: { to: "/apps/image/create", state: { cast: "{id}" } } } });
+  expect(shelf.empty_state).toMatchObject({ text: "No characters yet. Make one and it can appear in any picture.", action_label: "Make a character", action: { navigate: { to: "/apps/image/create" } } });
+  const loaded = loadManifestOnly("image");
+  expect(loaded.ok && (loaded.value.contributes as { data: Array<{ id: string }> }).data.some((item) => item.id === "characters")).toBe(true);
+});
+
+test("characters data lists only the viewer's own saved characters, never props or places, and a minor never sees an adult-only one", async () => {
+  const { row } = await owner();
+  expect(imageAppData(row, "characters", {})).toEqual([]);
+  const mine = createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl in a yellow coat" });
+  createMediaSubject(row, { name: "Mug", kind: "prop", look: "a blue mug" });
+  db.update(mediaSubjects).set({ referenceIds: JSON.stringify(["file-a", "file-b"]) }).where(eq(mediaSubjects.id, mine.id)).run();
+  const rows = imageAppData(row, "characters", {}) as Array<Record<string, unknown>>;
+  expect(rows.map((item) => item.title)).toEqual(["Juniper"]);
+  expect(rows[0]).toMatchObject({ id: mine.id, subtitle: "Character, 2 pictures" });
+  expect(Object.keys(rows[0]!).sort()).toEqual(["id", "subtitle", "thumbnail", "title"]);
+});
+
+test("characters data keeps a child to their own subjects and drops real-person and adult-only ones", async () => {
+  const { client, row } = await owner();
+  const { row: kid } = await child(client);
+  const now = new Date().toISOString();
+  const real = createMediaSubject(row, { name: "Real", kind: "character", look: "a real person", real: true });
+  const adultOnly = createMediaSubject(row, { name: "Spicy", kind: "character", look: "an adult look" });
+  const plain = createMediaSubject(row, { name: "Plain", kind: "character", look: "a cartoon fox" });
+  db.insert(attachments).values({ id: "file-adult", ownerPersonId: row.id, mediaType: "image/png", size: 1, sha256: "x", storagePath: "x", retention: "kept", provenance: 'media-subject-reference:{"audience":"adult-only"}', createdAt: now, hlc: "1:0:test" }).run();
+  db.update(mediaSubjects).set({ referenceIds: JSON.stringify(["file-adult"]) }).where(eq(mediaSubjects.id, adultOnly.id)).run();
+  for (const item of [real, adultOnly, plain]) shareMediaSubject(row, item.id, kid.id, true);
+  expect((imageAppData(row, "characters", {}) as Array<{ title: string }>).map((item) => item.title).sort()).toEqual(["Plain", "Real", "Spicy"]);
+  expect((imageAppData(kid, "characters", {}) as Array<{ title: string }>).map((item) => item.title)).toEqual(["Plain"]);
+  const own = createMediaSubject(kid, { name: "Kitty", kind: "character", look: "a cat" });
+  expect((imageAppData(kid, "characters", {}) as Array<{ id: string }>).map((item) => item.id)).toContain(own.id);
+  expect((imageAppData(row, "characters", {}) as Array<{ id: string }>).map((item) => item.id)).not.toContain(own.id);
 });

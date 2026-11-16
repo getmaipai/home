@@ -4,15 +4,40 @@
   "title": "Characters",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "user-round",
-      "text": "Your cast lives here: the people and pets you reuse in pictures.",
-      "action": {
+      "type": "media_shelf",
+      "heading": "Characters",
+      "bind": {
+        "source": "package",
+        "path": "characters"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "on_select": {
         "navigate": {
-          "to": "/apps/image/create"
+          "to": "/apps/image/create",
+          "state": {
+            "cast": "{id}"
+          }
         }
       },
-      "action_label": "Make a picture"
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "user-round",
+        "text": "No characters yet. Make one and it can appear in any picture.",
+        "action": {
+          "navigate": {
+            "to": "/apps/image/create",
+            "state": {
+              "prompt": "A character: "
+            }
+          }
+        },
+        "action_label": "Make a character"
+      }
     }
   ]
 }

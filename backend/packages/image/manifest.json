@@ -242,6 +242,10 @@
     ],
     "data": [
       {
+        "id": "characters",
+        "rows": "list"
+      },
+      {
         "id": "templates",
         "rows": "list"
       },
