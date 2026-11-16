@@ -81,7 +81,7 @@ describe("GET /api/ai/overview", () => {
     expect(level("pictures","boost")).toMatchObject({state:"problem",detail:"This model needs more memory than this computer has."});
     expect(level("pictures","max").state).toBe("off");
     expect(level("voice","boost")).toMatchObject({state:"same",word:"Same as Standard"});
-    expect(level("music","boost").state).toBe("waits");
+    expect(level("music","boost").state).toBe("unset");
     expect(body.attention.download_all).toEqual({bytes:56e9,count:2});
   });
 
@@ -110,5 +110,38 @@ describe("GET /api/ai/overview", () => {
     expect(body.features.map((feature) => feature.id)).toEqual(["chat", "pictures", "videos", "music", "voice"]);
     expect(body.features.every((feature) => feature.levels.length === 4)).toBe(true);
     expect(body.right_now.engine).toBe("ready");
+  });
+
+  test("keeps a null recommended Max unset and installed models ready despite install_block", async () => {
+    const { token, person } = addPerson("person-ai-overview-null-max", "owner");
+    const component = { id:"glimmer",label:"Muse Glimmer",summary:"Muse Glimmer",group:"chat",kind:"model",state:"installed",size_bytes:2e9,download_bytes:0,full_bytes:2e9,required_free_bytes:2e9,plan_need:"recommended",requirement:"optional",requirement_reason:null,last_used_at:null,used_by:[],depends_on:[],job:null,percent:null,failure:null,can_install:false,install_block:"It is already installed.",can_uninstall:false,uninstall_block:null };
+    let maxRecommended: string | null = "glimmer";
+    __setComponentsFetchForTests((async(input:Parameters<typeof fetch>[0])=>{const url=new URL(String(input),"http://stack");if(url.pathname==="/stack/v1/components")return Response.json({tier:"fixture",free_disk_bytes:100e9,disk_margin_bytes:0,installed_bytes:2e9,components:[component]});if(url.pathname==="/stack/v1/tiers/candidates"){const category=url.searchParams.get("category")??"chat";return Response.json({category,profile:"fixture",room_bytes:20e9,levels:["standard","boost","max"].map(tier=>({tier,cap_bytes:20e9,recommended:tier==="max"?maxRecommended:"glimmer",candidates:tier==="max"&&!maxRecommended?[]:[{id:"glimmer",label:"Muse Glimmer",family:"muse",peak_bytes:2e9,verified:true,fits:true,refusal:null}]}))});}return new Response("not found",{status:404});}) as unknown as typeof fetch);
+    setValue(person,"household","engines.chat.tier.boost",{model:"glimmer",options:{}});
+    setValue(person,"household","engines.chat.tier.max",{model:"recommended",options:{}});
+    const get = async() => app.request("http://localhost/api/ai/overview",{headers:{cookie:`session=${token}`}});
+    const first=await (await get()).json() as {features:Array<{id:string;levels:Array<{tier:string;state:string;model_label:string|null}>}>};
+    maxRecommended=null;
+    const second=await (await get()).json() as typeof first;
+    const level=(body:typeof first,tier:string)=>body.features.find(row=>row.id==="chat")!.levels.find(row=>row.tier===tier)!;
+    expect(level(first,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
+    expect(level(second,"standard")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
+    expect(level(second,"boost")).toMatchObject({state:"ready",model_label:"Muse Glimmer"});
+    expect(level(second,"max")).toMatchObject({state:"unset",model_label:null});
+  });
+
+  test("reports feature off and an off level, and shows the assigned video slot model", async () => {
+    const { token, person } = addPerson("person-ai-overview-video-off", "owner");
+    const models=["wan","ltx"].map((id)=>({id,label:id==="wan"?"Wan":"LTX-2.5",summary:id,group:"video",kind:"model",state:"installed",size_bytes:2e9,download_bytes:0,full_bytes:2e9,required_free_bytes:2e9,plan_need:"recommended",requirement:"optional",requirement_reason:null,last_used_at:null,used_by:[],depends_on:[],job:null,percent:null,failure:null,can_install:false,install_block:"It is already installed.",can_uninstall:false,uninstall_block:null}));
+    __setComponentsFetchForTests((async(input:Parameters<typeof fetch>[0])=>{const url=new URL(String(input),"http://stack");if(url.pathname==="/stack/v1/components")return Response.json({tier:"fixture",free_disk_bytes:100e9,disk_margin_bytes:0,installed_bytes:4e9,components:models});if(url.pathname==="/stack/v1/tiers/candidates"){const category=url.searchParams.get("category")??"video";const id=category==="video"?"wan":`${category}-model`;return Response.json({category,profile:"fixture",room_bytes:20e9,levels:["standard","boost","max"].map(tier=>({tier,cap_bytes:20e9,recommended:id,candidates:[{id,label:id==="wan"?"Wan":"Model",family:"test",peak_bytes:2e9,verified:true,fits:true,refusal:null},...(category==="video"?[{id:"ltx",label:"LTX-2.5",family:"ltx",peak_bytes:2e9,verified:true,fits:true,refusal:null}]:[])]}))});}return new Response("not found",{status:404});}) as unknown as typeof fetch);
+    setValue(person,"household","engines.video.tier.standard",{model:"ltx",options:{}});
+    setValue(person,"household","engines.video.choice","ltx");
+    setValue(person,"household","engines.video.tier.boost",{model:"off",options:{}});
+    setValue(person,"household","generation.video.enabled",false);
+    const response=await app.request("http://localhost/api/ai/overview",{headers:{cookie:`session=${token}`}});
+    const body=await response.json() as {features:Array<{id:string;levels:Array<{tier:string;state:string;model_label:string|null}>}>};
+    const video=body.features.find(row=>row.id==="videos")!;
+    expect(video.levels.find(level=>level.tier==="standard")).toMatchObject({state:"ready",model_label:"LTX-2.5"});
+    expect(video.levels.find(level=>level.tier==="boost")?.state).toBe("off");
   });
 });

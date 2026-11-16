@@ -11,7 +11,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
-import { holdsMax } from "@/lib/tiers";
+import { holdsMax, writeSlotModel } from "@/lib/tiers";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
 import { rowHasModel, type DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
@@ -51,7 +51,7 @@ const FEATURE_ROWS = [
 ] as const;
 const OVERVIEW_TIERS = ["reduced", "standard", "boost", "max"] as const;
 const tierName = (tier: string) => tier[0]!.toUpperCase() + tier.slice(1);
-const OverviewLevelSchema = z.object({ tier: z.enum(OVERVIEW_TIERS), state: z.enum(["ready", "missing", "problem", "off", "waits", "same"]), word: z.string(), model_label: z.string().nullable(), size_bytes_missing: z.number().nullable(), detail: z.string().nullable(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() });
+const OverviewLevelSchema = z.object({ tier: z.enum(OVERVIEW_TIERS), state: z.enum(["ready", "missing", "problem", "off", "unset", "waits", "same"]), word: z.string(), model_label: z.string().nullable(), size_bytes_missing: z.number().nullable(), detail: z.string().nullable(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() });
 const OverviewSchema = z.object({ features: z.array(z.object({ id: z.string(), name: z.string(), used_by: z.array(z.string()), levels: z.array(OverviewLevelSchema), ready_count: z.number(), level_count: z.number() })), helpers: z.array(z.object({ id: z.string(), name: z.string(), model_label: z.string().nullable(), used_by: z.array(z.string()), state: z.enum(["ready", "missing", "problem", "off", "waits", "same"]), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), attention: z.object({ items: z.array(z.object({ id: z.string(), kind: z.enum(["problem", "missing"]), title: z.string(), line: z.string(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), download_all: z.object({ bytes: z.number(), count: z.number() }).nullable() }), right_now: z.object({ engine: z.enum(["ready", "problem"]), waiting: z.number(), memory_free_bytes: z.number(), models_bytes: z.number(), disk_free_bytes: z.number() }) });
 const overviewRoute = createRoute({ method: "get", path: "/overview", tags: ["AI"], summary: "A household view of AI features, their model levels and any attention needed", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: OverviewSchema } }, description: "The feature overview assembled from current Stack candidates, installed components, saved slots and current health." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) } });
 aiChoicesRoutes.openapi(overviewRoute, async (c) => {
@@ -79,14 +79,18 @@ aiChoicesRoutes.openapi(overviewRoute, async (c) => {
       const candidateTier = tier === "reduced" ? "standard" : tier;
       const level = candidates.find((item) => item.tier === candidateTier);
       const offered = level?.candidates ?? [];
-      const chosen = slot.model === "recommended" ? offered.find((item) => item.id === level?.recommended) ?? offered[0] : offered.find((item) => item.id === slot.model);
-      if (!chosen) return { tier, state: "waits" as const, word: "Waits", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      // Standard follows the role's own choice, as slotRun does for every category; `auto` resolves to that level's Stack recommendation.
+      const role = row.role;
+      const roleChoice = getHouseholdSettingValue(`engines.${role}.choice`);
+      const modelId = tier === "standard" ? (typeof roleChoice === "string" && roleChoice !== "auto" && roleChoice !== "off" ? roleChoice : level?.recommended) : slot.model === "recommended" ? level?.recommended : slot.model;
+      const chosen = modelId ? offered.find((item) => item.id === modelId) : undefined;
+      if (!chosen) return { tier, state: "unset" as const, word: "No model chosen", model_label: null, size_bytes_missing: null, detail: null, action: null };
       const component = componentList?.components.find((item) => item.id === chosen.id);
       if (!componentList) return { tier, state: "waits" as const, word: "Waits", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: null };
-      if (!component) return chosen.fits ? { tier, state: "missing" as const, word: "Missing", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null } : { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: null };
-      if (component.state === "failed" || (component.state !== "installed" && component.state !== "notInstalled" && Boolean(component.install_block))) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: component.failure ?? component.install_block ?? chosen.refusal, action: null };
-      if (component.state === "installed") return chosen.fits ? { tier, state: "ready" as const, word: "Ready", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null } : { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: null };
-      if (!chosen.fits) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: null };
+      if (!chosen.fits) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal ?? "Too big for this level.", action: null };
+      if (!component) return { tier, state: "missing" as const, word: "Missing", model_label: chosen.label, size_bytes_missing: null, detail: null, action: { kind: "download" as const, label: "Install", job: row.id, level: tier } };
+      if (component.state === "failed") return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: component.failure, action: { kind: "fix" as const, label: "Fix", job: row.id, level: tier } };
+      if (component.state === "installed") return { tier, state: "ready" as const, word: "Ready", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null };
       if (component.state !== "notInstalled") return { tier, state: "waits" as const, word: "Waits", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null };
       const bytes = component.download_bytes || component.full_bytes || component.size_bytes || 0;
       if (bytes > 0) missingComponents.set(chosen.id, bytes);
@@ -409,6 +413,30 @@ aiChoicesRoutes.openapi(tiersRoute, async (c) => {
     if (error instanceof StackComponentError) return c.json({ error: error.message, code: error.code }, 503) as never;
     throw error;
   }
+});
+
+const levelInstallRoute = createRoute({
+  method: "post", path: "/level/{job}/{tier}/install", tags: ["AI"], summary: "Install the selected model for one level and save that level only after install starts",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ job: z.enum(["chat", "pictures", "videos", "music", "voice"]), tier: z.enum(["standard", "boost", "max"]) }), body: { required: true, content: { "application/json": { schema: z.object({ model: z.string().min(1).max(120) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), job: z.string().nullable() }) } }, description: "The selected model's install job and saved level." }, ...refusals },
+});
+aiChoicesRoutes.openapi(levelInstallRoute, async (c) => {
+  const { job, tier } = c.req.valid("param"); const { model } = c.req.valid("json");
+  const category = TIER_STACK_CATEGORY[job]!;
+  try {
+    const [list, candidates] = await Promise.all([listStackComponents(), listTierCandidates(category)]);
+    const candidate = candidates.levels.find((level) => level.tier === tier)?.candidates.find((item) => item.id === model);
+    if (!candidate) return c.json({ error: "That model is no longer available.", code: "unknown_model" }, 404) as never;
+    if (!candidate.fits) return c.json({ error: candidate.refusal ?? "Too big for this level.", code: "model_refused" }, 409) as never;
+    const component = list.components.find((item) => item.id === model);
+    let jobId: string | null = null;
+    if (!component || component.state !== "installed") jobId = (await installStackComponent(model)).job ?? null;
+    const write = writeSlotModel(job === "pictures" ? "image" : job === "videos" ? "video" : job === "voice" ? "voice" : job, tier, model);
+    if (!write.ok) return c.json({ error: write.error, code: "setting" }, write.status) as never;
+    dropModelCaches();
+    return c.json({ ok: true as const, job: jobId }, 200);
+  } catch (error) { return componentFailure(c, error) as never; }
 });
 
 const unusedRoute = createRoute({
