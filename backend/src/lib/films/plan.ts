@@ -53,7 +53,9 @@ const filmPlanShape = {
   format: z.string().optional(),
   preset: z.string().optional(),
 };
-export const filmPlanSchema = z.object({ ...filmPlanShape, cast: filmPlanShape.cast.min(1) });
+/** FILM-PAGE-01: the stored plan's shot also carries the person's keep or skip mark from the Film maker page (`kept: false` is skipped). The model never writes it (`filmPlanForModel` is built from `filmPlanShape`). */
+const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional() });
+export const filmPlanSchema = z.object({ ...filmPlanShape, shots: z.array(storedFilmShotSchema).min(2).max(12), cast: filmPlanShape.cast.min(1) });
 export const facelessFilmPlanSchema = z.object({
   ...filmPlanShape,
   cast: filmPlanShape.cast.min(0),

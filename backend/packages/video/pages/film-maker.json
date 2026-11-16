@@ -9,16 +9,373 @@
       "layout": "chat",
       "chat_distribution": "start_end",
       "label": "Describe the film",
-      "placeholder": "Describe the film. Name the people with @.",
+      "placeholder": "Describe the film in a sentence. Name the people with @.",
       "prompt_state": "prompt",
       "max_length": 1200,
       "submit_label": "Plan the film",
-      "starts": "video",
+      "mode_selector": {
+        "state": "mode",
+        "label": "Mode",
+        "default": "plan",
+        "options": [
+          {
+            "value": "plan",
+            "label": "Plan a film",
+            "icon": "clapperboard"
+          },
+          {
+            "value": "change",
+            "label": "Change a shot",
+            "icon": "pencil"
+          }
+        ]
+      },
+      "mode_actions": {
+        "change": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-shot",
+            "method": "POST",
+            "args": {
+              "prompt": "{prompt}",
+              "shot": "{shot}",
+              "shot_seconds": "{shot_seconds}",
+              "camera": "{camera}"
+            }
+          }
+        }
+      },
+      "chips": [
+        {
+          "state": "format",
+          "label": "Film style",
+          "group": "Settings",
+          "icon": "clapperboard",
+          "icon_only": true,
+          "presentation": "popover",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "Any style"
+            }
+          ]
+        },
+        {
+          "state": "film_seconds",
+          "label": "Film length",
+          "group": "Settings",
+          "icon": "clock",
+          "icon_only": true,
+          "presentation": "popover",
+          "default": 30,
+          "options": [
+            {
+              "value": 10,
+              "label": "10 seconds"
+            },
+            {
+              "value": 15,
+              "label": "15 seconds"
+            },
+            {
+              "value": 20,
+              "label": "20 seconds"
+            },
+            {
+              "value": 30,
+              "label": "30 seconds"
+            },
+            {
+              "value": 45,
+              "label": "45 seconds"
+            },
+            {
+              "value": 60,
+              "label": "60 seconds"
+            },
+            {
+              "value": 90,
+              "label": "90 seconds"
+            },
+            {
+              "value": 120,
+              "label": "120 seconds"
+            },
+            {
+              "value": 180,
+              "label": "180 seconds"
+            },
+            {
+              "value": 300,
+              "label": "300 seconds"
+            }
+          ]
+        },
+        {
+          "state": "shot",
+          "label": "Shot to change",
+          "group": "Settings",
+          "icon": "list-ordered",
+          "icon_only": true,
+          "presentation": "popover",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "No shots yet"
+            }
+          ]
+        },
+        {
+          "state": "shot_seconds",
+          "label": "Shot length",
+          "group": "Settings",
+          "icon": "timer",
+          "icon_only": true,
+          "presentation": "popover",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "Keep the length"
+            },
+            {
+              "value": 3,
+              "label": "3 seconds"
+            },
+            {
+              "value": 4,
+              "label": "4 seconds"
+            },
+            {
+              "value": 5,
+              "label": "5 seconds"
+            },
+            {
+              "value": 6,
+              "label": "6 seconds"
+            },
+            {
+              "value": 7,
+              "label": "7 seconds"
+            },
+            {
+              "value": 8,
+              "label": "8 seconds"
+            },
+            {
+              "value": 9,
+              "label": "9 seconds"
+            },
+            {
+              "value": 10,
+              "label": "10 seconds"
+            }
+          ]
+        },
+        {
+          "state": "camera",
+          "label": "Camera",
+          "group": "Settings",
+          "icon": "video",
+          "icon_only": true,
+          "presentation": "popover",
+          "default": "keep",
+          "options": [
+            {
+              "value": "keep",
+              "label": "Keep the camera"
+            },
+            {
+              "value": "push_in",
+              "label": "Slow push in"
+            },
+            {
+              "value": "pull_back",
+              "label": "Slow pull back"
+            },
+            {
+              "value": "pan_left",
+              "label": "Pan left"
+            },
+            {
+              "value": "pan_right",
+              "label": "Pan right"
+            },
+            {
+              "value": "hold",
+              "label": "Hold still"
+            }
+          ]
+        }
+      ],
+      "references": [
+        {
+          "state": "cast",
+          "label": "Cast",
+          "kind": "character",
+          "max": 3,
+          "placement": "in_field"
+        }
+      ],
       "submit": {
-        "navigate": {
-          "to": "/apps/video/create"
+        "call": {
+          "target": "/api/plugins/video/actions/film-plan",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "format": "{format}",
+            "seconds": "{film_seconds}",
+            "cast": "{cast}"
+          }
         }
       }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your film",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film"
+        }
+      },
+      "layout": "grid",
+      "hide_when_empty": true,
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "poll_while": {
+        "field": "making",
+        "values": [
+          "yes"
+        ]
+      },
+      "making_field": "making",
+      "row_actions": [
+        {
+          "icon": "images",
+          "label": "Draft all",
+          "show_when_field": "can_draft",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-draft",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "clapperboard",
+          "label": "Finish kept",
+          "show_when_field": "can_finish",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-finish",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}"
+              }
+            }
+          }
+        },
+        {
+          "icon": "music",
+          "label": "Music video to the beat",
+          "show_when_field": "can_beat",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-beat",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}",
+                "track": "latest"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Shots",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-shots"
+        }
+      },
+      "layout": "grid",
+      "hide_when_empty": true,
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "variant": "plain",
+      "poll_while": {
+        "field": "making",
+        "values": [
+          "yes"
+        ]
+      },
+      "making_field": "making",
+      "row_actions": [
+        {
+          "icon": "check",
+          "label": "Keep",
+          "show_when_field": "can_keep",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-review",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}",
+                "shot": "{id}",
+                "keep": true
+              }
+            }
+          }
+        },
+        {
+          "icon": "x",
+          "label": "Skip",
+          "show_when_field": "can_skip",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-review",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}",
+                "shot": "{id}",
+                "keep": false
+              }
+            }
+          }
+        },
+        {
+          "icon": "refresh-cw",
+          "label": "Make this shot again",
+          "show_when_field": "can_redo",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/film-again",
+              "method": "POST",
+              "args": {
+                "run": "{run_id}",
+                "shot": "{id}"
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

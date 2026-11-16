@@ -1,7 +1,7 @@
 import type { PersonRow } from "@/types";
 import { recordFilmCreation, safely } from "@/lib/creations/writers";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { createMediaProduction } from "@/lib/mediaProductions";
+import { clearShotArtifacts, createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
 import { bindCastSubjects, planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { subjectViewById } from "@/lib/mediaSubjects";
 import { changeFilmMusic, realFilmEngines, redoFilmShot, resumeFilm } from "./engines";
@@ -117,4 +117,51 @@ export function resumeFilmRun(actor:PersonRow,id:string): FilmRun | {line:string
 }
 export function redoFilmRunShot(actor:PersonRow,id:string,shotId:string): FilmRun | {line:string} | null { const run=ownedAdult(actor,id); if(!run)return null; if(anotherActiveRun(actor,id))return {line:"A film is already running. Wait for it to finish or cancel it first."}; if(!run.plan||!run.production_id||run.state!=="done")return {line:"Finish the film before redoing a shot."}; if(!run.plan.shots.some(s=>s.id===shotId))return {line:"That shot is not in the film plan."}; updateFilmRun(actor,id,{state:"running"}); launch(actor,getFilmRun(actor,id)!,"redo",shotId); return getFilmRun(actor,id); }
 export function changeFilmRunMusic(actor:PersonRow,id:string): FilmRun | {line:string} | null { const run=ownedAdult(actor,id); if(!run)return null; if(anotherActiveRun(actor,id))return {line:"A film is already running. Wait for it to finish or cancel it first."}; if(!run.plan||!run.production_id||run.state!=="done")return {line:"Finish the film before changing its music."}; updateFilmRun(actor,id,{state:"running"}); launch(actor,getFilmRun(actor,id)!,"music"); return getFilmRun(actor,id); }
+// FILM-PAGE-01: the Film maker page's steps on a planned film (waiting for Go). Each is a plain line or the run; nothing here renders a clip before "finish kept".
+const BUSY_LINE="A film is already running. Wait for it to finish or cancel it first.";
+function pictured(actor:PersonRow,run:FilmRun): Set<string> { const production=run.production_id?getMediaProduction(actor,run.production_id):null; return new Set((production?.episodes.flatMap(e=>e.scenes.flatMap(sc=>sc.shots))??[]).filter(shot=>!!shot.picture_file_id).map(shot=>shot.id)); }
+/** The shots of a waiting film that have a picture yet (the page shows a shot without one as not drafted). */
+export function filmDraftedShots(actor:PersonRow,run:FilmRun): Set<string> { return pictured(actor,run); }
+/** "Draft all": make the cast and one picture per shot, then stop and wait (no clip, no music, no cut). */
+export function draftFilmRun(actor:PersonRow,id:string): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  if(run.state!=="waiting_for_go"||!run.plan||!run.production_id)return {line:"Plan the film first, then draft it."};
+  if(anotherActiveRun(actor,id))return {line:BUSY_LINE};
+  previewFirst.add(id); updateFilmRun(actor,id,{go_ahead:true,state:"running",note:null,error_line:null}); launch(actor,getFilmRun(actor,id)!,"stills"); return getFilmRun(actor,id);
+}
+/** "Make this shot again" on a draft: its picture alone is made again; the other pictures stay. */
+export function redoDraftShot(actor:PersonRow,id:string,shotId:string): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  if(run.state!=="waiting_for_go"||!run.plan||!run.production_id)return {line:"Plan the film first, then draft it."};
+  if(!run.plan.shots.some(s=>s.id===shotId))return {line:"That shot is not in the film plan."};
+  if(anotherActiveRun(actor,id))return {line:BUSY_LINE};
+  clearShotArtifacts(actor.id,run.production_id,shotId); previewFirst.add(id); updateFilmRun(actor,id,{go_ahead:true,state:"running",note:null,error_line:null}); launch(actor,getFilmRun(actor,id)!,"stills"); return getFilmRun(actor,id);
+}
+/** Keep or skip one drafted shot (the mark rides in the stored plan; a skipped shot is left out when the film is finished). */
+export function reviewFilmShot(actor:PersonRow,id:string,shotId:string,keep:boolean): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  if(run.state!=="waiting_for_go"||!run.plan)return {line:"Draft the film before keeping or skipping shots."};
+  if(!run.plan.shots.some(s=>s.id===shotId))return {line:"That shot is not in the film plan."};
+  return updateFilmRun(actor,id,{plan:{...run.plan,shots:run.plan.shots.map(s=>s.id===shotId?{...s,kept:keep}:s)}});
+}
+/** Change one shot's words, seconds or camera before it is drafted again. New words clear its picture so it is drawn again. */
+export function editFilmShot(actor:PersonRow,id:string,shotId:string,change:{still?:string;seconds?:number;motion?:string}): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  if(run.state!=="waiting_for_go"||!run.plan||!run.production_id)return {line:"Plan the film first, then change its shots."};
+  if(!run.plan.shots.some(s=>s.id===shotId))return {line:"That shot is not in the film plan."};
+  const words=change.still!==undefined&&change.still!==run.plan.shots.find(s=>s.id===shotId)!.still;
+  if(words) clearShotArtifacts(actor.id,run.production_id,shotId);
+  return updateFilmRun(actor,id,{plan:{...run.plan,shots:run.plan.shots.map(s=>s.id===shotId?{...s,...(change.still!==undefined?{still:change.still}:{}),...(change.seconds!==undefined?{seconds:change.seconds}:{}),...(change.motion!==undefined?{motion:change.motion}:{}),...(words?{kept:undefined}:{})}:s)}});
+}
+/** "Finish kept": leave out the skipped shots, then render the kept ones and join them (the same run a full Go makes). */
+export function finishKeptFilm(actor:PersonRow,id:string): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  if(run.state!=="waiting_for_go"||!run.plan||!run.production_id)return {line:"Draft the film first, then finish the shots you kept."};
+  const kept=run.plan.shots.filter(s=>s.kept!==false);
+  if(kept.length<2)return {line:"Keep at least two shots to finish the film."};
+  const have=pictured(actor,run); if(kept.some(s=>!have.has(s.id)))return {line:"Some kept shots have no picture yet. Draft them first."};
+  if(anotherActiveRun(actor,id))return {line:BUSY_LINE};
+  const plan={...run.plan,shots:kept}; updateFilmRun(actor,id,{plan,total_steps:total(plan,run.faceless),go_ahead:true,state:"running",error_line:null,note:null});
+  launch(actor,getFilmRun(actor,id)!,"run"); return getFilmRun(actor,id);
+}
 export function resumeStoppedFilms(): void { failInterruptedFilmRuns(); }

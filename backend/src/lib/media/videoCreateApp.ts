@@ -28,6 +28,7 @@ import { listFragments, listTemplates } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
+import { fillFilmMakerPage, filmRows, filmShotRows } from "@/lib/films/pageFilm";
 import type { PersonRow } from "@/types";
 import { captionEditRows, captionLineRows, captionMakeRows } from "@/lib/videos/captionsPage";
 import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
@@ -190,6 +191,9 @@ registerAppPageFill("video", "voiceover", (_person, page) => {
 });
 
 // CREATOR-26: reuse Create's own Shape and Quality fill so the option lists and icons have one definition.
+// FILM-PAGE-01: the Film maker page's style and shot choices.
+registerAppPageFill("video", "film-maker", fillFilmMakerPage);
+
 registerAppPageFill("video", "talking-avatar", (person, page) => {
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
@@ -353,6 +357,9 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));
     case "feed": return feedRows(person, { favorites: params.favorites === true, type: params.type, limit: params.limit });
     case "job": return feedRowById(person, params.id);
+    // FILM-PAGE-01: the Film maker page (lib/films/pageFilm.ts): the newest film, and its shots as cards.
+    case "film": return filmRows(person, params.id);
+    case "film-shots": return filmShotRows(person, params.id);
     case "how-made": return params.id ? creationDetailsFor(person, params.id) : [];
     case "clips": return clipRows(person, params.view, Math.min(params.limit ?? 200, 200));
     // VIDEO-STUDIO-07: the Studio page. `studio` is the opened clip as the TrackStudio's row, `studio-header` its header row, `studio-picker` the clips to

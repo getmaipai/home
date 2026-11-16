@@ -19,6 +19,7 @@ import { musicJobLockState } from "@/lib/music/lock";
 import { getMusicJobFor } from "@/lib/music/store";
 import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
+import { listFilmRunsInStates } from "@/lib/films/store";
 
 /** The five states of the one status card (section 20): WAITING, MAKING NOW, DONE, NEEDS A LOOK, COULD NOT FINISH. */
 export type ActivityState = "waiting" | "making" | "done" | "attention" | "failed";
@@ -186,6 +187,18 @@ function otherItems(actor: PersonRow): ActivityItem[] {
   return out;
 }
 
+/** FILM-PAGE-01: the person's own films (the Film maker page) as one row each: planning, making (with its step count), waiting for their keep or skip, done or failed. */
+function filmItems(actor: PersonRow): ActivityItem[] {
+  const out: ActivityItem[] = [];
+  for (const run of listFilmRunsInStates(["planning", "waiting_for_go", "running", "done", "failed"])) {
+    if (run.person_id !== actor.id || run.parent_id || !recent(run.updated_at)) continue;
+    const state: ActivityState = run.state === "done" ? "done" : run.state === "failed" ? "failed" : run.state === "waiting_for_go" ? "attention" : "making";
+    const line = run.state === "planning" ? "Planning the shots." : run.state === "waiting_for_go" ? "Your shot list is waiting for you." : run.state === "failed" ? "It did not finish. Open it to try again." : run.state === "running" ? `${run.stage ?? "Working"}, step ${Math.min(run.done_steps, run.total_steps)} of ${run.total_steps}.` : null;
+    out.push({ id: `film:${run.id}`, source: "job", state, title: oneLine(run.plan?.title ?? run.idea), line, percent: run.state === "running" && run.total_steps > 0 ? percentOf(Math.round((run.done_steps / run.total_steps) * 100)) : null, typicalMinutes: null, href: "/apps/video/film-maker", at: run.updated_at });
+  }
+  return out;
+}
+
 /** The dot an Activity entry carries (section 25): needs a look wins, then finished and unopened, then running; no number. */
 export function activityDot(items: readonly ActivityItem[], seenAt: string | null): ActivityDot {
   const seen = seenAt ? Date.parse(seenAt) : 0;
@@ -225,7 +238,7 @@ function dismissedKeys(actor: PersonRow): Set<string> {
 }
 
 function allItems(actor: PersonRow): ActivityItem[] {
-  return [...pictureItems(actor), ...videoItems(actor), ...songItems(actor), ...otherItems(actor)].sort((a, b) => b.at.localeCompare(a.at));
+  return [...pictureItems(actor), ...videoItems(actor), ...songItems(actor), ...otherItems(actor), ...filmItems(actor)].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 /** The viewer's own work, newest change first, without the rows they cleared. */

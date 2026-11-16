@@ -43,6 +43,7 @@ import { addCredits, addTitle, burnCaptions, makeCaptions, saveCaptionText } fro
 import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { studioAdd } from "@/lib/videos/studio";
+import { FILM_PAGE_ACTIONS, filmPageAction } from "@/lib/films/pageFilm";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
@@ -280,6 +281,18 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     c.header("x-maipai-lock", result.mark.lock);
     return c.body(result.bytes as never, 200);
   });
+
+  // FILM-PAGE-01: the Film maker page's actions (lib/films/pageFilm.ts): plan, draft all, keep or skip, change or redo a shot, finish kept, cut to the beat.
+  // Each is the film backend the chat tool uses; the page floor (adults) is checked here, the age lane and the locks inside.
+  for (const name of FILM_PAGE_ACTIONS) {
+    routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (appId !== "video") return next();
+      if (!appRouteAllowed(person, appId, "actions", name)) return next();
+      const done = await filmPageAction(person, name, await jsonBody(c));
+      return done.ok ? c.json({ ok: true as const, id: done.id, state: done.state }, 200) : c.json({ error: done.error, code: done.code, ...(done.status === 423 ? { locked: true } : {}) }, done.status as never);
+    });
+  }
 
   // VIDEO-UI-06: the Create feed's Stop. Only the person's own Create clip (no chat behind it); a finished clip stays finished.
   routes.post("/actions/cancel", requireAuth, async (c, next) => {

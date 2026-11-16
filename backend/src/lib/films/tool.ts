@@ -41,6 +41,11 @@ function failed(callId: string, args: Record<string, unknown>): ToolExecutionOut
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "failed", via: "tool_call", args, errorCode: "bad_arguments", failureKind: "bad_arguments", durationMs: 0 });
 }
 
+/** The planner's hint line for each cast member the person picked (the Film maker page plans with the same lines). */
+export function castHintsFor(chosen: { members: ReadonlyArray<{ subject_id: string; look: { medium: string | null } }>; subjects: ReadonlyArray<{ subject: { id: string; name: string; real: boolean; look: string } }> }): string[] {
+  return chosen.subjects.map(({ subject }) => `${subject.name} (cast member; ${subject.real || chosen.members.find((m) => m.subject_id === subject.id)?.look.medium === "photo" ? "photograph" : "illustration"}): ${subject.look}`.slice(0, 700));
+}
+
 /** A turn with pictures attached: read each one, save it as cast, and hand the planner what each is for. Without pictures this is runMakeFilm. */
 export async function runMakeFilmTurn(input: { state: FilmState & Partial<Pick<TurnState, "images" | "conversationId">>; args: Record<string, unknown>; callId: string; spoken: boolean }): Promise<ToolExecutionOutcome> {
   // CREATOR-05: cast ids are resolved first; a refused member starts nothing. A resolved member reaches the planner as a hint in the picture-hint form, so the
@@ -49,7 +54,7 @@ export async function runMakeFilmTurn(input: { state: FilmState & Partial<Pick<T
   const band = turnAgeBand(input.state.surface, input.state.actor, input.state.speakerEvidence, new Date(), input.state.deviceId);
   const castChosen = await castForTool(input.state.actor as PersonRow, input.args, { band, temporary: input.state.temporary === true || input.state.ephemeral === true });
   if (!castChosen.ok) return refused(input.callId, input.args, castChosen.line, "cast");
-  const castHints = castChosen.subjects.map(({ subject }) => `${subject.name} (cast member; ${subject.real || castChosen.members.find((m) => m.subject_id === subject.id)?.look.medium === "photo" ? "photograph" : "illustration"}): ${subject.look}`.slice(0, 700));
+  const castHints = castHintsFor(castChosen);
   const withCast = { ...input, castSubjectIds: castChosen.subjects.map(({ subject }) => subject.id), args: { ...input.args, cast_hints: castHints.length ? castHints : undefined } };
   const images = input.state.images ?? [];
   if (!images.length) return runMakeFilm(withCast);
