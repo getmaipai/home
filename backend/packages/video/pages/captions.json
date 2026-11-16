@@ -4,15 +4,264 @@
   "title": "Captions",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "captions",
-      "text": "Add and fix captions here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/video/clips"
+      "type": "media_shelf",
+      "heading": "Pick a clip",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "studio-picker",
+          "id": "$state.clip"
         }
       },
-      "action_label": "Open My clips"
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "locked_field": "locked",
+      "making_field": "making",
+      "aspect": "wide",
+      "variant": "plain",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/captions",
+          "state": {
+            "clip": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "You have no clips yet. Make one with Create.",
+        "action": {
+          "navigate": {
+            "to": "/apps/video/create"
+          }
+        },
+        "action_label": "Make a video"
+      }
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "caption-make",
+          "id": "$state.clip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "subtitle",
+      "hide_when_empty": true,
+      "row_action": {
+        "icon": "captions",
+        "label": "Make captions",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/captions-make",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}"
+            },
+            "success_label": "Captions made"
+          }
+        }
+      }
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "caption-edit",
+          "id": "$state.clip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "subtitle",
+      "hide_when_empty": true,
+      "row_action": {
+        "icon": "pencil",
+        "label": "Fix the words",
+        "action": {
+          "navigate": {
+            "to": "/apps/video/captions",
+            "state": {
+              "clip": "{clip}",
+              "prompt": "{text}",
+              "mode": "lines"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "caption-lines",
+          "id": "$state.clip"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "text",
+      "item_subtitle_field": "times",
+      "hide_when_empty": true
+    },
+    {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Captions and titles",
+      "placeholder": "Lines look like 0:03-0:06 Hello there. For a title or credits, type them here.",
+      "prompt_state": "prompt",
+      "max_length": 4000,
+      "submit_label": "Apply",
+      "starts": "video",
+      "references": [
+        {
+          "state": "clip",
+          "label": "Clip",
+          "kind": "video"
+        }
+      ],
+      "mode_selector": {
+        "state": "mode",
+        "label": "What to do",
+        "default": "lines",
+        "options": [
+          {
+            "value": "lines",
+            "label": "Save lines",
+            "icon": "captions"
+          },
+          {
+            "value": "burn",
+            "label": "Add to video",
+            "icon": "film"
+          },
+          {
+            "value": "title",
+            "label": "Title",
+            "icon": "type"
+          },
+          {
+            "value": "credits",
+            "label": "Credits",
+            "icon": "list"
+          }
+        ]
+      },
+      "chips": [
+        {
+          "state": "position",
+          "label": "Where captions sit",
+          "default": "bottom",
+          "icon": "captions",
+          "icon_only": true,
+          "presentation": "popover",
+          "group": "Position",
+          "options": [
+            {
+              "value": "top",
+              "label": "Top",
+              "icon": "align-vertical-justify-start"
+            },
+            {
+              "value": "middle",
+              "label": "Middle",
+              "icon": "align-vertical-justify-center"
+            },
+            {
+              "value": "bottom",
+              "label": "Bottom",
+              "icon": "align-vertical-justify-end"
+            }
+          ]
+        }
+      ],
+      "mode_actions": {
+        "lines": {
+          "call": {
+            "target": "/api/plugins/video/actions/captions-save",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "prompt": "{prompt}"
+            },
+            "success_label": "Lines saved"
+          }
+        },
+        "burn": {
+          "call": {
+            "target": "/api/plugins/video/actions/captions-burn",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "prompt": "{prompt}",
+              "position": "{position}"
+            },
+            "then": {
+              "navigate": {
+                "to": "/apps/video/create"
+              }
+            }
+          }
+        },
+        "title": {
+          "call": {
+            "target": "/api/plugins/video/actions/captions-title",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "prompt": "{prompt}"
+            },
+            "then": {
+              "navigate": {
+                "to": "/apps/video/create"
+              }
+            }
+          }
+        },
+        "credits": {
+          "call": {
+            "target": "/api/plugins/video/actions/captions-credits",
+            "method": "POST",
+            "args": {
+              "clip": "{clip}",
+              "prompt": "{prompt}"
+            },
+            "then": {
+              "navigate": {
+                "to": "/apps/video/create"
+              }
+            }
+          }
+        }
+      },
+      "submit": {
+        "call": {
+          "target": "/api/plugins/video/actions/captions-save",
+          "method": "POST",
+          "args": {
+            "clip": "{clip}",
+            "prompt": "{prompt}"
+          },
+          "success_label": "Lines saved"
+        }
+      }
     }
   ]
 }

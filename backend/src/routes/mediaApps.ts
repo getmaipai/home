@@ -3,6 +3,7 @@
 // package, or an id it does not know, it passes on, so the generic route (and its 404) still decide. The rules live in
 // lib/media/appHost.ts; this file is the wire.
 import { jsonBody } from "@/lib/validation";
+import type { PersonRow } from "@/types";
 import { ImageEditError, applyPreview, editErrorFrom } from "@/lib/imageEdit";
 import { MediaOpRequest, startLibraryOp } from "@/lib/mediaOps/http";
 import { studioApply, studioComment, studioMarkup, studioRun } from "@/lib/mediaOps/studio";
@@ -38,6 +39,7 @@ import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
+import { addCredits, addTitle, burnCaptions, makeCaptions, saveCaptionText } from "@/lib/videos/captionsPage";
 import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { studioAdd } from "@/lib/videos/studio";
@@ -381,6 +383,23 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });
+
+  // CAPTIONS-PAGE-01: the Captions page. Make captions (listen to the clip), save the fixed lines, and the three edits that start a new clip (captions burned in, a title card,
+  // rolling credits). The gate, the lock check and the edit are written once in lib/videos/captionsPage.ts and clipEditStart.ts; the page names the clip as `clip`.
+  const captionsAction = (name: string, run: (person: PersonRow, body: Record<string, unknown>) => Promise<unknown> | unknown) => routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", name)) return next();
+    const body = await jsonBody(c);
+    const done = await run(person, body) as { ok: boolean; error?: string; code?: string; status?: number; locked?: true; job?: { id: string; state: string }; lines?: number };
+    if (!done.ok) return c.json({ error: done.error, code: done.code, ...(done.status === 423 ? { locked: true } : {}) }, (done.status ?? 422) as never);
+    return c.json({ ok: true as const, ...(done.job ? { id: done.job.id, state: done.job.state } : { lines: done.lines }) }, 200);
+  });
+  captionsAction("captions-make", (person, body) => makeCaptions(person, body.clip));
+  captionsAction("captions-save", (person, body) => saveCaptionText(person, body.clip, body.prompt));
+  captionsAction("captions-burn", (person, body) => burnCaptions(person, body.clip, body.position, body.prompt));
+  captionsAction("captions-title", (person, body) => addTitle(person, body.clip, body.prompt));
+  captionsAction("captions-credits", (person, body) => addCredits(person, body.clip, body.prompt));
 
   // MAKE-CLEARER-01: "Make clearer" (Quick, Better or Best) on a finished Create clip: the one registry operation, so the feed, the video Studio and chat start the same edit.
   // A level that is not ready answers 503 with its plain line (the Best level, until the Stack has the AI restore); the original clip is kept.

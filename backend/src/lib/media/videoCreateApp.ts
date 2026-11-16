@@ -29,6 +29,7 @@ import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
+import { captionEditRows, captionLineRows, captionMakeRows } from "@/lib/videos/captionsPage";
 import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
 import { listClonedVoices } from "@/lib/clonedVoices";
 import { getOfferedVoices, peekOfferedVoices } from "@/lib/voiceResolve";
@@ -359,6 +360,10 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "studio": return studioRows(person, params.id);
     case "studio-header": return studioHeaderRows(person, params.id);
     case "studio-picker": return params.id && !params.id.startsWith("$") ? [] : clipRows(person, "all", 60);
+    // CAPTIONS-PAGE-01: the Captions page: the clip's caption lines, the one row that opens them as text, and the one row that makes them.
+    case "caption-lines": return captionLineRows(person, params.id);
+    case "caption-edit": return captionEditRows(person, params.id);
+    case "caption-make": return captionMakeRows(person, params.id);
     // A scope this page does not know (the three old pages' scopes are gone) answers nothing.
     default: return [];
   }
