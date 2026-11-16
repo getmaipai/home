@@ -12,7 +12,7 @@ import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
 import { listLibrary } from "@/lib/library";
 import { imageAppData } from "@/lib/imageApp";
 import { createMediaSubject, shareMediaSubject } from "@/lib/mediaSubjects";
-import { attachments, mediaSubjects } from "@/db/schema";
+import { attachments, mediaSubjects, pictureJobs } from "@/db/schema";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
@@ -211,4 +211,21 @@ test("characters data keeps a child to their own subjects and drops real-person 
   const own = createMediaSubject(kid, { name: "Kitty", kind: "character", look: "a cat" });
   expect((imageAppData(kid, "characters", {}) as Array<{ id: string }>).map((item) => item.id)).toContain(own.id);
   expect((imageAppData(row, "characters", {}) as Array<{ id: string }>).map((item) => item.id)).not.toContain(own.id);
+});
+
+test("Image Create level hints add a measured wait only for a level with 3 finished pictures", async () => {
+  const { row } = await owner();
+  const now = new Date().toISOString();
+  const seed = (n: number, tier: "boost" | undefined, ms: number) => {
+    for (let i = 0; i < n; i++) {
+      db.insert(pictureJobs).values({ id: `wait-${tier ?? "standard"}-${i}`, personId: row.id, kind: "generate", state: "done", prompt: "a fox", request: JSON.stringify({ size: "square", n: 1, ...(tier ? { tier } : {}) }), files: JSON.stringify([{ id: `f${i}`, width: 1, height: 1, seed: null, model: null, steps: null, ms }]), createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
+    }
+  };
+  seed(3, undefined, 21000);
+  seed(2, "boost", 90000);
+  const page = getAppPage(row, "image", "create");
+  expect(page.ok).toBe(true);
+  if (!page.ok) return;
+  const bar = (page.value as { body: Array<unknown> }).body[0] as { tier: { tiers: Array<{ id: string; hint: string }> } };
+  expect(bar.tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. Shows no words on the picture. About 20 seconds."], ["boost", "More detail. Shows no words unless you ask for them."], ["max", "More detail. Shows no words unless you ask for them."]]);
 });

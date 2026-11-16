@@ -9,6 +9,7 @@ import { attachments, pictureJobs } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { getPictureJob } from "@/lib/pictures/jobStore";
+import { typicalWait } from "@/lib/pictures/quality";
 import { pictureJobLockState } from "@/lib/pictures/lock";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { pictureActivityItem } from "@/lib/activity";
@@ -91,6 +92,23 @@ registerAppData("image", imageAppData);
 /** CREATOR-13: the Create page's preset chips (Look by family, Light, Angle, Format), from the preset records. A Create page chip holds at most 24 options,
  * and each chip is its own popover (the kit's popover has no height limit, so one popover over all 79 options is 3,100 px tall and cannot be reached).
  * The composer's mode list reads this page's chips, so the Home ask box and every other composer show the same ones. */
+/** The last 20 finished pictures of a level, as the time each took (the sum of its files' ms). A job stored before ms was kept is skipped. */
+function levelWaitMs(level: "standard" | "boost" | "max"): number[] {
+  const rows = db.select({ request: pictureJobs.request, files: pictureJobs.files }).from(pictureJobs).where(eq(pictureJobs.state, "done")).orderBy(desc(pictureJobs.updatedAt)).limit(400).all();
+  const out: number[] = [];
+  for (const row of rows) {
+    try {
+      const request = JSON.parse(row.request) as { tier?: string };
+      if ((request.tier ?? "standard") !== level) continue;
+      const files = JSON.parse(row.files) as Array<{ ms?: number | null }>;
+      const ms = files.reduce((sum, file) => sum + (typeof file.ms === "number" ? file.ms : 0), 0);
+      if (ms > 0) out.push(ms);
+    } catch { /* a malformed row is skipped */ }
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 registerAppPageFill("image", "create", (person, page) => {
   const bar = findPromptBar(page.body);
   if (!bar) return;
@@ -99,6 +117,10 @@ registerAppPageFill("image", "create", (person, page) => {
   for (const item of tier?.tiers ?? []) {
     if (item.id === "standard") item.hint = "Fast. Shows no words on the picture.";
     if (item.id === "boost" || item.id === "max") item.hint = "More detail. Shows no words unless you ask for them.";
+    if (item.id === "standard" || item.id === "boost" || item.id === "max") {
+      const wait = typicalWait(levelWaitMs(item.id));
+      if (wait && item.hint) item.hint = `${item.hint} ${wait}`;
+    }
   }
   const reference = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).find((item) => item.state === "reference") : undefined;
   if (reference) reference.max = 3;

@@ -79,3 +79,14 @@ export function plainPrompt(prompt: string): string {
     .replace(/\.{2,}/g, ".")
     .trim();
 }
+
+/** The plain wait for a level, from how long its recent finished pictures took (milliseconds each, newest first). Fewer than 3 samples: nothing to say (null). Under a minute rounds to 5 seconds, above it to the minute. */
+export function typicalWait(msList: readonly number[]): string | null {
+  const list = msList.filter((ms) => Number.isFinite(ms) && ms > 0).sort((a, b) => a - b);
+  if (list.length < 3) return null;
+  const mid = Math.floor(list.length / 2);
+  const seconds = (list.length % 2 ? list[mid]! : (list[mid - 1]! + list[mid]!) / 2) / 1000;
+  if (seconds < 57.5) return `About ${Math.max(5, Math.round(seconds / 5) * 5)} seconds.`;
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `About ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
+}

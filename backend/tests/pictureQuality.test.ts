@@ -265,3 +265,23 @@ describe("the card and its switch", () => {
 test("a style the person may use is listed with its maker (the adapters read stays as it was)", async () => {
   expect((await adaptersFor(["all-ages"])).map((a) => a.base_model).sort()).toEqual(["flux2-klein-4b", "z-image-turbo"]);
 });
+
+describe("typicalWait", () => {
+  const { typicalWait } = require("@/lib/pictures/quality") as typeof import("@/lib/pictures/quality");
+  test("fewer than 3 samples says nothing", () => {
+    expect(typicalWait([])).toBeNull();
+    expect(typicalWait([20000, 21000])).toBeNull();
+  });
+  test("rounds to 5 seconds under a minute", () => {
+    expect(typicalWait([19000, 21000, 22000])).toBe("About 20 seconds.");
+    expect(typicalWait([1000, 1000, 1000])).toBe("About 5 seconds.");
+    expect(typicalWait([41000, 42000, 43000])).toBe("About 40 seconds.");
+  });
+  test("uses the median, not the average", () => {
+    expect(typicalWait([10000, 10000, 10000, 10000, 600000])).toBe("About 10 seconds.");
+  });
+  test("rounds to the minute above a minute", () => {
+    expect(typicalWait([60000, 61000, 62000])).toBe("About 1 minute.");
+    expect(typicalWait([115000, 120000, 125000])).toBe("About 2 minutes.");
+  });
+});
