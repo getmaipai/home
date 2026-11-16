@@ -176,7 +176,7 @@ describe("ported from the old settings page", () => {
       within(document.body).getAllByRole("link").forEach((a) => hrefs.add(a.getAttribute("href") ?? ""));
     }
     void view;
-    for (const href of ["/users", "/people", "/settings/ai?tab=engines", "/backups", "/storage", "/updates", "/repairs", "/performance", "/status", "/privacy"]) expect(hrefs).toContain(href);
+    for (const href of ["/users", "/people", "/backups", "/storage", "/updates", "/repairs", "/performance", "/status", "/privacy"]) expect(hrefs).toContain(href);
   });
 
   test("Chat settings > Skills draws the registered Skills view, and Keyboard shortcuts the chat's own list", async () => {

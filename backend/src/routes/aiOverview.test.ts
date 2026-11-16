@@ -36,7 +36,7 @@ describe("GET /api/ai/overview", () => {
   });
 
 
-  test("maps current candidates and slots to ready, missing, problem, off, waits and same without counting an unlisted pick", async () => {
+  test("maps installed fit, installed refusal, missing, off and chat Boost and Max from candidates", async () => {
     const { token, person } = addPerson("person-ai-overview-states", "owner");
     const models = [
       ["chat-model", "Chat Model", "chat", "installed", 4e9],
@@ -45,7 +45,7 @@ describe("GET /api/ai/overview", () => {
       ["music-model", "Music Model", "music", "notInstalled", 7e9],
       ["voice-model", "Voice Model", "voice", "installed", 1e9],
     ] as const;
-    const componentList = { tier: "fixture", free_disk_bytes: 100e9, disk_margin_bytes: 0, installed_bytes: 13e9, components: models.map(([id,label,group,state,bytes]) => ({ id,label,summary:label,group,kind:"model",state,size_bytes:state==="installed"?bytes:null,download_bytes:state==="installed"?0:bytes,full_bytes:bytes,required_free_bytes:bytes,plan_need:"recommended",requirement:"optional",requirement_reason:null,last_used_at:null,used_by:[],depends_on:[],job:null,percent:null,failure:null,can_install:true,install_block:null,can_uninstall:false,uninstall_block:null })) };
+    const componentList = { tier: "fixture", free_disk_bytes: 100e9, disk_margin_bytes: 0, installed_bytes: 13e9, components: models.map(([id,label,group,state,bytes]) => ({ id,label,summary:label,group,kind:"model",state,size_bytes:state==="installed"?bytes:null,download_bytes:state==="installed"?0:bytes,full_bytes:bytes,required_free_bytes:bytes,plan_need:"recommended",requirement:"optional",requirement_reason:null,last_used_at:null,used_by:[],depends_on:[],job:null,percent:null,failure:null,can_install:true,install_block:state==="installed"?"It is already installed.":null,can_uninstall:false,uninstall_block:null })) };
     const makeCandidate = (id: string, label: string, fits=true, refusal: string|null=null) => ({ id,label,family:id,peak_bytes:2e9,verified:true,fits,refusal });
     const setCandidateFetch = (async (input: Parameters<typeof fetch>[0]) => {
       const url = new URL(String(input), "http://stack");
@@ -53,7 +53,7 @@ describe("GET /api/ai/overview", () => {
       if (url.pathname === "/stack/v1/tiers/candidates") {
         const category = url.searchParams.get("category") ?? "chat";
         const model = ({ chat:"chat-model", pictures:"minimax-h3-image", video:"video-model", music:"music-model", voice:"voice-model" } as Record<string,string>)[category]!;
-        const levels = ["standard","boost","max"].map((tier) => ({ tier, cap_bytes: 20e9, recommended:model, candidates:[makeCandidate(model, model === "minimax-h3-image" ? "MiniMax H3-Image" : `${category} model`), ...(category === "pictures" && tier === "boost" ? [makeCandidate("problem-model","Problem model",false,"This model needs more memory than this computer has.")] : [])] }));
+        const levels = ["standard","boost","max"].map((tier) => ({ tier, cap_bytes: 20e9, recommended:model, candidates:[makeCandidate(model, model === "minimax-h3-image" ? "MiniMax H3-Image" : `${category} ${tier} model`), ...(category === "pictures" && tier === "boost" ? [makeCandidate("problem-model","Problem model",false,"This model needs more memory than this computer has.")] : []), ...(category === "chat" && tier !== "standard" ? [makeCandidate(`chat-${tier}`,`Chat ${tier} Model`)] : [])] }));
         return Response.json({ category,profile:"fixture",room_bytes:20e9,levels });
       }
       return new Response("not found", { status:404 });
@@ -61,6 +61,10 @@ describe("GET /api/ai/overview", () => {
     __setComponentsFetchForTests(setCandidateFetch);
     setValue(person,"household","engines.image.tier.boost",{model:"problem-model",options:{}});
     setValue(person,"household","engines.image.tier.max",{model:"off",options:{}});
+    setValue(person,"household","engines.chat.tier.boost",{model:"chat-boost",options:{}});
+    setValue(person,"household","engines.chat.tier.max",{model:"chat-max",options:{}});
+    const extendedComponents = componentList.components as unknown as Array<Record<string, unknown>>;
+    extendedComponents.push(...["chat-boost","chat-max"].map((id)=>({...componentList.components[0]!,id,label:`Chat ${id.endsWith("boost")?"boost":"max"} Model`,group:"chat" as const,state:"installed" as const,size_bytes:2e9,download_bytes:0,full_bytes:2e9})));
     setValue(person,"household","engines.music.tier.standard",{model:"music-model",options:{}});
     setValue(person,"household","engines.music.tier.boost",{model:"ernie-image-turbo",options:{}});
     const response = await app.request("http://localhost/api/ai/overview", { headers: { cookie: `session=${token}` } });
@@ -68,6 +72,8 @@ describe("GET /api/ai/overview", () => {
     const body = await response.json() as { features:Array<{id:string;levels:Array<{tier:string;state:string;detail:string|null;size_bytes_missing:number|null;action:unknown}>}>; attention:{download_all:{bytes:number;count:number}|null} };
     const level = (feature:string,tier:string) => body.features.find((row)=>row.id===feature)!.levels.find((row)=>row.tier===tier)!;
     expect(level("chat","standard").state).toBe("ready");
+    expect(level("chat","boost")).toMatchObject({state:"ready",model_label:"Chat boost Model",size_bytes_missing:null});
+    expect(level("chat","max")).toMatchObject({state:"ready",model_label:"Chat max Model"});
     expect(level("chat","reduced").state).toBe("off");
     expect(level("pictures","reduced").state).toBe("waits");
     expect(level("pictures","standard").state).toBe("missing");
@@ -77,6 +83,22 @@ describe("GET /api/ai/overview", () => {
     expect(level("voice","boost")).toMatchObject({state:"same",word:"Same as Standard"});
     expect(level("music","boost").state).toBe("waits");
     expect(body.attention.download_all).toEqual({bytes:56e9,count:2});
+  });
+
+  test("groups missing attention by model and does not offer a fix for fit refusals", async () => {
+    const { token, person } = addPerson("person-ai-overview-grouped", "owner");
+    const models = ["minimax-h3-image", "chat-model", "video-model", "music-model", "voice-model"];
+    const componentList = { tier:"fixture",free_disk_bytes:100e9,disk_margin_bytes:0,installed_bytes:0,components:models.map((id)=>({id,label:id==="minimax-h3-image"?"MiniMax H3-Image":id,summary:id,group:id==="minimax-h3-image"?"pictures":"chat",kind:"model",state:id==="minimax-h3-image"?"notInstalled":"installed",size_bytes:null,download_bytes:49e9,full_bytes:49e9,required_free_bytes:49e9,plan_need:"recommended",requirement:"optional",requirement_reason:null,last_used_at:null,used_by:[],depends_on:[],job:null,percent:null,failure:null,can_install:true,install_block:null,can_uninstall:false,uninstall_block:null})) };
+    const fetcher=(async(input:Parameters<typeof fetch>[0])=>{const url=new URL(String(input),"http://stack");if(url.pathname==="/stack/v1/components")return Response.json(componentList);if(url.pathname==="/stack/v1/tiers/candidates"){const category=url.searchParams.get("category")??"chat";const id=category==="pictures"?"minimax-h3-image":category==="chat"?"chat-model":`${category}-model`;return Response.json({category,profile:"fixture",room_bytes:20e9,levels:["standard","boost","max"].map(tier=>({tier,cap_bytes:20e9,recommended:id,candidates:[{id,label:id==="minimax-h3-image"?"MiniMax H3-Image":id,family:id,peak_bytes:2e9,verified:true,fits:true,refusal:null},...(category==="pictures"&&tier==="boost"?[{id:"problem-model",label:"Problem model",family:"x",peak_bytes:2e9,verified:true,fits:false,refusal:"This model cannot fit."}]:[])]}))});}return new Response("not found",{status:404});}) as unknown as typeof fetch;
+    __setComponentsFetchForTests(fetcher);
+    setValue(person,"household","engines.image.tier.boost",{model:"problem-model",options:{}});
+    setValue(person,"household","engines.image.tier.max",{model:"recommended",options:{}});
+    const response=await app.request("http://localhost/api/ai/overview",{headers:{cookie:`session=${token}`}});
+    const body=await response.json() as {attention:{items:Array<{title:string;line:string;action:unknown}>;download_all:{bytes:number;count:number}|null}};
+    expect(body.attention.items).toContainEqual(expect.objectContaining({title:"MiniMax H3-Image is missing.",line:"Pictures Standard and Pictures Max use it."}));
+    expect(body.attention.items.filter(item=>item.title.includes("MiniMax H3-Image"))).toHaveLength(1);
+    expect(body.attention.items.find(item=>item.title.includes("MiniMax H3-Image"))?.action).toBeTruthy();
+    expect(body.attention.download_all).toEqual({bytes:49e9,count:1});
   });
 
   test("a failed Stack source is skipped and the feature response still completes", async () => {

@@ -15,6 +15,8 @@ function render(data: Fixture) {
   globalThis.fetch = ((input: RequestInfo | URL) => {
     const path=(typeof input==="string"?input:input.toString()).split("?")[0]!;
     if(path==="/api/ai/overview") return Promise.resolve(Response.json(data));
+    if((typeof input==="string"?input:input.toString()).startsWith("/api/settings?scope=")) return Promise.resolve(Response.json(REGISTRY.filter((key)=>key.scope==="household").map((key)=>({key:key.key,value:key.default??null,source:"default",label:key.label,help:key.help,level:key.level,secret:false}))));
+    if(path==="/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
     if(path==="/api/settings") return Promise.resolve(Response.json([]));
     if(path==="/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
     if(path.startsWith("/api/ai/tiers/")) return Promise.resolve(Response.json({profile:"test",room_bytes:0,levels:[]}));
@@ -36,6 +38,21 @@ describe("AI Features overview",()=>{
     expect(await view.findByText("This level needs a download.")).toBeTruthy();
     expect(view.getByText("Missing")).toBeTruthy();
     expect(view.getByText("MiniMax H3-Image")).toBeTruthy();
+  });
+  test("renders each feature in its own card with responsive level cells and helper words",async()=>{
+    const view=render({...base,features:[feature,{...feature,id:"pictures",name:"Pictures"}],helpers:[{id:"listening",name:"Listening",model_label:"Whisper",used_by:["chat"],state:"ready",action:null}]} as Fixture);
+    expect(await view.findByText("Everything is fine.")).toBeTruthy();
+    expect(view.getAllByTestId("ai-feature-card")).toHaveLength(2);
+    expect(view.getAllByTestId("ai-level-grid")[0]!.className).toContain("grid-cols-2");
+    expect(view.getAllByTestId("ai-level-grid")[0]!.className).toContain("sm:grid-cols-4");
+    expect(view.getByText("On")).toBeTruthy();
+  });
+  test("shows only the pause switch after Helpers and omits old overview cards",async()=>{
+    const view=render(base);
+    await view.findByRole("switch",{name:"Pause chat for everyone"});
+    expect(view.queryByText("Chat pause")).toBeNull();
+    expect(view.queryByText("View engine settings")).toBeNull();
+    expect(view.getByRole("switch",{name:"Pause chat for everyone"})).toBeTruthy();
   });
   test("opens one sheet for a feature",async()=>{
     const view=render(base);
