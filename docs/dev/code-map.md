@@ -893,6 +893,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/peaks.ts` | PEAK_COUNT, PEAKS_NO_FFMPEG_LINE, PEAKS_FAILED_LINE, __setPeaksDecoderForTests, bucketPeaks, computePeaks |
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
+| `backend/src/lib/music/scoreStack.ts` | __setScoreFetchForTests, scoreStackConfigured, scoreEngineReady, submitScore, getScore, fetchScoreFile |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
 | `backend/src/lib/music/shazamHelper.ts` | findShazamPython, wavOf, makeSignature |
 | `backend/src/lib/music/shazamLookup.ts` | SHAZAM_HOST, SHAZAM_USER_AGENT, SHAZAM_QUIET_MS, __resetShazamForTests, shazamQuietUntil, shazamBody |
@@ -1116,6 +1117,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/schedules/guard.ts` | scheduleActor, parseTarget, schedulableDomain, isUnknownReason, checkTargets, loadScheduleRegistry |
 | `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
 | `backend/src/lib/schedules/store.ts` | pendingAutomationIds, automationDeps, defaultZone, recordOf, wallClock, automationSpecOf |
+| `backend/src/lib/scoreJobs.ts` | startScoreJob, resumeScoreJob |
 | `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS, matchScore, rankGroups |
 | `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, testOrSaveSearchAddress, clearSearchAddress |
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |
@@ -1402,7 +1404,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceSamples.ts` | __enhanceForTests, ECHO_FALLBACK_NOTICE, removeEcho, __isolateForTests, isolateVoice, cleanFilter |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
-| `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, voiceoverToolSpec, makeSpeechToolSpec |
+| `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, GET_SCORE_TOOL_ID, voiceoverToolSpec |
 | `backend/src/lib/voiceTrace.ts` | VOICE_TRACE_EVENTS, TraceEntrySchema, VoiceTraceUploadSchema, storeVoiceTrace, voiceTraces, formatVoiceTrace |
 | `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
