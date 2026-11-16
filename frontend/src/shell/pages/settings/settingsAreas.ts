@@ -18,7 +18,7 @@ export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef
     ...(section.id === "ai" && section.cards ? { cards: section.cards.map((card) => ["household.coding", "household.coding_people", "household.coding_limits"].includes(card.group ?? "") ? { ...card, tab: "coding" } : card) } : {}),
     ...(section.id === "apps" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(tab.id === "robot" ? { view: "home.devices_admin" } : {}) })) } : {}),
     ...(section.id === "household" && section.tabs ? { tabs: section.tabs.map((tab) => tab.id === "people" ? { ...tab, view: "home.users_admin" } : tab) } : {}),
-    ...(section.id === "advanced" ? { tabs: [{ id: "developer", label: "Developer tools", view: "home.routing_stats" }, { id: "network", label: "Network and access" }], cards: section.cards?.map((card) => card.group === "household.network_port" ? { ...card, tab: "network" } : card) } : {}),
+    ...(section.id === "advanced" ? { tabs: section.tabs?.map((tab) => tab.id === "developer" ? { ...tab, view: "home.routing_stats" } : tab) } : {}),
     ...(section.id === "data" ? { tabs: section.tabs?.map((tab) => tab.id === "data" ? { ...tab, view: "account.memories" } : tab) } : {}),
     ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news").map((card) => ({
       ...card,

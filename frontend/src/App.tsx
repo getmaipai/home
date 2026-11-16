@@ -183,6 +183,7 @@ export function App() {
                     />
                     <Route path="/conversations" element={<AliasRedirect path="/conversations" person={person} />} />
                     <Route path="/settings/users" element={<AliasRedirect path="/settings/users" person={person} />} />
+                    <Route path="/settings/offline-data" element={<AliasRedirect path="/settings/offline-data" person={person} />} />
                     <Route path="/settings/models" element={<AliasRedirect path="/settings/models" person={person} />} />
                     <Route path="/settings/backups" element={<AliasRedirect path="/settings/backups" person={person} />} />
                     <Route path="/settings/voices" element={<AliasRedirect path="/settings/voices" person={person} />} />

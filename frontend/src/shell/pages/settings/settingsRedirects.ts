@@ -63,6 +63,7 @@ export function customizeTarget(band: "child" | "teen" | "adult"): string {
 /** The live alias map behind `App.tsx`'s `AliasRedirect`: an old path and where it lands. A path with no entry lands on itself. */
 export function aliasTarget(path: string, viewer: { canManageHousehold: boolean }): string {
   const fixed: Record<string, string> = {
+    "/settings/offline-data": settingsPath("search", "books"),
     "/conversations": "/chat",
     "/settings/users": settingsPath("household", "people"),
     // Keep the area in Settings; its Manage links lead to the standalone pages.

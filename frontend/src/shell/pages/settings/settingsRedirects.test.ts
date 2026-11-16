@@ -65,6 +65,10 @@ describe("other moved routes", () => {
     expect(retiredManagePageTarget("/voices", member)).toBe("/settings/voice?tab=voice");
     expect(retiredManagePageTarget("/devices", member)).toBe("/settings/profile?tab=profile");
   });
+
+  test("the removed Offline data route lands on Search, Offline books", () => {
+    expect(aliasTarget("/settings/offline-data", admin)).toBe(settingsPath("search", "books"));
+  });
   test("customize keeps the audience gate", () => {
     expect(customizeTarget("adult")).toBe("/settings/chat?tab=skills");
     expect(customizeTarget("child")).toBe("/settings/chat");

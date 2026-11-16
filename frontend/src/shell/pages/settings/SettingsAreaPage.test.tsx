@@ -131,7 +131,7 @@ describe("the settings route", () => {
   test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/household"));
-    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Offline data", "Apps and devices", "Backups, storage and updates", "Advanced"]);
+    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice, sound and robot", "Notifications", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voices and commands", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
     expect(view.getByRole("heading", { level: 1, name: /^Household and people$/ })).toBeTruthy();
   });
 
@@ -167,10 +167,10 @@ describe("the settings route", () => {
     window.sessionStorage.clear();
   });
 
-  test("a child gets the Home settings access explanation on a direct URL", async () => {
-    const view = open(makePerson("child"), "/settings/offline-data");
+  test("a child gets the Home settings access explanation on Offline books", async () => {
+    const view = open(makePerson("child"), "/settings/search?tab=books");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/offline-data");
+    expect(where(view)).toBe("/settings/search?tab=books");
     expect(view.queryByText("Disk space")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
@@ -183,10 +183,10 @@ describe("the settings route", () => {
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
   });
 
-  test("an admin opens Offline data as its own page, with no tab row", async () => {
-    const view = open(makePerson("admin"), "/settings/offline-data");
-    await waitFor(() => expect(where(view)).toBe("/settings/offline-data"));
-    expect(view.queryByRole("tab", { name: "Reference library" })).toBeNull();
+  test("an admin opens Offline books on the Search area tab", async () => {
+    const view = open(makePerson("admin"), "/settings/search?tab=books");
+    await waitFor(() => expect(where(view)).toBe("/settings/search?tab=books"));
+    expect(view.getByRole("tab", { name: "Offline books" }).getAttribute("aria-selected")).toBe("true");
   });
 
   test("an owner manages the household command list in Home settings", async () => {
@@ -209,6 +209,24 @@ describe("the settings route", () => {
     } finally {
       window.confirm = originalConfirm;
     }
+  });
+
+  test("Advanced checks and Developer draw the spec cards on their tabs", async () => {
+    const checks = open(makePerson("owner"), "/settings/advanced?tab=checks");
+    expect(await checks.findByText("Is the internet reachable")).toBeTruthy();
+    cleanup();
+    fixture?.restore();
+    fixture = null;
+    const developer = open(makePerson("owner"), "/settings/advanced?tab=developer");
+    expect(await developer.findByText("Selected chat model")).toBeTruthy();
+    expect(await developer.findByText("MaiPai Stack address")).toBeTruthy();
+    expect(await developer.findByText("Audio outside screen time")).toBeTruthy();
+  });
+
+  test("Offline books does not draw the Search tab web search block", async () => {
+    const books = open(makePerson("owner"), "/settings/search?tab=books");
+    expect(await books.findByRole("tab", { name: "Offline books" })).toBeTruthy();
+    expect(books.queryByText("Web search rules")).toBeNull();
   });
 
   test("away wizard opens from the checklist and from Settings, network", async () => {
@@ -283,7 +301,7 @@ describe("the settings route", () => {
   test("Backups area renders storage and all standalone management links", async () => {
     const view = open(makePerson("owner"), "/settings/backups?tab=storage");
     await waitFor(() => expect(where(view)).toBe("/settings/backups?tab=storage"));
-    expect(await view.findByText("Household storage cap (bytes)")).toBeTruthy();
+    expect(await view.findByText("Storage for the whole home")).toBeTruthy();
     for (const label of ["Backups", "Storage"]) expect(view.getByRole("link", { name: label })).toBeTruthy();
     cleanup();
     fixture?.restore();
@@ -360,7 +378,7 @@ describe("what a band is shown", () => {
 
   test("an adult sees the wake word device tab only once its assets are installed", async () => {
     const without = open(makePerson("adult"), "/settings/voice");
-    await waitFor(() => expect(without.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
+    await waitFor(() => expect(without.getByRole("heading", { level: 1, name: "Voice, sound and robot" })).toBeTruthy());
     expect(without.queryByRole("tab", { name: "This device" })).toBeNull();
     cleanup();
     fixture!.restore();
@@ -379,7 +397,7 @@ describe("what a band is shown", () => {
     fixture!.restore();
     fixture = null;
     const teen = open(makePerson("teen"), "/settings/voice", { robots: true });
-    await waitFor(() => expect(teen.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
+    await waitFor(() => expect(teen.getByRole("heading", { level: 1, name: "Voice, sound and robot" })).toBeTruthy());
     expect(teen.queryByRole("tab", { name: "Robot" })).toBeNull();
   });
 });
@@ -394,8 +412,8 @@ describe("what the page asks for", () => {
     for (const page of ["household", "privacy", "ai", "home-voice", "apps", "backups"]) {
       open(makePerson("owner"), `/settings/${page}`);
       await waitFor(() => expect(fixture!.scopes.length).toBeGreaterThan(0));
-      expect(fixture!.scopes).toContain("household");
-      expect(fixture!.scopes.every((scope) => scope === "household")).toBe(true);
+      expect(fixture!.scopes.some((scope) => scope.split("&")[0] === "household")).toBe(true);
+      expect(fixture!.scopes.every((scope) => scope.split("&")[0] === "household")).toBe(true);
       expect(fixture!.requests.some((r) => /scope=person%3A(?!person-owner)/.test(r))).toBe(false);
       cleanup();
       fixture!.restore();

@@ -101,7 +101,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
     matrix: card.matrix,
-    includeExpert: props.section.id === "advanced" && props.tab === "network",
+    includeExpert: props.section.id === "advanced" && (props.tab === "network" || props.tab === "developer"),
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : props.section.id === "clock" ? <ClockCardRenderer {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
   if (props.section.id === "advanced" && props.tab === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>{i18n._({ id: "Set up away access", message: "Set up away access" })}</Link></Button> : null}</>;
@@ -140,7 +140,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const tabView = section.tabs?.find((item) => item.id === props.tab)?.view;
   if (section.kind === "view") return <>{tabView ? <SettingsView view={tabView} {...viewProps} /> : section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
   // Web search belongs to the Search tab only; the Reference library tab shows its own page and nothing of web search.
-  const webSearchBlock = section.id === "search" && !tabView && (viewer.role === "owner" || viewer.role === "admin");
+  const webSearchBlock = section.id === "search" && (props.tab === undefined || props.tab === "search") && !tabView && (viewer.role === "owner" || viewer.role === "admin");
   return (
     <div className="flex min-w-0 flex-col gap-14">
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={minorDdgsTitle()} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}

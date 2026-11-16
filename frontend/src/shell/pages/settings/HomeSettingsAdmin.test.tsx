@@ -62,10 +62,9 @@ describe("who may open Home settings", () => {
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 
-  test("Search and web points to the Offline data page", async () => {
+  test("Search and web exposes Offline books as a Search tab", async () => {
     const view = open(makePerson("owner"), "/settings/search");
-    const link = await view.findByRole("link", { name: "Download Wikipedia, health and other offline books" });
-    expect(link.getAttribute("href")).toBe("/settings/offline-data");
+    expect(await view.findByRole("tab", { name: "Offline books" })).toBeTruthy();
   });
 
   test.each(["owner", "admin"] as const)("an %s opens it", async (role) => {
@@ -84,17 +83,18 @@ describe("the sections that had no entry draw inside Home settings", () => {
     expect(tabViews.apps).toMatchObject({ robot: "home.devices_admin" });
     expect(homeArea().sections.find((section) => section.id === "apps")?.tabs?.[0]?.id).toBe("robot");
     expect(tabViews.advanced).toMatchObject({ developer: "home.routing_stats" });
-    expect(homeArea().sections.find((section) => section.id === "advanced")?.tabs?.[0]?.id).toBe("developer");
+    expect(tabViews.advanced).toMatchObject({ developer: "home.routing_stats" });
+    expect(homeArea().sections.find((section) => section.id === "advanced")?.tabs?.map((tab) => tab.id)).toEqual(["network", "checks", "developer"]);
   });
 
 
   const cases: Array<[string, string, string, { robots?: boolean }]> = [
     ["robot passwords", "/settings/apps", "Robot password", { robots: true }],
-    ["plugin routing stats", "/settings/advanced", "Plugin routing", {}],
+    ["plugin routing stats", "/settings/advanced?tab=developer", "Plugin routing", {}],
   ];
   test.each(cases)("%s", async (_name, url, heading, home) => {
     const view = open(makePerson("owner"), url, home);
-    await waitFor(() => expect(where(view)).toBe(url));
+    await waitFor(() => expect(where(view)).toBe(url.split("?")[0]!));
     expect(await view.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
@@ -163,7 +163,6 @@ describe("Pictures, videos and music cards (VIDEO-SETTINGS-04)", () => {
   test("the Pictures tab draws the picture keys and the Children and teens card with its four keys", async () => {
     const view = open(makePerson("owner"), "/settings/media?tab=pictures");
     expect(await view.findByText("Adults can make pictures")).toBeTruthy();
-    expect(await view.findByText("Level when nobody says")).toBeTruthy();
     expect(await view.findByText("Children and teens")).toBeTruthy();
     for (const label of ["Let children make cartoon pictures and videos", "Cartoon pictures a child can make each day", "Cartoon videos a child can make each day", "Family can make pictures, videos and songs of each other"]) {
       expect(await view.findByText(label)).toBeTruthy();

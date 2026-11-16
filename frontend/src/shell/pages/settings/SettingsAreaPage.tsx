@@ -139,7 +139,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   const viewer: SettingsViewer = useMemo(() => ({ ...baseViewer(person), capabilities }), [person, capabilities]);
   const packageKeys = registryQuery.data ? packageAreaKeySet(packageAreas, registryQuery.data) : undefined;
   const registry = registryQuery.data
-    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "settings" && sectionId === "advanced" ? ["network.hub_port"] : [], packageKeys)
+    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "settings" && sectionId === "advanced" ? registryQuery.data.filter((key) => key.level === "expert" && ["household.network_port", "household.ai_developer", "media.budget"].includes(key.lives_in)).map((key) => key.key) : [], packageKeys)
     : undefined;
 
   const scopes = scopesOf(area, viewer);

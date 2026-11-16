@@ -14,6 +14,7 @@ import { SearchResults } from "@/shell/reader/SearchResults";
 import { useReferenceSaves } from "@/shell/reader/saves";
 import { ArticleCard } from "@/shell/reader/ArticleCard";
 import { SectionSidebar, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
+import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 
 const RECENT_KEY = "maipai.wikipedia.recent";
 const RECENT_MAX = 8;
@@ -167,8 +168,8 @@ export function WikipediaPage({ person }: { person?: Roster } = {}) {
         {booksQuery.data && !book ? (
           <section className="flex flex-col gap-2" aria-label={i18n._({ id: "Wikipedia is not installed", message: "Wikipedia is not installed" })}>
             <h2 className="text-xl font-semibold">{i18n._({ id: "Wikipedia is not in your library yet", message: "Wikipedia is not in your library yet" })}</h2>
-            <p className="text-muted-foreground">{i18n._({ id: "An owner or admin can download it in Settings, Offline data (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet.", message: "An owner or admin can download it in Settings, Offline data (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet." })}</p>
-            <Link className="underline underline-offset-2" to="/settings/offline-data">{i18n._({ id: "Open Offline data", message: "Open Offline data" })}</Link>
+            <p className="text-muted-foreground">{i18n._({ id: "An owner or admin can download it in Settings, Search, Offline books (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet.", message: "An owner or admin can download it in Settings, Search, Offline books (pick Minimum, Moderate or Full, or switch single books on). It downloads once and then works without the internet." })}</p>
+            <Link className="underline underline-offset-2" to={settingsPath("search", "books")}>{i18n._({ id: "Open Offline books", message: "Open Offline books" })}</Link>
           </section>
         ) : null}
         {book ? (
