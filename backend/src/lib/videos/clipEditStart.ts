@@ -55,8 +55,16 @@ export const NEXT_SHOTS = {
 } as const;
 export type NextShot = keyof typeof NEXT_SHOTS;
 
+export const EXTEND_DEFAULT = "Continue the scene from where it stops, keeping the same place, people and light.";
+export const EXTEND_MAX_CHARS = 300;
+
+/** Colorize: the one restyle the edit tool has (`ltx-ic-colorizer`, VIDEO_RESTYLES), started like Sharpen. The refusal lines (no colorizer installed, clip too long, level) come from the tool. */
+export function startColorize(actor: PersonRow, id: string): Promise<ClipEditStart> {
+  return startClipEdit(actor, id, { change: "restyle", restyle: "colorize" }, "I couldn't colour that video. Try again.", "colorize_failed");
+}
+
 /** Start a Create rerun or a last-frame continuation from the owner's finished clip. */
-export async function startClipCreation(actor: PersonRow, id: string, mode: "reshoot" | "next-shot", change?: string, shot?: NextShot): Promise<ClipEditStart> {
+export async function startClipCreation(actor: PersonRow, id: string, mode: "reshoot" | "next-shot" | "extend", change?: string, shot?: NextShot): Promise<ClipEditStart> {
   const gate = editRefusal(makeAudienceOf(actor), "");
   if (gate) return { ok: false, status: 403, error: gate.line, code: gate.kind === "denied" ? gate.why : "minor" };
   const source = getVideoJobFor(actor, id) ?? getVideoJobByFileFor(actor, id);
@@ -67,8 +75,9 @@ export async function startClipCreation(actor: PersonRow, id: string, mode: "res
   let body = mode === "reshoot" ? { ...base, ...(change ? { prompt: `${base.prompt}. ${change.trim()}` } : {}) } : base;
   const sourceMark = await clipMarkOf(source);
   let context: Parameters<typeof makeVideoFor>[2] = { parent: source, adultOnly: sourceMark.madeAudience === "adult-only", adultLock: sourceMark.lock };
-  if (mode === "next-shot") {
-    const instruction = shot ? NEXT_SHOTS[shot] : null;
+  if (mode === "next-shot" || mode === "extend") {
+    // Extend: the same last-frame continuation, with the person's one sentence (or the plain "keep going") instead of a camera choice.
+    const instruction = mode === "extend" ? change?.trim() || EXTEND_DEFAULT : shot ? NEXT_SHOTS[shot] : null;
     if (!instruction) return { ok: false, status: 422, error: "Choose one of the available next shots.", code: "bad_arguments" };
     const clip = clipFileOf(actor, source);
     if (!clip) return { ok: false, status: 404, error: "That video isn't available any more. Ask for it again.", code: "not_found" };

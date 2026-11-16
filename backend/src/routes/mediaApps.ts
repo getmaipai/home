@@ -40,7 +40,8 @@ import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { addCredits, addTitle, burnCaptions, makeCaptions, saveCaptionText } from "@/lib/videos/captionsPage";
-import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
+import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, startColorize, EXTEND_MAX_CHARS, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
+import { ceilingFor, startLongTake } from "@/lib/videos/longTake";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { FILM_PAGE_ACTIONS, filmPageAction } from "@/lib/films/pageFilm";
@@ -196,8 +197,20 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const person = c.get("person");
     if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "make")) return next();
-    const read = readMakeBody(await jsonBody(c));
+    const raw = await jsonBody(c);
+    const asked = typeof raw.seconds === "number" ? raw.seconds : typeof raw.seconds === "string" && raw.seconds.trim() !== "" ? Number(raw.seconds) : 0;
+    const read = readMakeBody(asked > 30 ? { ...raw, seconds: 30 } : raw);
     if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
+    // One Shot: a length past one piece's ceiling at this level is a long take (parts that continue from each other), never cut short. LONGTAKE-01 owns the rules.
+    const wanted = asked;
+    const tier = read.body.tier ?? "standard";
+    if (Number.isFinite(wanted) && wanted > ceilingFor(tier) && read.body.prompt) {
+      if (read.body.start_frame || read.body.end_frame) return c.json({ error: "A long take starts from your words. Take the picture off, or choose a shorter length.", code: "long_take_refused" }, 422);
+      const started = startLongTake(person, { prompt: read.body.prompt, seconds: Math.round(wanted), tier, ...(read.body.orientation ? { orientation: read.body.orientation } : {}), ...(read.body.styles?.length ? { styles: read.body.styles } : {}) });
+      return started.ok
+        ? c.json({ ok: true as const, id: started.id, state: "running", notice: `This is made in ${started.parts} parts of about ${started.per_part} seconds, each carrying on from the one before, so it takes longer and the picture may drift a little.`, long_take: true as const }, 200)
+        : c.json({ error: started.line, code: "long_take_refused" }, started.status as never);
+    }
     const made = await makeTakesFor(person, read.body);
     return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice, ...(made.ids && made.ids.length > 1 ? { ids: made.ids } : {}) }, 200) : c.json({ error: made.error, code: made.code }, made.status);
   });
@@ -245,6 +258,25 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "next-shot")) return next();
     const body = await jsonBody(c), id = typeof body.id === "string" ? body.id : "", shot = typeof body.shot === "string" && Object.hasOwn(NEXT_SHOTS, body.shot) ? body.shot as keyof typeof NEXT_SHOTS : undefined;
     const result = await startClipCreation(person, id, "next-shot", undefined, shot);
+    return result.ok ? c.json({ ok: true as const, id: result.job.id, state: result.job.state }, 200) : c.json({ error: result.error, code: result.code, ...(result.locked ? { locked: true } : {}) }, result.status as never);
+  });
+
+  // Extend: the clip carries on from its last frame as a new clip, with an optional one sentence. Colorize: the clip, coloured in (the edit tool's one restyle).
+  routes.post("/actions/extend", requireAuth, async (c, next) => {
+    const person = c.get("person"); if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "extend")) return next();
+    const body = await jsonBody(c), id = typeof body.id === "string" ? body.id : "";
+    const said = typeof body.words === "string" && !/^\{[a-z_]+\}$/.test(body.words.trim()) ? body.words.trim() : "";
+    if (said.length > EXTEND_MAX_CHARS) return c.json({ error: `Keep the sentence under ${EXTEND_MAX_CHARS} characters.`, code: "bad_arguments" }, 422);
+    const result = await startClipCreation(person, id, "extend", said || undefined);
+    return result.ok ? c.json({ ok: true as const, id: result.job.id, state: result.job.state }, 200) : c.json({ error: result.error, code: result.code, ...(result.locked ? { locked: true } : {}) }, result.status as never);
+  });
+
+  routes.post("/actions/colorize", requireAuth, async (c, next) => {
+    const person = c.get("person"); if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "colorize")) return next();
+    const body = await jsonBody(c), id = typeof body.id === "string" ? body.id : "";
+    const result = await startColorize(person, id);
     return result.ok ? c.json({ ok: true as const, id: result.job.id, state: result.job.state }, 200) : c.json({ error: result.error, code: result.code, ...(result.locked ? { locked: true } : {}) }, result.status as never);
   });
 

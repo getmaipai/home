@@ -19,6 +19,7 @@ import { syncLoras } from "@/lib/loras/sync";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason, videoStatusReady } from "@/lib/videos/ready";
+import { MAX_TAKE_SECONDS } from "@/lib/videos/longTake";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { householdActiveVideoJobs } from "@/lib/videos/jobs";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
@@ -89,6 +90,18 @@ function lengthOptions(): number[] {
     ltx25VideoReady(engine) ? maxSecondsFor("detailed", "ltx25", engine) : DETAILED_MAX_SECONDS,
   );
   return [...new Set([QUICK_MAX_SECONDS, longest])];
+}
+
+/** One Shot (LONGTAKE-02 in part): Create's Length also lists whole multiples of the longest single piece up to the longest unbroken take (`MAX_TAKE_SECONDS`).
+ * Those lengths are made as parts that continue from each other (lib/videos/longTake.ts) and say so on the option. Only when LTX-2.5 serves, as the chain needs it. */
+export function createLengthOptions(): Array<{ value: number; label: string }> {
+  const single = lengthOptions();
+  const options = single.map((value) => ({ value, label: `${value} seconds` }));
+  const engine = peekVideoEngineStatus();
+  if (engine === null || !ltx25VideoReady(engine)) return options;
+  const piece = Math.max(...single);
+  for (let n = 2; piece * n <= MAX_TAKE_SECONDS; n += 1) options.push({ value: piece * n, label: `${piece * n} seconds, made in parts` });
+  return options;
 }
 
 /** The first node of one type anywhere in a page's body (the prompt bar sits inside the page's split view). */
@@ -174,7 +187,7 @@ registerAppPageFill("video", "create", (person, page) => {
   const allChips = [
     templateChip,
     ...chips,
-    { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
+    { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: createLengthOptions() },
     // TAKES-01: how many takes of the prompt one press makes (different seeds, one queue). The most a level allows is checked when Generate runs.
     { state: "takes", label: "Takes", group: "Settings", icon: "layers", icon_only: true, presentation: "popover", default: 1, quiet_value: 1, options: [1, 2, 3, 4].map((value) => ({ value, label: value === 1 ? "1 take" : `${value} takes` })) },
     { state: "look", label: "Look", icon: "palette", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
@@ -204,7 +217,7 @@ registerAppPageFill("video", "create", (person, page) => {
     bar.submit_detail = { state: "tier", labels };
   } else {
     const labels: Record<string, string> = {};
-    for (const value of lengths) labels[String(value)] = videoTimeLine("standard", value);
+    for (const { value } of createLengthOptions()) labels[String(value)] = videoTimeLine("standard", value);
     bar.submit_detail = { state: "seconds", labels };
   }
 });

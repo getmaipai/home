@@ -224,14 +224,16 @@ describe("End image slot", () => {
 });
 
 describe("Length", () => {
-  test("offers five seconds and the longest this engine makes, never more", async () => {
+  test("offers five seconds and the longest this engine makes as one piece; longer lengths are whole multiples marked as made in parts", async () => {
     const { client } = await adultClient();
     const status = readyVideoStatusForTests({ ltx25: "ready" });
     __setVideoStatusForTests(status);
     const bar = await pagebar(client);
     const longest = Math.max(maxSecondsFor("quick", "ltx25", status), maxSecondsFor("detailed", "ltx25", status));
-    const values = bar.chips.find((chip: { state: string }) => chip.state === "seconds").options.map((o: { value: number }) => o.value);
+    const options = bar.chips.find((chip: { state: string }) => chip.state === "seconds").options as Array<{ value: number; label: string }>;
+    const values = options.filter((o) => !o.label.endsWith("made in parts")).map((o) => o.value);
     expect(Math.max(...values)).toBe(longest);
     expect(values[0]).toBe(5);
+    for (const o of options.filter((o) => o.label.endsWith("made in parts"))) expect(o.value % longest).toBe(0);
   });
 });
