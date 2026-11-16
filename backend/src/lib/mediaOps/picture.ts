@@ -17,6 +17,7 @@ import { PICTURE_COVERAGE } from "./coverage";
 import { EXPAND_BASE_PROMPT, EXPAND_SHAPES } from "@/lib/pictures/expand";
 import { COMBINE_EXTRAS_LINE, COMBINE_NEEDS_ONE_LINE, combineInstruction, combinePictureLimit } from "@/lib/pictures/combine";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { startNextShot } from "@/lib/pictures/nextShot";
 
 const empty = z.object({});
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
@@ -223,6 +224,25 @@ registerMediaOp({
     const result = await startComment(actor, chat.conversationId, chat.id, { prompt: combineInstruction(used.length + 1, args.words), references: used });
     const note = chosen.length > used.length ? { note: COMBINE_EXTRAS_LINE } : {};
     return "job" in result ? { job: { ...result, ...note } } : { file: { ...(result as object), ...note } };
+  },
+});
+
+const nextShotArgs = z.object({ words: z.string().max(300).optional().describe("Optional: what happens next, for example: he walks away down the street. Without it the chat model writes the next moment.") });
+
+/** CREATOR-17 Next shot (still): the NEXT picture of the same story, made as a new picture (not an edit) from the source as a reference with its cast. It goes through the ordinary generate path, so every gate there applies. The answer is the new picture's job, not an edit job. */
+registerMediaOp({
+  id: "picture.next_shot",
+  label: "Next shot",
+  summary: "Make the next picture in the same story: the same people and place at a different moment or angle (for example, the man now walks away down the street).",
+  input: "picture",
+  output: "picture",
+  args: nextShotArgs,
+  controls: [{ kind: "words", name: "words", label: "What happens next (optional)" }],
+  needs: "image",
+  minBand: "child",
+  run: async ({ actor, signal }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof nextShotArgs> }) => {
+    const started = await startNextShot(actor, chatSource(source), args.words, signal);
+    return { job: { state: "running" as const, job: started.job, percent: null, label: "Next shot", pictureJobId: started.job } };
   },
 });
 

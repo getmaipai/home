@@ -149,6 +149,12 @@ async function describeOne(dataUrl: string): Promise<string> {
   return content.trim().slice(0, 600);
 }
 
+/** One picture's bytes described in words by the vision model, or null when the vision model is not up or cannot read it (CREATOR-17 Next shot). */
+export async function describePictureBytes(bytes: Uint8Array, mediaType: string): Promise<string | null> {
+  if (!describeForTests && !(await visionModelReadsPictures())) return null;
+  try { return await describeOne(`data:${mediaType};base64,${Buffer.from(bytes).toString("base64")}`); } catch { return null; }
+}
+
 /** Each stored picture of the turn, described in words by the vision model. A picture that could not be opened or read goes to `unread`. */
 export async function describePictures(actor: PersonRow, conversationId: string, temporary: boolean, images: readonly ChatImagePart[]): Promise<{ described: Array<{ name: string; text: string }>; unread: ChatImagePart[] }> {
   const loaded = loadPictureParts(actor, conversationId, temporary, images, VISION_PICTURE_TOKENS);

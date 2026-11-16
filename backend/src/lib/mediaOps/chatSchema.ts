@@ -33,7 +33,7 @@ export function editPictureSpec(id: string, state: TurnState | undefined): ToolS
     });
     return {
       id,
-      description: "Use one of the available picture operations with its shown arguments. To combine pictures use picture.combine: the source is Picture 1 and args.references lists the other picture ids (as many as the engine takes); words says how to combine them. For locate, inspect the numbered boxes and pick by number only if the intended subject is clear; otherwise ask one short question.",
+      description: "Use one of the available picture operations with its shown arguments. To combine pictures use picture.combine: the source is Picture 1 and args.references lists the other picture ids (as many as the engine takes); words says how to combine them. To make the next picture of the same story (the same people and place, a different moment) use picture.next_shot: it makes a new picture; args.words is optional and says what happens next (for example: he walks away). For locate, inspect the numbered boxes and pick by number only if the intended subject is clear; otherwise ask one short question.",
       args: {
         type: "object",
         properties: { op: { type: "string", enum: operations.map((operation) => operation.id), description: operations.map((operation) => `${operation.id}: ${operation.summary}`).join(" ") } },

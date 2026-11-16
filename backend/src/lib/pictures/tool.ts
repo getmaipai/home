@@ -85,6 +85,8 @@ export interface RunGenerateImageInput {
   signal?: AbortSignal;
   /** CREATOR-16: set by the set runner on one scene of a set. `seed` is shared by every scene; `detached` keeps a later scene off the chat turn (its job is its own Library file, like an extra take). */
   scene?: { seed: number; detached: boolean };
+  /** CREATOR-17 Next shot: the picture this new one follows. Its creation record becomes the new picture's parent (the same field Another take uses). */
+  parentFileId?: string;
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -331,6 +333,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       sources: usedLibraryRefs.map(({ adultMark }) => adultMark),
       subjectIds: resolvedSubjects.map(({ subject }) => subject.id),
+      ...(input.parentFileId ? { sourceFileId: input.parentFileId } : {}),
       ...(words.length ? { words } : {}),
       conversationId: extra || input.scene?.detached ? null : state.conversationId,
       turnId: extra || input.scene?.detached ? null : state.turnId,
