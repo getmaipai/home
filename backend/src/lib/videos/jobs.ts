@@ -521,13 +521,34 @@ export function storeContinueFrame(actor: PersonRow, input: { conversationId: st
   return made.ok ? { ok: true, id: made.value.id } : { ok: false, line: saveFailureLine(made.status) };
 }
 
+/** This person's clips that are waiting or being made. */
+function activeVideoJobListFor(actor: PersonRow): Array<{ id: string; anotherOf?: string }> {
+  const list: Array<{ id: string; anotherOf?: string }> = [];
+  for (const job of memory.values()) if (job.personId === actor.id && (job.state === "queued" || job.state === "running")) list.push({ id: job.id, ...(job.request.anotherOf ? { anotherOf: job.request.anotherOf } : {}) });
+  const rows = db.select({ id: videoJobs.id, request: videoJobs.request }).from(videoJobs).where(and(eq(videoJobs.personId, actor.id), inArray(videoJobs.state, ["queued", "running"]))).all();
+  for (const row of rows) if (!memory.has(row.id)) {
+    let anotherOf: string | undefined;
+    try { anotherOf = (JSON.parse(row.request) as { anotherOf?: string }).anotherOf; } catch { /* a row with no readable request counts as a clip of its own */ }
+    list.push({ id: row.id, ...(anotherOf ? { anotherOf } : {}) });
+  }
+  return list;
+}
+
 /** How many of this person's clips are waiting or being made. */
 export function activeVideoJobsFor(actor: PersonRow): number {
-  let count = 0;
-  for (const job of memory.values()) if (job.personId === actor.id && (job.state === "queued" || job.state === "running")) count += 1;
-  const rows = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, actor.id), inArray(videoJobs.state, ["queued", "running"]))).all();
-  for (const row of rows) if (!memory.has(row.id)) count += 1;
-  return count;
+  return activeVideoJobListFor(actor).length;
+}
+
+/** TAKES-01: how many takes of one prompt a level may queue together (heavier levels make fewer), and how many clips may wait in the whole home before a new set is refused. */
+export const MAX_TAKES_BY_TIER = { standard: 4, boost: 3, max: 2 } as const;
+export const HOUSEHOLD_WAITING_LIMIT = 8;
+
+/** Clips waiting or being made anywhere in this home (everyone's), for the "N ahead of you" line and the too-many-waiting refusal. */
+export function householdActiveVideoJobs(): number {
+  const ids = new Set<string>();
+  for (const job of memory.values()) if (job.state === "queued" || job.state === "running") ids.add(job.id);
+  for (const row of db.select({ id: videoJobs.id }).from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) ids.add(row.id);
+  return ids.size;
 }
 
 // ---------------------------------------------------------------- start
@@ -557,12 +578,16 @@ export interface StartVideoInput {
   /** ADULT-LOCK-06: the source's Adult lock (`on` or `off`) when `adultOnly` comes from a source clip; absent means on. */
   adultLock?: "on" | "off";
   retakeOf?: string;
+  /** TAKES-01: the first clip of a set of takes. A take after the first starts while only this set's clips are waiting (the one-at-a-time rule otherwise holds). */
+  takeOf?: string;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
 export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   // One clip at a time per person: a second one waits until the first is done or stopped, so no one can fill the Stack's line.
-  if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
+  const waiting = activeVideoJobListFor(input.actor);
+  const inSet = input.takeOf !== undefined && waiting.every((job) => job.id === input.takeOf || job.anotherOf === input.takeOf);
+  if (waiting.length > 0 && !inSet) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
   if (videoReservations.has(input.actor.id)) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
   videoReservations.add(input.actor.id);
   // Whoever calls, a teen or a child is on an allowed model (Quick, silent); only an adult's own choice reaches the engine.

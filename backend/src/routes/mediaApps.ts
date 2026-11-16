@@ -34,7 +34,7 @@ import { mediaBandOf } from "@/lib/media/band";
 import { changePlaylistMembers, musicPlaylistOps, playlistFor } from "@/lib/media/musicPlaylists";
 import { reportKeptSongs, clearMusicSearches, musicQueueAction, recentMusicSongs, pinMusicItem, recordMusicSearch } from "@/lib/media/musicLibrary";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeVideoFor, readMakeBody } from "@/lib/videos/make";
+import { anotherTakeFor, bodyOfVideoJob, makeAudienceOf, makeTakesFor, makeVideoFor, readMakeBody } from "@/lib/videos/make";
 import { makePictureFor, readPictureMakeBody } from "@/lib/pictures/make";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeItMaxBody } from "@/lib/videos/editTool";
@@ -198,8 +198,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "make")) return next();
     const read = readMakeBody(await jsonBody(c));
     if (!read.ok) return c.json({ error: read.error, code: "bad_arguments" }, 422);
-    const made = await makeVideoFor(person, read.body);
-    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice }, 200) : c.json({ error: made.error, code: made.code }, made.status);
+    const made = await makeTakesFor(person, read.body);
+    return made.ok ? c.json({ ok: true as const, id: made.job.id, state: made.job.state, notice: made.notice, ...(made.ids && made.ids.length > 1 ? { ids: made.ids } : {}) }, 200) : c.json({ error: made.error, code: made.code }, made.status);
   });
 
   // CREATOR-30: a read-only view of the maker's own finished clip record. The store applies the same not-found and Adult lock rules as GET /api/creations/by-file.

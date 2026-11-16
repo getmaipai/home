@@ -229,8 +229,8 @@ describe("the Create page and the make action", () => {
     expect(segment ? { ...segment, label: "Quality", presentation: "dropdown" } : null).toEqual(bar.tier ?? null);
     // The page document itself is not changed by serving it: a second request gets one set of chips, not two.
     const again = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
-    // five page chips plus the seven shot-card chips (CREATOR-20b): a second request gets the same set, not a doubled one
-    expect(promptBarOf(again.body)!.chips).toHaveLength(13);
+    // six page chips (with Takes) plus the seven shot-card chips (CREATOR-20b): a second request gets the same set, not a doubled one
+    expect(promptBarOf(again.body)!.chips).toHaveLength(14);
     // VIDEO-UI-06: the compact Create page keeps the prompt first with no oversized studio heading.
     expect((page as Record<string, any>).surface).toBeUndefined(); // PRO-LOOK-STUDIOS-01: the studio surface is retired
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
@@ -247,7 +247,8 @@ describe("the Create page and the make action", () => {
     expect(chip("camera")).toMatchObject({ presentation: "popover", group: "Style" });
     expect(chip("voices").fold).toBeUndefined();
     expect(chip("orientation").fold).toBeUndefined();
-    expect(bar.submit_detail).toBeUndefined();
+    // TAKES-02: the time and the engine's state sit under Generate, per level.
+    expect(bar.submit_detail).toMatchObject({ state: expect.stringMatching(/^(tier|seconds)$/) });
     expect(JSON.stringify(page.body)).not.toMatch(/\b(GB|RAM|memory|model|credits?|pack)\b/i);
     // The feed sits in a "Your clips" section (the kit's feed has no heading of its own), in the media look with the filters behind one View button.
     const section = page.body.find((node) => node.type === "section") as Record<string, any>;

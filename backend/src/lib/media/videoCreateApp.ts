@@ -17,8 +17,10 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
 import { syncLoras } from "@/lib/loras/sync";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
-import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
-import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason } from "@/lib/videos/ready";
+import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
+import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason, videoStatusReady } from "@/lib/videos/ready";
+import { estimateVideoMinutes } from "@/lib/videos/estimate";
+import { householdActiveVideoJobs } from "@/lib/videos/jobs";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
 import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
@@ -114,6 +116,34 @@ registerAppPageWarm("video", "create", async () => {
  * Max 10 s 205 s). Never credits, memory or model names. */
 export const VIDEO_TIME_WORDS = { standard: "Standard, under a minute", boost: "Boost, about a minute", max: "Max, about four minutes" } as const;
 
+/** TAKES-02: the plain line under Generate for one level: the time (this home's own finished clips when there are enough, else the fixed words above) and where the engine stands.
+ * The kit has no read-only status chip, so the engine's state rides in this one line. Never memory, credits or model names. */
+export function videoEngineLine(): string | null {
+  const engine = peekVideoEngineStatus();
+  if (engine === null) return null;
+  if (!videoStatusReady(engine, true)) return "Video is not set up on this computer yet";
+  if (engine.memory?.fits === false) return "Too big for this computer right now";
+  const ahead = householdActiveVideoJobs();
+  return ahead === 0 ? "Ready" : `Busy: ${ahead} ahead of you`;
+}
+export function videoTimeLine(tier: "standard" | "boost" | "max", seconds: number): string {
+  const { minutes } = estimateVideoMinutes({ tier, seconds });
+  const time = minutes === null ? VIDEO_TIME_WORDS[tier] : `About ${minutes} ${minutes === 1 ? "minute" : "minutes"} on this computer`;
+  const engine = videoEngineLine();
+  return (engine ? `${time} · ${engine}` : time).slice(0, 80);
+}
+
+/** The kit page schema allows at most 16 chips on a prompt bar. When styles, characters and strength all show beside the seven shot cards the set is over, so the last shot cards (Grade, then Film stock) give way. */
+export function capChips(chips: Array<Record<string, unknown>>, max = 16): Array<Record<string, unknown>> {
+  const out = [...chips];
+  for (const state of ["card_grade", "card_film_stock", "card_light"]) {
+    if (out.length <= max) break;
+    const at = out.findIndex((chip) => chip.state === state);
+    if (at >= 0) out.splice(at, 1);
+  }
+  return out.slice(0, max);
+}
+
 registerAppPageFill("video", "create", (person, page) => {
   // A card whose loop is not in the package (not made yet, or removed) is a plain tile with its label, never a broken video.
   const media = (loop: string): { media?: string } => (packageAssetFile("video", loop) ? { media: loop } : {});
@@ -141,10 +171,12 @@ registerAppPageFill("video", "create", (person, page) => {
     const icons: Record<string, string> = { landscape: "rectangle-horizontal", portrait: "rectangle-vertical" };
     if (Array.isArray(chip.options)) for (const option of chip.options as Array<Record<string, unknown>>) if (icons[String(option.value)]) option.icon = icons[String(option.value)];
   }
-  bar.chips = [
+  const allChips = [
     templateChip,
     ...chips,
     { state: "seconds", label: "Length", group: "Settings", icon: "clock", icon_only: true, presentation: "popover", default: QUICK_MAX_SECONDS, options: lengths.map((value) => ({ value, label: `${value} seconds` })) },
+    // TAKES-01: how many takes of the prompt one press makes (different seeds, one queue). The most a level allows is checked when Generate runs.
+    { state: "takes", label: "Takes", group: "Settings", icon: "layers", icon_only: true, presentation: "popover", default: 1, quiet_value: 1, options: [1, 2, 3, 4].map((value) => ({ value, label: value === 1 ? "1 take" : `${value} takes` })) },
     { state: "look", label: "Look", icon: "palette", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: VIDEO_LOOKS[0]!.id, quiet_value: VIDEO_LOOKS[0]!.id, options: VIDEO_LOOKS.map(({ id, label, loop }) => ({ value: id, label: id === VIDEO_LOOKS[0]!.id ? "Auto" : label, ...media(loop) })) },
     // Auto is the start for both: Look's Auto is `natural` (adds no words; a clip's tag still says "Natural"), Camera's Auto is "none" (the route reads it as not given).
     { state: "camera", label: "Camera", icon: "clapperboard", icon_only: true, variant: "cards", presentation: "popover", group: "Style", default: "none", quiet_value: "none", options: [{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map(({ id, label, loop }) => ({ value: id, label, ...media(loop) }))] },
@@ -153,16 +185,27 @@ registerAppPageFill("video", "create", (person, page) => {
     ...styleChips({ person, engine: peekVideoEngineStatus(), offered: ((videoTierSegment(person)?.tiers as Array<{ id: StyleTier }> | undefined)?.map((t) => t.id)) ?? ["standard"] }),
     ...shotCardChips(person),
   ];
+  bar.chips = capChips(allChips as Array<Record<string, unknown>>);
+  // VIDEO-INPUTS-03: a second picture slot (the clip ends on it) only where the maker reports `end_image`; the kit's `row` slot sits beside the Start picture's field slot.
+  const engineNow = peekVideoEngineStatus();
+  const refs = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).filter((ref) => ref.state !== "end_frame") : [];
+  if (ltx25EndPictureReady(engineNow) || ltx25EndPictureReady(engineNow, true)) refs.push({ state: "end_frame", label: "End image", kind: "picture" });
+  bar.references = refs;
   // Make it Max shows only when this person holds Max and the Stack reports the Max model ready (the same offer the level segment makes); otherwise the
   // action is not drawn, so nobody presses a button whose answer is a refusal.
   const feed = findNode(page.body, "result_feed");
   if (feed && Array.isArray(feed.actions) && !maxOfferedNow(person)) feed.actions = (feed.actions as Array<{ action?: { call?: { target?: string } } }>).filter((entry) => !entry.action?.call?.target?.endsWith("/actions/max"));
   const tier = videoTierSegment(person);
+  // TAKES-02: the time and the engine's state under Generate, per level (by length when Standard is the only level).
   if (tier) {
     bar.tier = { ...tier, label: "Quality", presentation: "dropdown" };
-    delete bar.submit_detail;
+    const labels: Record<string, string> = {};
+    for (const entry of tier.tiers as Array<{ id: "standard" | "boost" | "max" }>) labels[entry.id] = videoTimeLine(entry.id, QUICK_MAX_SECONDS);
+    bar.submit_detail = { state: "tier", labels };
   } else {
-    delete bar.submit_detail;
+    const labels: Record<string, string> = {};
+    for (const value of lengths) labels[String(value)] = videoTimeLine("standard", value);
+    bar.submit_detail = { state: "seconds", labels };
   }
 });
 

@@ -62,7 +62,9 @@
             "style": "{style}",
             "character": "{character}",
             "strength": "{strength}",
-            "start_frame": "{start_frame}"
+            "start_frame": "{start_frame}",
+            "end_frame": "{end_frame}",
+            "takes": "{takes}"
           }
         }
       },

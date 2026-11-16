@@ -97,6 +97,8 @@ export interface RunGenerateVideoInput {
   adultOnly?: boolean;
   /** The source clip's Adult lock (design 3.10); absent means on. */
   adultLock?: "on" | "off";
+  /** TAKES-01: the first clip of the set this clip is a take of (the Create page's takes; not a tool argument, so the tool's size does not grow). */
+  takeOf?: string;
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -223,7 +225,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (ending) {
     if (!image) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: an ending picture needs a starting picture too." }, data: { refused: "end_frame_needs_start" }, actions: [] } });
     const id = /^(latest|last|this|that)$/i.test(ending) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId!) : latestGeneratedPictureId(actor, state.conversationId!)) : ending;
-    const ref = id && shotPictureId ? loadLibraryPicture(actor, id) : id && state.conversationId ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
+    const ref = id && (shotPictureId || !state.conversationId) ? loadLibraryPicture(actor, id) : id && state.conversationId ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
     if (!ref || !ref.ok) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${ref && !ref.ok ? ref.line : "I can only use a picture made here in this chat for the ending picture."}` }, data: { refused: "end_reference" }, actions: [] } });
     if (ref.id === sourceFileId) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: The ending picture must be different from the starting picture." }, data: { refused: "same_end_frame" }, actions: [] } });
     endImage = ref.base64; endFileId = ref.id;
@@ -303,6 +305,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (kid && !slot) return refused(callId, args, { kind: "child", why: "daily_limit", line: CHILD_VIDEO_LIMIT_LINE });
   try {
     const job = await startVideoJob({
+      ...(input.takeOf ? { takeOf: input.takeOf } : {}),
       actor,
       conversationId: state.conversationId,
       turnId: state.turnId,

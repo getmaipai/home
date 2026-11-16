@@ -3,7 +3,7 @@
 // `runGenerateVideo`, the one definition the chat tool also runs, as the person's own screen with no chat behind it.
 import type { PersonRow } from "@/types";
 import { runGenerateVideo, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
-import { getVideoJobFor, markAnotherTake, type VideoJob } from "./jobs";
+import { HOUSEHOLD_WAITING_LIMIT, MAX_TAKES_BY_TIER, getVideoJobFor, householdActiveVideoJobs, markAnotherTake, type VideoJob } from "./jobs";
 import { videoLookFor, videoRecipeFor, videoVoicesFor } from "./recipes";
 import { MAX_NEEDS_ADMIN_LINE, tierArgument } from "@/lib/tiers";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -17,11 +17,13 @@ import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
 import { getTemplate, videoTemplateSettings } from "@/lib/media/templates";
 
+/** The most takes one press of Generate makes (the Takes chip offers 1 to 4; a level may cap lower, `MAX_TAKES_BY_TIER`). */
+export const MAX_TAKES = 8;
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** A second Library picture the clip ends on (needs a start_frame and a maker that reports end_image). */ end_frame?: string; /** TAKES-01: how many takes of this prompt to make (1 to 8; the level caps it). */ takes?: number; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
-export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off"; parent?: VideoJob }
+export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off"; parent?: VideoJob; /** TAKES-01: the first clip of the set this one is a take of. */ takeOf?: string }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
 
 /** The audience of the Create page: the signed-in person on their own written screen. */
@@ -100,6 +102,19 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
     if (startFrame.length > 200) return { ok: false, error: "Choose a picture from your Library, or leave the Picture slot empty." };
     body.start_frame = startFrame;
   }
+  const endFrame = typeof raw.end_frame === "string" ? raw.end_frame.trim() : "";
+  if (endFrame) {
+    if (endFrame.length > 200) return { ok: false, error: "Choose a picture from your Library for the end, or leave the End slot empty." };
+    if (!startFrame) return { ok: false, error: "The end picture needs a start picture too. Add the start picture, or clear the end one." };
+    if (endFrame === startFrame) return { ok: false, error: "The end picture must be different from the start picture. Choose another, or clear the end one." };
+    body.end_frame = endFrame;
+  }
+  // TAKES-01: an empty Takes chip is one take.
+  const takesRaw = typeof raw.takes === "number" ? raw.takes : typeof raw.takes === "string" && raw.takes.trim() !== "" ? Number(raw.takes) : undefined;
+  if (takesRaw !== undefined) {
+    if (!Number.isInteger(takesRaw) || takesRaw < 1 || takesRaw > MAX_TAKES) return { ok: false, error: `Choose 1 to ${MAX_TAKES} takes, or leave it empty.` };
+    if (takesRaw > 1) body.takes = takesRaw;
+  }
   // ONE-COMPOSER-2026-11-13: the From a picture and Animate pages make a clip from a picture, so they ask for one; an empty slot gets one plain line, nothing starts.
   if ((raw.need_picture === true || raw.need_picture === "true") && !startFrame) return { ok: false, error: "Pick a picture first. Press the picture button in the box, choose one, then try again." };
   return { ok: true, body };
@@ -138,6 +153,13 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
     }
     startFrame = { id: photo.id, base64: photo.base64, width, height };
   }
+  // The End picture gets the same screening as the Start picture; the tool loads it again by id for the Stack.
+  if (body.end_frame && !context.prepared) {
+    const end = loadLibraryPicture(actor, body.end_frame);
+    if (!end.ok) return { ok: false, status: 404, error: end.line, code: "end_frame_gone" };
+    const screenedEnd = await screenInputImage(end.bytes, body.prompt, viewerOf(actor, audience.band));
+    if (!screenedEnd.ok) return { ok: false, status: 422, error: screenedEnd.line, code: screenedEnd.code };
+  }
   // VIDEO-LORA-09: a style the person may not use, a locked one and a missing one each stop the clip here with one plain line, before anything is read or started.
   if (body.styles && body.styles.length > 0) {
     const styled = await resolveStyles({ audience, ids: body.styles });
@@ -146,7 +168,8 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   const outcome = await runGenerateVideo({
     ...(body.styles && body.styles.length > 0 ? { styleIds: body.styles } : {}),
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
-    args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.loop ? { loop: true } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}), ...(body.styles?.length ? { styles: body.styles } : {}), ...(body.template ? { template: body.template } : {}) },
+    args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.loop ? { loop: true } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}), ...(body.styles?.length ? { styles: body.styles } : {}), ...(body.template ? { template: body.template } : {}), ...(body.end_frame ? { end_frame: body.end_frame } : {}) },
+    ...(context.takeOf ? { takeOf: context.takeOf } : {}),
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
@@ -194,4 +217,26 @@ export async function anotherTakeFor(actor: PersonRow, source: VideoJob, context
   // CREATOR-02: the new clip's creation record names this clip's record as its parent.
   if (made.ok) markAnotherTake(made.job, source);
   return made;
+}
+
+/** TAKES-01: the Create page's Generate. One take is exactly `makeVideoFor`. More makes the first through it, then each other take with a new seed, queued through the one household
+ * queue and tagged as a take of the first (`anotherOf`, so each finished clip's creation record names the first as its parent). The level caps the count and a full queue refuses the set. */
+export async function makeTakesFor(actor: PersonRow, body: MakeVideoBody, context: MakeVideoContext = {}): Promise<MakeVideoResult & { ids?: string[] }> {
+  const takes = body.takes ?? 1;
+  const { takes: _unused, ...single } = body;
+  if (takes <= 1) return makeVideoFor(actor, single, context);
+  const tier = body.tier ?? "standard";
+  const cap = MAX_TAKES_BY_TIER[tier];
+  if (takes > cap) return { ok: false, status: 422, error: `${tier === "standard" ? "Standard" : tier === "boost" ? "Boost" : "Max"} makes up to ${cap} takes at once. Choose ${cap} or fewer, then try again.`, code: "too_many_takes" };
+  if (householdActiveVideoJobs() + takes > HOUSEHOLD_WAITING_LIMIT) return { ok: false, status: 422, error: "Too many videos are waiting right now. Make fewer takes, or try again when some have finished.", code: "queue_full" };
+  const first = await makeVideoFor(actor, single, context);
+  if (!first.ok) return first;
+  const ids = [first.job.id];
+  for (let i = 1; i < takes; i += 1) {
+    // A new seed for each take (left out of the body, the tool rolls one), the first clip as the parent.
+    const next = await makeVideoFor(actor, single, { ...context, parent: first.job, takeOf: first.job.id });
+    if (!next.ok) return { ...first, notice: `${first.notice ? `${first.notice} ` : ""}Made ${ids.length} of ${takes} takes. ${next.error}`, ids };
+    ids.push(next.job.id);
+  }
+  return { ...first, ids };
 }

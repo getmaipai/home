@@ -59,7 +59,7 @@ describe("composer modes by band", () => {
     expect(tryOn.text).not.toContain("cast_person");
     const video = res.modes.find((m) => m.id === "video")!;
     expect(video.route).toBe("/apps/video/create");
-    expect(video.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["orientation", "seconds"]);
+    expect(video.chips.filter((c) => c.group === "Settings").map((c) => c.id)).toEqual(["orientation", "seconds", "takes"]);
     expect(video.primary.label).toBe("Generate");
     expect(video.availability).toBe("ready");
   });
