@@ -246,7 +246,7 @@ export function MusicPlayerBar() {
   const body = (
     <Player key={`${track.key}-${expanded ? "full" : "bar"}`} {...common} layout={expanded ? "audio" : "mini"}
       {...(expanded
-        ? { shuffle: mode.shuffle, repeat: mode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }), lyricsBlur: true, artSpring: true, ...(lyrics ? { lyrics } : {}), actionsSlot: <>{equalizer}{studioButton(track)}</> }
+        ? { shuffle: mode.shuffle, repeat: mode.repeat, onShuffle: () => setPlayMode({ shuffle: !getPlayMode().shuffle }), onRepeat: () => setPlayMode({ repeat: nextRepeat(getPlayMode().repeat) }), lyricsBlur: true, artSpring: true, spectrum: { levels: spectrum.levels }, ...(lyrics ? { lyrics } : {}), actionsSlot: <>{equalizer}{studioButton(track)}</> }
         : { placement: "dock" as const, onClose: () => musicPlayer.stop(), onExpand: () => setExpanded(true), swipeUpToExpand: true, swipeToSkip: true,
           spectrum: { levels: spectrum.levels },
           actionsSlot: <>
