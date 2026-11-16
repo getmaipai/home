@@ -51,12 +51,11 @@ afterEach(() => {
 });
 
 describe("Engines and AI uses four tabs inside the settings shell", () => {
-  test("Features is the first tab and shows attention and feature levels", async () => {
+  test("Features is the first tab and shows feature cards without attention", async () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=overview");
     expect(await view.findByRole("tab", { name: "Features" })).toBeTruthy();
-    expect(await view.findByText("Needs attention")).toBeTruthy();
-    expect(await view.findByText("MiniMax H3-Image is needed for this level.")).toBeTruthy();
-    expect(await view.findByText("Features", { selector: "h2" })).toBeTruthy();
+    expect((await view.findAllByTestId("ai-feature-card")).length).toBeGreaterThan(0);
+    expect(view.queryByRole("heading", { name: "Needs attention" })).toBeNull();
     expect(view.queryByText("Install the AI for this computer")).toBeNull();
     expect(view.queryByText("Engine computer link")).toBeNull();
     expect(view.queryByRole("tab", { name: "Models" })).toBeNull();
@@ -64,19 +63,6 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
     expect(view.getAllByRole("link", { name: "AI and models" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
-  });
-
-  test("one feature sheet opens and saves only changed slots", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=overview");
-    fireEvent.click(await view.findByRole("button", { name: /Pictures: 1 of 4 levels ready/ }));
-    expect(await view.findByRole("heading", { name: "Pictures" })).toBeTruthy();
-    expect(view.getAllByText("Standard").length).toBeGreaterThan(0);
-    fireEvent.click(view.getByRole("combobox", { name: "Standard model" }));
-    fireEvent.click(await view.findByRole("option", { name: "MiniMax H3-Image · Recommended" }));
-    fireEvent.click(view.getByRole("button", { name: "Save" }));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(fixture?.puts).toHaveLength(1);
-    expect(fixture?.puts[0]?.key).toBe("engines.image.tier.standard");
   });
 
   test("a teen is blocked from the Features page by the household role gate", async () => {
@@ -93,8 +79,10 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
 
   test("Advanced keeps the model and storage sections the Models tab used to hold", async () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
-    expect(await view.findByText("Models and storage")).toBeTruthy();
-    expect(await view.findByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
+    expect(await view.findByText("Hugging Face token (for voice cloning)")).toBeTruthy();
+    expect(await view.findByRole("button", { name: "Free up space" })).toBeTruthy();
+    expect(view.queryByText("Models and storage")).toBeNull();
+    expect(view.queryByText("This computer: Apple Silicon, 24 GB memory.")).toBeNull();
   });
 
   test("the spec declares the tab strip and default view tab", () => {

@@ -22,7 +22,9 @@ import { AiGlance } from "@/apps/settings/AiGlance";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
 import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
-import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
+import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
+import { Button } from "@maipai/ui/src/ui/button";
+import { useState } from "react";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
@@ -104,8 +106,12 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   return <>
     {show("overview") ? <AiGlance person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <><HuggingFaceTokenSection /><ModelsAndStorageSection /></> : null}
+    {show("advanced") ? <><HuggingFaceTokenSection /><AiStorageTidy /></> : null}
   </>;
+}
+function AiStorageTidy() {
+  const [open, setOpen] = useState(false);
+  return <section className="flex flex-col gap-2"><h2 className="text-lg font-semibold">{i18n._({ id: "Storage", message: "Storage" })}</h2><Button type="button" variant="outline" onClick={() => setOpen(true)}>{i18n._({ id: "Free up space", message: "Free up space" })}</Button><FreeUpSpaceDialog open={open} onOpenChange={setOpen} /></section>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }

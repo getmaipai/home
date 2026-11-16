@@ -7,90 +7,72 @@ import { makePerson, REGISTRY } from "@/shell/pages/settings/settingsTestKit";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
-const ready = { tier:"standard",state:"ready",word:"Ready",model_label:"Qwen",size_bytes_missing:null,detail:null,action:null };
-const feature = { id:"chat",name:"Chat",used_by:["chat"],levels:[{tier:"reduced",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},ready,{tier:"boost",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4 };
-type Fixture = { features: typeof feature[]; helpers: Array<{id:string;name:string;model_label:string|null;used_by:string[];state:"ready"|"missing"|"problem"|"off"|"waits"|"same";action:unknown}>; attention:{items:Array<{id:string;kind:"problem"|"missing";title:string;line:string;action:unknown}>;download_all:{bytes:number;count:number}|null};right_now:{engine:"ready"|"problem";waiting:number;memory_free_bytes:number;disk_free_bytes:number;models_bytes:number} };
-const base: Fixture = { features:[feature],helpers:[],attention:{items:[],download_all:null},right_now:{engine:"ready",waiting:0,memory_free_bytes:100,disk_free_bytes:100,models_bytes:0} };
-function render(data: Fixture) {
-  globalThis.fetch = ((input: RequestInfo | URL) => {
-    const path=(typeof input==="string"?input:input.toString()).split("?")[0]!;
-    if(path==="/api/ai/overview") return Promise.resolve(Response.json(data));
-    if(path==="/api/ai/choices") return Promise.resolve(Response.json({cards:[{id:"chat",choices:[{id:"chat.standard",action:"use",label:"Qwen",name:"Qwen"}]}]}));
-    if((typeof input==="string"?input:input.toString()).startsWith("/api/settings?scope=")) return Promise.resolve(Response.json(REGISTRY.filter((key)=>key.scope==="household").map((key)=>({key:key.key,value:key.default??null,source:"default",label:key.label,help:key.help,level:key.level,secret:false}))));
-    if(path==="/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
-    if(path==="/api/settings") return Promise.resolve(Response.json([]));
-    if(path==="/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
-    if(path.startsWith("/api/ai/tiers/")) return Promise.resolve(Response.json({profile:"test",room_bytes:0,levels:[]}));
-    return Promise.resolve(Response.json({}));
+const mkLevel = (tier: string, state: string = "ready", label: string | null = "Qwen") => ({ tier, state, model_label: label, size_bytes_missing: state === "missing" ? 2e9 : null, detail: null, action: state === "missing" ? { kind: "download", label: "Install", job: "chat", level: tier } : null });
+const rows = ["chat", "pictures", "videos", "music", "voice"].map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1), used_by: ["chat"], levels: [mkLevel("reduced", "waits", null), mkLevel("standard"), mkLevel("boost", "same", null), mkLevel("max", "same", null)], ready_count: 1, level_count: 4 }));
+const base = { features: rows, helpers: [], attention: { items: [], download_all: null }, right_now: { engine: "ready", waiting: 0, memory_free_bytes: 1e9, disk_free_bytes: 2e9, models_bytes: 3e9 } };
+const candidates = { profile: "test", room_bytes: 10e9, levels: ["standard", "boost", "max"].map((tier) => ({ tier, cap_bytes: 10e9, recommended: "model-qwen", candidates: [{ id: "model-qwen", label: "Qwen", fits: true, refusal: null }, { id: "model-muse", label: "Muse Glimmer", fits: true, refusal: null }] })) };
+function render(data = base, role = "owner") {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString(); calls.push({ url, init }); const path = url.split("?")[0]!;
+    if (path.endsWith("/api/ai/overview")) return Promise.resolve(Response.json(data));
+    if (path.includes("/api/ai/tiers/")) return Promise.resolve(Response.json({ profile: candidates.profile, room_bytes: candidates.room_bytes, levels: candidates.levels.map((level) => ({ ...level, candidates: level.candidates.map((item) => ({ ...item, family: "qwen", peak_bytes: 1e9, verified: true })) })) }));
+    if (path === "/api/settings" && url.includes("scope=")) return Promise.resolve(Response.json(REGISTRY.filter((key) => key.scope === "household").map((key) => ({ key: key.key, value: key.key === "chat.paused" ? false : key.key.endsWith("tier.standard") ? { model: "model-qwen", who: "everyone", options: {} } : key.default ?? null, source: "default", label: key.label, help: key.help, level: key.level, secret: false }))));
+    if (path === "/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
+    if (path === "/api/settings" && init?.method === "PUT") return Promise.resolve(Response.json({ ok: true }));
+    return Promise.resolve(Response.json({ ok: true, job: "install-job" }));
   }) as typeof fetch;
-  return renderWithQueryClient(<MemoryRouter><AiGlance person={makePerson("owner")} onPersonChange={()=>undefined}/></MemoryRouter>);
+  const view = renderWithQueryClient(<MemoryRouter><AiGlance person={makePerson(role as "owner" | "admin" | "adult" | "teen" | "child" | "guest")} onPersonChange={() => undefined} /></MemoryRouter>);
+  return { ...view, calls };
 }
 
-describe("AI Features overview",()=>{
-  test("shows the empty attention state and the ready feature levels",async()=>{
-    const view=render(base);
-    expect(await view.findByText("Qwen")).toBeTruthy();
-    expect(await view.findByText("Qwen")).toBeTruthy();
-    expect(view.getByText("Ready")).toBeTruthy();
+describe("AI and models feature levels", () => {
+  test("shows six feature cards with four cells and no removed overview blocks", async () => {
+    const { findAllByTestId, queryByText } = render();
+    expect(await findAllByTestId("ai-feature-card")).toHaveLength(6);
+    expect(await findAllByTestId("ai-level-grid")).toHaveLength(6);
+    expect(queryByText("Needs attention")).toBeNull();
+    expect(queryByText("Download all that is missing")).toBeNull();
   });
-  test("renders the five feature cards inline without attention or download-all",async()=>{
-    const rows=["Chat","Pictures","Videos","Music","Voice","Coding"].map((name)=>({...feature,id:name.toLowerCase(),name,levels:[{...ready,tier:"reduced"},{...ready,tier:"standard"},{...ready,tier:"boost"},{...ready,tier:"max"}]}));
-    const view=render({...base,features:rows as typeof feature[]});
-    expect(await view.findAllByTestId("ai-feature-card")).toHaveLength(6);
-    expect(view.getAllByTestId("ai-level-grid")).toHaveLength(6);
-    expect(view.queryByText("Needs attention")).toBeNull();
-    expect(view.queryByText("Download all that is missing")).toBeNull();
+  test("selecting a model writes that level slot without installing", async () => {
+    const view = render();
+    await view.findByTestId("ai-features");
+    fireEvent.click(view.getAllByRole("combobox", { name: "Standard model" })[0]!);
+    fireEvent.click(view.getAllByRole("option", { name: "Muse Glimmer" })[0]!);
+    await waitFor(() => expect(view.calls.some((call) => call.url === "/api/settings" && call.init?.method === "PUT" && String(call.init.body).includes("engines.chat.tier.standard"))).toBe(true));
+    expect(view.calls.some((call) => call.url.includes("/install"))).toBe(false);
   });
-  test("has the feature level picker and feature switch controls in the inline card",async()=>{
-    const view=render({...base,features:[{...feature,levels:[{...ready,tier:"reduced",state:"unset"},{...ready,tier:"standard"},{...ready,tier:"boost"},{...ready,tier:"max"}]}]});
-    expect(await view.findByRole("button",{name:"Details"})).toBeTruthy();
-    expect(view.getByRole("switch",{name:"Chat"})).toBeTruthy();
-    expect(view.queryByText("Needs attention")).toBeNull();
+  test("Install uses the install-and-assign endpoint once", async () => {
+    const missing = { ...base, features: [{ ...rows[0]!, levels: [mkLevel("reduced", "waits", null), mkLevel("standard", "missing", "Qwen"), mkLevel("boost"), mkLevel("max")] }] };
+    const view = render(missing);
+    await view.findByTestId("ai-features");
+    fireEvent.click(await view.findByRole("button", { name: "Install 2.0 GB" }));
+    await waitFor(() => expect(view.calls.filter((call) => call.url === "/api/ai/level/chat/standard/install")).toHaveLength(1));
   });
-  test("writes a level model through the existing slot setting",async()=>{
-    const puts:string[]=[];
-    globalThis.fetch=((input:RequestInfo|URL,init?:RequestInit)=>{const url=typeof input==="string"?input:input.toString();if(url==="/api/settings"&&init?.method==="PUT"){puts.push(String(init.body));return Promise.resolve(Response.json({ok:true}));}if(url==="/api/ai/overview")return Promise.resolve(Response.json(base));if(url.startsWith("/api/settings?scope="))return Promise.resolve(Response.json(REGISTRY.filter(key=>key.scope==="household").map(key=>({key:key.key,value:key.default??null,source:"default",label:key.label,help:key.help,level:key.level,secret:false}))));return Promise.resolve(Response.json({}));}) as typeof fetch;
-    const view=render(base);
-    await view.findByRole("button",{name:"Details"});
-    const select=view.getByRole("combobox",{name:"Standard model"});
-    fireEvent.click(select);
-    fireEvent.click(await view.findByRole("option",{name:"Muse Glimmer"}));
-    await waitFor(()=>expect(puts.some(put=>put.includes("engines.chat.tier.standard"))).toBe(true));
+  test("level switch writes off and feature switch writes the real feature key", async () => {
+    const view = render();
+    await view.findByTestId("ai-features");
+    fireEvent.click((await view.findAllByRole("switch", { name: "Boost level" }))[0]!);
+    fireEvent.click(view.getByRole("switch", { name: "Chat" }));
+    await waitFor(() => expect(view.calls.filter((call) => call.url === "/api/settings" && call.init?.method === "PUT").length).toBeGreaterThanOrEqual(2));
+    const bodies = view.calls.filter((call) => call.init?.method === "PUT").map((call) => String(call.init?.body));
+    expect(bodies.some((body) => body.includes("engines.chat.tier.boost") && body.includes("off"))).toBe(true);
+    expect(bodies.some((body) => body.includes("chat.paused") && body.includes("true"))).toBe(true);
   });
-  test("shows an attention item and a missing chip",async()=>{
-    const missing={...feature,id:"pictures",name:"Pictures",ready_count:0,levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"missing",word:"Missing",model_label:"MiniMax H3-Image",size_bytes_missing:49e9,detail:null,action:{kind:"download",label:"Download",job:"pictures",level:"standard"}},{tier:"boost",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"waits",word:"Waits",model_label:null,size_bytes_missing:null,detail:null,action:null}]} as unknown as typeof feature;
-    const view=render(({...base,features:[missing],attention:{items:[{id:"p",kind:"missing",title:"Pictures Standard",line:"This level needs a download.",action:null}],download_all:{bytes:49e9,count:1}}} as unknown as Fixture));
-    expect(await view.findByText("This level needs a download.")).toBeTruthy();
-    expect(view.getByText("Missing")).toBeTruthy();
-    expect(view.getByText("MiniMax H3-Image")).toBeTruthy();
+  test("Details opens one sheet; Save writes only the level whose who changed", async () => {
+    const view = render();
+    await view.findByTestId("ai-features");
+    fireEvent.click((await view.findAllByRole("button", { name: "Details" }))[1]!);
+    expect(await view.findByText("Adult gate")).toBeTruthy();
+    await view.findByText("Adult gate");
+    // Each level has Everyone, Assigned, Admins in that order: the third radio is the first level's Admins.
+    fireEvent.click((await view.findAllByRole("radio"))[2]!);
+    fireEvent.click(view.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(view.calls.some((call) => call.url === "/api/settings" && call.init?.method === "PUT" && String(call.init.body).includes("engines.image.tier.") && /"who":"(assigned|admins)"/.test(String(call.init.body)))).toBe(true));
+    expect(view.calls.filter((call) => call.init?.method === "PUT" && String(call.init.body).includes("engines.image.tier.")).length).toBe(1);
   });
-  test("renders each feature in its own card with responsive level cells and helper words",async()=>{
-    const view=render({...base,features:[feature,{...feature,id:"pictures",name:"Pictures"}],helpers:[{id:"listening",name:"Listening",model_label:"Whisper",used_by:["chat"],state:"ready",action:null}]} as Fixture);
-    expect(await view.findByText("Chat")).toBeTruthy();
-    expect(view.getAllByTestId("ai-feature-card")).toHaveLength(2);
-    expect(view.getAllByTestId("ai-level-grid")[0]!.className).toContain("grid-cols-2");
-    expect(view.getAllByTestId("ai-level-grid")[0]!.className).toContain("sm:grid-cols-4");
-    expect(view.getByText("On")).toBeTruthy();
-  });
-  test("shows feature switches and omits old overview cards",async()=>{
-    const view=render(base);
-    expect(view.queryByText("Chat pause")).toBeNull();
-    expect(view.queryByText("View engine settings")).toBeNull();
-    expect(view.getByRole("switch",{name:"Chat"})).toBeTruthy();
-  });
-  test("renders a Details control for a feature",async()=>{
-    const view=render(base);
-    expect(await view.findByRole("button",{name:"Details"})).toBeTruthy();
-  });
-  test("keeps picture reduced and voice advanced tiers out of configuration",async()=>{
-    const pictures={...feature,id:"pictures",name:"Pictures",used_by:["the Pictures app"],levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{...ready,tier:"standard"},{tier:"boost",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"waits",word:"Waits",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4} as unknown as typeof feature;
-    const view=render({...base,features:[pictures]} as Fixture);
-    expect(await view.findByRole("button",{name:"Details"})).toBeTruthy();
-    expect(view.getByText("Reduced")).toBeTruthy();
-  });
-  test("has no technical identifiers in the feature page",async()=>{
-    const view=render(base);
-    await view.findByRole("button",{name:"Details"});
-    expect(view.container.textContent).not.toContain("engines.chat");
+  test("a non-admin does not get the admin feature page", async () => {
+    const view = render(base, "child");
+    await waitFor(() => expect(view.queryByTestId("ai-features")).toBeNull());
   });
 });

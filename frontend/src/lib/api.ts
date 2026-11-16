@@ -1072,6 +1072,11 @@ export const api = {
     attention: { items: Array<{ id: string; kind: "problem"|"missing"; title: string; line: string; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; download_all: { bytes: number; count: number }|null };
     right_now: { engine: "ready"|"problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };
   }>("/api/ai/overview"),
+  aiTierCandidates: (job: string) => request<{ levels: Array<{ tier: string; recommended: string | null; candidates: Array<{ id: string; label: string; fits: boolean; refusal: string | null }> }> }>(`/api/ai/tiers/${encodeURIComponent(job)}`),
+  aiInstallLevel: (job: string, tier: string, model: string) => request<{ job: string | null; component: string }>(`/api/ai/level/${encodeURIComponent(job)}/${encodeURIComponent(tier)}/install`, { method: "POST", body: JSON.stringify({ model }) }),
+  aiSaveSlot: (job: string, tier: string, model: string) => request<{ ok: true }>(`/api/ai/slot/${encodeURIComponent(job)}/${encodeURIComponent(tier)}`, { method: "PUT", body: JSON.stringify({ model }) }),
+  aiUnused: () => request<{ items: Array<{ id: string; name: string; bytes: number; reason: string; lastUsedAt: string | null }>; total_bytes: number }>("/api/ai/unused"),
+  aiCleanup: (ids: string[]) => request<{ results: Array<{ id: string; status: "removed" | "kept" | "failed"; freed_bytes: number; message: string }>; freed_bytes: number; kept: number; failed: number }>("/api/ai/cleanup", { method: "POST", body: JSON.stringify({ ids }) }),
   sceneWeatherAlerts: () => request<Array<{ id: string; event: string; severity: string; headline: string; ends: string; dismissed: "none" | "you" | "household" }>>("/api/scene/alerts"),
   lists: () => request<ListRecord[]>("/api/lists"),
   comingUp: () => request<ComingUpItem[]>("/api/coming-up"),

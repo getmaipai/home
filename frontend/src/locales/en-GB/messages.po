@@ -773,7 +773,7 @@ msgid "{matches, plural, one {# match} other {# matches}} on {lines, plural, one
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:35
+#: src/apps/settings/AiGlance.tsx:58
 msgid "{memory} free memory · {models} in models · {disk} free disk · {count} downloads waiting"
 msgstr ""
 
@@ -891,6 +891,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:19
 msgid "notification.engines.update_failed"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
+msgid "{name} details"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1321,6 +1326,12 @@ msgid "{thingsLeftLine}. You'll find them in Home settings."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:65
+msgid "{tier} level"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:65
 #: src/apps/settings/AiSlotDialog.tsx:83
 msgid "{tier} model"
 msgstr ""
@@ -2227,7 +2238,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:117
+#: src/shell/pages/settings/settingsViews.tsx:123
 msgid "Add a robot"
 msgstr ""
 
@@ -2515,6 +2526,11 @@ msgid "Admin"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
+msgid "Admins and assigned people"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1059
 msgid "setting.robot.live_view.who.help"
 msgstr ""
@@ -2547,6 +2563,14 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Adult controls"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
+#: src/apps/settings/AiGlance.tsx:81
+#: src/apps/settings/AiGlance.tsx:81
+#: src/apps/settings/AiGlance.tsx:81
+msgid "Adult gate"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2754,7 +2778,7 @@ msgid "area.AI developer settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:35
+#: src/apps/settings/AiGlance.tsx:58
 msgid "AI is ready"
 msgstr ""
 
@@ -2764,7 +2788,7 @@ msgid "AI models"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:35
+#: src/apps/settings/AiGlance.tsx:58
 msgid "AI needs attention"
 msgstr ""
 
@@ -3113,6 +3137,7 @@ msgid "Always close"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:31
 #: src/apps/settings/AiJobCardView.tsx:13
 #: src/apps/settings/AiJobCardView.tsx:17
 msgid "Always on"
@@ -3688,6 +3713,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1660
 msgid "Asking the bare model…"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
+msgid "Assigned"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4422,6 +4452,7 @@ msgid "Books that live on this Home, like Wikipedia and health information. Each
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:32
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
 #: src/apps/settings/CapabilityTable.tsx:12
@@ -4673,6 +4704,7 @@ msgstr ""
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
 #: src/apps/settings/AddVoiceForm.tsx:120
+#: src/apps/settings/AiGlance.tsx:81
 #: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/AutoLocksSection.tsx:83
@@ -5017,6 +5049,7 @@ msgid "setting.tts.voice_id.option_label.charles"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:48
 #: src/apps/settings/ModelsSection.tsx:138
 #: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
@@ -5564,6 +5597,11 @@ msgid "Choose a look for this browser. It does not change your personal setting.
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:65
+msgid "Choose a model"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:175
 msgid "Choose a name and duration."
 msgstr ""
@@ -5849,6 +5887,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:88
 msgid "Choose which sections show on Home and the order they come in."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
+msgid "Choose who can use each level and its options."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6258,6 +6301,7 @@ msgid "area.Coding"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:48
 #: src/apps/settings/CodingSettings.tsx:128
 #: src/apps/settings/CodingSettings.tsx:226
 msgid "Coding"
@@ -8502,7 +8546,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:338
-#: src/apps/settings/AiGlance.tsx:36
+#: src/apps/settings/AiGlance.tsx:61
 #: src/apps/settings/ModelsSection.tsx:154
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
@@ -9534,6 +9578,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:43
+#: src/apps/settings/AiGlance.tsx:81
 #: src/shell/pages/CompanionAudienceDialog.tsx:53
 msgid "Everyone"
 msgstr ""
@@ -9846,8 +9891,8 @@ msgid "Favorites"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-#: src/apps/settings/AiGlance.tsx:36
+#: src/apps/settings/AiGlance.tsx:64
+#: src/apps/settings/AiGlance.tsx:64
 msgid "Feature is off"
 msgstr ""
 
@@ -10074,7 +10119,8 @@ msgid "Fit details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
+#: src/apps/settings/AiGlance.tsx:65
+#: src/apps/settings/AiGlance.tsx:75
 #: src/shell/pages/RepairsPage.tsx:67
 msgid "Fix"
 msgstr ""
@@ -10363,6 +10409,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:59
+#: src/shell/pages/settings/settingsViews.tsx:114
 msgid "Free up space"
 msgstr ""
 
@@ -10946,7 +10993,8 @@ msgid "Helper not installed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:37
+#: src/apps/settings/AiGlance.tsx:75
+#: src/apps/settings/AiGlance.tsx:75
 msgid "Helpers"
 msgstr ""
 
@@ -12729,7 +12777,7 @@ msgid "Inspired voice ({level})"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:37
+#: src/apps/settings/AiGlance.tsx:75
 #: src/apps/settings/CodingSettings.tsx:140
 #: src/apps/settings/CodingSettings.tsx:165
 #: src/apps/settings/ModelsAndStorageSection.tsx:92
@@ -12743,7 +12791,7 @@ msgid "Install {label}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
+#: src/apps/settings/AiGlance.tsx:65
 msgid "Install {size}"
 msgstr ""
 
@@ -13275,7 +13323,7 @@ msgid "Keep things as they are"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:156
+#: src/shell/pages/settings/settingsViews.tsx:162
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr ""
 
@@ -13549,7 +13597,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:67
+#: src/shell/pages/settings/settingsViews.tsx:69
 msgid "Language"
 msgstr ""
 
@@ -14550,7 +14598,7 @@ msgid "Loading faded memories…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:31
+#: src/apps/settings/AiGlance.tsx:47
 msgid "Loading features…"
 msgstr ""
 
@@ -15752,6 +15800,7 @@ msgid "setting.ui.look.option_label.mauve"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:32
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
 #: src/apps/settings/CapabilityTable.tsx:12
@@ -16078,6 +16127,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/AlarmRinger.tsx:55
 msgid "Missed at {time}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:31
+msgid "Missing"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17209,6 +17263,8 @@ msgid "No matching projects"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:31
+#: src/apps/settings/AiGlance.tsx:64
 #: src/apps/settings/AiJobSummary.tsx:35
 msgid "No model chosen"
 msgstr ""
@@ -18031,6 +18087,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
+#: src/apps/settings/AiGlance.tsx:31
 #: src/apps/settings/AiJobSummary.tsx:38
 #: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/settings/AiSlotDialog.tsx:79
@@ -19086,7 +19143,7 @@ msgid "Pair"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:117
+#: src/shell/pages/settings/settingsViews.tsx:123
 msgid "Pair a robot with this home."
 msgstr ""
 
@@ -19766,7 +19823,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:121
-#: src/shell/pages/settings/settingsViews.tsx:71
+#: src/shell/pages/settings/settingsViews.tsx:73
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr ""
@@ -20193,6 +20250,11 @@ msgid "area.Privacy and safety"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:31
+msgid "Problem"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:20
 msgid "notification.engines.problem"
 msgstr ""
@@ -20209,7 +20271,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:195
-#: src/shell/pages/settings/settingsViews.tsx:61
+#: src/shell/pages/settings/settingsViews.tsx:63
 msgid "Profile"
 msgstr ""
 
@@ -20514,6 +20576,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/library/appPresentation.ts:18
+#: src/apps/settings/AiGlance.tsx:31
 #: src/apps/settings/CodingSettings.tsx:133
 #: src/apps/settings/ModelsSection.tsx:149
 #: src/apps/settings/RobotBody.tsx:19
@@ -20653,6 +20716,7 @@ msgid "Reduce noise"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:32
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:53
 msgid "Reduced"
@@ -21918,6 +21982,11 @@ msgid "setting.safety.alarm.volume.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:31
+msgid "Same as Standard"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:30
 msgid "same time"
 msgstr ""
@@ -21948,6 +22017,7 @@ msgstr ""
 #: src/apps/people/ProfileForm.tsx:190
 #: src/apps/people/ProfileForm.tsx:195
 #: src/apps/reminders/ListMenu.tsx:46
+#: src/apps/settings/AiGlance.tsx:81
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/CodingSettings.tsx:234
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
@@ -23330,8 +23400,8 @@ msgid "Show in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:155
-#: src/shell/pages/settings/settingsViews.tsx:158
+#: src/shell/pages/settings/settingsViews.tsx:161
+#: src/shell/pages/settings/settingsViews.tsx:164
 msgid "Show in the sidebar"
 msgstr ""
 
@@ -23498,7 +23568,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:151
+#: src/shell/pages/settings/settingsViews.tsx:157
 msgid "Sidebar"
 msgstr ""
 
@@ -24398,6 +24468,7 @@ msgid "Staged"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:32
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
 #: src/apps/settings/CapabilityTable.tsx:12
@@ -24849,6 +24920,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/pages/settings/settingsViews.tsx:114
 #: src/shell/pages/StoragePage.tsx:116
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -27615,6 +27687,11 @@ msgid "Tonight"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:65
+msgid "Too big for this level"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:15
 msgid "api.error.attempts_locked"
 msgstr ""
@@ -28145,7 +28222,7 @@ msgid "Two computers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:76
 msgid "Two-step sign-in"
 msgstr ""
 
@@ -28801,8 +28878,8 @@ msgid "Used {weeks} weeks ago"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-#: src/apps/settings/AiGlance.tsx:37
+#: src/apps/settings/AiGlance.tsx:61
+#: src/apps/settings/AiGlance.tsx:75
 msgid "Used by {places}"
 msgstr ""
 
@@ -29141,7 +29218,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:366
 #: src/shell/pages/musicComposerMode.ts:135
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:172
+#: src/shell/pages/settings/settingsViews.tsx:178
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr ""
@@ -29260,7 +29337,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/pages/settings/settingsViews.tsx:95
+#: src/shell/pages/settings/settingsViews.tsx:97
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
@@ -29385,11 +29462,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:953
 msgid "setting.resources.quiet_seconds.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-msgid "Waits for Standard"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29999,11 +30071,13 @@ msgid "Who can use {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
 #: src/apps/settings/AiSlotDialog.tsx:131
 msgid "Who can use {tier}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiGlance.tsx:81
 #: src/apps/settings/AiSlotDialog.tsx:130
 #: src/apps/settings/styles/StyleEditor.tsx:101
 msgid "Who can use it"
