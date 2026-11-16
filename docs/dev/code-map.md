@@ -980,8 +980,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
 | `backend/src/lib/pictures/expand.ts` | EXPAND_SHAPES, EXPAND_BASE_PROMPT, EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, isExpandShape, expandGeometry |
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
-| `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
-| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, cancelPictureJob, resumePictureJobs |
+| `backend/src/lib/pictures/jobStore.ts` | SPELLING_PHASE, PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled |
+| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, misspelledNote, cancelPictureJob |
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
@@ -998,6 +998,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/pose.ts` | __setPoseVisionForTests, parsePose, parseSeatBox, readPose, readSeatBox |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
+| `backend/src/lib/pictures/readWords.ts` | READ_WORDS_SCHEMA, parseWordLines, __setReadWordsRunnerForTests, readPictureWords, normalizeWords, compareWords |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, peekPictureEngineStatus, dropPictureStatusCache, pictureReferenceLimit |
 | `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, waitPicture, getGenerationJob |
