@@ -19,9 +19,8 @@ export function useLook(personId: string): Look {
     document.body.classList.add(`style-${look}`);
     const cached = readShellCache();
     writeShellCache({ look, dark: cached?.dark ?? false });
-    return () => {
-      document.body.classList.remove(...STYLE_CLASSES);
-    };
+    // No cleanup that removes the class: when the screen unmounts or crashes, the page keeps the selected theme instead of dropping to
+    // the kit's generic dark navy (the blank Backups page showed it). A change of look replaces the class at the top of this effect.
   }, [look]);
 
   return look;
