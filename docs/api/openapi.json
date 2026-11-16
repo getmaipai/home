@@ -69504,6 +69504,179 @@
         }
       }
     },
+    "/api/media-subjects/from-picture": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Save a finished picture as a character and start its look capture",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "file_id",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The saved character",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subject": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "character",
+                            "prop",
+                            "place"
+                          ]
+                        },
+                        "owner_person_id": {
+                          "type": "string"
+                        },
+                        "shared_with": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "look": {
+                          "type": "string"
+                        },
+                        "reference_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "real": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "hlc": {
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "kind",
+                        "owner_person_id",
+                        "shared_with",
+                        "look",
+                        "reference_ids",
+                        "real",
+                        "created_at",
+                        "updated_at",
+                        "hlc",
+                        "provenance"
+                      ]
+                    },
+                    "capture": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "waiting"
+                      ]
+                    },
+                    "job_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "line": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "subject",
+                    "capture",
+                    "job_id",
+                    "line"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid name or picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Locked, adult-only for this profile, or unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Picture not in the Library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cast": {
       "get": {
         "tags": [

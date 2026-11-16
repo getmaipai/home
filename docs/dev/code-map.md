@@ -306,6 +306,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/TranscriptCaptionTracks.tsx` | CaptionTracks |
 | `frontend/src/shell/library/TranscriptFindReplace.tsx` | FindReplace |
 | `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, parseClock, useTranscriptWorkspace |
+| `frontend/src/shell/library/useSaveAsCharacter.tsx` | CHARACTER_NAME_MAX, CHARACTERS_PATH, canSaveAsCharacter, useSaveAsCharacter |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
 | `frontend/src/shell/media/EqualizerMenu.tsx` | eqLabel, EqualizerMenu |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
@@ -512,6 +513,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/castLookKey.ts` | LOOK_KEY_VERSION, SHEET_PROVENANCE_PREFIX, sheetNote, plainReferences, synthLookParts, lookSourceKey |
 | `backend/src/lib/certainty.ts` | WEB_AGREEMENT_MIN_HOSTS, PRECIP_LIKELY_MIN, PRECIP_MAYBE_MIN, MEMORY_LOW_CONFIDENCE, MEMORY_OLD_DAYS, webHostCount |
 | `backend/src/lib/changeVoice.ts` | changeVoice |
+| `backend/src/lib/characterFromPicture.ts` | CHARACTER_NAME_MAX, CHARACTER_LOCKED_LINE, CHARACTER_HIDDEN_LINE, CHARACTER_MISSING_LINE, CHARACTER_KEEP_LINE, CHARACTER_NAME_LINE |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesDescribedNote, picturesNotReadNote, picturesWindowNote, audioAttachedNote |
 | `backend/src/lib/chatLease.ts` | LEASE_GRACE_MS, DEFAULT_LEASE, createChatLease, registerActiveChatLease, chatLeaseHeld, chatLeaseHeldBy |
