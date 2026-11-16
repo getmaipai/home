@@ -3,6 +3,7 @@ import type { PersonRow } from "@/types";
 import { runGenerateImage, type RunGenerateImageInput } from "./tool";
 import { getTemplate } from "@/lib/media/templates";
 import { PICTURE_WORD_BLANKS } from "./quality";
+import { askPictureWords, picturePromptNeedsWordsQuestion } from "./wordsQuestion";
 
 export interface PictureMakeBody {
   prompt: string;
@@ -104,6 +105,12 @@ export function readPictureMakeBody(raw: Record<string, unknown>): { ok: true; b
 }
 
 export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): Promise<PictureMakeResult> {
+  let wordNotice: string | null = null;
+  if (picturePromptNeedsWordsQuestion(body.prompt, body)) {
+    const asked = await askPictureWords(body.prompt);
+    body = { ...body, ...(asked.words.length ? { words: asked.words } : {}) };
+    if (!asked.ok) wordNotice = asked.notice;
+  }
   let submitted: PictureMakeBody = body;
   if (body.template) {
     const template = getTemplate(body.template);
@@ -140,7 +147,7 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
     // TEXT-PIC-07: one plain line when the picture has words.
     const wordsLine = body.words?.length ? "This picture has words, so Home will check the spelling." : null;
     const setLine = body.set ? `Making a set of ${ids.length} pictures.` : null;
-    const notice = [setLine, extras, wordsLine].filter(Boolean).join(" ") || null;
+    const notice = [wordNotice, setLine, extras, wordsLine].filter(Boolean).join(" ") || null;
     return { ok: true, ids, notice };
   }
   const rawLine = (outcome.result?.reply?.text ?? "").replace(/^No picture was (?:made|changed)\. Say this to the person in your own words(?: and keep its meaning)?:\s*/, "").trim();

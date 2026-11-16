@@ -18,8 +18,12 @@ import { EXPAND_BASE_PROMPT, EXPAND_SHAPES } from "@/lib/pictures/expand";
 import { COMBINE_EXTRAS_LINE, COMBINE_NEEDS_ONE_LINE, combineInstruction, combinePictureLimit } from "@/lib/pictures/combine";
 import { pictureEngineStatus, pictureEngineStatusPatient } from "@/lib/pictures/ready";
 import { startNextShot } from "@/lib/pictures/nextShot";
+import { creationOfFile } from "@/lib/creations/store";
+import { runGenerateImage } from "@/lib/pictures/tool";
+import { pictureWordsForFix, FIX_WORDS_LABEL, promptWithoutPrintedWords } from "./pictureWords";
 
 const empty = z.object({});
+const fixWordsArgs = z.object({ words: z.string().trim().max(480).optional() });
 const eraseArgs = z.object({ mask: z.instanceof(Uint8Array).optional(), people: z.string().optional(), subjects: z.string().optional() });
 const upscaleArgs = z.object({ scale: z.union([z.literal(2), z.literal(4)]).default(2) });
 const resizeArgs = z.object({ width: z.number().int().min(1).max(8000), height: z.number().int().min(1).max(8000) });
@@ -137,6 +141,33 @@ registerMediaOp({
 
 const angleArgs = z.object({ angle: z.string().min(1) });
 const coverageArgs = z.object({ coverage: z.enum(["wide", "medium", "close"]) });
+
+registerMediaOp({
+  id: "picture.fix_words",
+  label: FIX_WORDS_LABEL,
+  summary: "Make a new copy of this picture with its exact words and check the spelling.",
+  input: "picture", output: "picture", args: fixWordsArgs,
+  controls: [{ kind: "words", name: "words", label: "Words to print (enter the exact words)" }],
+  needs: "image", minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof fixWordsArgs> }) => {
+    const loaded = loadSource(actor, source.via === "file" ? LIBRARY_SOURCE : chatSource(source).conversationId, source.id, false);
+    const creation = creationOfFile(actor.id, loaded.id);
+    const stored = creation?.checks && typeof creation.checks === "object" && "picture_words" in creation.checks
+      ? (creation.checks as { picture_words?: { exact?: unknown } }).picture_words?.exact
+      : null;
+    const words = Array.isArray(stored) && stored.every((word) => typeof word === "string") ? stored as string[] : null;
+    const plan = pictureWordsForFix({ prompt: creation?.words?.written ?? creation?.words?.composed ?? "", words, seed: creation?.generation?.seed ?? null });
+    const entered = args.words?.trim();
+    if ("askForWords" in plan && !entered) throw new ImageEditError(422, "This picture has no saved words. Type the exact words to print, then try again.", "words_needed");
+    const exactWords = "askForWords" in plan ? [entered!] : plan.words;
+    const prompt = promptWithoutPrintedWords("askForWords" in plan ? (creation?.words?.written ?? creation?.words?.composed ?? "") : plan.prompt);
+    const state = { actor, persona: null, conversationId: null, turnId: null, temporary: false, ephemeral: false, surface: "chat", speakerEvidence: null, deviceId: null, planBasis: { surfaceClass: "written" }, plan: null } as never;
+    const outcome = await runGenerateImage({ state, args: { prompt, words: exactWords, ...( "askForWords" in plan || plan.seed === null ? {} : { seed: plan.seed }), count: 1 }, callId: "fix-words", spoken: false, parentFileId: loaded.id });
+    const data = outcome.result?.data as { pictureJobId?: string } | undefined;
+    if (outcome.status === "succeeded" && data?.pictureJobId) return { job: { state: "running" as const, job: data.pictureJobId, percent: null, label: "Fixing the words", pictureJobId: data.pictureJobId } };
+    throw new ImageEditError(422, outcome.result?.reply?.text ?? "The picture could not be made. Try again.", "fix_words_failed");
+  },
+});
 
 /** Word edits share picture.change's model route and therefore all of its image, age and lock gates. */
 async function startWordsEdit(actor: import("@/types").PersonRow, source: { via?: "chat" | "file"; conversationId?: string; id: string }, prompt: string) {
