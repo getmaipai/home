@@ -171,3 +171,23 @@ the short side and MiniMax's own 2K step is hosted only, so the Stack's existing
   shot), today ComfyUI nodes only in the port; the route for companions and the long-clip design.
 
 Scratch kept for the build: `data-scratch/minimax-eval/` (venvs, 146 GB of weights, runners, clips, pictures).
+
+## 6. The 24 GB streaming preset, measured (2026-11-16, after the "MiniMax at every tier" question)
+
+Same kitchen-mom prompt, seed 7, 864 by 480, 5 s, turbo adapter, 5 steps, on the Studio with the live hub running beside it (load average about 10).
+
+| Clip | Build | Wall | Peak footprint | Max RSS |
+|---|---|---|---|---|
+| v3 | 4-bit, resident | 178 s | 34.0 GB | 17.2 GB |
+| v4 | 8-bit, 25 steps, no turbo adapter | 641 s | 42.1 GB | 26.1 GB |
+| v5 | **24 GB Core4 stream2, offset streaming** | **170 s** | **14.8 GB** | 14.4 GB |
+
+Streaming is not slower here: 170 s against 178 s resident, and the footprint is less than half. By the frames (v5 sheet) the same woman, steady glasses and
+kitchen, open smile and mouth shapes across the clip with no visible clipping; the lips and face against v3 and v4 are Jesse's eye. So H3 video fits the 24.9 GB
+Standard cap at 14.8 GB and can run as Reduced beside a Max job (62 GB Max plus 15 GB plus chat Reduced 5 GB fits 128 GB). Build cost: the preset is built
+locally from the 40 GB BF16-pruned source (needs torch for the build step) into an 11 GB streaming bundle. Not measured: the same preset on a real 24 GB Mac,
+and the GPU contention beside a running Max job.
+
+Jesse's judgement of v5 (2026-11-16): the voice is a tiny bit robotic and the mouth has a tiny sign of tearing, "but not as bad as originally" (v3). So the 24
+GB streaming preset is good enough for the Standard and Reduced video tiers, with the 8-bit build at Boost as the quality step up; the robotic voice is the
+next thing to measure (the H3 audio path, and Chatterbox as a dubbing alternative, are the candidates).
