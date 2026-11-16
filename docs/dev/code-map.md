@@ -830,7 +830,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, listTemplates, getTemplate, listFragments, getFragment |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
-| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, creationDetailsFor, SHORT_CLIP_MAX_S, isShortClip |
+| `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, voiceoverVoiceOptions, creationDetailsFor, SHORT_CLIP_MAX_S |
 | `backend/src/lib/media/videoFilters.ts` | VIDEO_FILTERED_IDS, SHORT_BELOW_S, LONG_FROM_S, videoFilterOf, videoSortOf, wantsVideoRules |
 | `backend/src/lib/media/watchTime.ts` | MEDIA_KID_COPY, TIME_UP_LINE, WRITE_INTERVAL_S, WRITE_SLACK_S, FORWARD_CAP_S, SESSION_ROW_TTL_MS |
 | `backend/src/lib/mediaClaims.ts` | asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SOUND_STARTED_LINE, MEDIA_REASK_INSTRUCTION |
@@ -1374,6 +1374,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, strengthWord, styleNamesOf, resolveStyles |
 | `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
+| `backend/src/lib/videos/voiceoverStart.ts` | VOICEOVER_MAX_LINE, VOICEOVER_NO_LINE, VOICEOVER_LONG_LINE, VOICEOVER_NO_CLIP, VOICEOVER_BAD_LEVEL, startVoiceover |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
 | `backend/src/lib/visionAssets.ts` | FACE_DETECTOR_ASSET_ID, FACE_EMBEDDER_ASSET_ID, VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, faceAssetPath |
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
@@ -1385,7 +1386,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceList.ts` | playableVoices, listPlayableVoices, isPlayableVoiceId |
 | `backend/src/lib/voiceMatch.ts` | computeVoiceVerdict |
 | `backend/src/lib/voiceMatchVerdict.ts` | voiceMatchSessionKey, setVoiceMatchVerdict, consumeVoiceMatchVerdict, clearVoiceMatchVerdictsForTests |
-| `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
+| `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, peekOfferedVoices |
 | `backend/src/lib/voiceSamples.ts` | __enhanceForTests, ECHO_FALLBACK_NOTICE, removeEcho, __isolateForTests, isolateVoice, cleanFilter |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
 | `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
