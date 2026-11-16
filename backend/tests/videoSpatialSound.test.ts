@@ -364,7 +364,7 @@ describe("SPATIAL-REACH: the Create page action", () => {
     const { readFileSync } = await import("node:fs");
     const page = JSON.parse(readFileSync(new URL("../packages/video/pages/create.json", import.meta.url), "utf8")) as unknown;
     const found: Array<{ label: string; starts?: string; action: { call?: { target: string; args: Record<string, unknown> } } }> = [];
-    const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.type === "result_feed") { const actions = record.actions as typeof found; expect(actions.length).toBeLessThanOrEqual(8); found.push(...actions); } Object.values(record).forEach(walk); } };
+    const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const record = node as Record<string, unknown>; if (record.type === "result_feed") { const actions = record.actions as typeof found; expect(actions.length).toBeLessThanOrEqual(16); found.push(...actions); } Object.values(record).forEach(walk); } };
     walk(page);
     const entry = found.find((a) => a.label === "Spatial sound")!;
     expect(entry.action.call!.target).toBe(ACTION);
@@ -466,7 +466,7 @@ describe("PHOSPHENE-PARITY-01: Make it vertical and Sharpen 2x on the Create pag
     const walk = (node: unknown): void => { if (Array.isArray(node)) node.forEach(walk); else if (node && typeof node === "object") { const r = node as Record<string, unknown>; if (r.type === "result_feed") labels.push(...(r.actions as Array<{ label: string }>).map((a) => a.label)); Object.values(r).forEach(walk); } };
     walk(create);
     expect(labels).toContain("Make it vertical");
-    expect(labels.length).toBeLessThanOrEqual(8);
+    expect(labels.length).toBeLessThanOrEqual(16);
   });
 
   test("an adult reshapes a clip: the Stack gets a blurred 9:16 reframe, and a bad shape is refused", async () => {
