@@ -21,7 +21,7 @@ describe("AutoLocksSection", () => {
   });
   test("shows the zero line", async () => {
     const original = api.autoLocks; api.autoLocks = mock(async () => snapshot(0));
-    try { const ui = renderWithQueryClient(<AutoLocksSection person={owner} />); expect(await ui.findByText("Nothing needs clearing. No picture was locked by Home on its own.")).toBeTruthy(); expect(ui.getByRole("button", { name: "Clear 0 locks" }).hasAttribute("disabled")).toBe(true); }
+    try { const ui = renderWithQueryClient(<AutoLocksSection person={owner} />); expect(await ui.findByText("Nothing needs clearing. No picture was locked by Home on its own.")).toBeTruthy(); expect(ui.queryByRole("button", { name: "Clear 0 locks" })).toBeNull(); }
     finally { api.autoLocks = original; }
   });
   test("confirms, clears, and undoes", async () => {

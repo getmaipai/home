@@ -153,6 +153,9 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // Same for the voice page: its lead view (account.voice) is the one dropdown bound to tts.voice_id, so the
         // registry row for that key is not drawn here (the key stays in the registry for other surfaces).
         if (section.id === "voice" && card.group === "person.voice") return null;
+        // Voice recognition owns person.voice_print.enrollment in its body; do not show its registry row again.
+        if (section.id === "profile" && card.group === "person.voice_print") return null;
+        if (section.id === "voice" && card.group === "device.voice" && props.tab === "device") return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props, returnPath, places)}</div>;
         if (card.view) return <SettingsView key={`${card.scope}:${card.group ?? card.label}`} view={card.view} card={card} {...viewProps} />;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>
@@ -160,7 +163,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
 {keysCard(card, viewer, props, returnPath, places)}</div>;
       })}
       {section.trail_view && (section.view_tab === undefined || section.view_tab === props.tab) ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
-      {section.id === "data" && canViewFaceEnrollment(person, person) ? <KitCard><FaceEnrollmentBody profile={person} viewer={person} /></KitCard> : null}
+      {section.id === "data" && (props.tab === undefined || props.tab === "data") && canViewFaceEnrollment(person, person) ? <KitCard><FaceEnrollmentBody profile={person} viewer={person} /></KitCard> : null}
     </div>
   );
 }

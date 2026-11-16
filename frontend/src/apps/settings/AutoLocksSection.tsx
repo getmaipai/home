@@ -66,10 +66,10 @@ export function AutoLocksSection({ person }: { person: Roster }) {
           <ItemDescription clamp={false}>{i18n._({ id: "Some pictures were locked by Home on its own, not by you. Clearing them makes them visible again. Pictures you locked yourself, and adult-style pictures, are never changed.", message: "Some pictures were locked by Home on its own, not by you. Clearing them makes them visible again. Pictures you locked yourself, and adult-style pictures, are never changed." })}</ItemDescription>
           {query.data ? <p className="text-body text-muted-foreground">{count === 0 ? i18n._({ id: "Nothing needs clearing. No picture was locked by Home on its own.", message: "Nothing needs clearing. No picture was locked by Home on its own." }) : i18n._({ id: count === 1 ? "1 picture was locked automatically." : "{count} pictures were locked automatically.", message: count === 1 ? "1 picture was locked automatically." : "{count} pictures were locked automatically.", values: { count } })}</p> : null}
           {lastRun ? <p className="text-body text-muted-foreground">{i18n._({ id: "Last cleared {date}: {pictures}.", message: "Last cleared {date}: {pictures}.", values: { date: formatDateTime(lastRun.at), pictures: `${lastRun.changed} ${pictureCount(lastRun.changed)}` } })}</p> : null}
-          {busy || count === 0 ? <p className="text-body text-muted-foreground">{busy ? i18n._({ id: "Please wait for this change to finish.", message: "Please wait for this change to finish." }) : i18n._({ id: "There are no automatic locks to clear.", message: "There are no automatic locks to clear." })}</p> : null}
+          {busy ? <p className="text-body text-muted-foreground">{i18n._({ id: "Please wait for this change to finish.", message: "Please wait for this change to finish." })}</p> : null}
         </ItemContent>
         <ItemActions>
-          <Button type="button" variant="outline" disabled={busy || count === 0 || !query.data} onClick={() => setConfirming(true)}>{i18n._({ id: "Clear {count} locks", message: "Clear {count} locks", values: { count } })}</Button>
+          {count > 0 ? <Button type="button" variant="outline" disabled={busy || !query.data} onClick={() => setConfirming(true)}>{i18n._({ id: "Clear {count} locks", message: "Clear {count} locks", values: { count } })}</Button> : null}
           {undoRun && !lastRun?.undone ? <Button type="button" variant="ghost" disabled={busy} onClick={() => void undo(undoRun)}>{i18n._({ id: "Undo", message: "Undo" })}</Button> : null}
         </ItemActions>
       </Item>

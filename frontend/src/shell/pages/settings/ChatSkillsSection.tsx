@@ -28,8 +28,18 @@ function bySkillOrder(a: SkillRow, b: SkillRow): number {
   return Number(b.used_in_chat) - Number(a.used_in_chat) || a.name.localeCompare(b.name);
 }
 
+function safeOfferLabel(label: string | null): string | null {
+  if (!label) return null;
+  if (/^[a-z][A-Za-z0-9]*$/.test(label) || /^not offered:/i.test(label) || /\b(?:developer|internal|implementation)\b/i.test(label)) return null;
+  return label;
+}
+
 /** One skill's row: its name, what it does, and whether chat uses it. */
 function skillRow(skill: SkillRow, minor: boolean) {
+  const offerLabel = safeOfferLabel(skill.offer_label);
+  const fallback = skill.offer_label && !offerLabel
+    ? (/not measured/i.test(skill.offer_label) ? i18n._({ id: "Not in chat yet", message: "Not in chat yet" }) : i18n._({ id: "Off for you", message: "Off for you" }))
+    : null;
   return (
     <Item key={skill.id} size="sm" data-skill-id={skill.id}>
       <ItemMedia variant="icon">
@@ -40,8 +50,8 @@ function skillRow(skill: SkillRow, minor: boolean) {
         <ItemDescription>{skill.description}</ItemDescription>
       </ItemContent>
       <ItemActions>
-        {skill.offer_label ? (
-          <Badge variant="outline">{skill.offer_label}</Badge>
+        {offerLabel || fallback ? (
+          <Badge variant="outline">{offerLabel ?? fallback}</Badge>
         ) : skill.used_in_chat ? (
           <Badge variant="secondary">{i18n._({ id: "Used in chat", message: "Used in chat" })}</Badge>
         ) : (

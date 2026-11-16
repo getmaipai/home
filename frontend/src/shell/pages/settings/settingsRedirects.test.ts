@@ -72,8 +72,8 @@ describe("other moved routes", () => {
 });
 
 describe("aliasTarget (AUDIT-UI-01)", () => {
-  test("/settings/backups lands on the Backups page, never on itself (it looped and drew a blank shell)", () => {
-    expect(aliasTarget("/settings/backups", admin)).toBe("/backups");
+  test("/settings/backups remains the Settings area while its own pages stay separate", () => {
+    expect(aliasTarget("/settings/backups", admin)).toBe("/settings/backups");
     expect(aliasTarget("/settings/updates", admin)).toBe("/updates");
   });
   test("/apps/radio lands on the Radio page of Music", () => {

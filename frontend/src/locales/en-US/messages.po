@@ -2361,7 +2361,7 @@ msgid "Added to the prompt"
 msgstr "Added to the prompt"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:69
+#: src/shell/pages/settings/ChatSkillsSection.tsx:79
 msgid "Added to this home"
 msgstr "Added to this home"
 
@@ -7088,7 +7088,7 @@ msgid "Could not load setup status."
 msgstr "Could not load setup status."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:60
+#: src/shell/pages/settings/ChatSkillsSection.tsx:70
 msgid "Could not load skills."
 msgstr "Could not load skills."
 
@@ -10169,6 +10169,11 @@ msgid "setting.search.source_mode.wikimedia.option.inherit"
 msgstr "Follows the household choice for where answers come from."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:33
+msgid "Follows your settings"
+msgstr "Follows your settings"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:497
 msgid "setting.generation.picture_quick_model.option.ernie"
 msgstr "Follows your words closely."
@@ -12621,12 +12626,12 @@ msgid "Inbound connections"
 msgstr "Inbound connections"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:67
+#: src/shell/pages/settings/ChatSkillsSection.tsx:77
 msgid "Included"
 msgstr "Included"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:68
+#: src/shell/pages/settings/ChatSkillsSection.tsx:78
 msgid "Included skills"
 msgstr "Included skills"
 
@@ -12636,7 +12641,7 @@ msgid "Incognito can't turn on partway through a chat. Start a new chat to go in
 msgstr "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsSectionContent.tsx:159
+#: src/shell/pages/settings/SettingsSectionContent.tsx:162
 msgid "Incognito is on, so places cannot be added or renamed until you turn it off."
 msgstr "Incognito is on, so places cannot be added or renamed until you turn it off."
 
@@ -14642,7 +14647,7 @@ msgid "Loading shared media"
 msgstr "Loading shared media"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:60
+#: src/shell/pages/settings/ChatSkillsSection.tsx:70
 msgid "Loading skills"
 msgstr "Loading skills"
 
@@ -17294,7 +17299,7 @@ msgid "No singing, just the music."
 msgstr "No singing, just the music."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:78
+#: src/shell/pages/settings/ChatSkillsSection.tsx:88
 msgid "No skills added yet"
 msgstr "No skills added yet"
 
@@ -17585,6 +17590,11 @@ msgid "Not for you? Choose the Standard level, or turn Videos off, above and not
 msgstr "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/ChatSkillsSection.tsx:41
+msgid "Not in chat yet"
+msgstr "Not in chat yet"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:164
 #: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
@@ -17707,12 +17717,12 @@ msgid "Not supported in this hub version yet."
 msgstr "Not supported in this hub version yet."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:48
+#: src/shell/pages/settings/ChatSkillsSection.tsx:58
 msgid "Not used in chat yet"
 msgstr "Not used in chat yet"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:48
+#: src/shell/pages/settings/ChatSkillsSection.tsx:58
 msgid "Not used in your chats"
 msgstr "Not used in your chats"
 
@@ -18122,6 +18132,11 @@ msgstr "Off by default. When on, this robot may hear music playing nearby and da
 #: src/lib/settingCopy.generated.ts:1581
 msgid "setting.reason.off_until_guardian.admin.off"
 msgstr "Off for {person} until you turn it on."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/settings/ChatSkillsSection.tsx:41
+msgid "Off for you"
+msgstr "Off for you"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1337
@@ -21875,11 +21890,6 @@ msgid "setting.safety.alarm.volume.label"
 msgstr "Safety alarm volume"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:33
-msgid "Same as the household"
-msgstr "Same as the household"
-
-#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:30
 msgid "same time"
 msgstr "same time"
@@ -23637,12 +23647,12 @@ msgid "area.Skills"
 msgstr "Skills"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:80
+#: src/shell/pages/settings/ChatSkillsSection.tsx:90
 msgid "Skills added from the MaiPai Catalog will show up here. Adding them from here, and writing your own, is not built yet."
 msgstr "Skills added from the MaiPai Catalog will show up here. Adding them from here, and writing your own, is not built yet."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:71
+#: src/shell/pages/settings/ChatSkillsSection.tsx:81
 msgid "Skills added to this home"
 msgstr "Skills added to this home"
 
@@ -26920,11 +26930,6 @@ msgid "them"
 msgstr "them"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AutoLocksSection.tsx:69
-msgid "There are no automatic locks to clear."
-msgstr "There are no automatic locks to clear."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:33
 msgid "There are no folders in here. Use this folder, or make a new one."
 msgstr "There are no folders in here. Use this folder, or make a new one."
@@ -28800,7 +28805,7 @@ msgid "Used by: {apps}"
 msgstr "Used by: {apps}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/ChatSkillsSection.tsx:46
+#: src/shell/pages/settings/ChatSkillsSection.tsx:56
 msgid "Used in chat"
 msgstr "Used in chat"
 

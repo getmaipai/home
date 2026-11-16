@@ -280,6 +280,26 @@ describe("the settings route", () => {
     expect(where(view)).toBe("/settings/data");
   });
 
+  test("Backups area renders storage and all standalone management links", async () => {
+    const view = open(makePerson("owner"), "/settings/backups?tab=storage");
+    await waitFor(() => expect(where(view)).toBe("/settings/backups?tab=storage"));
+    expect(await view.findByText("Household storage cap (bytes)")).toBeTruthy();
+    for (const label of ["Backups", "Storage"]) expect(view.getByRole("link", { name: label })).toBeTruthy();
+    cleanup();
+    fixture?.restore();
+    fixture = null;
+    const maintenance = open(makePerson("owner"), "/settings/backups?tab=maintenance");
+    await waitFor(() => expect(where(maintenance)).toBe("/settings/backups?tab=maintenance"));
+    for (const label of ["Updates", "Repairs", "Performance", "Status"]) expect(maintenance.getByRole("link", { name: label })).toBeTruthy();
+  });
+
+  test("People tab draws the users admin view before the two links", async () => {
+    const view = open(makePerson("owner"), "/settings/household?tab=people");
+    expect(await view.findByRole("heading", { name: "Users" })).toBeTruthy();
+    expect(view.getAllByRole("link", { name: "Family" }).some((link) => link.getAttribute("href") === "/people")).toBe(true);
+    expect(view.getAllByRole("link", { name: "Users" }).some((link) => link.getAttribute("href") === "/users")).toBe(true);
+  });
+
   test("a dirty profile draft blocks a SettingsShell section change", async () => {
     const originalConfirm = window.confirm;
     window.confirm = mock(() => false);
@@ -348,6 +368,8 @@ describe("what a band is shown", () => {
     const withAssets = open(makePerson("adult"), "/settings/voice", { wakeword: true });
     await waitFor(() => expect(withAssets.getByRole("tab", { name: "This device" })).toBeTruthy());
     expect(withAssets.getByRole("tab", { name: "Voice" })).toBeTruthy();
+    const device = open(makePerson("adult"), "/settings/voice?tab=device", { wakeword: true });
+    expect(await device.findByRole("switch", { name: "Wake word listening" })).toBeTruthy();
   });
 
   test("the Robot tab is an adult's or admin's and only with a paired robot", async () => {

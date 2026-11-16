@@ -45,6 +45,19 @@ describe("ported from the old settings page", () => {
     expect(fixture!.puts.every((put) => put.scope === deviceScope && put.key === "voice.wakeword.enabled")).toBe(true);
   });
 
+  test("the Data Developer tab does not repeat the face enrollment card", async () => {
+    const view = open(makePerson("owner"), "/settings/data?tab=developer");
+    await waitFor(() => expect(view.getByRole("tab", { name: "Developer tools" }).getAttribute("aria-selected")).toBe("true"));
+    expect(view.queryByText("Not set up yet")).toBeNull();
+    expect(view.queryByRole("link", { name: "Enroll" })).toBeNull();
+  });
+
+  test("Profile does not render the registry voice print enrollment row", async () => {
+    const view = open(makePerson("adult"), "/settings/profile?tab=profile");
+    await waitFor(() => expect(view.getByLabelText("Name")).toBeTruthy());
+    expect(view.queryByRole("switch", { name: "Voice print enrollment" })).toBeNull();
+  });
+
   test("the enrollment sounds switch is on the Account face card and writes false", async () => {
     const owner = makePerson("owner");
     const view = open(owner, "/settings/data?tab=data");
@@ -83,6 +96,8 @@ describe("ported from the old settings page", () => {
     const view = open(makePerson("adult"), "/settings/appearance?tab=appearance");
     const choose = await view.findByRole("combobox", { name: "On this device only" });
     expect(choose).toBeTruthy();
+    fireEvent.click(choose);
+    expect(await view.findByText("Follows your settings")).toBeTruthy();
     fireEvent.click(await view.findByRole("button", { name: "Reset device appearance" }));
     expect(fixture!.puts.filter((put) => put.key === "ui.appearance")).toEqual([]);
     expect(view.getByText("Choose a look for this browser. It does not change your personal setting.")).toBeTruthy();

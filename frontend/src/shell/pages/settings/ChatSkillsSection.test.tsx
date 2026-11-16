@@ -79,12 +79,32 @@ describe("ChatSkillsSection", () => {
     });
   });
 
-  test("an unmeasured package tool says why it is not offered", async () => {
+  test("an unmeasured package tool uses the plain chat status", async () => {
     await withSkills([skill("joke", "Joke", { offer_label: "not offered: not measured" })], async () => {
       const view = renderWithQueryClient(<ChatSkillsSection person={makePerson("adult")} />);
       await view.findByText("Joke");
       const row = view.container.querySelector('[data-skill-id="joke"]') as HTMLElement;
-      expect(within(row).getByText("not offered: not measured")).toBeTruthy();
+      expect(within(row).getByText("Not in chat yet")).toBeTruthy();
+    });
+  });
+
+  test.each(["musicBandEditAllowed", "houseAllowed", "uptimeAllowed"]) ("a gate id %s is never shown", async (gate) => {
+    await withSkills([skill("joke", "Joke", { offer_label: gate })], async () => {
+      const view = renderWithQueryClient(<ChatSkillsSection person={makePerson("adult")} />);
+      await view.findByText("Joke");
+      const row = view.container.querySelector('[data-skill-id="joke"]') as HTMLElement;
+      expect(await within(row).findByText("Off for you")).toBeTruthy();
+      expect(within(row).queryByText(gate)).toBeNull();
+    });
+  });
+
+  test("an internal offer sentence is replaced by a plain status", async () => {
+    await withSkills([skill("joke", "Joke", { offer_label: "not offered: requires local developer configuration" })], async () => {
+      const view = renderWithQueryClient(<ChatSkillsSection person={makePerson("adult")} />);
+      await view.findByText("Joke");
+      const row = view.container.querySelector('[data-skill-id="joke"]') as HTMLElement;
+      expect(within(row).getByText("Off for you")).toBeTruthy();
+      expect(within(row).queryByText(/developer configuration/)).toBeNull();
     });
   });
 

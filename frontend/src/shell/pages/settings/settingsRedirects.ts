@@ -65,8 +65,7 @@ export function aliasTarget(path: string, viewer: { canManageHousehold: boolean 
   const fixed: Record<string, string> = {
     "/conversations": "/chat",
     "/settings/users": settingsPath("household", "people"),
-    // AUDIT-UI-01: Backups and Updates are their own pages; pointing this at /settings/backups looped it onto itself and drew a blank shell.
-    "/settings/backups": "/backups",
+    // Keep the area in Settings; its Manage links lead to the standalone pages.
     "/settings/commands": settingsPath("home-voice", "commands"),
     "/settings/devices": settingsPath("profile", "profile"),
     "/settings/repairs": settingsPath("advanced"),
