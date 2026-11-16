@@ -34,9 +34,6 @@ import { AssistantKeysSettings } from "@/apps/settings/AssistantKeysSettings";
 import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
-import { useAppRows } from "@/shell/useAppCatalog";
-import { backLabelFor, lastAppRoute } from "@/shell/pages/settings/settingsBackLink";
-import { getIcon } from "@maipai/ui/src/icons";
 import { useSetupChecklist, setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -90,26 +87,6 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
     </>
   );
   return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} packageArea={area.id !== "settings" && area.id !== "clock"} />;
-}
-
-const BackIcon = getIcon("arrow-left");
-
-/** COLUMN-UNIFY-01 (owner, 2026-10-19: a settings page had no way back to the app): the settings column's first row returns to the
- * app the person came from, with the column's title under it. The kit draws no title of its own once it is given a back link in the docked (desktop) layout; on a phone it does, so the title is drawn here only when docked. */
-function SettingsBackLink({ title, reach, showTitle }: { title: string; reach: string; showTitle: boolean }) {
-  const rows = useAppRows();
-  const to = lastAppRoute();
-  const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
-  return (
-    <>
-      <div className="flex"><Button variant="ghost" size="row" nativeButton={false} role="link" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
-        <BackIcon aria-hidden />
-        {label}
-      </Button></div>
-      {showTitle ? <h2 className="px-2 text-lg leading-7 font-semibold">{title}</h2> : null}
-      <Badge variant="secondary">{reach}</Badge>
-    </>
-  );
 }
 
 function scopesOf(area: SettingsAreaDef, viewer: SettingsViewer): Scope[] {
@@ -290,9 +267,8 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
   return (
     <SettingsShell
       layout={desktop ? "docked" : "default"}
-      backLink={<SettingsBackLink showTitle={desktop} title={i18n._({ id: "Settings", message: "Settings" })} reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: "Settings" }}
-      trail={[{ label: area.title, href: packageArea && area.id !== "clock" ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
+      trail={detailId ? [{ label: active?.label ?? area.title, href: pagePath(active?.id ?? "", tab) }, { label: detailName ?? active?.label ?? detailId }] : undefined}
       contentAs="section"
       area={area}
       viewer={viewer}
@@ -308,6 +284,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       onSearchChange={(next) => setParams((current) => { const updated = new URLSearchParams(current); if (next) updated.set("q", next); else updated.delete("q"); return updated; }, { replace: true })}
       onBack={() => { if (confirmRouteLeave()) navigate(packageArea ? `/settings/${area.id}` : settingsPath(detailId ? active?.id : undefined)); }}
     >
+      {active?.scope === "household" && !detailId ? <p className="mb-4 text-supporting text-muted-foreground">{i18n._({ id: "Applies to everyone at home", message: "Applies to everyone at home" })}</p> : null}
       {content}
     </SettingsShell>
   );

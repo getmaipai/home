@@ -1096,7 +1096,7 @@ msgid "{name} will stay closed when the job is done."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:56
+#: src/shell/pages/settings/SettingsHomePage.tsx:54
 msgid "{name}, {role} · checked just now"
 msgstr ""
 
@@ -3402,6 +3402,11 @@ msgid "Applied."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/SettingsAreaPage.tsx:287
+msgid "Applies to everyone at home"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1589
 msgid "setting.reason.household_admin.admin.line"
 msgstr ""
@@ -5382,7 +5387,7 @@ msgid "Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:59
+#: src/shell/pages/settings/SettingsHomePage.tsx:57
 msgid "Checked just now."
 msgstr ""
 
@@ -7055,7 +7060,7 @@ msgid "Could not get that backup ready."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:283
+#: src/shell/pages/settings/SettingsAreaPage.tsx:260
 msgid "Could not hide this item. Try again."
 msgstr ""
 
@@ -8856,7 +8861,7 @@ msgstr ""
 #: src/shell/pages/ActivityPage.tsx:27
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
-#: src/shell/pages/settings/SettingsAreaPage.tsx:275
+#: src/shell/pages/settings/SettingsAreaPage.tsx:252
 #: src/shell/pages/status/StatusBoard.tsx:26
 msgid "Done"
 msgstr ""
@@ -9666,7 +9671,7 @@ msgid "Everything installed is in use."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:59
+#: src/shell/pages/settings/SettingsHomePage.tsx:57
 msgid "Everything is fine."
 msgstr ""
 
@@ -10030,7 +10035,7 @@ msgid "Find"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:47
+#: src/shell/pages/settings/SettingsHomePage.tsx:46
 msgid "Find a setting"
 msgstr ""
 
@@ -10117,8 +10122,8 @@ msgid "settings.attention.setup.todo"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:262
-#: src/shell/pages/settings/SettingsAreaPage.tsx:266
+#: src/shell/pages/settings/SettingsAreaPage.tsx:239
+#: src/shell/pages/settings/SettingsAreaPage.tsx:243
 msgid "Finish setting up"
 msgstr ""
 
@@ -14767,8 +14772,8 @@ msgid "Loading sessions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:67
-#: src/shell/pages/settings/SettingsAreaPage.tsx:180
+#: src/shell/pages/settings/SettingsAreaPage.tsx:64
+#: src/shell/pages/settings/SettingsAreaPage.tsx:157
 #: src/shell/pages/settings/SettingsRenderer.tsx:194
 msgid "Loading settings"
 msgstr ""
@@ -16750,7 +16755,7 @@ msgid "Needs attention"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:57
+#: src/shell/pages/settings/SettingsHomePage.tsx:55
 msgid "Needs attention · {count}"
 msgstr ""
 
@@ -17445,7 +17450,7 @@ msgid "No selling"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:217
+#: src/shell/pages/settings/SettingsAreaPage.tsx:194
 msgid "No settings match that search."
 msgstr ""
 
@@ -17781,7 +17786,7 @@ msgstr ""
 #: src/apps/setup/CloseAppsStep.tsx:73
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/apps/setup/SetupWizard.tsx:482
-#: src/shell/pages/settings/SettingsAreaPage.tsx:277
+#: src/shell/pages/settings/SettingsAreaPage.tsx:254
 msgid "Not now"
 msgstr ""
 
@@ -18714,8 +18719,8 @@ msgid "area.Online radio and podcasts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:75
-#: src/shell/pages/settings/SettingsAreaPage.tsx:87
+#: src/shell/pages/settings/SettingsAreaPage.tsx:72
+#: src/shell/pages/settings/SettingsAreaPage.tsx:84
 msgid "Only a parent or admin can change these settings. Ask the person who set up Home."
 msgstr ""
 
@@ -18976,8 +18981,8 @@ msgid "Open Weather"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:77
-#: src/shell/pages/settings/SettingsAreaPage.tsx:88
+#: src/shell/pages/settings/SettingsAreaPage.tsx:74
+#: src/shell/pages/settings/SettingsAreaPage.tsx:85
 msgid "Open your settings"
 msgstr ""
 
@@ -19149,6 +19154,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:103
+#: src/shell/pages/settings/SettingsHomePage.tsx:44
 msgid "Overview"
 msgstr ""
 
@@ -23249,10 +23255,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
-#: src/shell/pages/settings/SettingsAreaPage.tsx:293
 #: src/shell/pages/settings/SettingsHomePage.tsx:46
-#: src/shell/pages/settings/SettingsHomePage.tsx:47
-#: src/shell/pages/settings/SettingsHomePage.tsx:48
 #: src/shell/Routes.tsx:510
 msgid "Settings"
 msgstr ""
@@ -23748,7 +23751,7 @@ msgid "Since"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:60
+#: src/shell/pages/settings/SettingsHomePage.tsx:58
 msgid "Since {date}"
 msgstr ""
 
@@ -25717,7 +25720,7 @@ msgstr ""
 #: src/shell/pages/PackageAppPage.tsx:302
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
-#: src/shell/pages/settings/SettingsAreaPage.tsx:283
+#: src/shell/pages/settings/SettingsAreaPage.tsx:260
 #: src/shell/pages/settings/SettingsRenderer.tsx:184
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82

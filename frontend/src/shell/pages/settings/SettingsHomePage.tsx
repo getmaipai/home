@@ -41,11 +41,9 @@ export function SettingsHomePage({ person }: { person: Roster }) {
   const summary = attention.data;
   return <SettingsShell
     layout={phone ? "default" : "docked"}
-    area={area}
+    area={{ ...area, title: i18n._({ id: "Overview", message: "Overview" }) }}
     viewer={viewer}
-    backLink={<><h2 className="px-2 text-row font-semibold">{i18n._({ id: "Settings", message: "Settings" })}</h2></>}
     labels={{ columnTitle: i18n._({ id: "Settings", message: "Settings" }), search: i18n._({ id: "Find a setting", message: "Find a setting" }) }}
-    trail={[{ label: i18n._({ id: "Settings", message: "Settings" }) }]}
     activeSection={undefined}
     sectionHref={(id) => settingsPath(id)}
     searchQuery={query}

@@ -9,7 +9,6 @@ import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { CustomizeRedirect, LegacySettingsRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
-import { settingsArea } from "@/shell/pages/settings/settingsAreas";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { makePerson, mockHome, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
@@ -115,17 +114,18 @@ describe("the settings route", () => {
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 
-  test("the column names its area and shows its reach", async () => {
+  test("the column is a plain Settings title and the audience note sits in the page, not the column", async () => {
     const home = open(makePerson("owner"), "/settings/household?tab=general");
-    expect(await home.findByRole("heading", { level: 2, name: settingsArea("settings")!.title })).toBeTruthy();
-    expect(within(column(home)).getByText("Applies to everyone at home")).toBeTruthy();
-    cleanup();
-    fixture?.restore();
-    fixture = null;
+    expect(await home.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(within(column(home)).queryByText("Applies to everyone at home")).toBeNull();
+    expect(home.getByText("Applies to everyone at home")).toBeTruthy();
+    expect(within(column(home)).queryByRole("link", { name: /^Back/ })).toBeNull();
+  });
 
+  test("a personal page has no audience note and the same plain column", async () => {
     const personal = open(makePerson("adult"), "/settings/chat?tab=general");
     expect(await personal.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
-    expect(within(column(personal)).getByText("Only you")).toBeTruthy();
+    expect(personal.queryByText("Only you")).toBeNull();
   });
 
   test("an owner opens Settings and sees the personal and household pages together", async () => {
@@ -158,12 +158,11 @@ describe("the settings route", () => {
     expect(await view.findByRole("link", { name: "Robot settings" })).toHaveAttribute("href", "/settings/apps/d1?tab=overview");
   });
 
-  test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the area title stays", async () => {
+  test("the column has no back arrow and no link out, only the title, search and the areas (Jesse, 2026-11-16)", async () => {
     rememberLastAppRoute("/files?section=all");
     const view = open(makePerson("adult"), "/settings/chat?tab=general");
-    const back = await waitFor(() => within(column(view)).getByRole("link", { name: "Back to Library" }));
-    expect(back.getAttribute("href")).toBe("/files?section=all");
-    expect(within(column(view)).getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(await view.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(within(column(view)).queryByRole("link", { name: /Back/ })).toBeNull();
     window.sessionStorage.clear();
   });
 
