@@ -101,6 +101,7 @@
     {
       "type": "studio",
       "kind": "video",
+      "panels": ["volume", "fades", "crossfade", "titles", "level"],
       "bind": {
         "source": "package",
         "path": "recipes",
