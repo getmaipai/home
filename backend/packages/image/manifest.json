@@ -90,7 +90,7 @@
       {
         "id": "index",
         "label": "Home",
-        "icon": "house",
+        "icon": "image",
         "nav": true,
         "kind": "schema",
         "module": "index"
