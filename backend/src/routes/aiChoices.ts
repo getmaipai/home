@@ -36,8 +36,93 @@ import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { readSlot } from "@/lib/tiers";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { roleHealth } from "@/lib/roleHealth";
 
 export const aiChoicesRoutes = apiRouter();
+
+const FEATURE_ROWS = [
+  { id: "chat", name: "Chat", category: "chat", role: "chat", used_by: ["chat", "companions"] },
+  { id: "pictures", name: "Pictures", category: "pictures", role: "image", used_by: ["the Pictures app", "companions"] },
+  { id: "videos", name: "Videos", category: "video", role: "video", used_by: ["the Film maker", "companions"] },
+  { id: "music", name: "Music", category: "music", role: "music", used_by: ["the Music maker", "companions"] },
+  { id: "voice", name: "Voice", category: "voice", role: "tts", used_by: ["companions"] },
+] as const;
+const OVERVIEW_TIERS = ["reduced", "standard", "boost", "max"] as const;
+const OverviewLevelSchema = z.object({ tier: z.enum(OVERVIEW_TIERS), state: z.enum(["ready", "missing", "problem", "off", "waits", "same"]), word: z.string(), model_label: z.string().nullable(), size_bytes_missing: z.number().nullable(), detail: z.string().nullable(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() });
+const OverviewSchema = z.object({ features: z.array(z.object({ id: z.string(), name: z.string(), used_by: z.array(z.string()), levels: z.array(OverviewLevelSchema), ready_count: z.number(), level_count: z.number() })), helpers: z.array(z.object({ id: z.string(), name: z.string(), model_label: z.string().nullable(), used_by: z.array(z.string()), state: z.enum(["ready", "missing", "problem", "off", "waits", "same"]), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), attention: z.object({ items: z.array(z.object({ id: z.string(), kind: z.enum(["problem", "missing"]), title: z.string(), line: z.string(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), download_all: z.object({ bytes: z.number(), count: z.number() }).nullable() }), right_now: z.object({ engine: z.enum(["ready", "problem"]), waiting: z.number(), memory_free_bytes: z.number(), models_bytes: z.number(), disk_free_bytes: z.number() }) });
+const overviewRoute = createRoute({ method: "get", path: "/overview", tags: ["AI"], summary: "A household view of AI features, their model levels and any attention needed", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: OverviewSchema } }, description: "The feature overview assembled from current Stack candidates, installed components, saved slots and current health." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) } });
+aiChoicesRoutes.openapi(overviewRoute, async (c) => {
+  const [componentList, candidateResults, chatHealth] = await Promise.all([
+    listStackComponents().catch(() => null),
+    Promise.all(FEATURE_ROWS.map((row) => listTierCandidates(row.category).catch(() => null))),
+    roleHealth("chat").catch(() => null),
+  ]);
+  const components = componentList?.components ?? [];
+  const slotsByFeature: Record<string, Record<string, ReturnType<typeof readSlot>>> = {};
+  for (const row of FEATURE_ROWS) {
+    const cat = row.category === "pictures" ? "image" : row.category;
+    slotsByFeature[row.id] = Object.fromEntries(["standard", "boost", "max"].map((tier) => [tier, readSlot(cat as "chat" | "image" | "video" | "music" | "voice", tier as "standard" | "boost" | "max")]));
+    if (row.id === "chat" || row.id === "voice") slotsByFeature[row.id]!.reduced = readSlot(row.id, "reduced");
+  }
+  const missingComponents = new Map<string, number>();
+  const features = FEATURE_ROWS.map((row, index) => {
+    const candidates = candidateResults[index]?.levels ?? [];
+    const levels = OVERVIEW_TIERS.map((tier) => {
+      if (tier === "reduced" && row.id !== "chat" && row.id !== "voice") return { tier, state: "waits" as const, word: `Waits for the ${row.id === "pictures" ? "Standard" : "Standard"} level`, model_label: null, size_bytes_missing: null, detail: null, action: null };
+      if (row.id === "voice" && (tier === "boost" || tier === "max")) return { tier, state: "same" as const, word: "Same as Standard", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      if (row.id === "chat" && (tier === "boost" || tier === "max")) return { tier, state: "waits" as const, word: "Waits for Standard", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      const slot = slotsByFeature[row.id]?.[tier];
+      if (!slot) return { tier, state: "waits" as const, word: "Waits", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      if (slot.model === "off") return { tier, state: "off" as const, word: "Off", model_label: null, size_bytes_missing: null, detail: null, action: null };
+      const candidateTier = tier === "reduced" ? "standard" : tier;
+      const level = candidates.find((item) => item.tier === candidateTier);
+      const offered = level?.candidates ?? [];
+      const chosen = slot.model === "recommended" ? offered.find((item) => item.id === level?.recommended) ?? offered[0] : offered.find((item) => item.id === slot.model);
+      if (!chosen) return { tier, state: "waits" as const, word: `Waits for the ${tier === "standard" ? "Standard" : tier[0]!.toUpperCase() + tier.slice(1)} level`, model_label: null, size_bytes_missing: null, detail: null, action: null };
+      const component = componentList?.components.find((item) => item.id === chosen.id);
+      if (!chosen.fits) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: chosen.refusal, action: { kind: "fix" as const, label: "Review", job: row.id, level: tier } };
+      if (!componentList || !component) return { tier, state: "waits" as const, word: "Waits", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null };
+      if (component.state === "failed" || component.install_block) return { tier, state: "problem" as const, word: "Problem", model_label: chosen.label, size_bytes_missing: null, detail: component.failure ?? component.install_block ?? "This model could not be installed.", action: { kind: "fix" as const, label: "Fix", job: row.id, level: tier } };
+      if (component.state === "installed") return { tier, state: "ready" as const, word: "Ready", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null };
+      if (component.state !== "notInstalled") return { tier, state: "waits" as const, word: "Waits", model_label: chosen.label, size_bytes_missing: null, detail: null, action: null };
+      const bytes = component.download_bytes || component.full_bytes || component.size_bytes || 0;
+      if (bytes > 0) missingComponents.set(chosen.id, bytes);
+      return { tier, state: "missing" as const, word: "Missing", model_label: chosen.label, size_bytes_missing: bytes > 0 ? bytes : null, detail: null, action: { kind: "download" as const, label: "Download", job: row.id, level: tier } };
+    });
+    return { id: row.id, name: row.name, used_by: [...row.used_by], levels, ready_count: levels.filter((level) => level.state === "ready").length, level_count: levels.length };
+  });
+  const helperPlan = await loadPlan().catch(() => null);
+  const helperRows: Array<{ id: string; name: string; aliases: string[]; used_by: string[] }> = [
+    { id: "vision", name: "Describing pictures", aliases: ["vision", "reads-pictures"], used_by: ["chat", "companions"] },
+    { id: "picture-tools", name: "Picture tools", aliases: ["image-tools"], used_by: ["the Pictures app"] },
+    { id: "clearer", name: "Make clearer best", aliases: ["image-tools"], used_by: ["the Pictures app"] },
+    { id: "listening", name: "Listening", aliases: ["stt", "speech-to-text"], used_by: ["chat", "companions"] },
+    { id: "stems", name: "Stems", aliases: ["stems"], used_by: ["the Music maker"] },
+    { id: "sounds", name: "Sound effects", aliases: ["sound-effects"], used_by: ["the Music maker"] },
+    { id: "coding", name: "Coding helper", aliases: ["coding"], used_by: ["chat"] },
+    { id: "search", name: "Search and memory", aliases: ["search", "embed"], used_by: ["chat"] },
+    { id: "ingredients", name: "Video from pictures", aliases: ["ingredients-adapter"], used_by: ["the Film maker"] },
+    { id: "wakeword", name: "Wake word", aliases: ["wakeword-detector"], used_by: ["companions"] },
+    { id: "faces", name: "Telling people apart", aliases: ["faces-finder"], used_by: ["companions"] },
+  ];
+  const helpers = helperRows.map((helper) => {
+    const planId = helperPlan?.rows.find((row) => helper.aliases.includes(row.id))?.id;
+    const comp = components.find((item) => helper.aliases.includes(item.id) || item.group === helper.id);
+    const state = !componentList || !comp || (!planId && !comp) ? "waits" as const : comp.state === "notInstalled" ? "missing" as const : comp.state === "installed" ? "ready" as const : comp.state === "failed" || Boolean(comp.install_block) ? "problem" as const : "waits" as const;
+    const bytes = comp ? (comp.download_bytes || comp.full_bytes || comp.size_bytes || 0) : 0;
+    if (state === "missing" && comp && bytes > 0) missingComponents.set(comp.id, bytes);
+    return { id: helper.id, name: helper.name, model_label: comp?.label ?? null, used_by: helper.used_by, state, action: state === "missing" ? { kind: "download" as const, label: "Download", job: helper.id } : state === "problem" ? { kind: "fix" as const, label: "Fix", job: helper.id } : null };
+  });
+  const attention = [
+    ...features.flatMap((feature) => feature.levels.filter((level) => level.state === "missing" || level.state === "problem").map((level) => ({ id: `${feature.id}-${level.tier}`, kind: level.state as "missing" | "problem", title: `${feature.name} ${level.tier}`, line: level.detail ?? (level.state === "missing" ? `${level.model_label ?? "This model"} is needed for this level.` : "This level needs attention."), action: level.action }))),
+    ...helpers.filter((helper) => helper.state === "missing" || helper.state === "problem").map((helper) => ({ id: helper.id, kind: helper.state as "missing" | "problem", title: helper.name, line: helper.state === "problem" ? `${helper.name} could not start.` : `${helper.name} needs a download.`, action: helper.action })),
+  ];
+  const waiting = components.filter((item) => item.state === "installing").length;
+  const missingBytes = [...missingComponents.values()].reduce((sum, bytes) => sum + bytes, 0);
+  return c.json({ features, helpers, attention: { items: attention, download_all: missingComponents.size ? { bytes: missingBytes, count: missingComponents.size } : null }, right_now: { engine: (chatHealth?.availability === "ready" ? "ready" : "problem") as "ready" | "problem", waiting, memory_free_bytes: (await systemAvailableBytes().catch(() => null))?.available ?? 0, models_bytes: components.filter((item) => item.state === "installed").reduce((sum, item) => sum + (item.size_bytes ?? 0), 0), disk_free_bytes: componentList?.free_disk_bytes ?? 0 } }, 200);
+});
 
 const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"] as const;
 type JobId = (typeof JOBS)[number];

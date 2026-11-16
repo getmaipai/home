@@ -81,6 +81,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route === "/api/house/test" && init?.method === "POST") return Promise.resolve(Response.json({ ok: true, rooms: 2, devices: 4 }));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/settings/attention")) return Promise.resolve(Response.json(attention));
+    if (route.endsWith("/api/ai/overview")) return Promise.resolve(Response.json({ features: [], helpers: [], attention: { items: [], download_all: null }, right_now: { engine: "ready", waiting: 0, memory_free_bytes: 0, models_bytes: 0, disk_free_bytes: 0 } }));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));
     if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));

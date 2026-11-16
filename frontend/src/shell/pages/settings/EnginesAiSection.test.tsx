@@ -21,6 +21,8 @@ function open(person: Roster, url: string) {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
     const json = (body: unknown) => Promise.resolve(Response.json(body));
+    if (path.endsWith("/api/ai/overview")) return json({ features: [{ id:"chat", name:"Chat", used_by:["chat"], levels:[{tier:"reduced",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"ready",word:"Ready",model_label:"Qwen",size_bytes_missing:null,detail:null,action:null},{tier:"boost",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4},{id:"pictures",name:"Pictures",used_by:["the Pictures app"],levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"missing",word:"Missing",model_label:"MiniMax H3-Image",size_bytes_missing:100,detail:null,action:{kind:"download",label:"Download",job:"pictures",level:"standard"}},{tier:"boost",state:"ready",word:"Ready",model_label:"MiniMax H3-Image",size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4}], helpers:[], attention:{items:[{id:"pictures-standard",kind:"missing",title:"Pictures standard",line:"MiniMax H3-Image is needed for this level.",action:{kind:"download",label:"Download",job:"pictures",level:"standard"}}],download_all:{bytes:100,count:1}},right_now:{engine:"ready",waiting:0,memory_free_bytes:1e9,models_bytes:1e9,disk_free_bytes:1e9} });
+    if (path.endsWith("/api/ai/tiers/pictures")) return json({profile:"test",room_bytes:1e9,levels:[{tier:"standard",cap_bytes:1e9,recommended:"minimax-h3-image",candidates:[{id:"minimax-h3-image",label:"MiniMax H3-Image",family:"minimax",peak_bytes:1e9,verified:true,fits:true,refusal:null}]},{tier:"boost",cap_bytes:1e9,recommended:"minimax-h3-image",candidates:[{id:"minimax-h3-image",label:"MiniMax H3-Image",family:"minimax",peak_bytes:1e9,verified:true,fits:true,refusal:null}]},{tier:"max",cap_bytes:1e9,recommended:null,candidates:[]}] });
     if (path.endsWith("/api/ai/choices")) return json({ stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e12, installed_bytes: 4e10, cards: [], alwaysOn: { text: "Always on: Home itself.", bytes: 1, rowIds: [] }, recommended: null, unused_bytes: 0 });
     if (path.endsWith("/api/engine-link/credentials")) return json({ paired: false });
     if (path.endsWith("/api/engines/health")) return json({ configured: false, health: [] });
@@ -49,11 +51,12 @@ afterEach(() => {
 });
 
 describe("Engines and AI uses four tabs inside the settings shell", () => {
-  test("Overview is the default and each tab shows its existing parts", async () => {
+  test("Features is the first tab and shows attention and feature levels", async () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=overview");
-    expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
-    expect(await view.findByRole("switch", { name: "Pause chat for everyone" })).toBeTruthy();
-    expect(await view.findByText("Model choices at a glance")).toBeTruthy();
+    expect(await view.findByRole("tab", { name: "Features" })).toBeTruthy();
+    expect(await view.findByText("Needs attention")).toBeTruthy();
+    expect(await view.findByText("MiniMax H3-Image is needed for this level.")).toBeTruthy();
+    expect(await view.findByText("Features", { selector: "h2" })).toBeTruthy();
     expect(view.queryByText("Install the AI for this computer")).toBeNull();
     expect(view.queryByText("Engine computer link")).toBeNull();
     expect(view.queryByRole("tab", { name: "Models" })).toBeNull();
@@ -61,6 +64,25 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
     expect(view.getAllByRole("link", { name: "AI and models" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
+  });
+
+  test("one feature sheet opens and saves only changed slots", async () => {
+    const view = open(makePerson("owner"), "/settings/ai?tab=overview");
+    fireEvent.click(await view.findByRole("button", { name: /Pictures: 1 of 4 levels ready/ }));
+    expect(await view.findByRole("heading", { name: "Pictures" })).toBeTruthy();
+    expect(view.getAllByText("Standard").length).toBeGreaterThan(0);
+    fireEvent.click(view.getByRole("combobox", { name: "Standard model" }));
+    fireEvent.click(await view.findByRole("option", { name: "MiniMax H3-Image · Recommended" }));
+    fireEvent.click(view.getByRole("button", { name: "Save" }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fixture?.puts).toHaveLength(1);
+    expect(fixture?.puts[0]?.key).toBe("engines.image.tier.standard");
+  });
+
+  test("a teen is blocked from the Features page by the household role gate", async () => {
+    const view = open(makePerson("teen"), "/settings/ai?tab=overview");
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(view.queryByTestId("ai-features")).toBeNull();
   });
 
   test("?tab keeps the requested shell tab in the URL", async () => {

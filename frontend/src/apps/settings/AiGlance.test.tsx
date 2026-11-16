@@ -1,163 +1,46 @@
-// The staged banner and Apply live in a sticky bar so they are always on screen, and Apply writes what was staged.
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { MemoryRouter } from "react-router-dom";
 import { AiGlance } from "@/apps/settings/AiGlance";
+import { makePerson, REGISTRY } from "@/shell/pages/settings/settingsTestKit";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
+const ready = { tier:"standard",state:"ready",word:"Ready",model_label:"Qwen",size_bytes_missing:null,detail:null,action:null };
+const feature = { id:"chat",name:"Chat",used_by:["chat"],levels:[{tier:"reduced",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},ready,{tier:"boost",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4 };
+type Fixture = { features: typeof feature[]; helpers: Array<{id:string;name:string;model_label:string|null;used_by:string[];state:"ready"|"missing"|"problem"|"off"|"waits"|"same";action:unknown}>; attention:{items:Array<{id:string;kind:"problem"|"missing";title:string;line:string;action:unknown}>;download_all:{bytes:number;count:number}|null};right_now:{engine:"ready"|"problem";waiting:number;memory_free_bytes:number;disk_free_bytes:number;models_bytes:number} };
+const base: Fixture = { features:[feature],helpers:[],attention:{items:[],download_all:null},right_now:{engine:"ready",waiting:0,memory_free_bytes:100,disk_free_bytes:100,models_bytes:0} };
+function render(data: Fixture) {
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const path=(typeof input==="string"?input:input.toString()).split("?")[0]!;
+    if(path==="/api/ai/overview") return Promise.resolve(Response.json(data));
+    if(path==="/api/settings") return Promise.resolve(Response.json([]));
+    if(path==="/api/settings/registry") return Promise.resolve(Response.json(REGISTRY));
+    if(path.startsWith("/api/ai/tiers/")) return Promise.resolve(Response.json({profile:"test",room_bytes:0,levels:[]}));
+    return Promise.resolve(Response.json({}));
+  }) as typeof fetch;
+  return renderWithQueryClient(<MemoryRouter><AiGlance person={makePerson("owner")} onPersonChange={()=>undefined}/></MemoryRouter>);
+}
 
-const wakeChoice = { id: "wakeword.detector", job: "wakeword", kind: "switch", label: "Hey Jarvis", description: "Hey Jarvis.", name: "Hey Jarvis", rowIds: [], recommended: true, current: false, state: "notInstalled", percent: null, failure: null, downloadBytes: 3_700_000, installedBytes: 3_700_000, ramBytes: 3_700_000, ramBasis: "estimate", stateText: "", blockedReason: null, action: "get", setting: null, chosenNotReady: false, details: [] };
-const overview = { stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e12, installed_bytes: 0, cards: [{ id: "wakeword", title: "Wake Word", summary: "", chip: "", choices: [wakeChoice], notReady: false, unavailable: null }], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 };
-
-describe("AiGlance first paint", () => {
-  test("the page draws the last answer at once while the engine's reply is still on its way", async () => {
-    localStorage.setItem("maipai.ai-choices.v1", JSON.stringify(overview));
-    globalThis.fetch = ((input: RequestInfo | URL) => {
-      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-      return new Promise<Response>(() => {});
-    }) as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
-    expect(view.getByTestId("ai-glance")).toBeTruthy();
-    localStorage.removeItem("maipai.ai-choices.v1");
+describe("AI Features overview",()=>{
+  test("shows the empty attention state and the ready feature levels",async()=>{
+    const view=render(base);
+    expect(await view.findByText("Everything is fine.")).toBeTruthy();
+    expect(await view.findByText("Qwen")).toBeTruthy();
+    expect(view.getByText("Ready")).toBeTruthy();
   });
-});
-
-describe("AiGlance Apply", () => {
-  test("a staged switch shows the sticky bar and Apply posts the choice", async () => {
-    const posts: string[] = [];
-    let release = () => {};
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return new Promise((resolve) => { release = () => resolve(Response.json({ ok: true, started: [] })); }); }
-      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json(overview));
-      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      return Promise.resolve(Response.json({}));
-    }) as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { eyebrow: "Your AI setup", title: "AI & Models", apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
-    const toggle = await view.findByRole("switch", { name: /Wake Word/ });
-    fireEvent.click(toggle);
-    const bar = await view.findByTestId("ai-action-bar");
-    expect(bar.querySelector('[data-testid="ai-staged"]')).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Apply changes" }));
-    await waitFor(() => expect(posts.length).toBeGreaterThan(0));
-    expect(posts[0]).toContain("/api/ai/choices/wakeword");
-    expect(posts[0]).toContain("wakeword.detector");
-    expect((await view.findByRole("button", { name: "Applying…" })).hasAttribute("disabled")).toBe(true);
-    expect(view.queryByText("Your AI setup")).toBeNull();
-    expect(view.queryByRole("heading", { name: "AI & Models" })).toBeNull();
-    release();
+  test("shows an attention item and a missing chip",async()=>{
+    const missing={...feature,id:"pictures",name:"Pictures",ready_count:0,levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"missing",word:"Missing",model_label:"MiniMax H3-Image",size_bytes_missing:49e9,detail:null,action:{kind:"download",label:"Download",job:"pictures",level:"standard"}},{tier:"boost",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"waits",word:"Waits",model_label:null,size_bytes_missing:null,detail:null,action:null}]} as unknown as typeof feature;
+    const view=render(({...base,features:[missing],attention:{items:[{id:"p",kind:"missing",title:"Pictures Standard",line:"This level needs a download.",action:null}],download_all:{bytes:49e9,count:1}}} as unknown as Fixture));
+    expect(await view.findByText("This level needs a download.")).toBeTruthy();
+    expect(view.getByText("Missing")).toBeTruthy();
+    expect(view.getByText("MiniMax H3-Image")).toBeTruthy();
   });
-
-  test("the Stems switch (three switch choices) stages the standard splitter and Apply posts it", async () => {
-    const posts: string[] = [];
-    const mk = (id: string, label: string, recommended: boolean) => ({ ...wakeChoice, id, job: "stems", label, name: label, recommended, rowIds: [id] });
-    const stems = { id: "stems", title: "Stems", summary: "Split songs", chip: "", choices: [mk("stems.standard", "Split songs into stems", true), mk("stems.finer", "Finer stem splitter", false), mk("stems.more", "Guitar and piano parts", false)], notReady: false, unavailable: null };
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return Promise.resolve(Response.json({ ok: true, started: [] })); }
-      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [stems] }));
-      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      return Promise.resolve(Response.json({}));
-    }) as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
-    fireEvent.click(await view.findByRole("switch", { name: /Stems/ }));
-    fireEvent.click(await view.findByRole("button", { name: "Apply changes" }));
-    await waitFor(() => expect(posts.length).toBeGreaterThan(0));
-    expect(posts[0]).toContain("/api/ai/choices/stems");
-    expect(posts[0]).toContain("stems.standard");
-  });
-
-  test("Sound effects is its own row and its choice dialog shows the 3.5 GB size and licence", async () => {
-    const posts: string[] = [];
-    const sound = { ...wakeChoice, id: "music.sound", job: "sounds", label: "Make better sound effects", description: "Make short sound effects and ambience, like rain or a door slam, from a sentence. Sounds are Powered by Stability AI.", kind: "switch", rowIds: ["sound-effects"], downloadBytes: 3_492_094_340, installedBytes: 3_492_094_340, licence: { id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/licence", summary: ["Personal use only."], accepted_at: null } };
-    const sounds = { id: "sounds", title: "Sound effects", summary: "Make short sound effects and ambience, like rain or a door slam. Stays on this computer.", chip: "", choices: [sound], notReady: false, unavailable: null };
-    const music = { id: "music", title: "Music", summary: "Make music", chip: "", choices: [{ ...wakeChoice, id: "music.make", job: "music", label: "Make music (ACE-Step 1.5)", description: "Make music (ACE-Step 1.5)", kind: "switch", current: true }], notReady: false, unavailable: null };
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return Promise.resolve(Response.json({ ok: true, started: [] })); }
-      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [music, sounds] }));
-      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      return Promise.resolve(Response.json({}));
-    }) as typeof fetch;
-    const copy = { dialog_title: "Choose a model", dialog_note: "Choose a model", recommended: "Recommended", fits: "Fits this computer", ram_estimate: "About {size} memory", disable_option: "Turn off {name}", save_choice: "Save choice", cancel: "Cancel", on: "On", off: "Off" };
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
-    expect(await view.findByText("Sound effects")).toBeTruthy();
-    expect(view.getByRole("switch", { name: /^Music:/ })).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Choose a model: Sound effects" }));
-    expect(await view.findByText(/3\.5 GB/)).toBeTruthy();
-    expect(view.getByText(/Stability AI Community Licence; Gemma Terms of Use/)).toBeTruthy();
-    expect(view.getByText(/Accept it in Models and storage before installing/)).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(view.getByRole("switch", { name: /Sound effects:/ }));
-    fireEvent.click(view.getByRole("button", { name: "Apply" }));
-    await waitFor(() => expect(posts.some((post) => post.includes("/api/ai/choices/sounds") && post.includes("music.sound"))).toBe(true));
-  });
-
-  test("a refused Apply shows the cause in a status row and keeps the change staged", async () => {
-    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (init?.method === "POST") return Promise.resolve(Response.json({ error: "Not enough room on the disk. Free some space, then try again.", code: "not_enough_space" }, { status: 409 }));
-      if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json(overview));
-      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-      if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      return Promise.resolve(Response.json({}));
-    }) as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
-    fireEvent.click(await view.findByRole("switch", { name: /Wake Word/ }));
-    fireEvent.click(await view.findByRole("button", { name: "Apply changes" }));
-    expect(await view.findByText("That did not work")).toBeTruthy();
-    expect(view.getByText(/Not enough room on the disk/)).toBeTruthy();
-    expect(view.getByTestId("ai-staged")).toBeTruthy();
-  });
-
-  test("a row whose model is downloading shows the progress, and a failed one says so", async () => {
-    const serve = (choice: object) => {
-      globalThis.fetch = ((input: RequestInfo | URL) => {
-        const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-        if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ ...overview.cards[0]!, choices: [choice] }] }));
-        if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-        if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-        return Promise.resolve(Response.json({}));
-      }) as typeof fetch;
-    };
-    const card = { card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0];
-    serve({ ...wakeChoice, state: "installing", percent: 40 });
-    const downloading = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
-    const bar = await downloading.findByRole("progressbar", { name: "Hey Jarvis progress" });
-    expect(bar).toBeTruthy();
-    cleanup();
-    serve({ ...wakeChoice, current: true, state: "failed", failure: "The download stopped. Try again." });
-    const failed = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
-    expect(await failed.findByText("The download stopped. Try again.")).toBeTruthy();
-  });
-
-  test("the chat row carries an Uncensored badge only while the uncensored model is the one in use", async () => {
-    const base = { ...wakeChoice, job: "chat", kind: "radio", recommended: false, state: "installed", action: "none", stateText: "Installed" };
-    const standard = { ...base, id: "chat.standard", kind: "fixed", label: "Standard chat AI", name: "Standard chat AI", recommended: true, current: true };
-    const uncensored = { ...base, id: "chat.uncensored", label: "Uncensored chat AI", name: "Uncensored chat AI", current: false };
-    const serve = (choices: object[]) => {
-      globalThis.fetch = ((input: RequestInfo | URL) => {
-        const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-        if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ id: "chat", title: "Chat", summary: "", chip: "", choices, notReady: false, unavailable: null }] }));
-        if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
-        if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
-        return Promise.resolve(Response.json({}));
-      }) as typeof fetch;
-    };
-    const card = { card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0];
-    serve([standard, uncensored]);
-    const before = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
-    await before.findByTestId("ai-row-chat");
-    expect(before.queryByText("Uncensored")).toBeNull();
-    cleanup();
-    serve([{ ...standard, current: false }, { ...uncensored, current: true }]);
-    const after = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
-    expect(await after.findByText("Uncensored")).toBeTruthy();
+  test("opens one sheet for a feature",async()=>{
+    const view=render(base);
+    fireEvent.click(await view.findByRole("button",{name:/Chat: 1 of 4 levels ready/}));
+    expect(await view.findByRole("dialog")).toBeTruthy();
+    expect(view.getAllByRole("heading",{name:"Chat"}).length).toBeGreaterThan(0);
   });
 });

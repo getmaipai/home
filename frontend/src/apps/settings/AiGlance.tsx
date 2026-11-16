@@ -1,282 +1,49 @@
-// AIMODELS-GLANCE-2026-10-26: Settings, AI and models, Overview: one bird's-eye page (view `ai.glance`). Header, the "not on this
-// device" and "staged" banners, the Memory and Storage bars with their after-apply projection, seven rows, and the footer.
-// Choices are staged in the page and written only by Apply. All words are the spec card's `copy` (rule S5); progress rides
-// InstallStrip (rule S6); kit Elements as shipped (rule 9). Variants the kit lacks are listed in the design note.
 import { i18n } from "@lingui/core";
-import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { JobProgress } from "@maipai/ui/src/elements/job-progress";
-import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { Switch } from "@maipai/ui/src/ui/switch";
-import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { getIcon } from "@maipai/ui/src/icons";
-import { Link } from "react-router-dom";
+import { Input } from "@maipai/ui/src/ui/input";
 import { api } from "@/lib/api";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import { Link } from "react-router-dom";
 import { aiChoicesApi } from "@/lib/aiChoicesApi";
-import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
-import { InstallStrip } from "@/shell/InstallStrip";
-import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
-import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
-import { AiModelChoices } from "@/apps/settings/AiModelDialog";
-import { AiSlotChoices } from "@/apps/settings/AiSlotDialog";
-import { AiJobSummary } from "@/apps/settings/AiJobSummary";
-import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, type SlotDrafts, type SlotTier } from "@/apps/settings/aiTierSlots";
-import { useAiChoices } from "@/apps/settings/useAiChoices";
-import { ENGINE_ROLE, HUB_PART_JOBS, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
-import { sizeGb } from "../../../../shared/diskPlanMath";
-import type { AiJobId } from "../../../../shared/aiChoices";
+import { configurableTiers, draftOf, sameDraft, slotKey, toStored, TIERED_JOBS, optionDefs, type SlotDraft, type SlotTier } from "@/apps/settings/aiTierSlots";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
-import { downloadProgress } from "@/lib/downloadProgress";
-import { errorLine } from "@/lib/hubReachability";
-import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { sizeGb } from "../../../../shared/diskPlanMath";
 
-const GB = 1_000_000_000;
-const messageOf = (error: unknown, fallback: string) => (errorLine(error, fallback));
-const delta = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
-
-function whenText(updatedAt: number): string {
-  const minutes = Math.floor((Date.now() - updatedAt) / 60_000);
-  return minutes < 1 ? i18n._({ id: "just now", message: "just now" }) : i18n._({ id: "{minutes, plural, one {# minute ago} other {# minutes ago}}", message: "{minutes, plural, one {# minute ago} other {# minutes ago}}", values: { minutes } });
-}
-
-export function AiGlance({ card }: SettingsViewProps) {
-  const copy = ((card as { copy?: Record<string, string> } | undefined)?.copy) ?? {};
-  const { query, refresh } = useAiChoices();
-  const hardware = useQuery({ queryKey: ["host", "hardware"], queryFn: () => api.hardware(), staleTime: 300_000 });
-  const settings = useQuery({ queryKey: ["settings", "household", "engines"], queryFn: () => api.settingsValues("household") });
-  const [staged, setStaged] = useState<StagedMap>({});
-  const [editing, setEditing] = useState<GlanceRow | null>(null);
-  const [resetting, setResetting] = useState<GlanceRow | null>(null);
-  const maxWindow = useQuery({ queryKey: ["ai", "tier-window"], queryFn: () => aiChoicesApi.tierWindow(), refetchInterval: 10_000, retry: false });
-  const stopWindow = useMutation({ mutationFn: () => aiChoicesApi.stopTierWindow(), onSettled: () => { void maxWindow.refetch(); } });
-  const [levels, setLevels] = useState<GlanceRow | null>(null);
-  const [levelTier, setLevelTier] = useState<SlotTier | null>(null);
-  const [levelsError, setLevelsError] = useState<string | null>(null);
-  const [cleanup, setCleanup] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<string | null>(null);
-
-  const data = query.data;
-  const offJobs = useMemo(() => {
-    const off = new Set<AiJobId>();
-    for (const job of JOB_ORDER) {
-      const value = settings.data?.find((entry) => entry.key === `engines.${ENGINE_ROLE[job]}.choice`)?.value;
-      if (value === "off") off.add(job);
-    }
-    return off;
-  }, [settings.data]);
-  const rows = useMemo(() => buildRows(data?.cards ?? [], offJobs, staged), [data, offJobs, staged]);
-  const projection = project(rows);
-  const tally = counts(rows);
-  const missing = missingRows(rows);
-  const stagedCount = rows.filter((row) => row.staged).length;
-  const missingBytes = missing.reduce((sum, row) => sum + (row.live?.downloadBytes ?? 0), 0);
-
-  const stage = (row: GlanceRow, pick: string) => {
-    setStaged((previous) => {
-      const next = { ...previous };
-      const entry = stageFor(row, pick);
-      if (entry) next[row.job] = entry; else delete next[row.job];
-      return next;
-    });
-  };
-
-  const slotDrafts = (row: GlanceRow): SlotDrafts => {
-    const role = TIERED_JOBS[row.job]!.role;
-    const read = (tier: "reduced" | "standard" | "boost" | "max") => draftOf(settings.data?.find((entry) => entry.key === slotKey(role, tier))?.value, tier);
-    return { reduced: read("reduced"), standard: read("standard"), boost: read("boost"), max: read("max") };
-  };
-  const tierPicks = useQuery({ queryKey: ["ai", "tiers", levels?.job], queryFn: () => aiChoicesApi.tiers(levels!.job), enabled: levels !== null, staleTime: 60_000, retry: false });
-  const saveLevels = useMutation({
-    mutationFn: async ({ row, drafts }: { row: GlanceRow; drafts: SlotDrafts }) => {
-      const before = slotDrafts(row);
-      const role = TIERED_JOBS[row.job]!.role;
-      for (const tier of configurableTiers(row.job)) if (!sameDraft(before[tier], drafts[tier])) await api.setSetting("household", slotKey(role, tier), toStored(drafts[tier], tier));
-    },
-    onSuccess: () => { setLevelTier(null); setLevelsError(null); void settings.refetch(); refresh(); },
-    onError: (e) => setLevelsError(messageOf(e, i18n._({ id: "Could not save the levels. Check that Home is running, then try again.", message: "Could not save the levels. Check that Home is running, then try again." }))),
-  });
-
-  const download = useMutation({
-    mutationFn: async (targets: GlanceRow[]) => { for (const row of targets) if (row.live) await aiChoicesApi.choose(row.job, row.live.id); },
-    onSuccess: refresh,
-    onError: (e) => setError(messageOf(e, i18n._({ id: "Could not start the downloads. Check that the engine is running, then try again.", message: "Could not start the downloads. Check that the engine is running, then try again." }))),
-  });
-
-  const apply = useMutation({
-    mutationFn: async () => {
-      for (const row of rows.filter((entry) => entry.staged)) {
-        setStep(row.shownEnabled ? i18n._({ id: "Setting up {title}…", message: "Setting up {title}…", values: { title: row.title } }) : i18n._({ id: "Turning off {title}…", message: "Turning off {title}…", values: { title: row.title } }));
-        const role = ENGINE_ROLE[row.job];
-        const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
-        if (!row.shownEnabled) {
-          if (single?.setting) {
-            // A picture slot (Boost) is not a plain on/off key: the hub's choose route turns the switch off and keeps the slot's options.
-            if (single.setting.key.includes(".tier.")) { if (row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
-            else await api.setSetting("household", single.setting.key, false, true);
-          }
-          else if (row.job === "stems") { /* Stems has no On/Off setting: the parts are installed or not, and nothing else to turn off. */ }
-          else if (HUB_PART_JOBS.has(row.job) || row.job === "sounds") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
-          else await api.setSetting("household", `engines.${role}.choice`, "off", true);
-        } else if (row.shown && (staged[row.job]?.choiceId || single)) {
-          await aiChoicesApi.choose(row.job, row.shown.id);
-          if (offJobs.has(row.job)) await api.setSetting("household", `engines.${role}.choice`, "auto");
-        } else if (offJobs.has(row.job)) {
-          await api.setSetting("household", `engines.${role}.choice`, "auto");
-        }
-      }
-    },
-    onSuccess: () => { setStep(null); setStaged({}); setError(null); refresh(); void settings.refetch(); },
-    onError: (e) => { setStep(null); setError(messageOf(e, i18n._({ id: "Could not apply the changes. Check that the engine is running, then try again.", message: "Could not apply the changes. Check that the engine is running, then try again." }))); refresh(); void settings.refetch(); },
-  });
-
-  if (query.isLoading) return <RouteSkeleton label={i18n._({ id: "Loading your AI setup", message: "Loading your AI setup" })} />;
-  if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>{i18n._({ id: "The page did not load", message: "The page did not load" })}</AlertTitle><AlertDescription>{messageOf(query.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))}</AlertDescription></Alert></section>;
-
-  const totalRam = (hardware.data?.totalRamGb ?? 0) * GB;
-  const installed = data.installed_bytes;
-  const freeDisk = data.free_disk_bytes ?? hardware.data?.freeDiskBytes ?? null;
-  // What the computer reports as not free, less Home's own models: an estimate, shown only when the hub could read it.
-  const alwaysBytes = Math.min(projection.alwaysNow, projection.alwaysAfter);
-  const whenUsedBytes = Math.max(0, Math.min(projection.ramNow, projection.ramAfter) - alwaysBytes);
-  const otherApps = totalRam > 0 && data.memory_available_bytes != null ? Math.max(0, totalRam - data.memory_available_bytes - projection.ramNow) : 0;
-  const memorySegments = [
-    { id: "home", label: i18n._({ id: "Always loaded", message: "Always loaded" }), bytes: alwaysBytes, hue: "--hue-violet" },
-    ...(whenUsedBytes > 0 ? [{ id: "when-used", label: i18n._({ id: "Loads when used", message: "Loads when used" }), bytes: whenUsedBytes, hue: "--hue-blue" }] : []),
-    ...(otherApps > 0 ? [{ id: "other", label: i18n._({ id: "Other apps", message: "Other apps" }), bytes: otherApps, hue: "--hue-teal" }] : []),
-    ...(projection.ramAfter > projection.ramNow ? [{ id: "pending", label: copy.staged_label ?? i18n._({ id: "Staged", message: "Staged" }), bytes: projection.ramAfter - projection.ramNow, hue: "--hue-orange" }] : []),
-  ];
-  const storageSegments = [
-    { id: "models", label: i18n._({ id: "Models", message: "Models" }), bytes: installed, hue: "--hue-violet" },
-    ...(projection.downloadBytes > 0 ? [{ id: "pending", label: copy.staged_label ?? i18n._({ id: "Staged", message: "Staged" }), bytes: projection.downloadBytes, hue: "--hue-orange" }] : []),
-  ];
-  const storageCapacity = freeDisk !== null ? installed + freeDisk : null;
-  const device = hardware.data?.computerName ?? i18n._({ id: "this computer", message: "this computer" });
-
-  return (
-    <section aria-label={copy.title} className="flex flex-col gap-4" data-testid="ai-glance">
-      <InstallStrip detailsHref={null} />
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-base text-muted-foreground">{copy.subtitle}</p>
-        </div>
-        {missing.length > 0 ? <Button type="button" disabled={download.isPending || data.stack === "unreachable"} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
-      </header>
-      {data.stack === "unreachable" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "The AI is waiting for its helper to start. The Status page shows what is happening.", message: "The AI is waiting for its helper to start. The Status page shows what is happening." })}</p> : null}
-      {missing.length > 0 ? (
-        <Alert variant="warning" data-testid="ai-missing">
-          <AlertTitle>{fill(copy.missing_title ?? "", { count: missing.length })}</AlertTitle>
-          <AlertDescription>{missing.map((row) => row.live?.label).join(", ")} · {sizeGb(missingBytes)}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <ItemGroup variant="card">
-        <Item>
-          <ItemContent>
-            <ItemTitle>{copy.memory}</ItemTitle>
-            <StorageBar segments={memorySegments} capacityBytes={totalRam > 0 ? totalRam : null} formatBytes={sizeGb} />
-            {stagedCount > 0 ? <ItemDescription clamp={false}>{fill(copy.memory_after ?? "", { delta: delta(projection.ramAfter - projection.ramNow) })}</ItemDescription> : null}
-          </ItemContent>
-        </Item>
-        <Item>
-          <ItemContent>
-            <ItemTitle>{copy.storage}</ItemTitle>
-            <StorageBar segments={storageSegments} capacityBytes={storageCapacity} formatBytes={sizeGb} />
-            {data.unused_bytes > 0 ? <Button type="button" variant="link" onClick={() => setCleanup(true)}>{fill(copy.free_up ?? "", { size: sizeGb(data.unused_bytes) })}</Button> : null}
-            {projection.downloadBytes > 0 ? <ItemDescription clamp={false}>{fill(copy.storage_after ?? "", { total: sizeGb(installed + projection.downloadBytes), delta: delta(projection.downloadBytes) })}</ItemDescription> : null}
-          </ItemContent>
-        </Item>
-      </ItemGroup>
-
-      {maxWindow.data && (maxWindow.data.open || maxWindow.data.profile || (maxWindow.data.closed_apps?.length ?? 0) > 0) ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-base" role="status" data-testid="max-window-line">
-          <div className="space-y-1">
-            {maxWindow.data.open ? <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` ${i18n._({ id: "About {count, plural, one {# minute} other {# minutes}} left.", message: "About {count, plural, one {# minute} other {# minutes}} left.", values: { count: maxWindow.data.minutes_left } })}` : ""}</p> : null}
-            {maxWindow.data.profile ? <p data-testid="profile-line">{maxWindow.data.profile}</p> : null}
-            {(maxWindow.data.closed_apps ?? []).map((line) => <p key={line} className="text-muted-foreground" data-testid="closed-apps-line">{line}</p>)}
-          </div>
-          {maxWindow.data.open ? <Button type="button" variant="outline" disabled={stopWindow.isPending} onClick={() => stopWindow.mutate()}>{i18n._({ id: "Stop the Max job", message: "Stop the Max job" })}</Button> : null}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold">{copy.glance}</h2>
-        <p className="text-base text-muted-foreground" data-testid="ai-counter">{fill(copy.counter ?? "", tally)}</p>
-      </div>
-      <ItemGroup variant="card" role="group" aria-label={copy.glance}>
-        {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => { if (TIERED_JOBS[row.job]) { setLevelsError(null); setLevelTier(null); setLevels(row); } else setEditing(row); }, onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
-      </ItemGroup>
-
-      <p className="text-base text-muted-foreground">
-        {fill(copy.checked ?? "", { when: whenText(query.dataUpdatedAt) })} · {device}{" "}
-        <Link to="/settings/ai?tab=engines" className="inline-flex min-h-12 items-center underline">{copy.view_device}</Link>
-      </p>
-
-      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} onAdded={refresh} /> : null}</DialogContent>
-      </Dialog>
-      <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) { setLevels(null); setLevelTier(null); } }}>
-        <DialogContent scroll="viewport">{levels && levelTier === null ? <AiJobSummary key={`${levels.job}-summary`} row={levels} drafts={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} onClose={() => setLevels(null)} onEdit={(tier) => { if (tier === "standard") { setLevels(null); setEditing(levels); } else setLevelTier(tier); }} /> : null}{levels && levelTier !== null ? <AiSlotChoices key={`${levels.job}-${levelTier}`} only={levelTier} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevelTier(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
-      </Dialog>
-      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "That did not work", message: "That did not work" })}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? i18n._({ id: "Apply", message: "Apply" })} discardLabel={copy.discard ?? i18n._({ id: "Discard", message: "Discard" })} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
-      <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{copy.reset_eyebrow}</p>
-            <AlertDialogTitle>{fill(copy.reset_title ?? "", { name: resetting?.title ?? "" })}</AlertDialogTitle>
-            <AlertDialogDescription>{copy.reset_body}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{copy.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (resetting?.recommended) stage(resetting, resetting.recommended.id); setResetting(null); }}>{copy.reset_confirm}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <FreeUpSpaceDialog open={cleanup} onOpenChange={setCleanup} onChanged={refresh} />
-    </section>
-  );
-}
-
-/** One row, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
-function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: GlanceRow; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onReset: () => void; onDownload: () => void }) {
-  const Icon = getIcon(JOB_ICONS[row.job]);
-  const Reset = getIcon("rotate-ccw");
-  const Gear = getIcon("settings");
-  const Down = getIcon("download");
-  const model = row.shown;
-  // What the engine is doing for this row right now: a download or install in flight (any of its models), or the chosen model's failure.
-  const busy = row.options.find((option) => option.state === "installing") ?? null;
-  const installingText = busy ? (copy.installing ? fill(copy.installing, { name: busy.label }) : i18n._({ id: "Downloading and installing {name}", message: "Downloading and installing {name}", values: { name: busy.label } })) : "";
-  const progress = busy ? { text: busy.percent !== null ? i18n._({ id: "{text}: {percent}%", message: "{text}: {percent}%", values: { text: installingText, percent: Math.round(busy.percent) } }) : installingText, percent: busy.percent } : null;
-  const failed = !busy && model?.state === "failed" ? model : null;
-  const line = !row.offered ? (copy.not_offered ?? "") : model?.description ?? row.summary;
-  return (
-    <Item key={row.job} data-testid={`ai-row-${row.job}`} data-missing={row.missing ? "true" : undefined}>
-      <ItemMedia variant="icon"><Icon /></ItemMedia>
-      <ItemContent>
-        <ItemTitle>
-          {row.title}
-          {row.offered ? <Badge tone={row.badge === "recommended" ? "success" : undefined} variant={row.badge === "disabled" ? "secondary" : "default"}>{copy[row.badge]}</Badge> : null}
-          {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">{i18n._({ id: "Uncensored", message: "Uncensored" })}</Badge> : null}
-        </ItemTitle>
-        <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
-        {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
-        {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
-        {progress && busy ? <JobProgress presentation="card" {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
-        {failed ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={failed.failure ?? failed.stateText} /> : null}
-      </ItemContent>
-      <ItemActions>
-        {model && row.offered && row.shownEnabled ? <span className="text-base text-muted-foreground">{sizeGb(model.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(model.ramBytes) })}</span> : null}
-        {row.badge === "custom" && row.recommended ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${copy.reset_confirm}: ${row.title}`} onClick={onReset}><Reset /></Button> : null}
-        {row.missing ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${copy.download_missing?.replace(" ({count})", "")}: ${row.title}`} onClick={onDownload}><Down /></Button> : null}
-        <Switch checked={row.shownEnabled} disabled={!row.offered} onCheckedChange={onSwitch} aria-label={`${row.title}: ${row.shownEnabled ? copy.on : copy.off}`} />
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={`${copy.dialog_title}: ${row.title}`} disabled={!row.offered} onClick={onEdit}><Gear /></Button>
-      </ItemActions>
-    </Item>
-  );
+type Level = { tier: SlotTier; state: "ready"|"missing"|"problem"|"off"|"waits"|"same"; word: string; model_label: string|null; size_bytes_missing: number|null; detail: string|null; action: {kind:"download"|"fix"|"open";label:string;job?:string;level?:string}|null };
+type Feature = { id:string; name:string; used_by:string[]; levels:Level[]; ready_count:number; level_count:number };
+const overviewKey = ["ai","overview"] as const;
+const STATE_TONE: Record<Level["state"], "success"|"warning"|"warning"|undefined> = { ready:"success", missing:"warning", problem:"warning", off:undefined, waits:undefined, same:undefined };
+const tierWord = (tier:string) => tier[0]!.toUpperCase()+tier.slice(1);
+const roleFor = (job:string) => TIERED_JOBS[job as keyof typeof TIERED_JOBS]?.role ?? "image";
+const categoryFor = (job:string) => TIERED_JOBS[job as keyof typeof TIERED_JOBS]?.category ?? "image";
+export function AiGlance(_props: SettingsViewProps) {
+  const qc = useQueryClient();
+  const overview = useQuery({ queryKey: overviewKey, queryFn: () => api.aiFeaturesOverview() });
+  const settings = useQuery({ queryKey:["settings","household"], queryFn:()=>api.settingsValues("household") });
+  const [feature,setFeature] = useState<Feature|null>(null);
+  const [drafts,setDrafts] = useState<Record<string,SlotDraft>>({});
+  const picks = useQuery({ queryKey:["ai","tiers",feature?.id], queryFn:()=>aiChoicesApi.tiers(feature!.id), enabled:!!feature });
+  const refresh = () => { void qc.invalidateQueries({queryKey:overviewKey}); void qc.invalidateQueries({queryKey:["ai","choices"]}); void qc.invalidateQueries({queryKey:["components"]}); };
+  const save = useMutation({ mutationFn:async()=>{ if(!feature)return; const before=settings.data??[]; for(const tier of configurableTiers(feature.id as never)){ const key=slotKey(roleFor(feature.id),tier); const old=draftOf(before.find((entry)=>entry.key===key)?.value,tier); const next=drafts[tier]; if(next&&!sameDraft(old,next)) await api.setSetting("household",key,toStored(next,tier)); } }, onSuccess:async()=>{ await qc.invalidateQueries({queryKey:["settings","household"]}); refresh(); setFeature(null); } });
+  const download = useMutation({ mutationFn: async(item:{job?:string;level?:string;model_label?:string})=>{ const job=item.job??""; const card=await aiChoicesApi.overview(); const choices=card.cards.find((c)=>c.id===job)?.choices??[]; const choice=choices.find((c)=>(c.action==="get"||c.action==="use")&&(c.label===item.model_label||c.name===item.model_label))??(!item.model_label?choices.find((c)=>c.action==="get"||c.action==="use"):undefined); if(choice) await aiChoicesApi.choose(job,choice.id); }, onSuccess:refresh });
+  const downloadLevel = (action: Level["action"], model_label: string|null) => { if(action?.kind==="download") download.mutate({...action,model_label: model_label??undefined}); };
+  const data=overview.data;
+  if(!data) return <p>{i18n._({id:"Loading features…",message:"Loading features…"})}</p>;
+  const open=(row:Feature)=>{ setFeature(row); const next:Record<string,SlotDraft>={}; for(const tier of configurableTiers(row.id as never)){const key=slotKey(roleFor(row.id),tier);next[tier]=draftOf(settings.data?.find((entry)=>entry.key===key)?.value,tier);} setDrafts(next); };
+  return <section className="flex flex-col gap-5" data-testid="ai-features">
+    <p className="text-sm text-muted-foreground" data-testid="ai-right-now">{data.right_now.engine === "ready" ? i18n._({id:"AI is ready",message:"AI is ready"}) : i18n._({id:"AI needs attention",message:"AI needs attention"})} · {i18n._({id:"{memory} free memory · {models} in models · {disk} free disk · {count} downloads waiting",message:"{memory} free memory · {models} in models · {disk} free disk · {count} downloads waiting",values:{memory:sizeGb(data.right_now.memory_free_bytes),models:sizeGb(data.right_now.models_bytes),disk:sizeGb(data.right_now.disk_free_bytes),count:data.right_now.waiting}})}</p>
+    <section aria-labelledby="ai-attention-title"><h2 id="ai-attention-title" className="text-lg font-semibold">{i18n._({id:"Needs attention",message:"Needs attention"})}</h2><ItemGroup variant="card">{data.attention.items.length===0?<Item><ItemContent><ItemTitle>{i18n._({id:"Everything is fine.",message:"Everything is fine."})}</ItemTitle></ItemContent></Item>:data.attention.items.map((item)=><Item key={item.id}><ItemContent><ItemTitle>{item.title}</ItemTitle><ItemDescription clamp={false}>{item.line}</ItemDescription></ItemContent><ItemActions>{item.action?<Button onClick={()=>item.action?.kind==="download"?downloadLevel(item.action,data.features.find((row)=>row.id===item.action?.job)?.levels.find((level)=>level.tier===item.action?.level)?.model_label??null):setFeature(data.features.find((row)=>row.id===item.action?.job)??null)}>{item.action.label}</Button>:null}</ItemActions></Item>)}{data.attention.download_all?<Item><ItemContent><ItemTitle>{i18n._({id:"{count} downloads are missing",message:"{count} downloads are missing",values:{count:data.attention.download_all.count}})}</ItemTitle></ItemContent><ItemActions><Button onClick={()=>data.attention.items.filter((x)=>x.kind==="missing").forEach((x)=>x.action&&downloadLevel(x.action,data.features.find((row)=>row.id===x.action?.job)?.levels.find((level)=>level.tier===x.action?.level)?.model_label??null))}>{i18n._({id:"Download all that is missing",message:"Download all that is missing"})}</Button></ItemActions></Item>:null}</ItemGroup></section>
+    <section aria-labelledby="ai-features-title"><h2 id="ai-features-title" className="text-lg font-semibold">{i18n._({id:"Features",message:"Features"})}</h2><ItemGroup variant="card">{data.features.map((row)=><Item key={row.id} render={<Button type="button" variant="ghost" onClick={()=>open(row)} aria-label={`${row.name}: ${row.ready_count} of ${row.level_count} levels ready`} /> }><ItemContent><ItemTitle>{row.name}</ItemTitle><ItemDescription clamp={false}>{i18n._({id:"Used by {places}",message:"Used by {places}",values:{places:row.used_by.join(", ")}})} · {i18n._({id:"{ready} of {total} levels ready",message:"{ready} of {total} levels ready",values:{ready:row.ready_count,total:row.level_count}})}</ItemDescription><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{row.levels.map((level)=><span key={level.tier} className="flex flex-col gap-1 rounded-lg border p-2"><span>{tierWord(level.tier)}</span><span className="truncate text-sm text-muted-foreground">{level.model_label??level.word}</span><span className="flex items-center gap-2"><Badge variant="outline" tone={STATE_TONE[level.state]} aria-label={level.state}><span aria-hidden="true" className="size-2 rounded-full bg-current" /></Badge>{level.word}</span></span>)}</div></ItemContent></Item>)}</ItemGroup></section>
+    <section aria-labelledby="ai-helpers-title"><h2 id="ai-helpers-title" className="text-lg font-semibold">{i18n._({id:"Helpers",message:"Helpers"})}</h2><ItemGroup variant="card">{data.helpers.map((helper)=><Item key={helper.id}><ItemContent><ItemTitle>{helper.name}</ItemTitle><ItemDescription clamp={false}>{helper.model_label??""}{helper.model_label?" · ":""}{helper.used_by.join(", ")}</ItemDescription></ItemContent><ItemActions><Badge variant="outline" tone={STATE_TONE[helper.state]} aria-label={helper.state}><span aria-hidden="true" className="size-2 rounded-full bg-current" /></Badge>{helper.action?.kind==="download"?<Button variant="outline" onClick={()=>download.mutate({...helper.action!,model_label:helper.model_label??undefined})}>{i18n._({id:"Download",message:"Download"})}</Button>:null}</ItemActions></Item>)}</ItemGroup></section>
+    <p><Link to="/settings/ai?tab=engines" className="text-sm text-muted-foreground underline">{i18n._({id:"View engine settings",message:"View engine settings"})}</Link></p>
+    <Sheet open={!!feature} onOpenChange={(open)=>{if(!open)setFeature(null);}}><SheetContent side="bottom"><SheetHeader><SheetTitle>{feature?.name}</SheetTitle><SheetDescription>{feature?.used_by.join(", ")}</SheetDescription></SheetHeader>{feature? <div className="flex flex-col gap-4">{configurableTiers(feature.id as never).map((tier)=>{const tierPicks=picks.data?.levels.find((level)=>level.tier===(tier==="reduced"?"standard":tier)); const draft=drafts[tier]??draftOf(undefined,tier);const options=tierPicks?.candidates??[];return <div key={tier} className="flex flex-col gap-2"><h3 className="font-semibold">{tierWord(tier)}</h3><Select value={draft.model} onValueChange={(model)=>setDrafts((current)=>({...current,[tier]:{...draft,model}}))}><SelectTrigger aria-label={`${tierWord(tier)} model`}><SelectValue /></SelectTrigger><SelectContent>{tier!=="standard"?<SelectItem value="off">Off</SelectItem>:null}<SelectItem value="recommended">Recommended</SelectItem>{options.map((option)=><SelectItem key={option.id} value={option.id} disabled={!option.fits}>{option.label}{tierPicks?.recommended===option.id?" · Recommended":""}</SelectItem>)}</SelectContent></Select>{options.filter((o)=>!o.fits).map((o)=><p key={o.id} className="text-sm text-muted-foreground">{o.label}: {o.refusal}</p>)}<ToggleGroup type="single" variant="chip" value={draft.who} onValueChange={(who)=>who&&setDrafts((current)=>({...current,[tier]:{...draft,who:who as SlotDraft["who"]}}))} aria-label={i18n._({id:"Who can use {tier}",message:"Who can use {tier}",values:{tier:tierWord(tier)}})}><ToggleGroupItem value="everyone">{i18n._({id:"Everyone",message:"Everyone"})}</ToggleGroupItem><ToggleGroupItem value="assigned">{i18n._({id:"Assigned",message:"Assigned"})}</ToggleGroupItem><ToggleGroupItem value="admins">{i18n._({id:"Admins",message:"Admins"})}</ToggleGroupItem></ToggleGroup>{optionDefs(categoryFor(feature.id)).map((option)=>option.type==="boolean"?<label key={option.id} className="flex items-center justify-between gap-3"><span>{option.label}</span><Switch checked={Boolean(draft.options[option.id]??option.default)} onCheckedChange={(checked)=>setDrafts((current)=>({...current,[tier]:{...draft,options:{...draft.options,[option.id]:checked}}}))} aria-label={option.label}/></label>:<label key={option.id} className="flex flex-col gap-1"><span>{option.label}</span><Input type="number" min={option.min} max={option.max} step={option.type==="integer"?1:"any"} value={Number(draft.options[option.id]??option.default)} onChange={(event)=>setDrafts((current)=>({...current,[tier]:{...draft,options:{...draft.options,[option.id]:Number(event.target.value)}}}))}/></label>)}{draft.model==="off"?<p className="text-sm text-muted-foreground">{i18n._({id:"Requests for this level use the level below it.",message:"Requests for this level use the level below it."})}</p>:null}{feature.levels.find((level)=>level.tier===tier)?.detail?<p className="text-sm text-muted-foreground">{feature.levels.find((level)=>level.tier===tier)?.detail}</p>:null}</div>})}<section aria-label={i18n._({id:"Adult access",message:"Adult access"})}><SettingsRenderer scope="household" scopeValue="household" includeKeys={feature.id==="pictures"?["generation.adults"]:feature.id==="videos"?["generation.video.enabled"]:feature.id==="music"?["generation.music.enabled"]:[]} /></section><div className="flex justify-end gap-2"><Button variant="outline" onClick={()=>setFeature(null)}>{i18n._({id:"Cancel",message:"Cancel"})}</Button><Button disabled={save.isPending} onClick={()=>save.mutate()}>{i18n._({id:"Save",message:"Save"})}</Button></div></div>:null}</SheetContent></Sheet>
+  </section>;
 }

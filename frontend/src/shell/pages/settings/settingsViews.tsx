@@ -101,8 +101,9 @@ function HomeVoiceCatalogSettings() { useTabItem(i18n._({ id: "Voices", message:
 // hub still gates every call these make.
 // SETTINGS-UX-05: the existing Engines and AI pieces are placed in four short tabs.
 function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
-  const show = (id: string) => tab === undefined || tab === id;
+  const show = (id: string) => tab === id || (tab === undefined && id === "overview");
   return <>
+    {show("overview") ? <AiGlance person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
     {show("advanced") ? <><HuggingFaceTokenSection /><ModelsAndStorageSection /><ModelsSection /></> : null}
   </>;
