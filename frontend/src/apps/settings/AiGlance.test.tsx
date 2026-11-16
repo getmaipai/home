@@ -60,4 +60,25 @@ describe("AI Features overview",()=>{
     expect(await view.findByRole("dialog")).toBeTruthy();
     expect(view.getAllByRole("heading",{name:"Chat"}).length).toBeGreaterThan(0);
   });
+  test("keeps the feature sheet private, names the adult gate plainly, and omits planned and same levels",async()=>{
+    const pictures={...feature,id:"pictures",name:"Pictures",used_by:["the Pictures app"],levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{...ready,tier:"standard"},{tier:"boost",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"waits",word:"Waits",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4} as unknown as typeof feature;
+    const view=render({...base,features:[pictures]} as Fixture);
+    fireEvent.click(await view.findByRole("button",{name:/Pictures:/}));
+    await view.findByRole("dialog");
+    expect(view.getByRole("heading",{name:"Adult gate"})).toBeTruthy();
+    expect(view.getByRole("heading",{name:/Standard.*Ready/})).toBeTruthy();
+    expect(view.getByRole("heading",{name:/Boost.*Off/})).toBeTruthy();
+    const dialog=view.getByRole("dialog");
+    expect(dialog.textContent).not.toContain("Reduced");
+    expect(dialog.textContent).not.toContain("Max");
+    expect(dialog.textContent).not.toContain("household.media_pictures");
+    expect(view.getByRole("button",{name:"Save"})).toBeTruthy();
+    expect(view.getByRole("button",{name:"Cancel"})).toBeTruthy();
+  });
+  test("shows only the refusal for the selected model or recommended candidate",async()=>{
+    const view=render(base);
+    fireEvent.click(await view.findByRole("button",{name:/Chat:/}));
+    await view.findByRole("dialog");
+    expect(view.queryByText(/needs 37 GB/)).toBeNull();
+  });
 });
