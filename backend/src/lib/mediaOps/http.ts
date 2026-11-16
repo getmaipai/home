@@ -14,7 +14,7 @@ export const MediaOpRequest = z.object({
   file_id: z.string().min(1).max(80).describe("The Library picture to run the operation on."),
   args: z.record(z.string(), z.unknown()).optional().describe("The operation's own arguments (GET /api/media-ops gives each one's `params`)."),
   mask: z.string().max(14_000_000).nullable().optional().describe("A painted area as a base64 PNG (white is the part to change or erase). Only for an operation whose controls include a mask or that describes a change in words."),
-  references: z.array(z.string().min(1).max(80)).max(3).optional().describe("Other Library pictures a described change draws on (only for picture.change)."),
+  references: z.array(z.string().min(1).max(80)).max(5).optional().describe("Other Library pictures a described change draws on (only for picture.change)."),
 });
 export type MediaOpRequestBody = z.infer<typeof MediaOpRequest>;
 

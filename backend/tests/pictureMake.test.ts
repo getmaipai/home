@@ -221,13 +221,13 @@ describe("Images Create make", () => {
 });
 
 describe("USE-AS-REFERENCE: how many reference pictures a call keeps", () => {
-  test("the limit is the engine's own count, at least 1 and at most 3", async () => {
+  test("the limit is the engine's own count, at least 1 and at most 6", async () => {
     const { pictureReferenceLimit, readyStatusForTests } = await import("@/lib/pictures/ready");
     const withRefs = (references: number | undefined) => readyStatusForTests({ edit: { generative: true, masked: true, ...(references === undefined ? {} : { references }) } });
     expect(pictureReferenceLimit(withRefs(3))).toBe(3);
     expect(pictureReferenceLimit(withRefs(1))).toBe(1);
     expect(pictureReferenceLimit(withRefs(2))).toBe(2);
-    expect(pictureReferenceLimit(withRefs(7))).toBe(3);
+    expect(pictureReferenceLimit(withRefs(7))).toBe(6);
     expect(pictureReferenceLimit(withRefs(0))).toBe(1);
     expect(pictureReferenceLimit(withRefs(undefined))).toBe(1);
     expect(pictureReferenceLimit(null)).toBe(1);
@@ -253,7 +253,7 @@ describe("USE-AS-REFERENCE: the chat tool says how many references it takes", ()
     const manifest = JSON.parse(await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text()) as { args: { properties: Record<string, { type: string; maxItems?: number; description?: string }> } };
     const references = manifest.args.properties.references;
     expect(references?.type).toBe("array");
-    expect(references?.maxItems).toBe(3);
-    expect(references?.description).toBe("references: ids of pictures to use as references, up to 3.");
+    expect(references?.maxItems).toBe(6);
+    expect(references?.description).toBe("references: ids of pictures to use as references, up to the engine's own count (3 to 6).");
   });
 });

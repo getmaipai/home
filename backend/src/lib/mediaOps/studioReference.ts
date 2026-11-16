@@ -5,7 +5,7 @@
 import { ImageEditError, LIBRARY_SOURCE, loadSource } from "@/lib/imageEdit";
 import { CHILD_NO_PHOTOS_LINE } from "@/lib/pictures/lane";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { pictureEngineReferences, pictureEngineStatus } from "@/lib/pictures/ready";
 import type { PersonRow } from "@/types";
 
 export const REFERENCE_UNSUPPORTED_LINE = "Using a second picture needs an update first. Ask an admin to update Home.";
@@ -21,6 +21,6 @@ export async function studioReference(person: PersonRow, body: Record<string, un
   const source = loadSource(person, LIBRARY_SOURCE, ref, false);
   if (source.id === file) throw new ImageEditError(422, "Choose a different picture to draw on than the one you are changing.", "reference_same");
   const status = await pictureEngineStatus().catch(() => null);
-  if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, REFERENCE_UNSUPPORTED_LINE, "references_unsupported");
+  if (pictureEngineReferences(status) < 1) throw new ImageEditError(503, REFERENCE_UNSUPPORTED_LINE, "references_unsupported");
   return { id: ref, label: source.name?.trim() || "Picture" };
 }

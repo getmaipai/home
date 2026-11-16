@@ -10,6 +10,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { getPictureJob } from "@/lib/pictures/jobStore";
 import { typicalWait } from "@/lib/pictures/quality";
+import { peekPictureEngineStatus, pictureReferenceLimit } from "@/lib/pictures/ready";
 import { pictureJobLockState } from "@/lib/pictures/lock";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { pictureActivityItem } from "@/lib/activity";
@@ -115,15 +116,17 @@ registerAppPageFill("image", "create", (person, page) => {
   bar.placeholder = 'Describe the picture. Put exact words in quotes, like "Summer Fair". Type @ to add someone from your cast.';
   const tier = bar.tier as { tiers?: Array<{ id?: string; hint?: string }> } | undefined;
   for (const item of tier?.tiers ?? []) {
-    if (item.id === "standard") item.hint = "Fast. Shows no words on the picture.";
-    if (item.id === "boost" || item.id === "max") item.hint = "More detail. Shows no words unless you ask for them.";
+    if (item.id === "standard") item.hint = "Fast.";
+    if (item.id === "boost" || item.id === "max") item.hint = "More detail.";
     if (item.id === "standard" || item.id === "boost" || item.id === "max") {
       const wait = typicalWait(levelWaitMs(item.id));
       if (wait && item.hint) item.hint = `${item.hint} ${wait}`;
     }
   }
   const reference = Array.isArray(bar.references) ? (bar.references as Array<Record<string, unknown>>).find((item) => item.state === "reference") : undefined;
-  if (reference) reference.max = 3;
+  // The composer slot holds at most 3 (spec prompt_bar.references.max); the engine may take fewer.
+  const engine = peekPictureEngineStatus();
+  if (reference) reference.max = engine ? Math.min(3, pictureReferenceLimit(engine)) : 3;
   const templates = listTemplates({ actor: person, kind: "picture" });
   const templateState = page.state && typeof page.state === "object" ? (page.state as Record<string, unknown>).template : undefined;
   const selectedTemplate = typeof templateState === "string" ? templates.find((item) => item.id === templateState) : undefined;

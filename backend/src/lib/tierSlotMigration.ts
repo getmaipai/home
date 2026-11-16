@@ -9,12 +9,12 @@ import { settingsValues } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
 import { slotKey, writeSlotModel } from "@/lib/tiers";
-import { QUICK_MODEL } from "@/lib/pictures/quality";
+import { PICTURE_MODEL } from "@/lib/pictures/quality";
 
 const MARKER_KEY = "__migration.tier_slots_home_02";
 export const QUICK_MODEL_KEY = "generation.picture_quick_model";
 export const DETAILED_ENABLED_KEY = "generation.picture_detailed.enabled";
-export const MODEL_OF_CHOICE: Record<string, string> = { ernie: "ernie-image-turbo", klein: QUICK_MODEL };
+export const MODEL_OF_CHOICE: Record<string, string> = { ernie: PICTURE_MODEL, klein: PICTURE_MODEL };
 
 /** Copy one old key's stored value into its slot. */
 export function copyLegacyIntoSlot(key: string, value: unknown): void {

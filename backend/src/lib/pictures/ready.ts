@@ -5,7 +5,7 @@
 import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { imageStatus, type StackImageStatus } from "./stack";
-import { QUICK_MODEL } from "./quality";
+import { PICTURE_MODEL } from "./quality";
 
 let cached: { at: number; status: StackImageStatus | null } | null = null;
 let forTests: StackImageStatus | null | undefined;
@@ -43,9 +43,33 @@ export function peekPictureEngineStatus(): StackImageStatus | null {
 
 export function dropPictureStatusCache(): void { cached = null; }
 
-/** How many reference pictures a call keeps: the engine's own count, at least 1 and at most 3. */
+/** The most pictures one call carries whatever the engine says: the shipped picture model takes up to 6 in one edit (the edited picture counts). */
+export const MAX_REFERENCE_PICTURES = 6;
+
+/** Extra pictures the engine takes beside the one it changes. Not capped here (pictureReferenceLimit caps it). */
+export function pictureEngineReferences(status: StackImageStatus | null | undefined): number {
+  if (!status) return 0;
+  // Order: the Stack's own per-request cap (Home never sends more pictures than the engine says it takes), then the count it reports for
+  // edits, then the count of the model that would make the picture (a summary that still says 0 while a model that edits is installed).
+  const cap = status.limits?.max_references;
+  if (typeof cap === "number") return cap;
+  const own = status.edit?.references ?? 0;
+  if (own > 0) return own;
+  const wanted = status.default_model;
+  const model = status.models?.find((m) => m.installed && m.id === wanted && m.edit !== false) ?? status.models?.find((m) => m.installed && m.edit);
+  return model?.max_references ?? 0;
+}
+
+/** Whether the engine can change a picture from words: the Stack says so, or an installed model that edits is there. */
+export function pictureEngineEdits(status: StackImageStatus | null | undefined): boolean {
+  if (!status || status.available === false) return false;
+  return Boolean(status.edit?.generative) || (status.edit?.models?.length ?? 0) > 0 || Boolean(status.models?.some((m) => m.installed && m.edit));
+}
+
+/** How many reference pictures a call keeps: the engine's own count, at least 1 and at most MAX_REFERENCE_PICTURES. */
 export function pictureReferenceLimit(status: StackImageStatus | null | undefined): number {
-  return Math.min(3, Math.max(1, status?.edit?.references ?? 1));
+  const own = pictureEngineReferences(status);
+  return Math.min(MAX_REFERENCE_PICTURES, Math.max(1, own || 1));
 }
 
 /** The engine is installed and able to take a job (building or running counts: the job queues). */
@@ -59,8 +83,8 @@ export async function pictureEngineReady(): Promise<boolean> {
 /** A test status that is ready. */
 export function readyStatusForTests(overrides: Partial<StackImageStatus> = {}): StackImageStatus {
   return {
-    state: "idle", phase: null, available: true, reason: null, default_model: QUICK_MODEL,
-    models: [{ id: QUICK_MODEL, family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }],
+    state: "idle", phase: null, available: true, reason: null, default_model: PICTURE_MODEL,
+    models: [{ id: PICTURE_MODEL, family: "minimax-h3-image", installed: true, licence: "MiniMax-H3-Image Community License", loras: false, edit: true, steps_default: 6, peak_gb: 22 }],
     loras_supported: true, edit: { generative: true, masked: true, references: 2 },
     limits: { min_side: 256, max_side: 2048, size_step: 16, max_n: 4, max_prompt_chars: 2000, max_loras: 3, queue_max: 8 }, idle_unload_s: 600,
     memory: { fits: true, reason: null, peak_gb: 13.5 },

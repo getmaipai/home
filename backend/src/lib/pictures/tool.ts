@@ -16,9 +16,9 @@ import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
-import { pictureEngineStatus, pictureReferenceLimit } from "./ready";
+import { MAX_REFERENCE_PICTURES, pictureEngineReferences, pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
-import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, QUICK_MODEL, ERNIE_MODEL, modelCanSpell } from "./quality";
+import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, PICTURE_MODEL, REMOVED_MODEL_LINE, modelCanSpell } from "./quality";
 import { StackPicturesError } from "./stack";
 import { getTemplate } from "@/lib/media/templates";
 import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
@@ -154,7 +154,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const createPage = !state.conversationId && state.temporary !== true && state.ephemeral !== true;
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
-  // USE-AS-REFERENCE: references kept per call = the engine's own count (1 to 3); read only when the call carries references.
+  // USE-AS-REFERENCE: references kept per call = the engine's own count (1 to 6); read only when the call carries references.
   const refLimit = Array.isArray(args.references) ? pictureReferenceLimit(await pictureEngineStatus().catch(() => null)) : 1;
   let template: ReturnType<typeof getTemplate> = null;
   let promptOverride: string | null = null;
@@ -217,7 +217,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const libraryRefs: Array<{ id: string; bytes: Uint8Array; mediaType: string; imageSource: "generated" | "uploaded"; adultMark: { madeAudience: "adult-only" | "all-ages" | null; lock: "on" | "off" } }> = [];
   if (createPage && Array.isArray(args.references)) {
     const childLine = CHILD_NO_PHOTOS_LINE;
-    for (const entry of args.references.slice(0, 3)) {
+    for (const entry of args.references.slice(0, MAX_REFERENCE_PICTURES)) {
       const id = typeof entry === "string" ? entry : entry && typeof entry === "object" && "id" in entry ? String((entry as { id: unknown }).id) : "";
       if (!id) continue;
       let source;
@@ -301,8 +301,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const subjectPromptBase = [...resolvedSubjects.map(({ subject }) => subject.look), sentPrompt].join(". ");
   const subjectRefs = resolvedSubjects.flatMap(({ subject, references }) => references.map((ref) => ({ ...ref, kind: subject.kind })))
     .sort((a, b) => ({ place: 0, character: 1, prop: 2 }[a.kind] - { place: 0, character: 1, prop: 2 }[b.kind]))
-    .slice(0, Math.max(1, 1 + (engine.edit?.references ?? 0)));
-  const referenceCapacity = Math.max(1, 1 + (engine.edit?.references ?? 0));
+    .slice(0, Math.max(1, 1 + pictureEngineReferences(engine)));
+  const referenceCapacity = Math.min(MAX_REFERENCE_PICTURES, Math.max(1, 1 + pictureEngineReferences(engine)));
   const combinedRefs = [...libraryRefs.map((ref) => ({ ...ref, kind: "character" as const })), ...subjectRefs].slice(0, referenceCapacity);
   const usedLibraryRefs = libraryRefs.filter((ref) => combinedRefs.some((used) => used.id === ref.id));
   const droppedReferences = libraryRefs.length + subjectRefs.length > combinedRefs.length;
@@ -314,10 +314,11 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "image", arg: args.tier, band: audience.band });
-  const regularChoice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: QUICK_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
-  const ernie = engine.models?.find((model) => model.id === ERNIE_MODEL);
-  if (words.length && (!ernie?.installed || ernie.available === false)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: Words on a picture need the text picture model. Turn on ERNIE-Image-Turbo in Settings, AI and models, then try again." }, data: { refused: "text_model_missing" }, actions: [] } });
-  const choice = words.length ? { quality: "quick" as const, model: ERNIE_MODEL, note: null, announce: false } : regularChoice;
+  const regularChoice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: PICTURE_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
+  if (regularChoice.removed) return refused(callId, args, { kind: "plan", why: "style_plan", line: REMOVED_MODEL_LINE });
+  const maker = engine.models?.find((model) => model.id === PICTURE_MODEL);
+  if (words.length && (!maker?.installed || maker.available === false)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: Words on a picture need the picture model, and it is not ready on this computer. An admin can check Settings, AI and models, then try again." }, data: { refused: "text_model_missing" }, actions: [] } });
+  const choice = words.length ? { quality: "quick" as const, model: PICTURE_MODEL, note: null, announce: false } : regularChoice;
   const textPrompt = words.length ? `${subjectPromptBase}. Show this text on the picture, spelled exactly as written: ${words.map((word) => `"${word}"`).join(", ")}.` : subjectPromptBase;
   const addNoText = !words.length && !modelCanSpell(choice.model);
   const subjectPrompt = addNoText ? `${textPrompt}. No text, no letters, no words, no logos anywhere in the picture.` : textPrompt;

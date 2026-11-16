@@ -35,8 +35,8 @@ export interface FakeImageStack {
 // Frozen on purpose: the fake stack PATCHes its own copies (below), never these. A shallow copy once let picturesAdmin turn
 // "Boudoir Film" all-ages for every later file in the same process, which failed teenLane only in the gate's shard order.
 const TEST_LORA_SOURCE: StackLora[] = [
-  { id: "lora-aaaaaaaaaaaaaaaa", name: "Pixel Art", sha256: "a".repeat(64), bytes: 100, base_model: "flux2-klein-4b", licence: "Apache-2.0", source_url: null, classification: "all-ages", trigger_words: ["pixelart"], strength_default: 0.8, added_at: "2026-10-17T00:00:00Z" },
-  { id: "lora-bbbbbbbbbbbbbbbb", name: "Boudoir Film", sha256: "b".repeat(64), bytes: 100, base_model: "flux2-klein-4b", licence: null, source_url: null, classification: "adult-only", trigger_words: ["boudoirfilm"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" },
+  { id: "lora-aaaaaaaaaaaaaaaa", name: "Pixel Art", sha256: "a".repeat(64), bytes: 100, base_model: "minimax-h3-image", licence: "Apache-2.0", source_url: null, classification: "all-ages", trigger_words: ["pixelart"], strength_default: 0.8, added_at: "2026-10-17T00:00:00Z" },
+  { id: "lora-bbbbbbbbbbbbbbbb", name: "Boudoir Film", sha256: "b".repeat(64), bytes: 100, base_model: "minimax-h3-image", licence: null, source_url: null, classification: "adult-only", trigger_words: ["boudoirfilm"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" },
 ];
 export const TEST_LORAS: readonly StackLora[] = TEST_LORA_SOURCE.map((l) => Object.freeze({ ...l, trigger_words: Object.freeze([...l.trigger_words]) as unknown as string[] }));
 
@@ -101,12 +101,12 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "queued" : "rendering", progress: job.polls * 30, phase_progress: null, position: job.state === "queued" ? 1 : null, error: null, code: null, data: [], ...liveFields });
     }
     if (method === "GET" && path === "/stack/v1/image") return json({ image: readyStatusForTests() });
-    if (method === "GET" && path === "/stack/v1/image/loras") return json({ loras: fake.loras, base_models: ["flux2-klein-4b", "z-image-turbo"], max_per_picture: 3 });
+    if (method === "GET" && path === "/stack/v1/image/loras") return json({ loras: fake.loras, base_models: ["minimax-h3-image"], max_per_picture: 3 });
     if (method === "POST" && path === "/stack/v1/image/loras") {
       const form = init?.body as FormData;
       fake.loraAdds.push(Object.fromEntries([...form.entries()].map(([k, v]) => [k, typeof v === "string" ? v : `file:${(v as File).size}`])));
       if (fake.loraRefusal) return json({ error: fake.loraRefusal.error, code: fake.loraRefusal.code }, 422);
-      const record: StackLora = { id: "lora-dddddddddddddddd", name: String(form.get("name")), sha256: "d".repeat(64), bytes: 1234, base_model: "flux2-klein-4b", licence: String(form.get("licence")), source_url: null, classification: String(form.get("classification")) as StackLora["classification"], trigger_words: JSON.parse(String(form.get("trigger_words") ?? "[]")), strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
+      const record: StackLora = { id: "lora-dddddddddddddddd", name: String(form.get("name")), sha256: "d".repeat(64), bytes: 1234, base_model: "minimax-h3-image", licence: String(form.get("licence")), source_url: null, classification: String(form.get("classification")) as StackLora["classification"], trigger_words: JSON.parse(String(form.get("trigger_words") ?? "[]")), strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
       fake.loras.push(record);
       return json(record);
     }
@@ -116,7 +116,7 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       return json({ job: "lora-job-1" }, 202);
     }
     if (method === "GET" && path === "/stack/v1/jobs/lora-job-1") {
-      const record: StackLora = { id: "lora-eeeeeeeeeeeeeeee", name: "From Link", sha256: "e".repeat(64), bytes: 99, base_model: "z-image-turbo", licence: "unknown", source_url: "https://huggingface.co/x/y/resolve/main/a.safetensors", classification: "adult-only", trigger_words: [], strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
+      const record: StackLora = { id: "lora-eeeeeeeeeeeeeeee", name: "From Link", sha256: "e".repeat(64), bytes: 99, base_model: "minimax-h3-image", licence: "unknown", source_url: "https://huggingface.co/x/y/resolve/main/a.safetensors", classification: "adult-only", trigger_words: [], strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
       fake.loras.push(record);
       return json({ job: { id: "lora-job-1", state: "done", percent: 100, result: { lora: record } } });
     }

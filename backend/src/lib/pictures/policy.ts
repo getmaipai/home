@@ -20,7 +20,6 @@ import type { Surface } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readSlot, slotIsOff } from "@/lib/tiers";
-import { QUICK_MODEL } from "@/lib/pictures/quality";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
 import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, childPromptUnsafe, kidLaneOn, laneOf, teenPromptUnsafe, type Lane } from "@/lib/pictures/lane";
@@ -100,13 +99,9 @@ export function householdPictureQuality(): "quick" | "detailed" {
   }
 }
 
-/** The picture Standard slot (`engines.image.tier.standard`; the AI card writes it directly): "ernie" (default) or "klein", the model behind Quick pictures. */
+/** The value the AI card still reads for the Standard picture slot. Every pick now means the one picture model (quality.ts PICTURE_MODEL), so this no longer chooses a model; the card is replaced in the settings follow-up. */
 export function householdQuickModel(): "ernie" | "klein" {
-  try {
-    return readSlot("image", "standard").model === QUICK_MODEL ? "klein" : "ernie";
-  } catch {
-    return "ernie";
-  }
+  return "ernie";
 }
 
 /** The picture Boost slot is on (`engines.image.tier.boost`; the AI card writes it directly): the Detailed pictures switch on the AI and models page. On unless turned off. */

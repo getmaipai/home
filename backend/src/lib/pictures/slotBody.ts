@@ -4,7 +4,7 @@
 // Age gates ran before this and are not loosened: a person's band ceiling caps the level whatever the slots say (RULES.md rules 0 and 8).
 import type { AgeBand } from "@/lib/ageBand";
 import { bandCeiling, maxModel, MAX_NOT_ON_THIS_COMPUTER_LINE, slotRun, type Tier } from "@/lib/tiers";
-import { DETAILED_MODEL, qualityOfModel, quickModelFor, type PictureQuality } from "./quality";
+import { isRemovedPictureModel, PICTURE_MODEL, qualityOfModel, quickModelFor, type PictureQuality } from "./quality";
 import type { GenerationBody, StackImageStatus } from "./stack";
 
 type Body = Omit<GenerationBody, "timeout_ms">;
@@ -38,10 +38,12 @@ export function pictureBodyForSlot(base: Body, requested: Tier, band: AgeBand, e
   }
   const tier = run.tier;
   const lowered = tier !== requested;
-  if (tier === "max") body.model = run.model ?? maxModel("image")!;
-  else if (tier === "boost") { if (!styled) body.model = run.model ?? DETAILED_MODEL; }
-  else if (lowered && !styled && base.model === DETAILED_MODEL) {
-    // Lowered from the Detailed maker: Standard's own maker is ERNIE when installed, else the Stack's default (Klein). A model chosen for Standard stays.
+  // A slot saved before the removal of ERNIE, Klein and Z-Image names a model that is gone: it reads as the one picture model.
+  const live = (model: string | null | undefined): string | undefined => (model && !isRemovedPictureModel(model) ? model : undefined);
+  if (tier === "max") body.model = live(run.model) ?? maxModel("image")!;
+  else if (tier === "boost") { if (!styled) body.model = live(run.model) ?? PICTURE_MODEL; }
+  else if (lowered && !styled) {
+    // Lowered to Standard: the one picture model, a model chosen for Standard stays.
     const standard = quickModelFor(engine);
     if (standard) body.model = standard; else delete body.model;
   }

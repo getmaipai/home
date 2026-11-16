@@ -44,7 +44,7 @@ import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, attachKid, kidLaneOn, laneOf, r
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
-import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { pictureEngineReferences, pictureEngineStatus } from "@/lib/pictures/ready";
 import { EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, planExpand, type ExpandShape } from "@/lib/pictures/expand";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
@@ -793,10 +793,10 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const references: Array<{ source: SourcePicture; prepared: Extract<Awaited<ReturnType<typeof prepareEditSource>>, { ok: true }> }> = [];
   let referenceAdult = false;
   let audience: "all-ages" | "adult-only" = source.audience ?? "all-ages";
-  const referenceFields = ["reference", "reference2", "reference3"] as const;
+  const referenceFields = ["reference", "reference2", "reference3", "reference4", "reference5"] as const;
   if (referenceRefs.length) {
     const status = await pictureEngineStatus().catch(() => null);
-    const limit = status?.edit?.references ?? 0;
+    const limit = pictureEngineReferences(status);
     const supportedCount = Math.min(limit, referenceFields.length);
     if (referenceRefs.length > supportedCount) throw new ImageEditError(supportedCount === 0 ? 503 : 422, "Using a second picture needs an update first. Ask an admin to update Home.", "references_unsupported");
     for (const reference of referenceRefs) {

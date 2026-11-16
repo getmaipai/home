@@ -26,8 +26,8 @@ beforeEach(() => {
   const allAges = secretLora(owner.id, { id: "lora-aaaaaaaaaaaaaaaa", media: "picture", file: { sha256: "e".repeat(64), bytes: 1000, rank: 16, modules: [], format: "safetensors" }, audience: "all-ages", audience_set_by: owner.id, audience_set_at: new Date().toISOString(), availability: { who: "adults", people: [] }, name: "Pixel Art", trigger_words: ["pixelart"] });
   saveLora(adult, owner.id); saveLora(allAges, owner.id);
   fake.loras = [
-    { id: adult.id, name: adult.name, sha256: adult.file.sha256, bytes: 1000, base_model: "flux2-klein-4b", licence: "MIT", source_url: null, classification: "adult-only", trigger_words: adult.trigger_words, strength_default: 0.9, added_at: adult.added_at },
-    { id: allAges.id, name: allAges.name, sha256: allAges.file.sha256, bytes: 1000, base_model: "flux2-klein-4b", licence: "MIT", source_url: null, classification: "all-ages", trigger_words: allAges.trigger_words, strength_default: 0.8, added_at: allAges.added_at },
+    { id: adult.id, name: adult.name, sha256: adult.file.sha256, bytes: 1000, base_model: "minimax-h3-image", licence: "MIT", source_url: null, classification: "adult-only", trigger_words: adult.trigger_words, strength_default: 0.9, added_at: adult.added_at },
+    { id: allAges.id, name: allAges.name, sha256: allAges.file.sha256, bytes: 1000, base_model: "minimax-h3-image", licence: "MIT", source_url: null, classification: "all-ages", trigger_words: allAges.trigger_words, strength_default: 0.8, added_at: allAges.added_at },
   ];
 });
 afterEach(() => { fake.restore(); __resetAdultLockForTests(); __resetLoraSyncForTests(); });

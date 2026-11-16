@@ -56,7 +56,7 @@ describe("song covers", () => {
     const { actor, client } = await owner(); const job = await song(actor);
     const done = await covered(actor, job.id);
     expect(pictures.submitted).toHaveLength(1);
-    expect(pictures.submitted[0]).toMatchObject({ model: "flux2-klein-4b", n: 1 });
+    expect(pictures.submitted[0]).toMatchObject({ model: "minimax-h3-image", n: 1 });
     const prompt = String(pictures.submitted[0]!.prompt);
     expect(prompt).toContain("Pancakes"); expect(prompt).toContain("Morning light"); expect(prompt).toContain("Warm and bright"); expect(prompt).not.toContain("[Verse]"); expect(prompt).not.toContain("[Chorus]");
     const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_pending: boolean; cover_url: string; cover_versions: { id: string; url: string }[] };

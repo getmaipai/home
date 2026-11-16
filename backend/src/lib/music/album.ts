@@ -15,7 +15,7 @@ import { promoteMadeMusicFile } from "@/lib/media/appHost";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
 import { adultStylesAllowed, pictureDenial, refusePrompt } from "@/lib/pictures/policy";
-import { QUICK_MODEL } from "@/lib/pictures/quality";
+import { PICTURE_MODEL } from "@/lib/pictures/quality";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { outcomeOf } from "@/lib/turnContext";
@@ -109,7 +109,7 @@ export async function startAlbumCover(state: { conversationId: string | null; tu
     if (!(await pictureEngineReady())) return { ok: false, error: NO_PICTURE_ENGINE_LINE };
     const picture = await startPictureJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false,
       purpose: `album:${albumId}:cover`, kind: "generate", prompt: full,
-      body: { prompt: full, model: QUICK_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: adultStylesAllowed() ? "adult" : "all-ages" } });
+      body: { prompt: full, model: PICTURE_MODEL, size: "1024x1024", n: 1, seed: Math.floor(Math.random() * 2147483647), audience: adultStylesAllowed() ? "adult" : "all-ages" } });
     finishAlbumPicture(picture);
     return { ok: true };
   } catch { return { ok: false, error: "The cover could not be started. Try again in a minute." }; }

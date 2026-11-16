@@ -42,13 +42,13 @@ export interface StackImageStatus {
   available: boolean;
   reason: string | null;
   default_model: string | null;
-  models: Array<{ id: string; family?: string; label?: string; installed: boolean; default?: boolean; available?: boolean; licence?: string; loras?: boolean; edit?: boolean; steps_default?: number; peak_gb?: number; install?: { remaining_bytes: number } }>;
+  models: Array<{ id: string; family?: string; label?: string; installed: boolean; default?: boolean; available?: boolean; licence?: string; loras?: boolean; edit?: boolean; max_references?: number; steps_default?: number; peak_gb?: number; install?: { remaining_bytes: number } }>;
   lora_count?: number;
   code?: string | null;
   install?: { remaining_bytes: number };
   loras_supported: boolean;
-  edit: { generative: boolean; masked: boolean; /** IMGEDIT-01: extra pictures an edit takes beside the one it changes; absent on an older Stack. */ references?: number };
-  limits: { min_side?: number; max_side?: number; size_step?: number; max_n?: number; max_prompt_chars?: number; max_loras?: number; max_edit_megapixels?: number; queue_max?: number };
+  edit: { generative: boolean; masked: boolean; /** Models that can edit, when the Stack lists them. */ models?: string[]; /** IMGEDIT-01: extra pictures an edit takes beside the one it changes; absent on an older Stack. */ references?: number };
+  limits: { min_side?: number; max_side?: number; size_step?: number; max_n?: number; max_prompt_chars?: number; max_loras?: number; max_references?: number; max_edit_megapixels?: number; queue_max?: number };
   idle_unload_s?: number;
   memory?: { fits: boolean; reason: string | null; peak_gb: number | null };
 }

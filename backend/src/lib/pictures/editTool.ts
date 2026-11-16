@@ -19,16 +19,16 @@ import { runPictureEdit } from "@/lib/mediaOps/registry";
 import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
 import { PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
-import { pictureEngineStatus, pictureReferenceLimit } from "./ready";
+import { pictureEngineEdits, pictureEngineReferences, pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
-import { QUICK_MODEL } from "./quality";
+import { PICTURE_MODEL } from "./quality";
 import { asStackPic, hasProtectableFace, runLikenessEdit, type LikenessScope } from "./likeness/edit";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 
-/** Every Stack edit operation, including reference edits, is handled by Klein. */
+/** Every Stack edit operation, including reference edits, is handled by the one picture model. */
 export function nameEditModel(form: FormData): void {
-  form.set("model", QUICK_MODEL);
+  form.set("model", PICTURE_MODEL);
 }
 
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
@@ -140,9 +140,9 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
 
   // ---- a change in words (the picture engine's instruction edit)
   const status = await pictureEngineStatus().catch(() => null);
-  if (!status || status.available === false || !status.edit?.generative) return failed(callId, args, "no_engine", "unavailable", "no picture model that can change a picture is installed on the Stack");
+  if (!pictureEngineEdits(status)) return failed(callId, args, "no_engine", "unavailable", "no picture model that can change a picture is installed on the Stack");
 
-  // USE-AS-REFERENCE: the second picture ("reference") plus any extras, kept up to the engine's own count (1 to 3).
+  // USE-AS-REFERENCE: the second picture ("reference") plus any extras, kept up to the engine's own count (1 to 6).
   const refLimit = pictureReferenceLimit(status);
   const extraReferences = Array.isArray(args.references) ? (args.references as unknown[]).map((value) => typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String((value as { id: unknown }).id) : "").filter(Boolean) : [];
   const named = args.reference !== undefined && args.reference !== null && String(args.reference).trim() !== "";
@@ -150,7 +150,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const loaded = refWords.map((word) => load(input, word));
   if (named && !loaded[0]) return line(callId, args, NOT_FOUND_LINE);
   const refs = loaded.filter((entry): entry is SourcePicture => entry !== null);
-  if (refs.length && (status.edit.references ?? 0) < 1) return line(callId, args, REFERENCES_MISSING_LINE);
+  if (refs.length && pictureEngineReferences(status) < 1) return line(callId, args, REFERENCES_MISSING_LINE);
   if (refs.some((entry) => entry.id === base.id)) return line(callId, args, "The second picture has to be a different picture from the one you want changed.");
   if (new Set(refs.map((entry) => entry.id)).size !== refs.length) return line(callId, args, "Choose different reference pictures.");
 

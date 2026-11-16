@@ -118,7 +118,7 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   expect(bar.chips!.slice(0, 3).map((chip) => [chip.state, chip.group])).toEqual([["shape", "Shape"], ["count", "Pictures"], ["set", "Pictures"]]);
   expect(bar.chips![2]!.options!.map((option) => [option.value, option.label])).toEqual([[0, "1 picture"], [4, "A set of 4"], [6, "A set of 6"]]);
   expect(bar).toMatchObject({ placeholder: 'Describe the picture. Put exact words in quotes, like "Summer Fair". Type @ to add someone from your cast.' });
-  expect((bar as unknown as { tier: { tiers: Array<{ id: string; hint: string }> } }).tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. Shows no words on the picture."], ["boost", "More detail. Shows no words unless you ask for them."], ["max", "More detail. Shows no words unless you ask for them."]]);
+  expect((bar as unknown as { tier: { tiers: Array<{ id: string; hint: string }> } }).tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast."], ["boost", "More detail."], ["max", "More detail."]]);
   expect(bar.chips![0]).toMatchObject({ icon: "rectangle-horizontal", icon_only: true, options: [{ value: "square", icon: "square" }, { value: "landscape", icon: "rectangle-horizontal" }, { value: "portrait", icon: "rectangle-vertical" }, { value: "wide", icon: "monitor" }, { value: "tall", icon: "smartphone" }] });
   expect(bar.chips![1]).toMatchObject({ icon: "layers", icon_only: true });
   expect(bar.chips!.slice(4).every((chip) => chip.group === "Style" && chip.icon_only)).toBe(true);
@@ -227,5 +227,5 @@ test("Image Create level hints add a measured wait only for a level with 3 finis
   expect(page.ok).toBe(true);
   if (!page.ok) return;
   const bar = (page.value as { body: Array<unknown> }).body[0] as { tier: { tiers: Array<{ id: string; hint: string }> } };
-  expect(bar.tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. Shows no words on the picture. About 20 seconds."], ["boost", "More detail. Shows no words unless you ask for them."], ["max", "More detail. Shows no words unless you ask for them."]]);
+  expect(bar.tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. About 20 seconds."], ["boost", "More detail."], ["max", "More detail."]]);
 });

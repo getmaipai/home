@@ -1,70 +1,59 @@
-// IMGGEN-QUALITY-01: Quick and Detailed are the person-facing choices. New Quick pictures use ERNIE when installed, otherwise
-// the Stack's Klein default; Detailed uses Z-Image. Model names stay in the Details disclosure and this internal mapping.
-// Rule 0 is untouched: the age and surface gates ran before anything here.
-import { householdDetailedEnabled, householdPictureQuality, householdQuickModel } from "./policy";
+// IMGGEN-QUALITY-01 / H3-SLOTS-HOME-01: one picture model, MiniMax H3-Image, makes every picture, edit and reference picture, and it
+// spells words itself. Quick and Detailed stay as person-facing levels (the level only changes the Stack's window, not the model).
+// ERNIE-Image-Turbo, Klein and Z-Image were removed on the owner's order (2026-11-16): none is a default or a choice any more, and a
+// request that names one gets the plain line below. Rule 0 is untouched: the age and surface gates ran before anything here.
 import type { StackImageStatus } from "./stack";
 
 export type PictureQuality = "quick" | "detailed";
-export const QUICK_MODEL = "flux2-klein-4b";
-export const ERNIE_MODEL = "ernie-image-turbo";
-export const DETAILED_MODEL = "z-image-turbo";
-export const TEXT_CAPABLE_MODELS = new Set([ERNIE_MODEL]);
+/** The one picture model (the Stack's own default). Every default in Home points here, never at a removed model. */
+export const PICTURE_MODEL = "minimax-h3-image";
+/** Models that no longer exist on this computer. Matched only to refuse or to ignore an old saved pick; never offered. */
+const REMOVED_PICTURE_MODELS: ReadonlySet<string> = new Set(["flux2-klein-4b", "ernie-image-turbo", "z-image-turbo"]);
+export const isRemovedPictureModel = (model: string | null | undefined): boolean => Boolean(model && REMOVED_PICTURE_MODELS.has(model));
+/** What a person is told when something they asked for needs a picture model that was removed. */
+export const REMOVED_MODEL_LINE = "That picture maker is no longer on this computer. Home makes pictures with its one picture model now. Try again without that choice, or pick a different style.";
+export const TEXT_CAPABLE_MODELS: ReadonlySet<string> = new Set([PICTURE_MODEL]);
 /** Until media_template.words_blanks ships in the spec, these blank names mark exact picture text. */
 export const PICTURE_WORD_BLANKS = new Set(["headline", "title", "text", "caption", "tagline", "words", "name_text"]);
 export const modelCanSpell = (model: string | null | undefined): boolean => Boolean(model && TEXT_CAPABLE_MODELS.has(model));
 
-export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL || model === ERNIE_MODEL ? "quick" : null);
+export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === PICTURE_MODEL ? "quick" : null);
 export const isPictureQuality = (value: unknown): value is PictureQuality => value === "quick" || value === "detailed";
 
-/** ERNIE is text-to-picture only. When the household picked Klein, or ERNIE is not ready, leave Quick unnamed so the Stack uses its existing Klein default. */
+/** The model to name for a picture: the one picture model when the Stack has it installed, else left unnamed so the Stack uses its own default. */
 export function quickModelFor(engine: Pick<StackImageStatus, "models"> | null): string | undefined {
-  if (householdQuickModel() === "klein") return undefined;
-  const model = engine?.models.find((m) => m.id === ERNIE_MODEL);
-  return model?.installed && model.available !== false ? ERNIE_MODEL : undefined;
+  const model = engine?.models?.find((m) => m.id === PICTURE_MODEL);
+  return model?.installed && model.available !== false ? PICTURE_MODEL : undefined;
 }
 
 /** Why the quality is not the one that was wanted, as a code the tool turns into one sentence for the model to relay. */
-export type QualityNote = "detailed_not_installed" | "detailed_off" | "style_needs_detailed" | "style_needs_quick" | null;
+export type QualityNote = "detailed_off" | "style_needs_detailed" | "style_needs_quick" | null;
 
 export interface QualityChoice {
   quality: PictureQuality;
-  /** The Stack model to name; undefined lets the Stack use its own default (Quick). */
+  /** The Stack model to name; undefined lets the Stack use its own default. */
   model?: string;
   note: QualityNote;
-  /** True when the person or the model asked for Detailed outright or a style needs it, so the reply should say so. */
+  /** True when the person or the model asked for Detailed outright, so the reply should say so. */
   announce: boolean;
+  /** Set when a style was made for a removed model: no picture is made, the person gets REMOVED_MODEL_LINE. */
+  removed?: true;
 }
 
-/** Whether Detailed can run here now: the model is installed and this computer's tier can run it. */
-export function detailedReady(engine: Pick<StackImageStatus, "models"> | null): boolean {
-  const model = engine?.models.find((m) => m.id === DETAILED_MODEL);
-  return Boolean(model && model.installed && model.available !== false);
+/** Detailed is a level of the one model, not a second model, so there is nothing separate to switch to. */
+export function detailedReady(_engine: Pick<StackImageStatus, "models"> | null): boolean {
+  return false;
 }
 
-/**
- * The quality for one picture. A style (LoRA) is made for one model, so it decides: a style made for the detailed model makes
- * the picture Detailed on its own (and says so), a style made for the quick one keeps it Quick. With no style, the request's own
- * choice wins, else the household's setting; Detailed that is not installed falls back to Quick with a note.
- */
+/** The quality for one picture. A style made for a removed model cannot run (`removed`); everything else is the one model. */
 export function chooseQuality(input: { requested?: PictureQuality | undefined; style?: { base_model: string } | null; engine: Pick<StackImageStatus, "models"> | null; household?: PictureQuality }): QualityChoice {
-  const wanted = input.requested ?? input.household ?? householdPictureQuality();
-  const base = qualityOfModel(input.style?.base_model);
-  if (input.style && base) {
-    if (base === "detailed") return { quality: "detailed", model: DETAILED_MODEL, note: wanted === "detailed" ? null : "style_needs_detailed", announce: true };
-    return { quality: "quick", model: QUICK_MODEL, note: input.requested === "detailed" ? "style_needs_quick" : null, announce: false };
-  }
-  if (wanted === "detailed") {
-    if (!householdDetailedEnabled()) return { quality: "quick", note: "detailed_off", announce: false };
-    if (detailedReady(input.engine)) return { quality: "detailed", model: DETAILED_MODEL, note: null, announce: input.requested === "detailed" };
-    return { quality: "quick", note: "detailed_not_installed", announce: false };
-  }
+  if (input.style && isRemovedPictureModel(input.style.base_model)) return { quality: "quick", note: null, announce: false, removed: true };
   const model = quickModelFor(input.engine);
   return { quality: "quick", ...(model ? { model } : {}), note: null, announce: false };
 }
 
 /** The line the model relays for a quality note (plain words, no model names). */
 export const QUALITY_NOTE_LINE: Record<Exclude<QualityNote, null>, string> = {
-  detailed_not_installed: "Detailed pictures are not on this computer yet, so this one was made Quick. If they want Detailed, tell them an admin can get it in Settings, Pictures and videos.",
   detailed_off: "Detailed pictures are turned off, so this one was made Quick. If they want Detailed, tell them an admin can turn it on in Settings, AI and models.",
   style_needs_detailed: "That style only works with Detailed pictures, so this one is Detailed and takes a little longer. Say so in one short sentence.",
   style_needs_quick: "That style only works with Quick pictures, so this one was made Quick.",

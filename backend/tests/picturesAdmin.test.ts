@@ -38,7 +38,7 @@ describe("overview", () => {
     const proof = unlockHeader(await unlock(client, "correcthorse"));
     const body = (await (await client.get("/api/pictures/admin", proof)).json()) as { stack: string; engine: { default_model: string; edit_ready: boolean }; adapters: Array<{ id: string; enabled: boolean; classification: string; licence: string }>; bands: Array<{ band: string; on: boolean; locked: boolean }>; adult_adapters: string };
     expect(body.stack).toBe("ok");
-    expect(body.engine).toMatchObject({ default_model: "flux2-klein-4b", edit_ready: true });
+    expect(body.engine).toMatchObject({ default_model: "minimax-h3-image", edit_ready: true });
     expect(body.adapters.map((a) => a.id)).toEqual(["lora-aaaaaaaaaaaaaaaa", "lora-bbbbbbbbbbbbbbbb"]);
     expect(body.adapters.find((a) => a.id === "lora-bbbbbbbbbbbbbbbb")).toMatchObject({ classification: "adult-only", licence: "No licence stated", enabled: true });
     expect(body.bands).toEqual([expect.objectContaining({ band: "children", on: true, locked: true }), expect.objectContaining({ band: "teens", on: true, locked: true }), expect.objectContaining({ band: "adults", on: true, locked: false })]);

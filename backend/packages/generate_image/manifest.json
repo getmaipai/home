@@ -111,10 +111,10 @@
       },
       "references": {
         "type": "array",
-        "maxItems": 3,
+        "maxItems": 6,
         "items": { "type": "string", "maxLength": 40 },
         "grounded": false,
-        "description": "references: ids of pictures to use as references, up to 3."
+        "description": "references: ids of pictures to use as references, up to the engine's own count (3 to 6)."
       },
       "words": {
         "type": "array",

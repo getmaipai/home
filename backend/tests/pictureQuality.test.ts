@@ -1,7 +1,6 @@
 // IMGGEN-QUALITY-01 (owner ruling 2026-10-17): plain pictures stay fast (Quick); Detailed is the slower, richer maker. The
 // person-facing choice is the household setting, the chat tool's `quality` argument, a style's own maker, and the card's switch.
 // No model name reaches the model's tool result or the card.
-import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -16,7 +15,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
-import { chooseQuality, detailedReady, ERNIE_MODEL, QUICK_MODEL, qualityOfModel, QUALITY_NOTE_LINE } from "@/lib/pictures/quality";
+import { chooseQuality, detailedReady, isRemovedPictureModel, modelCanSpell, PICTURE_MODEL, qualityOfModel, QUALITY_NOTE_LINE, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
 import { nameEditModel } from "@/lib/pictures/editTool";
 import { cardView } from "@/routes/pictures";
 import { adaptersFor, __resetAdapterCacheForTests } from "@/lib/pictures/adapters";
@@ -31,13 +30,12 @@ import { people as peopleTable } from "@/db/schema";
 let people: BenchPeople;
 let fake: FakeImageStack;
 
-const KLEIN = { id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 };
-const ERNIE = { id: ERNIE_MODEL, family: "ernie-image-turbo", installed: true, available: true, licence: "Apache-2.0", edit: false, steps_default: 8, peak_gb: 18.8 };
-const ZIMAGE = { id: "z-image-turbo", family: "z-image", installed: true, licence: "Apache-2.0", loras: true, edit: false, steps_default: 9, peak_gb: 34 };
-const ZIMAGE_LORA = { ...TEST_LORAS[0]!, id: "lora-cccccccccccccccc", name: "Technicolor", sha256: "c".repeat(64), base_model: "z-image-turbo", trigger_words: ["technicolor"] };
+const MINIMAX = { id: PICTURE_MODEL, family: "minimax-h3-image", installed: true, available: true, licence: "MiniMax-H3-Image Community License", loras: false, edit: true, steps_default: 6, max_references: 2, peak_gb: 22 };
+const REMOVED = ["flux2-klein-4b", "ernie-image-turbo", "z-image-turbo"] as const;
+const removedLora = (id: string, name: string, base: string) => ({ ...TEST_LORAS[0]!, id, name, sha256: id.slice(5, 6).repeat(64), base_model: base, trigger_words: [name.toLowerCase()] });
 
-function engine(withDetailed: boolean) {
-  __setPictureStatusForTests(readyStatusForTests({ models: withDetailed ? [KLEIN, ZIMAGE] : [KLEIN] }));
+function engine() {
+  __setPictureStatusForTests(readyStatusForTests({ models: [MINIMAX] }));
 }
 
 beforeEach(() => {
@@ -50,8 +48,8 @@ beforeEach(() => {
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
   fake = installFakeImageStack();
-  fake.loras = [...TEST_LORAS, ZIMAGE_LORA];
-  engine(true);
+  fake.loras = [...TEST_LORAS, removedLora("lora-cccccccccccccccc", "Technicolor", "z-image-turbo")];
+  engine();
 });
 afterEach(() => {
   fake.restore();
@@ -78,169 +76,108 @@ async function run(args: Record<string, unknown>, text = "draw a red fox"): Prom
   return told;
 }
 
-describe("chooseQuality", () => {
-  const withZ = { models: [KLEIN, ZIMAGE] };
-  const withoutZ = { models: [KLEIN] };
-  test("no ask and no setting is Quick with no model named", () => {
-    expect(chooseQuality({ engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+describe("chooseQuality (one picture model)", () => {
+  const eng = { models: [MINIMAX] };
+  test("every request is the one picture model, Quick or Detailed asked", () => {
+    expect(chooseQuality({ engine: eng, household: "quick" })).toEqual({ quality: "quick", model: PICTURE_MODEL, note: null, announce: false });
+    expect(chooseQuality({ requested: "detailed", engine: eng })).toEqual({ quality: "quick", model: PICTURE_MODEL, note: null, announce: false });
   });
-  test("Quick uses ERNIE when installed and available, while Detailed remains Z-Image", () => {
-    expect(chooseQuality({ engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toEqual({ quality: "quick", model: ERNIE_MODEL, note: null, announce: false });
-    expect(chooseQuality({ requested: "detailed", engine: { models: [KLEIN, ERNIE, ZIMAGE] } })).toMatchObject({ quality: "detailed", model: "z-image-turbo" });
+  test("a Stack that does not list it leaves the model unnamed (the Stack's own default)", () => {
+    expect(chooseQuality({ engine: { models: [{ ...MINIMAX, installed: false }] } })).toEqual({ quality: "quick", note: null, announce: false });
+    expect(chooseQuality({ engine: null })).toEqual({ quality: "quick", note: null, announce: false });
   });
-  test("Quick leaves model selection to the Stack when ERNIE is missing or unavailable", () => {
-    expect(chooseQuality({ engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
-    expect(chooseQuality({ engine: { models: [{ ...ERNIE, available: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
-    expect(chooseQuality({ engine: { models: [{ ...ERNIE, installed: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+  test("a style made for a removed model is refused (removed), never quietly run on another model", () => {
+    for (const base of REMOVED) expect(chooseQuality({ style: { base_model: base }, engine: eng })).toMatchObject({ removed: true });
+    expect(chooseQuality({ style: { base_model: PICTURE_MODEL }, engine: eng })).toMatchObject({ quality: "quick", model: PICTURE_MODEL });
   });
-  test("a household that picked Klein as the Quick model leaves Quick unnamed even when ERNIE is ready", () => {
-    writeChoiceSetting("engines.image.tier.standard", "klein");
-    expect(chooseQuality({ engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+  test("only the one model maps to a quality; the removed ones map to nothing", () => {
+    expect(qualityOfModel(PICTURE_MODEL)).toBe("quick");
+    for (const base of REMOVED) { expect(qualityOfModel(base)).toBeNull(); expect(isRemovedPictureModel(base)).toBe(true); }
+    expect(isRemovedPictureModel(PICTURE_MODEL)).toBe(false);
+    expect(modelCanSpell(PICTURE_MODEL)).toBe(true);
+    expect(modelCanSpell("flux2-klein-4b")).toBe(false);
   });
-  test("Detailed switched off answers Quick with the detailed_off note even when Z-Image is ready", () => {
-    writeChoiceSetting("engines.image.tier.boost", false);
-    expect(chooseQuality({ engine: withZ, household: "detailed" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
-    expect(chooseQuality({ requested: "detailed", engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
-  });
-  test("model ids map to the two person-facing qualities", () => {
-    expect(qualityOfModel(ERNIE_MODEL)).toBe("quick");
-    expect(qualityOfModel(QUICK_MODEL)).toBe("quick");
-    expect(qualityOfModel("z-image-turbo")).toBe("detailed");
-    expect(qualityOfModel("unknown")).toBeNull();
-  });
-  test("the household's Detailed uses Detailed when it is installed, and falls back to Quick with a note when it is not", () => {
-    expect(chooseQuality({ engine: withZ, household: "detailed" })).toMatchObject({ quality: "detailed", model: "z-image-turbo", note: null });
-    expect(chooseQuality({ engine: withoutZ, household: "detailed" })).toEqual({ quality: "quick", note: "detailed_not_installed", announce: false });
-    expect(detailedReady({ models: [{ ...ZIMAGE, available: false }] })).toBe(false);
-  });
-  test("an asked-for kind beats the setting, and Detailed asked for outright is announced", () => {
-    expect(chooseQuality({ requested: "quick", engine: withZ, household: "detailed" })).toMatchObject({ quality: "quick" });
-    expect(chooseQuality({ requested: "detailed", engine: withZ, household: "quick" })).toMatchObject({ quality: "detailed", announce: true });
-  });
-  test("a style decides the maker: Detailed on its own with a note, Quick kept for a Quick style", () => {
-    expect(chooseQuality({ style: { base_model: "z-image-turbo" }, engine: withZ, household: "quick" })).toMatchObject({ quality: "detailed", model: "z-image-turbo", note: "style_needs_detailed", announce: true });
-    expect(chooseQuality({ style: { base_model: "z-image-turbo" }, engine: withZ, household: "detailed" })).toMatchObject({ quality: "detailed", note: null });
-    expect(chooseQuality({ style: { base_model: "flux2-klein-4b" }, requested: "detailed", engine: withZ })).toMatchObject({ quality: "quick", note: "style_needs_quick" });
-    expect(chooseQuality({ style: { base_model: "flux2-klein-4b" }, engine: withZ, household: "detailed" })).toMatchObject({ quality: "quick", note: null });
-    expect(chooseQuality({ style: { base_model: ERNIE_MODEL }, engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toMatchObject({ quality: "quick", model: QUICK_MODEL });
+  test("there is no separate Detailed model to switch to", () => {
+    expect(detailedReady({ models: [MINIMAX] })).toBe(false);
   });
 });
 
 describe("the chat tool", () => {
-  test("an installed ERNIE is named for a new Quick picture", async () => {
-    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
+  test("a plain request names the one picture model and adds no no-text sentence", async () => {
     await run({});
-    expect(fake.submitted[0]!.model).toBe(ERNIE_MODEL);
+    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
+    expect(String(fake.submitted[0]!.prompt)).not.toContain("No text, no letters");
     await until(() => fake.jobs.length > 0);
   });
 
-  test("a plain request is Quick: the Stack is told no model", async () => {
-    await run({});
-    expect(fake.submitted[0]!.model).toBeUndefined();
-    await until(() => fake.jobs.length > 0);
-  });
-
-  test("words force ERNIE for Standard and Detailed requests and append the exact words after the prompt", async () => {
-    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
-    writeChoiceSetting("engines.image.tier.standard", "klein");
+  test("words use the one model and append the exact words after the prompt, Detailed or not", async () => {
     await run({ words: ["  Hello  ", "World"], quality: "detailed" });
-    expect(fake.submitted[0]!.model).toBe(ERNIE_MODEL);
+    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
     expect(fake.submitted[0]!.prompt).toContain('Show this text on the picture, spelled exactly as written: "Hello", "World".');
     expect(fake.submitted[0]!.prompt).not.toContain("No text, no letters");
     await until(() => fake.jobs.length > 0);
   });
 
-  test("words with ERNIE unavailable are refused before a picture job starts", async () => {
-    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE] }));
+  test("words with the picture model not installed are refused before a picture job starts, naming no removed model", async () => {
+    __setPictureStatusForTests(readyStatusForTests({ models: [{ ...MINIMAX, installed: false }] }));
     const told = await run({ words: ["Hello"] });
     expect(told).toContain("No picture was made");
-    expect(told).toContain("Words on a picture need the text picture model. Turn on ERNIE-Image-Turbo in Settings, AI and models, then try again.");
+    expect(told).toContain("Words on a picture need the picture model");
+    expect(told).not.toMatch(/ernie|klein|z-image/i);
     expect(fake.submitted).toHaveLength(0);
     expect(fake.jobs).toHaveLength(0);
   });
 
-  test("a no-words Klein request gets one no-text addendum and negative prompt; ERNIE does not", async () => {
-    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
-    writeChoiceSetting("engines.image.tier.standard", "klein");
-    await run({});
-    const prompt = String(fake.submitted.at(-1)!.prompt);
-    expect(prompt.match(/No text, no letters, no words, no logos anywhere in the picture\./g)).toHaveLength(1);
-    expect(fake.submitted.at(-1)!.negative_prompt).toContain("text, letters, words, logos, watermark");
-    await until(() => fake.jobs.length > 0);
-    await run({ words: [] });
-    // Restore ERNIE as household Standard's model, where it is text-capable and needs no no-text prompt.
-    writeChoiceSetting("engines.image.tier.standard", "ernie");
-    await run({});
-    expect(fake.submitted.at(-1)!.model).toBe(ERNIE_MODEL);
-    expect(fake.submitted.at(-1)!.prompt).not.toContain("No text, no letters");
-  });
-
-  test("the model asking for Detailed makes a Detailed picture and is told to say so in one sentence, without a model name", async () => {
+  test("the model asking for Detailed makes the same picture without a note about a second model", async () => {
     const told = await run({ quality: "detailed" }, "the most detailed, photoreal fox you can");
-    expect(fake.submitted[0]!.model).toBe("z-image-turbo");
-    expect(told).toContain("Detailed picture");
-    expect(told).not.toMatch(/z-image|klein|flux/i);
+    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
+    expect(told).not.toMatch(/z-image|klein|flux|ernie/i);
+    expect(told).not.toContain("not on this computer yet");
   });
 
-  test("the household's Detailed setting applies when nothing is asked", async () => {
-    setHouseholdSettingValue("generation.picture_tier", "boost");
-    await run({});
-    expect(fake.submitted[0]!.model).toBe("z-image-turbo");
-  });
-
-  test("Detailed that is not installed makes a Quick picture and tells the model how an admin gets it", async () => {
-    engine(false);
-    const told = await run({ quality: "detailed" });
-    expect(fake.submitted[0]!.model).toBeUndefined();
-    expect(told).toContain("not on this computer yet");
-    expect(told).toContain("Settings, Pictures and videos");
-    expect(told).not.toMatch(/z-image|klein|flux/i);
-  });
-
-  test("a style made for the detailed maker picks Detailed on its own, with a plain note", async () => {
+  test("a style made for a removed model is refused in plain words and no job starts", async () => {
     const told = await run({ style: "technicolor" });
-    expect(fake.submitted[0]!.model).toBe("z-image-turbo");
-    expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-cccccccccccccccc", scale: 0.8 }]);
-    expect(told).toContain("only works with Detailed");
+    expect(told).toContain("no longer on this computer");
+    expect(told).not.toMatch(/z-image|klein|flux|ernie/i);
+    expect(fake.submitted).toHaveLength(0);
   });
 
-  test("a style made for the quick maker stays Quick even when Detailed is asked for", async () => {
-    const told = await run({ style: "pixel", quality: "detailed" });
-    expect(fake.submitted[0]!.model).toBe("flux2-klein-4b");
-    expect(told).toContain("only works with Quick");
+  test("a style made for Klein is refused the same way", async () => {
+    fake.loras = [...fake.loras, removedLora("lora-dddddddddddddddd", "Chunky", "flux2-klein-4b")];
+    const told = await run({ style: "chunky" });
+    expect(told).toContain("no longer on this computer");
+    expect(fake.submitted).toHaveLength(0);
   });
 
-  test("all edit forms explicitly name Klein", () => {
+  test("all edit forms name the one picture model", () => {
     const form = new FormData();
     nameEditModel(form);
-    expect(form.get("model")).toBe(QUICK_MODEL);
+    expect(form.get("model")).toBe(PICTURE_MODEL);
   });
 });
 
-test("changed person-facing picture copy contains no model names", async () => {
+test("no default, copy or note names a removed model", async () => {
   const settings = await Bun.file(new URL("../src/settings/pictureKeys.ts", import.meta.url)).text();
   const manifest = await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text();
-  const personFacing = [settings.match(/help: "Quick draws[^"]+"/)?.[0], settings.match(/quick: "Clear words[^"]+"/)?.[0], settings.match(/detailed: "About 30 to 45[^"]+"/)?.[0], QUALITY_NOTE_LINE.detailed_not_installed, QUALITY_NOTE_LINE.style_needs_detailed, QUALITY_NOTE_LINE.style_needs_quick, JSON.parse(manifest).args.properties.quality.description].join(" ");
+  const personFacing = [settings.match(/help: "Quick draws[^"]+"/)?.[0], settings.match(/quick: "Clear words[^"]+"/)?.[0], settings.match(/detailed: "About 30 to 45[^"]+"/)?.[0], ...Object.values(QUALITY_NOTE_LINE), REMOVED_MODEL_LINE, JSON.parse(manifest).args.properties.quality.description].join(" ");
   expect(personFacing).not.toMatch(/Klein|ERNIE|Z-Image/i);
 });
 
 describe("the card and its switch", () => {
-  async function made(model?: string, loras = false) {
+  async function made(loras = false) {
     const resolved = (await import("@/lib/conversationHistory")).resolveOrCreateConversation(people.owner, "chat", undefined, {});
     if (!resolved.ok) throw new Error("no conversation");
-    const job = await startPictureJob({ actor: people.owner, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult", ...(model ? { model } : {}), ...(loras ? { loras: [{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }] } : {}) } });
+    const job = await startPictureJob({ actor: people.owner, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult", ...(loras ? { loras: [{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }] } : {}) } });
     await until(() => getPictureJob(people.owner, job.id)?.state === "done");
     return getPictureJob(people.owner, job.id)!;
   }
 
-  test("a Quick card offers Detailed when it is installed; a Detailed card offers Quick; a styled card offers nothing", async () => {
-    expect(cardView(people.owner, await made(), true, true)).toMatchObject({ quality: "quick", switch_to: "detailed" });
+  test("a card never offers a second picture model to switch to", async () => {
     expect(cardView(people.owner, await made(), true, false)).toMatchObject({ quality: "quick", switch_to: null });
-    expect(cardView(people.owner, await made("z-image-turbo"), true, true)).toMatchObject({ quality: "detailed", switch_to: "quick" });
-    expect(cardView(people.owner, await made(undefined, true), true, true)).toMatchObject({ switch_to: null });
+    expect(cardView(people.owner, await made(true), true, false)).toMatchObject({ switch_to: null });
   });
 
-  test("the variation route makes the picture again as the other kind, and keeps its own kind when none is given", async () => {
+  test("the variation route makes the picture again on the one model", async () => {
     resetDb();
     const client = new TestClient();
     await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -251,19 +188,12 @@ describe("the card and its switch", () => {
     await until(() => getPictureJob(actor, job.id)?.state === "done");
     const again = await client.post(`/api/pictures/jobs/${job.id}/variation`, { quality: "detailed" });
     expect(again.status).toBe(200);
-    expect(fake.submitted.at(-1)!.model).toBe("z-image-turbo");
-    await until(() => getPictureJob(actor, job.id)?.state === "done" && fake.jobs.every((j) => j.state === "done"));
-    const before = fake.submitted.length;
-    const kept = await client.post(`/api/pictures/jobs/${job.id}/variation`, {});
-    expect(kept.status).toBe(200);
-    // The household queue submits a job when its turn comes, so wait for the Stack to receive it.
-    await until(() => fake.submitted.length > before);
-    expect(fake.submitted.at(-1)!.model).toBeUndefined();
+    expect(fake.submitted.at(-1)!.model).toBe(PICTURE_MODEL);
   });
 });
 
 test("a style the person may use is listed with its maker (the adapters read stays as it was)", async () => {
-  expect((await adaptersFor(["all-ages"])).map((a) => a.base_model).sort()).toEqual(["flux2-klein-4b", "z-image-turbo"]);
+  expect((await adaptersFor(["all-ages"])).map((a) => a.base_model).sort()).toEqual(["minimax-h3-image", "z-image-turbo"]);
 });
 
 describe("typicalWait", () => {

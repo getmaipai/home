@@ -1,6 +1,6 @@
 import { WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
 import { createHash } from "node:crypto";
-import { chooseQuality, QUICK_MODEL, DETAILED_MODEL, ERNIE_MODEL } from "@/lib/pictures/quality";
+import { chooseQuality, PICTURE_MODEL } from "@/lib/pictures/quality";
 import { pictureEngineStatus, __setPictureStatusForTests, __setPictureStatusReaderForTests } from "@/lib/pictures/ready";
 import { chooseVideoQuality, QUICK_BASE } from "@/lib/videos/quality";
 import { videoEngineStatus, __setVideoStatusForTests, __setVideoStatusReaderForTests } from "@/lib/videos/ready";
@@ -10,7 +10,7 @@ import type { StackVideoStatus } from "@/lib/videos/stack";
 export const COMPANION_STILL_MODEL_MISSING_LINE = "The chosen picture model is not installed or available. An admin can install it in Settings, AI and models.";
 export const COMPANION_CLIP_MODEL_MISSING_LINE = "The chosen video model is not installed or available. An admin can add it in Settings, Models and storage.";
 export const COMPANION_MODEL_MISMATCH_LINE = "The picture came out different from the one chosen. Try again.";
-export const COMPANION_EDIT_MODEL = QUICK_MODEL;
+export const COMPANION_EDIT_MODEL = PICTURE_MODEL;
 
 export interface CompanionArtChoice { model: string; quality: "quick" | "detailed"; }
 let statusReaders: { picture: typeof pictureEngineStatus; video: typeof videoEngineStatus } | null = null;
@@ -35,9 +35,9 @@ function installedStill(engine: StackImageStatus | null, model: string): boolean
 }
 export function resolveCompanionStillFromStatus(engine: StackImageStatus | null): CompanionArtChoice {
   const choice = chooseQuality({ engine });
-  if (choice.note === "detailed_not_installed" || choice.note === "detailed_off") refusal(COMPANION_STILL_MODEL_MISSING_LINE);
-  const model = choice.model ?? QUICK_MODEL;
-  if (!installedStill(engine, model) || ![QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL].includes(model)) refusal(COMPANION_STILL_MODEL_MISSING_LINE);
+  if (choice.removed || choice.note === "detailed_off") refusal(COMPANION_STILL_MODEL_MISSING_LINE);
+  const model = choice.model ?? PICTURE_MODEL;
+  if (!installedStill(engine, model) || model !== PICTURE_MODEL) refusal(COMPANION_STILL_MODEL_MISSING_LINE);
   return { model, quality: choice.quality };
 }
 export async function resolveCompanionStill(): Promise<CompanionArtChoice> { return resolveCompanionStillFromStatus(await (statusReaders?.picture ?? pictureEngineStatus)()); }

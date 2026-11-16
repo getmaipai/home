@@ -68,7 +68,7 @@ describe("cast picture templates", () => {
   test("a missing cast blank asks for it and starts nothing", async () => {
     const made = await makePictureFor(owner, { prompt: "", template: "mtpl-tryonoutfit", blanks: { garment: "a red coat" } });
     expect(made.ok).toBe(false);
-    if (!made.ok) expect(made.error).toContain("Ask for cast person");
+    if (!made.ok) expect(made.error).toContain("This template needs a person from your cast");
     expect(fake.submitted).toHaveLength(0);
   });
 

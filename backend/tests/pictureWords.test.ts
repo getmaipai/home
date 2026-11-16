@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readPictureMakeBody } from "@/lib/pictures/make";
-import { ERNIE_MODEL, modelCanSpell, TEXT_CAPABLE_MODELS } from "@/lib/pictures/quality";
+import { PICTURE_MODEL, modelCanSpell, TEXT_CAPABLE_MODELS } from "@/lib/pictures/quality";
 
 describe("TEXT-PIC words arguments and model catalog", () => {
-  test("only ERNIE is marked text capable", () => {
-    expect(TEXT_CAPABLE_MODELS).toEqual(new Set([ERNIE_MODEL]));
-    expect(modelCanSpell(ERNIE_MODEL)).toBe(true);
+  test("only the one picture model is marked text capable", () => {
+    expect(TEXT_CAPABLE_MODELS).toEqual(new Set([PICTURE_MODEL]));
+    expect(modelCanSpell(PICTURE_MODEL)).toBe(true);
     expect(modelCanSpell("flux2-klein-4b")).toBe(false);
     expect(modelCanSpell("z-image-turbo")).toBe(false);
     expect(modelCanSpell(undefined)).toBe(false);
