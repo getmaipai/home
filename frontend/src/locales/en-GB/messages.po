@@ -1096,7 +1096,7 @@ msgid "{name} will stay closed when the job is done."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:54
+#: src/shell/pages/settings/SettingsHomePage.tsx:53
 msgid "{name}, {role} · checked just now"
 msgstr ""
 
@@ -5387,7 +5387,7 @@ msgid "Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:57
+#: src/shell/pages/settings/SettingsHomePage.tsx:58
 msgid "Checked just now."
 msgstr ""
 
@@ -5606,7 +5606,7 @@ msgid "Choose a folder in the window that just opened."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:27
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:26
 msgid "Choose a look for this browser. It does not change your personal setting."
 msgstr ""
 
@@ -9671,7 +9671,7 @@ msgid "Everything installed is in use."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:57
+#: src/shell/pages/settings/SettingsHomePage.tsx:58
 msgid "Everything is fine."
 msgstr ""
 
@@ -10035,7 +10035,7 @@ msgid "Find"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:46
+#: src/shell/pages/settings/SettingsHomePage.tsx:45
 msgid "Find a setting"
 msgstr ""
 
@@ -10276,7 +10276,8 @@ msgid "setting.search.source_mode.wikimedia.option.inherit"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:33
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:30
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:32
 msgid "Follows your settings"
 msgstr ""
 
@@ -15007,7 +15008,7 @@ msgid "area.Look and ease"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:26
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:25
 msgid "Look on this device"
 msgstr ""
 
@@ -18564,9 +18565,9 @@ msgid "On the engine computer, open a terminal and run this one command. Copy it
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:20
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:21
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:22
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:31
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:30
 msgid "On this device only"
 msgstr ""
 
@@ -19154,7 +19155,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:103
-#: src/shell/pages/settings/SettingsHomePage.tsx:44
+#: src/shell/pages/settings/SettingsHomePage.tsx:43
 msgid "Overview"
 msgstr ""
 
@@ -21344,18 +21345,12 @@ msgstr ""
 #: src/apps/clock/StopwatchTab.tsx:69
 #: src/apps/clock/TimersTab.tsx:126
 #: src/apps/clock/TimersTab.tsx:138
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
 msgid "Reset"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:138
 msgid "Reset {text}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
-msgid "Reset device appearance"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23255,7 +23250,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
-#: src/shell/pages/settings/SettingsHomePage.tsx:46
+#: src/shell/pages/settings/SettingsHomePage.tsx:45
 #: src/shell/Routes.tsx:510
 msgid "Settings"
 msgstr ""
@@ -23751,7 +23746,7 @@ msgid "Since"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:58
+#: src/shell/pages/settings/SettingsHomePage.tsx:64
 msgid "Since {date}"
 msgstr ""
 
@@ -26346,7 +26341,7 @@ msgid "The helper works only when Home runs on a Mac, so Close apps stays Off on
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:38
+#: src/shell/pages/settings/SettingsHomePage.tsx:37
 msgid "The home"
 msgstr ""
 
@@ -31182,7 +31177,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:157
-#: src/shell/pages/settings/SettingsHomePage.tsx:37
+#: src/shell/pages/settings/SettingsHomePage.tsx:36
 msgid "Yours"
 msgstr ""
 

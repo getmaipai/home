@@ -92,13 +92,12 @@ describe("ported from the old settings page", () => {
     await waitFor(() => expect(document.body.querySelector("input#profile-display-name")).not.toBeNull());
   });
 
-  test("Appearance offers a device-only override and reset without writing the setting", async () => {
+  test("Appearance offers a device-only override, with the way back in the same list, without writing the setting", async () => {
     const view = open(makePerson("adult"), "/settings/appearance?tab=appearance");
     const choose = await view.findByRole("combobox", { name: "On this device only" });
     expect(choose).toBeTruthy();
     fireEvent.click(choose);
-    expect(await view.findByText("Follows your settings")).toBeTruthy();
-    fireEvent.click(await view.findByRole("button", { name: "Reset device appearance" }));
+    fireEvent.click(await view.findByRole("option", { name: "Follows your settings" }));
     expect(fixture!.puts.filter((put) => put.key === "ui.appearance")).toEqual([]);
     expect(view.getByText("Choose a look for this browser. It does not change your personal setting.")).toBeTruthy();
   });

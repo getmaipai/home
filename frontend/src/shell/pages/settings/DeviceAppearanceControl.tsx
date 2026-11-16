@@ -2,7 +2,6 @@ import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { api } from "@/lib/api";
@@ -28,13 +27,12 @@ export function DeviceAppearanceControl() {
           </ItemContent>
           <ItemActions>
             <Select value={value ?? "inherit"} onValueChange={(next) => { const appearance = next === "inherit" ? null : isAppearance(next) ? next : null; setValue(appearance); writeDeviceAppearancePreference(appearance); }}>
-              <SelectTrigger size="row" aria-label={i18n._({ id: "On this device only", message: "On this device only" })}><SelectValue /></SelectTrigger>
+              <SelectTrigger size="row" aria-label={i18n._({ id: "On this device only", message: "On this device only" })}><SelectValue>{value === null ? i18n._({ id: "Follows your settings", message: "Follows your settings" }) : value[0]!.toUpperCase() + value.slice(1)}</SelectValue></SelectTrigger>
               <SelectContent>
                 <SelectItem value="inherit">{i18n._({ id: "Follows your settings", message: "Follows your settings" })}</SelectItem>
                 {options.map((option) => <SelectItem key={option} value={option}>{option[0]!.toUpperCase() + option.slice(1)}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button type="button" variant="secondary" size="row" aria-label={i18n._({ id: "Reset device appearance", message: "Reset device appearance" })} onClick={() => { setValue(null); writeDeviceAppearancePreference(null); }}>{i18n._({ id: "Reset", message: "Reset" })}</Button>
           </ItemActions>
         </Item>
       </ItemGroup>

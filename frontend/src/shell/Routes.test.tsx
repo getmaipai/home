@@ -689,7 +689,7 @@ describe("Routes settings areas", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
-      expect(view.getByRole("heading", { level: 1, name: "Profile and sign-in" })).toBeTruthy();
+      expect(view.getByRole("heading", { level: 1, name: path === "/settings" ? "Overview" : "Profile and sign-in" })).toBeTruthy();
       expect(view.container.querySelector("h1.sr-only")).toBeNull();
       expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
     } finally {

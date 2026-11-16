@@ -1100,7 +1100,7 @@ msgid "{name} will stay closed when the job is done."
 msgstr "{name} will stay closed when the job is done."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:54
+#: src/shell/pages/settings/SettingsHomePage.tsx:53
 msgid "{name}, {role} · checked just now"
 msgstr "{name}, {role} · checked just now"
 
@@ -5390,7 +5390,7 @@ msgid "Check your connection and try again."
 msgstr "Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:57
+#: src/shell/pages/settings/SettingsHomePage.tsx:58
 msgid "Checked just now."
 msgstr "Checked just now."
 
@@ -5609,7 +5609,7 @@ msgid "Choose a folder in the window that just opened."
 msgstr "Choose a folder in the window that just opened."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:27
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:26
 msgid "Choose a look for this browser. It does not change your personal setting."
 msgstr "Choose a look for this browser. It does not change your personal setting."
 
@@ -9674,7 +9674,7 @@ msgid "Everything installed is in use."
 msgstr "Everything installed is in use."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:57
+#: src/shell/pages/settings/SettingsHomePage.tsx:58
 msgid "Everything is fine."
 msgstr "Everything is fine."
 
@@ -10038,7 +10038,7 @@ msgid "Find"
 msgstr "Find"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:46
+#: src/shell/pages/settings/SettingsHomePage.tsx:45
 msgid "Find a setting"
 msgstr "Find a setting"
 
@@ -10279,7 +10279,8 @@ msgid "setting.search.source_mode.wikimedia.option.inherit"
 msgstr "Follows the household choice for where answers come from."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:33
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:30
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:32
 msgid "Follows your settings"
 msgstr "Follows your settings"
 
@@ -15010,7 +15011,7 @@ msgid "area.Look and ease"
 msgstr "Look and ease"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:26
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:25
 msgid "Look on this device"
 msgstr "Look on this device"
 
@@ -18577,9 +18578,9 @@ msgid "On the engine computer, open a terminal and run this one command. Copy it
 msgstr "On the engine computer, open a terminal and run this one command. Copy it with the button."
 
 #. js-lingui-explicit-id
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:20
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:21
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:22
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:31
+#: src/shell/pages/settings/DeviceAppearanceControl.tsx:30
 msgid "On this device only"
 msgstr "On this device only"
 
@@ -19167,7 +19168,7 @@ msgstr "Overrides the household's default per-person cap for this one person. 0 
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:103
-#: src/shell/pages/settings/SettingsHomePage.tsx:44
+#: src/shell/pages/settings/SettingsHomePage.tsx:43
 msgid "Overview"
 msgstr "Overview"
 
@@ -21357,7 +21358,6 @@ msgstr "Research, discoveries, space, physics, chemistry, biology and how things
 #: src/apps/clock/StopwatchTab.tsx:69
 #: src/apps/clock/TimersTab.tsx:126
 #: src/apps/clock/TimersTab.tsx:138
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
 msgid "Reset"
 msgstr "Reset"
 
@@ -21365,11 +21365,6 @@ msgstr "Reset"
 #: src/apps/clock/TimersTab.tsx:138
 msgid "Reset {text}"
 msgstr "Reset {text}"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/settings/DeviceAppearanceControl.tsx:37
-msgid "Reset device appearance"
-msgstr "Reset device appearance"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:124
@@ -23268,7 +23263,7 @@ msgstr "Setting up your AI"
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:303
 #: src/shell/pages/PersonProfilePage.tsx:207
-#: src/shell/pages/settings/SettingsHomePage.tsx:46
+#: src/shell/pages/settings/SettingsHomePage.tsx:45
 #: src/shell/Routes.tsx:510
 msgid "Settings"
 msgstr "Settings"
@@ -23764,7 +23759,7 @@ msgid "Since"
 msgstr "Since"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:58
+#: src/shell/pages/settings/SettingsHomePage.tsx:64
 msgid "Since {date}"
 msgstr "Since {date}"
 
@@ -26359,7 +26354,7 @@ msgid "The helper works only when Home runs on a Mac, so Close apps stays Off on
 msgstr "The helper works only when Home runs on a Mac, so Close apps stays Off on this computer."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsHomePage.tsx:38
+#: src/shell/pages/settings/SettingsHomePage.tsx:37
 msgid "The home"
 msgstr "The home"
 
@@ -31195,7 +31190,7 @@ msgstr "Your video is ready."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:157
-#: src/shell/pages/settings/SettingsHomePage.tsx:37
+#: src/shell/pages/settings/SettingsHomePage.tsx:36
 msgid "Yours"
 msgstr "Yours"
 
