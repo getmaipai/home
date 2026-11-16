@@ -1067,7 +1067,7 @@ export interface MediaBudgetResponse { limit_min: number; used_min: number; left
 
 export const api = {
   aiFeaturesOverview: () => request<{
-    features: Array<{ id: string; name: string; used_by: string[]; levels: Array<{ tier: "reduced"|"standard"|"boost"|"max"; state: "ready"|"missing"|"problem"|"off"|"waits"|"same"; word: string; model_label: string|null; size_bytes_missing: number|null; detail: string|null; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; ready_count: number; level_count: number }>;
+    features: Array<{ id: string; name: string; used_by: string[]; levels: Array<{ tier: "reduced"|"standard"|"boost"|"max"; state: "ready"|"missing"|"problem"|"off"|"unset"|"waits"|"same"; word: string; model_label: string|null; size_bytes_missing: number|null; detail: string|null; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; ready_count: number; level_count: number }>;
     helpers: Array<{ id: string; name: string; model_label: string|null; used_by: string[]; state: "ready"|"missing"|"problem"|"off"|"waits"|"same"; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>;
     attention: { items: Array<{ id: string; kind: "problem"|"missing"; title: string; line: string; action: { kind: "download"|"fix"|"open"; label: string; job?: string; level?: string }|null }>; download_all: { bytes: number; count: number }|null };
     right_now: { engine: "ready"|"problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };

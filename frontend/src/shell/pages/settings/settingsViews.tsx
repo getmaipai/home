@@ -18,7 +18,6 @@ import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearance
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
-import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { AiGlance } from "@/apps/settings/AiGlance";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
 import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
@@ -105,7 +104,7 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   return <>
     {show("overview") ? <AiGlance person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <><HuggingFaceTokenSection /><ModelsAndStorageSection /><ModelsSection /></> : null}
+    {show("advanced") ? <><HuggingFaceTokenSection /><ModelsAndStorageSection /></> : null}
   </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
