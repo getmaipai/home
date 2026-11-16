@@ -700,6 +700,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/integrations/homeAssistant.ts` | isLanHomeAssistantUrl, subscribeHomeAssistantEntities, homeAssistantEventsHealth, readHomeAssistantEntityState, refreshHomeAssistantEvents, __resetHomeAssistantEventsForTests |
 | `backend/src/lib/internetProbe.ts` | classifyInternetFailures, probeInternet, runConfiguredInternetProbe, __resetInternetProbeForTests |
 | `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, mayCarryInterruptedReply, dropInterruptedReply, __clearInterruptedRepliesForTests |
+| `backend/src/lib/issueStillTrue.ts` | issueStillTrue |
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, raiseIssue, resolveIssue, listIssues, registerFixHandler |
 | `backend/src/lib/items/tool.ts` | READ_ITEM_TOOL_ID, ITEM_REF_PATTERN, ITEM_READERS, itemRefsIn, readItemToolSpec, runReadItemTool |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, startImageProducerJob, pollActiveStackImageJobs |
