@@ -68,6 +68,7 @@ test("the watch page item carries the shot notes for the maker only", async () =
   const mine = mediaAppDataRaw(maker, "video", "item", { id: clip.fileId }) as { facts?: string } | null;
   expect(mine?.facts).toContain("Seed: 71");
   expect(mine?.facts).toContain("Length: 6 seconds");
+  expect(mine?.facts).not.toContain("\n");
   const other = mediaAppDataRaw(h.row("Quill"), "video", "item", { id: clip.fileId }) as { facts?: string } | [] | null;
   expect((Array.isArray(other) ? "" : other?.facts) ?? "").not.toContain("Seed");
 });

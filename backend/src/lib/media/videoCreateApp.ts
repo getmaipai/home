@@ -322,9 +322,9 @@ export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ l
 registerMadeFileView("video", (person, file, view) => {
   const notes = creationDetailsFor(person, file.id).filter((row) => row.label !== "Prompt" && row.label !== "Clip checks");
   if (notes.length === 0) return view;
-  const lines = notes.map((row) => `${row.label}: ${row.value}`).join("\n");
+  const lines = notes.map((row) => `${row.label}: ${row.value}`).join(" · ");
   const existing = (view as { facts?: string }).facts;
-  return { ...view, facts: existing ? `${existing}\n${lines}` : lines } as typeof view;
+  return { ...view, facts: existing ? `${existing} · ${lines}` : lines } as typeof view;
 });
 
 /** VIDEO-STUDIO-07: Export is offered only where the Stack can take an edit job: Home runs the AI on this computer and the Stack is set up. One plain line
