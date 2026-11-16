@@ -16,7 +16,7 @@ import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
-import { MAX_REFERENCE_PICTURES, pictureEngineReferences, pictureEngineStatus, pictureReferenceLimit } from "./ready";
+import { MAX_REFERENCE_PICTURES, pictureEngineReferences, pictureEngineStatus, pictureEngineStatusPatient, pictureReferenceLimit } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, PICTURE_MODEL, REMOVED_MODEL_LINE, modelCanSpell } from "./quality";
 import { StackPicturesError } from "./stack";
@@ -155,7 +155,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const audience = audienceOf(state, input.spoken);
   const normalized = { ...args };
   // USE-AS-REFERENCE: references kept per call = the engine's own count (1 to 6); read only when the call carries references.
-  const refLimit = Array.isArray(args.references) ? pictureReferenceLimit(await pictureEngineStatus().catch(() => null)) : 1;
+  const refLimit = Array.isArray(args.references) ? pictureReferenceLimit(await pictureEngineStatusPatient()) : 1;
   let template: ReturnType<typeof getTemplate> = null;
   let promptOverride: string | null = null;
   if (typeof args.template === "string" && args.template) {
@@ -361,8 +361,10 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         form.append("instruction", subjectPrompt);
         form.append("image_source", "imageSource" in combinedRefs[0]! ? combinedRefs[0]!.imageSource : "uploaded");
         for (const [index, ref] of combinedRefs.slice(1).entries()) {
-          form.append("reference", new File([new Uint8Array(ref.bytes)], `picture-reference-${index + 2}`, { type: ref.mediaType }));
-          form.append("reference_source", "imageSource" in ref ? ref.imageSource : "uploaded");
+          // The Stack names its reference fields `reference`, `reference2`, `reference3`...: each one once, with its own `<field>_source`.
+          const field = index === 0 ? "reference" : `reference${index + 1}`;
+          form.append(field, new File([new Uint8Array(ref.bytes)], `picture-reference-${index + 2}`, { type: ref.mediaType }));
+          form.append(`${field}_source`, "imageSource" in ref ? ref.imageSource : "uploaded");
         }
         form.append("timeout_ms", "1");
         const { submitEdit } = await import("./stack");

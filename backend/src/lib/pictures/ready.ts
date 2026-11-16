@@ -34,6 +34,14 @@ export async function pictureEngineStatus(): Promise<StackImageStatus | null> {
   return Promise.race([pending, new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_500))]);
 }
 
+/** The status for sizing how many pictures a call carries: the quick read, and when that gave nothing (the first read after a start waits
+ * only 1.5 seconds) one patient read of up to 5 seconds, so a cold cache never shrinks a three-picture combine to one. */
+export async function pictureEngineStatusPatient(): Promise<StackImageStatus | null> {
+  const quick = await pictureEngineStatus().catch(() => null);
+  if (quick || statusReaderForTests || forTests !== undefined || !isStackConfigured()) return quick;
+  return (await refresh().catch(() => null)) ?? null;
+}
+
 /** The last picture status read, without waiting or fetching. */
 export function peekPictureEngineStatus(): StackImageStatus | null {
   if (forTests !== undefined) return forTests;

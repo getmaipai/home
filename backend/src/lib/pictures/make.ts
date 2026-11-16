@@ -138,7 +138,7 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
     // The reply text is written for the chat model; the only line a person needs is that extra references were left out.
     const extras = /Some extra reference pictures were not used\./.test(outcome.result?.reply?.text ?? "") ? "Some extra reference pictures were not used." : null;
     // TEXT-PIC-07: one plain line when the picture has words.
-    const wordsLine = body.words?.length ? "This picture has words, so Home used its text picture model and will check the spelling." : null;
+    const wordsLine = body.words?.length ? "This picture has words, so Home will check the spelling." : null;
     const setLine = body.set ? `Making a set of ${ids.length} pictures.` : null;
     const notice = [setLine, extras, wordsLine].filter(Boolean).join(" ") || null;
     return { ok: true, ids, notice };

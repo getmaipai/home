@@ -7,7 +7,7 @@ export const EXPAND_SHAPES = ["16:9", "9:16", "4:5", "1:1"] as const;
 export type ExpandShape = (typeof EXPAND_SHAPES)[number];
 
 export const EXPAND_BASE_PROMPT = "Continue the scene naturally into the new area";
-export const EXPAND_NEEDS_ENGINE = "Expanding needs the picture editor engine. Turn it on in Settings, AI and models, then try again.";
+export const EXPAND_NEEDS_ENGINE = "Making a picture wider or taller needs a picture model that can fill just the new area. The model on this computer cannot do that yet.";
 export const EXPAND_SAME_SHAPE = "That picture is already that shape. Choose a different shape.";
 
 export interface ExpandLimits { maxSide?: number; maxMegapixels?: number; step?: number }

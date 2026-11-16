@@ -7,6 +7,7 @@ import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
+import { PICTURE_MODEL } from "./quality";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -131,6 +132,9 @@ export async function submitGeneration(body: GenerationBody): Promise<{ job: str
 
 /** Submits a described edit (POST /v1/images/edits operation edit or edit_masked). The picture and mask ride as files. */
 export async function submitEdit(form: FormData): Promise<{ job: string }> {
+  // The Stack routes an edit that names no model to its own edit default, which can be a removed model (measured 2026-11-16: "no picture
+  // model is installed" with MiniMax installed). Every Home edit names the one picture model unless the caller already named one.
+  if (!form.has("model")) form.set("model", PICTURE_MODEL);
   const res = await request("/v1/images/edits", { method: "POST", body: form, timeoutMs: 30_000 });
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("image");

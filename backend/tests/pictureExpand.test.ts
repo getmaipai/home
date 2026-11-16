@@ -145,7 +145,7 @@ describe("the expand operation", () => {
     expect(rows.find((row) => row.id === "picture.expand")).toMatchObject({ enabled: false, reason: EXPAND_NEEDS_ENGINE });
     const res = await run(sage, "picture.expand", { file_id: file.id, args: { shape: "16:9" } });
     expect(res.status).toBe(503);
-    expect(((await res.json()) as { error: string }).error).toBe("Expanding needs the picture editor engine. Turn it on in Settings, AI and models, then try again.");
+    expect(((await res.json()) as { error: string }).error).toBe("Making a picture wider or taller needs a picture model that can fill just the new area. The model on this computer cannot do that yet.");
     expect(sent).toHaveLength(0);
     expect(db.select().from(attachments).all()).toHaveLength(1);
   });

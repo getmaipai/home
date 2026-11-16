@@ -12,7 +12,7 @@ import { adultStylesAllowed, householdAllowsAdults, householdPictureQuality } fr
 import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } from "@/lib/pictures/lane";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { detailedReady } from "@/lib/pictures/quality";
-import { dropPictureStatusCache } from "@/lib/pictures/ready";
+import { dropPictureStatusCache, pictureEngineEdits } from "@/lib/pictures/ready";
 import { pictureStyleAccess } from "@/lib/styleLock";
 import type { PersonRow } from "@/types";
 import { db } from "@/db";
@@ -93,7 +93,7 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
     engine: {
       state: status?.state ?? "unsupported", available: status?.available ?? false,
       reason: status ? status.reason : "The picture engine isn't answering. Check that the engine is running, then reload this page.",
-      default_model: status?.default_model ?? null, edit_ready: Boolean(status?.edit?.generative),
+      default_model: status?.default_model ?? null, edit_ready: pictureEngineEdits(status),
       models: (status?.models ?? []).map((m) => ({ id: m.id, label: m.label ?? m.id, installed: m.installed, available: m.available ?? true, licence: m.licence ?? "", edit: Boolean(m.edit), peak_gb: m.peak_gb ?? null, remaining_bytes: m.install?.remaining_bytes ?? 0 })),
       remaining_bytes: status?.install?.remaining_bytes ?? 0,
     },

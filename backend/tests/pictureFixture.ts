@@ -72,7 +72,13 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
     if (method === "POST" && path === "/v1/images/edits") {
       const form = init?.body as FormData;
       const body: Record<string, unknown> = { edit: true };
-      for (const [key, value] of form.entries()) body[key] = typeof value === "string" ? value : `file:${(value as File).size}`;
+      // The Stack's multipart schema takes each field once (`reference`, `reference2`): a repeated field is a 422 there (found on the real engine, 2026-11-16).
+      const seen = new Set<string>();
+      for (const [key, value] of form.entries()) {
+        if (seen.has(key)) return json({ error: `${key}: Invalid input: a field may appear only once` , code: "invalid_request" }, 422);
+        seen.add(key);
+        body[key] = typeof value === "string" ? value : `file:${(value as File).size}`;
+      }
       fake.edits.push(body);
       if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
       const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body: { ...body, n: 1 }, polls: 0, state: "queued", deleted: false };

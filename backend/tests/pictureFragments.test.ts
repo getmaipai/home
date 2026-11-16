@@ -91,10 +91,10 @@ describe("the Images Create page", () => {
     expect(page.ok).toBe(true);
     const bar = JSON.stringify(page.ok ? page.value : {});
     const node = (JSON.parse(bar).body as Array<Record<string, any>>).find((n) => n.type === "prompt_bar")!;
-    const presets = node.chips.filter((c: { state: string }) => !["shape", "count"].includes(c.state));
+    const presets = node.chips.filter((c: { state: string }) => !["shape", "count", "set", "template"].includes(c.state));
     expect(presets.every((c: { group: string }) => c.group === "Style")).toBe(true);
     expect(presets.map((c: { state: string }) => c.state)).toEqual(["look_art", "look_story", "look_portrait", "look_product", "look_other", "light", "angle", "format"]);
-    expect(node.chips.length).toBeLessThanOrEqual(10);
+    expect(node.chips.length).toBeLessThanOrEqual(12); // shape, count, set, template and the 8 presets
     expect(presets.every((c: { options: unknown[] }) => c.options.length <= 24)).toBe(true);
     const args = node.submit.call.args as Record<string, unknown>;
     expect(Object.keys(args).filter((key) => presets.some((c: { state: string }) => c.state === key)).sort()).toEqual(presets.map((c: { state: string }) => c.state).sort());

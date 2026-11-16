@@ -16,7 +16,7 @@ import { composePicturePrompt, resolvePicks } from "@/lib/media/pictureFragments
 import { PICTURE_COVERAGE } from "./coverage";
 import { EXPAND_BASE_PROMPT, EXPAND_SHAPES } from "@/lib/pictures/expand";
 import { COMBINE_EXTRAS_LINE, COMBINE_NEEDS_ONE_LINE, combineInstruction, combinePictureLimit } from "@/lib/pictures/combine";
-import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { pictureEngineStatus, pictureEngineStatusPatient } from "@/lib/pictures/ready";
 import { startNextShot } from "@/lib/pictures/nextShot";
 
 const empty = z.object({});
@@ -219,7 +219,7 @@ registerMediaOp({
       : value;
     const chosen = args.references.map(asRef).filter((reference) => reference.id !== "" && reference.id !== chat.id);
     if (chosen.length < 1) throw new ImageEditError(422, COMBINE_NEEDS_ONE_LINE, "combine_needs_picture");
-    const limit = combinePictureLimit(await pictureEngineStatus().catch(() => null)) - 1;
+    const limit = combinePictureLimit(await pictureEngineStatusPatient()) - 1;
     const used = chosen.slice(0, limit);
     const result = await startComment(actor, chat.conversationId, chat.id, { prompt: combineInstruction(used.length + 1, args.words), references: used });
     const note = chosen.length > used.length ? { note: COMBINE_EXTRAS_LINE } : {};

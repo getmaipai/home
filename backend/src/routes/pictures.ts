@@ -15,7 +15,7 @@ import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { getLoraRecord } from "@/lib/loras/store";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
-import { chooseQuality, detailedReady, isPictureQuality, PICTURE_MODEL, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
+import { chooseQuality, detailedReady, isPictureQuality, PICTURE_MODEL, plainPrompt, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
@@ -133,7 +133,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.find((j) => j.state === "queued" || j.state === "running") ?? null;
   const last = jobs[jobs.length - 1]!;
-  const alt = root.prompt.replace(/\s+/g, " ").trim().slice(0, 200);
+  const alt = plainPrompt(root.prompt).slice(0, 200);
   const files = jobs.flatMap((j) => j.state === "done" ? j.files.map((f) => ({ id: f.id, url: fileUrl(j, f), width: f.width, height: f.height, seed: f.seed, model: kid ? null : f.model, steps: kid ? null : f.steps, ms: f.ms, alt })) : []);
   const shown = active ?? last;
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;

@@ -248,6 +248,29 @@ describe("USE-AS-REFERENCE: how many reference pictures a call keeps", () => {
   });
 });
 
+describe("references sent to the Stack", () => {
+  test("three pictures go as image, reference and reference2, each field once, each with its own source", async () => {
+    const { __setPictureStatusForTests, readyStatusForTests } = await import("@/lib/pictures/ready");
+    __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 2 } }));
+    try {
+      const refs = [file(owner, await png()), file(owner, await png()), file(owner, await png())];
+      const read = readPictureMakeBody({ prompt: "a boat at sunset", references: refs.map((ref) => ref.id) });
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+      const made = await makePictureFor(owner, read.body);
+      expect(made.ok).toBe(true);
+      await until(() => fake.edits.length > 0);
+      const sent = fake.edits[0]!;
+      expect(Object.keys(sent).filter((key) => /^(image|reference\d*)$/.test(key))).toEqual(["image", "reference", "reference2"]);
+      expect(sent.reference_source).toBeDefined();
+      expect(sent.reference2_source).toBeDefined();
+      expect(sent.reference3).toBeUndefined();
+      // An edit that names no model reaches the Stack's own edit default, which is a removed model: Home always names the one picture model.
+      expect(sent.model).toBe("minimax-h3-image");
+    } finally { __setPictureStatusForTests(undefined); }
+  });
+});
+
 describe("USE-AS-REFERENCE: the chat tool says how many references it takes", () => {
   test("generate_image offers references and says up to 3", async () => {
     const manifest = JSON.parse(await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text()) as { args: { properties: Record<string, { type: string; maxItems?: number; description?: string }> } };

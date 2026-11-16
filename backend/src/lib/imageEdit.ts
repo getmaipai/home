@@ -44,7 +44,7 @@ import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, attachKid, kidLaneOn, laneOf, r
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
-import { pictureEngineReferences, pictureEngineStatus } from "@/lib/pictures/ready";
+import { pictureEngineEdits, pictureEngineReferences, pictureEngineStatus, pictureEngineStatusPatient } from "@/lib/pictures/ready";
 import { EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, planExpand, type ExpandShape } from "@/lib/pictures/expand";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
@@ -110,7 +110,7 @@ async function commentState(actor: PersonRow): Promise<EditToolState> {
   if (denial) return { enabled: false, reason: PICTURE_DENIAL_LINE[denial] };
   if (imageEngineForTests !== undefined) return imageEngineForTests ? { enabled: true } : { enabled: false, reason: COMMENT_NOT_SET_UP };
   const status = await pictureEngineStatus().catch(() => null);
-  if (status?.edit?.generative && status.available !== false) return { enabled: true };
+  if (pictureEngineEdits(status)) return { enabled: true };
   return { enabled: false, reason: COMMENT_NOT_SET_UP };
 }
 
@@ -365,7 +365,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 interface Preview { level?: ClearerLevel; token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
-interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; /** Make clearer: the level, so the Best result is face-checked before it is kept. */ level?: ClearerLevel; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
+interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; /** Make clearer: the level, so the Best result is face-checked before it is kept. */ level?: ClearerLevel; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; audience?: "all-ages" | "adult-only"; /** A hash of the words, for the safety log; never the words. */ promptHash?: string; }
 const jobs = new Map<string, EditJob>();
 
 /**
@@ -795,7 +795,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   let audience: "all-ages" | "adult-only" = source.audience ?? "all-ages";
   const referenceFields = ["reference", "reference2", "reference3", "reference4", "reference5"] as const;
   if (referenceRefs.length) {
-    const status = await pictureEngineStatus().catch(() => null);
+    const status = await pictureEngineStatusPatient();
     const limit = pictureEngineReferences(status);
     const supportedCount = Math.min(limit, referenceFields.length);
     if (referenceRefs.length > supportedCount) throw new ImageEditError(supportedCount === 0 ? 503 : 422, "Using a second picture needs an update first. Ask an admin to update Home.", "references_unsupported");
