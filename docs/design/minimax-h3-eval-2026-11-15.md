@@ -147,7 +147,10 @@ Standard video cap question from section 6 of the audit report goes away if H3 s
 ## 5. Owner ruling and build rows (2026-11-15)
 
 Jesse, after watching the four clips and the compare page: "Yes, both." Clip 4 (8-bit, 25 steps) fixes the lips, and the pictures earn
-the slot. Rows for `docs/BACKLOG.md` (Stack first, then Home; no fix brief from the audit is needed before these):
+the slot. His one condition on video (same evening): **"video is soft, needs upscaling or sharpening."** The open weights stop at 768 px on
+the short side and MiniMax's own 2K step is hosted only, so the Stack's existing frame-by-frame upscale (Real-ESRGAN x4v3 through the
+`media.edit` upscale op, the same tool the Picture editor uses) runs after every H3 clip as part of the job, to 1728 by 960 or 1920 by
+1080, and the slot is judged on the upscaled clip. SeedVR2 (the "Best" clearer) on video is a separate bench if Real-ESRGAN is not enough. Rows for `docs/BACKLOG.md` (Stack first, then Home; no fix brief from the audit is needed before these):
 
 - **H3-IMAGE-STACK-01 (Stack, M):** a `minimax-h3-image` family on the `h3-image-mlx` runtime (0.1.0a8 pinned, Apache-2.0 code; the
   INT8 ConvRot weights from `Comfy-Org/MiniMax-H3-Image` at `b8ebf14`, 49.3 GB, pinned and hashed), serving `/v1/images/generations` and
