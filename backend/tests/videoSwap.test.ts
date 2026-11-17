@@ -60,6 +60,13 @@ describe("Stack swap", () => {
     __setSwapFetchForTests((async () => new Response(JSON.stringify({ error: "Not enough free memory for a face swap right now. Try again when nothing else is being made.", code: "no_memory" }), { status: 503 })) as unknown as typeof fetch);
     expect(await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 2.33 })).toMatchObject({ ok: false, line: expect.stringContaining("Not enough free memory") });
   });
+  test("a swap that only ever waited for its turn says memory is short, not that the clip was too long", async () => {
+    const source = join(mkdtempSync(join(tmpdir(), "swap-test-")), "source.mp4"); writeFileSync(source, new Uint8Array([1]));
+    __setSwapFetchForTests((async (_i: unknown, init?: RequestInit) => (init?.method ?? "GET") === "POST" ? new Response(JSON.stringify({ created: 1, job: "j", state: "queued" })) : new Response(JSON.stringify({ job: "j", state: "queued", progress: 0, status: "Waiting for its turn" }))) as unknown as typeof fetch);
+    const result = await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 2.33 });
+    expect(result).toMatchObject({ ok: false, code: "timeout", line: expect.stringContaining("not enough free memory") });
+    expect(JSON.stringify(result)).not.toContain("shorter clip");
+  });
   test("maps a route 404 to the plain unavailable line", async () => { const source = join(mkdtempSync(join(tmpdir(), "swap-test-")), "source.mp4"); writeFileSync(source, new Uint8Array([1])); __setSwapFetchForTests((async () => new Response("{}", { status: 404 })) as unknown as typeof fetch); expect(await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 1 })).toMatchObject({ ok: false, line: "Swapping a face is not available on this computer yet." }); });
 });
 

@@ -5,6 +5,7 @@ import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 import { stageClipForStack, type StackEditResult } from "./stackEdit";
 
+const NO_MEMORY = "I couldn't change that video. There is not enough free memory for a swap right now. Try again when chat and other creating are idle.";
 const NOT_READY = "Swapping a face is not available on this computer yet.";
 const MAX_RESULT_BYTES = 1024 * 1024 * 1024;
 const http = createStackHttp({ makeError: (status, code, message) => Object.assign(new Error(message), { status, code }), noStackMessage: NOT_READY, unreachableMessage: NOT_READY, timeoutMs: 30_000 });
@@ -37,12 +38,14 @@ export async function runStackSwap(input: StackSwapRequest): Promise<StackEditRe
     // The route answers at once with the job and its state; progress is read from GET /v1/videos/swap/{job} until done, failed or cancelled.
     let status: { state: string; progress?: number; status?: string | null; error?: unknown } = { state: String(submitted.state ?? "running") };
     const deadline = Date.now() + deadlineMs;
+    let neverStarted = true; // true while the Stack has only said it is waiting for its turn (it holds a swap until enough memory is free)
     while (["queued", "running", "stalled"].includes(status.state)) {
       if (input.signal?.aborted) { cancel(); return { ok: false, code: "cancelled", line: "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." }; }
-      if (Date.now() > deadline) { cancel(); return { ok: false, code: "timeout", line: "I couldn't change that video. It took longer than expected. Try again with a shorter clip." }; }
+      if (Date.now() > deadline) { cancel(); return { ok: false, code: "timeout", line: neverStarted ? NO_MEMORY : "I couldn't change that video. It took longer than expected. Try again with a shorter clip." }; }
       await sleep(pollMs, input.signal); if (input.signal?.aborted) continue;
       res = await http.request(`/v1/videos/swap/${encodeURIComponent(jobId)}`, { method: "GET", signal: input.signal }); if (!res.ok) await failure(res);
       status = await res.json() as typeof status;
+      if (status.state === "running" && (Number(status.progress) > 0 || !/wait/i.test(String(status.status ?? "")))) neverStarted = false;
       input.onProgress?.(Math.max(0, Math.min(100, Number(status.progress) || 0)), plain(status.status) ?? undefined);
     }
     if (status.state !== "done") return { ok: false, code: "failed", line: plain(status.error) ?? "I couldn't change that video. The edit did not finish. Try again, or change what you asked for." };
