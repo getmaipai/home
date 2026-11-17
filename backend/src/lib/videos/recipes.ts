@@ -81,17 +81,22 @@ export function withVideoVoices(prompt: string, voices: VideoVoices | null): str
 }
 
 // VIDEO-UI-11 (docs/design/video-create-feel-2026-11-02.md item 1): the "Try this" rail on the Create page. One tile is a ready-made idea: words plus a Look and a
-// Camera move from the two lists above. A press only refills the panel (it starts nothing). `poster` is one of the 13 loops; its poster JPEG sits beside the
-// mp4 (made by scripts/video-posters.swift). Plain scenes only: no real person, no brand, no character from a film.
-export interface VideoShowcase { id: string; title: string; prompt: string; look: string; camera: string; /** The loop whose poster is the tile's picture. */ poster: string }
+// Camera move from the two lists above. A press only refills the panel (it starts nothing). `poster` is the tile's own clip, `showcase/<id>.mp4`, made from showcaseClipPrompt(tile) with the video model; its poster JPEG sits beside it. Plain scenes only: no real person, no brand, no character from a film.
+export interface VideoShowcase { id: string; title: string; prompt: string; look: string; camera: string; /** The tile's own clip (path inside the package's `assets/`). */ poster: string }
 
 export const VIDEO_SHOWCASE: readonly VideoShowcase[] = [
-  { id: "paper-boat-anime", title: "Paper boat", prompt: "A paper boat floats down a rainy street, soft evening light", look: "anime", camera: "dolly-in", poster: "loops/anime.mp4" },
-  { id: "valley-aerial", title: "Valley sunrise", prompt: "Sunrise over a misty green valley, birds crossing the sky", look: "natural", camera: "aerial", poster: "loops/aerial.mp4" },
-  { id: "cabin-orbit", title: "Snowy cabin", prompt: "A small cabin in falling snow, warm light glowing in the windows", look: "3d-animated", camera: "slow-orbit", poster: "loops/3d-animated.mp4" },
-  { id: "morning-cartoon", title: "Cartoon morning", prompt: "A cheerful cartoon fox chases a paper plane across a sunny backyard", look: "classic-cartoon", camera: "none", poster: "loops/classic-cartoon.mp4" },
-  { id: "lighthouse-film", title: "Lighthouse", prompt: "A lighthouse on a rocky coast at dusk, waves rolling in, the lamp turning on", look: "film", camera: "handheld", poster: "loops/film.mp4" },
-  { id: "city-time-lapse", title: "City waking", prompt: "A city street from dawn to morning, traffic and light building up", look: "natural", camera: "time-lapse", poster: "loops/time-lapse.mp4" },
-  { id: "splash-slow", title: "Slow splash", prompt: "A water balloon bursts on a sunny lawn, drops flying everywhere", look: "natural", camera: "slow-motion", poster: "loops/slow-motion.mp4" },
-  { id: "raindrop-close", title: "Raindrop", prompt: "A single raindrop rolls along a green leaf, then falls", look: "natural", camera: "close-up", poster: "loops/close-up.mp4" },
+  { id: "paper-boat-anime", title: "Paper boat", prompt: "A paper boat floats down a rainy street, soft evening light", look: "anime", camera: "dolly-in", poster: "showcase/paper-boat-anime.mp4" },
+  { id: "valley-aerial", title: "Valley sunrise", prompt: "Sunrise over a misty green valley, birds crossing the sky", look: "natural", camera: "aerial", poster: "showcase/valley-aerial.mp4" },
+  { id: "cabin-orbit", title: "Snowy cabin", prompt: "A small cabin in falling snow, warm light glowing in the windows", look: "3d-animated", camera: "slow-orbit", poster: "showcase/cabin-orbit.mp4" },
+  { id: "morning-cartoon", title: "Cartoon morning", prompt: "A cheerful cartoon fox chases a paper plane across a sunny backyard", look: "classic-cartoon", camera: "none", poster: "showcase/morning-cartoon.mp4" },
+  { id: "lighthouse-film", title: "Lighthouse", prompt: "A lighthouse on a rocky coast at dusk, waves rolling in, the lamp turning on", look: "film", camera: "handheld", poster: "showcase/lighthouse-film.mp4" },
+  { id: "city-time-lapse", title: "City waking", prompt: "A city street from dawn to morning, traffic and light building up", look: "natural", camera: "time-lapse", poster: "showcase/city-time-lapse.mp4" },
+  { id: "splash-slow", title: "Slow splash", prompt: "A water balloon bursts on a sunny lawn, drops flying everywhere", look: "natural", camera: "slow-motion", poster: "showcase/splash-slow.mp4" },
+  { id: "raindrop-close", title: "Raindrop", prompt: "A single raindrop rolls along a green leaf, then falls", look: "natural", camera: "close-up", poster: "showcase/raindrop-close.mp4" },
 ];
+
+/** The words a showcase clip was made from: exactly what the Create panel sends when its Look and Camera chips are set to the tile's. showcase-sources.json records the sha256 of this
+ * string and of the mp4 each tile shows, so a clip made from other words, a shared clip or a missing one fails backend/tests/videoShowcase.test.ts. */
+export function showcaseClipPrompt(tile: Pick<VideoShowcase, "prompt" | "look" | "camera">): string {
+  return withVideoRecipe(withVideoLook(tile.prompt, videoLookFor(tile.look)), videoRecipeFor(tile.camera));
+}
