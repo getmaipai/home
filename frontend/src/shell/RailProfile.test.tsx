@@ -15,7 +15,7 @@ const degradedChat = [{
 }];
 
 function person(role: Roster["role"]): Roster {
-  return { id: `person-${role}`, display_name: "Juniper", nickname: null, role, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1:0:t", hasSecret: false, age_band: role === "child" ? "child" : "adult" } as unknown as Roster;
+  return { id: `person-${role}`, display_name: "Juniper", nickname: null, role, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1:0:t", hasSecret: false, age_band: role === "child" ? "child" : "adult" } as unknown as Roster;
 }
 
 function renderProfile(role: Roster["role"]) {

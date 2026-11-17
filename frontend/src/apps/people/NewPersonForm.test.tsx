@@ -11,6 +11,24 @@ function renderForm(actorRole: Role, onSubmit = mock(() => {})) {
 }
 
 describe("NewPersonForm", () => {
+  test("Guest shows Teen controls by default and submits the choice; Adult does not send controls", () => {
+    const guest = renderForm("owner");
+    fireEvent.change(guest.getByLabelText("Name"), { target: { value: "Visitor" } });
+    fireEvent.click(guest.getByRole("combobox", { name: "Role" }));
+    fireEvent.click(guest.getByRole("option", { name: "Guest" }));
+    expect(guest.getByRole("combobox", { name: "Controls" }).textContent).toContain("Teen controls");
+    expect(guest.getByRole("combobox", { name: "Controls" }).id).toBe("new-person-controls");
+    fireEvent.submit(guest.getByLabelText("Name").closest("form")!);
+    expect(guest.onSubmit).toHaveBeenCalledWith({ displayName: "Visitor", role: "guest", controls: "teen" });
+    guest.unmount();
+
+    const adult = renderForm("owner");
+    fireEvent.change(adult.getByLabelText("Name"), { target: { value: "Avery" } });
+    fireEvent.submit(adult.getByLabelText("Name").closest("form")!);
+    expect(adult.queryByLabelText("Controls")).toBeNull();
+    expect(adult.onSubmit).toHaveBeenCalledWith({ displayName: "Avery", role: "adult", secret: "" });
+  });
+
   test("Child, Teen and Adult submit with only role as the age signal", () => {
     for (const [label, role] of [["Child", "child"], ["Teen", "teen"], ["Adult", "adult"]] as const) {
       const view = renderForm("owner");

@@ -82,6 +82,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     toast: true,
   },
   {
+    id: "people.guests_without_controls",
+    level: "passive",
+    audience: "admins",
+    template: "Guests with no controls chosen: {count}. They are on child controls until you choose. Check them in Settings, Users.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
+  {
     id: "engines.chat_engine_changed",
     level: "passive",
     audience: "admins",

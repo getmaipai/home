@@ -200,7 +200,7 @@ function operator(): Roster {
   return {
     id: "person-sage", display_name: "Sage", nickname: null, role: "owner", avatar_seed: "person-sage", source: "hub", local_only: false,
     created_at: "2026-09-29T00:00:00.000Z", updated_at: "2026-09-29T00:00:00.000Z", deleted_at: null, enabled: true,
-    guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true,
+    guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true,
   };
 }
 

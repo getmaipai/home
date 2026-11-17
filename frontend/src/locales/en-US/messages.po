@@ -243,17 +243,17 @@ msgid "{count, plural, one {# face sample saved.} other {# face samples saved.}}
 msgstr "{count, plural, one {# face sample saved.} other {# face samples saved.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:475
+#: src/apps/settings/UsersSection.tsx:476
 msgid "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}"
 msgstr "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:476
+#: src/apps/settings/UsersSection.tsx:477
 msgid "{count, plural, one {# file only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.} other {# files only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.}}"
 msgstr "{count, plural, one {# file only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.} other {# files only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:479
+#: src/apps/settings/UsersSection.tsx:480
 msgid "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}"
 msgstr "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}"
 
@@ -389,7 +389,7 @@ msgid "{count, plural, one {Make a sound} other {Make # sounds}}"
 msgstr "{count, plural, one {Make a sound} other {Make # sounds}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:255
+#: src/apps/settings/UsersSection.tsx:256
 msgid "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}"
 msgstr "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}"
 
@@ -1115,6 +1115,11 @@ msgid "{name} will be closed when a big job needs room."
 msgstr "{name} will be closed when a big job needs room."
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:235
+msgid "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time."
+msgstr "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:65
 msgid "{name} will no longer be closed."
 msgstr "{name} will no longer be closed."
@@ -1186,7 +1191,7 @@ msgid "{names} and {last}"
 msgstr "{names} and {last}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:208
+#: src/apps/settings/UsersSection.tsx:209
 msgid "{names} could not be removed: {reason}"
 msgstr "{names} could not be removed: {reason}"
 
@@ -1898,7 +1903,7 @@ msgid "setting.robot.face.color.option.lavender"
 msgstr "A light purple."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:174
+#: src/apps/people/ProfileForm.tsx:195
 msgid "A line about you"
 msgstr "A line about you"
 
@@ -2131,8 +2136,8 @@ msgid "About your address"
 msgstr "About your address"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:180
-#: src/apps/people/ProfileForm.tsx:182
+#: src/apps/people/ProfileForm.tsx:201
+#: src/apps/people/ProfileForm.tsx:203
 msgid "Accent color"
 msgstr "Accent color"
 
@@ -2382,7 +2387,7 @@ msgid "Add Score transcription under Settings, AI and models"
 msgstr "Add Score transcription under Settings, AI and models"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:447
+#: src/apps/settings/UsersSection.tsx:448
 msgid "Add someone"
 msgstr "Add someone"
 
@@ -2425,7 +2430,7 @@ msgid "Add to a song"
 msgstr "Add to a song"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:448
+#: src/apps/settings/UsersSection.tsx:449
 msgid "Add to household"
 msgstr "Add to household"
 
@@ -2502,7 +2507,7 @@ msgid "Adding your song…"
 msgstr "Adding your song…"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:141
+#: src/apps/people/NewPersonForm.tsx:154
 #: src/apps/settings/styles/StyleAddFile.tsx:68
 msgid "Adding…"
 msgstr "Adding…"
@@ -2543,7 +2548,7 @@ msgid "setting.news.feeds.teen.does"
 msgstr "Adds feed addresses to the shelf on top of the checked lists."
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:114
+#: src/apps/people/NewPersonForm.tsx:127
 #: src/apps/people/roles.ts:11
 msgid "Admin"
 msgstr "Admin"
@@ -2584,6 +2589,8 @@ msgid "Adult answers. Any companion can be chosen."
 msgstr "Adult answers. Any companion can be chosen."
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:115
+#: src/apps/people/ProfileForm.tsx:215
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Adult controls"
 msgstr "Adult controls"
@@ -2786,12 +2793,12 @@ msgid "setting.companions.allowed.help"
 msgstr "AI companions are on for everyone unless an admin turns them off for the household or for one person. Turning this off hides companions and keeps their data."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:360
+#: src/apps/settings/UsersSection.tsx:361
 msgid "AI companions for {name}"
 msgstr "AI companions for {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:234
+#: src/apps/settings/UsersSection.tsx:235
 msgid "AI companions for everyone"
 msgstr "AI companions for everyone"
 
@@ -3645,9 +3652,9 @@ msgid "Ask a parent to choose your voice."
 msgstr "Ask a parent to choose your voice."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:170
-#: src/apps/people/ProfileForm.tsx:177
-#: src/apps/people/ProfileForm.tsx:185
+#: src/apps/people/ProfileForm.tsx:191
+#: src/apps/people/ProfileForm.tsx:198
+#: src/apps/people/ProfileForm.tsx:206
 msgid "Ask an admin to change this."
 msgstr "Ask an admin to change this."
 
@@ -4271,12 +4278,12 @@ msgid "setting.tts.voice_id.option_label.bill_boerst"
 msgstr "Bill Boerst"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:173
+#: src/apps/people/ProfileForm.tsx:194
 msgid "Bio"
 msgstr "Bio"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:176
+#: src/apps/people/ProfileForm.tsx:197
 msgid "Bio must be 160 characters or less."
 msgstr "Bio must be 160 characters or less."
 
@@ -4724,8 +4731,8 @@ msgstr "Can someone reach into your house?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:278
-#: src/apps/people/ProfileForm.tsx:191
-#: src/apps/people/ProfileForm.tsx:196
+#: src/apps/people/ProfileForm.tsx:223
+#: src/apps/people/ProfileForm.tsx:228
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
 #: src/apps/settings/AddVoiceForm.tsx:120
@@ -4741,8 +4748,8 @@ msgstr "Can someone reach into your house?"
 #: src/apps/settings/styles/StyleAddFile.tsx:68
 #: src/apps/settings/styles/StyleConfirm.tsx:143
 #: src/apps/settings/styles/StylesTab.tsx:160
-#: src/apps/settings/UsersSection.tsx:372
-#: src/apps/settings/UsersSection.tsx:455
+#: src/apps/settings/UsersSection.tsx:373
+#: src/apps/settings/UsersSection.tsx:456
 #: src/apps/settings/VoiceManagerSection.tsx:151
 #: src/apps/settings/VoiceManagerSection.tsx:164
 #: src/apps/setup/SetupReviewPage.tsx:67
@@ -5517,6 +5524,8 @@ msgid "Child"
 msgstr "Child"
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:115
+#: src/apps/people/ProfileForm.tsx:213
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Child controls"
 msgstr "Child controls"
@@ -6568,7 +6577,7 @@ msgid "Confirm"
 msgstr "Confirm"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:128
+#: src/apps/people/NewPersonForm.tsx:141
 msgid "Confirm passcode"
 msgstr "Confirm passcode"
 
@@ -6679,6 +6688,10 @@ msgid "Control a smart-home device"
 msgstr "Control a smart-home device"
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:113
+#: src/apps/people/NewPersonForm.tsx:114
+#: src/apps/people/ProfileForm.tsx:209
+#: src/apps/people/ProfileForm.tsx:211
 #: src/apps/settings/RobotCompanionChoices.tsx:57
 #: src/apps/settings/RobotCompanionChoices.tsx:58
 msgid "Controls"
@@ -6807,7 +6820,7 @@ msgid "setting.tts.voice_id.option_label.cosette"
 msgstr "Cosette"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:123
+#: src/apps/settings/UsersSection.tsx:124
 msgid "Could not add that person."
 msgstr "Could not add that person."
 
@@ -6908,7 +6921,7 @@ msgid "Could not change who may hear that memory. Check your connection and try 
 msgstr "Could not change who may hear that memory. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:333
+#: src/apps/settings/UsersSection.tsx:334
 msgid "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them."
 msgstr "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them."
 
@@ -7127,7 +7140,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "Could not load conversations. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:163
+#: src/shell/pages/PersonProfilePage.tsx:164
 msgid "Could not load creations."
 msgstr "Could not load creations."
 
@@ -7252,7 +7265,7 @@ msgid "Could not load the household"
 msgstr "Could not load the household"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:228
+#: src/apps/settings/UsersSection.tsx:229
 #: src/shell/pages/FamilyPage.tsx:42
 #: src/shell/pages/PersonProfilePage.tsx:57
 msgid "Could not load the household."
@@ -7344,7 +7357,7 @@ msgid "Could not load voices. Try again."
 msgstr "Could not load voices. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:147
+#: src/shell/pages/PersonProfilePage.tsx:148
 msgid "Could not load what's been shared."
 msgstr "Could not load what's been shared."
 
@@ -7514,7 +7527,7 @@ msgid "Could not remove it."
 msgstr "Could not remove it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:191
+#: src/apps/settings/UsersSection.tsx:192
 msgid "Could not remove that person."
 msgstr "Could not remove that person."
 
@@ -7534,7 +7547,7 @@ msgid "Could not remove this synth. Check your connection and try again."
 msgstr "Could not remove this synth. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:213
+#: src/apps/settings/UsersSection.tsx:214
 msgid "Could not remove those people."
 msgstr "Could not remove those people."
 
@@ -7641,8 +7654,8 @@ msgid "Could not save that token."
 msgstr "Could not save that token."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:137
-#: src/apps/settings/UsersSection.tsx:151
+#: src/apps/settings/UsersSection.tsx:138
+#: src/apps/settings/UsersSection.tsx:152
 msgid "Could not save the AI companions setting."
 msgstr "Could not save the AI companions setting."
 
@@ -7700,12 +7713,12 @@ msgid "Could not save this. Check your connection and try again."
 msgstr "Could not save this. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:177
+#: src/apps/settings/UsersSection.tsx:178
 msgid "Could not save those changes."
 msgstr "Could not save those changes."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:157
+#: src/apps/people/ProfileForm.tsx:168
 msgid "Could not save those changes. Check your connection and try again."
 msgstr "Could not save those changes. Check your connection and try again."
 
@@ -8007,7 +8020,7 @@ msgid "Creating…"
 msgstr "Creating…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:173
+#: src/shell/pages/PersonProfilePage.tsx:174
 msgid "Creations"
 msgstr "Creations"
 
@@ -8163,7 +8176,7 @@ msgid "setting.allowance.robot_body.daily_minutes.label"
 msgstr "Daily Robot body minutes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:117
+#: src/shell/pages/PersonProfilePage.tsx:118
 msgid "Daily time limits for {name}."
 msgstr "Daily time limits for {name}."
 
@@ -8910,7 +8923,7 @@ msgid "Download {label}"
 msgstr "Download {label}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:483
+#: src/apps/settings/UsersSection.tsx:484
 msgid "Download {name}'s files"
 msgstr "Download {name}'s files"
 
@@ -9140,7 +9153,7 @@ msgid "Edit {level}: {title}"
 msgstr "Edit {level}: {title}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:405
+#: src/apps/settings/UsersSection.tsx:406
 #: src/shell/pages/ProjectsPage.tsx:200
 msgid "Edit {name}"
 msgstr "Edit {name}"
@@ -9181,8 +9194,8 @@ msgid "Edit keyframe: {label}"
 msgstr "Edit keyframe: {label}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:205
-#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:206
+#: src/shell/pages/PersonProfilePage.tsx:206
 msgid "Edit profile"
 msgstr "Edit profile"
 
@@ -9404,7 +9417,7 @@ msgid "api.error.display_name_length"
 msgstr "Enter a name from 1 to 80 characters."
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:120
+#: src/apps/people/NewPersonForm.tsx:133
 msgid "Enter a PIN or password"
 msgstr "Enter a PIN or password"
 
@@ -9674,12 +9687,12 @@ msgid "Everything looks ready."
 msgstr "Everything looks ready."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:329
+#: src/apps/settings/UsersSection.tsx:330
 msgid "Everything MaiPai remembers about {display_name}, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone."
 msgstr "Everything MaiPai remembers about {display_name}, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:257
+#: src/apps/settings/UsersSection.tsx:258
 msgid "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone."
 msgstr "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone."
 
@@ -10365,6 +10378,16 @@ msgid "failure.tool.found_nothing.verb"
 msgstr "found nothing"
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:120
+msgid "Frank answers on every subject. Replies are still checked as they arrive and crisis help is always offered."
+msgstr "Frank answers on every subject. Replies are still checked as they arrive and crisis help is always offered."
+
+#. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:119
+msgid "Frank answers on most subjects, still no adult content, replies checked."
+msgstr "Frank answers on most subjects, still no adult content, replies checked."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:151
 msgid "Free for jobs: {gb} GB"
 msgstr "Free for jobs: {gb} GB"
@@ -10771,6 +10794,16 @@ msgstr "Giovanni"
 #: src/lib/settingCopy.generated.ts:139
 msgid "setting.coding.person.git_hosts.label"
 msgstr "Git hosts"
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:239
+msgid "Give {level} controls"
+msgstr "Give {level} controls"
+
+#. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:234
+msgid "Give {name} {level} controls?"
+msgstr "Give {name} {level} controls?"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:121
@@ -12038,7 +12071,7 @@ msgid "area.Household"
 msgstr "Household"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:276
+#: src/apps/settings/UsersSection.tsx:277
 msgid "Household"
 msgstr "Household"
 
@@ -12183,7 +12216,7 @@ msgid "setting.robot.volume.help"
 msgstr "How loud this robot speaks by default, from 20 to 100 percent. You can also tell it 'volume to 60'. At night it plays quieter and goes back to this level in the morning."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:127
+#: src/shell/pages/PersonProfilePage.tsx:128
 msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 msgstr "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 
@@ -13238,6 +13271,11 @@ msgid "setting.coding.home_mode.option.normal"
 msgstr "Keep chat and pictures running as usual."
 
 #. js-lingui-explicit-id
+#: src/apps/people/ProfileForm.tsx:238
+msgid "Keep current controls"
+msgstr "Keep current controls"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1303
 msgid "setting.storage.library.trash_days.help"
 msgstr "Keep deleted file links for this many days. This takes effect when Library Trash is ready."
@@ -13348,8 +13386,8 @@ msgstr "Keep the voice"
 #: src/apps/memory/PersonMemories.tsx:428
 #: src/apps/memory/PersonMemories.tsx:449
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
-#: src/apps/settings/UsersSection.tsx:267
-#: src/apps/settings/UsersSection.tsx:390
+#: src/apps/settings/UsersSection.tsx:268
+#: src/apps/settings/UsersSection.tsx:391
 #: src/shell/library/LibraryTrash.tsx:28
 msgid "Keep them"
 msgstr "Keep them"
@@ -13836,9 +13874,9 @@ msgid "setting.person.quiet_hours.to.help"
 msgstr "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:70
-#: src/apps/people/ProfileForm.tsx:81
-#: src/apps/people/ProfileForm.tsx:97
+#: src/apps/people/ProfileForm.tsx:79
+#: src/apps/people/ProfileForm.tsx:90
+#: src/apps/people/ProfileForm.tsx:106
 msgid "Leave without saving?"
 msgstr "Leave without saving?"
 
@@ -14184,7 +14222,7 @@ msgid "Library"
 msgstr "Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:200
+#: src/shell/pages/PersonProfilePage.tsx:201
 msgid "Library counts"
 msgstr "Library counts"
 
@@ -14313,7 +14351,7 @@ msgid "Limit peaks"
 msgstr "Limit peaks"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:104
+#: src/shell/pages/PersonProfilePage.tsx:105
 msgid "Limits"
 msgstr "Limits"
 
@@ -14613,7 +14651,7 @@ msgid "Loading copies"
 msgstr "Loading copies"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:163
+#: src/shell/pages/PersonProfilePage.tsx:164
 msgid "Loading creations"
 msgstr "Loading creations"
 
@@ -14653,7 +14691,7 @@ msgid "Loading Home highlight"
 msgstr "Loading Home highlight"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:229
+#: src/apps/settings/UsersSection.tsx:230
 #: src/shell/pages/FamilyPage.tsx:42
 #: src/shell/pages/SignInPage.tsx:88
 msgid "Loading household"
@@ -14773,7 +14811,7 @@ msgid "Loading setup status"
 msgstr "Loading setup status"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:147
+#: src/shell/pages/PersonProfilePage.tsx:148
 msgid "Loading shared media"
 msgstr "Loading shared media"
 
@@ -15994,7 +16032,7 @@ msgid "Memories"
 msgstr "Memories"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:436
+#: src/apps/settings/UsersSection.tsx:437
 msgid "Memories for {name}"
 msgstr "Memories for {name}"
 
@@ -16572,9 +16610,9 @@ msgstr "My styles"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:178
-#: src/apps/people/NewPersonForm.tsx:98
-#: src/apps/people/NewPersonForm.tsx:99
-#: src/apps/people/ProfileForm.tsx:168
+#: src/apps/people/NewPersonForm.tsx:101
+#: src/apps/people/NewPersonForm.tsx:102
+#: src/apps/people/ProfileForm.tsx:189
 #: src/apps/reminders/CreateListSheet.tsx:33
 #: src/apps/reminders/ListMenu.tsx:45
 #: src/apps/settings/AddVoiceForm.tsx:80
@@ -16595,7 +16633,7 @@ msgid "Name"
 msgstr "Name"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:285
+#: src/apps/settings/UsersSection.tsx:286
 msgid "Name for {name}"
 msgstr "Name for {name}"
 
@@ -17699,7 +17737,7 @@ msgstr "Normal size."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:358
-#: src/apps/settings/UsersSection.tsx:208
+#: src/apps/settings/UsersSection.tsx:209
 msgid "not allowed"
 msgstr "not allowed"
 
@@ -18003,7 +18041,7 @@ msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr "Nothing saved yet. Open an article and press Save to keep it here."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:153
+#: src/shell/pages/PersonProfilePage.tsx:154
 msgid "Nothing shared yet."
 msgstr "Nothing shared yet."
 
@@ -18417,8 +18455,8 @@ msgid "Older backups can keep their data for up to three months. Restoring a who
 msgstr "Older backups can keep their data for up to three months. Restoring a whole older backup brings them back."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:260
-#: src/apps/settings/UsersSection.tsx:331
+#: src/apps/settings/UsersSection.tsx:261
+#: src/apps/settings/UsersSection.tsx:332
 msgid "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days."
 msgstr "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days."
 
@@ -19138,7 +19176,7 @@ msgid "setting.storage.person.cap_bytes.help"
 msgstr "Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:103
+#: src/shell/pages/PersonProfilePage.tsx:104
 #: src/shell/pages/settings/SettingsHomePage.tsx:43
 msgid "Overview"
 msgstr "Overview"
@@ -19289,7 +19327,7 @@ msgid "PASS hop {id}: {detail}"
 msgstr "PASS hop {id}: {detail}"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:136
+#: src/apps/people/NewPersonForm.tsx:149
 msgid "Passcodes match"
 msgstr "Passcodes match"
 
@@ -19765,7 +19803,7 @@ msgstr "Picture quality"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AutoLocksSection.tsx:13
-#: src/shell/pages/PersonProfilePage.tsx:192
+#: src/shell/pages/PersonProfilePage.tsx:193
 msgid "pictures"
 msgstr "pictures"
 
@@ -19794,7 +19832,7 @@ msgid "setting.resources.strict.image.label"
 msgstr "Pictures always go first"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:120
+#: src/shell/pages/PersonProfilePage.tsx:121
 msgid "Pictures and videos can be made in chat."
 msgstr "Pictures and videos can be made in chat."
 
@@ -19864,14 +19902,14 @@ msgid "Pin example: {phrase}"
 msgstr "Pin example: {phrase}"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:121
+#: src/apps/people/NewPersonForm.tsx:134
 #: src/shell/pages/settings/settingsViews.tsx:73
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr "PIN or password"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:119
+#: src/apps/people/NewPersonForm.tsx:132
 msgid "PIN or password (required for {role})"
 msgstr "PIN or password (required for {role})"
 
@@ -20312,7 +20350,7 @@ msgid "Professional"
 msgstr "Professional"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:195
+#: src/shell/pages/PersonProfilePage.tsx:196
 #: src/shell/pages/settings/settingsViews.tsx:63
 msgid "Profile"
 msgstr "Profile"
@@ -20915,7 +20953,7 @@ msgid "Remove {count} books?"
 msgstr "Remove {count} books?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:328
+#: src/apps/settings/UsersSection.tsx:329
 msgid "Remove {display_name} from your household?"
 msgstr "Remove {display_name} from your household?"
 
@@ -20933,7 +20971,7 @@ msgstr "Remove {label}?"
 #: src/apps/clock/WorldClocksTab.tsx:154
 #: src/apps/settings/CloseAppsSettings.tsx:65
 #: src/apps/settings/DevicesSection.tsx:147
-#: src/apps/settings/UsersSection.tsx:421
+#: src/apps/settings/UsersSection.tsx:422
 #: src/shell/pages/MakeSongPage.tsx:146
 #: src/shell/pages/MusicComposer.tsx:202
 msgid "Remove {name}"
@@ -21001,7 +21039,7 @@ msgid "Remove SearXNG?"
 msgstr "Remove SearXNG?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:245
+#: src/apps/settings/UsersSection.tsx:246
 msgid "Remove selected"
 msgstr "Remove selected"
 
@@ -21072,8 +21110,8 @@ msgstr "Removing {title}…"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
-#: src/apps/settings/UsersSection.tsx:264
-#: src/apps/settings/UsersSection.tsx:387
+#: src/apps/settings/UsersSection.tsx:265
+#: src/apps/settings/UsersSection.tsx:388
 #: src/shell/pages/WikipediaPage.tsx:100
 msgid "Removing…"
 msgstr "Removing…"
@@ -21257,7 +21295,7 @@ msgid "setting.coding.requests_per_minute_per_key.label"
 msgstr "Requests per minute"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:308
+#: src/apps/settings/UsersSection.tsx:309
 msgid "Require PIN lock"
 msgstr "Require PIN lock"
 
@@ -21267,7 +21305,7 @@ msgid "setting.security.session_lock_required.label"
 msgstr "Require PIN to unlock after inactivity"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:306
+#: src/apps/settings/UsersSection.tsx:307
 msgid "Require session lock for {name}"
 msgstr "Require session lock for {name}"
 
@@ -21859,15 +21897,15 @@ msgid "Rock"
 msgstr "Rock"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:105
-#: src/apps/people/NewPersonForm.tsx:106
+#: src/apps/people/NewPersonForm.tsx:108
+#: src/apps/people/NewPersonForm.tsx:109
 #: src/shell/pages/EnginesPage.tsx:46
 #: src/shell/pages/StoragePage.tsx:177
 msgid "Role"
 msgstr "Role"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:294
+#: src/apps/settings/UsersSection.tsx:295
 msgid "Role for {name}"
 msgstr "Role for {name}"
 
@@ -22055,15 +22093,15 @@ msgstr "Sat"
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:112
 #: src/apps/clock/TimersTab.tsx:180
-#: src/apps/people/ProfileForm.tsx:190
-#: src/apps/people/ProfileForm.tsx:195
+#: src/apps/people/ProfileForm.tsx:222
+#: src/apps/people/ProfileForm.tsx:227
 #: src/apps/reminders/ListMenu.tsx:46
 #: src/apps/settings/AiGlance.tsx:124
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/CodingSettings.tsx:234
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/styles/StylesTab.tsx:159
-#: src/apps/settings/UsersSection.tsx:369
+#: src/apps/settings/UsersSection.tsx:370
 #: src/shell/pages/MusicSpeechPage.tsx:80
 #: src/shell/pages/settings/SettingField.tsx:138
 #: src/shell/pages/settings/WebSearchSettings.tsx:104
@@ -22214,7 +22252,7 @@ msgid "Saved place"
 msgstr "Saved place"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:166
+#: src/apps/people/ProfileForm.tsx:187
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
@@ -22257,8 +22295,8 @@ msgstr "Saving your face samples…"
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:180
 #: src/apps/people/FaceEnrollmentPage.tsx:631
-#: src/apps/people/ProfileForm.tsx:190
-#: src/apps/people/ProfileForm.tsx:195
+#: src/apps/people/ProfileForm.tsx:222
+#: src/apps/people/ProfileForm.tsx:227
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
@@ -22787,7 +22825,7 @@ msgid "See"
 msgstr "See"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:178
+#: src/shell/pages/PersonProfilePage.tsx:179
 msgid "See all"
 msgstr "See all"
 
@@ -22846,7 +22884,7 @@ msgid "Select"
 msgstr "Select"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:350
+#: src/apps/settings/UsersSection.tsx:351
 msgid "Select {name}"
 msgstr "Select {name}"
 
@@ -22889,7 +22927,7 @@ msgid "Select memories"
 msgstr "Select memories"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:249
+#: src/apps/settings/UsersSection.tsx:250
 msgid "Select people"
 msgstr "Select people"
 
@@ -22961,7 +22999,7 @@ msgid "setting.security.session_lock_timeout_minutes.label"
 msgstr "Session lock timeout (minutes)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:318
+#: src/apps/settings/UsersSection.tsx:319
 msgid "Session lock timeout, minutes, for {name}"
 msgstr "Session lock timeout, minutes, for {name}"
 
@@ -23215,7 +23253,7 @@ msgstr "Setting up your AI"
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:303
-#: src/shell/pages/PersonProfilePage.tsx:207
+#: src/shell/pages/PersonProfilePage.tsx:208
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
 #: src/shell/Routes.tsx:510
 msgid "Settings"
@@ -23291,7 +23329,7 @@ msgstr "Shapes the music sound. Flat leaves it as recorded; the others lift bass
 #: src/shell/library/LibraryViewer.tsx:209
 #: src/shell/pages/FilesPage.tsx:352
 #: src/shell/pages/MusicSongDetails.tsx:164
-#: src/shell/pages/PersonProfilePage.tsx:206
+#: src/shell/pages/PersonProfilePage.tsx:207
 msgid "Share"
 msgstr "Share"
 
@@ -23306,7 +23344,7 @@ msgid "Share with the household"
 msgstr "Share with the household"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:146
+#: src/shell/pages/PersonProfilePage.tsx:147
 msgid "Shared"
 msgstr "Shared"
 
@@ -24039,13 +24077,13 @@ msgid "Some pictures were locked by Home on its own, not by you. Clearing them m
 msgstr "Some pictures were locked by Home on its own, not by you. Clearing them makes them visible again. Pictures you locked yourself, and adult-style pictures, are never changed."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:129
+#: src/shell/pages/PersonProfilePage.tsx:130
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:98
-#: src/apps/settings/UsersSection.tsx:207
+#: src/apps/settings/UsersSection.tsx:208
 msgid "someone"
 msgstr "someone"
 
@@ -24151,7 +24189,7 @@ msgstr "Something went wrong. Try asking again."
 #: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:165
 #: src/shell/pages/musicComposerMode.ts:19
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:177
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
 msgid "Song"
@@ -24190,7 +24228,7 @@ msgid "Song to change"
 msgstr "Song to change"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:190
+#: src/shell/pages/PersonProfilePage.tsx:191
 msgid "songs"
 msgstr "songs"
 
@@ -25321,6 +25359,8 @@ msgid "Teen"
 msgstr "Teen"
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:115
+#: src/apps/people/ProfileForm.tsx:214
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Teen controls"
 msgstr "Teen controls"
@@ -25562,8 +25602,8 @@ msgstr "That did not send. Try again."
 #: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
 #: src/apps/people/FaceEnrollmentPage.tsx:781
-#: src/apps/people/ProfileForm.tsx:176
-#: src/apps/people/ProfileForm.tsx:187
+#: src/apps/people/ProfileForm.tsx:197
+#: src/apps/people/ProfileForm.tsx:219
 #: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/AddVoiceForm.tsx:117
@@ -25602,8 +25642,8 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/styles/StylesTab.tsx:163
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:229
-#: src/apps/settings/UsersSection.tsx:221
-#: src/apps/settings/UsersSection.tsx:333
+#: src/apps/settings/UsersSection.tsx:222
+#: src/apps/settings/UsersSection.tsx:334
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/shell/AmbientCompanionPane.tsx:181
@@ -26245,6 +26285,11 @@ msgid "The full licence: {url}"
 msgstr "The full licence: {url}"
 
 #. js-lingui-explicit-id
+#: src/apps/people/NewPersonForm.tsx:117
+msgid "The full set of protections. Every subject is gentle and replies are checked sentence by sentence."
+msgstr "The full set of protections. Every subject is gentle and replies are checked sentence by sentence."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:567
 msgid "setting.host.guard.mode.option.off"
 msgstr "The guard never watches or restarts the Mac."
@@ -26556,7 +26601,7 @@ msgid "the one you chose"
 msgstr "the one you chose"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:116
+#: src/apps/people/NewPersonForm.tsx:129
 msgid "The owner is always an admin."
 msgstr "The owner is always an admin."
 
@@ -26571,7 +26616,7 @@ msgid "The page did not load"
 msgstr "The page did not load"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:454
+#: src/apps/settings/UsersSection.tsx:455
 #: src/shell/pages/settings/SettingField.tsx:265
 msgid "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept."
 msgstr "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept."
@@ -26915,7 +26960,7 @@ msgid "setting.companion.voice.tutor.label"
 msgstr "The Tutor's voice"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:39
+#: src/apps/people/NewPersonForm.tsx:40
 msgid "The two passcodes are different. Type the same passcode in both boxes."
 msgstr "The two passcodes are different. Type the same passcode in both boxes."
 
@@ -27373,7 +27418,7 @@ msgid "This password would cross a network that is not your home network or your
 msgstr "This password would cross a network that is not your home network or your tailnet, so the form is off. Add networks while the robot is at home or connected through your tailnet."
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:125
+#: src/apps/people/NewPersonForm.tsx:138
 msgid "This person will use it to sign in."
 msgstr "This person will use it to sign in."
 
@@ -27463,7 +27508,7 @@ msgid "This robot runs a test firmware. Updating from here is off so it keeps it
 msgstr "This robot runs a test firmware. Updating from here is off so it keeps its tailnet."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:122
+#: src/apps/settings/UsersSection.tsx:123
 msgid "This role requires a PIN or password. Enter one above, then try again."
 msgstr "This role requires a PIN or password. Enter one above, then try again."
 
@@ -27777,7 +27822,7 @@ msgid "Top rated"
 msgstr "Top rated"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:105
+#: src/shell/pages/PersonProfilePage.tsx:106
 msgid "Topics"
 msgstr "Topics"
 
@@ -28056,7 +28101,7 @@ msgstr "Turn it off with a code first, then set it up again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
-#: src/apps/settings/UsersSection.tsx:455
+#: src/apps/settings/UsersSection.tsx:456
 #: src/shell/pages/settings/SettingField.tsx:269
 msgid "Turn off"
 msgstr "Turn off"
@@ -28289,7 +28334,7 @@ msgid "api.error.file_name_required"
 msgstr "Type a name for this file."
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:36
+#: src/apps/people/NewPersonForm.tsx:37
 msgid "Type a name for this person."
 msgstr "Type a name for this person."
 
@@ -28299,7 +28344,7 @@ msgid "Type a name for your character first."
 msgstr "Type a name for your character first."
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:37
+#: src/apps/people/NewPersonForm.tsx:38
 msgid "Type a PIN or password for this person so they can sign in."
 msgstr "Type a PIN or password for this person so they can sign in."
 
@@ -28314,7 +28359,7 @@ msgid "Type a style, for example paper cut-out"
 msgstr "Type a style, for example paper cut-out"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:129
+#: src/apps/people/NewPersonForm.tsx:142
 #: src/apps/settings/SignInSecretSection.tsx:71
 msgid "Type it again"
 msgstr "Type it again"
@@ -28497,7 +28542,7 @@ msgid "Unpin"
 msgstr "Unpin"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:165
+#: src/apps/people/ProfileForm.tsx:186
 msgid "Unsaved changes."
 msgstr "Unsaved changes."
 
@@ -28687,7 +28732,7 @@ msgid "Use"
 msgstr "Use"
 
 #. js-lingui-explicit-id
-#: src/apps/people/NewPersonForm.tsx:38
+#: src/apps/people/NewPersonForm.tsx:39
 msgid "Use 4 to 128 characters for the PIN or password."
 msgstr "Use 4 to 128 characters for the PIN or password."
 
@@ -28947,7 +28992,7 @@ msgid "Used yesterday"
 msgstr "Used yesterday"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:232
+#: src/apps/settings/UsersSection.tsx:233
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:11
 #: src/shell/Routes.tsx:175
@@ -29081,7 +29126,7 @@ msgstr "Very Simple"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/CompanionsPage.tsx:260
 #: src/shell/pages/FilesPage.tsx:165
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:177
 msgid "Video"
 msgstr "Video"
 
@@ -29141,7 +29186,7 @@ msgid "setting.generation.video.adult_adapters.option.restricted"
 msgstr "Video styles with an age limit are left out of the choices."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:191
+#: src/shell/pages/PersonProfilePage.tsx:192
 msgid "videos"
 msgstr "videos"
 
@@ -30419,12 +30464,12 @@ msgid "Yes, forget it"
 msgstr "Yes, forget it"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:387
+#: src/apps/settings/UsersSection.tsx:388
 msgid "Yes, remove"
 msgstr "Yes, remove"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:264
+#: src/apps/settings/UsersSection.tsx:265
 msgid "Yes, remove {count}"
 msgstr "Yes, remove {count}"
 

@@ -89,6 +89,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                       key={`${profile.id}-${editOpen}`}
                       person={profile}
                       canEdit
+                      canSetControls={canEdit && !viewingSelf && isOwnerOrAdminRole(person.role)}
                       layout="dialog"
                       onSaved={async () => {
                         await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);

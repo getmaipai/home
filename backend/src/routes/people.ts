@@ -6,7 +6,7 @@ import { hashSecret, secretDigitsOf } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { requireAuth, requireRoleOrGrant, ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
-import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } from "@/lib/personShape";
+import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem, guestControlsProblem } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
@@ -101,6 +101,7 @@ const createRoute_ = createRoute({
             secret: z.string().optional(),
             localOnly: z.boolean().optional(),
             guestExpiresAt: z.string().nullable().optional(),
+            controls: z.enum(["child", "teen", "adult"]).nullable().optional(),
           }),
         },
       },
@@ -108,7 +109,7 @@ const createRoute_ = createRoute({
   },
   responses: {
     201: { content: { "application/json": { schema: RosterSchema } }, description: "Created." },
-    ...errorResponses({ 400: "Invalid displayName/role/secret", 401: "Not signed in", 403: "Not allowed to create this role" }),
+    ...errorResponses({ 400: "Invalid displayName/role/secret/controls", 401: "Not signed in", 403: "Not allowed to create this role" }),
   },
 });
 peopleRoutes.openapi(createRoute_, async (c) => {
@@ -162,6 +163,9 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   const guestExpiresAt = body.guestExpiresAt ?? null;
   const guestProblem = guestExpiryProblem(role, guestExpiresAt);
   if (guestProblem) return c.json({ error: guestProblem }, 400);
+  const controls = body.controls ?? null;
+  const controlsProblem = guestControlsProblem(role, controls);
+  if (controlsProblem) return c.json({ error: controlsProblem }, 400);
 
   const now = new Date().toISOString();
   const id = newPersonId();
@@ -182,6 +186,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
     hlc: nextHlc(),
     enabled: true,
     guest_expires_at: guestExpiresAt,
+    controls,
     memorialized_at: null,
   });
   if (!candidate.success) {
@@ -228,6 +233,7 @@ const patchRoute = createRoute({
             localOnly: z.boolean().optional(),
             enabled: z.boolean().optional(),
             guestExpiresAt: z.string().nullable().optional(),
+            controls: z.enum(["child", "teen", "adult"]).nullable().optional(),
             // INCOGNITO-07: routed through settings.ts's setValue(), not a
             // person-table column - assertCanSetSessionLock() there is the
             // actual authorization (owner/admin only, any target), checked
@@ -241,7 +247,7 @@ const patchRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: RosterWithSecuritySchema } }, description: "Updated." },
-    ...errorResponses({ 400: "Invalid role/displayName/bio/accent/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
+    ...errorResponses({ 400: "Invalid role/displayName/bio/accent/guestExpiresAt/controls", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
   },
 });
 peopleRoutes.openapi(patchRoute, async (c) => {
@@ -260,6 +266,10 @@ peopleRoutes.openapi(patchRoute, async (c) => {
 
   const rawBody = c.req.valid("json");
   const body = rawBody as PersonEdit;
+
+  if (actor.role === "guest" && actor.id === target.id && rawBody.controls !== undefined) {
+    return c.json({ error: "You cannot change your own controls. Ask an owner or admin." }, 403);
+  }
 
   // INCOGNITO-07: checked before anything on this request is written
   // (same "whole request refused together" reasoning as the role check
@@ -311,6 +321,9 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   }
   const guestProblem = guestExpiryProblem(nextRole, guestExpiresAt);
   if (guestProblem) return c.json({ error: guestProblem }, 400);
+  const controls = (body.controls !== undefined ? body.controls : (nextRole === "guest" ? target.controls ?? null : null)) as "child" | "teen" | "adult" | null;
+  const controlsProblem = guestControlsProblem(nextRole, controls);
+  if (controlsProblem) return c.json({ error: controlsProblem }, 400);
 
   const now = new Date().toISOString();
   // Validate the whole Person, preserving the stored compatibility field.
@@ -337,6 +350,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     // (POST /api/people/:id/memorialize) may set it.
     enabled: body.enabled ?? target.enabled,
     guest_expires_at: guestExpiresAt,
+    controls,
     memorialized_at: target.memorializedAt,
   });
   if (!candidate.success) {

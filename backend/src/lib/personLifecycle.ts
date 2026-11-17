@@ -139,6 +139,7 @@ export interface PersonEdit {
   localOnly?: boolean;
   enabled?: boolean;
   guestExpiresAt?: string | null;
+  controls?: "child" | "teen" | "adult" | null;
 }
 
 /** The rules a role change has to satisfy, kept separate from the route

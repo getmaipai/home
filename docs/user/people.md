@@ -17,6 +17,7 @@ Account management lives in Settings, not on the Family page itself.
 
 1. Open **Settings**, then **Household and people**, then the **People** tab, and choose **Users**.
 2. To add someone, enter their name under **Add someone**, pick a role, and tap **Add to household**. Adults and owners can also be marked **Admin**. A PIN or password is needed for some roles.
+When you add a guest, choose child, teen or adult controls for them; teen is suggested, and guests added before this update use child controls until an admin chooses.
 3. To change someone's role or details, tap **Edit** next to their name.
 4. To remove someone, tap **Remove** next to their name. You can't remove the owner's own account.
 

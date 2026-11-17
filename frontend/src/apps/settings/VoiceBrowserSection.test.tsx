@@ -11,7 +11,7 @@ import type { StackVoice, Roster } from "@/lib/api";
 
 const testI18n = setupI18n({ locale: "en", messages: { en: {} } });
 
-const person = (role: Roster["role"] = "adult"): Roster => ({ id: "person-1", display_name: "Taylor", role, nickname: null, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "", hasSecret: false } as Roster);
+const person = (role: Roster["role"] = "adult"): Roster => ({ id: "person-1", display_name: "Taylor", role, nickname: null, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "", hasSecret: false } as Roster);
 const voice = (id: string, more: Partial<StackVoice> = {}): StackVoice => ({ id, name: id, description: "unknown", language: "en", country: "US", gender: "female", source: "preset", engine: "engine-a", onDisk: true, licence: null, revision: "", ...more });
 
 afterEach(() => { cleanup(); mock.restore(); });

@@ -14,7 +14,7 @@ afterEach(() => {
 const KEY = "voice.wakeword.enabled";
 
 function adult(): Roster {
-  return { id: "person-adult123", display_name: "Riff", nickname: null, role: "adult", avatar_seed: "person-adult123", source: "hub", local_only: false, created_at: "2026-09-27T00:00:00.000Z", updated_at: "2026-09-27T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
+  return { id: "person-adult123", display_name: "Riff", nickname: null, role: "adult", avatar_seed: "person-adult123", source: "hub", local_only: false, created_at: "2026-09-27T00:00:00.000Z", updated_at: "2026-09-27T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
 }
 
 function stubOn() {

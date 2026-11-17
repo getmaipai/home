@@ -112,6 +112,7 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
       const created = await api.createPerson({
         displayName: values.displayName,
         role: values.role,
+        ...(values.role === "guest" ? { controls: values.controls } : {}),
         secret: values.secret,
       });
       const allowed = newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed);

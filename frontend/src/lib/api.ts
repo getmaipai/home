@@ -1528,7 +1528,7 @@ export const api = {
     method: "POST",
     body: JSON.stringify(source === undefined ? {} : { source }),
   }),
-  createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
+  createPerson: (input: { displayName: string; role: Role; secret?: string; controls?: "child" | "teen" | "adult" }) =>
     request<PersonRosterEntry>("/api/people", {
       method: "POST",
       body: JSON.stringify(input),
@@ -1552,6 +1552,7 @@ export const api = {
       bio?: string | null;
       accent?: Person["accent"];
       role?: string;
+      controls?: "child" | "teen" | "adult";
       sessionLockRequired?: boolean;
       sessionLockTimeoutMinutes?: number;
     },
