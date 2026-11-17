@@ -1,6 +1,6 @@
-# Catalog holds the data, the Stack acts, Home knows people: parts, units, one budget (2026-11-16)
+# The Stack owns every part, Home knows people, the Catalog publishes: parts, units, one budget (2026-11-16)
 
-Status: proposed, needs an architect verdict. Owner decisions (Jesse, 2026-11-16, in chat; his words are the record, spelling tidied):
+Status: accepted (architect APPROVED 2026-11-16, PARTS-SEPARATION-NOTE); amended the same day to a lean core at the owner's word (section 12, PARTS-SEPARATION-LEAN). Owner decisions (Jesse, 2026-11-16, in chat; his words are the record, spelling tidied):
 
 - "home really should just know category (ex. image) and model, description, and priority (ex 1)", later adding "enabled/disabled status".
 - "the stack contains the rest of the data on the models like metadata including url, sha"; "install uninstall are calls to the stack".
@@ -9,20 +9,21 @@ Status: proposed, needs an architect verdict. Owner decisions (Jesse, 2026-11-16
 - "dont keep legacy names, code, tables, etc for ease of migration - do this right".
 - "50% of a mac studio 128gb is no different than a mac studio 64gb"; "why are we doing fixed machine classes. is that wise vs dynamic?"
 - "how can we build this so pieces are just upgradeable units that can work in and out of maipai and be upgraded, can be maintained by someone else for use in their system. but we also want this to be performant" (his example: PowerShell commandlets that are registered, upgraded and called by a core script).
+- "i also dont want to make this overcomplicated, slow (in performance or development) - so push back if you think we should do something else"; asked which scope, he chose the lean core first (question box, 2026-11-16).
 - Answered in the question box the same day: a hard rule in `RULES.md` (yes); a Stack that runs with no Home (yes, small, after Home conforms); outside apps drawing their own web screens (no, our cards only).
 
 Evidence, the audit with file and line, and the full plan: [reports/stack-vs-home-model-data-review-2026-11-16.md](../reports/stack-vs-home-model-data-review-2026-11-16.md) and [reports/portable-apps-and-catalog-review-2026-11-16.md](../reports/portable-apps-and-catalog-review-2026-11-16.md).
 
 ## Supersedes
 
-- [model-choice-2026-11-16.md](model-choice-2026-11-16.md) section 1 ("The pair is data in the package (the engine catalog the Stack serves)") and section 4 ("the picture status lists the installed families with a `role` of primary or secondary"): the pair is priority 1 and 2 of the parts list in section 3 below, and the data lives in the Catalog. Section 5 row 2 (MODEL-PAIR-01) is replaced by the PARTS rows below; OPTION-NAMES-02 as a Home-side name map is dropped (names arrive from the Stack). Section 6 ("The default lives in the engine catalog"): the default is the `priority` field. Sections 2 and 3 (the Make with chip, the retry order) stand and read the parts list.
+- [model-choice-2026-11-16.md](model-choice-2026-11-16.md) section 1 ("The pair is data in the package (the engine catalog the Stack serves)") and section 4 ("the picture status lists the installed families with a `role` of primary or secondary"): the pair is priority 1 and 2 of the parts list in section 3 below, and the data lives in the Stack's one parts table (section 2). Section 5 row 2 (MODEL-PAIR-01) is replaced by the PARTS rows below; OPTION-NAMES-02 as a Home-side name map is dropped (names arrive from the Stack). Section 6 ("The default lives in the engine catalog"): the default is the `priority` field. Sections 2 and 3 (the Make with chip, the retry order) stand and read the parts list.
 - [h3-tier-slots-2026-11-16.md](h3-tier-slots-2026-11-16.md): its tier tables stand as measured peaks; where it writes them into `TIER_CANDIDATES` with machine classes, read "the part's `peaks` and `builds`" (section 2 below). H3-SLOTS-STACK-01 and H3-SLOTS-HOME-01 are re-read against this note before dispatch.
-- [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) line 114 ("The model names stay under Details, as today") and every place it sizes by `p16`, `p32`, `p64` or `p128`: names come from the Stack per audience; sizing is the one budget of section 5. The tier ladder (Reduced, Standard, Boost, Max) and its shares stand.
+- [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) line 114 ("The model names stay under Details, as today") and every place it sizes by `p16`, `p32`, `p64` or `p128`: names come from the Stack per audience; the machine class is picked from the one budget (BUDGET-01); removing `p16` to `p128` is BUDGET-02 (LATER). The tier ladder (Reduced, Standard, Boost, Max) and its shares stand.
 - [video-tiers-2026-11-02.md](video-tiers-2026-11-02.md) decision 1 ("Minors keep the silent Wan Quick lane ... until VIDEO-LTX-06"): unchanged in order, restated as the plan of section 8. Nothing about a child's or teen's protection is loosened by this note.
 - [video-tiers-2026-11-02.md](video-tiers-2026-11-02.md) decision 3, where Wan stays as the speed floor to compare against, and VIDEO-TIERS-01's "an adult's Standard falls back to Wan Quick until the licence is accepted": Wan is in no adult path (VIDEO-WAN-HIDE-01); an adult with no accepted licence gets the plain line and the accept step, not another model.
-- [memory-management-2026-10-25.md](memory-management-2026-10-25.md) Q2 to Q5 and Q7 (class order, round robin by person, backfill, aging, no cap on the line): the policy stands in full. What changes is where it runs: Home turns Q2, Q3 and Q5 into the priority and group it sends, and the Stack's queue applies them with Q4 and the start rule of Q6; Q7 (no cap on the line) holds in both queues; Home's re-queue of a stopped job (Q6, R15) stays (section 6).
-- [resource-profiles-2026-10-30.md](resource-profiles-2026-10-30.md) section 3b ("Live fit: the table is the wish, memory decides") and [resource-management.md](resource-management.md) R12 ("Home's live fit reads its hardware table from the Stack"): the live fit ladder stands and runs in the Stack; Home's copy and its hardware table are deleted (HOME-MEMORY-REMOVE-01).
-- [making-space-2026-10-30.md](making-space-2026-10-30.md) and [auto-close-apps-2026-10-30.md](auto-close-apps-2026-10-30.md), where Home closes apps to make room: the same steps, the same settings and the same counts-only reporting (rule 6a), run by the Stack on the computer it is on (JOBS-PRIORITY-01). MEM-SPACE-07 is re-read against this before dispatch.
+- [memory-management-2026-10-25.md](memory-management-2026-10-25.md) Q2 to Q5 and Q7 (class order, round robin by person, backfill, aging, no cap on the line): the policy stands in full. What changes is where it runs, when JOBS-PRIORITY-01 lands (LATER); until then Home runs them as today. Then Home turns Q2, Q3 and Q5 into the priority and group it sends, and the Stack's queue applies them with Q4 and the start rule of Q6; Q7 (no cap on the line) holds in both queues; Home's re-queue of a stopped job (Q6, R15) stays (section 6).
+- [resource-profiles-2026-10-30.md](resource-profiles-2026-10-30.md) section 3b ("Live fit: the table is the wish, memory decides") and [resource-management.md](resource-management.md) R12 ("Home's live fit reads its hardware table from the Stack"): the live fit ladder stands and runs in the Stack; Home's copy and its hardware table are deleted when HOME-MEMORY-REMOVE-01 lands (LATER).
+- [making-space-2026-10-30.md](making-space-2026-10-30.md) and [auto-close-apps-2026-10-30.md](auto-close-apps-2026-10-30.md), where Home closes apps to make room: the same steps, the same settings and the same counts-only reporting (rule 6a), run by the Stack when JOBS-PRIORITY-01 lands (LATER); until then by Home as today. MEM-SPACE-07 is re-read against this before dispatch.
 - The Stack's own records that say it "installs only through Home", and the org product table's "Home is its only caller" (in `getmaipai/.github`, outside this rulebook): both are amended when STACK-ALONE-02 lands, by section 10. Until then they stand.
 
 ## Reuse check
@@ -33,7 +34,7 @@ Everything named here exists and is extended, not rebuilt: the Catalog's signed 
 
 | Owner | Owns | Never holds |
 |---|---|---|
-| Catalog | Signed data: every installable part and every package | Running state, household choices |
+| Catalog | Every package, and the signed published copy of the parts list that update checks read | Running state, household choices |
 | Stack | Every action and runtime fact: install, uninstall, update, enable, what fits, what is loaded, what runs or waits, what is wrong, the budget | People, age, households, wording for people |
 | Home | People, the age and surface gates, the household's choices, wording, notifications, drawing what the Stack serves | Model names, descriptions, download links, checksums, sizes, fit math, engine processes, the Stack's health logic |
 
@@ -41,7 +42,7 @@ The Stack has no users. Home sends the audience (`adult` or `minor`) with every 
 
 ## 2. A part
 
-A part is anything the Stack installs and runs: a model, a tool (a sharpener, a stem splitter, a wake word), or an engine (the chat engine, a picture runner). One record in `commons/spec`, one source file in the Catalog (`parts/index.json`), one signed published index. The Stack pins a Catalog tag at build, so a new install works offline, and reads a newer signed index only when update checks are on.
+A part is anything the Stack installs and runs: a model, a tool (a sharpener, a stem splitter, a wake word), or an engine (the chat engine, a picture runner). One record shape in `commons/spec`. The one source is one table in the Stack's own code, so adding a model stays one commit in one repo. The Catalog's signed index is generated from that table and published, as its model index is today, and the Stack reads a newer signed index only when update checks are on. Making the Catalog the source, with the Stack pinning it, was considered and set aside: it adds a second pin to every model change for a gain (a new revision with no Stack release) that nothing needs yet.
 
 The record (`StackPart`, PARTS-SPEC-01): `id` (opaque), `kind` (model, tool, engine), `category`, `priority` (the shipped order, 1 first), `label` (true name, adults only), `neutral_label` (what a child or teen is served), `description`, `adult_only`, `version`, `files` (link, sha256, bytes), `licence` (name and notice id, never the text), `runner` (the engine part that runs it), `requires`, `builds` (tier steps), `peaks` (measured memory per option set, each marked measured or unverified), `min_stack`. A chat model's part also carries what chat rules 3 and 8 need: its sampling with the source of the values named, the template features it is proven to support, and its measured record (PARTS-SPEC-02). Home reads these from the Stack for each turn; a model with no measured record keeps the no-tools fail-safe for minors, exactly as rule 8 says today.
 
@@ -63,9 +64,11 @@ Home's household settings hold one value per category: an order and an off list,
 
 One setting, the share of this computer the Stack may use (1 to 100 percent), shown to people as a slider in plain words with no memory figures. The Stack turns it into a byte budget, limited by the hardware ceiling. Equal budgets give equal fit answers on any computer.
 
-Three things that depend on the machine class today come from the budget instead: which parts can ever run (the part's peak against the tier's share of the budget; the shares 0.6, 0.85 and 1.0 stand), what stays loaded and what loads on demand (required parts in priority order until the resident share is full), and the working margin (a continuous function of the budget). A second, live check stays at job start. A preview route returns the consequence in plain lines before the person saves. Speed is served from timings measured on this computer, separately from fit.
+Lean core (BUDGET-01): the machine class is picked from the budget, not from the installed memory, through the override the sizing function already takes (`proposeProfile(hw, overrideGb)`, `stack/backend/src/profiles.ts`). 50 percent of 128 GB is then sized as a 64 GB computer everywhere the class is read, with no class deleted. Later, and only if the four fixed steps prove too coarse (BUDGET-02): three things that depend on the machine class today come from the budget instead: which parts can ever run (the part's peak against the tier's share of the budget; the shares 0.6, 0.85 and 1.0 stand), what stays loaded and what loads on demand (required parts in priority order until the resident share is full), and the working margin (a continuous function of the budget). A second, live check stays at job start. A preview route returns the consequence in plain lines before the person saves. Speed is served from timings measured on this computer, separately from fit.
 
 ## 6. Jobs, memory and the queue
+
+Later, not in the lean core: Home's queue, live fit and app-closing code predate rule E4 and stay until JOBS-PRIORITY-01 and HOME-MEMORY-REMOVE-01 land (LATER); no new fit, memory or app-closing logic is added to Home meanwhile (E4).
 
 The Stack decides whether and when a job can run. Home decides whose job goes first. A job submit gains a `priority` number and an opaque `group`; the Stack orders by priority, then age, with a fair share across groups. Home computes the priority from household policy and a child's daily limit and passes a hashed person id as the group. The priority keeps memory-management Q2 (chat, then pictures, then video, then the rest), Q3 (by person), Q5 (aging) and Q7 (no cap on the line); the Stack applies Q4 (backfill) and the start rule of Q6, and JOBS-PRIORITY-01 builds whatever part of them its queue lacks; Home's re-queue of a stopped job stays in Home. Home's own fit, memory and app-closing code is deleted; its queue code keeps the scoring and the mirror of Stack job states.
 
@@ -88,6 +91,8 @@ A unit is a piece someone can build, version, publish, and upgrade on its own, a
 | Component | a voice loop (it holds no model) | a role contract: a streaming wire plus the hooks the host fills | one long-running process on loopback | none per request |
 
 Every unit, whatever its kind, has the same life: a manifest with an id, a version and what it provides and requires; files pinned by checksum; listed in the signed Catalog index; installed, updated and rolled back by id; replaced without the caller changing.
+
+No framework is built ahead of need. A role contract is written when the first real outside component exists, from that component (PORTABLE-01); until then this section is the principle new work follows.
 
 Speed rules, because a boundary in the wrong place is slow:
 1. Processes stay warm. Nothing on a person's path starts a process per call.
@@ -112,6 +117,15 @@ Each row deletes what it replaces in the same landing. No alias lists, no "new k
 
 ## 12. Build rows
 
-Spec, then Catalog, then Stack, then Home, then Bot. Each row is small, has an exit check that can fail, and is in `docs/BACKLOG.md` under "Catalog data, Stack actions, Home people". Rows: PARTS-SPEC-01, PARTS-SPEC-02, PARTS-CATALOG-01, PARTS-STACK-01, PARTS-API-01, PARTS-ENABLE-01, PARTS-UPDATE-01, STACK-STATUS-01, VIDEO-WAN-HIDE-01, VIDEO-LTX-06 (existing), VIDEO-WAN-REMOVE-01, BUDGET-01, BUDGET-02, BUDGET-03, HOME-PARTS-01 to HOME-PARTS-05, JOBS-PRIORITY-01, HOME-MEMORY-REMOVE-01, HOME-STATUS-01, BOT-PARTS-01, STACK-ALONE-01 to STACK-ALONE-04, PORTABLE-01, then the existing MODEL-WITH-01 and MODEL-RETRY-01.
+All rows are in `docs/BACKLOG.md` under "Catalog data, Stack actions, Home people". Each is small, has an exit check that can fail, and deletes what it replaces.
 
-The riskiest rows and their guards: BUDGET-02 (a parity test against today's plan at five memory sizes, and two real runs); PARTS-STACK-01 (every link, checksum and byte count equal to today's pins); VIDEO-LTX-06 and VIDEO-WAN-REMOVE-01 (risky surface, real clips).
+**Lean core, in order (owner's choice, 2026-11-16).** It gives the whole result asked for: Home shows no part name it holds itself, the Stack owns install, update, on or off and priority, and the budget works. It adds no call that is not already made.
+
+1. PARTS-SPEC-01 (done, `spec-v0.1.410`) and PARTS-SPEC-02.
+2. Stack: PARTS-STACK-01 (one table), PARTS-API-01 (the list, install by id), PARTS-ENABLE-01, PARTS-UPDATE-01, VIDEO-WAN-HIDE-01, STACK-STATUS-01, BUDGET-01.
+3. Home: HOME-PARTS-01 to HOME-PARTS-05, HOME-STATUS-01, BUDGET-03.
+4. Then the features that started this: MODEL-WITH-01 and MODEL-RETRY-01.
+
+**Later, each when it is worth doing:** PARTS-CATALOG-01 (the published copy in the part shape), BUDGET-02 (no machine classes), JOBS-PRIORITY-01 and HOME-MEMORY-REMOVE-01 (the queue and memory move), VIDEO-LTX-06 then VIDEO-WAN-REMOVE-01 (children's video, on its own track), BOT-PARTS-01, STACK-ALONE-01 to STACK-ALONE-04, PORTABLE-01.
+
+The riskiest rows and their guards: PARTS-STACK-01 (every link, checksum and byte count equal to today's pins); VIDEO-LTX-06 and VIDEO-WAN-REMOVE-01 (risky surface, real clips); BUDGET-02, if it is ever taken up (a parity test against today's plan at five memory sizes, and two real runs).
