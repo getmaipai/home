@@ -2064,7 +2064,7 @@ state, not something built against yet. Entities and relationships got
 their own frontend, lane 11 item 2 (2026-09-13, below); grants and
 approvals are still real, unstarted work for a future session.
 
-- [ ] **GRANTS-01: `min_role` on every package manifest becomes a grant check too** AMENDED 2026-11-16: this is the one feature access check where a feature starts (rule C7); a grant may deny any feature to anyone and allows one only within rule 0's gates ([content-ratings-and-access-2026-11-16.md](design/content-ratings-and-access-2026-11-16.md)).
+- [x] **GRANTS-01: `min_role` on every package manifest becomes a grant check too** AMENDED 2026-11-16: this is the one feature access check where a feature starts (rule C7); a grant may deny any feature to anyone and allows one only within rule 0's gates ([content-ratings-and-access-2026-11-16.md](design/content-ratings-and-access-2026-11-16.md)). Landed 2026-11-17 (24c5fc5).
       (L) - a manifest's declared minimum role is D's package-host
       territory (`packageHost.ts`), not touched by Session F step 7.
       Once `use:<package>` grants are actually consulted anywhere (see
