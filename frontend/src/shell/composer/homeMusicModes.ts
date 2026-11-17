@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ComposerQualityData } from "@maipai/ui/src/elements/composer-parts";
-import { request } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import { musicApi } from "@/lib/musicApi";
 import type { PromptBarMode } from "@maipai/ui/src/elements/prompt-bar";
 import { EMPTY_FORM, EMPTY_SOUND, type CreateForm, type SoundForm, type Tier } from "@/shell/pages/musicCreateForm";
@@ -35,7 +35,7 @@ export function useHomeMusic(pickAudio: () => Promise<{ id: string } | null>, cl
     make, form, sound, styles: styles.data ?? [], bands: bands.data ?? [], tiers, reference, referenceReason: "",
     change: "restyle", householdVoices: [], householdVoice: "", setChange: () => {}, setHouseholdVoice: () => {},
     setForm, setSound: (patch) => setSoundState((current) => ({ ...current, ...patch })),
-    onPickReference: () => { void pickAudio().then((got) => { if (got) setReference({ id: got.id, name: i18n._({ id: "Your song", message: "Your song" }) }); }, () => {}); },
+    onPickReference: () => { void pickAudio().then(async (got) => { if (!got) return; const named = await api.libraryFile(got.id).then((file) => file.name ?? "", () => ""); setReference({ id: got.id, name: named || i18n._({ id: "Your song", message: "Your song" }) }); }, () => {}); },
     onPickSource: () => {}, onClearReference: () => setReference(null),
     onTags: (tags) => setForm({ tags }), onClear: clear,
   });

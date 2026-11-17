@@ -20,7 +20,7 @@ import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { getIcon } from "@maipai/ui/src/icons";
-import { request } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE } from "./MakeSongPage";
 import { COLLECTION, createBody as recordBody, editPath } from "./MusicStudioPages";
@@ -113,7 +113,7 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
     if (carriedTags) onTags(carriedTags.split(",").filter(Boolean).slice(0, 8));
     setSoundState((current) => ({ seconds: params.get("seconds") ?? current.seconds, loop: params.get("loop") === "1", stick: params.get("stick") === "surprise" ? "surprise" : "words" }));
     const ref = params.get("reference");
-    if (ref) setReference({ id: ref, name: i18n._({ id: "Your song", message: "Your song" }) });
+    if (ref) { setReference({ id: ref, name: i18n._({ id: "Your song", message: "Your song" }) }); void api.libraryFile(ref).then((file) => setReference((current) => (current?.id === ref ? { id: ref, name: file.name ?? current.name } : current)), () => {}); }
   }, [search, onTags]);
 
   const withTags: CreateForm = { ...form, tags };
