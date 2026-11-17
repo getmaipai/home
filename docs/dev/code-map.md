@@ -568,6 +568,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
 | `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
+| `backend/src/lib/contactSheet.ts` | SHEET_MAX_TILES, composeContactSheet, SheetError, SHEET_NEEDS_ONE, SHEET_TOO_MANY, __setSheetFramesForTests |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant, dialsFor, projectionOf |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, CHILD_UNSAFE_CLASSES, createContentPolicyResolver, checkAll, contentPolicyFor |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
