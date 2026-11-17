@@ -17,5 +17,6 @@
   "tools.house.mode",
   "tools.lists.mode",
   "tools.assist.widened",
-  "ui.rail_expanded"
+  "ui.rail_expanded",
+  "video.end_anchor"
 ]
