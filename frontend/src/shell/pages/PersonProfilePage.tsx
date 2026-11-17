@@ -19,6 +19,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 import { ACCESS_KINDS, accessKindName, accessSource } from "@/shell/pages/personAccessCopy";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import { PersonContentSection, useOwnContentKeys } from "@/shell/pages/PersonContentSection";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
 
 const PencilIcon = getIcon("pencil");
@@ -38,15 +39,22 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const access = accessQuery.data && typeof accessQuery.data.ceiling === "object" && Array.isArray(accessQuery.data.overrides) && Array.isArray(accessQuery.data.unrated) ? accessQuery.data : undefined;
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
+  // CONTENT-POLICY-05: a Content tab for an owner or admin on another person's page (any role: the hub's override read is narrow), and on
+  // a person's own page when they have a content control to use.
+  const adminOnOther = !viewingSelf && isOwnerOrAdminRole(person.role);
+  const ownContent = useOwnContentKeys(person.id, viewingSelf);
+  const showContent = adminOnOther || ownContent;
   const activeTab = params.get("tab") === "limits" && canViewLimits
       ? "limits"
       : params.get("tab") === "topics" && canViewLimits
         ? "topics"
-        : "overview";
+        : params.get("tab") === "content" && showContent
+          ? "content"
+          : "overview";
   function onTabChange(value: string) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (value === "limits" || value === "topics") next.set("tab", value);
+      if (value === "limits" || value === "topics" || value === "content") next.set("tab", value);
       else next.delete("tab");
       return next;
     }, { replace: true });
@@ -78,6 +86,8 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 <p className="text-base font-medium">{i18n._({ id: "You cannot open this profile.", message: "You cannot open this profile." })}</p>
                 <p className="text-sm text-muted-foreground">{i18n._({ id: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else.", message: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else." })}</p>
                 <Link to="/people" className="text-primary underline">{i18n._({ id: "Back to Family", message: "Back to Family" })}</Link>
+                {/* The teen's profile stays closed; the admin's own controls for them (level, unrated, filters) do not. */}
+                <div className="mt-4 w-full max-w-xl text-left"><PersonContentSection personId={profile.id} viewingSelf={false} heading /></div>
               </div>
             );
           }
@@ -109,6 +119,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                   <TabsTrigger value="overview">{i18n._({ id: "Overview", message: "Overview" })}</TabsTrigger>
                   {showLimits ? <TabsTrigger value="limits">{i18n._({ id: "Limits", message: "Limits" })}</TabsTrigger> : null}
                   {showLimits ? <TabsTrigger value="topics">{i18n._({ id: "Topics", message: "Topics" })}</TabsTrigger> : null}
+                  {showContent ? <TabsTrigger value="content">{i18n._({ id: "Content", message: "Content" })}</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
@@ -128,10 +139,15 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                   <TabsContent value="limits">
                     <div className="flex flex-col gap-4 py-2">
                       <p className="text-sm text-muted-foreground">{i18n._({ id: "Daily time limits for {name}.", message: "Daily time limits for {name}.", values: { name: profile.display_name } })}</p>
-                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
+                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} excludeKeyPrefixes={["content."]} />
                       {/* The per-child cartoon switch (KIDS-CREATE-01): a guardian finds it here, on the child's own page, next to the other limits. The home switch and the daily limits are in Home settings, Pictures and videos. */}
                       {viewingSelf && profile.age_band !== "child" ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Pictures and videos can be made in chat.", message: "Pictures and videos can be made in chat." })}</p> : <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />}
                     </div>
+                  </TabsContent>
+                ) : null}
+                {showContent ? (
+                  <TabsContent value="content">
+                    <div className="flex flex-col gap-4 py-2"><PersonContentSection personId={profile.id} viewingSelf={viewingSelf} /></div>
                   </TabsContent>
                 ) : null}
                 {showLimits ? (

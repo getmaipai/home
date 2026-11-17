@@ -29,6 +29,7 @@ import { bumpNewsCounter } from "./newsCounters";
 import { feedLabels } from "./feedLabels";
 import { datelineOf, dayGroupOf } from "./dayParts";
 import { spreadPublishers } from "./spread";
+import { passForSurface } from "@/lib/filter/pass";
 
 export interface BlocksData { as_of: string; blocks: unknown[]; degraded?: true }
 export type RowsData = Array<Record<string, unknown>>;
@@ -335,7 +336,7 @@ export async function storyData(person: PersonRow, body: Record<string, unknown>
     recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item) }, now.toISOString());
   }
   // Key points are shown once written (the idle step or "Key points" in the menu); opening a story never waits for the model.
-  const points = block ? storedKeyPoints(storyIdOf(item), viewer.band) : null;
+  const points = block ? storedKeyPoints(storyIdOf(item), viewer.band, passForSurface({ actor: person, band: viewer.band })) : null;
   if (block && points) (block.props as Record<string, unknown>).key_points = points;
   return { as_of: now.toISOString(), blocks: block ? finishBlocks(person, viewer.band, [block]) : [] };
 }

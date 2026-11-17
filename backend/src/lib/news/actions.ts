@@ -15,6 +15,7 @@ import { viewerOf } from "./data";
 
 import { summarizeStory } from "./summary";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
+import { passForSurface } from "@/lib/filter/pass";
 
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
@@ -127,7 +128,7 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
     case "summarize": {
       const item = releasedItem(viewer, body.id);
       if (!item) return gone();
-      const summary = await summarizeStory(storyIdOf(item), viewer.band);
+      const summary = await summarizeStory(storyIdOf(item), viewer.band, passForSurface({ actor: person, band: viewer.band }));
       // Not ready is not an error: the reader keeps showing progress and asks again, so the answer is a plain 200 with no summary.
       return ok({ summary });
     }

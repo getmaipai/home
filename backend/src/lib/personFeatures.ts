@@ -3,7 +3,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { audienceBand } from "@/lib/audience";
+import { audienceBand, isGuestRole } from "@/lib/audience";
 import { userFacingManifests } from "@/lib/apps";
 import { passForPerson } from "@/lib/filter/pass";
 import { isGrantActive, listGrants } from "@/lib/grants";
@@ -42,7 +42,7 @@ export function personFeatures(target: PersonRow): PersonFeatureRow[] {
     grant: grantFor(manifest.id),
   }));
   rows.sort((a, b) => a.title.localeCompare(b.title));
-  if (target.role !== "guest") { // guests are left out of the Coding row, as the old roster was
+  if (!isGuestRole(target.role)) { // guests are left out of the Coding row, as the old roster was
     rows.unshift({
       id: CODING_FEATURE_ID, title: "Coding", min_role: "adult",
       role_allows: audienceBand(target) === "adult" && getHouseholdSettingValue("coding.adults_by_default") === true,

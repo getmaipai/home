@@ -17,13 +17,14 @@ import { apiRouter, errorResponses, idParamSchema, respond } from "@/lib/openapi
 import { blocklistIds } from "@/lib/blocklists/policy";
 import { backToUserDefaults, changeOverrides, resetBlocklistRow, hiddenOwnChoice, siteBlocksView } from "@/lib/settingsLayers";
 import { Person } from "@maipai/spec/gen/ts/person.js";
-import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
+import { listOverrideValues, setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
 import { personAccessView } from "@/lib/accessView";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 import { exportPersonFiles, personFilesFate } from "@/lib/storage/personFiles";
 import { apiError } from "@/lib/apiErrorCopy";
 import { personFeatures, activePerson } from "@/lib/personFeatures";
+import { ResolvedSettingSchema } from "@/routes/settings";
 
 export const peopleRoutes = apiRouter();
 
@@ -756,6 +757,28 @@ peopleRoutes.openapi(siteBlocksPutRoute, (c) => {
   return view.ok ? c.json(view.value, 200) : c.json({ error: view.error }, 403);
 });
 
+// CONTENT-POLICY-05 (record 6b): the override keys of one person for an owner or admin: the content level, the unrated choices and the
+// filters the admin may see. `canAccessPerson` stays child-only, so this is the one narrow read; the writes use PUT and POST /api/settings,
+// whose gates are `assertCanSetAccessKey` and the union write gate. `GET /api/people/:id/access` (UNSEEN-01) is a different read: if it
+// lands first, this reads move there.
+const overridesGetRoute = createRoute({
+  method: "get",
+  path: "/{id}/overrides",
+  tags: ["People"],
+  summary: "A person's content level, unrated choices and filters, for an owner or admin",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: { content: { "application/json": { schema: z.array(ResolvedSettingSchema) } }, description: "Only the override keys the viewer may set for this person." },
+    ...errorResponses({ 401: "Not signed in", 403: "Only an owner or admin can see these" }),
+  },
+});
+peopleRoutes.openapi(overridesGetRoute, (c) => {
+  const { id } = c.req.valid("param");
+  const out = listOverrideValues(c.get("person"), id);
+  return out.ok ? c.json(out.value, 200) : c.json({ error: out.error }, 403);
+});
+
 const siteBlocksResetRoute = createRoute({
   method: "post",
   path: "/{id}/site-blocks/reset",
@@ -775,6 +798,7 @@ peopleRoutes.openapi(siteBlocksResetRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const { id: item } = c.req.valid("json");
+  // Resetting site blocks names the site-block keys only (CONTENT-POLICY-05: `backToUserDefaults` with no key leaves `content.filters` alone).
   const res = item ? resetBlocklistRow(actor, id, item) : backToUserDefaults(actor, id, []);
   if (!res.ok) return c.json({ error: res.error }, res.status === 400 ? 400 : 403);
   const view = siteBlocksView(actor, id);

@@ -41,6 +41,7 @@ type PassPerson = Pick<PersonRow, "id" | "role" | "controls">;
 const settingsModule = () => require("@/lib/settings") as typeof import("@/lib/settings");
 const grantsModule = () => require("@/lib/grants") as typeof import("@/lib/grants");
 const pluginsModule = () => require("@/lib/plugins") as typeof import("@/lib/plugins");
+const layersModule = () => require("@/lib/settingsLayers") as typeof import("@/lib/settingsLayers");
 
 const KINDS = CONTENT_KINDS as readonly ContentKind[];
 const MAX_RANK = 4;
@@ -122,6 +123,9 @@ function buildFrom(person: PassPerson): Pass {
   for (const key of personProtectionKeys()) settings[key] = settingsModule().getPersonSettingValue(person as PersonRow, key);
   // CONTENT-POLICY-02: the rollout flags are household keys, read here once so the check path never reads settings (a write drops every pass).
   for (const key of CONTENT_POLICY_FLAG_KEYS) settings[key] = settingsModule().getHouseholdSettingValue(key);
+  // CONTENT-POLICY-05: the person's added content filters (the union of every layer, band minimum not included), worked out once here so the
+  // resolver and the dials read them from the pass, never from a settings read on the check path. A write to the key drops every pass.
+  settings["content.filters"] = Object.freeze(layersModule().resolvedContentFilters(person.id, band));
 
   return Object.freeze({ person_id: person.id, version: nextPassVersion(), access, ceiling: Object.freeze(ceiling), unrated, band, expires_at: expiresAt, settings: Object.freeze(settings) });
 }

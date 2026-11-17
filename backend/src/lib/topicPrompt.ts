@@ -4,7 +4,8 @@
 // A child's own keys apply only when the speaker really is that child: a
 // robot turn that heard a child on a parent's session gets the band defaults.
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
-import { getMinorCeilingForBand } from "@/lib/contentCeiling";
+import { dialsFor, getMinorCeilingForBand } from "@/lib/contentCeiling";
+import { passFor } from "@/lib/filter/pass";
 import { resolveTopicStances, topicStancesForPerson } from "@/lib/topicStances";
 import { renderTopicBlock, type TopicFamily, type TopicStance } from "@maipai/spec/interpreters/ts/topicBlock.js";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -32,7 +33,10 @@ export function topicBlockFor(band: AgeBand, personId?: string): string {
     console.warn(`[topics] could not read the topic settings (${error instanceof Error ? error.message : String(error)}); using the ${band} defaults`);
     resolved = defaultStances(band);
   }
-  return renderTopicBlock({ band, record: getMinorCeilingForBand(band), stances: resolved.stances, familyStoryNames: resolved.familyStoryNames });
+  // CONTENT-POLICY-05: the record's dials are the projection of the person's pass; `topics` and `family_stories` stay the age group's own.
+  const record = getMinorCeilingForBand(band);
+  const withDials = personId ? { ...record, dials: dialsFor(passFor(personId), "chat") } : record;
+  return renderTopicBlock({ band, record: withDials, stances: resolved.stances, familyStoryNames: resolved.familyStoryNames });
 }
 
 /** The turn's block: the person's own keys when they are the band's person, the band defaults otherwise. */

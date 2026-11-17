@@ -29,6 +29,7 @@ import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayer
 import { LIVE_PERSONA_IDS } from "@/lib/personaIds";
 import { invalidatePass, invalidatePassForSetting } from "@/lib/filter/passCache";
 import { validTimeZone } from "@/lib/wallClock";
+import { FILTERS_KEY, mayHoldFilters, resetVisibleContentFilters, setVisibleContentFilters, visibleContentFilters } from "@/lib/settingsLayers";
 
 const HOUSEHOLD_HOME_KEY = "household.home";
 const ROBOT_FIRMWARE_INSTALLED_KEY = "robot.firmware.installed";
@@ -404,6 +405,25 @@ function responseContext(viewer: PersonRow, subject: PersonRow, scopeKind: Parse
   return { viewer, subject, adminName };
 }
 
+const isOverrideKey = (key: string): boolean => key.startsWith("content.ceiling") || key.startsWith("content.unrated");
+
+/** CONTENT-POLICY-05 (C10: absent, not locked): whether a person-scope key is in the list `actor` gets for `personId`. The override keys
+ * (`content.ceiling*`, `content.unrated*`) are listed only to an owner or admin looking at someone else; the person's own `content.own_*`
+ * lowering only on their own page, and only when it has something to do; the filters control only where the viewer may set it. */
+function isListedFor(actor: PersonRow, personId: string, key: string): boolean {
+  const other = actor.id !== personId;
+  if (isOverrideKey(key)) return other && isOwnerOrAdmin(actor);
+  if (key === FILTERS_KEY) return mayHoldFilters(actor, personId);
+  if (key.startsWith("content.own_ceiling") || key === "content.own_unrated") {
+    if (other) return false;
+    const pass = (require("@/lib/filter/pass") as typeof import("@/lib/filter/pass")).passFor(personId); // lazy: the pass reads settings
+    if (key === "content.own_unrated") return pass.unrated.size > 0 || getSettingValueForPerson(personId, key) === "no";
+    // Something lower to pick than what the household gives, or an own choice already made (so it can be put back).
+    return Object.values(pass.ceiling).some((rank) => rank > 0) || getSettingValueForPerson(personId, key) !== "default";
+  }
+  return true;
+}
+
 /** Keys a reader may ask for alone (`?key=`) under the scope's ordinary read rule. The locale pair is read by
  * `usePersonLocale` on every sign-in (I18N-F0); without it the person's language never activated on a real hub. */
 const PLAIN_KEY_FILTERS = new Set(["companions.preview_shells", "person.locale", "household.locale"]);
@@ -439,8 +459,14 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
     // guardian to inspect other settings for a child.
     .filter((k) => !(parsed.kind === "person" && parsed.id !== actor.id && k.selector === "location"))
     .filter((k) => !isRetiredKey(k))
+    .filter((k) => parsed.kind !== "person" || !parsed.id || isListedFor(actor, parsed.id, k.key))
     .map((k) => {
       const row = storedByKey.get(k.key);
+      if (parsed.kind === "person" && parsed.id && k.key === FILTERS_KEY) {
+        // CONTENT-POLICY-05: the person's own entries only (an admin's are never shown to them: C10); an admin sees what they set.
+        const own = visibleContentFilters(actor, parsed.id);
+        return resolveForResponse(k, own, own.length > 0 ? "user" : "default", descriptionContext); // a stored row the viewer may not see is not hinted at
+      }
       if (parsed.kind === "person" && parsed.id && isLayeredScalar(k)) {
         // EASE-OF-USE-01c: person's own value, else household's, else the age group's, else the default.
         const layered = resolveLayeredScalar(k, parsed.id, speakerAgeBand(subject, new Date()));
@@ -452,6 +478,34 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
       return resolveForResponse(k, rawValue, source, descriptionContext);
     });
   return { ok: true, value: results };
+}
+
+/** CONTENT-POLICY-05 (record 6b): the override keys of one person, for an owner or admin, through one narrow read path. `canAccessPerson`
+ * admits an admin to a child only and is not widened, so this reads nothing but `content.ceiling*`, `content.unrated*` and the filters the
+ * admin may see (what an admin set, and a child's entries; never a teen's or an adult's own choices). Empty for anyone else and for the
+ * admin's own page. The writes go through the ordinary `setValue` and `resetValue` (their gates are `assertCanSetAccessKey` and the union
+ * write gate). */
+export function listOverrideValues(actor: PersonRow, personId: string): SettingsOpResult<ResolvedSetting[]> {
+  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "Only an owner or admin can see these settings. Ask one of them." };
+  const target = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+  if (!target) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
+  if (target.id === actor.id) return { ok: true, value: [] };
+  const subject = target as PersonRow;
+  const band = speakerAgeBand(subject, new Date());
+  const context = responseContext(actor, subject, "person");
+  const out: ResolvedSetting[] = [];
+  for (const k of getRegistry()) {
+    if (k.scope !== "person" || isRetiredKey(k)) continue;
+    if (k.key === FILTERS_KEY) {
+      if (!mayHoldFilters(actor, personId)) continue;
+      const seen = visibleContentFilters(actor, personId);
+      out.push(resolveForResponse(k, seen, seen.length > 0 ? "user" : "default", context));
+    } else if (isOverrideKey(k.key) && isLayeredScalar(k)) {
+      const layered = resolveLayeredScalar(k, personId, band);
+      out.push({ ...resolveForResponse(k, layered.value, layered.layer === "person" ? "user" : "default", context), layer: layered.layer, locked: layered.locked });
+    }
+  }
+  return { ok: true, value: out };
 }
 
 /** The validate-then-write core shared by setValue (actor-gated, every
@@ -735,12 +789,39 @@ function auditScope(scope: string): "household" | "person" | null {
   return parsed && (parsed.kind === "household" || parsed.kind === "person") ? parsed.kind : null;
 }
 
+/** CONTENT-POLICY-05: a person's `content.filters` is written only through the union write gate (`settingsLayers.ts`), never as a plain
+ * row, so an old client's `PUT /api/settings` of the list cannot overwrite an admin's entry. The list the writer sends is compared with the
+ * list the writer sees; the difference goes to the gate, which records its own audit line. */
+function setPersonFilters(actor: PersonRow, scope: string, personId: string, value: unknown): SettingsOpResult<ResolvedSetting> {
+  const keyDef = getRegistryKey(FILTERS_KEY);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${FILTERS_KEY}` };
+  const valid = validateSelectorValue(keyDef, value);
+  if (!valid.ok) return valid;
+  const res = setVisibleContentFilters(actor, personId, value as string[]);
+  if (!res.ok) return res;
+  const parsed = parseScope(scope)!;
+  return { ok: true, value: resolveForResponse(keyDef, res.value, "user", responseContext(actor, responseSubject(actor, parsed), "person")) };
+}
+
+function resetPersonFilters(actor: PersonRow, scope: string, personId: string): SettingsOpResult<ResolvedSetting> {
+  const keyDef = getRegistryKey(FILTERS_KEY);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${FILTERS_KEY}` };
+  const res = resetVisibleContentFilters(actor, personId);
+  if (!res.ok) return res;
+  const parsed = parseScope(scope)!;
+  return { ok: true, value: resolveForResponse(keyDef, res.value, res.value.length > 0 ? "user" : "default", responseContext(actor, responseSubject(actor, parsed), "person")) };
+}
+
 export function setValue(
   actor: PersonRow,
   scope: string,
   key: string,
   value: unknown,
 ): SettingsOpResult<ResolvedSetting> {
+  if (key === FILTERS_KEY) {
+    const parsed = parseScope(scope);
+    if (parsed?.kind === "person" && parsed.id) return setPersonFilters(actor, scope, parsed.id, value);
+  }
   const layer = auditScope(scope);
   const previous = layer ? storedBefore(scope, key) : null;
   const result = setValueGated(actor, scope, key, value);
@@ -1038,6 +1119,10 @@ registerStoredHouseholdReader((key, fallback) => {
  * every caller into a second round trip (a full list re-fetch) just to
  * learn the value it already knew was the registry default. */
 export function resetValue(actor: PersonRow, scope: string, key: string): SettingsOpResult<ResolvedSetting> {
+  if (key === FILTERS_KEY) {
+    const parsed = parseScope(scope);
+    if (parsed?.kind === "person" && parsed.id) return resetPersonFilters(actor, scope, parsed.id);
+  }
   const layer = auditScope(scope);
   const previous = layer ? storedBefore(scope, key) : null;
   const result = resetValueGated(actor, scope, key);

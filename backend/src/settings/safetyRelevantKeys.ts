@@ -28,8 +28,8 @@ const TRUE_NARROWS = new Set(["media.allowlist_only", "search.page_text_cleaning
 const SAFE_SEARCH_ORDER = ["off", "moderate", "strict"];
 
 function isListKey(key: string): "fewer-widens" | "fewer-narrows" | null {
-  if (key.startsWith("search.blocklists") || key === "search.hosts.deny") return "fewer-widens";
-  if (key === "search.hosts.allow" || key === "content.filters") return "fewer-narrows";
+  if (key.startsWith("search.blocklists") || key === "search.hosts.deny" || key === "content.filters") return "fewer-widens";
+  if (key === "search.hosts.allow") return "fewer-narrows";
   return null;
 }
 

@@ -20,12 +20,16 @@
 //   - nobody but an admin lifts or reads an entry an admin set (a child or teen cannot);
 //   - an admin never reads or touches a teen's or an adult's own (`self`) entries;
 //   - an unknown list or a bad site name is refused with what to type instead.
+// CONTENT-POLICY-05: `content.filters` (person scope, merge: union) is held here too, with two differences: its entries are kinds of
+// content from the registry's options, and a removal the writer may not make is dropped silently, never answered with a line that
+// names the filter or who set it (C10). The band minimum is never in the delta; it is the policy's immutable band set.
 import { SettingsDelta } from "@maipai/spec/gen/ts/settings-delta.js";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { getPersonRole, isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { isMinorBand } from "@/lib/audience";
 import { BLOCKLIST_POLICY, blocklistIds, defaultListIds, lockedListIds } from "@/lib/blocklists/policy";
 import { parseHostEntries } from "@/lib/blocklists/customHosts";
 import { checkHost } from "@/lib/blocklists/hostLists";
@@ -56,6 +60,16 @@ export const SELF = "self";
 const HOSTS_ALLOW = "search.hosts.allow";
 
 const EMPTY: Delta = { add: [], remove: [] };
+export const FILTERS_KEY = "content.filters";
+const SITE_BLOCK_KEYS_EXCLUDED = new Set([FILTERS_KEY]);
+/** Roles that set no filters of their own: an owner or admin holds them (a child's own filters control is absent). */
+const GUARDIAN_HELD_ROLES: ReadonlySet<string> = new Set(["child"]);
+
+/** The kinds `content.filters` offers, from the registry. */
+function filterOptions(): string[] {
+  const range = getRegistryKey(FILTERS_KEY)?.range as { options?: unknown } | undefined;
+  return Array.isArray(range?.options) ? range.options.filter((o): o is string => typeof o === "string") : [];
+}
 
 /** The key's layering declaration, or undefined when the key is not a layered list. */
 function unionKey(key: string) {
@@ -106,28 +120,37 @@ export function globalDefaultItems(key: string): string[] {
   }
 }
 
+/** A stored `content.filters` row from before the gate: a plain list of kinds (written by the generic settings write). It is read as an
+ * override delta, a lazy rewrite: the next gate write stores it in that format. A person's own list stays theirs (`self`); a minor's is
+ * held by the household (`system`), so a minor can never lift what may have been an admin's choice, and it only ever tightens. */
+function legacyFilters(personId: string, list: unknown[]): Delta {
+  const known = new Set(filterOptions());
+  const by = isMinorBand(bandOfPerson(personId)) ? "system" : SELF;
+  const items = [...new Set(list.filter((v): v is string => typeof v === "string" && known.has(v)))];
+  return { add: items.map((item) => ({ item, set_by: by, hlc: "0:0:legacy" })), remove: [] };
+}
+
+function parseDelta(personId: string, key: string, text: string): Delta | undefined {
+  let json: unknown;
+  try { json = JSON.parse(text); } catch { return undefined; }
+  const parsed = SettingsDelta.safeParse(json);
+  if (parsed.success) return parsed.data;
+  if (key === FILTERS_KEY && Array.isArray(json)) return legacyFilters(personId, json);
+  return undefined;
+}
+
 /** A user-overrides row, parsed. An unreadable row reads as no change from the layers above, which is what
  * the person gets until an admin resets it; the write gate refuses to build on one (see readDeltaForWrite). */
 function readDelta(personId: string, key: string): Delta {
   const text = readLayerRow(personId, key);
   if (text === undefined) return EMPTY;
-  try {
-    const parsed = SettingsDelta.safeParse(JSON.parse(text));
-    return parsed.success ? parsed.data : EMPTY;
-  } catch {
-    return EMPTY;
-  }
+  return parseDelta(personId, key, text) ?? EMPTY;
 }
 
 function readDeltaForWrite(personId: string, key: string): Delta | undefined {
   const text = readLayerRow(personId, key);
   if (text === undefined) return EMPTY;
-  try {
-    const parsed = SettingsDelta.safeParse(JSON.parse(text));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
+  return parseDelta(personId, key, text);
 }
 
 /** The layered list keys, from the registry. */
@@ -190,7 +213,7 @@ function viewKind(viewer: PersonRow, target: { id: string; role: string }): "sel
  *   - an owner or admin: everything of a child's; of a teen's or an adult's, only the admin-set entries,
  *     never the person's own choices. */
 export function readOverrides(viewer: PersonRow, targetId: string, key: string): SettingsOpResult<OverrideView> {
-  if (!unionKey(key)) return { ok: false, status: 400, error: `${key} is not a setting with user overrides. Pick one of the site-block settings.` };
+  if (!unionKey(key)) return { ok: false, status: 400, error: `That setting has no per-person choices to change.` };
   const role = getPersonRole(targetId);
   if (!role) return { ok: false, status: 403, error: "That person could not be found. Pick someone from the People page." };
   const kind = viewKind(viewer, { id: targetId, role });
@@ -236,6 +259,10 @@ function addTightens(key: string): boolean {
 
 function normalizeItem(key: string, raw: string): { ok: true; item: string } | { ok: false; error: string } {
   const text = raw.trim();
+  if (key === FILTERS_KEY) {
+    if (!filterOptions().includes(text)) return { ok: false, error: `"${text.slice(0, 40)}" is not a kind of content Home can hold back. Pick one from the list.` };
+    return { ok: true, item: text };
+  }
   if (key === "search.blocklists") {
     if (!blocklistIds().includes(text)) return { ok: false, error: `"${text.slice(0, 40)}" is not a kind of site Home can block. Pick one from the list.` };
     return { ok: true, item: text };
@@ -277,7 +304,7 @@ export function changeOverrides(actor: PersonRow, targetId: string, key: string,
 }
 
 function changeOverridesGated(actor: PersonRow, targetId: string, key: string, change: LayerChange): SettingsOpResult<UnionResult> {
-  if (!unionKey(key)) return { ok: false, status: 400, error: `${key} is not a setting with user overrides. Pick one of the site-block settings.` };
+  if (!unionKey(key)) return { ok: false, status: 400, error: `That setting has no per-person choices to change.` };
   const role = getPersonRole(targetId);
   if (!role) return deny("That person could not be found. Pick someone from the People page.");
   const w = writer(actor, targetId, role);
@@ -300,7 +327,7 @@ function changeOverridesGated(actor: PersonRow, targetId: string, key: string, c
   }
 
   const current = readDeltaForWrite(targetId, key);
-  if (!current) return deny("This person's saved site settings could not be read, so Home will not change them. Use Back to the age group's settings on their page to reset them, then try again.");
+  if (!current) return deny("This person's saved settings could not be read, so Home will not change them. Reset them from the person's page, then try again.");
   const tightens = addTightens(key);
   const delta: Delta = { add: [...current.add], remove: [...current.remove] };
   if (w.kind === "self" && minor) {
@@ -333,8 +360,18 @@ function changeOverridesGated(actor: PersonRow, targetId: string, key: string, c
     return null;
   };
 
+  // CONTENT-POLICY-05 (C10, item 15): for the content filters a removal the writer may not make is dropped, never answered with a line
+  // that names a filter or who set it. What is left to remove is exactly what the writer may touch.
+  const silent = key === FILTERS_KEY;
+  if (silent) {
+    for (let i = removes.length - 1; i >= 0; i--) {
+      const existing = delta.add.find((e) => e.item === removes[i]);
+      if (!existing || mayTouch(existing) !== null) removes.splice(i, 1);
+    }
+  }
+
   // A teen's removal must be of an own add; checked before anything changes so a refusal writes nothing.
-  if (w.kind === "self" && role === "teen" && tightens) {
+  if (!silent && w.kind === "self" && role === "teen" && tightens) {
     const ownAdds = new Set(delta.add.filter((e) => e.set_by === SELF).map((e) => e.item));
     for (const item of removes) {
       if (!ownAdds.has(item) || baseline.has(item)) return deny("An owner or admin sets this.");
@@ -353,6 +390,7 @@ function changeOverridesGated(actor: PersonRow, targetId: string, key: string, c
     if (existing) {
       if (existing.set_by === w.by || w.kind === "self") continue; // already in force
       const refused = mayTouch(existing);
+      if (refused && silent) continue; // already in force as the person's own choice; the admin is not told
       if (refused) return deny(refused);
       delta.add = delta.add.filter((e) => e.item !== item);
     } else if (baseline.has(item) && !inRemove) {
@@ -384,9 +422,9 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
   const w = writer(actor, targetId, role);
   if ("error" in w) return deny(w.error);
   if (w.kind === "self" && role === "child") return deny("An owner or admin sets this.");
-  const names = keys.length > 0 ? keys : layeredListKeys();
+  const names = keys.length > 0 ? keys : layeredListKeys().filter((key) => !SITE_BLOCK_KEYS_EXCLUDED.has(key));
   for (const key of names) {
-    if (!unionKey(key)) return { ok: false, status: 400, error: `${key} is not a setting with user overrides. Pick one of the site-block settings.` };
+    if (!unionKey(key)) return { ok: false, status: 400, error: `That setting has no per-person choices to change.` };
   }
   let cleared = 0;
   for (const key of names) {
@@ -472,7 +510,7 @@ export function resetBlocklistRow(actor: PersonRow, targetId: string, item: stri
   if (w.kind === "self" && role === "child") return deny("An owner or admin sets this.");
   const band = bandOfPerson(targetId);
   const delta = readDeltaForWrite(targetId, BLOCKLISTS_KEY);
-  if (!delta) return deny("This person's saved site settings could not be read, so Home will not change them. Use Back to the age group's settings on their page to reset them, then try again.");
+  if (!delta) return deny("This person's saved settings could not be read, so Home will not change them. Reset them from the person's page, then try again.");
   // Same reach as backToUserDefaults. An entry out of reach is left alone and answered like "nothing to
   // reset", so an admin cannot tell a teen made a private choice.
   const mayClear = (e: DeltaEntry): boolean => (w.kind === "admin" ? e.set_by !== SELF || role === "child" : e.set_by === SELF || isAdultRole(role));
@@ -492,4 +530,50 @@ export function hiddenOwnChoice(actor: PersonRow, targetId: string, item: string
   const delta = readDeltaForWrite(targetId, BLOCKLISTS_KEY);
   if (!delta) return false;
   return [...delta.add, ...delta.remove].some((e) => e.item === item && e.set_by === SELF);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// CONTENT-POLICY-05: the person's content filters (`content.filters`)
+
+/** The added content filters in force for a person: the union of every layer, limited to the kinds the registry offers. The band minimum is
+ * not in it (it is the policy's immutable band set, `contentPolicy.ts`). The pass reads this once per person (C10, record 5a). */
+export function resolvedContentFilters(personId: string, band: AgeBand): string[] {
+  const known = new Set(filterOptions());
+  return resolveUnion(FILTERS_KEY, { band, personId }).items.filter((item) => known.has(item));
+}
+
+/** Whether `viewer` has a filters control for `targetId` at all: the person themself unless a child (a child sets none), and an owner or
+ * admin for a child's or teen's. Anyone else has none, and the key is left out of their list (absent, not locked: C10). */
+export function mayHoldFilters(viewer: PersonRow, targetId: string): boolean {
+  const role = getPersonRole(targetId);
+  if (!role) return false;
+  const w = writer(viewer, targetId, role);
+  if ("error" in w) return false;
+  return !(w.kind === "self" && GUARDIAN_HELD_ROLES.has(role));
+}
+
+/** The entries `viewer` may see on `targetId`'s filters: the person sees only their own (never an admin's: C10); an owner or admin sees
+ * a child's entries and only the admin-set entries of a teen's, never a teen's own choices (record 6b). */
+export function visibleContentFilters(viewer: PersonRow, targetId: string): string[] {
+  const seen = readOverrides(viewer, targetId, FILTERS_KEY);
+  return seen.ok ? [...new Set(seen.value.add.map((e) => e.item))].sort() : [];
+}
+
+/** A write of the whole visible list (the settings screen and an old client's `PUT /api/settings`): the difference from what the writer sees
+ * goes through the one gate as adds and removes. A removal of an entry the writer may not touch never appears in the difference, so an old
+ * client writing `[]` cannot lift what an admin set. */
+export function setVisibleContentFilters(actor: PersonRow, targetId: string, wanted: readonly string[]): SettingsOpResult<string[]> {
+  const current = visibleContentFilters(actor, targetId);
+  const want = new Set(wanted);
+  const res = changeOverrides(actor, targetId, FILTERS_KEY, {
+    add: [...want].filter((item) => !current.includes(item)),
+    remove: current.filter((item) => !want.has(item)),
+  });
+  return res.ok ? { ok: true, value: visibleContentFilters(actor, targetId) } : res;
+}
+
+/** "Back to the age group's settings" for the filters alone: a person clears their own, an owner or admin what they set; nothing else. */
+export function resetVisibleContentFilters(actor: PersonRow, targetId: string): SettingsOpResult<string[]> {
+  const res = backToUserDefaults(actor, targetId, [FILTERS_KEY]);
+  return res.ok ? { ok: true, value: visibleContentFilters(actor, targetId) } : res;
 }

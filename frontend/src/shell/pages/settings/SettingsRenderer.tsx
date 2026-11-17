@@ -33,6 +33,10 @@ interface SettingsRendererProps {
   settingKey?: string;
   optionsFrom?: Readonly<Record<string, readonly { value: string; label: string }[]>>;
   includeExpert?: boolean;
+  /** CONTENT-POLICY-05: read the values from `GET /api/people/:id/overrides` (an owner or admin's view of another person's content level, unrated and filter controls) instead of the person's own settings list; writes are the ordinary ones. */
+  overrides?: boolean;
+  /** Leave out keys that start with one of these (a page that shows them elsewhere). */
+  excludeKeyPrefixes?: readonly string[];
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -52,7 +56,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOverrides = {}, labelOverrides = {}, plainRows = false, settingKey, optionsFrom, includeExpert = false }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOverrides = {}, labelOverrides = {}, plainRows = false, settingKey, optionsFrom, includeExpert = false, overrides = false, excludeKeyPrefixes }: SettingsRendererProps) {
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -85,9 +89,10 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
     queryFn: () => api.settingsRegistry(),
     staleTime: Infinity,
   });
+  const valuesKey = overrides ? ["settings-values", scopeValue, "overrides"] : settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue];
   const valuesQuery = useQuery<ResolvedSetting[]>({
-    queryKey: settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue],
-    queryFn: () => api.settingsValues(scopeValue, settingKey),
+    queryKey: valuesKey,
+    queryFn: () => overrides ? api.personOverrides(scopeValue.slice("person:".length)) : api.settingsValues(scopeValue, settingKey),
   });
 
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -96,7 +101,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
   const [removal, setRemoval] = useState<{ key: string; value: unknown; message: string } | null>(null);
 
   function replaceValue(next: ResolvedSetting) {
-    queryClient.setQueryData<ResolvedSetting[]>(settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue], (prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
+    queryClient.setQueryData<ResolvedSetting[]>(valuesKey, (prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
   }
 
   async function handleChange(key: string, value: unknown): Promise<boolean> {
@@ -201,8 +206,9 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
             const eligible = (item: (typeof group.basic)[number]) =>
               (item.def.key !== "companions.allowed" || settingKey === "companions.allowed")
               && (companionsVisible || item.def.key !== "persona.active_id");
-            const basic = group.basic.filter(eligible);
-            const advanced = group.advanced.filter(eligible);
+            const kept = (item: (typeof group.basic)[number]) => !excludeKeyPrefixes?.some((prefix) => item.def.key.startsWith(prefix));
+            const basic = group.basic.filter(eligible).filter(kept);
+            const advanced = group.advanced.filter(eligible).filter(kept);
             return includeKeys ? { ...group, basic: basic.filter((item) => includeKeys.includes(item.def.key)), advanced: advanced.filter((item) => includeKeys.includes(item.def.key)) } : { ...group, basic, advanced };
           }).filter((group) => group.basic.length + group.advanced.length > 0);
           return groups.length === 0 ? (

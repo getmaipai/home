@@ -1500,6 +1500,8 @@ export const api = {
       body: JSON.stringify({ scope, key }),
     }),
   people: () => request<PersonRosterEntry[]>("/api/people"),
+  // CONTENT-POLICY-05: one person's content level, unrated and filter controls for an owner or admin (a teen's profile is closed to the ordinary settings read).
+  personOverrides: (id: string) => request<ResolvedSetting[]>(`/api/people/${encodeURIComponent(id)}/overrides`),
   // SETTINGS-LAYERS-01d: a person's blocked-site categories as two columns (global defaults, user overrides).
   siteBlocks: (id: string) => request<SiteBlocksView>(`/api/people/${encodeURIComponent(id)}/site-blocks`),
   setSiteBlock: (id: string, item: string, checked: boolean) =>

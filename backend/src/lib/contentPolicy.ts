@@ -142,7 +142,9 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
   return Object.freeze({ contentPolicyFor: resolve, filtersFor: (person: Person) => resolve(person).filters, checkAll });
 }
 export type CheckHit = { kind: ProtectionKind; severity: "mild" | "strong" };
-const resolver = createContentPolicyResolver({ readFilters: () => [] });
+// CONTENT-POLICY-05: the added filters come from the person's pass (resolved once per person, dropped on a write), never a settings read here.
+const passModule = () => require("@/lib/filter/pass") as typeof import("@/lib/filter/pass");
+const resolver = createContentPolicyResolver({ readFilters: (person) => passModule().passForPerson(person).settings["content.filters"] ?? [] });
 export const checkAll: (text: string) => CheckHit[] = resolver.checkAll;
 export const contentPolicyFor: (subject: Person | Audience) => ContentPolicy = resolver.contentPolicyFor;
 export const filtersFor: (person: Person) => ReadonlySet<ProtectionKind> = resolver.filtersFor;

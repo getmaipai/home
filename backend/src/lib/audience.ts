@@ -25,3 +25,8 @@ export function isMinorBand(band: AgeBand): boolean {
 export function controlsForNewPerson(role: string, controls: "child" | "teen" | "adult" | null | undefined): "child" | "teen" | "adult" | null {
   return controls ?? (role === "guest" ? "child" : null);
 }
+
+/** A guest has no band of their own (their controls give one): the one role check callers make outside this module. */
+export function isGuestRole(role: string): boolean {
+  return role === "guest";
+}

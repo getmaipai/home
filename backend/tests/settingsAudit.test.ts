@@ -67,11 +67,11 @@ describe("safety-relevant keys", () => {
     expect(directionFor("search.safe_search", "strict", "moderate")).toBe("widens");
     expect(directionFor("search.safe_search", "moderate", "off")).toBe("widens");
     expect(directionFor("search.safe_search", "off", "strict")).toBe("narrows");
-    for (const key of ["search.blocklists", "search.blocklists.child", "search.hosts.deny"]) {
+    for (const key of ["search.blocklists", "search.blocklists.child", "search.hosts.deny", "content.filters"]) {
       expect(directionFor(key, ["a", "b"], ["a"])).toBe("widens");
       expect(directionFor(key, ["a"], ["a", "b"])).toBe("narrows");
     }
-    for (const key of ["search.hosts.allow", "content.filters"]) {
+    for (const key of ["search.hosts.allow"]) {
       expect(directionFor(key, ["a", "b"], ["a"])).toBe("narrows");
       expect(directionFor(key, ["a"], ["a", "b"])).toBe("widens");
     }

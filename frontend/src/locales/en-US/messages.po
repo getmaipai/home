@@ -2008,7 +2008,7 @@ msgid "api.minor.grant_teen_max_pictures"
 msgstr "A teen can be given Max only for pictures. Chat, video and music stay Standard for them."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:79
+#: src/shell/pages/PersonProfilePage.tsx:87
 msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 msgstr "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 
@@ -3919,8 +3919,8 @@ msgstr "Back to draft"
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:243
 #: src/apps/people/FaceEnrollmentPage.tsx:261
-#: src/shell/pages/PersonProfilePage.tsx:71
-#: src/shell/pages/PersonProfilePage.tsx:80
+#: src/shell/pages/PersonProfilePage.tsx:79
+#: src/shell/pages/PersonProfilePage.tsx:88
 msgid "Back to Family"
 msgstr "Back to Family"
 
@@ -4736,7 +4736,7 @@ msgstr "Can use it now"
 #: src/shell/pages/FilesPage.tsx:428
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:170
+#: src/shell/pages/settings/SettingsRenderer.tsx:175
 #: src/shell/pages/status/StatusBoard.tsx:72
 #: src/shell/pages/status/StatusComponents.tsx:161
 #: src/shell/pages/StoragePage.tsx:205
@@ -6605,7 +6605,7 @@ msgstr "Computers, phones, the internet, software, artificial intelligence, gadg
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:180
+#: src/shell/pages/settings/SettingsRenderer.tsx:185
 #: src/shell/pages/UpdatesPage.tsx:202
 msgid "Confirm"
 msgstr "Confirm"
@@ -6678,6 +6678,12 @@ msgstr "Connection"
 #: src/lib/settingCopy.generated.ts:1901
 msgid "area.Connections"
 msgstr "Connections"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PersonContentSection.tsx:22
+#: src/shell/pages/PersonProfilePage.tsx:122
+msgid "Content"
+msgstr "Content"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:322
@@ -7214,7 +7220,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "Could not load conversations. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:192
 msgid "Could not load creations."
 msgstr "Could not load creations."
 
@@ -7295,7 +7301,7 @@ msgid "Could not load routing stats."
 msgstr "Could not load routing stats."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:193
+#: src/shell/pages/settings/SettingsRenderer.tsx:198
 msgid "Could not load settings."
 msgstr "Could not load settings."
 
@@ -7347,7 +7353,7 @@ msgstr "Could not load the household"
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:229
 #: src/shell/pages/FamilyPage.tsx:42
-#: src/shell/pages/PersonProfilePage.tsx:62
+#: src/shell/pages/PersonProfilePage.tsx:70
 msgid "Could not load the household."
 msgstr "Could not load the household."
 
@@ -7437,7 +7443,7 @@ msgid "Could not load voices. Try again."
 msgstr "Could not load voices. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:160
+#: src/shell/pages/PersonProfilePage.tsx:176
 msgid "Could not load what's been shared."
 msgstr "Could not load what's been shared."
 
@@ -7712,8 +7718,8 @@ msgid "Could not save that answer. Try again."
 msgstr "Could not save that answer. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:121
-#: src/shell/pages/settings/SettingsRenderer.tsx:178
+#: src/shell/pages/settings/SettingsRenderer.tsx:126
+#: src/shell/pages/settings/SettingsRenderer.tsx:183
 msgid "Could not save that change."
 msgstr "Could not save that change."
 
@@ -8100,7 +8106,7 @@ msgid "Creating…"
 msgstr "Creating…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:186
+#: src/shell/pages/PersonProfilePage.tsx:202
 msgid "Creations"
 msgstr "Creations"
 
@@ -8256,7 +8262,7 @@ msgid "setting.allowance.robot_body.daily_minutes.label"
 msgstr "Daily Robot body minutes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:130
+#: src/shell/pages/PersonProfilePage.tsx:141
 msgid "Daily time limits for {name}."
 msgstr "Daily time limits for {name}."
 
@@ -9340,7 +9346,7 @@ msgid "Edit {name}"
 msgstr "Edit {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:92
+#: src/shell/pages/PersonProfilePage.tsx:102
 msgid "Edit {name}’s profile"
 msgstr "Edit {name}’s profile"
 
@@ -9375,8 +9381,8 @@ msgid "Edit keyframe: {label}"
 msgstr "Edit keyframe: {label}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:218
-#: src/shell/pages/PersonProfilePage.tsx:218
+#: src/shell/pages/PersonProfilePage.tsx:234
+#: src/shell/pages/PersonProfilePage.tsx:234
 msgid "Edit profile"
 msgstr "Edit profile"
 
@@ -12778,7 +12784,7 @@ msgid "setting.robot.volume.help"
 msgstr "How loud this robot speaks by default, from 20 to 100 percent. You can also tell it 'volume to 60'. At night it plays quieter and goes back to this level in the morning."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:140
+#: src/shell/pages/PersonProfilePage.tsx:156
 msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 msgstr "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 
@@ -14820,7 +14826,7 @@ msgid "Library"
 msgstr "Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:213
+#: src/shell/pages/PersonProfilePage.tsx:229
 msgid "Library counts"
 msgstr "Library counts"
 
@@ -14949,7 +14955,7 @@ msgid "Limit peaks"
 msgstr "Limit peaks"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:110
+#: src/shell/pages/PersonProfilePage.tsx:120
 msgid "Limits"
 msgstr "Limits"
 
@@ -15244,7 +15250,7 @@ msgid "Loading copies"
 msgstr "Loading copies"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:192
 msgid "Loading creations"
 msgstr "Loading creations"
 
@@ -15351,7 +15357,7 @@ msgid "Loading performance"
 msgstr "Loading performance"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:63
+#: src/shell/pages/PersonProfilePage.tsx:71
 msgid "Loading profile"
 msgstr "Loading profile"
 
@@ -15400,7 +15406,7 @@ msgstr "Loading sessions"
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:65
 #: src/shell/pages/settings/SettingsAreaPage.tsx:162
-#: src/shell/pages/settings/SettingsRenderer.tsx:194
+#: src/shell/pages/settings/SettingsRenderer.tsx:199
 msgid "Loading settings"
 msgstr "Loading settings"
 
@@ -15410,7 +15416,7 @@ msgid "Loading setup status"
 msgstr "Loading setup status"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:160
+#: src/shell/pages/PersonProfilePage.tsx:176
 msgid "Loading shared media"
 msgstr "Loading shared media"
 
@@ -18125,7 +18131,7 @@ msgid "No one in this household has that profile"
 msgstr "No one in this household has that profile"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:70
+#: src/shell/pages/PersonProfilePage.tsx:78
 msgid "No one in this household has that profile."
 msgstr "No one in this household has that profile."
 
@@ -18247,7 +18253,7 @@ msgid "No settings match that search."
 msgstr "No settings match that search."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:209
+#: src/shell/pages/settings/SettingsRenderer.tsx:215
 msgid "No settings yet."
 msgstr "No settings yet."
 
@@ -18806,7 +18812,7 @@ msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr "Nothing saved yet. Open an article and press Save to keep it here."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:166
+#: src/shell/pages/PersonProfilePage.tsx:182
 msgid "Nothing shared yet."
 msgstr "Nothing shared yet."
 
@@ -19947,7 +19953,7 @@ msgid "setting.storage.person.cap_bytes.help"
 msgstr "Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:109
+#: src/shell/pages/PersonProfilePage.tsx:119
 #: src/shell/pages/settings/SettingsHomePage.tsx:43
 msgid "Overview"
 msgstr "Overview"
@@ -20691,7 +20697,7 @@ msgstr "Picture quality"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AutoLocksSection.tsx:13
-#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:221
 msgid "pictures"
 msgstr "pictures"
 
@@ -20730,7 +20736,7 @@ msgid "setting.resources.strict.image.label"
 msgstr "Pictures always go first"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:133
+#: src/shell/pages/PersonProfilePage.tsx:144
 msgid "Pictures and videos can be made in chat."
 msgstr "Pictures and videos can be made in chat."
 
@@ -21258,7 +21264,7 @@ msgid "Professional"
 msgstr "Professional"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:208
+#: src/shell/pages/PersonProfilePage.tsx:224
 #: src/shell/pages/settings/settingsViews.tsx:64
 msgid "Profile"
 msgstr "Profile"
@@ -22904,7 +22910,7 @@ msgid "Role for {name}"
 msgstr "Role for {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:119
+#: src/shell/pages/PersonProfilePage.tsx:130
 msgid "Role: {role}"
 msgstr "Role: {role}"
 
@@ -23824,7 +23830,7 @@ msgid "See"
 msgstr "See"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:191
+#: src/shell/pages/PersonProfilePage.tsx:207
 msgid "See all"
 msgstr "See all"
 
@@ -24272,7 +24278,7 @@ msgstr "Setting up your AI"
 #: src/shell/coreLabels.ts:13
 #: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FilesPage.tsx:304
-#: src/shell/pages/PersonProfilePage.tsx:220
+#: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
 #: src/shell/Routes.tsx:510
 msgid "Settings"
@@ -24353,7 +24359,7 @@ msgstr "Shapes the music sound. Flat leaves it as recorded; the others lift bass
 #: src/shell/library/LibraryViewer.tsx:209
 #: src/shell/pages/FilesPage.tsx:353
 #: src/shell/pages/MusicSongDetails.tsx:164
-#: src/shell/pages/PersonProfilePage.tsx:219
+#: src/shell/pages/PersonProfilePage.tsx:235
 msgid "Share"
 msgstr "Share"
 
@@ -24368,7 +24374,7 @@ msgid "Share with the household"
 msgstr "Share with the household"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:159
+#: src/shell/pages/PersonProfilePage.tsx:175
 msgid "Shared"
 msgstr "Shared"
 
@@ -24440,7 +24446,7 @@ msgid "Show {count} more"
 msgstr "Show {count} more"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:239
+#: src/shell/pages/settings/SettingsRenderer.tsx:245
 msgid "Show {length} advanced settings"
 msgstr "Show {length} advanced settings"
 
@@ -24679,7 +24685,7 @@ msgid "setting.media.allowlist_only.does"
 msgstr "Shows the home library and sources picked for you."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:120
+#: src/shell/pages/PersonProfilePage.tsx:131
 msgid "shows unrated items"
 msgstr "shows unrated items"
 
@@ -25216,7 +25222,7 @@ msgid "Some pictures were locked by Home on its own, not by you. Clearing them m
 msgstr "Some pictures were locked by Home on its own, not by you. Clearing them makes them visible again. Pictures you locked yourself, and adult-style pictures, are never changed."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:142
+#: src/shell/pages/PersonProfilePage.tsx:158
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 
@@ -25308,7 +25314,7 @@ msgstr "Something went wrong. Try asking again."
 #: src/shell/pages/CompanionsPage.tsx:262
 #: src/shell/pages/FilesPage.tsx:166
 #: src/shell/pages/musicComposerMode.ts:19
-#: src/shell/pages/PersonProfilePage.tsx:189
+#: src/shell/pages/PersonProfilePage.tsx:205
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
 msgid "Song"
@@ -25347,7 +25353,7 @@ msgid "Song to change"
 msgstr "Song to change"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:203
+#: src/shell/pages/PersonProfilePage.tsx:219
 msgid "songs"
 msgstr "songs"
 
@@ -26936,7 +26942,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:265
-#: src/shell/pages/settings/SettingsRenderer.tsx:184
+#: src/shell/pages/settings/SettingsRenderer.tsx:189
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82
 #: src/shell/pages/status/StatusBoard.tsx:41
@@ -29137,7 +29143,7 @@ msgid "Top rated"
 msgstr "Top rated"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:111
+#: src/shell/pages/PersonProfilePage.tsx:121
 msgid "Topics"
 msgstr "Topics"
 
@@ -29489,7 +29495,7 @@ msgid "setting.news.shelf.enabled.help"
 msgstr "Turn the household news shelf on or off."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:166
+#: src/shell/pages/settings/SettingsRenderer.tsx:171
 msgid "Turn this feature off?"
 msgstr "Turn this feature off?"
 
@@ -30466,7 +30472,7 @@ msgstr "Very Simple"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:166
-#: src/shell/pages/PersonProfilePage.tsx:189
+#: src/shell/pages/PersonProfilePage.tsx:205
 msgid "Video"
 msgstr "Video"
 
@@ -30526,7 +30532,7 @@ msgid "setting.generation.video.adult_adapters.option.restricted"
 msgstr "Video styles with an age limit are left out of the choices."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:204
+#: src/shell/pages/PersonProfilePage.tsx:220
 msgid "videos"
 msgstr "videos"
 
@@ -31105,7 +31111,7 @@ msgid "Welcome to MaiPai Home"
 msgstr "Welcome to MaiPai Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:117
+#: src/shell/pages/PersonProfilePage.tsx:128
 msgid "What {name} can see"
 msgstr "What {name} can see"
 
@@ -32117,7 +32123,7 @@ msgid "You cannot make a new key with your current Coding access."
 msgstr "You cannot make a new key with your current Coding access."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:78
+#: src/shell/pages/PersonProfilePage.tsx:86
 msgid "You cannot open this profile."
 msgstr "You cannot open this profile."
 
