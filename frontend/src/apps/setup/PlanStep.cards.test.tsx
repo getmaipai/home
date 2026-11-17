@@ -36,7 +36,7 @@ describe("the plan step's job cards", () => {
   });
   test("the face finder is listed ticked and sent as a row; the video-from-pictures adapter is listed, off, and says where to add it", async () => {
     const plan = plans.p128!;
-    const choices = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } });
+    const choices = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } });
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { choices })} start={start} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });

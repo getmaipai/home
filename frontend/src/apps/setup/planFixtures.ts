@@ -6,5 +6,5 @@ export const fakeCopy: AiCopy = {
   choice: (id) => ({ label: id === "videos.detailed" ? "Detailed videos" : id === "videos.quick" ? "Quick videos" : id === "music.sound" ? "Make better sound effects" : `Choice ${id}`, description: `What ${id} does.` }),
 };
 export function cardsFor(plan: DiskPlan) {
-  return buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null });
+  return buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors: false }, freeBytes: null });
 }

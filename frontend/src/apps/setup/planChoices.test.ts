@@ -52,7 +52,7 @@ describe("setup jobs", () => {
 
 describe("the hub's own parts in the wizard", () => {
   const plan = plans.p128!;
-  const cards = () => buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } }).cards;
+  const cards = () => buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } }).cards;
 
   test("the face finder starts on and is a hub row; the adapter is listed but blocked and off", () => {
     const jobs = setupJobs(cards(), plan);
