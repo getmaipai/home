@@ -38,7 +38,6 @@ import { checkTrack, clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { resolveStyles } from "./styleChoice";
-import { castForTool } from "@/lib/cast";
 import { runStackSwap } from "./stackSwap";
 import { swapReferencePhotos } from "./swapReferences";
 import { ltx25LorasSupported } from "./loraWire";
@@ -259,6 +258,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     const h3Swap = (engine?.qualities as unknown as { h3_swap?: { ready?: boolean; memory?: { fits?: boolean } } } | undefined)?.h3_swap;
     if (!h3Swap?.ready) return refused(callId, args, "Swapping a face is not available on this computer yet.", "swap_unavailable");
     if (h3Swap.memory?.fits === false) return refused(callId, args, "Not enough free memory for a face swap right now. Close other big jobs, or try again in a few minutes.", "no_memory");
+    const { castForTool } = await import("@/lib/cast"); // loaded here: cast.ts reaches the persona store, which imports this file back
     const chosen = await castForTool(actor, args, { band: audience.band, temporary });
     if (!chosen.ok) return refused(callId, args, chosen.line, "bad_cast");
     const member = chosen.members[0];
