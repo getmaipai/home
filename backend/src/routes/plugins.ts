@@ -16,7 +16,7 @@ import { isDirectory } from "@/lib/bundledPackages";
 import type { PersonRow } from "@/types";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
-import { listInstalledManifests, listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { listInstalledManifests, listPackageIds, loadManifestOnly, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
@@ -30,7 +30,7 @@ import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { passFor } from "@/lib/filter/pass";
+import { mayUse } from "@/lib/filter/pass";
 import "@/lib/imageApp";
 
 export const pluginsRoutes = apiRouter();
@@ -42,7 +42,7 @@ export const pluginsRoutes = apiRouter();
 pluginsRoutes.get("/", requireAuth, async (c) => {
   const statuses = allPackageStatuses();
   const actor = c.get("person");
-  const manifests = listInstalledManifests().filter((manifest) => meetsMinRole(actor.role, manifest.min_role) && passFor(actor.id).access.has(`use:${manifest.id}`));
+  const manifests = listInstalledManifests().filter((manifest) => mayUse(actor, manifest.id));
   const rows = manifests.map((manifest) => {
     const status = statuses.get(manifest.id);
     return {
@@ -118,7 +118,7 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
     false, false, false, false, false, false, false, null,
     // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
-    writingFormatsFor(actor.role).length > 0,
+    writingFormatsFor(actor).length > 0,
     false, voiceoverOk, false, houseOk,
     uptimeOk,
     inspiredVoiceOk,
@@ -134,7 +134,7 @@ pluginsRoutes.openapi(skillsRoute, async (c) => {
   const rows = listPackageIds()
     .map((id) => loadManifestOnly(id))
     .flatMap((loaded) => (loaded.ok ? [loaded.value] : []))
-    .filter((manifest) => SKILL_KINDS.has(manifest.kind) && meetsMinRole(actor.role, manifest.min_role) && missingRequired(manifest, unavailable).length === 0)
+    .filter((manifest) => SKILL_KINDS.has(manifest.kind) && mayUse(actor, manifest.id) && missingRequired(manifest, unavailable).length === 0)
     .map((manifest) => {
       const status = statuses.get(manifest.id)?.status ?? "enabled";
       const offeredHere = manifest.kind === "project" ? offered.has(START_PROJECT_TOOL_ID) && getProjectType(manifest.id) !== undefined : offered.has(manifest.id);

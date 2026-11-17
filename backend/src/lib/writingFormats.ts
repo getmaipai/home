@@ -6,7 +6,8 @@
 import type { ToolSpec } from "@/lib/llm";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import { loadAllSkills, loadSkill, type LoadedSkill } from "@/lib/skills";
-import { meetsMinRole } from "@/lib/plugins";
+import { mayUse } from "@/lib/filter/pass";
+import type { PersonRow } from "@/types";
 
 export const WRITING_FORMAT_TOOL_ID = "writing_format";
 
@@ -31,9 +32,9 @@ export function installedWritingFormats(): LoadedSkill[] {
   }
 }
 
-/** The installed formats a person of this role may use (the manifest's min_role floor). */
-export function writingFormatsFor(role: string): LoadedSkill[] {
-  return installedWritingFormats().filter((skill) => meetsMinRole(role, skill.manifest.min_role));
+/** The installed formats this person may use (GRANTS-01: `mayUse`, the role floor and their grants). */
+export function writingFormatsFor(person: Pick<PersonRow, "id" | "role" | "controls">): LoadedSkill[] {
+  return installedWritingFormats().filter((skill) => mayUse(person, skill.manifest.id));
 }
 
 /** Built fresh on every call (which formats exist changes when a package is installed): the enum is the real list of ids. */

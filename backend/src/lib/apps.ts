@@ -6,7 +6,7 @@
 // status, capabilities, platforms), the page is a spec `page` document, the place is `resolvePlace`,
 // the data is the package's own recipe through `runPlugin`, and the blocks leave through
 // `filterAnswerBlocks` exactly as a chat turn's do.
-import { passFor } from "@/lib/filter/pass";
+import { mayUse } from "@/lib/filter/pass";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -273,17 +273,18 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
 
 // ---- Who may see an app --------------------------------------------------------------------
 
-/** The one gate for the app list, a page and a data call: the person's role clears the package's `min_role`,
+/** The one gate for the app list, a page and a data call: the person may use the package (`mayUse`: its `min_role`, their grants),
  * its last smoke test did not disable it, no required capability is missing, and it runs on `home`. A package
  * that fails it is absent (404 on the routes), so its existence does not leak. Age and surface gates are not
  * here and are not loosened: they stay on the data path (`resolvePlace` coarsening, `filterAnswerBlocks`). */
 export function appVisibleTo(
-  person: Pick<PersonRow, "role">,
+  person: Pick<PersonRow, "role"> & Partial<Pick<PersonRow, "id" | "controls">>,
   manifest: PackageManifest,
   status: { status: "enabled" | "disabled" } = getPackageStatus(manifest.id),
   unavailable: Set<string> = unavailableCapabilities(),
 ): boolean {
-  if (!meetsMinRole(person.role, manifest.min_role)) return false;
+  // GRANTS-01 (C5, C10): the one feature access check (the role floor, the person's grants and the pass), not a second inline compare.
+  if (!mayUse({ id: person.id ?? "", role: person.role, controls: person.controls ?? null }, manifest.id)) return false;
   if (status.status !== "enabled") return false;
   if (missingRequired(manifest, unavailable).length > 0) return false;
   if (!manifest.platforms.includes("home")) return false;
@@ -453,14 +454,12 @@ function settingsAreaFor(person: Pick<PersonRow, "role">, manifest: PackageManif
 export function listApps(person: PersonRow): AppRow[] {
   const statuses = allPackageStatuses();
   const unavailable = unavailableCapabilities();
-  const pass = passFor(person.id); // OVERRIDES-01: an app outside the person's pass is absent
   const rows: AppRow[] = [];
   for (const id of listPackageIds()) {
     const app = loadApp(id);
     if (!app || app.problems.length > 0) continue;
     const status = statuses.get(id) ?? { status: "enabled" as const };
     if (!appVisibleTo(person, app.manifest, status, unavailable)) continue;
-    if (!pass.access.has(`use:${id}`)) continue;
     const index = app.contributes.pages!.find((page) => page.id === "index")!;
     if (index.nav === false) continue;
     if (!pageVisibleTo(person, app.manifest, index)) continue;

@@ -263,7 +263,7 @@ describe("policyNode: structured brake confirmation", () => {
     setHouseholdSettingValue("tools.lists.mode", "never");
     const state = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [], crisis: false, temporary: false, utterance: "move several things" } as unknown as TurnState;
     const outcome = await policyNode(state, { calls: [{ id: "call-list", tool: "remind", args: { action: "move_items", items: ["a", "b", "c", "d", "e", "f"] } }] }, new AbortController().signal);
-    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "min_role" });
+    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "not_available" });
     expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "lists", action: "move_items", decision: "never" }]);
   });
 
@@ -276,7 +276,7 @@ describe("policyNode: structured brake confirmation", () => {
     setHouseholdSettingValue("tools.remind.mode", "never");
     const state = { actor: { id: owner.id, role: "adult" }, surface: "chat", speakerEvidence: { kind: "person" }, context: [{ source: "window", id: "window-user-1", text: "tomorrow at 5 to call" }], crisis: false, temporary: false, utterance: "remind me tomorrow at 5 to call" } as unknown as TurnState;
     const outcome = await policyNode(state, { calls: [{ id: "call-remind", tool: "remind", args: { expression: "tomorrow at 5 to call" } }] }, new AbortController().signal);
-    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "min_role" });
+    expect(outcome.output.entries[0]?.decision).toMatchObject({ allow: false, reason: "not_available" });
     expect(listOwnToolAudit(owner.id, 5)).toMatchObject([{ tool: "remind", action: "", decision: "never" }]);
   });
 });

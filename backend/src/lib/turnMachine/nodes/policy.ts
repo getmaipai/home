@@ -18,7 +18,7 @@ import { tokenize, wordsOf, isBarePronoun } from "@/lib/text";
 import { READ_ITEM_TOOL_ID, itemRefsIn } from "@/lib/items/tool";
 import { WRITING_FORMAT_TOOL_ID, writingFormatForArgs } from "@/lib/writingFormats";
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID } from "@/lib/voiceTools";
-import { meetsMinRole } from "@/lib/plugins";
+import { mayUse } from "@/lib/filter/pass";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
@@ -76,7 +76,7 @@ function gateRefusalReason(reason: import("@/lib/gate/types").DenyReason): Extra
   if (reason === "needs_parent_unavailable") return "parent_required";
   // Keep the legacy policy line for both a role floor and a capability
   // the band may never use; no new parent-approval path is implied.
-  return "min_role";
+  return "not_available";
 }
 
 /** The owner's ruling (state record, "Grounding, stated exactly",
@@ -425,7 +425,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const formatProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const format = writingFormatForArgs(callArgs);
-      if (!state.writingFormatAllowed || (format && !meetsMinRole(state.actor.role, format.manifest.min_role))) {
+      if (!state.writingFormatAllowed || (format && !mayUse(state.actor, format.manifest.id))) {
         noteRefusal("format_not_here");
         entries.push({ proposal: formatProposal, decision: { allow: false, reason: "format_not_here" } });
         continue;
@@ -627,6 +627,12 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       continue;
     }
     const manifest = loaded.value;
+    // GRANTS-01 (C5, C10): the one feature access check. A package this person may not use is refused as not available here.
+    if (!mayUse(state.actor, manifest.id)) {
+      noteRefusal("not_available", call.tool);
+      entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "not_available" } });
+      continue;
+    }
     // An alarm action (or a reminder cancel or list) is private to the identified person; a plain timer or reminder is not.
     if (isAlarmActionCall(manifest.id, call.args as Record<string, unknown> | undefined) && speakerIsAnonymous(state)) {
       noteRefusal("anonymous_speaker");
@@ -700,7 +706,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         }
         if (brake.decision === "never") {
           noteRefusal(brake.reason ?? "min_role");
-          entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
+          entries.push({ proposal, decision: { allow: false, reason: "not_available" } });
           continue;
         }
         if (brake.decision === "ask") {

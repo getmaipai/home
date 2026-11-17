@@ -19,6 +19,7 @@
 // function per package, the same "one definition, one implementation"
 // reasoning the org's own standards state outright.
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { mayUse } from "@/lib/filter/pass";
 import { getActiveInstall } from "@/lib/packageResolve";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { getPackageStatus } from "@/lib/smoke";
@@ -94,13 +95,13 @@ export type OpResult<T> = { ok: true; status: 200; value: T } | { ok: false; sta
 /** Every widget the actor's own role clears, across every bundled or
  * installed package - the same min_role floor `runPlugin()` itself
  * enforces before a widget's own data route ever runs its recipe. */
-export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
+export function listWidgets(actor: Pick<PersonRow, "id" | "role" | "controls">): WidgetDescriptor[] {
   const out: WidgetDescriptor[] = [];
   for (const id of listPackageIds()) {
     const loaded = loadManifestOnly(id);
     if (!loaded.ok) continue;
     const manifest = loaded.value;
-    if (!meetsMinRole(actor.role, manifest.min_role)) continue;
+    if (!mayUse(actor, id)) continue;
     const installedAt = getActiveInstall(id)?.installedAt ?? "";
     for (const widget of manifest.contributes?.widgets ?? []) {
       out.push({ package: id, id: widget.id, title: widget.title, size: widget.size, refresh_s: widget.refresh_s,
@@ -140,7 +141,7 @@ function allowedWidgets(widgets: WidgetDescriptor[], person: PersonRow, surface:
   return widgets.filter((widget) => {
     const loaded = loadManifestOnly(widget.package);
     if (!meetsMinRole(person.role, widget.min_role)) return false;
-    if (loaded.ok && !meetsMinRole(person.role, loaded.value.min_role)) return false;
+    if (!mayUse(person, widget.package)) return false;
     if (getPackageStatus(widget.package).status !== "enabled") return false;
     if (!widget.surfaces.includes(surface)) return false;
     if (surface !== "home" && Object.keys(widget.inputs ?? {}).some((key) => /person|people|user|profile/i.test(key))) return false;
@@ -217,7 +218,7 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   const manifest = loaded.value;
   const widget = manifest.contributes?.widgets?.find((w) => w.id === widgetId);
   if (!widget) return { ok: false, status: 404, error: "no such widget" };
-  if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
+  if (!mayUse(actor, packageId)) return { ok: false, status: 404, error: "no such package" };
 
   if (packageId === "remind" && widgetId === "upcoming") return comingUpWidget(actor, "reminder");
   if (packageId === "timer" && widgetId === "running") return comingUpWidget(actor, "timer");

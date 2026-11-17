@@ -645,7 +645,7 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     // dropped; the refusal line is for a generation that produced none. Every other reason
     // (age, surface, crisis, temporary, household, consent) keeps its line, and the text
     // still passes output_gate like any reply.
-    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool" || e.decision.reason === "unknown_project_type" || e.decision.reason === "format_not_here");
+    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool" || e.decision.reason === "unknown_project_type" || e.decision.reason === "not_available" || e.decision.reason === "format_not_here");
     if (onlyCallFaults && context.modelDraft && context.modelDraft.trim().length > 0) {
       return { kind: "model_text", text: context.modelDraft };
     }

@@ -91,10 +91,15 @@ function buildFrom(person: PassPerson): Pass {
   const now = new Date().toISOString();
   const grants = grantsModule().listGrants(person.id).filter((grant) => grantsModule().isGrantActive({ validFrom: grant.valid_from, validTo: grant.valid_to }, now));
   const denied = new Set(grants.filter((grant) => grant.effect === "deny").map((grant) => grant.action));
+  const allowed = new Set(grants.filter((grant) => grant.effect === "allow").map((grant) => grant.action));
   const { listInstalledManifests, meetsMinRole } = pluginsModule();
   for (const manifest of listInstalledManifests()) {
-    // An allow grant never lifts `min_role` for a child or teen (C7): meetsMinRole stays the gate.
-    if (meetsMinRole(person.role, manifest.min_role) && !denied.has(`use:${manifest.id}`)) access.add(`use:${manifest.id}`);
+    const action = `use:${manifest.id}`;
+    if (denied.has(action)) continue;
+    if (meetsMinRole(person.role, manifest.min_role)) { access.add(action); continue; }
+    // C7: an allow grant lifts an admin or owner `min_role` for a person in the adult band only (a permission ladder); it never lifts
+    // `adult` or `teen` for a child or teen (chat rule 0's age gate), and a row inserted directly changes nothing for them.
+    if (band === "adult" && (manifest.min_role === "admin" || manifest.min_role === "owner") && allowed.has(action)) access.add(action);
   }
   for (const grant of grants) if (grant.effect === "allow" && !denied.has(grant.action) && !grant.action.startsWith("use:")) access.add(grant.action);
 
@@ -102,6 +107,11 @@ function buildFrom(person: PassPerson): Pass {
   for (const key of personProtectionKeys()) settings[key] = settingsModule().getPersonSettingValue(person as PersonRow, key);
 
   return Object.freeze({ person_id: person.id, version: nextPassVersion(), access, ceiling: Object.freeze(ceiling), unrated, band, settings: Object.freeze(settings) });
+}
+
+/** GRANTS-01 (C5, C7, C10): the one feature access check, called where a feature starts. A refusal looks like absence. */
+export function mayUse(person: PassPerson, featureId: string): boolean {
+  return passForPerson(person).access.has(`use:${featureId}`);
 }
 
 /** The pass for a person row we already hold (a stale entry from another role or controls is rebuilt, so a changed role never reads old). */

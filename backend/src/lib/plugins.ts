@@ -55,6 +55,7 @@ import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
 import { cardMoon, moonTile } from "@/lib/weatherMoon";
 import { weatherAlerts, notifyWeatherAlertsForHome } from "@/lib/weatherAlerts";
+import { mayUse } from "@/lib/filter/pass";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -622,9 +623,8 @@ export async function runPlugin(
   const manifestResult = loadManifestOnly(id);
   if (!manifestResult.ok) return manifestResult;
   const manifest = manifestResult.value;
-  if (!meetsMinRole(actor.role, manifest.min_role)) {
-    return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
-  }
+  // GRANTS-01 (C10): a package this person may not use answers exactly as one that does not exist.
+  if (!mayUse(actor, id)) return { ok: false, status: 404, error: `no bundled package ${id}` };
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
   if (id === "remind") inputs = remindInputs(inputs);

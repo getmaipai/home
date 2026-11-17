@@ -170,7 +170,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   if (latch && objectAllowed && musicObjectRef) { latch.musicObject = musicObjectRef; if (musicObjectRef.kind === "track") latch.musicBandOk = true; }
   const musicBandOk = objectAllowed && musicObjectRef?.kind === "track";
   const musicObject: MusicObjectGate = !objectAllowed ? null : (musicObjectRef?.kind ?? "none");
-  const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor.role).length > 0);
+  const writingFormatOk = !input.bare && input.surfaceClass === "written" && safeGate(() => writingFormatsFor(input.actor).length > 0);
   const voiceoverOk = !input.bare && !input.spoken && input.surfaceClass === "written" && speakerAgeBand(input.actor, new Date()) === "adult" && input.actor.role !== "guest" && (await readiness(async () => (await roleHealth("voice")).availability === "ready"));
   const sceneOk = !input.bare && input.actor.role !== "guest" && (input.spoken || input.surfaceClass !== "written" || input.budget.rounds > 0);
   const impressionOk = !input.bare && input.surface === "robot" && input.surfaceClass === "spoken" && !!input.deviceId && impressionAvailable(input.actor, input.band, input.deviceId);

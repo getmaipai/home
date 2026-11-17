@@ -16,7 +16,8 @@
 import { matchCommand, runCommand } from "@/lib/commands";
 import { matchPattern, loadAllManifests } from "@/lib/turnShared";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
-import { runPlugin, meetsMinRole } from "@/lib/plugins";
+import { runPlugin } from "@/lib/plugins";
+import { mayUse } from "@/lib/filter/pass";
 import { outcomeOf } from "@/lib/turnContext";
 import { speakerIsAnonymous, touchesMemory } from "../speaker";
 import { usableReply } from "@/lib/composer";
@@ -136,7 +137,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
 
   for (const { id, manifest } of loadAllManifests()) {
     if (manifest.routing?.always_offer) continue;
-    if (!meetsMinRole(state.actor.role, manifest.min_role)) continue;
+    if (!mayUse(state.actor, id)) continue;
     // A code review (2026-09-22) caught this loop with neither of
     // the old engine file's own two guards on its identical literal-pattern
     // match: skipping a consequential manifest here (the old engine file

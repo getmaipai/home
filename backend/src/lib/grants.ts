@@ -135,6 +135,16 @@ function tierGrantRefusal(catalogActionId: string, action: string, personId: str
   return null;
 }
 
+/** GRANTS-01 (C7): an allow of `use:<package>` never lifts a package's `min_role` for a child or a teen (chat rule 0's age gate). A deny is always accepted. */
+function useGrantRefusal(input: GrantCreate, personId: string): string | null {
+  if (input.effect !== "allow" || !input.action.startsWith("use:")) return null;
+  const role = db.select({ role: people.role }).from(people).where(eq(people.id, personId)).get()?.role;
+  if (role !== "child" && role !== "teen") return null;
+  const { loadManifestOnly, meetsMinRole } = require("@/lib/plugins") as typeof import("@/lib/plugins");
+  const loaded = loadManifestOnly(input.action.slice("use:".length));
+  return loaded.ok && !meetsMinRole(role, loaded.value.min_role) ? "That one isn't available for this profile." : null;
+}
+
 export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {
   const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, input.person), isNull(people.deletedAt))).get();
   if (!person) return refusal(400, "grant_person_missing");
@@ -145,6 +155,8 @@ export function createGrant(actor: { id: string; role: Role }, input: GrantCreat
   }
   const tierRefusal = tierGrantRefusal(matchedAction.id, input.action, person.id);
   if (tierRefusal) return refusal(400, tierRefusal);
+  const useRefusal = useGrantRefusal(input, person.id);
+  if (useRefusal) return { ok: false, status: 400, error: useRefusal };
   if (!actorHoldsAction(actor, input.action, matchedAction.id)) return refusal(400, "grant_not_held");
 
   const now = new Date().toISOString();

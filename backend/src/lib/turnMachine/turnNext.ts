@@ -84,7 +84,7 @@ import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import { PARENT_REQUIRED_LINE } from "./nodes/answer";
+import { NOT_AVAILABLE_LINE, PARENT_REQUIRED_LINE } from "./nodes/answer";
 import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
 import { reAskForShowImages, toolSpecFor } from "./nodes/model";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -609,7 +609,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
           : pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "temporary_mode"
             ? "I can't save anything in a temporary chat."
             : pendingAskDecision?.kind === "deny" && (pendingAskDecision.reason === "min_band" || pendingAskDecision.reason === "never_for_band")
-              ? "That one needs a grown-up."
+              ? NOT_AVAILABLE_LINE
               : "That confirmation can't be answered here.";
       return { ok: false, result: { ok: false, status: 403, code: "ask_not_allowed", error } };
     }

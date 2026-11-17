@@ -207,11 +207,11 @@ describe("GET /api/widgets/:package/:id/data", () => {
     expect(res.status).toBe(404);
   });
 
-  test("403s below the package's own min_role", async () => {
+  test("answers like a missing package below the package's own min_role", async () => {
     const ownerClient = await owner();
     const guestClient = await guest(ownerClient);
     const res = await guestClient.get("/api/widgets/weather/current/data");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   test("runs the real package recipe with the widget's declared inputs - remind's shopping-list empty reply", async () => {
@@ -290,14 +290,14 @@ describe("Next up and Timers widgets", () => {
 
   test("a guest is refused by the package's own role floor", async () => {
     const guestClient = await guest(await owner());
-    expect((await guestClient.get("/api/widgets/remind/upcoming/data")).status).toBe(403);
-    expect((await guestClient.get("/api/widgets/timer/running/data")).status).toBe(403);
+    expect((await guestClient.get("/api/widgets/remind/upcoming/data")).status).toBe(404);
+    expect((await guestClient.get("/api/widgets/timer/running/data")).status).toBe(404);
   });
 });
 
 describe("widgetCardBlock", () => {
   const blocks = [{ kind: "spec_sheet" }, { kind: "weather_card", props: {} }];
-  const who = (role: string) => ({ role, birthdate: null }) as unknown as PersonRow;
+  const who = (role: string) => ({ id: `p-${role}`, role, controls: null, birthdate: null }) as unknown as PersonRow;
 
   test("an adult gets the weather_card block, nothing else from the list", () => {
     expect(widgetCardBlock(who("adult"), blocks)).toEqual({ kind: "weather_card", props: {} });

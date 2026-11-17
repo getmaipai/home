@@ -84,6 +84,8 @@ export interface AnswerOutput {
  * thing entirely during the live incident this fixes. `unknown_tool`
  * (no such package, the ordinary case of a model inventing a tool
  * name) keeps the honesty line - GROUND-01's ruling stands. */
+/** GRANTS-01 (C10): a tool this person may not use reads as absent: no age, role or rule word, and no claim that the thing does not exist. */
+export const NOT_AVAILABLE_LINE = "I can't do that one here. I'm glad to help with something else, so tell me what you're after.";
 export const PARENT_REQUIRED_LINE = "That needs a grown-up at home to decide. Ask one of them, or ask me something else.";
 export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people in our family. I can tell you what I already know, or you can ask a grown-up at home.";
 
@@ -98,7 +100,7 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "music_refused_minor") return MUSIC_REFUSAL_LINE.minor_sexual;
   if (reason === "video_not_here") return VIDEO_NOT_HERE_LINE;
   if (reason === "video_refused_minor") return VIDEO_REFUSAL_LINE.minor_sexual;
-  if (reason === "min_role") return "That one needs a grown-up.";
+  if (reason === "min_role" || reason === "not_available") return NOT_AVAILABLE_LINE;
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";
   if (reason === "crisis_state") return "Let's stay with this for now. I'm here.";
