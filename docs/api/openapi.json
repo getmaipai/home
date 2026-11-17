@@ -70845,6 +70845,32 @@
                                     }
                                   ]
                                 },
+                                "disabledWhen": {
+                                  "type": "object",
+                                  "properties": {
+                                    "chip": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        }
+                                      ]
+                                    },
+                                    "reason": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "chip",
+                                    "value",
+                                    "reason"
+                                  ]
+                                },
                                 "options": {
                                   "type": "array",
                                   "items": {
