@@ -629,8 +629,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
-| `backend/src/lib/filter/ceiling.ts` | ceilingFor, ceilingOf |
+| `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, filterList |
+| `backend/src/lib/filter/pass.ts` | passForPerson, buildPass, passFor, passForSurface |
+| `backend/src/lib/filter/passCache.ts` | getCachedPass, putCachedPass, nextPassVersion, invalidatePass, invalidatePassForSetting |
 | `backend/src/lib/filter/rateStored.ts` | __setRateHookForTests, rateStoredItem |
 | `backend/src/lib/filter/raters.ts` | prepareRaters, RATERS, ratersFor, contentKindForSurface |
 | `backend/src/lib/filter/ratingsSweep.ts` | mediaFingerprint, stampMediaRow, stampMediaById, stampAttachmentRow, stampAttachmentById, creationFingerprint |
