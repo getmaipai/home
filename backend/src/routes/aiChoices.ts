@@ -39,6 +39,7 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { readSlot } from "@/lib/tiers";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { roleHealth } from "@/lib/roleHealth";
+import { featureModels, isOrderedFeature, setFeatureOrder } from "@/lib/featureModels";
 import { getStackClient } from "@/lib/stackEngine";
 import { listActivePeople } from "@/lib/access";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -62,6 +63,21 @@ const LevelOptionSchema = z.object({ id: z.string(), label: z.string(), installe
 const OverviewLevelSchema = z.object({ tier: z.enum(OVERVIEW_TIERS), state: z.enum(["ready", "missing", "problem", "off", "unset", "waits", "same"]), word: z.string(), model_label: z.string().nullable(), automatic: z.boolean(), model_id: z.string().nullable(), can_choose: z.boolean(), options: z.array(LevelOptionSchema), size_bytes_missing: z.number().nullable(), detail: z.string().nullable(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() });
 const OverviewSchema = z.object({ features: z.array(z.object({ id: z.string(), name: z.string(), used_by: z.array(z.string()), levels: z.array(OverviewLevelSchema), ready_count: z.number(), level_count: z.number() })), helpers: z.array(z.object({ id: z.string(), name: z.string(), parent: z.string(), component_id: z.string().nullable(), size_bytes_missing: z.number().nullable(), model_label: z.string().nullable(), used_by: z.array(z.string()), state: z.enum(["ready", "missing", "problem", "off", "waits", "same"]), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), attention: z.object({ items: z.array(z.object({ id: z.string(), kind: z.enum(["problem", "missing"]), title: z.string(), line: z.string(), action: z.object({ kind: z.enum(["download", "fix", "open"]), label: z.string(), job: z.string().optional(), level: z.string().optional() }).nullable() })), download_all: z.object({ bytes: z.number(), count: z.number() }).nullable() }), right_now: z.object({ engine: z.enum(["ready", "problem"]), waiting: z.number(), memory_free_bytes: z.number(), models_bytes: z.number(), disk_free_bytes: z.number() }) });
 const overviewRoute = createRoute({ method: "get", path: "/overview", tags: ["AI"], summary: "A household view of AI features, their model levels and any attention needed", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: OverviewSchema } }, description: "The feature overview assembled from current Stack candidates, installed components, saved slots and current health." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) } });
+const FeatureModelSchema = z.object({ id: z.string(), label: z.string(), description: z.string(), rank: z.number(), state: z.enum(["ready", "missing", "installing", "updating", "failed", "unsupported"]), size_bytes: z.number(), download_bytes: z.number(), percent: z.number().nullable(), running: z.boolean(), failure: z.string().nullable(), install_block: z.string().nullable() });
+const FeatureModelsSchema = z.object({ audience: z.enum(["adult", "minor"]), features: z.array(z.object({ id: z.enum(["pictures", "videos", "music"]), ordered: z.literal(true), order: z.array(z.string()), models: z.array(FeatureModelSchema) })) });
+const featureModelsRoute = createRoute({ method: "get", path: "/feature-models", tags: ["AI"], summary: "The models behind each feature, in order, as the Stack names them", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: FeatureModelsSchema } }, description: "Names, descriptions, sizes, states and the order, all from the Stack's parts list and jobs catalog; the household's own order only reorders them. A child or teen's list is the Stack's minor list." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 502: "The AI engine did not answer" }) } });
+aiChoicesRoutes.openapi(featureModelsRoute, async (c) => {
+  const lane = laneOfPerson(c.get("person"));
+  try { return c.json(await featureModels(lane === "adult" ? "adult" : "minor"), 200); } catch { return c.json({ error: "The AI engine did not answer." }, 502) as never; }
+});
+const featureOrderRoute = createRoute({ method: "put", path: "/feature-models/{feature}/order", tags: ["AI"], summary: "Move models to the top of a feature (empty list = the Stack's own order)", middleware: [requireRole("owner", "admin")] as const, request: { params: z.object({ feature: z.string() }), body: { required: true, content: { "application/json": { schema: z.object({ order: z.array(z.string().min(1).max(120)).max(40) }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Saved and sent to the AI engine." }, ...errorResponses({ 400: "Not a feature with an order, or a bad list", 401: "Not signed in", 403: "Admins only", 502: "Saved, but the AI engine did not answer" }) } });
+aiChoicesRoutes.openapi(featureOrderRoute, async (c) => {
+  const { feature } = c.req.valid("param");
+  if (!isOrderedFeature(feature)) return c.json({ error: "That feature has no order." }, 400) as never;
+  if (laneOfPerson(c.get("person")) !== "adult") return c.json({ error: "Only an adult can change the order." }, 403) as never;
+  const result = await setFeatureOrder(feature, [...new Set(c.req.valid("json").order)]);
+  return result.ok ? c.json({ ok: true as const }, 200) : (c.json({ error: result.error }, 502) as never);
+});
 aiChoicesRoutes.openapi(overviewRoute, async (c) => {
   const [componentList, candidateResults, chatHealth] = await Promise.all([
     listStackComponents().catch(() => null),
