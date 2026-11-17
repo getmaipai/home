@@ -8,6 +8,8 @@ import { withStackCaller } from "./caller";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { SttEndpointResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
+import type { StackPartList } from "@maipai/spec/stack/ts/stack-part-list.js";
+import type { StackJobsCatalogRead } from "./jobsCatalogShape";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
 import { defaultStackBaseUrl } from "../ports";
@@ -239,6 +241,12 @@ export interface StackClient {
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** GET /stack/v1/install-plan: the models this computer should install, by hardware level. */
   installPlan(query?: { vramGb?: number }, opts?: { signal?: AbortSignal }): Promise<StackInstallPlan>;
+  /** GET /stack/v1/parts?audience=: every part with its label, description, priority, state and size, in the audience's words. Optional so a test double without it still types. */
+  parts?(query: { audience: "adult" | "minor"; category?: string; kind?: "model" | "tool" | "engine" }, opts?: { signal?: AbortSignal }): Promise<StackPartList>;
+  /** PUT /stack/v1/parts/choices: the household's order and off list per category (rule E5); the Stack stores no household of its own. */
+  setPartChoices?(choices: Record<string, { order: string[]; off: string[] }>, opts?: { signal?: AbortSignal }): Promise<unknown>;
+  /** GET /stack/v1/jobs/catalog?audience=: what can be made here, now, and which parts serve each job. */
+  jobsCatalog?(audience: "adult" | "minor", opts?: { signal?: AbortSignal }): Promise<StackJobsCatalogRead>;
   /** GET /stack/v1/models/catalog: shipped model pins with verified provenance. */
   updates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
   checkUpdates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
@@ -556,6 +564,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       call(`/stack/v1/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }, json<Record<string, unknown>>, opts),
     removeEngineBuild: (name, tag, opts) => call(`/stack/v1/engines/${encodeURIComponent(name)}/builds/${encodeURIComponent(tag)}`, { method: "DELETE" }, json<{ ok: true }>, opts),
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),
+    parts: (query, opts) => call(`/stack/v1/parts?${new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString()}`, { method: "GET" }, json<StackPartList>, opts),
+    setPartChoices: (choices, opts) => call("/stack/v1/parts/choices", { ...jsonInit(choices), method: "PUT" }, json<unknown>, opts),
+    jobsCatalog: (audience, opts) => call(`/stack/v1/jobs/catalog?audience=${audience}`, { method: "GET" }, json<StackJobsCatalogRead>, opts),
     modelCatalog: (opts) => call("/stack/v1/models/catalog", { method: "GET" }, json<Record<string, unknown>>, opts),
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     inspectModel: (body, opts) => call("/stack/v1/models/inspect", jsonInit(body), json<Record<string, unknown>>, opts),

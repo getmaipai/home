@@ -1079,6 +1079,9 @@ export type AiLevelOption = { id: string; label: string; installed: boolean; siz
 export type AiOverviewLevel = { tier: "reduced" | "standard" | "boost" | "max"; state: AiOverviewState; word: string; model_label: string | null; automatic: boolean; model_id: string | null; can_choose: boolean; options: AiLevelOption[]; size_bytes_missing: number | null; detail: string | null; action: AiOverviewAction | null };
 export type AiOverviewFeature = { id: string; name: string; used_by: string[]; levels: AiOverviewLevel[]; ready_count: number; level_count: number };
 export type AiOverviewHelper = { id: string; name: string; parent: string; component_id: string | null; size_bytes_missing: number | null; model_label: string | null; used_by: string[]; state: AiOverviewState; action: AiOverviewAction | null };
+/** GET /api/ai/feature-models: the models behind each ordered feature, every name, line and size from the Stack's parts list (rule E1). */
+export type AiFeatureModel = { id: string; label: string; description: string; rank: number; state: "ready" | "missing" | "installing" | "updating" | "failed" | "unsupported"; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null };
+export type AiFeatureModels = { audience: "adult" | "minor"; features: Array<{ id: "pictures" | "videos" | "music"; ordered: true; order: string[]; models: AiFeatureModel[] }> };
 export type AiOverview = {
   features: AiOverviewFeature[];
   helpers: AiOverviewHelper[];
@@ -1092,6 +1095,8 @@ export interface PersonAccess { role: string; ceiling: Record<string, string>; o
 export interface HeldBack { since: string; surfaces: Array<{ surface: "news" | "shelf" | "reference" | "search"; count: number }> }
 
 export const api = {
+  aiFeatureModels: () => request<AiFeatureModels>("/api/ai/feature-models"),
+  aiSetFeatureOrder: (feature: string, order: string[]) => request<{ ok: true }>(`/api/ai/feature-models/${encodeURIComponent(feature)}/order`, { method: "PUT", body: JSON.stringify({ order }) }),
   aiFeaturesOverview: () => request<AiOverview>("/api/ai/overview"),
   installComponent: (id: string) => request<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", body: JSON.stringify({}) }),
   aiTierCandidates: (job: string) => request<{ levels: Array<{ tier: string; recommended: string | null; candidates: Array<{ id: string; label: string; fits: boolean; refusal: string | null }> }> }>(`/api/ai/tiers/${encodeURIComponent(job)}`),

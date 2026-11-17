@@ -218,6 +218,10 @@ export function validateSelectorValue(keyDef: SettingsKey, value: unknown): Sett
         if (problems.length > 0) return { ok: false, status: 400, error: problems.join(" ") };
         break;
       }
+      if (range?.value_schema === "part-order") {
+        if (!Array.isArray(value) || value.some((id) => typeof id !== "string" || id.length === 0 || id.length > 120) || new Set(value).size !== value.length) return { ok: false, status: 400, error: "An order is a list of model ids, each at most once." };
+        break;
+      }
       if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
       break;
     case "select": {

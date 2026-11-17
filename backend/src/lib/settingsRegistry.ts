@@ -40,6 +40,7 @@ import { AUDIO_SETTINGS_KEYS } from "@/settings/audioKeys";
 import { NEWS_SETTINGS_KEYS } from "@/settings/newsKeys";
 import { ALARM_SETTINGS_KEYS } from "@/settings/alarmKeys";
 import { TOOL_BRAKE_SETTINGS_KEYS } from "@/settings/toolBrakeKeys";
+import { ENGINE_ORDER_SETTINGS_KEYS } from "@/settings/engineOrderKeys";
 import { UI_SETTINGS_KEYS } from "@/settings/uiKeys";
 import { ACCESS_SETTINGS_KEYS } from "@/settings/accessKeys";
 import { CONTENT_POLICY_SETTINGS_KEYS } from "@/settings/contentKeys";
@@ -112,7 +113,7 @@ function loadRegistry(): SettingsKey[] {
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
   const personaKey = bundledPersonaSettingsKey(raw);
-  const combined = [...parsed, ...(personaKey ? [personaKey] : []), ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...CHAT_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...ACOUSTID_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...ALARM_SETTINGS_KEYS, ...TOOL_BRAKE_SETTINGS_KEYS, ...UI_SETTINGS_KEYS, ...ACCESS_SETTINGS_KEYS, ...CONTENT_POLICY_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...(personaKey ? [personaKey] : []), ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...CHAT_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...ACOUSTID_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...ALARM_SETTINGS_KEYS, ...TOOL_BRAKE_SETTINGS_KEYS, ...ENGINE_ORDER_SETTINGS_KEYS, ...UI_SETTINGS_KEYS, ...ACCESS_SETTINGS_KEYS, ...CONTENT_POLICY_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map((key) => withPersonGuardFacts(withOwnControl(key)));
 }
 
