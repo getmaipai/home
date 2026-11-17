@@ -48,6 +48,8 @@ import { musicLibraryData } from "./musicLibrary";
 import { memberCandidates, memberPlaylists, ownPlaylists, playlistFor, playlistVisibility } from "./musicPlaylists";
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 import type { Result } from "@/lib/result";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
+import { storedRatingFilter } from "@/lib/filter/stamps";
 
 export type MediaKind = MediaItem["kind"];
 type ProductionSourceGate = (person: PersonRow, productionId: string) => boolean;
@@ -179,7 +181,9 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
   const limit = filter.limit ?? 50;
   const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(...(filter.order ?? [desc(mediaItems.addedAt)])).limit(filter.all ? -1 : limit * 2 + 2).all();
   const items: MediaItem[] = [];
+  const stamped = storedRatingFilter("media_item", person, rows.map((row) => row.id)); // RATE-INGEST-01: the stored rating, beside today's checks
   for (const row of rows) {
+    if (!stamped(row.id)) continue;
     // A stored row that no longer parses is left out and logged: one bad row never fails every shelf of every media app.
     let item: MediaItem;
     try {
@@ -1061,6 +1065,7 @@ export function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaIt
     lyrics: request && !request.instrumental && request.lyrics?.trim() ? JSON.stringify({ source: "made", text: request.lyrics }) : null,
     addedAt: file.created_at, createdAt: now, hlc: nextHlc(), provenance: "music:generated-library",
   }).run();
+  stampMediaById(id); // RATE-INGEST-01: the stored rating, written with the row
   return readableIn(person, "audio", id);
 }
 
@@ -1093,6 +1098,7 @@ export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaIt
   const title = request.speech ? `Speech by ${request.speech.voiceName}` : description ? description.slice(0, 60).replace(/^./, (c) => c.toUpperCase()) : "Sound";
   const id = `media-${crypto.randomUUID().replace(/-/g, "")}`;
   db.insert(mediaItems).values({ id, kind: "sound", title, sourceId: source.id, locFileId: file.id, mediaType: file.media_type, durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child", addedAt: file.created_at, createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: "music:generated-sound" }).run();
+  stampMediaById(id); // RATE-INGEST-01: the stored rating, written with the row
   return readableItem(person, id);
 }
 
@@ -1109,8 +1115,10 @@ export function savedMadeSounds(person: PersonRow) {
   }
   const roots = allowedSources(person).filter((source) => source.kind === "root");
   if (!roots.length) return [];
-  return db.select().from(mediaItems).where(and(isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), eq(mediaItems.kind, "sound"), inArray(mediaItems.sourceId, roots.map((source) => source.id)), inArray(mediaItems.bandOk, allowedBandsFor(person))))
-    .orderBy(desc(mediaItems.addedAt)).all().flatMap((row) => {
+  const soundRows = db.select().from(mediaItems).where(and(isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false), eq(mediaItems.kind, "sound"), inArray(mediaItems.sourceId, roots.map((source) => source.id)), inArray(mediaItems.bandOk, allowedBandsFor(person))))
+    .orderBy(desc(mediaItems.addedAt)).all();
+  const soundStamped = storedRatingFilter("media_item", person, soundRows.map((row) => row.id)); // RATE-INGEST-01: the stored rating, beside today's checks
+  return soundRows.filter((row) => soundStamped(row.id)).flatMap((row) => {
       const item = readableItem(person, row.id);
       if (!item || item.kind !== "sound" || !item.location.file_id) return [];
       const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, item.location.file_id)).get();

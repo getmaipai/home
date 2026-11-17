@@ -11,6 +11,7 @@ import type { PersonRow } from "@/types";
 import { readableIn, type MediaAppId } from "./appHost";
 import { mediaBandOf, trips } from "./band";
 import type { Result as SharedResult } from "@/lib/result";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 
 type Result = SharedResult<Record<string, unknown>, 400 | 403 | 404>;
 type Field = "title" | "description" | "artist" | "artwork";
@@ -88,6 +89,7 @@ export function editMediaItem(person: PersonRow, appId: MediaAppId, body: Record
   if (changed.includes("title") || changed.includes("artist")) Object.assign(update, { musicbrainzRecordingId: null, musicbrainzArtistId: null, musicbrainzReleaseGroupId: null, musicbrainzCheckedKey: null });
   if (changed.includes("artwork")) update.artwork = set.artwork ? JSON.stringify({ file_id: set.artwork }) : null;
   db.update(mediaItems).set(update).where(eq(mediaItems.id, item.id)).run();
+  stampMediaById(item.id); // RATE-INGEST-01: the words changed, so the stored rating is worked out again
 
   return { ok: true, value: { id: item.id, title: next.title, description: next.description, artist: next.artist, artwork: "artwork" in set ? set.artwork ?? null : current.artwork } };
 }

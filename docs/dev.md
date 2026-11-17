@@ -37827,3 +37827,18 @@ A notification delivery (and a held one) now stores `values_json` next to the En
 **TOOL-OFFER-VOICEOVER-01 (2026-11-07, next to AUDIO-PARITY-01's voice tools): `voiceover` is offered by structure, never by wording.** `VOICEOVER_INTENT` and its swap are gone. The adult written turn with the voice engine ready offers `voiceover` and `change_voice` together (the `voiceoverAllowed` gate in `turnMachine/budget.ts`). Past the sixteen-tool cap `change_voice` gives way first and `voiceover` keeps its place, displacing a media tool from `VOICEOVER_SWAP_ORDER` (make_sound first); with no media tool to give up it falls back to the old order and is dropped. A child, teen, guest, spoken or robot turn is unchanged. Bench rows: `backend/scripts/bench/datasets/voiceover-offer-ab.json`; `data-scratch/reports/voiceover-offer-bench.md`.
 
 Talent show writing tries the Stack judge and then the chat role through the reusable `lib/judgeFallback.ts` helper. If both fail for a news, weather or household briefing, the episode uses a fixed script made only from the already audience-filtered brief data and is marked `generated_by: "scripted"`.
+
+### Stored ratings (RATE-INGEST-01, rule C9)
+
+Stored content is rated when it arrives and lists read the stored rating only. One hub.db table, `content_ratings`
+(migration 0198, schema version 149), keyed by (`subject_kind`, `subject_id`) for `media_item`, `shelf_item`,
+`attachment` and `creation`, with the `fingerprint` it was rated from and the `rater_version`. `backend/src/lib/filter/`
+holds the pieces: `rateStored.ts` (the viewer-independent rating, today's checks mapped to one level, no model call; an
+error returns null and writes no stamp), `stamps.ts` (store, `allowedIds`, `storedRatingFilter`, `staleOrMissing`),
+`stampCompare.ts` (the one comparison, shared with the door's `filterList`), `ratingsSweep.ts` and `shelfStamp.ts`
+(the writers). Stamps are written where a row arrives (scan, podcast poll, made songs and sounds, radio recordings, shows,
+`storeFile`, `recordCreation`, `ShelfStore.put`) and when an adult mark or a band change follows. The core job
+`ratings.sweep` (every 10 minutes, once after boot, low priority, quiet when idle) stamps rows with no stamp, another
+fingerprint or an older `STORED_RATER_VERSION`; the old stamp holds until the new one is written. Library, media app,
+news and shelf lists add the stamp check beside the existing `band_ok` and floor checks for a viewer below the adult
+ceiling; an unstamped item is Unrated and waits for the sweep. A person's own uploaded files are never hidden by a stamp.

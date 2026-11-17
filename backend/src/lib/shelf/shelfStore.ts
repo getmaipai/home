@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { cacheDir } from "@/lib/paths";
 import type { AgeBand } from "@/lib/ageBand";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
+import { stampShelfItem } from "@/lib/filter/shelfStamp";
 
 export type ShelfItem = NewsItem;
 
@@ -72,6 +73,8 @@ export interface ShelfStore {
   put(item: ShelfItem): { inserted: boolean };
   /** The newest items carried by any of these feeds whose band_ok is one of `bandOk`. */
   list(feedIds: readonly string[], bandOk: readonly AgeBand[], limit: number): ShelfItem[];
+  /** RATE-INGEST-01: the newest items of every feed, for the ratings sweep to stamp what has no stored rating yet. */
+  recent(limit: number): ShelfItem[];
   /** Deletes items fetched before `cutoffIso`, except those a saved story pinned; returns how many. */
   prune(cutoffIso: string): number;
   /** NEWS-02: one item by its id, or null. */
@@ -192,6 +195,8 @@ export function openShelfStore(path: string): ShelfStore {
         stricten.run(item.canonical_url, item.band_ok);
         if (item.image_url) fillImage.run(item.canonical_url, item.image_url);
       }
+      // RATE-INGEST-01 (RULES.md C9): a new item is rated as it arrives; a failed check writes no stamp and the ratings sweep retries it.
+      if (result.changes > 0) stampShelfItem(item);
       return { inserted: result.changes > 0 };
     },
     list(feedIds, bandOk, limit) {
@@ -205,6 +210,11 @@ export function openShelfStore(path: string): ShelfStore {
         LIMIT ?${feedIds.length + bandOk.length + 1}`;
       const rows = sqlite.query<Row, (string | number)[]>(sql).all(...feedIds, ...bandOk, limit);
       return rows.map(toItem).filter((item): item is ShelfItem => item !== null);
+    },
+    recent(limit) {
+      if (limit <= 0) return [];
+      return sqlite.query<Row, [number]>("SELECT * FROM shelf_item ORDER BY COALESCE(published_at, fetched_at) DESC, canonical_url LIMIT ?1").all(limit)
+        .map(toItem).filter((item): item is ShelfItem => item !== null);
     },
     prune(cutoffIso) {
       const removed = pruneItems.run(cutoffIso).changes;

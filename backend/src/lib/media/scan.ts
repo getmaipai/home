@@ -13,6 +13,7 @@ import { nextHlc } from "@/lib/hlc";
 import { newMediaItemId } from "@/lib/id";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { bandOkAtIngest } from "./band";
+import { stampMediaRow } from "@/lib/filter/ratingsSweep";
 import { draftsForDirectory, type Draft, type DirListing, type FileEntry, type IngestContext } from "./ingest";
 import { decidePlayable } from "./kinds";
 import { healMadeSources } from "./heal";
@@ -256,6 +257,8 @@ function persist(item: MediaItem, prior: MediaItemRow | undefined, scanId: strin
   } else {
     db.insert(mediaItems).values(values).run();
   }
+  // RATE-INGEST-01: the stored rating, written with the row (RULES.md C9). A failed check writes none and the sweep retries.
+  stampMediaRow({ ...(prior ?? {}), ...values, id: prior?.id ?? values.id } as MediaItemRow);
 }
 
 /** The fast path: these paths are unchanged, so they are only marked seen (and brought back from the trash if a scan had pruned them). */

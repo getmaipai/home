@@ -34,6 +34,7 @@ import { readFile } from "node:fs/promises";
 import { allowedSources, queryItems, registerProductionSourceGate } from "@/lib/media/appHost";
 import { isPresetVoice } from "@/lib/voiceForSpeech";
 import { buildScriptedBriefing, canScriptBriefing } from "./scriptedBriefing";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 
 export type ShowSource = Show["sources"][number];
 export type Schedule = NonNullable<Show["schedule"]>;
@@ -215,6 +216,7 @@ export async function makeEpisode(actor: PersonRow, productionId: string, opts: 
       const stamp = nextHlc(), itemId = newMediaItemId();
       const record = MediaItem.parse({ id: itemId, kind: "podcast_episode", title: outline.title, subtitle: production.title, description: scripted ? "Read from today's headlines and weather" : outline.segments.map((segment) => segment.goal).join(". "), source_id: source.id, location: { file_id: file.value.id }, locator_kind: "none", media_type: "audio/mp4", duration_s: mixed.duration_s, playable: "original", artwork: null, chapters: chapterRows, subtitles: [], previews: null, external: null, advisory: { explicit: production.show!.audience === "adult", source: "platform" }, band_ok: production.show!.audience === "adult" ? "adult" : production.show!.audience === "teen" ? "teen" : "child", verified_by_person_id: null, hidden: false, added_at: now.toISOString(), created_at: now.toISOString(), hlc: stamp, provenance: `show:${episodeId}` });
       db.insert(mediaItems).values(itemToRow(record)).run();
+      stampMediaById(itemId); // RATE-INGEST-01: the stored rating, written with the row
       const durations = new Map(rendered.map((line) => [line.line_id, line.duration_ms])); let cursor = 0;
       const transcriptSegments = script.segments.flatMap((segment, segmentIndex) => segment.lines.map((line, index) => { const id = `${segmentIndex + 1}-${index + 1}`, start = cursor; const duration = durations.get(id) ?? 0; cursor += duration + (line.timing.gap_ms ?? format.gap_ms); return { id, start: start / 1000, end: (start + duration) / 1000, text: line.text, speaker: line.part }; }));
       insertTranscript(actor, { itemId, language: "en", segments: transcriptSegments as never, provenance: { source_kind: "generated", engine: "talent.show", model_id: "home" }, author: actor.id });

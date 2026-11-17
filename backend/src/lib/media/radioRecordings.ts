@@ -17,6 +17,7 @@ import { mediaBandOf } from "./band";
 import { registerMediaAppData, registerItemView } from "./appHost";
 import { readableItem } from "./access";
 import type { SavedStation } from "./radio";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { publicRecordingAddress } from "./radioStream";
 import { radioAddressDeps } from "@/routes/radioApp";
 
@@ -102,6 +103,7 @@ async function finish(entry: { personId: string; station: SavedStation; jobId: s
     const now = new Date().toISOString();
     const id = newMediaItemId();
     db.insert(mediaItems).values({ id, kind: "track", title: file.title ?? `${entry.station.name} recording`, subtitle: entry.station.name, sourceId, locFileId: stored.value.id, mediaType, durationS: file.duration_s ?? null, size: stored.value.size, playable: "original", bandOk: "child", addedAt: now, createdAt: now, hlc: nextHlc(), provenance: `radio:recording:${entry.jobId}` }).run();
+    stampMediaById(id); // RATE-INGEST-01: the stored rating, written with the row
   }
   active.delete(entry.jobId);
 }

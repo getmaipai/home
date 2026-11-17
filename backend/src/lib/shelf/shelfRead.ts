@@ -7,6 +7,7 @@
 // again on the text here, so a stored row is never trusted on its own word.
 import type { AgeBand } from "@/lib/ageBand";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
+import { storedRatingFilterForBand } from "@/lib/filter/stamps";
 import { listFeeds } from "./feedStore";
 import { adminAddresses } from "./shelfFeeds";
 import { bumpShelfCounter } from "./shelfCounters";
@@ -56,11 +57,15 @@ export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStor
   // Over-read so the release floor can drop a few and still fill the page.
   const candidates = store.list(feedIds, bandOkAllowedFor(band), band === "adult" ? limit : limit * 3);
   const released: ShelfItem[] = [];
+  // RATE-INGEST-01 (C9): beside today's checks, a minor reads the stored rating only (one query for the page; no rater runs here).
+  // An item with no stamp yet is Unrated and waits for the ratings sweep. An adult reads no stamps.
+  const stamped = storedRatingFilterForBand("shelf_item", band, candidates.map((item) => item.id));
   for (const item of candidates) {
     if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
       bumpShelfCounter("release_floor_dropped", band);
       continue;
     }
+    if (!stamped(item.id)) continue; // RATE-INGEST-01: after today's floor, so its counter still counts what it drops
     released.push(item);
     if (released.length >= limit) break;
   }
@@ -77,6 +82,7 @@ export function releaseShelfItem(band: AgeBand, id: string, store: ShelfStore | 
   const visible = new Set(visibleFeedIds(band));
   if (!store.feedIdsOf(item.canonical_url).some((feedId) => visible.has(feedId))) return null;
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return null;
+  if (!storedRatingFilterForBand("shelf_item", band, [item.id])(item.id)) return null;
   if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
     bumpShelfCounter("release_floor_dropped", band);
     return null;

@@ -72,6 +72,7 @@ import {
   mediaWatchDays,
   mediaWatchSessions,
   mediaItems,
+  contentRatings,
   transcripts,
   musicArtistProfiles,
   musicSongFacts,
@@ -253,6 +254,7 @@ export function resetDb(): void {
   db.delete(mediaWatchSessions).run();
   db.delete(mediaWatchDays).run();
   db.delete(transcripts).run();
+  db.delete(contentRatings).run(); // RATE-INGEST-01: stored ratings of the rows below
   db.delete(mediaItems).run();
   db.delete(musicArtistProfiles).run();
   db.delete(musicSongFacts).run();

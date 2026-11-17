@@ -15,6 +15,7 @@ import { attachments, creationCast, creations, mediaSubjects } from "@/db/schema
 import { canReadFileAudience } from "@/lib/access";
 import { fileLockState, lockItemOfProvenance, lockState, newItemMark, requestProof, type AdultProof, type ItemMark, type MarkSource } from "@/lib/adultLock";
 import { nextHlc } from "@/lib/hlc";
+import { stampAttachmentById, stampCreationRow } from "@/lib/filter/ratingsSweep";
 import { newCreationId } from "@/lib/id";
 import { CreationRecord } from "@maipai/spec/gen/ts/creation-record.js";
 import { validateCreationRecord } from "@maipai/spec/records/ts/validate.js";
@@ -159,6 +160,7 @@ export function recordCreation(actor: PersonRow, input: CreationInput): Creation
       else tx.insert(creations).values({ id: record.id, createdAt: record.created_at, ...values }).run();
       writeCast(record.id, record.cast);
     });
+    stampCreationRow({ id: record.id, madeAudience: record.made_audience, updatedAt: record.updated_at }); // RATE-INGEST-01: the stored rating, written with the record
     return record;
   } catch (error) {
     // The words and plan are private: log the kind of failure only.
@@ -172,6 +174,8 @@ export function recordCreation(actor: PersonRow, input: CreationInput): Creation
  * rule as at write time (the maximum over the made files, the source files and the parent). Called from `adultMarks.ts` and `libraryAudience.ts` after they write.
  */
 export function syncCreationMarkForFile(fileId: string): void {
+  // RATE-INGEST-01: the file's audience mark just changed (adult-only raised, or a recheck lowered it): the stored rating follows in the same call.
+  stampAttachmentById(fileId);
   try {
     const rows = db.select().from(creations).where(sqliteHasFile(fileId)).all();
     for (const row of rows) {
@@ -181,6 +185,7 @@ export function syncCreationMarkForFile(fileId: string): void {
       if (mark.madeAudience === row.madeAudience && mark.lock === row.lock) continue;
       body.audience = mark.madeAudience; body.made_audience = mark.madeAudience; body.lock = mark.lock; body.updated_at = new Date().toISOString(); body.hlc = nextHlc();
       db.update(creations).set({ madeAudience: mark.madeAudience, lock: mark.lock, body: JSON.stringify(body), updatedAt: body.updated_at, hlc: body.hlc }).where(eq(creations.id, row.id)).run();
+      stampCreationRow({ id: row.id, madeAudience: mark.madeAudience, updatedAt: body.updated_at });
     }
   } catch { /* the read path also checks the file's own live mark, so a record that could not be synced is never more open than the file */ }
 }

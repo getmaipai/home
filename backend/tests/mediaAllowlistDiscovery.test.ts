@@ -3,6 +3,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { stampSeededMedia } from "./support/stampSeeded";
 import { people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { DISCOVERY_IDS, mediaAppData, MEDIA_APPS, type MediaAppId } from "@/lib/media/appHost";
@@ -36,6 +37,7 @@ beforeEach(() => {
       album: kind === "track" ? "Days" : null, genre: "Family", year: 2021, artwork: JSON.stringify({ path: `${n}.jpg` }), bandOk: "child", mediaType: kind === "track" ? "audio/mpeg" : "video/mp4", playable: "original",
       addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   }
+  stampSeededMedia();
 });
 
 const rows = (who: PersonRow, app: MediaAppId, id: string, params: Record<string, unknown> = {}) => {

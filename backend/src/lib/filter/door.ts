@@ -4,6 +4,7 @@
  */
 import { ContentRating, overCeiling, type RatingLevel, type RatedContentKind } from "@maipai/spec/ratings/ts/contentRating";
 import { ceilingOf, type Audience } from "./ceiling";
+import { stampAllowed } from "./stampCompare";
 import { RATERS, contentKindForSurface, prepareRaters, type Rater, type RaterInput, type RaterVerdict, type Surface } from "./raters";
 
 export type { Surface, RaterInput } from "./raters";
@@ -96,10 +97,8 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
         let value: RaterInput | ContentRating | null;
         try { value = rate(row); } catch { value = null; }
         if (value instanceof Object && "level" in value && "source" in value) {
-          try {
-            const stamp = ContentRating.parse(value);
-            if (!overCeiling(stamp.level, ceiling)) kept.push(row);
-          } catch { /* invalid stamps are unrated */ }
+          // RATE-INGEST-01: the one stamp comparison, shared with the stored-rating list filter (stampCompare.ts); an invalid stamp is Unrated.
+          if (stampAllowed(value, ceiling)) kept.push(row);
           continue;
         }
         if (!value) continue;

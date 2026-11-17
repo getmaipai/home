@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { stampSeededMedia } from "./support/stampSeeded";
 import { people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { mediaAppData, saveProgress } from "@/lib/media/appHost";
@@ -21,7 +22,7 @@ beforeEach(() => {
   db.insert(mediaSources).values({ id: "msrc-music000001", kind: "root", scope: "household", label: "Music", createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   // Song 1,2: nova/Folk on "Garden"; 3: pippa/Jazz on "Night"; 4: explicit nova/Folk (a child may not see it); 5: pippa/Jazz on "Night".
   for (const [n, artist, album, genre, explicit] of [[1, "nova", "Garden", "Folk", false], [2, "nova", "Garden", "Folk", false], [3, "pippa", "Night", "Jazz", false], [4, "nova", "Garden", "Folk", true], [5, "pippa", "Night", "Jazz", false]] as const) {
-    db.insert(mediaItems).values({ id: id(n), sourceId: "msrc-music000001", kind: "track", locRootId: "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist: artist, album, discNo: 1, trackNo: n, genre, year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
+    db.insert(mediaItems).values({ id: id(n), sourceId: "msrc-music000001", kind: "track", locRootId: "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist: artist, album, discNo: 1, trackNo: n, genre, year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run(); stampSeededMedia();
   }
 });
 const call = (person: PersonRow, name: string, params: Record<string, unknown>) => mediaAppData(person, "audio", name, params) as unknown as Array<Record<string, any>>;

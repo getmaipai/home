@@ -189,6 +189,9 @@ ensureCoreJob("scheduler.prune", "every:7d");
 ensureCoreJob("conversation.retention", "every:1d");
 ensureCoreJob("notifications.deliver_held", "every:1m");
 ensureCoreJob("robot.offers.tick", "every:1m");
+// RATE-INGEST-01: stored content is rated in the background; one sweep right after boot, not blocking it.
+ensureCoreJob("ratings.sweep", "every:10m");
+void import("@/lib/filter/ratingsSweep").then(({ runRatingsSweep }) => runRatingsSweep()).catch(() => undefined);
 // A memory whose embed() call failed at write time (embed backend down,
 // or a transient error) sits in pending_embeddings until this retries
 // it; every:1m is the finest grain the scheduler's own grammar supports,

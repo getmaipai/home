@@ -320,11 +320,16 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void | CoreJobIdle>;
  * activity row. Such a job also writes no "running" row up front, so a tick that does work records one finished row. */
 export type CoreJobIdle = { idle: true };
 const IDLE: CoreJobIdle = { idle: true };
-const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs", "talent.history.refresh", "voice.whisper_samples"]);
+const QUIET_CORE_JOBS = new Set(["notifications.deliver_held", "robot.offers.tick", "memory.embedding_retry", "memory.judge", "news.full_text.prefetch", "stack.image_jobs", "talent.history.refresh", "voice.whisper_samples", "ratings.sweep"]);
 let talentShowsDuePromise: Promise<void> | null = null;
 export function isQuietCoreJob(job: string): boolean { return QUIET_CORE_JOBS.has(job); }
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
+  // RATE-INGEST-01 (RULES.md C9): stored content is rated here, in the background, never while a person waits for a list.
+  "ratings.sweep": async () => {
+    const { runRatingsSweep } = await import("@/lib/filter/ratingsSweep");
+    return (await runRatingsSweep()) === 0 ? IDLE : undefined;
+  },
   "notifications.deliver_held": async () => { return (await deliverHeldNotifications()) === 0 ? IDLE : undefined; },
   // INITIATIVE-01: send the queued robot offers whose gates pass, after closing the expired ones into the centre (so a backoff sees them).
   "robot.offers.tick": async () => {
@@ -684,7 +689,7 @@ export function runDueJobs(
 // query returned it. A plain, exported function (not inlined into
 // runDueJobsUnguarded below) so the ordering rule itself is directly
 // testable without running real jobs.
-const LOW_PRIORITY_CORE_JOBS = new Set(["voice.whisper_samples", "memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.shelf.summaries", "news.full_text.prefetch"]);
+const LOW_PRIORITY_CORE_JOBS = new Set(["voice.whisper_samples", "memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.shelf.summaries", "news.full_text.prefetch", "ratings.sweep"]);
 export function sortDueJobsForPriority<T extends { job: string }>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => Number(LOW_PRIORITY_CORE_JOBS.has(a.job)) - Number(LOW_PRIORITY_CORE_JOBS.has(b.job)));
 }

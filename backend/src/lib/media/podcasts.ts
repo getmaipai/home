@@ -20,6 +20,7 @@ import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 import type { PersonRow } from "@/types";
 import { isMediaAdmin, liveSourceById, readableItem } from "./access";
 import { bandOkAtIngest, mediaBandOf } from "./band";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { createFetchedFile, createFetchedFileFromResponse, removeFetchedFile } from "./fetchedFiles";
 import { mediaTypeOfExtension } from "./kinds";
 import { itemFromRow, itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
@@ -430,6 +431,7 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
     values.locFileId = existing?.locFileId ?? null;
     if (existing) db.update(mediaItems).set({ ...values, id: existing.id }).where(eq(mediaItems.id, existing.id)).run();
     else { db.insert(mediaItems).values(values).run(); freshIds.push(record.id); }
+    stampMediaById(existing?.id ?? record.id); // RATE-INGEST-01: the stored rating, written with the row
     if (episode.transcriptUrl) {
       // The transcript text lives in the shared Transcript record (CAPTION-01h); this row keeps the publisher address, the Stack job, the summary and takeaways.
       const hlc = nextHlc();

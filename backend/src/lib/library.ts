@@ -9,6 +9,7 @@ import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
 import { apiError } from "@/lib/apiErrorCopy";
 import { adultStateOf } from "@/lib/adultMarks";
+import { storedRatingFilter } from "@/lib/filter/stamps";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; origin?: "made" | "sent" | "fetched"; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
@@ -107,7 +108,10 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const page = rows.slice(0,limit);
   const last = page.at(-1);
   const expiring = expiringLibraryFiles(actor.id);
-  return { items: page.filter(row => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance })).map(row => ({ id: row.id, kind: row.kind, name: row.name, media_type: row.media_type, size_bytes: row.size, created_at: row.created_at,
+  // RATE-INGEST-01 (C9): beside today's audience gate, a person below the adult ceiling reads the stored rating of files that are not
+  // their own (one query for the page). Their own files stay: the owner always sees them, whatever the stamp says.
+  const stamped = storedRatingFilter("attachment", actor, page.filter(row => row.owner_person_id !== actor.id).map(row => row.id));
+  return { items: page.filter(row => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance }) && (row.owner_person_id === actor.id || stamped(row.id))).map(row => ({ id: row.id, kind: row.kind, name: row.name, media_type: row.media_type, size_bytes: row.size, created_at: row.created_at,
     owner: { id: row.owner_person_id, display_name: row.display_name }, shared_with: { count: row.share_count, household: Boolean(row.household) },
     retention: row.retention,
     origin: fileOrigin(row),

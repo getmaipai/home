@@ -30,6 +30,7 @@ import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
 import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
 import { fileIsAdultOnly } from "@/lib/adultLock";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedVisibleTo } from "@/lib/media/collections";
 
 export const mediaRoutes = apiRouter();
@@ -240,6 +241,7 @@ mediaRoutes.openapi(patchItemRoute, (c) => {
   if (!row || row.deletedAt) return c.json({ error: "That title is not in the library." }, 404);
   if (body.hidden !== undefined) hideItem(id, body.hidden);
   if (body.band_ok !== undefined) db.update(mediaItems).set({ bandOk: body.band_ok, verifiedByPersonId: actor.id, hlc: nextHlc() }).where(eq(mediaItems.id, id)).run();
+  if (body.band_ok !== undefined) stampMediaById(id); // RATE-INGEST-01: an adult changed who may see it, so the stored rating follows
   return c.json(itemFromRow(rowById(id)!), 200);
 });
 

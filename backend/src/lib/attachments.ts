@@ -27,6 +27,7 @@ import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { dropCreationsForFile } from "@/lib/creations/purge";
 import type { PersonRow } from "@/types";
 import { refusal, type Result } from "@/lib/result";
+import { stampAttachmentRow } from "@/lib/filter/ratingsSweep";
 
 export type AttachmentOpResult<T> = Result<T, 400 | 403 | 404 | 500>;
 
@@ -260,6 +261,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
     }
     throw err;
   }
+  stampAttachmentRow({ id, sha256, provenance }); // RATE-INGEST-01: the stored rating, written with the file (never fails the store)
   return { ok: true, value: record };
 }
 

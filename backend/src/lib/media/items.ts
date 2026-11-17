@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { db } from "@/db";
 import { mediaItems, mediaSources } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
+import { storedRatingFilter } from "@/lib/filter/stamps";
 import type { PersonRow } from "@/types";
 import { allowedBandsFor, bandAllows } from "./band";
 import { readableItem, sourceVisibleTo } from "./access";
@@ -75,10 +76,12 @@ export function listItems(actor: PersonRow, query: ItemQuery): ItemPage {
   const rows = db.select().from(mediaItems).where(where).orderBy(...orderFor(query)).limit(query.limit + (minor ? query.limit : 0)).offset(query.offset).all();
   const items: MediaItem[] = [];
   let consumed = 0;
+  // RATE-INGEST-01 (C9): beside today's checks, a person below the adult ceiling reads the stored rating only (one query for the page).
+  const stamped = storedRatingFilter("media_item", actor, rows.map((row) => row.id));
   for (const row of rows) {
     consumed++;
     const item = itemFromRow(row);
-    if (bandAllows(actor, item)) items.push(item);
+    if (stamped(row.id) && bandAllows(actor, item)) items.push(item);
     if (items.length >= query.limit) break;
   }
   const nextOffset = query.offset + consumed;
@@ -141,9 +144,10 @@ export function listGroups(actor: PersonRow, by: "series" | "album" | "author" |
   if (kind) conditions.push(eq(mediaItems.kind, kind));
   const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(asc(sql`lower(${column})`), asc(mediaItems.season), asc(mediaItems.episode), asc(mediaItems.trackNo)).all();
   const groups = new Map<string, MediaGroup>();
+  const stamped = storedRatingFilter("media_item", actor, rows.map((row) => row.id));
   for (const row of rows) {
     const item = itemFromRow(row);
-    if (!bandAllows(actor, item)) continue;
+    if (!stamped(row.id) || !bandAllows(actor, item)) continue;
     const key = by === "series" ? item.series! : by === "album" ? item.album! : by === "author" ? item.author! : item.artist!;
     const group = groups.get(key);
     if (group) group.count++;

@@ -2764,3 +2764,21 @@ export const scheduledTasks = sqliteTable("scheduled_tasks", {
   hlc: text("hlc").notNull(),
   deletedAt: text("deleted_at"),
 }, (table) => [index("scheduled_tasks_person_idx").on(table.person), index("scheduled_tasks_external_ref_idx").on(table.externalRef)]);
+
+// RATE-INGEST-01 (RULES.md C9): the stored content rating of one item, written when the item arrives or by the ratings sweep.
+// A reconstructible derived cache: lists read it, nothing rates on a request. `fingerprint` is what the rating was computed from.
+export const contentRatings = sqliteTable("content_ratings", {
+  subjectKind: text("subject_kind").notNull(), // media_item | shelf_item | attachment | creation
+  subjectId: text("subject_id").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  rater: text("rater").notNull(),
+  raterVersion: integer("rater_version").notNull(),
+  level: text("level").notNull(),
+  source: text("source").notNull(),
+  reasons: text("reasons"), // JSON array
+  label: text("label"), // JSON {system, value}
+  ratedAt: text("rated_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.subjectKind, table.subjectId] }),
+  index("content_ratings_kind_level_idx").on(table.subjectKind, table.level),
+]);

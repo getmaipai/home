@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
+import { stampSeededMedia } from "./support/stampSeeded";
 import { attachments, people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { mediaAppData, startMusicQueue, saveProgress, setListed } from "@/lib/media/appHost";
@@ -24,7 +25,7 @@ beforeEach(() => {
   db.insert(mediaSources).values({ id: "msrc-music000001", kind: "root", scope: "household", label: "Music", createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   db.insert(mediaSources).values({ id: "msrc-private0001", kind: "root", scope: "person", ownerPersonId: atlas.id, visibleTo: JSON.stringify([atlas.id]), label: "Private", createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   for (const [n, disc, track, artist, albumArtist, explicit] of [[1,2,1,"nova","atlas",false],[2,1,2,"pippa","atlas",false],[3,1,1,"nova","atlas",false],[4,1,3,"nova","atlas",true],[5,1,1,"nova","pippa",false],[6,1,1,"nova","atlas",false]] as const) {
-    db.insert(mediaItems).values({ id: id(n), sourceId: n === 6 ? "msrc-private0001" : "msrc-music000001", kind: "track", locRootId: n === 6 ? "msrc-private0001" : "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist, album: "Garden", discNo: disc, trackNo: track, genre: "Folk", year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
+    db.insert(mediaItems).values({ id: id(n), sourceId: n === 6 ? "msrc-private0001" : "msrc-music000001", kind: "track", locRootId: n === 6 ? "msrc-private0001" : "msrc-music000001", locPath: `${n}.mp3`, title: `Song ${n}`, artist, albumArtist, album: "Garden", discNo: disc, trackNo: track, genre: "Folk", year: 2021, advisoryExplicit: explicit, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run(); stampSeededMedia();
   }
 });
 const data = (person: PersonRow, name: string, key?: string) => mediaAppData(person, "audio", name, { id: key }) as Array<{id: string; title: string}>;
