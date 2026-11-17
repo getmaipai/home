@@ -15,7 +15,16 @@
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
       "aspect": "square",
-      "layout": "grid"
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/image/create",
+          "state": {
+            "template": "{pick}",
+            "prompt": "{starter}"
+          }
+        }
+      }
     }
   ]
 }

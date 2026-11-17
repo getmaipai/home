@@ -92,12 +92,17 @@ test("Image launcher, sidebar groups and template rows are available to the hous
   expect(sidebarGroups.find((group) => group.id === "create-edit")?.pages?.map((page) => page.page)).toEqual(["studio"]);
   const templates = await client.post("/api/plugins/image/data/templates", {});
   expect(templates.status).toBe(200);
-  const templateRows = await templates.json() as Array<{ id: string; title: string; starter?: string }>;
+  const templateRows = await templates.json() as Array<{ id: string; title: string; starter?: string; pick?: string }>;
   expect(templateRows.some((item) => item.id && item.title)).toBe(true);
   // Picking a template tile fills the box: every row carries the example words the page puts there, and the page asks for them.
   expect(templateRows.some((item) => typeof item.starter === "string" && item.starter.length > 0)).toBe(true);
+  // A template with no cast blank becomes its whole sentence in the box (a plain prompt); the sticker one shows no leftover blank markers.
+  expect(templateRows.some((item) => item.pick === "none" && (item.starter ?? "").split(" ").length > 4)).toBe(true);
+  expect(templateRows.every((item) => !(item.starter ?? "").includes("{{"))).toBe(true);
+  const templatesPage = await client.get("/api/plugins/image/pages/templates");
+  expect(JSON.stringify(await templatesPage.json())).toContain('"to":"/apps/image/create"');
   const createPage = await client.get("/api/plugins/image/pages/create");
-  expect(JSON.stringify(await createPage.json())).toContain('"template":"{id}","prompt":"{starter}"');
+  expect(JSON.stringify(await createPage.json())).toContain('"template":"{pick}","prompt":"{starter}"');
 });
 
 test("Image library rows match Library visibility for owner, teen and child", async () => {
@@ -138,7 +143,7 @@ test("Image Create submits to make, fills presets, and shows what was made on a 
   const templatesResponse = (await import("@/lib/media/templates")).listTemplates({ actor: row, kind: "picture" });
   expect(templateChip.options).toEqual([{ value: "none", label: "No template" }, ...templatesResponse.map((template) => ({ value: template.id, label: template.title }))]);
   expect(args.template).toBe("{template}");
-  expect(filledPage.body[1]).toMatchObject({ type: "media_shelf", heading: "Templates", bind: { source: "package", path: "templates" }, item_media_field: "thumbnail", item_label_field: "title", aspect: "square", on_select: { navigate: { to: "/apps/image/create", state: { template: "{id}" } } } });
+  expect(filledPage.body[1]).toMatchObject({ type: "media_shelf", heading: "Templates", bind: { source: "package", path: "templates" }, item_media_field: "thumbnail", item_label_field: "title", aspect: "square", on_select: { navigate: { to: "/apps/image/create", state: { template: "{pick}", prompt: "{starter}" } } } });
   expect(filledPage.body[2]).toMatchObject({ type: "media_shelf", heading: "My creations", bind: { source: "package", path: "recent" }, item_subtitle_field: "{subtitle}", item_badge_field: "badge", item_meta_field: "meta", item_progress_field: "progress", making_field: "making", poll_while: { field: "making", values: ["yes"] } });
   const manifest = loadManifestOnly("image");
   expect(manifest.ok && (manifest.value.contributes as { data: Array<{ id: string }> }).data.some((item) => item.id === "recent")).toBe(true);
