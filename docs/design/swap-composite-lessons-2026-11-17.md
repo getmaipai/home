@@ -94,3 +94,23 @@ minutes. Free memory with the household chat model loaded was about 78 GB, so a 
   turned, occluded or half-out frames.
 - **Takes.** A segment that comes back unswapped is retaken with seed 21 and adapter strength 1.6; retaking a start 0.33 s early removed the unswapped
   first frames.
+
+## Final state of the test clip (draft 4) and the last fixes
+
+- **Collar tuck.** In bare-head mode remove from the mask every pixel where the original shows collar, cape or cowl fabric (blue minus red at least 11 and
+  luminance at least 12, grown 2 px), then open the mask with a 9 px ellipse. The donor's skin then ends behind the original fabric edge and the jaw and
+  neck outline is smoother. The outline in the last piece was still a little blocky.
+- **Colour lock.** The LAB match (mean and contrast, per channel) is blended 25 percent new and 75 percent previous frame, reset at each segment start. This
+  removes frame-to-frame brightness jumps and softens the steps at segment joins.
+- **Recolour of leftover skin.** Any original skin pixel the donor did not cover keeps its light and shadow structure (luminance scaled 0.8 around the region
+  mean) but takes the donor's skin tone (a and b channels). This is what remains for a head that the frame cuts off.
+- **Canvas padding for a cut-off head failed twice.** Widening the canvas by 40 percent (352x448 for a 1512x1920 canvas, 66 GB) with the new area filled by
+  edge smear gave a donor that copied the smear; filling by mirror gave a symmetric non-head. Neither drew a head. Do not repeat; use temporal extension from
+  neighbouring swapped frames if this must be solved.
+- **Keyframe-propagated mouth was not built.** It needs face landmarks on the original, and the landmark tool only finds the face on front-on frames. The
+  flow-driven blend (step 10) is what keeps the mouth steady; the donor's own gentle mouth shape stays.
+- **Final numbers.** Joined clip: 10.00 s, 1080x1920, H.264 yuv420p, AAC, 4.2 MB. Mouth flicker (original / before filter / after filter): 2.52 / 3.02 / 1.51,
+  3.72 / 3.26 / 1.60, 3.62 / 6.19 / 4.89, 7.02 / 8.19 / 5.92, 6.54 / 8.01 / 5.67 for the five segments. Leftover-original-head check flagged 173 of 239
+  frames at the 15 percent bound (an upper bound on dark footage).
+- **Order of work that would have saved the most time:** crop references first; remove burned-in text from the guide; check each donor's PSNR against its
+  guide immediately and retake before compositing; build the composite from skin gating first, add the bare-head mode last and late.
