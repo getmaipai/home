@@ -261,5 +261,37 @@
     "wonder woman",
     "joker",
     "avengers"
-  ]
+  ],
+  "CHILD_UNSAFE_CLASSES": {
+    "scary": [
+      "horror",
+      "scary",
+      "creepy",
+      "zombie",
+      "zombies",
+      "ghost",
+      "haunted",
+      "nightmare",
+      "skull",
+      "skeleton"
+    ],
+    "pretend_fight": [
+      "sword fight",
+      "sword",
+      "swords",
+      "battle",
+      "fight",
+      "fighting",
+      "gun",
+      "guns"
+    ],
+    "hard": [
+      "stabbed",
+      "stabs",
+      "stabbings",
+      "shoots",
+      "strangled",
+      "tortured"
+    ]
+  }
 }

@@ -21,8 +21,10 @@ import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 
 const KID_MAX_SECONDS = 3;
-import { refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
+import { stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
+import { promptCheck } from "@/lib/pictures/promptDoor";
+import { rewriteForChild } from "@/lib/pictures/childRewrite";
 import { videoEngineStatus, videoNotReadyReason, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
@@ -47,7 +49,7 @@ export function videoAudienceOf(state: Pick<TurnState, "actor" | "surface" | "sp
   };
 }
 
-export type VideoCallRefusal = { kind: "denied"; why: VideoDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "child"; why: "photos" | "daily_limit"; line: string };
+export type VideoCallRefusal = { kind: "denied"; why: VideoDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string; /** A child's request held only for being scary or a pretend fight (CONTENT-POLICY-03): the tool rewrites it once before it gives the line. */ rewritable?: true } | { kind: "child"; why: "photos" | "daily_limit"; line: string };
 
 /** The `from_picture` word for a photo the person attached to this message. */
 export const ATTACHED_PHOTO = "attached";
@@ -59,8 +61,10 @@ export function videoRefusalFor(audience: VideoAudience, args: Record<string, un
   if (denial) return { kind: "denied", why: denial, line: VIDEO_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  const refused = refuseVideoPrompt(`${prompt} ${style}`, { lane: laneOf(audience) });
-  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]) };
+  // CONTENT-POLICY-03: the request goes through the filter door (surface "clip"); its verdict is today's typed refusal.
+  const checked = promptCheck(audience, "clip", `${prompt} ${style}`);
+  const refused = checked.refusal;
+  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]), ...(checked.softHold ? { rewritable: true as const } : {}) };
   return null;
 }
 
@@ -122,9 +126,18 @@ const PHOTO_ATTACH_LINE = "Attach one photo to your message.";
 const SEVERAL_PHOTOS_LINE = "A single clip starts from one photo. With several photos I can make it as a film instead: tell the person that, and call make_film with their idea (the attached photos are used there).";
 
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
-  const { state, args, callId } = input;
+  const { state, callId } = input;
+  let args = input.args;
   const audience = input.audience ?? videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
-  const refusal = videoRefusalFor(audience, args);
+  let refusal = videoRefusalFor(audience, args);
+  if (refusal?.kind === "prompt" && refusal.rewritable) {
+    // CONTENT-POLICY-03: a child's request held only for being scary or a pretend fight is rewritten once, checked by the door again and made; the person is not told.
+    const softened = await rewriteForChild({ text: `${typeof args.prompt === "string" ? args.prompt : ""} ${typeof args.style === "string" ? args.style : ""}`, audience, surface: "clip" });
+    if (softened) {
+      args = { ...args, prompt: softened, style: "" };
+      refusal = videoRefusalFor(audience, args);
+    }
+  }
   if (refusal) return refused(callId, args, refusal);
 
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";

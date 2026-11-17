@@ -7,10 +7,11 @@
 //            Quick only, no photos, no references, edits only of their own generated cartoons, a daily limit, and a
 //            child-safety check on every finished picture or clip that fails closed.
 // CSAM prevention applies across lanes.
-import { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
+import { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, CHILD_UNSAFE_CLASSES } from "@/lib/contentPolicy";
 export { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
 import type { AgeBand } from "@/lib/ageBand";
 import { audienceBand, stricterBand } from "@/lib/audience";
+import { ceilingOf } from "@/lib/filter/ceiling";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { kidUsage } from "@/db/schema";
@@ -21,9 +22,17 @@ import type { PersonRow } from "@/types";
 
 export type Lane = "adult" | "teen" | "child";
 
-/** The lane: the stricter of the band the turn presents and the person's own band (role and birthdate). */
+/** The lane of a ceiling for made content: G is the child lane, PG to R the teen lane, X the adult lane (RULES.md C8: the level decides the treatment). */
+const LANE_OF_CEILING: readonly Lane[] = ["child", "teen", "teen", "teen", "adult"];
+
+/**
+ * The one lane for a picture or clip (and every other made item): the stricter of the band the turn presents, the person's own band (role and birthdate) and the lane of the
+ * person's ceiling for made content (`ceilingOf`, CONTENT-POLICY-03). A lowered ceiling (an admin's or the person's own) tightens the lane; a raised one never loosens it, so a
+ * child stays in the child lane and a teen in the teen lane. A pass that cannot be read leaves the band's lane as it was.
+ */
 export function laneOf(input: Pick<PictureAudience, "actor" | "band">): Lane {
-  return stricterBand(input.band, audienceBand(input.actor));
+  const band = stricterBand(input.band, audienceBand(input.actor));
+  try { return stricterBand(band, LANE_OF_CEILING[ceilingOf({ actor: input.actor, band }, "picture")]!); } catch { return band; }
 }
 
 // ---------------------------------------------------------------- the settings
@@ -64,16 +73,30 @@ export const CHILD_NO_PHOTOS_LINE = "I can make cartoons for you, but not from p
 
 // ---------------------------------------------------------------- the child-safe topic gate
 
-/** Famous characters and brands a child's request may not name: each is somebody's trademark, and a drawing of one is not a safe original cartoon. Small on purpose, and one place to add a name; the finished-picture check is the backstop for the rest. A teen is not held to this list. */
-
+/** CONTENT-POLICY-03: how a child's unsafe words class. `hard` is any sexual or nudity word, any brand or character name, or any unsafe word that is not tagged
+ * `scary` or `pretend_fight` in lanes.v1.json (it keeps the fixed line, never a rewrite). When every hit is tagged, the class is `scary` if any hit is, else
+ * `pretend_fight`. `null` is no hit. One hard hit makes the whole request hard, so a mixed request ("a pirate sword fight where someone is stabbed") is hard. */
+export type ChildPromptClass = "scary" | "pretend_fight" | "hard";
+export function childPromptClass(text: string): ChildPromptClass | null {
+  if (mentionsSexualWord(text)) return "hard";
+  const words = normalise(text);
+  if (UNCLOTHED_PHRASES.some((phrase) => hasWord(words, phrase))) return "hard";
+  const plain = (term: string) => term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (CHILD_IP_NAMES.some((name) => hasWord(words, plain(name)))) return "hard";
+  const hits = CHILD_UNSAFE_TERMS.filter((term) => hasWord(words, plain(term)));
+  // A few inflections of hard words that the list lacks ("stabbed"): held for a child, and they make the request hard.
+  if (CHILD_UNSAFE_CLASSES.hard.some((term) => hasWord(words, plain(term)))) return "hard";
+  if (hits.length === 0) return null;
+  const scary = new Set(CHILD_UNSAFE_CLASSES.scary.map(plain));
+  const fight = new Set(CHILD_UNSAFE_CLASSES.pretend_fight.map(plain));
+  const classes = hits.map((term) => scary.has(plain(term)) ? "scary" as const : fight.has(plain(term)) ? "pretend_fight" as const : "hard" as const);
+  if (classes.includes("hard")) return "hard";
+  return classes.includes("scary") ? "scary" : "pretend_fight";
+}
 
 /** Whether a child's words stay inside the child-safe lane. Sexual and nudity words and minor-with-sexual wording are refused too (the absolute line runs separately and first). */
 export function childPromptUnsafe(text: string): boolean {
-  if (mentionsSexualWord(text)) return true;
-  const words = normalise(text);
-  if (UNCLOTHED_PHRASES.some((phrase) => hasWord(words, phrase))) return true;
-  const plain = (term: string) => term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return CHILD_UNSAFE_TERMS.some((term) => hasWord(words, plain(term))) || CHILD_IP_NAMES.some((name) => hasWord(words, plain(name)));
+  return childPromptClass(text) !== null;
 }
 
 /** A teen's words: nothing adult or sexual. The absolute line runs separately and first. */

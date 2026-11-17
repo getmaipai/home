@@ -382,7 +382,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const pictureProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const refusal = !state.picturesAllowed ? { kind: "denied" as const } : refusalFor(audienceOf(state, false), callArgs);
-      if (refusal) {
+      // CONTENT-POLICY-03: a child's request held only for being scary or a pretend fight goes on to the tool, which rewrites it once or gives the fixed line.
+      if (refusal && !("rewritable" in refusal && refusal.rewritable)) {
         const reason = refusal.kind === "denied" ? "picture_not_here" as const : "picture_refused_minor" as const;
         noteRefusal(reason);
         entries.push({ proposal: pictureProposal, decision: { allow: false, reason } });
@@ -575,7 +576,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const videoProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const offered = call.tool === EDIT_VIDEO_TOOL_ID ? state.videoEditAllowed : state.videosAllowed;
       const refusal = !offered ? { kind: "denied" as const } : videoRefusalFor(videoAudienceOf(state, false), callArgs);
-      if (refusal) {
+      // CONTENT-POLICY-03: as for pictures, a rewritable child clip request goes on to the tool.
+      if (refusal && !("rewritable" in refusal && refusal.rewritable && call.tool === GENERATE_VIDEO_TOOL_ID)) {
         const reason = refusal.kind === "denied" ? "video_not_here" as const : "video_refused_minor" as const;
         noteRefusal(reason);
         entries.push({ proposal: videoProposal, decision: { allow: false, reason } });

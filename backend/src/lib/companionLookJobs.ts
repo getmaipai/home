@@ -14,7 +14,8 @@ import { compositeOnNeutral, cutOutBackground } from "@/lib/imaging/backdrop";
 import { routeAudience } from "@/lib/pictures/audience";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
-import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
+import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
+import { promptCheck } from "@/lib/pictures/promptDoor";
 import { resolveCompanionStill, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { cancelOrDelete, fetchPicture, getGenerationJob, submitEdit, submitGeneration } from "@/lib/pictures/stack";
@@ -92,7 +93,7 @@ export function lookGenerationGate(actor: PersonRow, prompt: string): { status: 
   const audience = routeAudience(actor);
   const denial = pictureDenial(audience);
   if (denial) return { status: 403, error: PICTURE_DENIAL_LINE[denial] };
-  const refused = refusePrompt(prompt, { lane: laneOf(audience) });
+  const refused = promptCheck(audience, "picture", prompt).refusal; // CONTENT-POLICY-03: through the filter door
   if (refused) return { status: 422, error: promptRefusalLineFor(refused, "picture", actor, audience.band, prompt, PROMPT_REFUSAL_LINE[refused]) };
   return null;
 }

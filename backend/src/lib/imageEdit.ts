@@ -42,7 +42,8 @@ import { promptRefusalLineFor, checkImages, promptHash } from "@/lib/pictures/ag
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, attachKid, kidLaneOn, laneOf, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
-import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
+import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, type PictureAudience } from "@/lib/pictures/policy";
+import { promptCheck } from "@/lib/pictures/promptDoor";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineEdits, pictureEngineReferences, pictureEngineStatus, pictureEngineStatusPatient } from "@/lib/pictures/ready";
 import { EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, planExpand, type ExpandShape } from "@/lib/pictures/expand";
@@ -773,7 +774,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     if (resolvedStyles.some((adapter) => adapter === null)) throw new ImageEditError(422, "That style is not available for this profile.", "style_unavailable");
     throw new ImageEditError(501, "Styles are not available for picture changes yet.", "styles_not_available");
   }
-  const refused = refusePrompt(prompt, { lane: laneOf(editorAudience(actor)) });
+  const refused = promptCheck(editorAudience(actor), "picture", prompt).refusal; // CONTENT-POLICY-03: through the filter door
   if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);
   const generated = await isGeneratedPicture(actor, source);
   const comment = await commentState(actor);

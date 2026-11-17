@@ -20,7 +20,8 @@ import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { cancelLongTake, resumeLongTake, startLongTake, takeProgress } from "@/lib/videos/longTake";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { checkVideoPrompt } from "@/lib/videos/promptCheck";
-import { householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
+import { promptCheck } from "@/lib/pictures/promptDoor";
+import { householdAllowsVideo, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason, videoMaxNotReadyReason } from "@/lib/videos/ready";
@@ -400,7 +401,7 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   const audience = videoRouteAudience(actor);
   const denial = videoDenial(audience);
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
-  const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
+  const refused = promptCheck(audience, "clip", prompt).refusal; // CONTENT-POLICY-03: through the filter door
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
   if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
   { const adult = laneOf(audience) === "adult"; const engine = await videoEngineStatus(); if (!videoStatusReady(engine, adult)) return { status: 503, body: { error: videoNotReadyReason(engine, adult), code: "not_installed" } }; }

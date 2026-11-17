@@ -17,7 +17,8 @@ import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import { runPictureEdit } from "@/lib/mediaOps/registry";
 import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
-import { PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "./policy";
+import { PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
+import { promptCheck } from "./promptDoor";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineEdits, pictureEngineReferences, pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
@@ -109,7 +110,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const scope = ["clothes", "background", "face", "whole"].includes(String(args.scope)) ? args.scope as LikenessScope : "whole";
   if (instruction.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const temporary = state.temporary === true || state.ephemeral === true;
-  const refused = refusePrompt(instruction, { lane: laneOf(audience) });
+  const refused = promptCheck(audience, "picture", instruction).refusal; // CONTENT-POLICY-03: through the filter door
   if (refused) return line(callId, args, PROMPT_REFUSAL_LINE[refused], { refused });
   const kind = args.kind === "remove_background" || args.kind === "upscale" ? args.kind : "change";
   const kid = laneOf(audience) === "child";

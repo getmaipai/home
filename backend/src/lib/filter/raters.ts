@@ -12,7 +12,8 @@ export type Surface = "reply" | "search" | "news" | "library" | "picture" | "cli
 /** `whole`: the reply or article so far, read once more as a whole (the floor's cross-sentence check); its sentences already met `rules-check` one by one. */
 export type TextInput = { kind: "text"; text: string; field: "prompt" | "lyrics" | "title" | "transcript"; lane?: "child" | "teen" | "adult"; point: "request" | "release"; surface: Surface; whole?: true };
 export type ExplicitInput = { kind: "explicit"; explicit: boolean };
-export type PictureCheckInput = { kind: "picture_check"; checks: ImageCheck[]; childChecks?: ChildSafetyCheck[]; adultOnly: boolean; viewer: Viewer };
+/** `checked`: whether the finished item is a picture (default) or a clip's frames; it only changes the words of the line a withheld item gets (CONTENT-POLICY-03). */
+export type PictureCheckInput = { kind: "picture_check"; checks: ImageCheck[]; childChecks?: ChildSafetyCheck[]; adultOnly: boolean; viewer: Viewer; checked?: "picture" | "video" };
 export type RaterInput = TextInput | ExplicitInput | PictureCheckInput;
 /** CONTENT-POLICY-02: `detail` is what the rater's own check returned (the floor's `SafetyResult`), carried to the caller on the verdict.
  * `pass` is "this rater ran and found nothing to hold": the door keeps its detail and goes on to the next rater. */
@@ -72,13 +73,14 @@ const minorLine: Rater = {
         if (!ageModule) throw new Error("picture check module not prepared");
         const age = ageModule;
         const decision = input.viewer === "child" || input.viewer === "teen"
-          ? (minorModules ?? (() => { throw new Error("minor picture check module not prepared"); })()).laneGate.decideForLane({ lane: input.viewer, checks: input.checks, childChecks: input.childChecks, adultOnly: input.adultOnly, kind: "picture" })
-          : age.decideAgeCheck(input.checks, input.adultOnly, "picture", input.viewer);
+          ? (minorModules ?? (() => { throw new Error("minor picture check module not prepared"); })()).laneGate.decideForLane({ lane: input.viewer, checks: input.checks, childChecks: input.childChecks, adultOnly: input.adultOnly, kind: input.checked ?? "picture" })
+          : age.decideAgeCheck(input.checks, input.adultOnly, input.checked ?? "picture", input.viewer);
         const possibleMinorSexual = input.checks.some((check) => check.ok && age.showsPossibleMinor(check.verdict) && check.verdict.is_nude_or_sexual);
+        // The decision (its line and reason) rides on the verdict as `detail`, so the caller keeps today's line (CONTENT-POLICY-03).
         if (decision.action === "withhold") return possibleMinorSexual
-          ? { level: "Prohibited", reasons: ["minor_line"] }
-          : { level: "Unrated", withhold: true };
-        return { level: input.adultOnly ? "X" : input.viewer === "child" ? "G" : input.viewer === "teen" ? "PG-13" : "X" };
+          ? { level: "Prohibited", reasons: ["minor_line"], detail: decision }
+          : { level: "Unrated", withhold: true, detail: decision };
+        return { level: input.adultOnly ? "X" : input.viewer === "child" ? "G" : input.viewer === "teen" ? "PG-13" : "X", detail: decision };
       }
       if (input.kind !== "text") return null;
       if (input.surface === "reply") {
@@ -122,13 +124,14 @@ const lanePrompt: Rater = {
     try {
       const { pictures, videos } = minorModules ?? (() => { throw new Error("minor modules not prepared"); })();
       const lane = input.lane ?? audience.band;
+      // The refusal code rides on the verdict as `detail`, so a caller keeps today's typed refusal (CONTENT-POLICY-03).
       const result: string | null = pictures.refusePrompt(input.text, { lane });
-      if (result === "minor_sexual") return { level: "Prohibited", reasons: ["minor_line"] };
-      if (result === "child_content" || result === "teen_content") return { level: "R" };
+      if (result === "minor_sexual") return { level: "Prohibited", reasons: ["minor_line"], detail: result };
+      if (result === "child_content" || result === "teen_content") return { level: "R", detail: result };
       if (input.surface === "clip") {
         const videoResult = videos.refuseVideoPrompt(input.text, { lane });
-        if (videoResult === "minor_sexual") return { level: "Prohibited", reasons: ["minor_line"] };
-        if (videoResult) return { level: "R" };
+        if (videoResult === "minor_sexual") return { level: "Prohibited", reasons: ["minor_line"], detail: videoResult };
+        if (videoResult) return { level: "R", detail: videoResult };
       }
       return null;
     } catch { return null; }

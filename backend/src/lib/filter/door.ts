@@ -14,7 +14,9 @@ export type { Surface, RaterInput } from "./raters";
 export type { Audience } from "./ceiling";
 /** `safety`: on the reply and news surfaces, the floor's own result for the text (CONTENT-POLICY-02), on a released verdict too, so a
  * crisis signal (`allow_with_resources`) reaches the caller. */
-export type DoorVerdict = { verdict: "held" | "released"; rating: ContentRating | null; held_by?: string; safety?: SafetyResult };
+/** `detail` (CONTENT-POLICY-03): what the rater that decided returned beyond the level, for a caller that needs it: the lane rater's refusal code on a held request
+ * (`minor_sexual`, `child_content`, `teen_content`), the finished-item `AgeDecision` on a `picture_check`. The text of the person's line stays the caller's. */
+export type DoorVerdict = { verdict: "held" | "released"; rating: ContentRating | null; held_by?: string; safety?: SafetyResult; detail?: unknown };
 export type Door = {
   checkRequest(input: { surface: Surface; audience: Audience; request: RaterInput & { kind: "text" } }): Promise<DoorVerdict>;
   release(input: { surface: Surface; audience: Audience; item: RaterInput }): Promise<DoorVerdict>;
@@ -67,6 +69,11 @@ function rulesSkipped(surface: Surface, audience: Audience, item: RaterInput): b
   return passForSurface(audience).settings[key] === false;
 }
 
+/** The minor modules are needed below X, and for a finished item a teen or a child will see even when an override raised their ceiling (its decision is the lane's). */
+function needsMinorModules(ceiling: number, item: RaterInput): boolean {
+  return ceiling < 4 || (item.kind === "picture_check" && item.viewer !== "adult");
+}
+
 export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string, surface: Surface) => void } = {}): Door {
   const raters = options.raters ?? [...RATERS];
   async function evaluate(surface: Surface, audience: Audience, item: RaterInput): Promise<DoorVerdict> {
@@ -74,7 +81,7 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
     const adultPath = ceiling === 4;
     const adultAllowed = surface === "reply" || surface === "picture" || surface === "clip" || surface === "song" || surface === "coding";
     if (adultPath && (!adultAllowed || item.kind === "explicit")) return { verdict: "released", rating: null };
-    if (ceiling < 4) await loadMinorModules();
+    if (needsMinorModules(ceiling, item)) await loadMinorModules();
     await ensureFor(item);
     return run(surface, audience, item, ceiling);
   }
@@ -89,7 +96,10 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
     let last: Rater | undefined;
     let passedBy: Rater | undefined;
     let safety: SafetyResult | undefined;
-    const carry = (): { safety?: SafetyResult } => (safety ? { safety } : {});
+    let detail: unknown;
+    const carry = (): { safety?: SafetyResult; detail?: unknown } => ({ ...(safety ? { safety } : {}), ...(detail !== undefined ? { detail } : {}) });
+    // A text read by the floor carries the floor's `SafetyResult`; every other rater's detail is the caller's `detail`.
+    const keep = (rater: Rater, value: unknown): void => { if (!value) return; if (item.kind === "text" && rater.id === "minor-line") safety = value as SafetyResult; else detail = value; };
     for (const rater of selected) {
       options.onRate?.(rater.id, surface);
       last = rater;
@@ -97,8 +107,8 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
         const result = rater.rate(item, audience);
         if (!result) continue;
         // The rater ran and found nothing to hold: its detail is kept and the next rater runs (CONTENT-POLICY-02).
-        if ("pass" in result) { passedBy = rater; if (result.detail) safety = result.detail as SafetyResult; continue; }
-        if (result.detail) safety = result.detail as SafetyResult;
+        if ("pass" in result) { passedBy = rater; keep(rater, result.detail); continue; }
+        keep(rater, result.detail);
         const rating = makeStamp(rater, result, rater.source === "given" ? labelFor(item) : undefined);
         // C9: an allowed Unrated covers only a verdict a rater ran and gave without a withhold; a withhold and Prohibited are never released.
         const unratedReleased = result.level === "Unrated" && !result.withhold && unratedOk;
@@ -125,7 +135,7 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
     const ceiling = ceilingOf(audience, surface);
     const adultAllowed = surface === "reply" || surface === "picture" || surface === "clip" || surface === "song" || surface === "coding";
     if (ceiling === 4 && (!adultAllowed || item.kind === "explicit")) return { verdict: "released", rating: null };
-    if (ceiling < 4 && !minorRatersReady()) {
+    if (needsMinorModules(ceiling, item) && !minorRatersReady()) {
       try { prepareMinorRatersSync(); } catch { return { verdict: "held", rating: unratedStamp("filter-not-ready"), held_by: "filter-not-ready" }; }
     }
     return run(surface, audience, item, ceiling);

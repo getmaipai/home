@@ -15,7 +15,9 @@ import { isAdultPictureStyle } from "@/lib/pictures/lock";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
-import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { adapterAudiencesFor, adultStylesAllowed, householdPictureQuality, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { promptCheck } from "./promptDoor";
+import { rewriteForChild } from "./childRewrite";
 import { MAX_REFERENCE_PICTURES, pictureEngineReferences, pictureEngineStatus, pictureEngineStatusPatient, pictureReferenceLimit } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, PICTURE_MODEL, REMOVED_MODEL_LINE, modelCanSpell } from "./quality";
@@ -59,7 +61,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "plan"; why: "style_plan"; line: string };
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string; /** A child's request held only for being scary or a pretend fight (CONTENT-POLICY-03): the tool rewrites it once before it gives the line. */ rewritable?: true } | { kind: "plan"; why: "style_plan"; line: string };
 
 /** The refusal for this call, or null: the surface and age gate first, then the minor line on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -67,8 +69,10 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  const refused = refusePrompt(`${prompt} ${style}`, { lane: laneOf(audience) });
-  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
+  // CONTENT-POLICY-03: the request goes through the filter door; its verdict is today's typed refusal.
+  const checked = promptCheck(audience, "picture", `${prompt} ${style}`);
+  const refused = checked.refusal;
+  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]), ...(checked.softHold ? { rewritable: true as const } : {}) };
   return null;
 }
 
@@ -202,7 +206,15 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     if (refs.length) normalized.reference = refs[0];
   }
   delete normalized.template;
-  const refusal = refusalFor(audience, normalized);
+  let refusal = refusalFor(audience, normalized);
+  if (refusal?.kind === "prompt" && refusal.rewritable) {
+    // CONTENT-POLICY-03: a child's request held only for being scary or a pretend fight is rewritten once, checked by the door again and made; the person is not told.
+    const softened = await rewriteForChild({ text: `${typeof normalized.prompt === "string" ? normalized.prompt : ""} ${typeof normalized.style === "string" ? normalized.style : ""}`, audience, surface: "picture" });
+    if (softened) {
+      normalized.prompt = softened; normalized.style = ""; promptOverride = softened; args = { ...args, style: "" };
+      refusal = refusalFor(audience, normalized);
+    }
+  }
   if (refusal) return refused(callId, args, refusal);
   const prompt = promptOverride ?? (typeof args.prompt === "string" ? args.prompt.trim() : "");
   const chosenSubjects = Array.isArray(args.subjects) ? args.subjects.filter((name): name is string => typeof name === "string") : [];
@@ -309,7 +321,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const usedLibraryRefs = libraryRefs.filter((ref) => combinedRefs.some((used) => used.id === ref.id));
   const droppedReferences = libraryRefs.length + subjectRefs.length > combinedRefs.length;
   const strictAudience = usedLibraryRefs.some((ref) => ref.adultMark.madeAudience !== "all-ages" || ref.adultMark.lock === "on") || subjectRefs.some((ref) => ref.audience === "adult-only") || castIsAdultOnly(castChosen) ? "adult-only" : (laneOf(audience) === "adult" && adultStylesAllowed() ? "adult-only" : "all-ages");
-  const second = refusePrompt(`${subjectPromptBase} ${adapter?.name ?? ""}`, { lane });
+  const second = promptCheck(audience, "picture", `${subjectPromptBase} ${adapter?.name ?? ""}`).refusal;
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   if (plan && !plan.ok) return refused(callId, args, { kind: "plan", why: "style_plan", line: plan.line });
   // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.

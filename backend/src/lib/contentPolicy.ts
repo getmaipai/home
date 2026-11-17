@@ -29,6 +29,8 @@ function freeze<T>(value: T): T {
 const lanes = freeze(lanesSchema.parse(laneData));
 export const CHILD_UNSAFE_TERMS: readonly string[] = lanes.CHILD_UNSAFE_TERMS;
 export const CHILD_IP_NAMES: readonly string[] = lanes.CHILD_IP_NAMES;
+/** The two classes of unsafe words a child's request may have rewritten (CONTENT-POLICY-03); every other word in CHILD_UNSAFE_TERMS is a hard line. */
+export const CHILD_UNSAFE_CLASSES: { readonly scary: readonly string[]; readonly pretend_fight: readonly string[]; readonly hard: readonly string[] } = lanes.CHILD_UNSAFE_CLASSES;
 
 function immutableSet(values: Iterable<ProtectionKind>): ReadonlySet<ProtectionKind> {
   const set = new Set(values);

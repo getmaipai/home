@@ -7,7 +7,8 @@ import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { adapterAudiencesFor, adultStylesAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
+import { adapterAudiencesFor, adultStylesAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
+import { promptCheck } from "@/lib/pictures/promptDoor";
 import { SPELLING_PHASE } from "@/lib/pictures/jobStore";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor } from "@/lib/pictures/adapters";
@@ -253,7 +254,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const prompt = plan.prompt;
   const lane = laneOf(routeAudience(actor));
   const kid = lane === "child";
-  const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
+  const refused = promptCheck(routeAudience(actor), "picture", `${prompt} ${used.map((a) => a.name).join(" ")}`).refusal; // CONTENT-POLICY-03: through the filter door
   if (refused) return c.json({ error: promptRefusalLineFor(refused, "picture", actor, routeAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), code: refused }, 422) as never;
   // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;

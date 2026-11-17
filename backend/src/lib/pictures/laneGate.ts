@@ -6,7 +6,8 @@
 //     including no answer, withholds.
 // The line a withheld picture gets is ONE short friendly sentence for the lane, never a lecture. The admin hears of it (no image), at most
 // once in ten minutes for one person (ageCheck.recordWithheld).
-import { decideAgeCheck, downscaleForCheck, markChatReaderUnusable, pictureReader, type PictureReader, recordWithheld, showsPossibleMinor, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
+import { decideAgeCheck, downscaleForCheck, markChatReaderUnusable, pictureReader, type PictureReader, recordWithheld, showsPossibleMinor, uncheckedRefusalLine, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
+import { release } from "@/lib/filter/door";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
@@ -176,11 +177,27 @@ export interface FinishedGateInput {
   promptHash?: string;
 }
 
-/** The one finished-item decision for pictures, clips and described edits: the adult decision is ageCheck's, a teen's and a child's is stricter (decideForLane). A withheld item is reported to the admins (no image, rate limited) for every lane. */
+function isAgeDecision(value: unknown): value is AgeDecision {
+  return !!value && typeof value === "object" && ((value as { action?: unknown }).action === "allow" || (value as { action?: unknown }).action === "withhold");
+}
+
+/**
+ * The one finished-item decision for pictures, clips and described edits, made by the filter door (CONTENT-POLICY-03, RULES.md C5): the door's `minor-line`
+ * rater runs the adult decision (ageCheck's) or a teen's and a child's stricter one (decideForLane) and carries the `AgeDecision` on the verdict, so the caller keeps
+ * its line. The child's own cartoon question is asked here (it needs the pictures) and handed to the door. A verdict the door holds without an allowing decision
+ * withholds (fail closed). A withheld item is reported to the admins (no image, rate limited) for every lane; those two side effects stay here, after the verdict.
+ */
 export async function gateFinished(input: FinishedGateInput): Promise<AgeDecision> {
   const lane = laneOfPerson(input.actor);
   const childChecks = lane === "child" ? await checkChildSafety(input.images) : undefined;
-  const decision = decideForLane({ lane, checks: input.checks, adultOnly: input.adultOnly, kind: input.kind, ...(childChecks ? { childChecks } : {}) });
+  const verdict = await release({
+    surface: input.kind === "video" ? "clip" : "picture", audience: { actor: input.actor, band: lane },
+    item: { kind: "picture_check", checks: input.checks, ...(childChecks ? { childChecks } : {}), adultOnly: input.adultOnly, viewer: lane, checked: input.kind },
+  });
+  const given = verdict.detail;
+  const decision: AgeDecision = isAgeDecision(given) && (verdict.verdict === "released" || given.action === "withhold")
+    ? given
+    : { action: "withhold", reason: "unchecked", line: lane === "child" ? CHILD_CONTENT_LINE : uncheckedRefusalLine(input.kind) };
   if (decision.action === "withhold" && lane === "child") markKidWithheld(input.jobId);
   if (decision.action === "withhold" && (lane !== "adult" || decision.reason === "minor_sexual")) {
     await recordWithheld({ kind: input.kind, personId: input.actor.id, jobId: input.jobId, adultOnly: input.adultOnly, checks: input.checks, ...(input.prompt !== undefined ? { prompt: input.prompt } : {}), ...(input.promptHash !== undefined ? { promptHash: input.promptHash } : {}) });
