@@ -6,7 +6,8 @@
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { CRISIS_RESOURCES_TEXT, SAFETY_REFUSAL_COPY } from "@/lib/failureCopy";
-import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { type AgeBand } from "@/lib/ageBand";
+import { audienceBand } from "@/lib/audience";
 import { REFUSE_CATEGORIES } from "@maipai/spec/safety/ts/classifier.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { PersonRow } from "@/types";
@@ -32,7 +33,7 @@ export function codingFloor(text: string, band: AgeBand, direction: "in" | "out"
   return { action: result.action, crisis: result.categories.includes("self_harm"), result };
 }
 
-export const bandOf = (person: PersonRow): AgeBand => speakerAgeBand(person, new Date());
+export const bandOf = (person: PersonRow): AgeBand => audienceBand(person);
 export const crisisText = (): string => CRISIS_RESOURCES_TEXT;
 export const inputRefusalLine = (band: AgeBand): string => band === "child"
   ? "I can't help with that one, so let's pick something else."

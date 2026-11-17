@@ -11,6 +11,7 @@ import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { errorLine } from "@/lib/hubReachability";
 import { api, type ArrangeCard, type HomeSectionLayout, type WidgetDescriptor } from "@/lib/api";
 import { homeBlocks } from "@/shell/pages/dashboard/homeBlocks";
+import { isMinor } from "@/lib/audience";
 
 const ArrowDown = getIcon("arrow-down");
 const ArrowUp = getIcon("arrow-up");
@@ -25,8 +26,9 @@ export function defaultSectionLayout(role: string, layout: "ask" | "board" | "sh
   const blockToSection: Record<string, HomeSection> = { hero: "hero", ask: "composer", make: "make", pick_up: "continue", today: "today", today_chips: "today", media_continue: "continue", media_new: "new", media_made: "made", family: "family", admin: "admin", getting_started: "admin" };
   const order: HomeSection[] = [...new Set(homeBlocks(layout).map((block): HomeSection | undefined => blockToSection[block]).filter((id): id is HomeSection => Boolean(id)))];
   for (const id of HOME_SECTIONS) if (!order.includes(id)) order.push(id);
-  const hidden: string[] = role === "child" ? ["admin"] : role === "teen" ? ["admin"] : [];
-  return { order, hidden, heroSource: role === "child" || role === "teen" ? "companion" : "made" };
+  const minor = isMinor({ role });
+  const hidden: string[] = minor ? ["admin"] : [];
+  return { order, hidden, heroSource: minor ? "companion" : "made" };
 }
 
 /** The name a Home card goes by on screen (a few package titles read better in plain words). */

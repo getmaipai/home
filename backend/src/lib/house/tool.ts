@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ToolSpec } from "@/lib/llm";
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
+import { audienceBand, stricterBand } from "@/lib/audience";
 import { effectivePermissions } from "@/lib/permissions";
 import { brakeFor, type BrakeMode } from "@/lib/toolBrake";
 import { recordToolAudit } from "@/lib/toolAudit";
@@ -173,8 +174,8 @@ export type HouseCallPlan =
   | { kind: "run"; input: HouseArgs; actor: HouseActor; permissions: EffectivePermission[]; registry: { ok: true; areas: HouseArea[]; entities: HouseEntity[] }; matches: HouseEntity[]; action: HouseActionInput; mode: BrakeMode; count: number };
 
 function canonicalActor(actor: PersonRow | HouseActor, bandIn: HouseBand): HouseActor {
-  const roleBand: HouseBand = "role" in actor && (actor.role === "child" || actor.role === "teen") ? actor.role : "adult";
-  const band: HouseBand = bandIn === "child" || roleBand === "child" ? "child" : bandIn === "teen" || roleBand === "teen" ? "teen" : "adult";
+  const roleBand: HouseBand = "band" in actor ? actor.band : audienceBand(actor);
+  const band: HouseBand = stricterBand(bandIn, roleBand);
   return { id: actor.id, role: "role" in actor ? String(actor.role) as HouseActor["role"] : "unknown", band };
 }
 

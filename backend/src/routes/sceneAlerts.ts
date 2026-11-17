@@ -4,6 +4,7 @@ import { requireAuth } from "@/middleware/auth";
 import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
 import { weatherAlerts, weatherAlertsEnabled, isUsAlertCoordinate } from "@/lib/weatherAlerts";
 import { weatherAlertDismissal, resume } from "@/lib/sceneSuppression";
+import { audienceBand } from "@/lib/audience";
 
 export const sceneAlertsRoutes = apiRouter();
 const alertSchema = z.object({ id: z.string(), event: z.string(), severity: z.string(), headline: z.string(), ends: z.string(), dismissed: z.enum(["none", "you", "household"]) });
@@ -14,7 +15,7 @@ sceneAlertsRoutes.openapi(listRoute, async (c) => {
   const person = c.get("person");
   let current = null;
   try { const raw = c.req.valid("query").current_location; current = raw ? parseCurrentLocation(JSON.parse(raw)) : null; } catch { current = null; }
-  const place = await resolveWeatherPlace({ person, current, preferCurrent: !!current, band: person.role === "child" ? "child" : person.role === "teen" || person.role === "guest" ? "teen" : "adult" }).catch(() => null);
+  const place = await resolveWeatherPlace({ person, current, preferCurrent: !!current, band: audienceBand(person) }).catch(() => null);
   if (!weatherAlertsEnabled() || !place || typeof place.hostInputs.latitude !== "number" || typeof place.hostInputs.longitude !== "number" || !isUsAlertCoordinate(place.hostInputs.latitude, place.hostInputs.longitude)) return c.json([], 200);
   const now = Date.now();
   const alerts = await weatherAlerts(place.hostInputs.latitude, place.hostInputs.longitude);

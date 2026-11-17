@@ -4,6 +4,7 @@ import { requireAuth } from "@/middleware/auth";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordToolAudit } from "@/lib/toolAudit";
+import { audienceBand } from "@/lib/audience";
 import { recordUndo, type UndoInverse } from "@/lib/toolUndo";
 import { HOUSE_TOOL_ID } from "@/lib/house/ids";
 import { houseLanFetch } from "@/lib/house/connection";
@@ -44,7 +45,7 @@ const defaults: HouseRoomsDeps = {
 let overrides: Partial<HouseRoomsDeps> = {};
 export function __setHouseRoomsDepsForTests(deps: Partial<HouseRoomsDeps> = {}): void { overrides = deps; }
 function deps(): HouseRoomsDeps { return { ...defaults, ...overrides }; }
-function bandOf(person: PersonRow): HouseBand { return person.role === "child" ? "child" : person.role === "teen" ? "teen" : "adult"; }
+function bandOf(person: PersonRow): HouseBand { return audienceBand(person); }
 function actorOf(person: PersonRow): HouseActor { return { id: person.id, role: person.role as HouseActor["role"], band: bandOf(person) }; }
 function inaccessible(actor: HouseActor): boolean { return !actor.id || actor.role === "guest" || actor.role === "unknown"; }
 function stateFlags(entity: HouseEntity) {

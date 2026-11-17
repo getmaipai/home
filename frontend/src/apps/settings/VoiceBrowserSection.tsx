@@ -13,6 +13,7 @@ import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 import { api, type PersonRosterEntry, type ResolvedSetting, type Roster } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices, voiceTargets } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
+import { isMinor } from "@/lib/audience";
 
 /** "Choose a voice for <who>": ONE dropdown bound to tts.voice_id, a Test button beside it. */
 export function VoiceBrowserSection({ person }: { person: Roster }) {
@@ -27,7 +28,7 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const valuesQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", `person:${target.id}`], queryFn: () => api.settingsValues(`person:${target.id}`) });
   // AUDIO-PARITY-01 V4: every member but a guest may make a voice from a recording; liveliness and pitch stay with the owner and admin (rule 8).
   const mayMake = person.role !== "guest";
-  const minor = person.role === "child" || person.role === "teen";
+  const minor = isMinor(person);
   const [making, setMaking] = useState(false);
   const [inspired, setInspired] = useState(false);
   const [makeBusy, setMakeBusy] = useState(false);

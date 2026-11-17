@@ -13,7 +13,7 @@ import sharp from "sharp";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationDeliveries, people } from "@/db/schema";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { audienceBand } from "@/lib/audience";
 import type { PersonRow } from "@/types";
 import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
@@ -150,7 +150,7 @@ export type Viewer = "adult" | "teen" | "child";
 
 /** The viewer band for a person on their own: the person's age band (role and birthdate, the stricter). A caller that also knows the turn's band passes the stricter of the two. */
 export function viewerOf(actor: PersonRow, turnBand?: Viewer): Viewer {
-  const own: Viewer = speakerAgeBand(actor, new Date());
+  const own: Viewer = audienceBand(actor);
   const rank: Record<Viewer, number> = { child: 0, teen: 1, adult: 2 };
   return turnBand && rank[turnBand] < rank[own] ? turnBand : own;
 }

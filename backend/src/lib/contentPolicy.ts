@@ -3,7 +3,8 @@ import { policyWord, lanesSchema } from "./contentPolicy/dataSchema";
 import { foldForSafety, TermSet } from "@maipai/spec/safety/ts/fold.js";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { contentChecksForFold } from "./pictures/minorLine";
-import { speakerAgeBand, type AgeBand } from "./ageBand";
+import type { AgeBand } from "./ageBand";
+import { audienceBand } from "./audience";
 import type { PersonRow as Person } from "@/types";
 import type { PictureAudience } from "./pictures/policy";
 import kindsData from "./contentPolicy/data/kinds.v1.json";
@@ -47,10 +48,9 @@ function immutableSet(values: Iterable<ProtectionKind>): ReadonlySet<ProtectionK
 const defaults = freeze({ child: ["minor_line", "sexual", "swearing", "drugs", "gambling", "gore"], teen: ["minor_line", "sexual", "swearing", "gore"], adult: ["minor_line"] } satisfies Record<AgeBand, ProtectionKind[]>);
 const fallback = Object.freeze({ kind: "minor_line" as const, line: "I couldn't check that safely. Try something different." });
 const ranks: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
-// Unknown identities stay in the child band; known people use their role only.
+// Unknown identities stay in the child band; audience.ts is the one role-to-band answer.
 function bandOf(person: Person): AgeBand {
-  if (!person?.id || !["child", "teen", "adult", "owner", "admin", "guest"].includes(person.role)) return "child";
-  return speakerAgeBand(person, new Date());
+  return audienceBand(person);
 }
 
 /** The reader must return a validated in-memory snapshot. No settings writes are enabled here. */

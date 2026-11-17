@@ -3,6 +3,7 @@ import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
 import type { Roster } from "@/lib/api";
+import { bandOf } from "@/lib/audience";
 
 type Band = SettingsViewer["band"];
 export type KitSettingsKey = Omit<SettingsKey, "selector"> & { selector: Exclude<SettingsKey["selector"], "location"> };
@@ -10,8 +11,7 @@ export type KitSettingsKey = Omit<SettingsKey, "selector"> & { selector: Exclude
 /** The viewer's age band: the signed-in person's own, or the one their role
  * carries (a child or teen role is that band; everyone else is an adult). */
 export function viewerBand(person: Pick<Roster, "role" | "age_band">): Band {
-  if (person.age_band) return person.age_band;
-  return person.role === "child" ? "child" : person.role === "teen" ? "teen" : "adult";
+  return bandOf(person);
 }
 
 /** The viewer before any capability is known: enough to decide, with no
