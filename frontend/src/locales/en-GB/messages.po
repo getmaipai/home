@@ -1427,7 +1427,7 @@ msgid "{title}: which one"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:786
+#: src/apps/chat/chatThreadSlots.tsx:790
 msgid "{tokens} tokens"
 msgstr ""
 
@@ -3252,7 +3252,7 @@ msgid "Animate Character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:498
+#: src/apps/chat/chatThreadSlots.tsx:499
 msgid "Animate this picture"
 msgstr ""
 
@@ -4094,7 +4094,7 @@ msgid "Bare mode is on"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:830
+#: src/apps/chat/chatThreadSlots.tsx:834
 #: src/shell/pages/ChatPage.tsx:1658
 msgid "Bare model"
 msgstr ""
@@ -4720,7 +4720,7 @@ msgid "Can someone reach into your house?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:277
+#: src/apps/chat/chatThreadSlots.tsx:278
 #: src/apps/people/ProfileForm.tsx:191
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
@@ -8567,7 +8567,7 @@ msgid "setting.generation.picture_detailed.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:338
+#: src/apps/chat/chatThreadSlots.tsx:339
 #: src/apps/settings/ModelsSection.tsx:154
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
@@ -8730,7 +8730,7 @@ msgid "Disk space"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:185
+#: src/apps/chat/chatThreadSlots.tsx:186
 #: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
@@ -10019,6 +10019,11 @@ msgid "Find a setting"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:14
+msgid "Find a show"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:86
 #: src/shell/library/TranscriptFindReplace.tsx:87
 msgid "Find and replace"
@@ -10043,11 +10048,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:866
 msgid "setting.radio.directory.enabled.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/MakeShelf.tsx:14
-msgid "Find something to watch"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15378,7 +15378,7 @@ msgid "Make a talking character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:457
+#: src/apps/chat/chatThreadSlots.tsx:458
 msgid "Make a variation"
 msgstr ""
 
@@ -20417,8 +20417,8 @@ msgid "Queue"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:94
-#: src/apps/chat/chatThreadSlots.tsx:94
+#: src/apps/chat/chatThreadSlots.tsx:95
+#: src/apps/chat/chatThreadSlots.tsx:95
 msgid "Queue message"
 msgstr ""
 
@@ -21485,7 +21485,7 @@ msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:534
+#: src/apps/chat/chatThreadSlots.tsx:535
 msgid "Retry with current companion"
 msgstr ""
 
@@ -24721,7 +24721,7 @@ msgid "failure.composer.starting.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:598
+#: src/apps/chat/chatThreadSlots.tsx:599
 msgid "Starting your AI…"
 msgstr ""
 
@@ -25539,7 +25539,7 @@ msgid "That did not send. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:204
+#: src/apps/chat/chatThreadSlots.tsx:205
 #: src/apps/chat/chatToolUis.tsx:324
 #: src/apps/chat/chatToolUis.tsx:341
 #: src/apps/clock/AlarmsTab.tsx:71
@@ -27078,7 +27078,7 @@ msgid "Things it might say"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:253
+#: src/apps/chat/chatThreadSlots.tsx:254
 #: src/apps/settings/RobotBody.tsx:21
 msgid "Thinking"
 msgstr ""
@@ -27169,7 +27169,7 @@ msgid "This chat made {media}. Delete them too, or keep them in your Library? De
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:613
+#: src/apps/chat/chatThreadSlots.tsx:614
 msgid "This chat won't be saved to your history."
 msgstr ""
 
@@ -28121,7 +28121,7 @@ msgid "Turn this feature off?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:389
+#: src/apps/chat/chatThreadSlots.tsx:390
 #: src/shell/Routes.tsx:195
 msgid "Turn trace"
 msgstr ""
@@ -28749,7 +28749,7 @@ msgid "setting.coding.engine.option.llama-server"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:278
+#: src/apps/chat/chatThreadSlots.tsx:279
 msgid "Use Max"
 msgstr ""
 

@@ -1650,7 +1650,7 @@ msgid "{title}: which one"
 msgstr "{title}: cuál"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:786
+#: src/apps/chat/chatThreadSlots.tsx:790
 #, needs-review
 msgid "{tokens} tokens"
 msgstr "{tokens} tokens"
@@ -3723,7 +3723,7 @@ msgid "Animate Character"
 msgstr "Animar personaje"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:498
+#: src/apps/chat/chatThreadSlots.tsx:499
 #, needs-review
 msgid "Animate this picture"
 msgstr "Anima esta imagen"
@@ -4676,7 +4676,7 @@ msgid "Bare mode is on"
 msgstr "Modo base activado"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:830
+#: src/apps/chat/chatThreadSlots.tsx:834
 #: src/shell/pages/ChatPage.tsx:1658
 #, needs-review
 msgid "Bare model"
@@ -5387,7 +5387,7 @@ msgid "Can someone reach into your house?"
 msgstr "¿Puede alguien entrar a tu casa?"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:277
+#: src/apps/chat/chatThreadSlots.tsx:278
 #: src/apps/people/ProfileForm.tsx:191
 #: src/apps/people/ProfileForm.tsx:196
 #: src/apps/reminders/RemindersPage.tsx:188
@@ -9813,7 +9813,7 @@ msgid "setting.generation.picture_detailed.enabled.label"
 msgstr "Imágenes detalladas"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:338
+#: src/apps/chat/chatThreadSlots.tsx:339
 #: src/apps/settings/ModelsSection.tsx:154
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
@@ -10001,7 +10001,7 @@ msgid "Disk space"
 msgstr "Espacio en disco"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:185
+#: src/apps/chat/chatThreadSlots.tsx:186
 #: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
@@ -11482,6 +11482,11 @@ msgid "Find a setting"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/MakeShelf.tsx:14
+msgid "Find a show"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:86
 #: src/shell/library/TranscriptFindReplace.tsx:87
 #, needs-review
@@ -11512,11 +11517,6 @@ msgstr "Buscar podcasts en línea"
 #, needs-review
 msgid "setting.radio.directory.enabled.label"
 msgstr "Buscar estaciones de radio en línea"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/MakeShelf.tsx:14
-msgid "Find something to watch"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:65
@@ -17654,7 +17654,7 @@ msgid "Make a talking character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:457
+#: src/apps/chat/chatThreadSlots.tsx:458
 #, needs-review
 msgid "Make a variation"
 msgstr "Crea una variación"
@@ -23418,8 +23418,8 @@ msgid "Queue"
 msgstr "Cola"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:94
-#: src/apps/chat/chatThreadSlots.tsx:94
+#: src/apps/chat/chatThreadSlots.tsx:95
+#: src/apps/chat/chatThreadSlots.tsx:95
 #, needs-review
 msgid "Queue message"
 msgstr "Coloca el mensaje en cola"
@@ -24644,7 +24644,7 @@ msgid "failure.advice.engine_computer.next_step"
 msgstr "Inténtalo de nuevo cuando vuelva la conexión. Si sigue caído, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:534
+#: src/apps/chat/chatThreadSlots.tsx:535
 #, needs-review
 msgid "Retry with current companion"
 msgstr "Reintenta con la compañía actual"
@@ -28317,7 +28317,7 @@ msgid "failure.composer.starting.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:598
+#: src/apps/chat/chatThreadSlots.tsx:599
 #, needs-review
 msgid "Starting your AI…"
 msgstr "Iniciando tu IA..."
@@ -29249,7 +29249,7 @@ msgid "That did not send. Try again."
 msgstr "No se envió. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:204
+#: src/apps/chat/chatThreadSlots.tsx:205
 #: src/apps/chat/chatToolUis.tsx:324
 #: src/apps/chat/chatToolUis.tsx:341
 #: src/apps/clock/AlarmsTab.tsx:71
@@ -30999,7 +30999,7 @@ msgid "Things it might say"
 msgstr "Cosas que podría decir"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:253
+#: src/apps/chat/chatThreadSlots.tsx:254
 #: src/apps/settings/RobotBody.tsx:21
 msgid "Thinking"
 msgstr ""
@@ -31104,7 +31104,7 @@ msgid "This chat made {media}. Delete them too, or keep them in your Library? De
 msgstr "Este chat creó {media}. ¿Los eliminas también o los conservas en tu Biblioteca? Los archivos eliminados esperan en la Papelera durante 30 días."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:613
+#: src/apps/chat/chatThreadSlots.tsx:614
 #, needs-review
 msgid "This chat won't be saved to your history."
 msgstr "Este chat no se guardará en tu historial."
@@ -32193,7 +32193,7 @@ msgid "Turn this feature off?"
 msgstr "¿Apagar esta función?"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:389
+#: src/apps/chat/chatThreadSlots.tsx:390
 #: src/shell/Routes.tsx:195
 #, needs-review
 msgid "Turn trace"
@@ -32910,7 +32910,7 @@ msgid "setting.coding.engine.option.llama-server"
 msgstr "Usa llama-server, un motor que funciona en más ordenadores."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:278
+#: src/apps/chat/chatThreadSlots.tsx:279
 #, needs-review
 msgid "Use Max"
 msgstr "Usa Max"
