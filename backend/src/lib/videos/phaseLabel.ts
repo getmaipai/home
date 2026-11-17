@@ -9,6 +9,7 @@ import type { VideoJob } from "@/lib/videos/jobs";
 export const REFERENCE_PHASE = "making from the sheet";
 /** REFVIDEO-FIRSTFRAME-01: the phase of a video made from a first picture (a real person's face). */
 export const FIRST_FRAME_PHASE = "making from the first picture";
+export const SWAP_PHASE = "Swapping a face";
 
 export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   const hold = job.riseReason ?? (job.phase?.startsWith("held:") ? job.phase.slice(5) : null);
@@ -30,6 +31,7 @@ export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   if (job.phase === "encoding") return "Putting the video together";
   if (job.phase === REFERENCE_PHASE) return "Making your video from the sheet";
   if (job.phase === FIRST_FRAME_PHASE) return "Making your video from the first picture";
+  if (job.phase === SWAP_PHASE) return SWAP_PHASE;
   if (job.phase === "editing") return "Putting your edit together";
   if (job.phase === "placing the sound") return "Placing the sound";
   return "Making your video";

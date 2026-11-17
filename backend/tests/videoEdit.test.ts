@@ -120,7 +120,7 @@ describe("C2: edit_video", () => {
   test("the package declares its changes and look presets, the gate, the bench row and a reason", () => {
     const m = manifest(EDIT_VIDEO_TOOL_ID);
     expect(m.args.required).toEqual(["change"]);
-    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "continue", "extend", "retake", "reframe", "grade", "film_look", "cut_to_beat", "letterbox", "speed", "captions", "effect", "upscale", "remove_background", "title_card", "credits", "spatial_sound", "restyle"]);
+    expect(m.args.properties.change!.enum).toEqual(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "continue", "extend", "retake", "reframe", "grade", "film_look", "cut_to_beat", "letterbox", "speed", "captions", "effect", "upscale", "remove_background", "title_card", "credits", "spatial_sound", "restyle", "swap"]);
     expect(m.args.properties.look!.enum).toEqual([...ids(VIDEO_LOOKS), "70s_color", "noir", "teal_orange", "bleach_bypass", "technicolor", "faded_vintage", "cool_thriller"]);
     expect(m.args.properties.camera!.enum).toEqual(ids(VIDEO_RECIPES));
     expect(m.args.properties.voices!.enum).toEqual(ids(VIDEO_VOICES));
@@ -211,6 +211,22 @@ describe("C2: edit_video", () => {
       expect(line).not.toMatch(/\b(GB|RAM|memory|ltx|LTX)\b/);
       expect(fake.submitted).toHaveLength(before);
     }
+  });
+
+  test("swap: a teen and a child are refused as minors, an adult without the Stack's swap report is told it is not available, and nothing starts", async () => {
+    const owner = person("owner");
+    const made = await makeClip(owner);
+    const jobsBefore = db.select().from(videoJobs).all().length;
+    for (const role of ["teen", "child"]) {
+      const minor = person(role);
+      db.update(videoJobs).set({ personId: minor.id }).where(eq(videoJobs.id, made.job.id)).run();
+      const refused = await edit(chatState(minor), { clip: made.job.id, change: "swap", cast: ["someone"] });
+      expect((refused.result?.data as { refused: string }).refused).toBe("minor");
+    }
+    db.update(videoJobs).set({ personId: owner.id }).where(eq(videoJobs.id, made.job.id)).run();
+    const noReport = await edit(chatState(owner), { clip: made.job.id, change: "swap", cast: ["someone"] });
+    expect(["swap_unavailable", "max_needs_admin"]).toContain((noReport.result?.data as { refused: string }).refused);
+    expect(db.select().from(videoJobs).all()).toHaveLength(jobsBefore);
   });
 
   test("a teen is refused with the Create line, a child and a stranger's clip find nothing, and nothing reaches the Stack", async () => {

@@ -11,7 +11,7 @@ import { z } from "zod";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
-import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument } from "@/lib/tiers";
+import { MAX_NEEDS_ADMIN_LINE, jobTier, tierArgument, holdsMax } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, etaWords, ltx25MaxPictureReady, ltx25MaxReady, ltx25PictureReady, makerOfModel } from "./quality";
 import sharp from "sharp";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
@@ -23,8 +23,8 @@ import { db } from "@/db";
 import { attachments, musicJobs, people } from "@/db/schema";
 import type { MusicRequest } from "@/lib/music/types";
 import { attachmentFilePath } from "@/lib/attachments";
-import { existsSync } from "node:fs";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
+import { existsSync } from "node:fs";
 import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
@@ -38,6 +38,9 @@ import { checkTrack, clipFileOf, clipMarkOf, editableClip, editRefusal, lineMark
 import { VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES } from "./recipes";
 import { prepareVideoRerun } from "./rerun";
 import { resolveStyles } from "./styleChoice";
+import { castForTool } from "@/lib/cast";
+import { runStackSwap } from "./stackSwap";
+import { swapReferencePhotos } from "./swapReferences";
 import { ltx25LorasSupported } from "./loraWire";
 import { videoAudienceOf, videoRefusalFor, type GenerateVideoState, type RunGenerateVideoInput } from "./tool";
 import { getMediaProduction, listMediaProductions, updateMediaProduction } from "@/lib/mediaProductions";
@@ -56,7 +59,9 @@ const ids = <T extends { id: string }>(list: readonly T[]) => list.map((item) =>
 
 export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
-  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle", "continue", "extend", "retake"]),
+  change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle", "continue", "extend", "retake", "swap"]),
+  cast: z.array(z.string().trim().min(1).max(80)).max(6).optional(),
+  description: z.string().trim().min(1).max(120).optional(),
   restyle: z.enum(["colorize"]).optional(),
   words: z.string().trim().max(600).optional(),
   background: z.string().optional(),
@@ -135,6 +140,8 @@ export const editVideoArgs = z.object({
   if (value.change === "upscale") for (const key of Object.keys(value)) if (key !== "clip" && key !== "change" && key !== "clarity") ctx.addIssue({ code: "custom", path: [key], message: "Upscale takes only a clip and a clarity." });
   if (value.change !== "upscale" && value.clarity !== undefined) ctx.addIssue({ code: "custom", path: ["clarity"], message: "Clarity is only for upscale." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
+  if (value.change === "swap") { if (!value.cast?.length) ctx.addIssue({ code: "custom", path: ["cast"], message: "Choose one cast member." }); if ((value.cast?.length ?? 0) > 1) ctx.addIssue({ code: "custom", path: ["cast"], message: "Swap one person at a time." }); for (const key of Object.keys(value)) if (!["clip", "change", "cast", "description", "from_s", "seconds"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Swap takes a clip, one cast member, an optional description and a window." }); }
+  if (value.change !== "swap" && (value.cast !== undefined || value.description !== undefined)) ctx.addIssue({ code: "custom", path: ["cast"], message: "Cast and description are only for swap." });
 });
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
@@ -231,6 +238,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "captions" && value.captions?.some((line) => line.to_s <= line.from_s)) return refused(callId, args, "Give me caption words with a start and end time for each line.", "bad_captions");
   const actor = state.actor as PersonRow;
   const audience = videoAudienceOf(state as Parameters<typeof videoAudienceOf>[0], input.spoken);
+  if (value.change === "swap") { const editGate = editRefusal(audience, ""); if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor"); }
   if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "upscale", "remove_background", "spatial_sound", "restyle"].includes(value.change)) {
     const editGate = editRefusal(audience, "");
     if (editGate) return refused(callId, args, editGate.line, editGate.kind === "denied" ? editGate.why : "minor");
@@ -243,6 +251,42 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
 
   const temporary = state.temporary === true || state.ephemeral === true;
   if (value.change === "continue" && laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
+  if (value.change === "swap") {
+    if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
+    if (value.cast!.length > 1) return refused(callId, args, "Swap one person at a time.", "one_person");
+    if (!holdsMax(actor, "video")) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
+    const engine = await videoEngineStatus();
+    const h3Swap = (engine?.qualities as unknown as { h3_swap?: { ready?: boolean; memory?: { fits?: boolean } } } | undefined)?.h3_swap;
+    if (!h3Swap?.ready) return refused(callId, args, "Swapping a face is not available on this computer yet.", "swap_unavailable");
+    if (h3Swap.memory?.fits === false) return refused(callId, args, "Not enough free memory for a face swap right now. Close other big jobs, or try again in a few minutes.", "no_memory");
+    const chosen = await castForTool(actor, args, { band: audience.band, temporary });
+    if (!chosen.ok) return refused(callId, args, chosen.line, "bad_cast");
+    const member = chosen.members[0];
+    if (!member) return refused(callId, args, "Choose one cast member.", "missing_cast");
+    const ordinary = chosen.subjects[0] ? swapReferencePhotos(chosen.subjects[0]) : [];
+    if (!ordinary.length) return refused(callId, args, `Add a photo of ${member.name} first, then try the swap.`, "no_reference_photo");
+    if (temporary) return refused(callId, args, "A temporary chat does not save anything, so this edit cannot be saved here.", "temporary");
+    const source = ownClip(actor, state, value.clip!, false);
+    if (!source) return refused(callId, args, NO_CLIP_LINE, "no_clip");
+    if (videoJobLockState(actor, source) !== "open") return refused(callId, args, LOCKED_START_LINE, "locked");
+    const sourceRow = db.select().from(attachments).where(eq(attachments.id, source.files[0]!.id)).get();
+    if (!sourceRow || sourceRow.deletedAt !== null || sourceRow.ownerPersonId !== actor.id) return refused(callId, args, NO_CLIP_LINE, "no_clip");
+    const sourcePath = attachmentFilePath(sourceRow.storagePath);
+    if (!existsSync(sourcePath) || isRemoteStackSelected()) return refused(callId, args, "Swapping a face is not available on this computer yet.", "swap_unavailable");
+    const duration = source.files[0]?.seconds ?? source.request.seconds;
+    const from = value.from_s ?? 0, seconds = value.seconds ?? Math.min(10, Math.floor(duration));
+    if (!Number.isFinite(from) || from + seconds > duration || seconds < 1 || seconds > 10) return refused(callId, args, "Choose a swap window of up to 10 seconds inside the video.", "bad_swap_window");
+    const size = h3Swap.memory?.fits === true ? "640x480" : "512x384";
+    const mark = await clipMarkOf(source);
+    const edit: NonNullable<VideoRequest["edit"]> = { from: source.id, change: "swap" };
+    const run: EditRun = async (signal, onProgress) => {
+      const made = await runStackSwap({ sourcePath, references: ordinary, description: value.description ?? member.name, size, startSeconds: from, seconds, signal, onProgress: (pct) => onProgress?.(pct) });
+      return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
+    };
+    const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit, request: { swap_cast_id: member.id, subject_ids: [member.subject_id] }, run, phase: "Swapping a face", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
+    if (!started.ok) return refused(callId, args, started.line, "already_making");
+    return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "A new version with the cast member is being made; the first video is kept. The video card shows progress." }, data: { videoJobId: started.job.id }, actions: [] } });
+  }
   if (value.change === "cut_to_beat" && (!value.track || (!value.clip && !value.clips))) return refused(callId, args, value.track ? NO_CLIP_LINE : MIX_SOUND_LINE, "missing_argument");
   if (["extend", "retake", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle"].includes(value.change)) {
     // Cutting, joining and mixing are for adults on their own screen, like making one: a child's turn passes the screen above but never reaches the editor.

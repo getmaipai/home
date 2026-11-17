@@ -119,7 +119,7 @@ export function recordClipCreation(actor: PersonRow, job: VideoJob, files: Video
     // The reference recipe's own words (the person's request rewritten around the panels, and the whole prompt the Stack received).
     words: words(recipe ? recipe.request : job.prompt, recipe ? recipe.prompt : job.prompt),
     sources: sourcesOfVideo(job),
-    ...(job.request.subject_ids?.length ? { cast: castOfSubjects(job.request.subject_ids, "subject") } : {}),
+    ...(job.request.subject_ids?.length ? { cast: castOfSubjects(job.request.subject_ids, job.request.edit?.change === "swap" ? "swap" : "subject") } : {}),
     generation: generationBlock({ kind: "video", jobId: job.stackJob ?? job.id, task: job.request.edit ? "edit" : "generate", model: clip.model, seed: clip.seed ?? job.request.seed, seconds: clip.seconds, tier: job.request.tier, madeAt: job.updatedAt }),
     settings: { width: clip.width, height: clip.height, ...(clip.seconds !== null ? { seconds: clip.seconds } : {}), ...(clip.quality ? { quality: clip.quality } : {}), styles: job.request.loras.map((style_id) => ({ style_id })), ...(recipe ? { route: recipe.route ?? "sheet" } : {}) },
     checks: Object.keys(checks).length ? checks : null,

@@ -127,6 +127,8 @@ export interface VideoRequest {
   shot_id?: string;
   /** CREATOR-05: the saved subjects (cast) the clip shows. */
   subject_ids?: string[];
+  /** CREATOR-57a: the one cast member whose likeness a swap edit uses. */
+  swap_cast_id?: string;
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
@@ -152,7 +154,7 @@ export interface VideoRequest {
   reference?: ReferenceRecipe;
   /** REFVIDEO-STEPS-01: the two-step progress of a video made from pictures (set from the start, before the recipe exists). */
   refProgress?: ReferenceProgress;
-  edit?: { from: string; change: "ingredients" | "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle"; with?: string[];
+  edit?: { from: string; change: "ingredients" | "trim" | "join" | "mix" | "reframe" | "grade" | "speed" | "captions" | "upscale" | "remove_background" | "spatial_sound" | "restyle" | "swap"; with?: string[];
     /** SPATIAL-04: the one plain line kept with a spatial-sound clip (the Stack's own lines); the card shows it as its muted notice. */
     note?: string };
   background?: string;
