@@ -1,3 +1,4 @@
+import { controlsForNewPerson } from "@/lib/audience";
 import { createRoute, z } from "@hono/zod-openapi";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
@@ -163,7 +164,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   const guestExpiresAt = body.guestExpiresAt ?? null;
   const guestProblem = guestExpiryProblem(role, guestExpiresAt);
   if (guestProblem) return c.json({ error: guestProblem }, 400);
-  const controls = body.controls ?? null;
+  const controls = controlsForNewPerson(role, body.controls);
   const controlsProblem = guestControlsProblem(role, controls);
   if (controlsProblem) return c.json({ error: controlsProblem }, 400);
 

@@ -45,11 +45,11 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("creating people", () => {
-  test("guest controls are required and determine the roster band", async () => {
+  test("guest controls determine the roster band, and a guest made without a choice gets child controls", async () => {
     const owner = await ownerClient();
     const missing = await owner.post("/api/people", { displayName: "Visitor", role: "guest" });
-    expect(missing.status).toBe(400);
-    expect(await missing.json()).toMatchObject({ error: "Choose child, teen or adult controls for this guest." });
+    expect(missing.status).toBe(201);
+    expect(await missing.json()).toMatchObject({ controls: "child", age_band: "child" });
     const teen = await owner.post("/api/people", { displayName: "Visitor Teen", role: "guest", controls: "teen" });
     expect(teen.status).toBe(201);
     expect(await teen.json()).toMatchObject({ controls: "teen", age_band: "teen" });

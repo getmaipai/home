@@ -20,3 +20,8 @@ export function stricterBand(a: AgeBand, b: AgeBand): AgeBand {
 export function isMinorBand(band: AgeBand): boolean {
   return band !== "adult";
 }
+
+/** The controls a new person starts with: a guest made without a choice gets child controls, the strictest band; every other role has none. */
+export function controlsForNewPerson(role: string, controls: "child" | "teen" | "adult" | null | undefined): "child" | "teen" | "adult" | null {
+  return controls ?? (role === "guest" ? "child" : null);
+}
