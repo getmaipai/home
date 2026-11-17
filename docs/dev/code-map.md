@@ -479,6 +479,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/assistWidened.ts` | WIDENED_SETTING_KEY, WIDENED_PACKAGE_IDS, readWidenedFile, widenedAssistOn, applyWidenedAssist |
 | `backend/src/lib/assistantStreamWire.ts` | createAssistantStreamSink |
 | `backend/src/lib/attachments.ts` | checkAttachmentCapacity, attachmentFilePath, storedFileIntact, toRecord, createAttachment, storeFile |
+| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand |
 | `backend/src/lib/backgroundPriority.ts` | atBackgroundPriority |
 | `backend/src/lib/backgroundWork.ts` | trackBackgroundWork, __drainBackgroundWorkForTests |
 | `backend/src/lib/backup.ts` | cleanupStaleSnapshots, listBackups, runBackup, restoreBackup, pruneBackups, getBackupHealth |
@@ -626,6 +627,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
+| `backend/src/lib/filter/ceiling.ts` | ceilingFor, ceilingOf |
+| `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, filterList |
+| `backend/src/lib/filter/raters.ts` | prepareRaters, RATERS, ratersFor, contentKindForSurface |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording, waitedForRoomLine |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
@@ -638,6 +642,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
 | `backend/src/lib/grants.ts` | grantActionClassificationIsComplete, createGrant, listGrants, revokeGrant, isGrantActive, personIsGranted |
 | `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
+| `backend/src/lib/guestControlsNotice.ts` | noticeGuestsWithoutControls |
 | `backend/src/lib/healthSnapshot.ts` | __resetChatPauseTrackingForTests, collectHealth |
 | `backend/src/lib/hlc.ts` | nextHlc, seedHlc, __resetHlcForTests, HLC_BEARING_TABLES, seedHlcFromDatabase |
 | `backend/src/lib/homeCardQueries.ts` | isFixedHomeCardQuery |
@@ -974,7 +979,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/permissions.ts` | effectivePermissions |
 | `backend/src/lib/personAuthMethods.ts` | pinDigitsHint, getAuthMethods, requiresCredential, roleRequiresCredential |
 | `backend/src/lib/personLifecycle.ts` | MANAGEABLE_BY, canManage, checkRoleChange, commitPersonUpdate, hasSecret, erasePersonData |
-| `backend/src/lib/personShape.ts` | toPerson, toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem |
+| `backend/src/lib/personShape.ts` | toPerson, toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem, guestControlsProblem |
 | `backend/src/lib/persona.ts` | personaFromManifest, PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID |
 | `backend/src/lib/personaIds.ts` | LIVE_PERSONA_IDS |
 | `backend/src/lib/personaJudge.ts` | judgePersonaConsistency |

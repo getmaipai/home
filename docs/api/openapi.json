@@ -2513,6 +2513,16 @@
                   "guestExpiresAt": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "controls": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "child",
+                      "teen",
+                      "adult",
+                      null
+                    ]
                   }
                 }
               }
@@ -2778,7 +2788,7 @@
             }
           },
           "400": {
-            "description": "Invalid displayName/role/secret",
+            "description": "Invalid displayName/role/secret/controls",
             "content": {
               "application/json": {
                 "schema": {
@@ -2867,6 +2877,16 @@
                   "guestExpiresAt": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "controls": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "child",
+                      "teen",
+                      "adult",
+                      null
+                    ]
                   },
                   "sessionLockRequired": {
                     "type": "boolean"
@@ -3148,7 +3168,7 @@
             }
           },
           "400": {
-            "description": "Invalid role/displayName/bio/accent/guestExpiresAt",
+            "description": "Invalid role/displayName/bio/accent/guestExpiresAt/controls",
             "content": {
               "application/json": {
                 "schema": {
