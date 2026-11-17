@@ -566,7 +566,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
 | `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
-| `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, createContentPolicyResolver, contentPolicyFor, filtersFor |
+| `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, CHILD_UNSAFE_CLASSES, createContentPolicyResolver, contentPolicyFor, filtersFor |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
 | `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, continueRows |
@@ -998,6 +998,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/carouselPlan.ts` | CAROUSEL_MIN, CAROUSEL_MAX, CAROUSEL_DEFAULT, CAROUSEL_PROMPT_MAX, CAROUSEL_UNAVAILABLE_LINE, CAROUSEL_BAD_PLAN_LINE |
 | `backend/src/lib/pictures/characterFaces.ts` | CHARACTER_SCENES, CHARACTER_PROMPT_PREFIX, characterTraitsOf, characterFacesPrompt, characterScenePrompt, characterFacesForBand |
+| `backend/src/lib/pictures/childRewrite.ts` | CHILD_REWRITE_SYSTEM_PROMPT, CHILD_REWRITE_SCHEMA, __setChildRewriteCompleterForTests, parseRewrite, rewriteForChild |
 | `backend/src/lib/pictures/combine.ts` | COMBINE_DEFAULT_WORDS, COMBINE_NEEDS_ONE_LINE, COMBINE_EXTRAS_LINE, combinePictureLimit, combineInstruction |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
@@ -1021,6 +1022,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/pose.ts` | __setPoseVisionForTests, parsePose, parseSeatBox, readPose, readSeatBox |
+| `backend/src/lib/pictures/promptDoor.ts` | doorAudience, refusalOfVerdict, promptCheck, promptCheckAsync |
 | `backend/src/lib/pictures/quality.ts` | PICTURE_MODEL, isRemovedPictureModel, REMOVED_MODEL_LINE, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
 | `backend/src/lib/pictures/readWords.ts` | READ_WORDS_SCHEMA, parseWordLines, __setReadWordsRunnerForTests, readPictureWords, normalizeWords, compareWords |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, pictureEngineStatusPatient, peekPictureEngineStatus, dropPictureStatusCache |
