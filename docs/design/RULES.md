@@ -659,9 +659,12 @@ A4. **A device turn still carries no audio.** The turn route accepts no sound; e
 Owner rule (Jesse, 2026-11-13). Design and build rows: `docs/design/text-in-pictures-2026-11-14.md`.
 
 W1. **A picture that must show words is made with a text-capable model.** A poster, flyer, card, sticker or merch graphic with words, an ad,
-    a sign, an album, song, film or video cover with a title, and a template with a headline blank are made with ERNIE-Image-Turbo (the
-    model the bakeoff found good at text), whatever the household's Standard picture choice is. If it is not installed or cannot run, nothing
-    starts and one plain line says what to add and where (Settings, AI and models); it is never made on a model that misspells.
+    a sign, an album, song, film or video cover with a title, and a template with a headline blank are made with the household's primary
+    text-capable picture model (FLUX 3 Image Klein by default, chosen in Settings, AI and models), whatever the household's Standard picture
+    choice is, and fall back to the other text-capable model (MiniMax H3-Image) when the spelling check (W4) finds a word wrong: the other
+    model takes the first retry. If neither is installed or can run, nothing starts and one plain line says what to add and where (Settings,
+    AI and models); it is never made on a model that misspells. (Amended 2026-11-16, owner: "its really made the primary text model and
+    fallback"; ERNIE-Image-Turbo no longer named.)
 W2. **A picture that must show no words says so.** Every model that is not text-capable (Klein, Z-Image and any model the catalog does not
     mark `text: true`) gets the addendum "No text, no letters, no words, no logos anywhere in the picture." and a negative prompt where the
     model takes one, whenever the picture has no words. It is never added to a picture that has words, and never to an edit of a picture
