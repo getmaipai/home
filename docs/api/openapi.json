@@ -61033,6 +61033,167 @@
         }
       }
     },
+    "/api/library/contact-sheet": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "summary": "Make one contact sheet picture from chosen Library pictures and clips",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 24,
+                    "description": "Library file ids in order (pictures, or clips that show several frames each)."
+                  },
+                  "sections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "caption": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "minItems": 1,
+                          "maxItems": 8
+                        }
+                      },
+                      "required": [
+                        "ids"
+                      ]
+                    },
+                    "maxItems": 12,
+                    "description": "Compare mode: one section per prompt with one file per model. Use instead of ids."
+                  },
+                  "per_clip": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8,
+                    "description": "Frames taken from each clip (default 3)."
+                  },
+                  "columns": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8,
+                    "description": "Tiles per row."
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 90
+                  },
+                  "labels": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "name",
+                      "details"
+                    ],
+                    "description": "none, file name (default), or details: name, model, size and seconds when recorded."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new kept Library picture.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "width": {
+                      "type": "number"
+                    },
+                    "height": {
+                      "type": "number"
+                    },
+                    "tiles": {
+                      "type": "number"
+                    },
+                    "files": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "width",
+                    "height",
+                    "tiles",
+                    "files"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nothing chosen or too many files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A chosen file is locked, or storage is full",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A chosen file is not in the Library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A chosen file is not a picture or clip, or a clip could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/library/{item}/transcript": {
       "post": {
         "tags": [
