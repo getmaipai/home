@@ -28,6 +28,7 @@ import { Sources as SourcesCard } from "@maipai/ui/src/elements/sources";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { EmptyState, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "@maipai/ui/src/elements/empty-state";
 import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
+import { suggestionsFor } from "@/shell/composer/modeSuggestions";
 import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
@@ -624,10 +625,13 @@ export function ChatWelcome() {
 export function ChatStarterPills() {
   const aui = useAui();
   const engineDown = useEngineDownReason();
+  // The chips follow the chosen mode, as on Home (composer/modeSuggestions). Plain chat sends on a click; another mode only fills the words.
+  const mode = useSyncExternalStore(subscribeComposerMode, pickedComposerMode);
+  const list = mode === ASK_MODE ? STARTER_SUGGESTIONS : suggestionsFor(mode);
   return (
     <>
     <EmptyStateSuggestions>
-      {STARTER_SUGGESTIONS.map((suggestion, index) => (
+      {list.map((suggestion, index) => (
         <EmptyStateSuggestion
           key={suggestion.title}
           index={index}
@@ -637,7 +641,7 @@ export function ChatStarterPills() {
           onClick={() => {
             if (engineDown !== undefined) return;
             aui.composer().setText(suggestion.prompt);
-            aui.composer().send();
+            if (mode === ASK_MODE) aui.composer().send();
           }}
         >
           {suggestion.title} {suggestion.label}
