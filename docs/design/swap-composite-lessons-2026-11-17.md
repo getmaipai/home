@@ -114,3 +114,41 @@ minutes. Free memory with the household chat model loaded was about 78 GB, so a 
   frames at the 15 percent bound (an upper bound on dark footage).
 - **Order of work that would have saved the most time:** crop references first; remove burned-in text from the guide; check each donor's PSNR against its
   guide immediately and retake before compositing; build the composite from skin gating first, add the bare-head mode last and late.
+
+## Known imperfections of the accepted draft (the bar to beat)
+
+The accepted clip is draft 4 of the test clip: 10.00 s at 24 fps (frames 0 to 239), 1080x1920. Jesse's verdict: "not fully great but good enough".
+Frame numbers below are frames of that clip; times are frame divided by 24. A better swap job should beat every line.
+
+1. **Original actor still visible when the head is cut off by the frame, frames 174 to 186 (7.25 to 7.75 s).** The cheek, ear and profile line are the
+   original's shape, only recoloured to the donor's skin tone. Leftover-original-skin share in those frames: 22 to 27 percent. Cause: the generator cannot
+   draw a head the frame cuts off (a smear-extended and a mirror-extended canvas both failed). Try next: generate the head on a larger canvas by first
+   synthesising the missing region from neighbouring frames (the same head one or two frames earlier or later, warped by flow), or generate the segment
+   with the head moved into frame, then move the donor head back by the original's motion.
+2. **Leftover original skin, whole clip.** 173 of 239 frames have more than 15 percent of the original's skin pixels unchanged (bound, not proof, on dark
+   footage). By piece: cowl on (frames 0 to 55) 18 to 46 percent, mean 26; hand lifting (56 to 111) 16 to 96, mean 43, worst frames 81, 82, 89, 90 (above 82)
+   and 71, 78, 104 (60 to 78), where the glove covers the face and little skin is visible so the share is large; cowl dragged (112 to 167) 17 to 60, mean 32;
+   bare head (168 to 239) 16 to 29, mean 23. Try next: a head segmentation of the original (not a colour test) so the true head area is known, and a
+   stricter check that compares identity features, not pixel equality.
+3. **Jaw and neck edge, frames 168 to 239 (bare head).** The face is cut out of the donor, so the outline is blocky and, in places, a hard line against the
+   collar. The collar tuck and the 9 px opening smooth it but do not remove it. Try next: a soft alpha matte from the donor's own segmentation, and
+   Poisson blending at the jaw so skin tone and shading cross the edge.
+4. **Hair.** The original actor's dark curly hair remains around the new face (frames 168 to 239); the new head has short hair, so the result mixes the two.
+   The mask grows only 17 px around donor hair. Try next: replace the whole hair region (original head segmentation) and fill any hair area the donor does
+   not cover from the donor by extension.
+5. **Mouth not fully stable.** Mouth flicker after the filter against the original (same units): frames 0 to 55: 1.51 vs 2.52 (steadier than the original);
+   56 to 111: 1.60 vs 3.72; 112 to 167: 4.89 vs 3.62 (above the original); 168 to 223: 5.92 vs 7.02; 184 to 239: 5.67 vs 6.54. The reveal piece (frames
+   112 to 167) is the one above the original. The cowl-part mouth keeps the donor's gentle smile and does not follow the original's speech. Try next:
+   face landmarks that also work on turned heads (a different landmark model), then drive one fixed donor mouth texture from the original's mouth.
+6. **Cowl edge softness.** The cowl stays original pixels, but where the donor skin meets the hood (frames 112 to 150) the edge is the mask's 1.2 px
+   feather and the colour-based fabric test; the overlap of cowl outlines was 0.72 mean and 0.52 worst over the reveal piece. Some face area next to hood
+   fabric is replaced in the half-off frames. Try next: segment the cowl and glove with a video segmentation model and cut the mask against it.
+7. **Likeness limits.** Three head-only references of one front-on and two angled photos; the face is recognisably the reference man in the front-on
+   frames but flatter and paler than the scene lighting, and looks less like him on turned and tilted frames (about 112 to 190). The donor's colour is
+   matched only 55 percent of the way to the original on bare heads, so the face is brighter than the scene. Try next: more references per pose, a
+   per-segment relighting step, and a likeness score (face embedding distance to the references) per frame that fails the job below a threshold.
+8. **Brightness steps at joins (frames 56, 112, 168, 216).** Smaller after the colour lock, still visible on a close look at 56 and 112.
+9. **Segments that came back unswapped needed hand retakes** (one of five on the first pass, plus its first frames). The job should check donor-versus-guide
+   PSNR and retake automatically.
+10. **Time per clip.** Five donor segments at 3 to 5 minutes each, plus the composite at about 40 seconds per segment; about 25 minutes for 10 s of video,
+    one segment at a time because of memory (66 to 89 GB).
