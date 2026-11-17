@@ -5051,16 +5051,6 @@ msgid "setting.tts.voice_id.option_label.charles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:17
-msgid "setting.access.tier.boost.option_label.chat"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:30
-msgid "setting.access.tier.max.option_label.chat"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:138
 #: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
@@ -5073,6 +5063,16 @@ msgstr ""
 #: src/shell/pages/settings/settingsBackLink.ts:52
 #: src/shell/pages/UiShowcasePage.tsx:90
 msgid "Chat"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:17
+msgid "setting.access.tier.boost.option_label.chat"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:30
+msgid "setting.access.tier.max.option_label.chat"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17072,6 +17072,15 @@ msgid "Much lower"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:23
+#: src/apps/settings/performanceModel.ts:9
+#: src/shell/library/LibraryViewer.tsx:131
+#: src/shell/pages/ActivityPage.tsx:43
+#: src/shell/pages/settings/MediaCardViews.tsx:83
+msgid "Music"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:20
 msgid "setting.access.tier.boost.option_label.music"
 msgstr ""
@@ -17079,15 +17088,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:33
 msgid "setting.access.tier.max.option_label.music"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
-#: src/apps/settings/performanceModel.ts:9
-#: src/shell/library/LibraryViewer.tsx:131
-#: src/shell/pages/ActivityPage.tsx:43
-#: src/shell/pages/settings/MediaCardViews.tsx:83
-msgid "Music"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20587,6 +20587,15 @@ msgid "pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:22
+#: src/apps/settings/performanceModel.ts:9
+#: src/apps/settings/styles/StyleBrowser.tsx:148
+#: src/shell/pages/ActivityPage.tsx:41
+#: src/shell/pages/settings/MediaCardViews.tsx:60
+msgid "Pictures"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:18
 msgid "setting.access.tier.boost.option_label.image"
 msgstr ""
@@ -20594,15 +20603,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:31
 msgid "setting.access.tier.max.option_label.image"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:22
-#: src/apps/settings/performanceModel.ts:9
-#: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/pages/ActivityPage.tsx:41
-#: src/shell/pages/settings/MediaCardViews.tsx:60
-msgid "Pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30360,6 +30360,13 @@ msgid "videos"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/styles/StyleBrowser.tsx:148
+#: src/shell/pages/ActivityPage.tsx:42
+#: src/shell/pages/settings/MediaCardViews.tsx:67
+msgid "Videos"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:19
 msgid "setting.access.tier.boost.option_label.video"
 msgstr ""
@@ -30367,13 +30374,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:32
 msgid "setting.access.tier.max.option_label.video"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/pages/ActivityPage.tsx:42
-#: src/shell/pages/settings/MediaCardViews.tsx:67
-msgid "Videos"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30481,16 +30481,6 @@ msgid "Vocals, drums, bass and the rest. This takes a minute or two. The rows ap
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:21
-msgid "setting.access.tier.boost.option_label.voice"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:34
-msgid "setting.access.tier.max.option_label.voice"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/AmbientCompanionPane.tsx:184
@@ -30503,6 +30493,16 @@ msgstr ""
 #: src/shell/pages/settings/settingsViews.tsx:178
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:21
+msgid "setting.access.tier.boost.option_label.voice"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:34
+msgid "setting.access.tier.max.option_label.voice"
 msgstr ""
 
 #. js-lingui-explicit-id
