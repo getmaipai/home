@@ -6559,6 +6559,135 @@
         }
       }
     },
+    "/api/settings/changes": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Recent changes to safety settings",
+        "description": "Owner and admin only. Each row names the setting, the layer, the actor's role and the new value, never a person.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^schg-[a-z0-9]{6,}$"
+                          },
+                          "key": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+                            "description": "The settings key, as declared in settings/keys.json."
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "household",
+                              "person"
+                            ],
+                            "description": "Which layer was written. A person-scoped change names no person (rule 6a)."
+                          },
+                          "actor_role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "admin"
+                            ],
+                            "description": "Only an owner or admin can write a listed key; a teen or child never produces a record."
+                          },
+                          "value": {
+                            "nullable": true,
+                            "description": "The new value as written, any JSON."
+                          },
+                          "previous": {
+                            "nullable": true,
+                            "description": "The value before the write, when the hub had one; absent when the key had no stored value."
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "widens",
+                              "narrows",
+                              "changes"
+                            ],
+                            "default": "changes",
+                            "description": "Whether the change gives a child or teen more reach (widens), less (narrows), or is not ordered (changes). Decided by the hub per key where an order is known."
+                          },
+                          "changed_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "hlc": {
+                            "type": "string",
+                            "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                            "description": "Hybrid logical clock: wall_ms:counter:node."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "scope",
+                          "actor_role",
+                          "changed_at",
+                          "hlc"
+                        ],
+                        "additionalProperties": false,
+                        "description": "SETTINGS-AUDIT-01: one record of an owner or admin changing a safety-relevant setting (a key that widens or narrows what a child or teen can reach, or a role default or override under the content filter, Home RULES.md area 'Content filter and feature access'). Shown to owners and admins. Rule 6a: the record carries the actor's role, never a person id or name, and for a per-person key it says only that the scope was a person. The hub writes one per accepted write; a refused write leaves none."
+                      }
+                    }
+                  },
+                  "required": [
+                    "changes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin can see this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [

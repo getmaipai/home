@@ -241,6 +241,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/RobotSelfTests.tsx` | RobotSelfTests |
 | `frontend/src/apps/settings/RobotWifi.tsx` | RobotWifi |
 | `frontend/src/apps/settings/RoutingStatsSection.tsx` | RoutingStatsSection |
+| `frontend/src/apps/settings/SafetyChangesSection.tsx` | SafetyChangesSection |
 | `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
@@ -1159,6 +1160,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/session.ts` | generateSessionToken, hashSessionToken, sessionExpiresAt, sessionSignInSource, pruneExpiredSessions, issueSession |
 | `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, validateSelectorValue, resolveForResponse, listValues |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
+| `backend/src/lib/settingsAudit.ts` | newSettingsChangeId, recordSettingsChange, listSettingsChanges |
 | `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
 | `backend/src/lib/settingsMediaMigration.ts` | OLD_PICTURE_ADULT_KEY, OLD_VIDEO_ADULT_KEY, NEW_ADULT_STYLES_KEY, OLD_PICTURE_QUALITY_KEY, OLD_VIDEO_QUALITY_KEY, NEW_PICTURE_TIER_KEY |
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
