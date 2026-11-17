@@ -8,7 +8,7 @@ import { picturesAllowed } from "@/lib/pictures/policy";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { listMediaOps } from "@/lib/mediaOps/registry";
 import { videosAllowed } from "@/lib/videos/policy";
-import { videoEngineReady } from "@/lib/videos/ready";
+import { videoEngineAnyReady, videoEngineReady } from "@/lib/videos/ready";
 import { laneOf } from "@/lib/pictures/lane";
 import { itemRefsIn } from "@/lib/items/tool";
 import { writingFormatsFor } from "@/lib/writingFormats";
@@ -122,7 +122,7 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const musicEligible = !input.bare && safeGate(() => musicsAllowed(audience));
   const [pictureReadyNow, videoReadyNow, musicReadyNow] = await Promise.all([
     pictureEligible ? readiness(pictureEngineReady) : false,
-    videoEligible ? readiness(() => videoEngineReady(laneOf(audience) === "adult")) : false,
+    videoEligible ? readiness(() => laneOf(audience) === "adult" ? videoEngineAnyReady() : videoEngineReady(false)) : false,
     musicEligible ? readiness(musicEngineReady) : false,
   ]);
   const latchKey = input.conversationId ? `${input.actor.id}\u0000${input.conversationId}` : undefined;

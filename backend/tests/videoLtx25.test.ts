@@ -1,6 +1,6 @@
 // VIDEO-TIERS-01 (docs/design/video-tiers-2026-11-02.md), Home side: for adults, Standard video is LTX-2.5 (512x256, up to 10 s, with sound) and
 // Boost is LTX-2.5 (768x448, up to 5 s) when the Stack reports `qualities.ltx25.ready`; otherwise today's models, exactly. A teen or a child stays
-// on the silent Wan lane (rules 0, 8, 10). Max is not offered. A picture start or a style goes the old way (the Stack answers 422 for them on LTX-2.5).
+// on the silent Wan lane (rules 0, 8, 10). Adults without LTX-2.5 have no choice. Max is not offered.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
@@ -47,8 +47,8 @@ describe("the choice (quality.ts)", () => {
     const engine = READY();
     const choice = chooseVideoQuality({ requested: "quick", seconds: 10, engine, adultLane: true });
     expect(choice).toMatchObject({ quality: "quick", maker: "ltx25", seconds: 10, shortened: false, note: null });
-    expect(videoSizeFor(choice.maker, choice.quality, false, engine)).toBe("512x256");
-    expect(videoSizeFor(choice.maker, choice.quality, true, engine)).toBe("256x512");
+    expect(videoSizeFor(choice!.maker, choice!.quality, false, engine)).toBe("512x256");
+    expect(videoSizeFor(choice!.maker, choice!.quality, true, engine)).toBe("256x512");
   });
 
   test("a length past five with nothing asked stays Standard on ltx25 (Boost is five seconds there)", () => {
@@ -60,15 +60,15 @@ describe("the choice (quality.ts)", () => {
     const engine = READY();
     const choice = chooseVideoQuality({ requested: "detailed", seconds: 10, engine, adultLane: true });
     expect(choice).toMatchObject({ quality: "detailed", maker: "ltx25", seconds: 5, shortened: true });
-    expect(videoSizeFor(choice.maker, choice.quality, false, engine)).toBe("768x448");
+    expect(videoSizeFor(choice!.maker, choice!.quality, false, engine)).toBe("768x448");
     expect(maxSecondsFor("detailed", "ltx25", engine)).toBe(5);
     expect(maxSecondsFor("quick", "ltx25", engine)).toBe(10);
   });
 
-  test("ltx25 not ready: Wan Standard and silent fallback for Boost", () => {
+  test("ltx25 not ready: adult Standard and Boost have no choice", () => {
     for (const engine of [NOT_READY(), readyVideoStatusForTests()]) {
-      expect(chooseVideoQuality({ requested: "quick", seconds: 10, engine, adultLane: true })).toMatchObject({ quality: "quick", maker: "wan", seconds: 5, shortened: true });
-      expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, adultLane: true })).toMatchObject({ quality: "quick", maker: "wan", seconds: 5, note: "detailed_not_installed", shortened: true });
+      expect(chooseVideoQuality({ requested: "quick", seconds: 10, engine, adultLane: true })).toBeNull();
+      expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, adultLane: true })).toBeNull();
       expect(videoSizeFor("wan", "quick", false, engine)).toBe("832x480");
     }
   });
@@ -77,16 +77,16 @@ describe("the choice (quality.ts)", () => {
     const choice = chooseVideoQuality({ requested: "detailed", seconds: 10, engine: READY(), quickOnly: true, adultLane: false });
     expect(choice).toMatchObject({ quality: "quick", maker: "wan", seconds: 5 });
     // Even a call that wrongly says adultLane while quickOnly is only ever Standard (no tier choice for a minor).
-    expect(chooseVideoQuality({ requested: "detailed", engine: READY(), quickOnly: true }).maker).toBe("wan");
+    expect(chooseVideoQuality({ requested: "detailed", engine: READY(), quickOnly: true })!.maker).toBe("wan");
   });
 
-  test("a picture start and a style go the old way", () => {
+  test("adult picture starts and Wan styles have no fallback", () => {
     const engine = READY();
     const picture = chooseVideoQuality({ requested: "quick", seconds: 5, engine, adultLane: true, hasPicture: true });
-    expect(picture).toMatchObject({ quality: "quick", maker: "wan", note: "picture_needs_quick" });
-    expect(chooseVideoQuality({ requested: "detailed", engine, adultLane: true, hasPicture: true })).toMatchObject({ quality: "quick", maker: "wan", note: "picture_needs_quick" });
-    expect(chooseVideoQuality({ engine, adultLane: true, style: { base_model: "wan2.2-ti2v-5b" } })).toMatchObject({ quality: "quick", maker: "wan" });
-    expect(chooseVideoQuality({ engine, adultLane: true, style: { base_model: "ltx-2.3" } })).toMatchObject({ quality: "quick", maker: "wan" });
+    expect(picture).toBeNull();
+    expect(chooseVideoQuality({ requested: "detailed", engine, adultLane: true, hasPicture: true })).toBeNull();
+    expect(chooseVideoQuality({ engine, adultLane: true, style: { base_model: "wan2.2-ti2v-5b" } })).toBeNull();
+    expect(chooseVideoQuality({ engine, adultLane: true, style: { base_model: "ltx-2.3" } })).toBeNull();
   });
 
   test("the ETA words and the status ceilings", () => {
@@ -97,8 +97,24 @@ describe("the choice (quality.ts)", () => {
     expect(adult.boost).toEqual({ ready: true, max_seconds: 5, sound: true, model: "ltx25" });
     expect(adult.max.ready).toBe(false);
     expect(videoTiersStatus(READY(), false)).toMatchObject({ standard: { model: "wan", sound: false, max_seconds: 5 }, boost: { ready: false } });
-    expect(videoTiersStatus(NOT_READY(), true)).toMatchObject({ standard: { model: "wan" }, boost: { ready: false, model: null } });
+    expect(videoTiersStatus(NOT_READY(), true)).toMatchObject({ standard: { model: null }, boost: { ready: false, model: null } });
     expect(videoStatusReady(readyVideoStatusForTests({ quickMissing: true, ltx25: "ready" }), true)).toBe(true);
+  });
+
+  test("status route gives adults no Wan choice and keeps the teen lane unchanged", async () => {
+    fake.ltx25 = "missing";
+    __setVideoStatusForTests(readyVideoStatusForTests());
+    const { owner, teen } = await household();
+    const adultStatus = await (await owner.get("/api/videos/status")).json() as { can_make: boolean; reason: string | null; tiers: { standard: { model: string | null } } };
+    expect(adultStatus).toMatchObject({ can_make: false, reason: "Videos with sound need the newer video model. An admin can install it in Settings, AI and models.", tiers: { standard: { model: null } } });
+    const teenClient = new TestClient();
+    await teenClient.post("/api/auth/verify-secret", { personId: teen.id, secret: "0000" });
+    const teenStatus = await (await teenClient.get("/api/videos/status")).json() as { can_make: boolean; tiers: { standard: { model: string | null } } };
+    expect(teenStatus).toMatchObject({ can_make: true, tiers: { standard: { model: "wan" } } });
+    fake.ltx25 = "ready";
+    __setVideoStatusForTests(READY());
+    const readyStatus = await (await owner.get("/api/videos/status")).json() as { tiers: { standard: { model: string | null } } };
+    expect(readyStatus.tiers.standard.model).toBe("ltx25");
   });
 });
 
@@ -130,6 +146,10 @@ describe("the request on the wire", () => {
     await until(() => fake.submitted.length > 0);
     return { sent: fake.submitted[0]!, card: await res.json() as { notice: string | null } };
   }
+  async function refused(body: Record<string, unknown>) {
+    const { owner } = await household();
+    return owner.post("/api/videos/make", body);
+  }
 
   test("adult Standard, ltx25 ready: model ltx25-q8, 512x256, 10 seconds allowed", async () => {
     fake.ltx25 = "ready"; __setVideoStatusForTests(READY());
@@ -145,18 +165,17 @@ describe("the request on the wire", () => {
     expect(card.notice).toContain("5 seconds");
   });
 
-  test("ltx25 not ready: Standard falls back to Wan at five seconds (no model field)", async () => {
+  test("ltx25 not ready: Standard refuses with the adult install line", async () => {
     fake.ltx25 = "missing"; __setVideoStatusForTests(NOT_READY());
-    const { sent } = await made({ prompt: BOAT, tier: "standard", seconds: 10 });
-    expect(sent.model).toBeUndefined();
-    expect(sent).toMatchObject({ size: "832x480", seconds: 5 });
+    const response = await refused({ prompt: BOAT, tier: "standard", seconds: 10 });
+    expect(response.status).toBe(503);
+    expect((await response.json() as { error: string }).error).toBe("Videos with sound need the newer video model. An admin can install it in Settings, AI and models.");
   });
 
-  test("ltx25 not ready: Boost falls back to silent Wan Quick", async () => {
+  test("ltx25 not ready: Boost refuses with the adult install line", async () => {
     fake.ltx25 = "ready"; fake.ltx25 = "missing"; __setVideoStatusForTests(NOT_READY());
-    const { sent } = await made({ prompt: BOAT, tier: "boost", seconds: 10 });
-    expect(sent).toMatchObject({ size: "832x480", seconds: 5 });
-    expect(sent.model).toBeUndefined();
+    const response = await refused({ prompt: BOAT, tier: "boost", seconds: 10 });
+    expect(response.status).toBe(503);
   });
 
   test("a start picture falls back to the old Wan path even when ltx25 is ready", async () => {
@@ -294,8 +313,8 @@ describe("LTX-2.5 Max: the choice", () => {
     const engine = MAX_READY();
     const choice = chooseVideoQuality({ requested: "detailed", seconds: 15, engine, adultLane: true, max: true });
     expect(choice).toMatchObject({ quality: "detailed", maker: "ltx25max", seconds: 10, shortened: true, note: null, announce: true });
-    expect(videoSizeFor(choice.maker, choice.quality, false, engine)).toBe("1024x576");
-    expect(videoSizeFor(choice.maker, choice.quality, true, engine)).toBe("576x1024");
+    expect(videoSizeFor(choice!.maker, choice!.quality, false, engine)).toBe("1024x576");
+    expect(videoSizeFor(choice!.maker, choice!.quality, true, engine)).toBe("576x1024");
     expect(etaWords("detailed", 10, "ltx25max")).toBe("about four minutes");
   });
 
@@ -314,11 +333,11 @@ describe("LTX-2.5 Max: the choice", () => {
   test("Max is used only when it was asked for, is held, and the Stack says ready", () => {
     const engine = MAX_READY();
     expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true })).toMatchObject({ maker: "ltx25" });
-    expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true, max: false }).maker).toBe("ltx25");
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true, max: false })!.maker).toBe("ltx25");
     for (const status of ["not-installed", "missing"] as const) {
       const notReady = readyVideoStatusForTests({ ltx25: "ready", ltx25max: status });
       expect(ltx25MaxReady(notReady)).toBe(false);
-      expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine: notReady, adultLane: true, max: true }).maker).toBe("ltx25");
+      expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine: notReady, adultLane: true, max: true })!.maker).toBe("ltx25");
     }
     expect(ltx25MaxReady(readyVideoStatusForTests({ ltx25: "ready" }))).toBe(false);
   });
@@ -326,8 +345,8 @@ describe("LTX-2.5 Max: the choice", () => {
   test("a minor never gets Max, a picture start and a style go the old way", () => {
     const engine = MAX_READY();
     expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, quickOnly: true, adultLane: false, max: true })).toMatchObject({ maker: "wan", seconds: 5 });
-    expect(chooseVideoQuality({ requested: "detailed", engine, adultLane: true, max: true, hasPicture: true }).maker).not.toBe("ltx25max");
-    expect(chooseVideoQuality({ engine, adultLane: true, max: true, style: { base_model: "ltx-2.3" } }).maker).toBe("wan");
+    expect(chooseVideoQuality({ requested: "detailed", engine, adultLane: true, max: true, hasPicture: true })).toBeNull();
+    expect(chooseVideoQuality({ engine, adultLane: true, max: true, style: { base_model: "ltx-2.3" } })).toBeNull();
   });
 
   test("readiness: Max alone makes an adult ready, never a minor", () => {

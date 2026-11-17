@@ -1370,7 +1370,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_END_ANCHOR_KEY, endAnchorEnabled, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE |
 | `backend/src/lib/videos/promptCheck.ts` | checkVideoPrompt |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, LTX25_MODEL, LTX25_MAX_MODEL |
-| `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, peekVideoEngineStatus, dropVideoStatusCache, videoStatusReady |
+| `backend/src/lib/videos/ready.ts` | WAN_VIDEO_PART_ID, LTX_VIDEO_PART_ID, ADULT_VIDEO_LICENCE_LINE, ADULT_VIDEO_INSTALL_LINE, __setVideoStatusForTests, __setVideoStatusReaderForTests |
 | `backend/src/lib/videos/recipes.ts` | VIDEO_RECIPES, videoRecipeFor, withVideoRecipe, VIDEO_STARTERS, VIDEO_LOOKS, videoLookFor |
 | `backend/src/lib/videos/referenceFirstFrame.ts` | FIRST_FRAME_STEP_NAMES, FIRST_FRAME_LINES, FACE_MODELS_LINE, LOOK_ALIKE_LINE, FIRST_PICTURE_W, FACE_GATE |
 | `backend/src/lib/videos/referenceSheetCheck.ts` | REFERENCE_SHEET_W, MIN_SHEET_PANELS, SHEET_KINDS, __setSheetVisionForTests, parseSheetCheck, checkPictureIsSheet |

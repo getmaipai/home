@@ -276,6 +276,7 @@ export async function planFirstFrameClip(actor: PersonRow, engine: Parameters<ty
     requested: tierAsked.quality ? allowedQuality(actor, "video", tierAsked.quality, band) : undefined, household: allowedQuality(actor, "video", householdVideoQuality(), band), seconds, engine, hasPicture: true,
     quickOnly: allowedQuality(actor, "video", "detailed", band) === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady && maxFits !== false,
   });
+  if (!choice) return null;
   const model = choice.maker === "ltx25max" ? LTX25_MAX_MODEL : choice.maker === "ltx25" ? LTX25_MODEL : undefined;
   const plannedTier = maxFits === false && tierAsked.tier === "max" ? "boost" : jobTier("video", tierAsked.tier, choice.quality);
   return { size: videoSizeFor(choice.maker, choice.quality, false, engine), seconds: choice.seconds, quality: choice.quality, tier: choice.maker === "ltx25max" ? "max" : plannedTier, ...(model ? { model } : {}), ...(tierAsked.line ? { line: tierAsked.line } : {}) };

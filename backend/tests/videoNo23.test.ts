@@ -14,13 +14,14 @@ describe("retired video maker and style base", () => {
           for (const ltx25 of ["missing", "ready"] as const) for (const max of [false, true]) {
             cases.push({ adultLane, quickOnly, style, hasPicture, requested, engine: readyVideoStatusForTests({ ltx25, ltx25max: max ? "ready" : "missing", ltx25Picture: true, ltx25maxPicture: true }), max });
           }
-    for (const input of cases) expect(chooseVideoQuality(input).maker).not.toBe("ltx23");
+    for (const input of cases) expect(chooseVideoQuality(input)?.maker).not.toBe("ltx23");
   });
 
   test("old style records are unusable, while their base remains readable", () => {
     const old = { removed_at: null, base_model: "ltx-2.3", compatible_with: ["ltx-2.3"] } as never;
     expect(loraUsable(old)).toBe(false);
-    expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, engine: readyVideoStatusForTests({ ltx25: "ready" }), adultLane: true }).maker).toBe("wan");
+    // An adult never gets the silent maker (VIDEO-WAN-HIDE-01): a retired style leaves an adult with no choice.
+    expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, engine: readyVideoStatusForTests({ ltx25: "ready" }), adultLane: true })).toBeNull();
   });
 
   test("quality note lines contain no retired or technical model names", () => {

@@ -40,6 +40,9 @@ import { readSlot } from "@/lib/tiers";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { roleHealth } from "@/lib/roleHealth";
 import { getStackClient } from "@/lib/stackEngine";
+import { listActivePeople } from "@/lib/access";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { ADULT_VIDEO_INSTALL_LINE, LTX_VIDEO_PART_ID, WAN_VIDEO_PART_ID } from "@/lib/videos/ready";
 
 export const aiChoicesRoutes = apiRouter();
 
@@ -88,7 +91,7 @@ aiChoicesRoutes.openapi(overviewRoute, async (c) => {
       if (!slot) return { ...base, state: "waits" as const, word: "Waits", can_choose: false };
       const candidateTier = tier === "reduced" ? "standard" : tier;
       const level = candidates.find((item) => item.tier === candidateTier);
-      const offered = level?.candidates ?? [];
+      const offered = (level?.candidates ?? []).filter((item) => row.id !== "videos" || item.id !== WAN_VIDEO_PART_ID);
       const options = offered.filter((item) => item.fits).map((item) => {
         const component = componentById.get(item.id);
         const installed = component?.state === "installed";
@@ -105,14 +108,21 @@ aiChoicesRoutes.openapi(overviewRoute, async (c) => {
       let resolvedId: string | null = pinnedId;
       let fitsEver = true;
       if (!pinnedId) {
+        if (row.id === "videos" && (tier === "standard" || tier === "boost")) {
+          // VIDEO-WAN-HIDE-01: an adult's Standard and Boost videos run on LTX-2.5 or on nothing; the silent model the Stack assigns is never shown.
+          const ltx = componentById.get(LTX_VIDEO_PART_ID);
+          const ltxCandidate = offered.find((item) => item.id === LTX_VIDEO_PART_ID);
+          if (!ltx || ltx.state !== "installed" || !ltxCandidate || !ltxCandidate.fits) return { ...withOptions, state: "unset" as const, word: "Not turned on", can_choose: false, detail: ADULT_VIDEO_INSTALL_LINE };
+          resolvedId = LTX_VIDEO_PART_ID;
+        }
         if (tier === "max" && row.id !== "pictures") {
           const suggested = options.find((item) => item.suggested) ?? options[0];
           return { ...withOptions, state: "unset" as const, word: "Not turned on", detail: `Max has no model for ${row.name} yet. Choose one${suggested ? `, for example ${suggested.label}` : ""}.` };
         }
         const fitting = offered.filter((item) => item.fits);
         const installedFit = fitting.find((item) => componentById.get(item.id)?.state === "installed" && item.id === level?.recommended) ?? fitting.find((item) => componentById.get(item.id)?.state === "installed");
-        if (budget && budgetSlot && !budgetSlot.model) return { ...withOptions, state: "unset" as const, word: "Not offered", can_choose: false, detail: `${row.name} has no ${tierName(tier)} model on this Mac${tier === "boost" ? "; it uses Standard" : ""}.` };
-        resolvedId = budgetSlot?.model ?? (tier === "max" ? RECOMMENDED_MAX_IMAGE_MODEL : (fitting.find((item) => item.id === level?.recommended) ?? installedFit ?? fitting[0])?.id ?? null);
+        if (row.id !== "videos" && budget && budgetSlot && !budgetSlot.model) return { ...withOptions, state: "unset" as const, word: "Not offered", can_choose: false, detail: `${row.name} has no ${tierName(tier)} model on this Mac${tier === "boost" ? "; it uses Standard" : ""}.` };
+        resolvedId ??= (row.id === "videos" ? null : budgetSlot?.model) ?? (tier === "max" ? RECOMMENDED_MAX_IMAGE_MODEL : (fitting.find((item) => item.id === level?.recommended) ?? installedFit ?? fitting[0])?.id ?? null);
         if (budgetSlot?.fits_ever === false) fitsEver = false;
         if (!resolvedId) return { ...withOptions, state: "problem" as const, word: "Problem", can_choose: false, detail: "No model fits this level on this Mac." };
       }
@@ -211,7 +221,8 @@ async function loadPlan(): Promise<DiskPlan> {
 
 async function loadAiState(): Promise<AiState> {
   const [plan, list, uncensored, addedChats, ingredients] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState(), addedChatChoiceStates(), ingredientsState()]);
-  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored, addedChats, ingredients };
+  const householdHasMinors = listActivePeople().some((person) => laneOfPerson(person) === "child" || laneOfPerson(person) === "teen");
+  return { plan, components: list.components, settings: { ...readAiSettings(), householdHasMinors }, freeBytes: list.free_disk_bytes, list, uncensored, addedChats, ingredients };
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).

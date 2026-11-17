@@ -11,15 +11,23 @@ import { householdVideoQuality, VIDEO_TIER_KEY } from "@/lib/videos/policy";
 import { slotIsOff, slotKey, writeSlotModel } from "@/lib/tiers";
 import { MODEL_OF_CHOICE } from "@/lib/tierSlotMigration";
 import { listStackComponents } from "@/lib/stackComponents";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 
 export function readAiSettings(): AiChoicesInput["settings"] {
   const music = getHouseholdSettingValue("generation.music.enabled");
+  const householdHasMinors = db.select().from(people).all().some((person) => {
+    const lane = laneOfPerson(person);
+    return lane === "child" || lane === "teen";
+  });
   return {
     // The picture slots are the one place the picture models live (VIDEO-SETTINGS-04): the card reads and writes them directly.
     pictureQuickModel: householdQuickModel(),
     pictureDetailedEnabled: householdDetailedEnabled(),
     videoQuality: householdVideoQuality(),
     musicEnabled: typeof music === "boolean" ? music : true,
+    householdHasMinors,
   };
 }
 

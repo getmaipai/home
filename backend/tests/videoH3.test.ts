@@ -31,7 +31,7 @@ describe("MiniMax H3 video maker", () => {
     expect(chooseVideoQuality({ requested: "detailed", engine: status(), adultLane: false, quickOnly: true })).toMatchObject({ maker: "wan", quality: "quick" });
     const maxStatus = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" });
     expect(chooseVideoQuality({ requested: "detailed", engine: maxStatus, adultLane: true, max: true })).toMatchObject({ maker: "ltx25max" });
-    expect(chooseVideoQuality({ requested: "detailed", engine: status(), adultLane: true, hasPicture: true }).maker).toBe("h3");
+    expect(chooseVideoQuality({ requested: "detailed", engine: status(), adultLane: true, hasPicture: true })!.maker).toBe("h3");
   });
 
   test("uses H3 sizes and carries model, length, and first and end pictures through the slot", () => {
