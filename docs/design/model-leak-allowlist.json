@@ -1,0 +1,671 @@
+{
+  "note": "Rule E8 (docs/design/RULES.md). Files that may still name a model while MODELPACK-HOME rows land. The list only shrinks: delete an entry when its file is clean; never add one. Seeded 2026-11-17 from model-packs-audit-2026-11-17.md.",
+  "files": [
+    {
+      "file": "backend/src/db/schema.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/index.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/aiChoicesState.ts",
+      "verdict": "Move",
+      "reason": "Same family as audit section 5: the AI choices state reads model rows that the parts list replaces.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/changeVoice.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/chatModelSwitch.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/clonedVoices.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/companionArt.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: companion stills and clips ask for picture_edit and clip; the maker map and reported names are deleted.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/companionClipSize.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: companion stills and clips ask for picture_edit and clip; the maker map and reported names are deleted.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/companionPackFrame.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: companion stills and clips ask for generic jobs.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/companionTakes.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: companion stills and clips ask for picture_edit and clip; the maker map and reported names are deleted.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/deliveryChoice.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/engineAutotune.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/engineIdentity.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/films/referenceSheet.ts",
+      "verdict": "Move",
+      "reason": "Audit section 3: the sheet's pixel size becomes the pack's; the builder stays as the no-model fallback.",
+      "moveTo": "MODELPACK-HOME-01"
+    },
+    {
+      "file": "backend/src/lib/films/sheetMaker.ts",
+      "verdict": "Move",
+      "reason": "Audit section 3: the LTX Ingredients sheet layout moves to the character_sheet job; the Home cut-out builder stays as the fallback.",
+      "moveTo": "MODELPACK-HOME-01"
+    },
+    {
+      "file": "backend/src/lib/installStatus.ts",
+      "verdict": "Label",
+      "reason": "Audit section 5: comments and example labels, reworded with the rows above."
+    },
+    {
+      "file": "backend/src/lib/llm.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/loras/access.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/lib/loras/baseFamilies.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/lib/loras/install.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/lib/loras/readiness.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/lib/loras/source.ts",
+      "verdict": "Stay",
+      "reason": "Audit section 4: Hugging Face and Civitai browsing is outside the Stack; the model word is a search label."
+    },
+    {
+      "file": "backend/src/lib/loras/sync.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/lib/media/videoCreateApp.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/modelCatalog.ts",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/models.ts",
+      "verdict": "Move",
+      "reason": "Audit section 6: music stem and song jobs become generic jobs on the music packs.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/ready.ts",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/sections.ts",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/soundMaker.ts",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/stack.ts",
+      "verdict": "Move",
+      "reason": "Audit section 6: music stem and song jobs become generic jobs on the music packs.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/music/types.ts",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/pictures/keyframes.ts",
+      "verdict": "Stay",
+      "reason": "Audit section 2: five frames per 10 s is Home's own planning; the model word is incidental."
+    },
+    {
+      "file": "backend/src/lib/pictures/lane.ts",
+      "verdict": "Stay",
+      "reason": "Audit section 1: the minor's lane keeps its model list until the Stack enforces rule E6 (VIDEO-WAN-REMOVE-01); nothing is removed before then."
+    },
+    {
+      "file": "backend/src/lib/pictures/policy.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: PICTURE_MODEL, the text-capable list and the removed-model set become the picture job and the catalog's capabilities.text.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/pictures/quality.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: PICTURE_MODEL, the text-capable list and the removed-model set become the picture job and the catalog's capabilities.text.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/pictures/ready.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: PICTURE_MODEL, the text-capable list and the removed-model set become the picture job and the catalog's capabilities.text.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/pictures/slotBody.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: PICTURE_MODEL, the text-capable list and the removed-model set become the picture job and the catalog's capabilities.text.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/pictures/stack.ts",
+      "verdict": "Move",
+      "reason": "Audit section 2: PICTURE_MODEL, the text-capable list and the removed-model set become the picture job and the catalog's capabilities.text.",
+      "moveTo": "MODELPACK-HOME-02"
+    },
+    {
+      "file": "backend/src/lib/quickReaction.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/register.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/settings.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/systemFold.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/tierSlotMigration.ts",
+      "verdict": "Move",
+      "reason": "Same family as audit section 5: tier slot ids name models; the parts list replaces them.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/tiers.ts",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/lib/toolMarkup.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/tts.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/ttsCapabilities.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/turnMachine/contract.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/turnMachine/machine.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/turnMachine/messages.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/turnMachine/nodes/model.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/turnMachine/nodes/outputGate.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/uiFixtures.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/videos/clipEditStart.ts",
+      "verdict": "Stay",
+      "reason": "Audit section 1: the page action, gates, lock and cast resolution stay Home logic; the model word is incidental."
+    },
+    {
+      "file": "backend/src/lib/videos/createStyles.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/editPlan.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the clip_from_sheet and restyle recipes and the LTX Ingredients adapter move to the LTX packs.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/editTool.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the swap job size, window and reference count become the H3 pack's swap recipe and limits.",
+      "moveTo": "MODELPACK-HOME-01"
+    },
+    {
+      "file": "backend/src/lib/videos/ingredientsAdapter.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the clip_from_sheet and restyle recipes and the LTX Ingredients adapter move to the LTX packs.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/jobs.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/longTake.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/loraWire.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/quality.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/ready.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/recipes.ts",
+      "verdict": "Stay",
+      "reason": "Audit section 1: a comment only (measured on LTX-2.5); no model logic."
+    },
+    {
+      "file": "backend/src/lib/videos/referenceFirstFrame.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the clip_from_sheet and restyle recipes and the LTX Ingredients adapter move to the LTX packs.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/referenceVideo.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the clip_from_sheet and restyle recipes and the LTX Ingredients adapter move to the LTX packs.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/slotBody.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/stack.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/videos/stackSwap.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: the swap job size, window and reference count become the H3 pack's swap recipe and limits.",
+      "moveTo": "MODELPACK-HOME-01"
+    },
+    {
+      "file": "backend/src/lib/videos/tool.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/lib/voiceCatalog.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/voiceCues.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/voiceList.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/voiceResolve.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/voiceover.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/wellFormed.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/lib/whisperSample.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/routes/aiChoices.ts",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "backend/src/routes/engines.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/routes/loras.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/routes/lorasSources.ts",
+      "verdict": "Move",
+      "reason": "Audit section 4: base families, the ltx-2.3 rule and the base enum come from the packs' style_base lists.",
+      "moveTo": "MODELPACK-HOME-04"
+    },
+    {
+      "file": "backend/src/routes/videos.ts",
+      "verdict": "Move",
+      "reason": "Audit section 1: LTX, Wan and H3 size tables, ceilings and maker choice become the clip job's limits from the jobs catalog.",
+      "moveTo": "MODELPACK-HOME-03"
+    },
+    {
+      "file": "backend/src/routes/voice.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/routes/voiceover.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/settings/videoKeys.ts",
+      "verdict": "Label",
+      "reason": "Audit section 5: comments and example labels, reworded with the rows above."
+    },
+    {
+      "file": "backend/src/settings/voiceKeys.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "backend/src/setup/checks/setupDownloads.ts",
+      "verdict": "Move",
+      "reason": "Same family as audit section 5: setup downloads name model parts; the parts list replaces them.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/apps/chat/chatModelAdapter.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "frontend/src/apps/chat/chatToolUis.tsx",
+      "verdict": "Label",
+      "reason": "Audit section 5: comments and example labels, reworded with the rows above."
+    },
+    {
+      "file": "frontend/src/apps/settings/aiTierSlots.ts",
+      "verdict": "Label",
+      "reason": "Audit section 5: install words and family titles come from the parts list's description and labels."
+    },
+    {
+      "file": "frontend/src/apps/settings/styles/StyleBrowser.tsx",
+      "verdict": "Label",
+      "reason": "Audit section 4: base words and pills drawn from the base list the backend serves."
+    },
+    {
+      "file": "frontend/src/apps/settings/styles/StyleConfirm.tsx",
+      "verdict": "Label",
+      "reason": "Audit section 4: base words and pills drawn from the base list the backend serves."
+    },
+    {
+      "file": "frontend/src/apps/settings/styles/StyleEditor.tsx",
+      "verdict": "Label",
+      "reason": "Audit section 4: base words and pills drawn from the base list the backend serves."
+    },
+    {
+      "file": "frontend/src/apps/settings/styles/stylesApi.ts",
+      "verdict": "Label",
+      "reason": "Audit section 4: base words and pills drawn from the base list the backend serves."
+    },
+    {
+      "file": "frontend/src/apps/settings/styles/stylesShared.tsx",
+      "verdict": "Label",
+      "reason": "Audit section 4: base words and pills drawn from the base list the backend serves."
+    },
+    {
+      "file": "frontend/src/apps/setup/planFixtures.ts",
+      "verdict": "Move",
+      "reason": "Test fixture of the disk plan shape that the parts list replaces.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/lib/api.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "frontend/src/lib/componentsApi.ts",
+      "verdict": "Label",
+      "reason": "Audit section 5: comments and example labels, reworded with the rows above."
+    },
+    {
+      "file": "frontend/src/lib/sentenceSpeechScheduler.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "frontend/src/lib/settingCopy.generated.ts",
+      "verdict": "Label",
+      "reason": "Generated copy of settings words; it follows the settings rows that reword them."
+    },
+    {
+      "file": "frontend/src/lib/streamingWavPlayer.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "frontend/src/lib/videosApi.ts",
+      "verdict": "Label",
+      "reason": "Audit section 1: frontend mirror of the clip levels answer; drawn from the catalog once MODELPACK-HOME-03 lands."
+    },
+    {
+      "file": "frontend/src/lib/voice/voiceBrowserRows.ts",
+      "verdict": "Deferred",
+      "reason": "Audit section 6, outside the first packs: a voice, chat or engine model name (Pocket TTS, Chatterbox, Kyutai, Qwen and similar). Takes a voice or chat pack later.",
+      "moveTo": "MODELPACK-VOICE-CHAT-LATER (no backlog row yet)"
+    },
+    {
+      "file": "frontend/src/shell/installWords.ts",
+      "verdict": "Label",
+      "reason": "Audit section 5: install words and family titles come from the parts list's description and labels."
+    },
+    {
+      "file": "frontend/src/shell/music/WaveformSeek.tsx",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/shell/pages/MusicLibrary.tsx",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/shell/pages/MusicSongDetails.tsx",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/shell/pages/MusicSpeechPage.tsx",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "frontend/src/shell/pages/MusicVoiceCreate.tsx",
+      "verdict": "Move",
+      "reason": "Music files name a music model (ACE-Step, Demucs); they follow the music packs, MODELPACK-HOME-05.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "shared/aiChoices.ts",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "shared/diskPlan.json",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "shared/diskPlanMath.ts",
+      "verdict": "Move",
+      "reason": "Same family as audit section 5: reads the disk plan rows that HOME-PARTS-05 deletes.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "shared/licensedRows.ts",
+      "verdict": "Move",
+      "reason": "Audit section 5: HOME-PARTS-05 deletes the model records; the parts list is the plan.",
+      "moveTo": "MODELPACK-HOME-05"
+    },
+    {
+      "file": "shared/tierSlotOptions.ts",
+      "verdict": "Move",
+      "reason": "Same family as audit section 5: slot options name models; the parts list replaces them.",
+      "moveTo": "MODELPACK-HOME-05"
+    }
+  ]
+}
