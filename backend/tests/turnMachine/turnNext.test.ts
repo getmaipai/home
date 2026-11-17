@@ -1,3 +1,4 @@
+import { NOT_AVAILABLE_LINE } from "@/lib/turnMachine/nodes/answer";
 import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
 // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "Acceptance"):
@@ -1377,7 +1378,7 @@ describe("turnNext.ts: the commands node's own guards", () => {
 });
 
 describe("turnNext.ts: policy refusals without a parked ask", () => {
-  test("a child's tool call below its role answers with the min_role refusal line, not a blank reply", async () => {
+  test("a child's tool call below its role answers with the not-available line, not a blank reply", async () => {
     // A code review (2026-09-22) caught machine.ts's own `answer` step
     // with no producer for `policy`'s "every proposal refused, nothing
     // parked" exit (policyAllRefused) - it fell through to an empty
@@ -1399,7 +1400,7 @@ describe("turnNext.ts: policy refusals without a parked ask", () => {
     }
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe("That one needs a grown-up.");
+    expect(result.value.reply.text).toBe(NOT_AVAILABLE_LINE);
   });
 });
 
