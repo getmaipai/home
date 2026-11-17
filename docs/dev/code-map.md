@@ -441,6 +441,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | File | Exported names |
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, COMPANION_BAND_LINE, canMakeCompanion, canHaveTemporaryChat, mayUseClipVoices, rolesById |
+| `backend/src/lib/accessView.ts` | personAccessView |
 | `backend/src/lib/activity.ts` | ACTIVITY_SEEN_KEY, pictureActivityItem, activityDot, activitySeenAt, markActivitySeen, activityForViewer |
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
@@ -656,6 +657,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
 | `backend/src/lib/guestControlsNotice.ts` | noticeGuestsWithoutControls |
 | `backend/src/lib/healthSnapshot.ts` | __resetChatPauseTrackingForTests, collectHealth |
+| `backend/src/lib/heldBack.ts` | heldBackView |
 | `backend/src/lib/hlc.ts` | nextHlc, seedHlc, __resetHlcForTests, HLC_BEARING_TABLES, seedHlcFromDatabase |
 | `backend/src/lib/homeCardQueries.ts` | isFixedHomeCardQuery |
 | `backend/src/lib/homeListeners.ts` | startHomeListeners, attachHouseholdTlsRebind |
@@ -962,6 +964,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/topicTagger.ts` | TOPIC_OVERRIDE_MARGIN, cosine, chooseTopic, __resetTopicTaggerForTests, classifyPendingTopics |
 | `backend/src/lib/news/topics.ts` | TOPICS, topicsFor, topicById, topicOfferedTo |
 | `backend/src/lib/newsMinorFloor.ts` | applyNewsMinorFloor |
+| `backend/src/lib/notAvailable.ts` | NOT_AVAILABLE_HERE |
 | `backend/src/lib/notificationCopy.ts` | NOTIFICATION_COPY |
 | `backend/src/lib/notificationCopyEs.ts` | NOTIFICATION_ES |
 | `backend/src/lib/notificationTypes.ts` | NOTIFICATION_TYPES, registerPackageNotificationTypes, getNotificationType |
@@ -1327,8 +1330,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/answer.ts` | NOT_AVAILABLE_LINE, PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine |
 | `backend/src/lib/turnMachine/nodes/commands.ts` | commandsNode |
 | `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, sceneSpeakerForTurn, fitSceneBlock, renderScene, decideReasoning |
-| `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible, retryTools |
-| `backend/src/lib/turnMachine/nodes/model.ts` | toolSpecFor, replyMaxTokensFor, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, SEARCH_ASSIST_HOLD_LIMIT_MS, SEARCH_ASSIST_RESCUE_BUDGET_MS |
+| `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupMissKind, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible |
+| `backend/src/lib/turnMachine/nodes/model.ts` | NOT_AVAILABLE_NOTE, toolSpecFor, replyMaxTokensFor, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, SEARCH_ASSIST_HOLD_LIMIT_MS |
 | `backend/src/lib/turnMachine/nodes/outputGate.ts` | gateGrainFor, StreamGate, outputGateNode |
 | `backend/src/lib/turnMachine/nodes/policy.ts` | argsGrounded, policyNode |
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |

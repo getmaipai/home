@@ -3883,6 +3883,101 @@
         }
       }
     },
+    "/api/people/{id}/access": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "A person's role, content levels and the overrides that set them (owner and admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role, the level for each kind of content, the overrides that set a level and the kinds that show unrated items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "ceiling": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "overrides": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "person",
+                              "household"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "scope"
+                        ]
+                      }
+                    },
+                    "unrated": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "ceiling",
+                    "overrides",
+                    "unrated"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/people/{id}/site-blocks": {
       "get": {
         "tags": [
@@ -11549,7 +11644,7 @@
             }
           },
           "403": {
-            "description": "Temporary chat is not available for minors",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -17321,6 +17416,79 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status/held-back": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Count what the content filters held back since the hub started",
+        "responses": {
+          "200": {
+            "description": "One count per surface, kept in memory since the hub started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "since": {
+                      "type": "string"
+                    },
+                    "surfaces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "surface": {
+                            "type": "string",
+                            "enum": [
+                              "news",
+                              "shelf",
+                              "reference",
+                              "search"
+                            ]
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "surface",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "since",
+                    "surfaces"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
             "content": {
               "application/json": {
                 "schema": {
@@ -44730,7 +44898,7 @@
             }
           },
           "403": {
-            "description": "Children cannot delete household lists",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -53571,7 +53739,7 @@
             }
           },
           "403": {
-            "description": "Adults only",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -53633,7 +53801,7 @@
             }
           },
           "403": {
-            "description": "Adults only",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -60805,16 +60973,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Library item unavailable",
             "content": {
@@ -61610,16 +61768,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Library item unavailable",
             "content": {
@@ -61684,16 +61832,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
             "content": {
               "application/json": {
                 "schema": {
@@ -61801,16 +61939,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Transcript unavailable",
             "content": {
@@ -61882,16 +62010,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Transcript unavailable",
             "content": {
@@ -61933,16 +62051,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
             "content": {
               "application/json": {
                 "schema": {
@@ -62003,16 +62111,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
             "content": {
               "application/json": {
                 "schema": {
@@ -62132,16 +62230,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
             "content": {
               "application/json": {
                 "schema": {
@@ -62302,16 +62390,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Transcript, caption track or video unavailable",
             "content": {
@@ -62464,16 +62542,6 @@
               }
             }
           },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Transcript unavailable",
             "content": {
@@ -62562,16 +62630,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Transcripts are available to teens and adults",
             "content": {
               "application/json": {
                 "schema": {
@@ -63152,7 +63210,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -63354,7 +63412,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -63486,7 +63544,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -63822,7 +63880,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -64057,7 +64115,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -64230,7 +64288,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -64408,7 +64466,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -64705,7 +64763,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -64979,7 +65037,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile, or the chat is not theirs",
+            "description": "Not available, or the chat is not theirs",
             "content": {
               "application/json": {
                 "schema": {
@@ -65229,7 +65287,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -65420,7 +65478,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -65552,7 +65610,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -65826,7 +65884,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -66071,7 +66129,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -66254,7 +66312,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -66458,7 +66516,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -66748,7 +66806,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -68840,7 +68898,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -69296,7 +69354,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -69713,7 +69771,7 @@
             }
           },
           "403": {
-            "description": "Pictures are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -78680,7 +78738,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -79582,7 +79640,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -80188,7 +80246,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -80753,7 +80811,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -81813,7 +81871,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -82332,7 +82390,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -82474,7 +82532,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -82961,7 +83019,7 @@
             }
           },
           "403": {
-            "description": "Videos are off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -89311,7 +89369,7 @@
             }
           },
           "403": {
-            "description": "Only adults can make a companion.",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -91216,7 +91274,7 @@
             }
           },
           "403": {
-            "description": "Only teens and adults can make a companion.",
+            "description": "That one isn't available here. Try something else.",
             "content": {
               "application/json": {
                 "schema": {
@@ -98774,7 +98832,7 @@
             }
           },
           "403": {
-            "description": "Only teens and adults can make a companion",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -98833,7 +98891,7 @@
             }
           },
           "403": {
-            "description": "Only adults can make a companion.",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -117241,7 +117299,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -117322,7 +117380,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -117398,7 +117456,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -117515,7 +117573,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -118079,7 +118137,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -118652,7 +118710,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -119223,7 +119281,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -119815,7 +119873,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -119893,7 +119951,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -120482,7 +120540,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -121079,7 +121137,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -121726,7 +121784,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -122336,7 +122394,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -122444,7 +122502,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -122524,7 +122582,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -123696,7 +123754,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -123776,7 +123834,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -123900,7 +123958,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -124503,7 +124561,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -125129,7 +125187,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -125721,7 +125779,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -126317,7 +126375,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -126951,7 +127009,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -127128,7 +127186,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -127720,7 +127778,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -128319,7 +128377,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -128922,7 +128980,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -129578,7 +129636,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -129685,7 +129743,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -129780,7 +129838,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -129880,7 +129938,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -129967,7 +130025,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
@@ -130175,7 +130233,7 @@
             }
           },
           "403": {
-            "description": "Music is off for this profile",
+            "description": "Not available",
             "content": {
               "application/json": {
                 "schema": {
