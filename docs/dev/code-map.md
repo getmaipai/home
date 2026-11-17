@@ -498,7 +498,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/blocklists/listIndex.ts` | LIST_INDEX_URL, LIST_SOURCE_HOST, LIST_MAX_BYTES, LIST_MAX_ENTRIES, LIST_INDEX_MAX_BYTES, CATALOG_LIST_KEYS_PEM |
 | `backend/src/lib/blocklists/listStore.ts` | emptyState, listFilePath, readState, stateStamp, writeState, pruneListFiles |
 | `backend/src/lib/blocklists/listSync.ts` | LIST_SYNC_ISSUE_SOURCE, bandsInUse, neededListIds, runListSync |
-| `backend/src/lib/blocklists/policy.ts` | BLOCKLIST_POLICY, BLOCKLIST_KEYS, blocklistIds, lockedListIds, defaultListIds, enabledListIds |
+| `backend/src/lib/blocklists/policy.ts` | BLOCKLIST_POLICY, BLOCKLIST_KEYS, blocklistIds, webCeilingFor, lockedListIds, defaultListIds |
 | `backend/src/lib/blocklists/status.ts` | blocklistStatusNote |
 | `backend/src/lib/bootGuard.ts` | instanceLock |
 | `backend/src/lib/botRelease.ts` | __setBotReleaseForTests, hasBotReleaseAssets, botReleaseVersion, botReleaseSigningKeys, ensureBotRelease, ensureStackChanFirmware |
@@ -1099,7 +1099,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/lookup.ts` | parseScope, referenceUrl, referenceToLookupRow, webTimeRange, federatedLookup |
 | `backend/src/lib/retrieval/minorFloor.ts` | articleFloorText, tripsMinorFloor, releaseToBand |
 | `backend/src/lib/retrieval/minorQueryCheck.ts` | MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit |
-| `backend/src/lib/retrieval/minorRowFloor.ts` | minorRowTrips, searchAudienceFor, searchFilterApplies, searchModeFor, minorRowAllowed |
+| `backend/src/lib/retrieval/minorRowFloor.ts` | minorRowTrips, personFor, searchAudienceFor, searchFilterApplies, searchModeFor, minorRowAllowed |
 | `backend/src/lib/retrieval/referenceCounters.ts` | REFERENCE_COUNTER_NAMES, bumpReferenceCounter, referenceCounters, __resetReferenceCountersForTests |
 | `backend/src/lib/retrieval/referenceLicences.ts` | LICENCE_LABELS, licenceLabel |
 | `backend/src/lib/retrieval/referenceReader.ts` | REFERENCE_MAX_ROWS, __resetReferenceReaderCachesForTests, renderReferenceText, lookupReference, librarySnapshotDate, readReferencePage |
@@ -1130,7 +1130,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/roleHealth.ts` | __setRoleHealthForTests, cachedRoleHealth, sharedStackRoles, sharedCodingMode, __resetSharedStackReadsForTests, STACK_REFUSAL_KEY |
 | `backend/src/lib/routing.ts` | embedUtterance, __embedCallCountForTests, __resetEmbedCallCountForTests |
 | `backend/src/lib/ruleNames.ts` | RUNGS, isTypedSourcePackage, isLookupPackage, rungOf, RULES, RULE_NAMES |
-| `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
+| `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, safeSearchModeFor, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
