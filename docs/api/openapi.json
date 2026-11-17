@@ -55258,6 +55258,13 @@
                     "note": {
                       "type": "string",
                       "description": "Plain words for why there are no rows (off, no source, not allowed, not answering)."
+                    },
+                    "nothing_suitable": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ],
+                      "description": "Set when rows came back and none could be shown to this person; the palette shows its own neutral line."
                     }
                   },
                   "required": [
