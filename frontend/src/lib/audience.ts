@@ -10,3 +10,6 @@ export function bandOf(person: { age_band?: AgeBand; role: string } | null | und
 }
 
 export const isMinor = (person: { age_band?: AgeBand; role: string } | null | undefined): boolean => bandOf(person) !== "adult";
+
+/** A guest has no age band of their own (their controls give one): the one role check callers make outside this module. */
+export const isGuestRole = (role: string): boolean => role === "guest";

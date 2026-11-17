@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { FeatureAccess } from "@/apps/settings/FeatureAccess";
+import { FeatureAccess, PersonFeatures } from "@/apps/settings/FeatureAccess";
+import type { PersonRosterEntry } from "@/lib/api";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
@@ -28,10 +29,10 @@ function stub(rows: Record<string, unknown[]>) {
 }
 
 describe("FeatureAccess", () => {
-  test("shows a person's features from the route; Denied posts a deny and the row refetches", async () => {
+  test("shows a person's features from the route, Coding first; Denied posts a deny and the row refetches", async () => {
     const server = stub({ "p-sage": [feature("weather", "Weather")] });
     try {
-      const view = renderWithQueryClient(<FeatureAccess viewer={{ id: "p-sage", role: "owner" }} />);
+      const view = renderWithQueryClient(<PersonFeatures person={roster[0] as unknown as PersonRosterEntry} />);
       expect(await view.findByText("Weather")).toBeTruthy();
       fireEvent.click(await view.findByRole("radio", { name: "Denied" }));
       await waitFor(() => expect(server.calls.some((c) => c.method === "POST" && c.url.endsWith("/api/grants") && JSON.stringify(c.body) === JSON.stringify({ person: "p-sage", action: "use:weather", effect: "deny" }))).toBe(true));
@@ -42,7 +43,7 @@ describe("FeatureAccess", () => {
   test("going back to Allowed by role revokes the grant and posts nothing", async () => {
     const server = stub({ "p-sage": [feature("weather", "Weather", { effective: false, grant: { id: "grant-old", effect: "deny" } })] });
     try {
-      const view = renderWithQueryClient(<FeatureAccess viewer={{ id: "p-sage", role: "owner" }} />);
+      const view = renderWithQueryClient(<PersonFeatures person={roster[0] as unknown as PersonRosterEntry} />);
       fireEvent.click(await view.findByRole("radio", { name: "Allowed by role" }));
       await waitFor(() => expect(server.calls.some((c) => c.method === "DELETE" && c.url.endsWith("/api/grants/grant-old"))).toBe(true));
       expect(server.calls.some((c) => c.method === "POST")).toBe(false);
@@ -52,10 +53,7 @@ describe("FeatureAccess", () => {
   test("Allowed is not offered to a teen below a feature's age floor, but Coding is, with a confirmation first", async () => {
     const server = stub({ "p-sage": [], "p-marlow": [feature("code", "Coding", { min_role: "adult", role_allows: false, effective: false, allow_for_minors: true }), feature("news", "News", { min_role: "adult", role_allows: false, effective: false })] });
     try {
-      const view = renderWithQueryClient(<FeatureAccess viewer={{ id: "p-sage", role: "owner" }} />);
-      await view.findByRole("combobox", { name: "Person" });
-      fireEvent.click(await view.findByRole("combobox", { name: "Person" }));
-      fireEvent.click(await view.findByRole("option", { name: "Marlow" }));
+      const view = renderWithQueryClient(<PersonFeatures person={roster[1] as unknown as PersonRosterEntry} />);
       expect(await view.findByText("News")).toBeTruthy();
       const allowed = view.getAllByRole("radio", { name: "Allowed" }) as HTMLButtonElement[];
       expect(allowed.map((button) => button.disabled)).toEqual([false, true]);
@@ -81,7 +79,7 @@ describe("FeatureAccess", () => {
   test("the section is absent for a viewer who is not an owner or admin, and fetches nothing", async () => {
     const server = stub({});
     try {
-      const view = renderWithQueryClient(<FeatureAccess viewer={{ id: "p-adult", role: "adult" }} />);
+      const view = renderWithQueryClient(<FeatureAccess viewer={{ id: "p-adult", role: "adult" }} feature="code" />);
       expect(view.queryByTestId("feature-access")).toBeNull();
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(server.calls).toHaveLength(0);

@@ -37,6 +37,8 @@ interface SettingsRendererProps {
   overrides?: boolean;
   /** Leave out keys that start with one of these (a page that shows them elsewhere). */
   excludeKeyPrefixes?: readonly string[];
+  /** Called after a change or reset was saved, so a page that shows a "Saved" state can say it. */
+  onSaved?: () => void;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -56,7 +58,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOverrides = {}, labelOverrides = {}, plainRows = false, settingKey, optionsFrom, includeExpert = false, overrides = false, excludeKeyPrefixes }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOverrides = {}, labelOverrides = {}, plainRows = false, settingKey, optionsFrom, includeExpert = false, overrides = false, excludeKeyPrefixes, onSaved }: SettingsRendererProps) {
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -121,6 +123,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
       }
       replaceValue(updated);
       if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
+      onSaved?.();
       return true;
     } catch (e) {
       setWriteError(errorLine(e, i18n._({ id: "Could not save that change.", message: "Could not save that change." })));
@@ -137,6 +140,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, titleOv
       const restored = await api.resetSetting(scopeValue, key);
       replaceValue(restored);
       if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
+      onSaved?.();
     } catch (e) {
       setWriteError(errorLine(e, "Could not reset that setting."));
     } finally {

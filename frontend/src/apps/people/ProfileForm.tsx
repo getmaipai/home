@@ -12,30 +12,25 @@ import { ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, NO_ACCENT } from "@/apps/p
 import { registerRouteLeaveGuard } from "@/shell/routeLeaveGuard";
 import { errorLine } from "@/lib/hubReachability";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 
 export type ProfileFormPerson = PersonRosterEntry | Roster;
 
 export interface ProfileFormProps {
   person: ProfileFormPerson;
   canEdit: boolean;
-  canSetControls?: boolean;
   onSaved?: (person: PersonRosterEntry) => void | Promise<void>;
   onCancel?: () => void;
   layout?: "dialog" | "page";
 }
 
-export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, onCancel, layout = "dialog" }: ProfileFormProps) {
+export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dialog" }: ProfileFormProps) {
   const [displayName, setDisplayName] = useState(person.display_name);
   const [bio, setBio] = useState(person.bio ?? "");
   const [accent, setAccent] = useState<string>(person.accent ?? NO_ACCENT);
-  const [controls, setControls] = useState<"child" | "teen" | "adult">(person.controls ?? "child");
-  const [confirmControls, setConfirmControls] = useState<"teen" | "adult" | null>(null);
   const [savedValues, setSavedValues] = useState({
     displayName: person.display_name,
     bio: person.bio ?? null,
     accent: person.accent ?? null,
-    controls: person.controls ?? null,
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,11 +42,9 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
   const trimmedName = displayName.trim();
   const nextBio = bio.trim() || null;
   const nextAccent = accent === NO_ACCENT ? null : accent as Person["accent"];
-  const nextControls = controls;
   const hasUnsavedChanges = trimmedName !== savedValues.displayName
     || nextBio !== savedValues.bio
-    || nextAccent !== savedValues.accent
-    || (canSetControls && person.role === "guest" && nextControls !== savedValues.controls);
+    || nextAccent !== savedValues.accent;
   dirtyRef.current = hasUnsavedChanges;
   const bioTooLong = bio.length > 160;
   const canSave = canEdit && trimmedName.length > 0 && !bioTooLong && !submitting;
@@ -63,16 +56,14 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
     setDisplayName(person.display_name);
     setBio(person.bio ?? "");
     setAccent(person.accent ?? NO_ACCENT);
-    setControls(person.controls ?? "child");
     setSavedValues({
       displayName: person.display_name,
       bio: person.bio ?? null,
       accent: person.accent ?? null,
-      controls: person.controls ?? null,
     });
     setError(null);
     setSaved(false);
-  }, [person.id, person.display_name, person.bio, person.accent, person.controls]);
+  }, [person.id, person.display_name, person.bio, person.accent]);
 
   useEffect(() => {
     if (layout !== "page" || !hasUnsavedChanges) return;
@@ -141,11 +132,10 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
     setSaved(false);
     setSubmitting(true);
     try {
-      const edit: { displayName?: string; bio?: string | null; accent?: Person["accent"]; controls?: "child" | "teen" | "adult" } = {};
+      const edit: { displayName?: string; bio?: string | null; accent?: Person["accent"] } = {};
       if (trimmedName !== savedValues.displayName) edit.displayName = trimmedName;
       if (nextBio !== savedValues.bio) edit.bio = nextBio;
       if (nextAccent !== savedValues.accent) edit.accent = nextAccent;
-      if (canSetControls && person.role === "guest" && nextControls !== savedValues.controls) edit.controls = nextControls;
       let savedPerson: PersonRosterEntry | null = null;
       if (Object.keys(edit).length > 0) {
         savedPerson = await api.updatePerson(person.id, edit);
@@ -155,12 +145,10 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
       setDisplayName(confirmed.display_name);
       setBio(confirmed.bio ?? "");
       setAccent(confirmed.accent ?? NO_ACCENT);
-      setControls(confirmed.controls ?? "child");
       setSavedValues({
         displayName: confirmed.display_name,
         bio: confirmed.bio ?? null,
         accent: confirmed.accent ?? null,
-        controls: confirmed.controls ?? null,
       });
       setSaved(true);
       if (layout === "dialog") onCancel?.();
@@ -173,11 +161,6 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
-    const rank = { child: 0, teen: 1, adult: 2 };
-    if (canSetControls && person.role === "guest" && rank[nextControls] > rank[savedValues.controls ?? "child"]) {
-      if (nextControls === "teen" || nextControls === "adult") setConfirmControls(nextControls);
-      return;
-    }
     await saveChanges();
   }
 
@@ -205,17 +188,6 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
         </Select>
         {!canEdit ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Ask an admin to change this.", message: "Ask an admin to change this." })}</p> : null}
       </div>
-      {canSetControls && person.role === "guest" ? <div className="flex flex-col gap-2">
-        <Label>{i18n._({ id: "Controls", message: "Controls" })}</Label>
-        <Select value={controls} onValueChange={(value) => updateDraft(() => setControls(value as "child" | "teen" | "adult"))} disabled={submitting}>
-          <SelectTrigger aria-label={i18n._({ id: "Controls", message: "Controls" })} id="profile-guest-controls"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="child">{i18n._({ id: "Child controls", message: "Child controls" })}</SelectItem>
-            <SelectItem value="teen">{i18n._({ id: "Teen controls", message: "Teen controls" })}</SelectItem>
-            <SelectItem value="adult">{i18n._({ id: "Adult controls", message: "Adult controls" })}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div> : null}
       {error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={error} /> : null}
       {canEdit ? layout === "dialog" ? (
         <DialogFooter>
@@ -228,18 +200,6 @@ export function ProfileForm({ person, canEdit, canSetControls = false, onSaved, 
           {onCancel ? <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button> : null}
         </div>
       ) : null}
-      <AlertDialog open={confirmControls !== null} onOpenChange={(open) => { if (!open) setConfirmControls(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{i18n._({ id: "Give {name} {level} controls?", message: "Give {name} {level} controls?", values: { name: person.display_name, level: confirmControls ?? "" } })}</AlertDialogTitle>
-            <AlertDialogDescription>{i18n._({ id: "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time.", message: "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time.", values: { name: person.display_name } })}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{i18n._({ id: "Keep current controls", message: "Keep current controls" })}</AlertDialogCancel>
-            <AlertDialogAction onClick={(event) => { event.preventDefault(); setConfirmControls(null); void saveChanges(); }}>{i18n._({ id: "Give {level} controls", message: "Give {level} controls", values: { level: confirmControls ?? "" } })}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </form>
   );
 }

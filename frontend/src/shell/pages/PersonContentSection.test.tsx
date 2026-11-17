@@ -1,5 +1,4 @@
-// CONTENT-POLICY-05: an owner or admin reaches a person's content controls through the narrow override read (a teen's profile is closed to the
-// ordinary settings read), a person sees only the keys the hub listed for them, and every label is the registry's.
+// CONTENT-POLICY-05: an owner or admin reaches a person's content controls on the access page (PersonAccessEditor.test.tsx), a person sees only the keys the hub listed for them, and every label is the registry's.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -51,16 +50,23 @@ const render = (path: string, who: Roster) => renderWithQueryClient(
 );
 
 describe("the person page's Content controls", () => {
-  test("an owner on a teen's closed profile gets the override controls through the narrow read, with the registry's labels", async () => {
-    const s = stub({ overrides: [value("content.ceiling", "PG-13"), value("content.unrated.library", "default"), value("content.filters", ["swearing"])] });
+  test("an owner on a teen's closed profile gets a link to that person's access page, and no content controls on the profile itself", async () => {
+    const s = stub({ overrides: [value("content.ceiling", "PG-13")] });
     try {
       const view = render("/people/person-marlow", sage);
-      expect(await view.findByText("Content level")).toBeTruthy();
-      expect(view.getByText("Unrated items in the library")).toBeTruthy();
-      expect(view.getByText("Content filters")).toBeTruthy();
-      expect(view.queryByText("Your content level")).toBeNull();
-      expect(s.urls.some((u) => u.includes("/api/people/person-marlow/overrides"))).toBe(true);
-      expect(s.urls.some((u) => u.includes("scope=person%3Aperson-marlow") || u.includes("scope=person:person-marlow"))).toBe(false);
+      const link = await view.findByRole("link", { name: "Role and access" });
+      expect(link.getAttribute("href")).toBe("/settings/household?tab=people&person=person-marlow");
+      expect(view.queryByText("Content level")).toBeNull();
+      expect(s.urls.some((u) => u.includes("/overrides"))).toBe(false);
+    } finally { s.restore(); }
+  });
+
+  test("an owner on a child's page has no Content tab; those controls live on the access page", async () => {
+    const s = stub({ overrides: [value("content.ceiling", "G")] });
+    try {
+      const view = render("/people/person-nova", sage);
+      expect(await view.findByRole("link", { name: "Role and access" })).toBeTruthy();
+      expect(view.queryByRole("tab", { name: "Content" })).toBeNull();
     } finally { s.restore(); }
   });
 

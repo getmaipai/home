@@ -25,32 +25,6 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
 }
 
 describe("ProfileForm", () => {
-  test("an admin can tighten a guest's controls and save without a confirmation dialog", async () => {
-    const originalFetch = globalThis.fetch;
-    const guest = makePerson({ role: "guest", controls: "teen", display_name: "Visitor" });
-    let body: unknown;
-    globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {
-      body = JSON.parse(String(init?.body));
-      return Promise.resolve(new Response(JSON.stringify({ ...guest, controls: "child" }), { status: 200 }));
-    }) as unknown as typeof fetch;
-    try {
-      const view = render(<ProfileForm person={guest} canEdit canSetControls layout="page" />);
-      await act(async () => { fireEvent.click(view.getByRole("combobox", { name: "Controls" })); });
-      const child = await view.findByRole("option", { name: "Child controls" });
-      await act(async () => {
-        fireEvent.pointerDown(child, { pointerId: 1, pointerType: "mouse", button: 0 });
-        fireEvent.pointerUp(child, { pointerId: 1, pointerType: "mouse", button: 0 });
-        fireEvent.click(child);
-      });
-      fireEvent.click(view.getByRole("button", { name: "Save" }));
-      await view.findByText("Saved.");
-      expect(body).toEqual({ controls: "child" });
-      expect(view.queryByRole("alertdialog")).toBeNull();
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
   test("renders the person's current profile values", () => {
     const { getByLabelText, getByText, queryByLabelText } = render(<ProfileForm person={makePerson()} canEdit />);
     expect((getByLabelText("Name") as HTMLInputElement).value).toBe("Avery");

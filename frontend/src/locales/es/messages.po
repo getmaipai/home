@@ -272,19 +272,19 @@ msgid "{count, plural, one {# face sample saved.} other {# face samples saved.}}
 msgstr "{count, plural, one {# muestra facial guardada.} other {# muestras faciales guardadas.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:476
+#: src/apps/settings/UsersSection.tsx:474
 #, needs-review
 msgid "{count, plural, one {# file only {name} could see will be deleted too. Download it first if you want to keep it.} other {# files only {name} could see will be deleted too. Download them first if you want to keep them.}}"
 msgstr "{count, plural, one {El archivo # que solo veía {name} también se borrará. Descárgalo antes si quieres guardarlo.} other {Los archivos # que solo veía {name} también se borrarán. Descárgalos antes si quieres guardarlos.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:477
+#: src/apps/settings/UsersSection.tsx:475
 #, needs-review
 msgid "{count, plural, one {# file only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.} other {# files only {name} could see will be deleted too. Only {name} can download their own files, so ask them to save anything they want to keep before you remove them.}}"
 msgstr "{count, plural, one {El archivo # que solo veía {name} también se borrará. Solo {name} puede descargar sus propios archivos, así que pídele que guarde lo que quiera conservar antes de eliminarlo.} other {Los archivos # que solo veía {name} también se borrarán. Solo {name} puede descargar sus propios archivos, así que pídele que guarde lo que quiera conservar antes de eliminarlo.}}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:480
+#: src/apps/settings/UsersSection.tsx:478
 #, needs-review
 msgid "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}"
 msgstr "{count, plural, one {El archivo # que otras personas aún pueden ver se quedará, lo guarda el hogar.} other {Los archivos # que otras personas aún pueden ver se quedarán, los guarda el hogar.}}"
@@ -440,7 +440,7 @@ msgid "{count, plural, one {Make a sound} other {Make # sounds}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:256
+#: src/apps/settings/UsersSection.tsx:252
 #, needs-review
 msgid "{count, plural, one {Remove # person from your household?} other {Remove # people from your household?}}"
 msgstr "{count, plural, one {¿Eliminar a la persona # de tu hogar?} other {¿Eliminar a las personas # de tu hogar?}}"
@@ -604,7 +604,7 @@ msgid "{feature} {level} on or off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:96
+#: src/apps/settings/FeatureAccess.tsx:95
 msgid "{feature} for {name}"
 msgstr ""
 
@@ -1281,7 +1281,7 @@ msgid "{name} will be closed when a big job needs room."
 msgstr "{name} se cerrará cuando una tarea grande necesite espacio."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:235
+#: src/apps/settings/PersonAccessEditor.tsx:135
 msgid "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time."
 msgstr ""
 
@@ -1369,7 +1369,7 @@ msgid "{names} and {last}"
 msgstr "{names} y {last}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:209
+#: src/apps/settings/UsersSection.tsx:205
 #, needs-review
 msgid "{names} could not be removed: {reason}"
 msgstr "No se pudo eliminar a {names}: {reason}"
@@ -2181,7 +2181,7 @@ msgid "setting.robot.face.color.option.lavender"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:195
+#: src/apps/people/ProfileForm.tsx:178
 #, needs-review
 msgid "A line about you"
 msgstr "Una línea sobre ti"
@@ -2333,6 +2333,11 @@ msgid "A token is saved. Home keeps it private and never shows it again."
 msgstr "Se guardó un token. Home lo mantiene privado y nunca lo muestra de nuevo."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:25
+msgid "A visitor. The controls below decide which protections apply."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:24
 msgid "a voice made at home"
 msgstr ""
@@ -2422,8 +2427,8 @@ msgid "About your address"
 msgstr "Sobre tu dirección"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:201
-#: src/apps/people/ProfileForm.tsx:203
+#: src/apps/people/ProfileForm.tsx:184
+#: src/apps/people/ProfileForm.tsx:186
 #, needs-review
 msgid "Accent color"
 msgstr "Color de acento"
@@ -2561,7 +2566,7 @@ msgstr "Añade un lugar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:124
+#: src/shell/pages/settings/settingsViews.tsx:123
 msgid "Add a robot"
 msgstr ""
 
@@ -2704,7 +2709,7 @@ msgid "Add Score transcription under Settings, AI and models"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:448
+#: src/apps/settings/UsersSection.tsx:446
 #, needs-review
 msgid "Add someone"
 msgstr "Añadir a alguien"
@@ -2754,7 +2759,7 @@ msgid "Add to a song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:449
+#: src/apps/settings/UsersSection.tsx:447
 #, needs-review
 msgid "Add to household"
 msgstr "Añadir al hogar"
@@ -2941,7 +2946,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/people/ProfileForm.tsx:215
+#: src/apps/settings/PersonAccessEditor.tsx:31
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Adult controls"
 msgstr ""
@@ -3063,7 +3068,7 @@ msgid "setting.generation.music.enabled.label"
 msgstr "Los adultos pueden crear canciones"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:66
+#: src/apps/settings/FeatureAccess.tsx:63
 msgid "Adults follow the household setting. Children and teens can use Coding only when you allow it. Their protections stay on."
 msgstr ""
 
@@ -3165,12 +3170,12 @@ msgid "setting.companions.allowed.help"
 msgstr "Los compañeros de IA están activados para todos a menos que un administrador los desactive para el hogar o para una persona. Desactivar esto oculta a los compañeros y conserva sus datos."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:361
+#: src/apps/settings/UsersSection.tsx:360
 msgid "AI companions for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:235
+#: src/apps/settings/UsersSection.tsx:231
 msgid "AI companions for everyone"
 msgstr ""
 
@@ -3388,7 +3393,7 @@ msgid "Allow"
 msgstr "Permitir"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:85
+#: src/apps/settings/FeatureAccess.tsx:44
 msgid "Allow Coding"
 msgstr ""
 
@@ -3465,12 +3470,12 @@ msgid "setting.generation.video.adult_adapters.option_label.allowed"
 msgstr "Permitido"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:98
+#: src/apps/settings/FeatureAccess.tsx:97
 msgid "Allowed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:97
+#: src/apps/settings/FeatureAccess.tsx:96
 msgid "Allowed by role"
 msgstr ""
 
@@ -4060,11 +4065,6 @@ msgid "Arrange"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:69
-msgid "Arrange by"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:89
 msgid "Arrange Home"
 msgstr ""
@@ -4116,9 +4116,9 @@ msgid "setting.tools.timer.mode.option_label.ask"
 msgstr "Preguntar"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:191
-#: src/apps/people/ProfileForm.tsx:198
-#: src/apps/people/ProfileForm.tsx:206
+#: src/apps/people/ProfileForm.tsx:174
+#: src/apps/people/ProfileForm.tsx:181
+#: src/apps/people/ProfileForm.tsx:189
 #, needs-review
 msgid "Ask an admin to change this."
 msgstr "Pídele a un administrador que lo cambie."
@@ -4456,6 +4456,11 @@ msgstr ""
 #, needs-review
 msgid "Back to draft"
 msgstr "Volver al borrador"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:45
+msgid "Back to everyone"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:243
@@ -4818,13 +4823,13 @@ msgid "setting.tts.voice_id.option_label.bill_boerst"
 msgstr "Bill Boerst"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:194
+#: src/apps/people/ProfileForm.tsx:177
 #, needs-review
 msgid "Bio"
 msgstr "Biografía"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:197
+#: src/apps/people/ProfileForm.tsx:180
 #, needs-review
 msgid "Bio must be 160 characters or less."
 msgstr "La biografía debe tener 160 caracteres o menos."
@@ -5273,16 +5278,6 @@ msgid "By {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:71
-msgid "By feature"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:70
-msgid "By person"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:29
 #, needs-review
 msgid "Calls {service} on {entityId}"
@@ -5347,14 +5342,14 @@ msgid "Can someone reach into your house?"
 msgstr "¿Puede alguien entrar a tu casa?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:94
+#: src/apps/settings/FeatureAccess.tsx:93
 msgid "Can use it now"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:278
-#: src/apps/people/ProfileForm.tsx:223
-#: src/apps/people/ProfileForm.tsx:228
+#: src/apps/people/ProfileForm.tsx:195
+#: src/apps/people/ProfileForm.tsx:200
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
 #: src/apps/settings/AddVoiceForm.tsx:120
@@ -5370,8 +5365,8 @@ msgstr ""
 #: src/apps/settings/styles/StyleAddFile.tsx:68
 #: src/apps/settings/styles/StyleConfirm.tsx:143
 #: src/apps/settings/styles/StylesTab.tsx:160
-#: src/apps/settings/UsersSection.tsx:373
-#: src/apps/settings/UsersSection.tsx:456
+#: src/apps/settings/UsersSection.tsx:372
+#: src/apps/settings/UsersSection.tsx:454
 #: src/apps/settings/VoiceManagerSection.tsx:151
 #: src/apps/settings/VoiceManagerSection.tsx:164
 #: src/apps/setup/SetupReviewPage.tsx:67
@@ -5386,7 +5381,7 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:436
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
-#: src/shell/pages/settings/SettingsRenderer.tsx:175
+#: src/shell/pages/settings/SettingsRenderer.tsx:179
 #: src/shell/pages/status/StatusBoard.tsx:72
 #: src/shell/pages/status/StatusComponents.tsx:161
 #: src/shell/pages/StoragePage.tsx:205
@@ -5465,7 +5460,7 @@ msgid "Cancelling…"
 msgstr "Cancelando…"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:94
+#: src/apps/settings/FeatureAccess.tsx:93
 msgid "Cannot use it now"
 msgstr ""
 
@@ -6307,7 +6302,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/people/ProfileForm.tsx:213
+#: src/apps/settings/PersonAccessEditor.tsx:29
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Child controls"
 msgstr ""
@@ -6315,6 +6310,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:123
 msgid "Child profiles start restricted, and parents choose what they can reach. No protection is perfect, so stay involved."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:24
+msgid "Child protections are on."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6708,7 +6708,7 @@ msgid "Choose Voice"
 msgstr "Elige voz"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:66
+#: src/apps/settings/PersonAccessEditor.tsx:62
 msgid "Choose what each person can use. A feature someone cannot use is simply absent for them."
 msgstr ""
 
@@ -7517,7 +7517,7 @@ msgstr ""
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
-#: src/shell/pages/settings/SettingsRenderer.tsx:185
+#: src/shell/pages/settings/SettingsRenderer.tsx:189
 #: src/shell/pages/UpdatesPage.tsx:202
 #, needs-review
 msgid "Confirm"
@@ -7611,7 +7611,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonContentSection.tsx:22
-#: src/shell/pages/PersonProfilePage.tsx:122
+#: src/shell/pages/PersonProfilePage.tsx:121
 msgid "Content"
 msgstr ""
 
@@ -7711,8 +7711,7 @@ msgstr "Controla un dispositivo de hogar inteligente"
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:113
 #: src/apps/people/NewPersonForm.tsx:114
-#: src/apps/people/ProfileForm.tsx:209
-#: src/apps/people/ProfileForm.tsx:211
+#: src/apps/settings/PersonAccessEditor.tsx:114
 #: src/apps/settings/RobotCompanionChoices.tsx:57
 #: src/apps/settings/RobotCompanionChoices.tsx:58
 msgid "Controls"
@@ -7923,7 +7922,17 @@ msgid "Could not cancel the schedule."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:49
+#: src/apps/settings/PersonAccessEditor.tsx:97
+msgid "Could not change {name}'s controls. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:96
+msgid "Could not change {name}'s role. Check your connection and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/FeatureAccess.tsx:34
 msgid "Could not change access. Try again."
 msgstr ""
 
@@ -7975,7 +7984,7 @@ msgid "Could not change who may hear that memory. Check your connection and try 
 msgstr "No se pudo cambiar quién puede escuchar esa memoria. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:334
+#: src/apps/settings/UsersSection.tsx:321
 #, needs-review
 msgid "Could not check {name}'s files. Their files will be deleted with them unless someone else can see them."
 msgstr "No se pudieron revisar los archivos de {name}. Sus archivos se borrarán con ellos a menos que otra persona pueda verlos."
@@ -8226,7 +8235,7 @@ msgid "Could not load conversations. Check your connection and try again."
 msgstr "No se pudieron cargar las conversaciones. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:192
+#: src/shell/pages/PersonProfilePage.tsx:191
 msgid "Could not load creations."
 msgstr ""
 
@@ -8248,8 +8257,8 @@ msgid "Could not load faded memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:78
-#: src/apps/settings/FeatureAccess.tsx:81
+#: src/apps/settings/FeatureAccess.tsx:65
+#: src/apps/settings/FeatureAccess.tsx:80
 msgid "Could not load feature access. Try again."
 msgstr ""
 
@@ -8318,7 +8327,7 @@ msgid "Could not load routing stats."
 msgstr "No se pudieron cargar las estadísticas de enrutamiento."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:198
+#: src/shell/pages/settings/SettingsRenderer.tsx:202
 #, needs-review
 msgid "Could not load settings."
 msgstr "No se pudieron cargar los ajustes."
@@ -8377,7 +8386,7 @@ msgid "Could not load the household"
 msgstr "No se pudo cargar el hogar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:229
+#: src/apps/settings/UsersSection.tsx:225
 #: src/shell/pages/FamilyPage.tsx:42
 #: src/shell/pages/PersonProfilePage.tsx:70
 #, needs-review
@@ -8483,7 +8492,7 @@ msgid "Could not load voices. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:175
 #, needs-review
 msgid "Could not load what's been shared."
 msgstr "No se pudo cargar lo compartido."
@@ -8683,7 +8692,7 @@ msgid "Could not remove it."
 msgstr "No se pudo eliminar."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:192
+#: src/apps/settings/UsersSection.tsx:188
 #, needs-review
 msgid "Could not remove that person."
 msgstr "No se pudo eliminar a esa persona."
@@ -8707,7 +8716,7 @@ msgid "Could not remove this synth. Check your connection and try again."
 msgstr "No se pudo quitar este synth. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:214
+#: src/apps/settings/UsersSection.tsx:210
 #, needs-review
 msgid "Could not remove those people."
 msgstr "No se pudieron eliminar esas personas."
@@ -8806,8 +8815,8 @@ msgid "Could not save that answer. Try again."
 msgstr "No se pudo guardar esa respuesta. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:126
-#: src/shell/pages/settings/SettingsRenderer.tsx:183
+#: src/shell/pages/settings/SettingsRenderer.tsx:129
+#: src/shell/pages/settings/SettingsRenderer.tsx:187
 #, needs-review
 msgid "Could not save that change."
 msgstr "No se pudo guardar el cambio."
@@ -8899,13 +8908,13 @@ msgid "Could not save this. Check your connection and try again."
 msgstr "No se pudo guardar esto. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:178
+#: src/apps/settings/UsersSection.tsx:174
 #, needs-review
 msgid "Could not save those changes."
 msgstr "No se pudieron guardar esos cambios."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:168
+#: src/apps/people/ProfileForm.tsx:156
 #, needs-review
 msgid "Could not save those changes. Check your connection and try again."
 msgstr "No se pudieron guardar esos cambios. Revisa tu conexión e inténtalo de nuevo."
@@ -9257,7 +9266,7 @@ msgid "Creating…"
 msgstr "Creando…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:202
+#: src/shell/pages/PersonProfilePage.tsx:201
 msgid "Creations"
 msgstr ""
 
@@ -9436,7 +9445,7 @@ msgid "setting.allowance.robot_body.daily_minutes.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:141
+#: src/shell/pages/PersonProfilePage.tsx:140
 #, needs-review
 msgid "Daily time limits for {name}."
 msgstr "Límites de tiempo diarios para {name}."
@@ -9880,7 +9889,7 @@ msgid "Demo mode"
 msgstr "Modo demo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:99
+#: src/apps/settings/FeatureAccess.tsx:98
 msgid "Denied"
 msgstr ""
 
@@ -10394,7 +10403,7 @@ msgid "Download {label}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:484
+#: src/apps/settings/UsersSection.tsx:482
 #, needs-review
 msgid "Download {name}'s files"
 msgstr "Descargar los archivos de {name}"
@@ -10662,7 +10671,7 @@ msgid "Edit {level}: {title}"
 msgstr "Editar {level}: {title}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:406
+#: src/apps/settings/UsersSection.tsx:405
 #: src/shell/pages/ProjectsPage.tsx:200
 #, needs-review
 msgid "Edit {name}"
@@ -10709,8 +10718,8 @@ msgid "Edit keyframe: {label}"
 msgstr "Editar fotograma clave: {label}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:234
-#: src/shell/pages/PersonProfilePage.tsx:234
+#: src/shell/pages/PersonProfilePage.tsx:233
+#: src/shell/pages/PersonProfilePage.tsx:233
 #, needs-review
 msgid "Edit profile"
 msgstr "Editar perfil"
@@ -11143,6 +11152,11 @@ msgid "Every change keeps the earlier version, so nothing is lost."
 msgstr "Cada cambio guarda la versión anterior, así que nada se pierde."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:53
+msgid "Every change saves as you make it."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:16
 msgid "Every child protection applies, whichever companion is chosen."
 msgstr ""
@@ -11286,13 +11300,13 @@ msgid "Everything looks ready."
 msgstr "Todo parece listo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:330
+#: src/apps/settings/UsersSection.tsx:317
 #, needs-review
 msgid "Everything MaiPai remembers about {display_name}, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone."
 msgstr "Todo lo que MaiPai recuerda sobre {display_name}, cada conversación que tuvieron, su configuración y cualquier voz que grabaron se borrarán. No se puede deshacer."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:258
+#: src/apps/settings/UsersSection.tsx:254
 #, needs-review
 msgid "Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. So will any files only they could see; files they shared stay with the household. To save someone's files first, remove them one at a time. This cannot be undone."
 msgstr "Todo lo que MaiPai recuerda sobre ellos, cada conversación que tuvieron, su configuración y cualquier voz que grabaron se borrarán. También se borrarán los archivos que solo ellos podían ver. Los archivos que compartieron se quedan con el hogar. Para guardar los archivos de alguien primero, elimínalos uno por uno. No se puede deshacer."
@@ -11626,18 +11640,8 @@ msgid "Favorites"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:75
-msgid "Feature"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1916
 msgid "area.Features"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:62
-msgid "Features"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12320,7 +12324,7 @@ msgstr "Libera memoria"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:59
-#: src/shell/pages/settings/settingsViews.tsx:115
+#: src/shell/pages/settings/settingsViews.tsx:114
 #, needs-review
 msgid "Free up space"
 msgstr "Liberar espacio"
@@ -12839,12 +12843,12 @@ msgid "setting.coding.person.git_hosts.label"
 msgstr "Servidores Git"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:239
+#: src/apps/settings/PersonAccessEditor.tsx:139
 msgid "Give {level} controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:234
+#: src/apps/settings/PersonAccessEditor.tsx:134
 msgid "Give {name} {level} controls?"
 msgstr ""
 
@@ -14400,7 +14404,7 @@ msgstr "Hogar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SafetyChangesSection.tsx:64
-#: src/apps/settings/UsersSection.tsx:277
+#: src/apps/settings/UsersSection.tsx:273
 #, needs-review
 msgid "Household"
 msgstr "Hogar"
@@ -14593,7 +14597,7 @@ msgid "setting.robot.volume.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:156
+#: src/shell/pages/PersonProfilePage.tsx:155
 #, needs-review
 msgid "How MaiPai answers {name} about sensitive subjects. Only you and other admins can change these."
 msgstr "Cómo responde MaiPai a {name} sobre temas sensibles. Solo tú y otros administradores pueden cambiarlos."
@@ -15781,6 +15785,11 @@ msgid "Keep {media}"
 msgstr "Conservar {media}"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:126
+msgid "Keep {role}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:194
 #, needs-review
 msgid "Keep adults only"
@@ -15793,7 +15802,7 @@ msgid "setting.coding.home_mode.option.normal"
 msgstr "Mantener el chat y las imágenes funcionando como de costumbre."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:238
+#: src/apps/settings/PersonAccessEditor.tsx:138
 msgid "Keep current controls"
 msgstr ""
 
@@ -15923,8 +15932,8 @@ msgstr "Mantén la voz"
 #: src/apps/memory/PersonMemories.tsx:428
 #: src/apps/memory/PersonMemories.tsx:449
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
-#: src/apps/settings/UsersSection.tsx:268
-#: src/apps/settings/UsersSection.tsx:391
+#: src/apps/settings/UsersSection.tsx:264
+#: src/apps/settings/UsersSection.tsx:390
 #: src/shell/library/LibraryTrash.tsx:28
 #, needs-review
 msgid "Keep them"
@@ -15937,7 +15946,7 @@ msgid "Keep things as they are"
 msgstr "Dejar las cosas como están"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:163
+#: src/shell/pages/settings/settingsViews.tsx:162
 #, needs-review
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr "Deja esta app en la barra lateral para tenerla a un toque."
@@ -16269,7 +16278,7 @@ msgstr "LAN"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:70
+#: src/shell/pages/settings/settingsViews.tsx:69
 #, needs-review
 msgid "Language"
 msgstr "Idioma"
@@ -16504,9 +16513,9 @@ msgid "setting.person.quiet_hours.to.help"
 msgstr "Dejar sin configurar para heredar las horas silenciosas del hogar. Un padre configura esto para un niño; los adolescentes pueden configurar los suyos."
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:79
-#: src/apps/people/ProfileForm.tsx:90
-#: src/apps/people/ProfileForm.tsx:106
+#: src/apps/people/ProfileForm.tsx:70
+#: src/apps/people/ProfileForm.tsx:81
+#: src/apps/people/ProfileForm.tsx:97
 #, needs-review
 msgid "Leave without saving?"
 msgstr "¿Salir sin guardar?"
@@ -16549,7 +16558,7 @@ msgid "Less than a minute left"
 msgstr "Falta menos de un minuto"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:85
+#: src/apps/settings/FeatureAccess.tsx:44
 #, needs-review
 msgid "Let {display_name} use Coding?"
 msgstr "¿Dejar que {display_name} use Coding?"
@@ -16927,7 +16936,7 @@ msgid "Library"
 msgstr "Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:229
+#: src/shell/pages/PersonProfilePage.tsx:228
 msgid "Library counts"
 msgstr ""
 
@@ -17069,7 +17078,7 @@ msgid "Limit peaks"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:120
+#: src/shell/pages/PersonProfilePage.tsx:119
 #, needs-review
 msgid "Limits"
 msgstr "Límites"
@@ -17409,7 +17418,7 @@ msgid "Loading copies"
 msgstr "Cargando copias"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:192
+#: src/shell/pages/PersonProfilePage.tsx:191
 msgid "Loading creations"
 msgstr ""
 
@@ -17431,8 +17440,8 @@ msgid "Loading faded memories…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:78
-#: src/apps/settings/FeatureAccess.tsx:81
+#: src/apps/settings/FeatureAccess.tsx:65
+#: src/apps/settings/FeatureAccess.tsx:80
 msgid "Loading feature access"
 msgstr ""
 
@@ -17460,7 +17469,7 @@ msgid "Loading Home highlight"
 msgstr "Cargando destacado de Home"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:230
+#: src/apps/settings/UsersSection.tsx:226
 #: src/shell/pages/FamilyPage.tsx:42
 #: src/shell/pages/SignInPage.tsx:88
 #, needs-review
@@ -17589,7 +17598,7 @@ msgstr "Cargando sesiones"
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingsAreaPage.tsx:65
 #: src/shell/pages/settings/SettingsAreaPage.tsx:162
-#: src/shell/pages/settings/SettingsRenderer.tsx:199
+#: src/shell/pages/settings/SettingsRenderer.tsx:203
 #, needs-review
 msgid "Loading settings"
 msgstr "Cargando ajustes"
@@ -17601,7 +17610,7 @@ msgid "Loading setup status"
 msgstr "Cargando estado de configuración"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:176
+#: src/shell/pages/PersonProfilePage.tsx:175
 #, needs-review
 msgid "Loading shared media"
 msgstr "Cargando medios compartidos"
@@ -17911,6 +17920,11 @@ msgstr "Búsqueda de canciones en línea"
 #, needs-review
 msgid "setting.search.dictionary_fallback.does"
 msgstr "Busca una palabra en Wiktionary si la Biblioteca sin conexión no tiene entrada."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:21
+msgid "Looks after the household: people, settings and what each person can use."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/PackSection.tsx:91
@@ -18285,6 +18299,16 @@ msgstr "Voz de MaiPai"
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/MakeShelf.tsx:33
 msgid "Make"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:122
+msgid "Make {name} {role}?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:127
+msgid "Make {role}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19036,7 +19060,7 @@ msgid "Memories"
 msgstr "Recuerdos"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:437
+#: src/apps/settings/UsersSection.tsx:435
 #, needs-review
 msgid "Memories for {name}"
 msgstr "Recuerdos para {name}"
@@ -19768,7 +19792,7 @@ msgstr ""
 #: src/apps/clock/TimersTab.tsx:178
 #: src/apps/people/NewPersonForm.tsx:101
 #: src/apps/people/NewPersonForm.tsx:102
-#: src/apps/people/ProfileForm.tsx:189
+#: src/apps/people/ProfileForm.tsx:172
 #: src/apps/reminders/CreateListSheet.tsx:33
 #: src/apps/reminders/ListMenu.tsx:45
 #: src/apps/settings/AddVoiceForm.tsx:80
@@ -19789,7 +19813,7 @@ msgid "Name"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:286
+#: src/apps/settings/UsersSection.tsx:282
 #, needs-review
 msgid "Name for {name}"
 msgstr "Nombre para {name}"
@@ -20802,7 +20826,7 @@ msgid "No settings match that search."
 msgstr "Ningún ajuste coincide con esa búsqueda."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:215
+#: src/shell/pages/settings/SettingsRenderer.tsx:219
 #, needs-review
 msgid "No settings yet."
 msgstr "Aún no hay ajustes."
@@ -21100,7 +21124,7 @@ msgstr "Tamaño normal."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:358
-#: src/apps/settings/UsersSection.tsx:209
+#: src/apps/settings/UsersSection.tsx:205
 #, needs-review
 msgid "not allowed"
 msgstr "no permitido"
@@ -21171,7 +21195,7 @@ msgid "Not known yet"
 msgstr "Aún no se sabe"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:85
+#: src/apps/settings/FeatureAccess.tsx:44
 #: src/apps/settings/ModelsAndStorageSection.tsx:111
 #: src/apps/settings/ModelsAndStorageSection.tsx:174
 #: src/apps/settings/styles/stylesShared.tsx:24
@@ -21447,7 +21471,7 @@ msgid "Nothing saved yet. Open an article and press Save to keep it here."
 msgstr "Aún no has guardado nada. Abre un artículo y pulsa Guardar para dejarlo aquí."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:182
+#: src/shell/pages/PersonProfilePage.tsx:181
 #, needs-review
 msgid "Nothing shared yet."
 msgstr "Aún no hay nada compartido."
@@ -21916,8 +21940,8 @@ msgid "Older backups can keep their data for up to three months. Restoring a who
 msgstr "Las copias de seguridad antiguas pueden guardar sus datos hasta tres meses. Restaurar una copia antigua completa los trae de vuelta."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:261
-#: src/apps/settings/UsersSection.tsx:332
+#: src/apps/settings/UsersSection.tsx:257
+#: src/apps/settings/UsersSection.tsx:319
 #, needs-review
 msgid "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days."
 msgstr "Las copias de seguridad antiguas aún conservan sus datos durante hasta tres meses, hasta que esas copias caduquen. Restaurar una copia antigua completa los devolvería. Los registros del hub aún los mencionan, sin nada de lo que dijeron, durante 7 días."
@@ -22301,6 +22325,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:146
 msgid "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:111
+msgid "Only the owner can change a role."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22747,7 +22776,7 @@ msgid "setting.storage.person.cap_bytes.help"
 msgstr "Anula el límite por persona predeterminado del hogar para esta persona concreta. 0 significa sin anulación: esta persona sigue el predeterminado del hogar. Lo establece un propietario o administrador."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:119
+#: src/shell/pages/PersonProfilePage.tsx:118
 #: src/shell/pages/settings/SettingsHomePage.tsx:43
 #, needs-review
 msgid "Overview"
@@ -22803,7 +22832,7 @@ msgid "Pair"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:124
+#: src/shell/pages/settings/settingsViews.tsx:123
 msgid "Pair a robot with this home."
 msgstr ""
 
@@ -23084,7 +23113,6 @@ msgid "area.Performance"
 msgstr "Rendimiento"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:74
 #: src/apps/settings/SiteBlocksSection.tsx:51
 #: src/shell/pages/StoragePage.tsx:177
 #, needs-review
@@ -23596,7 +23624,7 @@ msgstr "Calidad de imagen"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AutoLocksSection.tsx:13
-#: src/shell/pages/PersonProfilePage.tsx:221
+#: src/shell/pages/PersonProfilePage.tsx:220
 msgid "pictures"
 msgstr ""
 
@@ -23638,7 +23666,7 @@ msgid "setting.resources.strict.image.label"
 msgstr "Las imágenes siempre van primero"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:144
+#: src/shell/pages/PersonProfilePage.tsx:143
 #, needs-review
 msgid "Pictures and videos can be made in chat."
 msgstr "Puedes hacer fotos y vídeos en el chat."
@@ -23730,7 +23758,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:73
 #: src/shell/sessionLockContext.tsx:99
 #, needs-review
 msgid "PIN or password"
@@ -24241,8 +24269,8 @@ msgid "Professional"
 msgstr "Profesional"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:224
-#: src/shell/pages/settings/settingsViews.tsx:64
+#: src/shell/pages/PersonProfilePage.tsx:223
+#: src/shell/pages/settings/settingsViews.tsx:63
 #, needs-review
 msgid "Profile"
 msgstr "Perfil"
@@ -25010,7 +25038,7 @@ msgid "Remove {count} books?"
 msgstr "¿Eliminar {count} libros?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:329
+#: src/apps/settings/UsersSection.tsx:316
 #, needs-review
 msgid "Remove {display_name} from your household?"
 msgstr "¿Eliminar a {display_name} de tu hogar?"
@@ -25031,7 +25059,7 @@ msgstr "¿Eliminar {label}?"
 #: src/apps/clock/WorldClocksTab.tsx:154
 #: src/apps/settings/CloseAppsSettings.tsx:65
 #: src/apps/settings/DevicesSection.tsx:147
-#: src/apps/settings/UsersSection.tsx:422
+#: src/apps/settings/UsersSection.tsx:420
 #: src/shell/pages/MakeSongPage.tsx:147
 #: src/shell/pages/MusicComposer.tsx:202
 #, needs-review
@@ -25108,7 +25136,7 @@ msgid "Remove SearXNG?"
 msgstr "¿Eliminar SearXNG?"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:246
+#: src/apps/settings/UsersSection.tsx:242
 #, needs-review
 msgid "Remove selected"
 msgstr "Eliminar seleccionados"
@@ -25195,8 +25223,8 @@ msgstr "Eliminando {title}…"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
-#: src/apps/settings/UsersSection.tsx:265
-#: src/apps/settings/UsersSection.tsx:388
+#: src/apps/settings/UsersSection.tsx:261
+#: src/apps/settings/UsersSection.tsx:387
 #: src/shell/pages/WikipediaPage.tsx:100
 #, needs-review
 msgid "Removing…"
@@ -25409,7 +25437,7 @@ msgid "setting.coding.requests_per_minute_per_key.label"
 msgstr "Solicitudes por minuto"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:309
+#: src/apps/settings/UsersSection.tsx:296
 #, needs-review
 msgid "Require PIN lock"
 msgstr "Requerir bloqueo con PIN"
@@ -25421,7 +25449,7 @@ msgid "setting.security.session_lock_required.label"
 msgstr "Pedir PIN para desbloquear tras inactividad"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:307
+#: src/apps/settings/UsersSection.tsx:294
 #, needs-review
 msgid "Require session lock for {name}"
 msgstr "Requerir bloqueo de sesión para {name}"
@@ -26079,6 +26107,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:108
 #: src/apps/people/NewPersonForm.tsx:109
+#: src/apps/settings/PersonAccessEditor.tsx:57
 #: src/shell/pages/EnginesPage.tsx:46
 #: src/shell/pages/StoragePage.tsx:177
 #, needs-review
@@ -26086,18 +26115,30 @@ msgid "Role"
 msgstr "Rol"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/UsersSection.tsx:356
+#: src/shell/pages/PersonProfilePage.tsx:90
+#: src/shell/pages/PersonProfilePage.tsx:235
+msgid "Role and access"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/UsersSection.tsx:353
+msgid "Role and access for {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/personAccessCopy.ts:17
 msgid "Role default"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:295
+#: src/apps/settings/PersonAccessEditor.tsx:108
 #, needs-review
 msgid "Role for {name}"
 msgstr "Rol para {name}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:130
+#: src/shell/pages/PersonProfilePage.tsx:129
 msgid "Role: {role}"
 msgstr ""
 
@@ -26242,6 +26283,11 @@ msgid "Running..."
 msgstr "Ejecutando..."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:20
+msgid "Runs the household and can change anything."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/musicCreateForm.ts:48
 msgid "Russian"
 msgstr ""
@@ -26314,15 +26360,15 @@ msgstr "Sáb"
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:112
 #: src/apps/clock/TimersTab.tsx:180
-#: src/apps/people/ProfileForm.tsx:222
-#: src/apps/people/ProfileForm.tsx:227
+#: src/apps/people/ProfileForm.tsx:194
+#: src/apps/people/ProfileForm.tsx:199
 #: src/apps/reminders/ListMenu.tsx:46
 #: src/apps/settings/AiGlance.tsx:124
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/CodingSettings.tsx:195
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/styles/StylesTab.tsx:159
-#: src/apps/settings/UsersSection.tsx:370
+#: src/apps/settings/UsersSection.tsx:369
 #: src/shell/pages/MusicSpeechPage.tsx:80
 #: src/shell/pages/settings/SettingField.tsx:138
 #: src/shell/pages/settings/WebSearchSettings.tsx:104
@@ -26492,8 +26538,9 @@ msgid "Saved place"
 msgstr "Lugar guardado"
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:187
+#: src/apps/people/ProfileForm.tsx:170
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
+#: src/apps/settings/PersonAccessEditor.tsx:55
 #: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
 #, needs-review
@@ -26541,8 +26588,8 @@ msgstr "Guardando tus muestras faciales…"
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:180
 #: src/apps/people/FaceEnrollmentPage.tsx:631
-#: src/apps/people/ProfileForm.tsx:222
-#: src/apps/people/ProfileForm.tsx:227
+#: src/apps/people/ProfileForm.tsx:194
+#: src/apps/people/ProfileForm.tsx:199
 #: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
@@ -27150,7 +27197,7 @@ msgid "See"
 msgstr "Ver"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:207
+#: src/shell/pages/PersonProfilePage.tsx:206
 msgid "See all"
 msgstr ""
 
@@ -27213,7 +27260,7 @@ msgid "Select"
 msgstr "Seleccionar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:351
+#: src/apps/settings/UsersSection.tsx:338
 #, needs-review
 msgid "Select {name}"
 msgstr "Seleccionar {name}"
@@ -27264,7 +27311,7 @@ msgid "Select memories"
 msgstr "Seleccionar memorias"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:250
+#: src/apps/settings/UsersSection.tsx:246
 #, needs-review
 msgid "Select people"
 msgstr "Seleccionar personas"
@@ -27346,7 +27393,7 @@ msgid "setting.security.session_lock_timeout_minutes.label"
 msgstr "Tiempo de espera del bloqueo de sesión (minutos)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:319
+#: src/apps/settings/UsersSection.tsx:306
 #, needs-review
 msgid "Session lock timeout, minutes, for {name}"
 msgstr "Tiempo de espera del bloqueo de sesión, en minutos, para {name}"
@@ -27750,7 +27797,7 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:209
 #: src/shell/pages/FilesPage.tsx:353
 #: src/shell/pages/MusicSongDetails.tsx:164
-#: src/shell/pages/PersonProfilePage.tsx:235
+#: src/shell/pages/PersonProfilePage.tsx:234
 #, needs-review
 msgid "Share"
 msgstr "Compartir"
@@ -27767,7 +27814,7 @@ msgid "Share with the household"
 msgstr "Compartir con el hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:175
+#: src/shell/pages/PersonProfilePage.tsx:174
 #, needs-review
 msgid "Shared"
 msgstr "Compartido"
@@ -27851,7 +27898,7 @@ msgid "Show {count} more"
 msgstr "Mostrar {count} más"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:245
+#: src/shell/pages/settings/SettingsRenderer.tsx:249
 #, needs-review
 msgid "Show {length} advanced settings"
 msgstr "Mostrar {length} ajustes avanzados"
@@ -27931,8 +27978,8 @@ msgid "Show in Library"
 msgstr "Mostrar en Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:162
-#: src/shell/pages/settings/settingsViews.tsx:165
+#: src/shell/pages/settings/settingsViews.tsx:161
+#: src/shell/pages/settings/settingsViews.tsx:164
 #, needs-review
 msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
@@ -28124,7 +28171,7 @@ msgid "setting.media.allowlist_only.does"
 msgstr "Muestra la biblioteca del hogar y las fuentes elegidas para ti."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:131
+#: src/shell/pages/PersonProfilePage.tsx:130
 msgid "shows unrated items"
 msgstr ""
 
@@ -28179,7 +28226,7 @@ msgstr "Conversación lateral"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:158
+#: src/shell/pages/settings/settingsViews.tsx:157
 #, needs-review
 msgid "Sidebar"
 msgstr "Barra lateral"
@@ -28733,14 +28780,14 @@ msgid "Some pictures were locked by Home on its own, not by you. Clearing them m
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:158
+#: src/shell/pages/PersonProfilePage.tsx:157
 #, needs-review
 msgid "Some things never change for {name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number."
 msgstr "Algunas cosas nunca cambian para {name}. Los sentimientos y la seguridad siempre tienen prioridad y un adulto de confianza. El acoso, los secretos y compartir dónde viven nunca se ayudan. En religión y política, MaiPai no toma partido. En peligro, MaiPai indica a un adulto y al número de emergencia."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:98
-#: src/apps/settings/UsersSection.tsx:208
+#: src/apps/settings/UsersSection.tsx:204
 #, needs-review
 msgid "someone"
 msgstr "alguien"
@@ -28833,7 +28880,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:262
 #: src/shell/pages/FilesPage.tsx:166
 #: src/shell/pages/musicComposerMode.ts:19
-#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:204
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
 #, needs-review
@@ -28875,7 +28922,7 @@ msgid "Song to change"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:219
+#: src/shell/pages/PersonProfilePage.tsx:218
 msgid "songs"
 msgstr ""
 
@@ -29750,7 +29797,7 @@ msgstr "Cronómetro en marcha"
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/pages/settings/settingsViews.tsx:115
+#: src/shell/pages/settings/settingsViews.tsx:114
 #: src/shell/pages/StoragePage.tsx:116
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -30209,7 +30256,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/people/ProfileForm.tsx:214
+#: src/apps/settings/PersonAccessEditor.tsx:30
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Teen controls"
 msgstr ""
@@ -30217,6 +30264,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotCompanionChoices.tsx:17
 msgid "Teen protections apply, whichever companion is chosen. Still no adult content."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:23
+msgid "Teen protections are on."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30574,8 +30626,8 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
 #: src/apps/people/FaceEnrollmentPage.tsx:781
-#: src/apps/people/ProfileForm.tsx:197
-#: src/apps/people/ProfileForm.tsx:219
+#: src/apps/people/ProfileForm.tsx:180
+#: src/apps/people/ProfileForm.tsx:191
 #: src/apps/people/VoiceEnrollmentBody.tsx:103
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/AddVoiceForm.tsx:117
@@ -30594,13 +30646,15 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/settings/CommandsSection.tsx:190
 #: src/apps/settings/EngineLinkCredentialSection.tsx:247
 #: src/apps/settings/EngineLinkCredentialSection.tsx:282
-#: src/apps/settings/FeatureAccess.tsx:84
+#: src/apps/settings/FeatureAccess.tsx:68
+#: src/apps/settings/FeatureAccess.tsx:83
 #: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
 #: src/apps/settings/ModelsAndStorageSection.tsx:214
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
+#: src/apps/settings/PersonAccessEditor.tsx:118
 #: src/apps/settings/ReferenceLibrarySettings.tsx:224
 #: src/apps/settings/RoutingStatsSection.tsx:33
 #: src/apps/settings/SignInSecretSection.tsx:72
@@ -30615,8 +30669,8 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/settings/styles/StylesTab.tsx:163
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:229
-#: src/apps/settings/UsersSection.tsx:222
-#: src/apps/settings/UsersSection.tsx:334
+#: src/apps/settings/UsersSection.tsx:218
+#: src/apps/settings/UsersSection.tsx:321
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/shell/AmbientCompanionPane.tsx:181
@@ -30659,7 +30713,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:265
-#: src/shell/pages/settings/SettingsRenderer.tsx:189
+#: src/shell/pages/settings/SettingsRenderer.tsx:193
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82
 #: src/shell/pages/status/StatusBoard.tsx:41
@@ -31798,7 +31852,7 @@ msgid "The page did not load"
 msgstr "La página no se cargó"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:455
+#: src/apps/settings/UsersSection.tsx:453
 #: src/shell/pages/settings/SettingField.tsx:265
 #, needs-review
 msgid "The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept."
@@ -32325,7 +32379,7 @@ msgid "Their memories, conversations, settings and private files are deleted rig
 msgstr "Sus recuerdos, conversaciones, ajustes y archivos privados se borran de inmediato."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:85
+#: src/apps/settings/FeatureAccess.tsx:44
 msgid "Their safety protections stay on. Their keys work only while Coding is on, and an admin can take back this access at any time."
 msgstr ""
 
@@ -33176,7 +33230,7 @@ msgid "Top rated"
 msgstr "Mejor valorados"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:121
+#: src/shell/pages/PersonProfilePage.tsx:120
 #, needs-review
 msgid "Topics"
 msgstr "Temas"
@@ -33496,7 +33550,7 @@ msgstr "Apágalo primero con un código y luego configúralo de nuevo."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/TwoStepSignInSection.tsx:52
-#: src/apps/settings/UsersSection.tsx:456
+#: src/apps/settings/UsersSection.tsx:454
 #: src/shell/pages/settings/SettingField.tsx:269
 #, needs-review
 msgid "Turn off"
@@ -33582,7 +33636,7 @@ msgid "setting.news.shelf.enabled.help"
 msgstr "Activa o desactiva el estante de noticias del hogar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsRenderer.tsx:171
+#: src/shell/pages/settings/SettingsRenderer.tsx:175
 #, needs-review
 msgid "Turn this feature off?"
 msgstr "¿Apagar esta función?"
@@ -33734,7 +33788,7 @@ msgid "Two computers"
 msgstr "Dos ordenadores"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:77
+#: src/shell/pages/settings/settingsViews.tsx:76
 #, needs-review
 msgid "Two-step sign-in"
 msgstr "Inicio de sesión en dos pasos"
@@ -34036,7 +34090,7 @@ msgid "setting.content.unrated.web.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/people/ProfileForm.tsx:186
+#: src/apps/people/ProfileForm.tsx:169
 #, needs-review
 msgid "Unsaved changes."
 msgstr "Cambios sin guardar."
@@ -34545,7 +34599,7 @@ msgid "Used yesterday"
 msgstr "Usado ayer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:233
+#: src/apps/settings/UsersSection.tsx:229
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:12
 #: src/shell/Routes.tsx:175
@@ -34570,6 +34624,11 @@ msgstr "Usa {size}"
 #, needs-review
 msgid "Uses about {formatBytes} of memory."
 msgstr "Usa unos {formatBytes} de memoria."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:22
+msgid "Uses MaiPai fully. Cannot change other people's settings."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:11
@@ -34697,7 +34756,7 @@ msgstr "Muy simple"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:166
-#: src/shell/pages/PersonProfilePage.tsx:205
+#: src/shell/pages/PersonProfilePage.tsx:204
 #, needs-review
 msgid "Video"
 msgstr "Vídeo"
@@ -34768,7 +34827,7 @@ msgid "setting.generation.video.adult_adapters.option.restricted"
 msgstr "Los estilos de vídeo con límite de edad no están en las opciones."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:220
+#: src/shell/pages/PersonProfilePage.tsx:219
 msgid "videos"
 msgstr ""
 
@@ -34917,7 +34976,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:367
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:179
+#: src/shell/pages/settings/settingsViews.tsx:178
 #: src/shell/pages/status/StatusComponents.tsx:30
 #, needs-review
 msgid "Voice"
@@ -35066,7 +35125,7 @@ msgstr "Doblaje"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/pages/settings/settingsViews.tsx:98
+#: src/shell/pages/settings/settingsViews.tsx:97
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 #, needs-review
@@ -35427,13 +35486,20 @@ msgid "Welcome to MaiPai Home"
 msgstr "Bienvenido a MaiPai Home"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PersonProfilePage.tsx:128
+#: src/apps/settings/PersonAccessEditor.tsx:66
+#: src/shell/pages/PersonProfilePage.tsx:127
 msgid "What {name} can see"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:79
+#: src/apps/settings/FeatureAccess.tsx:81
+#: src/apps/settings/PersonAccessEditor.tsx:61
 msgid "What {name} can use"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/PersonAccessEditor.tsx:123
+msgid "What {name} can use and see follows the new role from now on. You can change it back any time."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -35991,7 +36057,7 @@ msgid "Who can use it"
 msgstr "Quién puede usarlo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureAccess.tsx:82
+#: src/apps/settings/FeatureAccess.tsx:66
 msgid "Who can use this feature"
 msgstr ""
 
@@ -36419,13 +36485,13 @@ msgid "Yes, forget it"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:388
+#: src/apps/settings/UsersSection.tsx:387
 #, needs-review
 msgid "Yes, remove"
 msgstr "Sí, eliminar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/UsersSection.tsx:265
+#: src/apps/settings/UsersSection.tsx:261
 #, needs-review
 msgid "Yes, remove {count}"
 msgstr "Sí, eliminar {count}"

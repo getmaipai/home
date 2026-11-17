@@ -10,7 +10,6 @@ import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Input } from "@maipai/ui/src/ui/input";
-import { Select } from "@maipai/ui/src/primitives/Select";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
@@ -21,7 +20,7 @@ import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { SiteBlocksSection } from "./SiteBlocksSection";
 import { NewPersonForm, type NewPersonValues } from "@/apps/people/NewPersonForm";
 import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
-import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@/apps/people/roles";
+import { ROLE_LABELS, canDeletePerson, canManagePerson } from "@/apps/people/roles";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { errorLine } from "@/lib/hubReachability";
@@ -31,6 +30,8 @@ interface UsersSectionProps {
   person: Roster;
   /** False when the page header already names the page. */
   headed?: boolean;
+  /** Opens one person's role and access page (PersonAccessEditor). Never offered for the viewer's own row (RULES.md C10). */
+  onOpenPerson?: (id: string) => void;
 }
 
 // Moved from PeoplePage.tsx (Jesse, 2026-09-06: "the edit part is for
@@ -45,7 +46,7 @@ interface UsersSectionProps {
 // recordings for real (backend/src/lib/personLifecycle.ts). So it gets a
 // confirmation that names them and says what goes, never a bare button,
 // and the batch version names the count.
-export function UsersSection({ person, headed = true }: UsersSectionProps) {
+export function UsersSection({ person, headed = true, onOpenPerson }: UsersSectionProps) {
   const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({
     queryKey: ["people"],
@@ -62,7 +63,6 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editRole, setEditRole] = useState<Role>("adult");
   const [editSessionLockRequired, setEditSessionLockRequired] = useState(false);
   const [editSessionLockTimeoutMinutes, setEditSessionLockTimeoutMinutes] = useState(5);
 
@@ -160,10 +160,6 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
       const target = (roster ?? []).find((p) => p.id === id);
       await api.updatePerson(id, {
         displayName: editName,
-        // Only sent when it actually changed: the backend refuses a role
-        // change from anyone but the owner, and sending an unchanged role
-        // would turn a rename by an admin into a 403.
-        role: target && editRole !== target.role ? editRole : undefined,
         // INCOGNITO-07: same "only send what changed" reasoning, though
         // here it's not an authorization concern (UsersSection only ever
         // renders for an owner/admin actor, and the backend re-checks
@@ -286,15 +282,6 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
                         aria-label={i18n._({ id: "Name for {name}", message: "Name for {name}", values: { name: p.display_name } })}
                       />
                     </div>
-                    {actorRole === "owner" && p.id !== person.id ? (
-                      <Select
-                        value={editRole}
-                        onValueChange={(v) => setEditRole(v as Role)}
-                        options={creatableRoles("owner")}
-                        getLabel={(v) => ROLE_LABELS[v as Role]}
-                        aria-label={i18n._({ id: "Role for {name}", message: "Role for {name}", values: { name: p.display_name } })}
-                      />
-                    ) : null}
                     {/* INCOGNITO-07: admin-configurable per account, any
                         role (assertCanSetSessionLock's own wider reach
                         than the generic person-scope gate) - shown for
@@ -358,6 +345,18 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
                       <span className="text-sm text-muted-foreground">{ROLE_LABELS[p.role]}</span>
                     </div>
                   </div>
+                  <div className="flex">
+                  {onOpenPerson && p.id !== person.id ? (
+                    <Button
+                      variant="secondary"
+                      size="control"
+                      aria-label={i18n._({ id: "Role and access for {name}", message: "Role and access for {name}", values: { name: p.display_name } })}
+                      onClick={() => onOpenPerson(p.id)}
+                    >
+                      {i18n._({ id: "Role and access", message: "Role and access" })}
+                    </Button>
+                  ) : null}
+                  </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows labelOverrides={{ "companions.allowed": i18n._({ id: "AI companions for {name}", message: "AI companions for {name}", values: { name: p.display_name } }) }} />
                 </div>
               );
@@ -407,7 +406,6 @@ export function UsersSection({ person, headed = true }: UsersSectionProps) {
                       onClick={() => {
                         setEditingId(p.id);
                         setEditName(p.display_name);
-                        setEditRole(p.role as Role);
                         setEditSessionLockRequired(p.sessionLockRequired);
                         setEditSessionLockTimeoutMinutes(p.sessionLockTimeoutMinutes);
                       }}

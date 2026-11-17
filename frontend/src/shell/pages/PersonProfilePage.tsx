@@ -24,6 +24,8 @@ import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_G
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
+/** One person's role, features and content level: Settings > Household > People opened on that person. */
+const accessPagePath = (id: string) => `/settings/household?tab=people&person=${encodeURIComponent(id)}`;
 
 /** The person profile page at /people/:id. Its tab permission rule: self, or owner/admin viewing another. */
 export function PersonProfilePage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
@@ -39,11 +41,9 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const access = accessQuery.data && typeof accessQuery.data.ceiling === "object" && Array.isArray(accessQuery.data.overrides) && Array.isArray(accessQuery.data.unrated) ? accessQuery.data : undefined;
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
-  // CONTENT-POLICY-05: a Content tab for an owner or admin on another person's page (any role: the hub's override read is narrow), and on
-  // a person's own page when they have a content control to use.
-  const adminOnOther = !viewingSelf && isOwnerOrAdminRole(person.role);
-  const ownContent = useOwnContentKeys(person.id, viewingSelf);
-  const showContent = adminOnOther || ownContent;
+  // CONTENT-POLICY-05: a Content tab on a person's own page when they have a content control to use. An owner or admin sets someone
+  // else's role, features and content level on that person's one access page in Settings > Household > People (PersonAccessEditor).
+  const showContent = useOwnContentKeys(person.id, viewingSelf);
   const activeTab = params.get("tab") === "limits" && canViewLimits
       ? "limits"
       : params.get("tab") === "topics" && canViewLimits
@@ -86,8 +86,8 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 <p className="text-base font-medium">{i18n._({ id: "You cannot open this profile.", message: "You cannot open this profile." })}</p>
                 <p className="text-sm text-muted-foreground">{i18n._({ id: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else.", message: "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else." })}</p>
                 <Link to="/people" className="text-primary underline">{i18n._({ id: "Back to Family", message: "Back to Family" })}</Link>
-                {/* The teen's profile stays closed; the admin's own controls for them (level, unrated, filters) do not. */}
-                <div className="mt-4 w-full max-w-xl text-left"><PersonContentSection personId={profile.id} viewingSelf={false} heading /></div>
+                {/* The teen's profile stays closed; the admin's own controls for them (role, features, level, unrated, filters) do not. */}
+                <Button asChild variant="inverse" shape="pill" size="control"><Link to={accessPagePath(profile.id)}>{i18n._({ id: "Role and access", message: "Role and access" })}</Link></Button>
               </div>
             );
           }
@@ -104,7 +104,6 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                       key={`${profile.id}-${editOpen}`}
                       person={profile}
                       canEdit
-                      canSetControls={canEdit && !viewingSelf && isOwnerOrAdminRole(person.role)}
                       layout="dialog"
                       onSaved={async () => {
                         await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);
@@ -233,6 +232,7 @@ function ProfileHeaderBody({ profile, viewer, viewingSelf, canEdit, onEdit }: { 
       <div className="flex flex-wrap items-center gap-3">
         {showSelfEdit && canEdit ? <Button asChild variant="inverse" shape="pill" size="control"><Link to="/settings/profile?tab=profile">{i18n._({ id: "Edit profile", message: "Edit profile" })}</Link></Button> : canEdit ? <Button variant="inverse" shape="pill" size="control" onClick={onEdit}><PencilIcon className="size-4" aria-hidden />{i18n._({ id: "Edit profile", message: "Edit profile" })}</Button> : null}
         <Button variant="glass" shape="pill" size="control" onClick={() => { if (navigator.share) void navigator.share({ title: profile.display_name, url: window.location.href }); }}>{i18n._({ id: "Share", message: "Share" })}</Button>
+        {!viewingSelf && isOwnerOrAdminRole(viewer.role) ? <Button asChild variant="glass" shape="pill" size="control"><Link to={accessPagePath(profile.id)}>{i18n._({ id: "Role and access", message: "Role and access" })}</Link></Button> : null}
         {viewingSelf ? <Button asChild variant="glass" shape="pill" size="control"><Link to="/settings/profile">{i18n._({ id: "Settings", message: "Settings" })}</Link></Button> : null}
       </div>
     </section>

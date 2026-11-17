@@ -177,7 +177,6 @@
   "frontend/src/apps/people/faceEnrollmentGate.ts": 3,
   "frontend/src/apps/people/FaceEnrollmentPage.tsx": 1,
   "frontend/src/apps/people/NewPersonForm.tsx": 5,
-  "frontend/src/apps/people/ProfileForm.tsx": 4,
   "frontend/src/apps/people/roles.ts": 3,
   "frontend/src/apps/reminders/RemindersPage.tsx": 2,
   "frontend/src/apps/settings/styles/StyleEditor.tsx": 2,
