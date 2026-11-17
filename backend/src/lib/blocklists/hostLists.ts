@@ -12,7 +12,7 @@
 import { domainToASCII } from "node:url";
 import { getDomain } from "tldts";
 import type { AgeBand } from "@/lib/ageBand";
-import { blocklistIds, enabledListIds, lockedListIds } from "@/lib/blocklists/policy";
+import { blocklistIds, enabledListIds, lockedListIds, webCeilingFor } from "@/lib/blocklists/policy";
 import { customHostRules, hostInSet } from "@/lib/blocklists/customHosts";
 import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
 import { listsReadyForBand, listsReadyOverride, parseStoredFile, readState, stateStamp } from "@/lib/blocklists/listStore";
@@ -244,7 +244,7 @@ export function checkHost(band: AgeBand, input: string | null | undefined, perso
     return bit !== undefined && (hitBits & (1 << bit)) !== 0;
   });
   if (hits.length === 0) return null;
-  const locked = new Set(lockedListIds(band));
+  const locked = new Set(lockedListIds(band, webCeilingFor(band, personId)));
   if (rules.allow.size > 0 && hostInSet(host, rules.allow) && hits.every((id) => !locked.has(id))) {
     bumpCounter(`blocklist.allowed.custom.${band}`);
     return null;
@@ -293,7 +293,7 @@ export function hostHits(band: AgeBand, input: string | null | undefined, person
     return bit !== undefined && (hitBits & (1 << bit)) !== 0;
   });
   if (hits.length === 0) return out;
-  const locked = new Set(lockedListIds(band));
+  const locked = new Set(lockedListIds(band, webCeilingFor(band, personId)));
   if (rules.allow.size > 0 && hostInSet(host, rules.allow) && hits.every((id) => !locked.has(id))) return out;
   out.lists = hits;
   return out;
@@ -327,7 +327,8 @@ export function urlAllowedFor(band: AgeBand, url: string | null | undefined, per
   const verdict = checkHost(band, url, personId);
   if (verdict === null) return true;
   // A grown-up's band is never held: lists still loading let the page through (a custom deny still applies).
-  if (verdict === LISTS_NOT_READY && band === "adult") return true;
+  // SEARCH-RATING-03: "grown-up" is a web ceiling of X now, so an adult an admin lowered below X fails closed like a child and a teen.
+  if (verdict === LISTS_NOT_READY && band === "adult" && webCeilingFor(band, personId) >= 4) return true;
   bumpListDrop(verdict, band);
   return false;
 }

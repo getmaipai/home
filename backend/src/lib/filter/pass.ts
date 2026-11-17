@@ -121,6 +121,13 @@ function buildFrom(person: PassPerson): Pass {
 
   const settings: Record<string, unknown> = {};
   for (const key of personProtectionKeys()) settings[key] = settingsModule().getPersonSettingValue(person as PersonRow, key);
+  // SEARCH-RATING-03: the engine mode follows the web ceiling, so the role default the registry shows for `search.safe_search` (strict, moderate, off)
+  // is not a choice of the person's own and must not tighten the ceiling's mode: only a person's or the household's stored value does.
+  const safeSearchDef = getRegistryKey("search.safe_search");
+  if (safeSearchDef && "search.safe_search" in settings) {
+    const layer = resolveLayeredScalar(safeSearchDef, person.id, band).layer;
+    if (layer === "band" || layer === "default") settings["search.safe_search"] = "default";
+  }
   // CONTENT-POLICY-02: the rollout flags are household keys, read here once so the check path never reads settings (a write drops every pass).
   for (const key of CONTENT_POLICY_FLAG_KEYS) settings[key] = settingsModule().getHouseholdSettingValue(key);
   // CONTENT-POLICY-05: the person's added content filters (the union of every layer, band minimum not included), worked out once here so the

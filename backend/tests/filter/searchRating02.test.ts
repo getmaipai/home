@@ -415,18 +415,17 @@ describe("the search tool: cache key, emptied list, page label", () => {
     expect(none.text).toBe("No web search results were found.");
   });
 
-  test("an adult at X gets every row; an adult whose own ceiling is R gets the filter and, with the engine's safe mode off and unrated hidden, 'nothing suitable' (03 absent)", async () => {
+  test("an adult at X gets every row; an adult whose own ceiling is R gets the filter with the engine in moderate mode, so a clean row is rated and stays even with unrated hidden (SEARCH-RATING-03)", async () => {
     await startServer([{ title: "Herons", url: "https://marsh.example.com/a", content: "a bird" }, { title: "Adult videos", url: "https://other.example.com/b", content: "porn videos" }]);
     expect((await search(adult)).rows.map((r) => r.title)).toEqual(["Herons", "Adult videos"]);
     ok(setValue(adult, `person:${adult.id}`, "content.own_ceiling.web", "R")); invalidatePass();
     __resetSearchCacheForTests();
-    // The X row leaves; the clean row is Unrated (the engine's safe mode is off for an adult) and the adult default allows Unrated.
+    // The X row leaves; the engine mode is moderate for a ceiling of R (SEARCH-RATING-03), so the clean row is rated PG-13 and shown.
     expect((await search(adult)).rows.map((r) => r.title)).toEqual(["Herons"]);
     ok(setValue(adult, `person:${adult.id}`, "content.own_unrated", "no")); invalidatePass();
     __resetSearchCacheForTests();
-    const filtered = await search(adult);
-    expect(filtered.rows).toEqual([]);
-    expect(filtered.text).toBe(NOTHING_SUITABLE_HINT);
+    // Hiding Unrated no longer hides it: it is not Unrated now. (Before 03 the engine ran off for an adult and this list came back empty.)
+    expect((await search(adult)).rows.map((r) => r.title)).toEqual(["Herons"]);
   });
 
   test("a fetched page's own adult label rates it X and a teen's pages drop it; a teen raised to X keeps it", async () => {

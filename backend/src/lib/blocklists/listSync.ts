@@ -64,7 +64,9 @@ export function neededListIds(now: Date): string[] {
   const inUse = new Set(bandsInUse(now));
   for (const band of inUse) for (const id of enabledListIds(band, null)) ids.add(id);
   // A list only one person's override turns on (a teen's added gambling list) is needed too, or that person's
-  // every URL would fail closed on LISTS_NOT_READY.
+  // every URL would fail closed on LISTS_NOT_READY. SEARCH-RATING-03: the same loop covers a person whose web
+  // ceiling is below X in a band that has no locked list by role (an adult an admin lowered): `enabledListIds`
+  // gives them the locked adult-site list, so the union of every person's needs is downloaded.
   const rows = db.select().from(people).where(isNull(people.deletedAt)).all() as PersonRow[];
   for (const row of rows) {
     const band = speakerAgeBand(row, now);

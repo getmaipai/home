@@ -92,7 +92,7 @@ function run(checks: CheckMap, c: SuiteCase, actor: PersonRow): any {
     case "minorRowAllowed": return f(c.band, i.row, i.options);
     case "urlAllowedFor": return f(c.band, i.url, i.personId);
     case "checkHost": return f(c.band, i.url, i.personId);
-    case "resolveSafeSearchLevel": return f(i.stored, c.band);
+    case "resolveSafeSearchLevel": return f(i.stored, { actor, band: c.band });
     case "safeSearchDefaultFor": return f(c.band);
     case "floorSearchResult": return f(i.result, c.band, i.options);
     case "releaseToBand": return f(i.candidates, c.band);

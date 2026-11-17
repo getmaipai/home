@@ -49,7 +49,7 @@ export async function webTabSearch(actor: PersonRow, rawQuery: string, signal?: 
   }
   // A closed personal detail in a child's or teen's words never leaves the house.
   if (minorQueryHit(query, band)) return { results: [], note: MINOR_QUERY_PERSONAL_NOTE };
-  const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
+  const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], searchAudienceFor(band, actor));
   try {
     const found = await runAsBlockViewer(actor.id, () =>
       searchPickedWebSources({

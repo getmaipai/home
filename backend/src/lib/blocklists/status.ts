@@ -1,7 +1,12 @@
 // MINOR-SEARCH-01e-6: the one-line status under each "Blocked sites" setting. It reports only counts and an age,
 // never a site, a search or a block (design section 6: nothing about what was blocked is shown).
 import type { AgeBand } from "@/lib/ageBand";
+import { isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { enabledListIds } from "@/lib/blocklists/policy";
+import type { PersonRow } from "@/types";
 import { isListLoaded, readState } from "@/lib/blocklists/listStore";
 
 const DAY_MS = 86_400_000;
@@ -20,9 +25,20 @@ function sitesText(entries: number): string {
   return `${entries} sites`;
 }
 
+/** The lists that count for a band: the role's own and, for everyone in the household of that band, what their web ceiling adds (an adult an
+ * admin lowered below X needs the locked adult-site list too, SEARCH-RATING-03). */
+function listIdsForBand(band: AgeBand, now: number): string[] {
+  const ids = new Set(enabledListIds(band));
+  try {
+    const rows = db.select().from(people).where(isNull(people.deletedAt)).all() as PersonRow[];
+    for (const row of rows) if (speakerAgeBand(row, new Date(now)) === band) for (const id of enabledListIds(band, row.id)) ids.add(id);
+  } catch { /* the role's own lists stand */ }
+  return [...ids];
+}
+
 /** The status sentence for a band's blocked-sites setting: the lists that count for it (locked ones included). */
 export function blocklistStatusNote(band: AgeBand, now = Date.now()): string {
-  const ids = enabledListIds(band);
+  const ids = listIdsForBand(band, now);
   if (ids.length === 0) return "No lists are checked.";
   const state = readState();
   const loaded = ids.filter((id) => isListLoaded(id));

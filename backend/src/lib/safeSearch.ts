@@ -9,6 +9,7 @@
 // request) so the two can never drift apart.
 import type { AgeBand } from "@/lib/ageBand";
 import { decide } from "@/lib/gate/decide";
+import { ceilingOf, type Audience, type Ceiling } from "@/lib/filter/ceiling";
 
 export type SafeSearchLevel = "off" | "moderate" | "strict";
 
@@ -27,24 +28,34 @@ export function safeSearchStrictness(level: SafeSearchLevel): number {
   return STRICTNESS[level];
 }
 
-/** Resolve the person's stored choice through the capability gate. The
- * spec-declared floor is never weaker than the band's own default, even
- * when an administrator stored a lower value for a child or teen. */
-export function applySafeSearchLimits(stored: unknown, band: AgeBand, limits: readonly string[]): SafeSearchLevel {
-  const requested = stored === "off" || stored === "moderate" || stored === "strict" ? stored : safeSearchDefaultFor(band);
-  const declaresBandFloor = limits.includes(BAND_DEFAULT_LIMIT);
-  if (!declaresBandFloor) return band === "adult" ? requested : safeSearchDefaultFor(band);
-  const bandFloor = safeSearchDefaultFor(band);
-  return safeSearchStrictness(requested) < safeSearchStrictness(bandFloor) ? bandFloor : requested;
+/** SEARCH-RATING-03: the engine mode follows the viewer's web ceiling (RULES.md, Content filter and feature access): G strict; PG, PG-13
+ * and R moderate (off only at X, so a raised ceiling never makes clean rows Unrated and hides them); X off. For the role defaults
+ * (G, PG-13, X) this is `safeSearchDefaultFor`. */
+export function safeSearchModeFor(ceiling: Ceiling): SafeSearchLevel {
+  return ceiling === 0 ? "strict" : ceiling >= 4 ? "off" : "moderate";
 }
 
-export function resolveSafeSearchLevel(stored: unknown, band: AgeBand): SafeSearchLevel {
+/** Resolve the person's stored choice through the capability gate. The spec-declared floor is never weaker than `floor` (the mode the
+ * viewer's web ceiling gives; the band's own default when a caller says nothing), even when an administrator stored a lower value. */
+export function applySafeSearchLimits(stored: unknown, band: AgeBand, limits: readonly string[], floor: SafeSearchLevel = safeSearchDefaultFor(band)): SafeSearchLevel {
+  const requested = stored === "off" || stored === "moderate" || stored === "strict" ? stored : floor;
+  const declaresBandFloor = limits.includes(BAND_DEFAULT_LIMIT);
+  if (!declaresBandFloor) return band === "adult" && safeSearchStrictness(requested) >= safeSearchStrictness(floor) ? requested : floor;
+  return safeSearchStrictness(requested) < safeSearchStrictness(floor) ? floor : requested;
+}
+
+/** The level a search runs with for this viewer. `audience` is the viewer as `searchAudienceFor(band, person)` builds it (never a bare
+ * pass): `ceilingOf` tightens the person's ceiling to the turn's band, so an unknown speaker or a shared-surface turn gets the child
+ * result (chat rule 0). `stored` is the person's own `search.safe_search`; it can only tighten the ceiling's mode. */
+export function resolveSafeSearchLevel(stored: unknown, audience: Audience): SafeSearchLevel {
+  const band = audience.band;
+  const floor = safeSearchModeFor(ceilingOf(audience, "search"));
   const decision = decide({
     who: { personId: "safe-search", role: band, band },
     what: { capabilities: ["search.safe_search"] },
     context: { provenance: "person" },
   });
-  return applySafeSearchLimits(stored, band, decision.kind === "allow_with_limits" ? decision.limits : []);
+  return applySafeSearchLimits(stored, band, decision.kind === "allow_with_limits" ? decision.limits : [], floor);
 }
 
 export function safeSearchNumericLevel(level: SafeSearchLevel): 0 | 1 | 2 {

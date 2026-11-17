@@ -50,13 +50,13 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
   // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): a real per-person
   // level, never left unset - child strict, teen moderate, adult off by
   // default ("default" resolves against the speaker's own band,
-  // safeSearch.ts's resolveSafeSearchLevel()). The write rule this key
+  // safeSearch.ts's resolveSafeSearchLevel(); SEARCH-RATING-03: it follows the web ceiling, not the age). The write rule this key
   // needs lives in settings.ts's assertCanSetSafeSearch(): the help text
   // states the intended rule (MINOR-SEARCH-01a); MINOR-SEARCH-01c aligns the
   // write path with it. It is
   // not in this declaration - no field here carries a writer rule, the
   // same as every other settings key in this repo.
-  SettingsKey.parse({
+  specFieldOrder(SettingsKey.parse({
     key: "search.safe_search",
     scope: "person",
     selector: "select",
@@ -65,11 +65,20 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     merge: "override",
     default: "default",
     label: "Safe search level",
-    help: "How strictly web search filters results for you. \"Default\" follows your age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. A teen can make theirs stricter but never lower than moderate. An adult can change their own.",
+    help: "How strictly web search filters results for you. Default means the mode your content level gives: strict at G, moderate from PG to R, off at X. You can pick a stricter mode than that, never a looser one.",
     level: "basic",
     lives_in: "person.search",
     honoured_by: ["home"],
-  }),
+    copy: {
+      does: "Picks how strictly web results are filtered, never looser than your content level gives.",
+      options: {
+        default: "The mode your content level gives.",
+        off: "No engine filtering, only where your level is X.",
+        moderate: "Hides the most explicit results.",
+        strict: "Hides anything not clearly fine to show.",
+      },
+    },
+  })),
   // MINOR-SEARCH-01c: declared once in commons (spec/settings/keys.json), mirrored here for the registry.
   specFieldOrder(SettingsKey.parse({
       "key": "search.web.child_mode",

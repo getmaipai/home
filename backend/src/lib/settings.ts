@@ -16,7 +16,9 @@ import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
-import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
+import { safeSearchModeFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
+import { ceilingOf } from "@/lib/filter/ceiling";
+import { searchAudienceFor } from "@/lib/retrieval/minorRowFloor";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -733,9 +735,10 @@ function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newVal
   // not read as an authorization question here.
   if (newValue === "default") return { ok: true, value: true };
   if (newValue !== "off" && newValue !== "moderate" && newValue !== "strict") return { ok: true, value: true };
-  const ownDefault = safeSearchDefaultFor(speakerAgeBand(actor, new Date()));
-  if (safeSearchStrictness(newValue as SafeSearchLevel) < safeSearchStrictness(ownDefault)) {
-    return { ok: false, status: 403, error: "Safe search can't go lower than the level for your age. Pick Default or a stricter level." };
+  // SEARCH-RATING-03: the floor is the mode the person's own web ceiling gives (G strict, PG to R moderate, X off), never the age.
+  const own = safeSearchModeFor(ceilingOf(searchAudienceFor(speakerAgeBand(actor, new Date()), actor), "search"));
+  if (safeSearchStrictness(newValue as SafeSearchLevel) < safeSearchStrictness(own)) {
+    return { ok: false, status: 403, error: "Safe search can't go lower than the mode your content level gives. Pick Default or a stricter level." };
   }
   return { ok: true, value: true };
 }

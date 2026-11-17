@@ -8,6 +8,7 @@ import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { setValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { minorVisibleSettingKeys } from "@/lib/settingsMinorSnapshot";
+import { surfaceActor } from "@/lib/filter/textGate";
 import { resolveSafeSearchLevel } from "@/lib/safeSearch";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
@@ -100,13 +101,13 @@ describe("settings guard agreement metadata", () => {
       }
 
       const expectedDefaults = {
-        child: key.key === "media.allowlist_only" ? true : key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "child")
+        child: key.key === "media.allowlist_only" ? true : key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("child"), band: "child" })
           : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false : key.key.startsWith("news.") || key.key === "ui.home_layout" ? key.band_default?.child
           : key.key === "search.page_text_cleaning" ? true : key.default,
-        teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen")
+        teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("teen"), band: "teen" })
           : key.key === "search.page_text_cleaning" ? true : key.default,
         // TALENT-00: an adult is never gated by synths.real_people, so the adult band default is "all" while the key default is "ask".
-        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.key === "synths.real_people" ? "all" : key.default,
+        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("adult"), band: "adult" }) : key.key === "synths.real_people" ? "all" : key.default,
       };
       // Ease of use is comfort, not protection: only the preset and reading level differ for a child (EASE-OF-USE-01).
       const coding = CODING_PERSON_BAND_DEFAULTS[key.key];
@@ -123,9 +124,9 @@ describe("settings guard agreement metadata", () => {
       expect(key.band_default, `${key.key} band default`).toEqual(expectedDefaults);
     }
 
-    expect(resolveSafeSearchLevel("default", "child")).toBe("strict");
-    expect(resolveSafeSearchLevel("default", "teen")).toBe("moderate");
-    expect(resolveSafeSearchLevel("default", "adult")).toBe("off");
+    expect(resolveSafeSearchLevel("default", { actor: surfaceActor("child"), band: "child" })).toBe("strict");
+    expect(resolveSafeSearchLevel("default", { actor: surfaceActor("teen"), band: "teen" })).toBe("moderate");
+    expect(resolveSafeSearchLevel("default", { actor: surfaceActor("adult"), band: "adult" })).toBe("off");
     expect(minorVisibleSettingKeys("child")?.has("chat.photo_uploads")).toBe(false);
     expect(minorVisibleSettingKeys("teen")?.has("chat.photo_uploads")).toBe(true);
   });

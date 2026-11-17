@@ -31,7 +31,7 @@ export type RowFloorOptions = {
   audience?: Audience;
 };
 
-function personFor(id: string | undefined): PersonRow | null {
+export function personFor(id: string | undefined): PersonRow | null {
   if (!id) return null;
   try {
     return db.select().from(people).where(eq(people.id, id)).get() ?? null;
@@ -48,13 +48,15 @@ export function searchAudienceFor(band: AgeBand, actor?: PersonRow | null): Audi
 
 /** Whether the filter runs for this viewer's search (E): every viewer whose band is not adult, and an adult whose own web ceiling is below X. */
 export function searchFilterApplies(band: AgeBand, actor?: PersonRow | null): boolean {
-  if (isMinorBand(band)) return true;
   const person = actor ?? personFor(currentBlockViewer());
-  return person ? ceilingOf({ actor: person, band }, "search") < 4 : false;
+  // SEARCH-RATING-03 (C): the viewer's web ceiling decides, through the same audience a search uses (a teen raised to X runs no rater; a
+  // robot or unknown-speaker turn is tightened to the child's ceiling and still does). With nobody known, the band's role default.
+  if (!person) return isMinorBand(band);
+  return ceilingOf(searchAudienceFor(band, person), "search") < 4;
 }
 
 export function searchModeFor(band: AgeBand, mode?: SearchMode): SearchMode {
-  return mode ?? safeSearchDefaultFor(band);
+  return mode ?? safeSearchDefaultFor(band); // callers that know the viewer pass the mode resolved from their web ceiling
 }
 
 /** True when the row may be shown to this viewer: the door rated it and its level is within the viewer's web ceiling (or Unrated and the admin allowed it). */

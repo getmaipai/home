@@ -6,6 +6,8 @@ import blocklistsPolicy from "@maipai/spec/search/blocklists.json" with { type: 
 import { Blocklists } from "@maipai/spec/gen/ts/blocklists.js";
 import type { AgeBand } from "@/lib/ageBand";
 import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
+import { ceilingFor, ceilingOf, type Ceiling } from "@/lib/filter/ceiling";
+import { personFor, searchAudienceFor } from "@/lib/retrieval/minorRowFloor";
 import { resolveUnion } from "@/lib/settingsLayers";
 
 export const BLOCKLIST_POLICY: Blocklists = Blocklists.parse(blocklistsPolicy);
@@ -22,9 +24,19 @@ export function blocklistIds(): string[] {
   return BLOCKLIST_POLICY.lists.map((row) => row.id);
 }
 
-/** Lists a band cannot turn off. */
-export function lockedListIds(band: AgeBand): string[] {
-  return BLOCKLIST_POLICY.lists.filter((row) => row.locked_for.includes(band)).map((row) => row.id);
+/** The viewer's web ceiling (SEARCH-RATING-03): the real person's `ceilingOf(searchAudienceFor(band, person), "search")` (which tightens
+ * their ceiling to the turn's band, chat rule 0), and the band's role default when no person is in hand. */
+export function webCeilingFor(band: AgeBand, personId: string | null | undefined): Ceiling {
+  const person = personId ? personFor(personId) : null;
+  return person ? ceilingOf(searchAudienceFor(band, person), "search") : ceilingFor(band);
+}
+
+/** Lists that cannot be turned off for a viewer: the locked adult-site list for everyone whose web ceiling is below X, and for nobody at X
+ * (chat rule 0, RULES.md C3: only an admin's rating override lifts it). With no ceiling given it is the band's role default (child G,
+ * teen PG-13: the list; adult X: none), which is what the settings page shows for a role. */
+export function lockedListIds(band: AgeBand, ceiling: Ceiling = ceilingFor(band)): string[] {
+  if (ceiling >= 4) return [];
+  return BLOCKLIST_POLICY.lists.filter((row) => row.locked_for.length > 0).map((row) => row.id);
 }
 
 export function defaultListIds(band: AgeBand): string[] {
@@ -39,10 +51,15 @@ export function defaultListIds(band: AgeBand): string[] {
  * fails closed). */
 export function enabledListIds(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): string[] {
   const known = new Set(blocklistIds());
+  const ceiling = webCeilingFor(band, personId);
+  const locked = lockedListIds(band, ceiling);
+  const liftable = new Set(BLOCKLIST_POLICY.lists.filter((row) => row.locked_for.length > 0).map((row) => row.id));
   try {
-    const items = resolveUnion("search.blocklists", { band, personId }).items.filter((id) => known.has(id));
-    return [...new Set([...lockedListIds(band), ...items])];
+    const union = resolveUnion("search.blocklists", { band, personId });
+    // At X the locked list is lifted unless a person or the household chose it themself (a stricter choice stays).
+    const items = union.items.filter((id) => known.has(id) && !(ceiling >= 4 && liftable.has(id) && union.source[id] === "user-default"));
+    return [...new Set([...locked, ...items])];
   } catch {
-    return [...new Set([...lockedListIds(band), ...defaultListIds(band)])];
+    return [...new Set([...locked, ...defaultListIds(band).filter((id) => !(ceiling >= 4 && liftable.has(id)))])];
   }
 }

@@ -85,7 +85,9 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
   const url = new URL("search", base.href.endsWith("/") ? base.href : `${base.href}/`);
   url.searchParams.set("q", query);
   url.searchParams.set("max", String(ROW_CAP));
-  if (minor) url.searchParams.set("safesearch", "on");
+  // SEARCH-RATING-03: the engine's safe mode follows the viewer's web ceiling (the resolved level the caller passes); off only at X.
+  const mode = searchModeFor(ctx.band, ctx.safeSearchLevel);
+  if (mode !== "off") url.searchParams.set("safesearch", "on");
   const isProbe = blockCount > 0;
   if (isProbe) probing = true;
   const controller = new AbortController();
@@ -109,7 +111,6 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
     // `safesearch` parameter may be ignored by the ddgs text path, so its rows keep the engine mode's declared level (SEARCH-RATING-03 follows up).
     const filtered = searchFilterApplies(ctx.band, ctx.actor);
     const audience = filtered ? searchAudienceFor(ctx.band, ctx.actor) : undefined;
-    const mode = searchModeFor(ctx.band, ctx.safeSearchLevel);
     let seen = 0;
     for (const raw of Array.isArray(body.rows) ? (body.rows as unknown[]) : []) {
       if (rows.length >= ROW_CAP) break;

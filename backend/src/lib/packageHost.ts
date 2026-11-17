@@ -734,7 +734,7 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
   const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
   if (!baseUrl) return [];
   try {
-    const level = band === "child" ? "strict" : resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
+    const level = band === "child" ? "strict" : resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], searchAudienceFor(band, actor));
     const safeEngines = band === "adult" ? undefined : await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 }, true);
     if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
@@ -1188,7 +1188,8 @@ type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFa
 type SearchFilter = { band: AgeBand; mode: SafeSearchLevel; actor?: PersonRow };
 function searchFilterOf(opts: Pick<SearchOptions, "minorBand" | "speakerBand" | "actor" | "safeSearchLevel">): SearchFilter | undefined {
   const band: AgeBand = opts.minorBand ?? opts.speakerBand ?? "adult";
-  const applies = opts.minorBand !== undefined || (opts.actor !== undefined && searchFilterApplies(band, opts.actor));
+  // SEARCH-RATING-03 (G): the viewer's web ceiling decides, for a minor band too (a teen raised to X runs no rater here either).
+  const applies = searchFilterApplies(band, opts.actor);
   return applies ? { band, mode: searchModeFor(band, opts.safeSearchLevel), ...(opts.actor ? { actor: opts.actor } : {}) } : undefined;
 }
 /** The part of the search cache key that keeps a result filtered for one person from being served to a person with a different web ceiling or
@@ -1684,7 +1685,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : researchStart ? RESEARCH_PAGES_PER_SEARCH : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : researchStart ? RESEARCH_PAGE_TEXT_CHARS : SEARCH_PAGE_TEXT_CHARS;
   const deduped = { ...found, rows: dedupeRows(found.rows) };
-  const floor = (value: SearxngSearchResult): SearxngSearchResult => filter ? floorSearchResult(value, filter.band, { mode: filter.mode, ...(filter.actor ? { actor: filter.actor } : {}) }) : minorBand ? floorSearchResult(value, minorBand) : dropBlockedSites(value);
+  const floor = (value: SearxngSearchResult): SearxngSearchResult => filter ? floorSearchResult(value, filter.band, { mode: filter.mode, ...(filter.actor ? { actor: filter.actor } : {}) }) : dropBlockedSites(value, minorBand ?? "adult");
   const result = floor(deduped);
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
@@ -1787,11 +1788,13 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
 
 /** MINOR-SEARCH-01e-8: a grown-up's results drop only what the household's always-block list names (and any
  * adult list the household turned on). Lists still loading never hold an adult, so this fails open for them. */
-function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
-  if (!siteBlocksActive("adult")) return result;
-  const rows = result.rows.filter((row) => urlAllowedFor("adult", row.url));
-  const pages = result.pages?.filter((page) => urlAllowedFor("adult", page.url));
-  const pageOk = !result.page || urlAllowedFor("adult", (result.page as { url?: string }).url);
+function dropBlockedSites(result: SearxngSearchResult, band: AgeBand = "adult"): SearxngSearchResult {
+  // SEARCH-RATING-03: reached only for a viewer the filter does not run for (a web ceiling of X). `siteBlocksActive` and `urlAllowedFor` read the
+  // viewer from the block viewer (`runAsBlockViewer`, set around every package call), so a person below X gets their lists through the filter, never here.
+  if (!siteBlocksActive(band)) return result;
+  const rows = result.rows.filter((row) => urlAllowedFor(band, row.url));
+  const pages = result.pages?.filter((page) => urlAllowedFor(band, page.url));
+  const pageOk = !result.page || urlAllowedFor(band, (result.page as { url?: string }).url);
   const dropped = (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
   if (dropped === 0 && pageOk) return result;
   const { page: _page, pages: _pages, ...rest } = result;
@@ -2847,7 +2850,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // ROBOT-COMPANION-01: the turn's own band (a robot's companion type, or child for an unknown speaker) can only tighten it.
           const actorBand = speakerAgeBand(actor, new Date());
           const band = runtime.band ? stricterBand(actorBand, runtime.band) : actorBand;
-          const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
+          // SEARCH-RATING-03: the mode follows the viewer's web ceiling (`searchAudienceFor` tightens it to this turn's band); the person's own setting only tightens.
+          const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], searchAudienceFor(band, actor));
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;
           // THIN-INC row 4 (rule 12, Incognito): a temporary chat's query is not kept in the in-process
@@ -2882,7 +2886,9 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         }
         if (id === "searxng" && method === "page.read") {
           // KS-MODE-01: `search.source_mode.web = offline` turns page reads off with web search.
-          const readBand = speakerAgeBand(actor, new Date());
+          // SEARCH-RATING-03 (F): the turn's own band can only tighten it, as in the search branch (chat rule 0: an unknown speaker on a shared surface gets the child result).
+          const readSpeakerBand = speakerAgeBand(actor, new Date());
+          const readBand = runtime.band ? stricterBand(readSpeakerBand, runtime.band) : readSpeakerBand;
           const readTemporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
           if (webSideOff(readBand, readTemporary)) throw new HostError("permission_denied", refuseWeb(readBand, readTemporary));
           // MINOR-SEARCH-01f: an address carrying an email, phone or id number is not fetched for a minor.
@@ -2894,7 +2900,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand, { temporary: readTemporary });
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
-          if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {
+          if (readBand !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {
             throw new HostError("network_unreachable", "That page isn't available.");
           }
           return doc;
