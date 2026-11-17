@@ -3760,6 +3760,129 @@
         }
       }
     },
+    "/api/people/{id}/features": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Each feature, what this person's role gives, what they can use now, and the grant that changes it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every installed feature a person could use, plus Coding (not for a guest).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "min_role": {
+                            "type": "string"
+                          },
+                          "role_allows": {
+                            "type": "boolean"
+                          },
+                          "effective": {
+                            "type": "boolean"
+                          },
+                          "grant": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "effect": {
+                                "type": "string",
+                                "enum": [
+                                  "allow",
+                                  "deny"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "effect"
+                            ]
+                          },
+                          "allow_for_minors": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ],
+                            "description": "Only the Coding row: an admin may allow it for a child or teen."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "min_role",
+                          "role_allows",
+                          "effective",
+                          "grant"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "features"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may see this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/people/{id}/site-blocks": {
       "get": {
         "tags": [

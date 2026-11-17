@@ -221,6 +221,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
+| `frontend/src/apps/settings/FeatureAccess.tsx` | FeatureAccess |
 | `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
@@ -989,6 +990,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/performance.ts` | median, recentTurnStats, getPerformance |
 | `backend/src/lib/permissions.ts` | effectivePermissions |
 | `backend/src/lib/personAuthMethods.ts` | pinDigitsHint, getAuthMethods, requiresCredential, roleRequiresCredential |
+| `backend/src/lib/personFeatures.ts` | CODING_FEATURE_ID, personFeatures, activePerson |
 | `backend/src/lib/personLifecycle.ts` | MANAGEABLE_BY, canManage, checkRoleChange, commitPersonUpdate, hasSecret, erasePersonData |
 | `backend/src/lib/personShape.ts` | toPerson, toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem, guestControlsProblem |
 | `backend/src/lib/persona.ts` | personaFromManifest, PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID |
