@@ -33,7 +33,7 @@ function stored(storyId: string, band: AgeBand) {
 export function safe(summary: StorySummary, band: AgeBand): boolean {
   const units = [summary.intro, ...summary.points];
   if (band !== "adult" && tripsMinorFloor(units.join("\n"))) return false;
-  if (band === "child") {
+  if (band !== "adult") {
     const gate = gateFor(band);
     // Reject the whole summary rather than keeping the sentences left after a refusal.
     if (!units.every((unit) => sentencesOf(unit).every((sentence) => gate.passes(sentence))) || gate.sawCrisis()) return false;

@@ -24,7 +24,7 @@
 // text reply here was never granted an action result to misrepresent).
 import { analysisLead, assessReply, repairReply, repairTail, EMOJI_RE } from "@/lib/wellFormed";
 import { isCloserSentence } from "@/lib/guards";
-import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
+import { checkReply, checkText } from "@/lib/filter/textGate";
 import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
 import { stripLinksForChild } from "@/lib/childLinks";
@@ -133,7 +133,7 @@ class ReasoningLane {
   ) {}
 
   private refuses(text: string): boolean {
-    const safety = forOutput(evaluateSafety(text, this.band, "reply"));
+    const { safety } = checkText({ surface: "reply", actor: this.actor, band: this.band, text });
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
     return safety.action === "refuse";
   }
@@ -352,7 +352,8 @@ export class StreamGate {
    * sentence on the streamed path reaches a parent exactly as it would
    * on the old path - never a second, silent check. */
   private checkAndNotify(chunk: string): SafetyResult {
-    const safety = forOutput(evaluateSafety(chunk, this.band, "reply"));
+    // CONTENT-POLICY-02: through the filter door (the floor, and below X the content rules); a held sentence reads as a refused result.
+    const { safety } = checkText({ surface: "reply", actor: this.actor, band: this.band, text: chunk });
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
     return safety;
   }
@@ -369,7 +370,7 @@ export class StreamGate {
    * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
     if (!this.checked.trim()) return undefined;
-    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band, "reply"));
+    const { safety: whole } = checkText({ surface: "reply", actor: this.actor, band: this.band, text: `${this.checked}${next}`, whole: true });
     if (whole.action !== "refuse") return undefined;
     notifyOncePerTurn(this.actor, whole, this.turnId, "[turn]");
     return whole;
@@ -704,7 +705,7 @@ export type OutputGateOutput =
  * this node's branches share the one implementation. */
 function gateReasoning(input: OutputGateInput, band: AgeBand, actor: PersonRow, turnId: string): { reasoningOut: string | undefined; withheldFor: TurnState["reasoning"]["withheld_for"] } {
   if (input.reasoningEmit && input.reasoningIn !== undefined) {
-    const reasoningEvaluation = evaluateReply({ text: input.reasoningIn }, band);
+    const reasoningEvaluation = checkReply(actor, band, { text: input.reasoningIn });
     // SAFETY-NOTIFY-NEXT-01: no old-path equivalent (reasoning emission,
     // REASONING-02, is new-path-only - the old path never streamed or
     // exposed a chain-of-thought span at all), but the same category of
@@ -811,7 +812,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const linked = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
   const repaired = band === "adult" ? linked : redactSuicideMethod(linked).text;
-  const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band);
+  const evaluation = checkReply(state.actor, band, { text: repairedRaw, speech: input.reply.speech });
   const speechOut = minorSpeech(band, band === "child" && input.reply.speech ? stripLinksForChild(input.reply.speech) : input.reply.speech);
   // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
   // reply boundary - the identical call the old engine file's own

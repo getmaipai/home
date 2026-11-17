@@ -644,7 +644,7 @@ export async function runPlugin(
     if (id === "news") {
       const band = speakerAgeBand(actor, new Date());
       const shelved = shelfNewsResult(band);
-      if (shelved) return { ok: true, value: applyNewsMinorFloor(shelved, band) };
+      if (shelved) return { ok: true, value: applyNewsMinorFloor(shelved, band, actor) };
     }
     // ALM-01: the almanac handlers are sandboxed Tier 1 packages, so the
     // turn's already-frozen clock crosses the MCP boundary as an internal
@@ -667,7 +667,7 @@ export async function runPlugin(
       return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };
     }
     // MINOR-SEARCH-01g: the news headlines pass the minor floor one by one; a child gets them through the model.
-    if (id === "news") return { ok: true, value: applyNewsMinorFloor(result.value, speakerAgeBand(actor, new Date())) };
+    if (id === "news") return { ok: true, value: applyNewsMinorFloor(result.value, speakerAgeBand(actor, new Date()), actor) };
     if (id === "book-lookup" && speakerAgeBand(actor, new Date()) !== "adult") {
       const data = result.value.data as Record<string, unknown> | undefined;
       const books = Array.isArray(data?.items) ? data.items.map((item) => {

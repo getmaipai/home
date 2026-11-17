@@ -15,6 +15,7 @@ import { audienceBand, stricterBand, type AgeBand } from "@/lib/audience";
 import { resolveLayeredScalar } from "@/lib/layeredScalar";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import { ACCESS_THINKING_KEY, ACCESS_TIER_BOOST_KEY, ACCESS_TIER_MAX_KEY, ACCESS_WORKS, CONTENT_CEILING_KEY, CONTENT_KINDS, CONTENT_OWN_CEILING_KEY, CONTENT_OWN_UNRATED_KEY, CONTENT_UNRATED_KEY } from "@/settings/accessKeys";
+import { CONTENT_POLICY_FLAG_KEYS } from "@/settings/contentKeys";
 import type { PersonRow } from "@/types";
 import { ceilingFor, type Ceiling } from "./ceiling";
 import { getCachedPass, invalidatePass, nextPassVersion, putCachedPass } from "./passCache";
@@ -28,7 +29,7 @@ export interface Pass {
   readonly ceiling: Readonly<Record<ContentKind, Ceiling>>;
   readonly unrated: ReadonlySet<ContentKind>;
   readonly band: AgeBand;
-  /** The resolved values of the per-person protection settings the readers use (search.safe_search, media.allowlist_only, synths.*, topics.*). */
+  /** The resolved values of the per-person protection settings the readers use (search.safe_search, media.allowlist_only, synths.*, topics.*) and the two household `content.policy.*` rollout flags. */
   readonly settings: Readonly<Record<string, unknown>>;
 }
 type PassPerson = Pick<PersonRow, "id" | "role" | "controls">;
@@ -105,6 +106,8 @@ function buildFrom(person: PassPerson): Pass {
 
   const settings: Record<string, unknown> = {};
   for (const key of personProtectionKeys()) settings[key] = settingsModule().getPersonSettingValue(person as PersonRow, key);
+  // CONTENT-POLICY-02: the rollout flags are household keys, read here once so the check path never reads settings (a write drops every pass).
+  for (const key of CONTENT_POLICY_FLAG_KEYS) settings[key] = settingsModule().getHouseholdSettingValue(key);
 
   return Object.freeze({ person_id: person.id, version: nextPassVersion(), access, ceiling: Object.freeze(ceiling), unrated, band, settings: Object.freeze(settings) });
 }

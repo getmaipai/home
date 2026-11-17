@@ -223,8 +223,8 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const publisher = publisherOf(item, env);
   if (!publisher) return null;
   const gate = env.gate;
-  const title = band === "child" ? gate.text(item.title) : item.title;
-  if (!title || (band === "child" && !gate.passes(publisher))) return null;
+  const title = band !== "adult" ? gate.text(item.title) : item.title;
+  if (!title || (band !== "adult" && !gate.passes(publisher))) return null;
   const fetched = await loadWithinGrace(item, band, { retry: options.retry, store: env.store });
   const loaded = { ...fetched, blocks: fetched.source === "teaser" ? fetched.blocks : trimArticleTail(fetched.blocks) };
   // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
@@ -254,11 +254,13 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
     if (!keptNumbers.has(number)) return [];
     return [{ ...block, src: `/api/plugins/news/images/${item.id}/figure/${number}?w=1280` }];
   }) : loaded.blocks.filter((block) => block.type !== "figure");
-  const gated = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
+  const gated = band !== "adult" ? gateBlocks(loaded.blocks, gate) : shown;
   if (gate.sawCrisis()) return null;
   // No page text and no feed summary: the story still exists, so it opens with its headline, picture and source and says why there is
   // no text, never "This story is not available". A child's story whose every sentence the gate removed stays hidden.
-  const blocks: ArticleBlock[] = gated.length > 0 ? gated : band === "child" ? [] : [{ type: "note", text: `The text of this story did not load. Press Try again, or open it at ${publisher}.` }];
+  // A teen's story whose every sentence the gate removed stays hidden too; one that never had text keeps the note.
+  const emptiedByGate = gated !== shown && gated.length === 0 && loaded.blocks.some((block) => block.type !== "figure");
+  const blocks: ArticleBlock[] = gated.length > 0 ? gated : band === "child" || emptiedByGate ? [] : [{ type: "note", text: `The text of this story did not load. Press Try again, or open it at ${publisher}.` }];
   if (blocks.length === 0) return null;
   const topicId = topicsShown(item, band).find((id) => !!topicById(id)?.label);
   const topic = topicId ? topicById(topicId)?.label : undefined;

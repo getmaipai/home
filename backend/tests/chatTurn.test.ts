@@ -1,5 +1,4 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
-import { NEWS_NONE_FOR_MINOR_TEXT } from "@/lib/newsMinorFloor";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -765,7 +764,7 @@ describe("CHAT-02: one output safety boundary", () => {
         const body = (await res.json()) as { reply?: { text: string }; data?: unknown };
         expect(body.reply?.text ?? "").not.toContain("pipe bomb");
         // MINOR-SEARCH-01g: the per-headline floor drops the unsafe headline first; the output gate stays the backstop.
-        expect(REFUSAL_FIRST.concat(REFUSAL_REPEAT, [NEWS_NONE_FOR_MINOR_TEXT])).toContain(body.reply?.text ?? "");
+        expect(REFUSAL_FIRST.concat(REFUSAL_REPEAT, [""])).toContain(body.reply?.text ?? ""); // CONTENT-POLICY-02: an emptied child list has no fixed line, only a hint
         expect(JSON.stringify(body.data ?? {})).not.toContain("pipe bomb");
       } finally {
         __resetDenoHostForTests();

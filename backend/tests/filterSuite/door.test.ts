@@ -23,7 +23,7 @@ function covered(c: SuiteCase): boolean {
   if (!MAPPED.has(c.input.check)) return false;
   if (c.input.check === "evaluateSafety" && c.surface !== "reply") return false;
   if (c.input.check === "codingFloor" && c.surface !== "coding") return false;
-  if (c.input.check === "contentPolicyFor" && c.surface !== "central") return false;
+  if (c.input.check === "contentPolicyFor" && c.surface !== "central" && c.surface !== "reply") return false;
   if (c.input.check === "bandOkAtIngest" && c.input.input?.explicit !== true) return false;
   return true;
 }

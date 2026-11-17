@@ -24,7 +24,7 @@ const TRUE_WIDENS = new Set([
   "search.web.child_mode", "search.web.teen_mode", "generation.kids", "generation.kid_enabled", "generation.video.enabled",
   "generation.music.enabled", "companions.allowed", "talent.minors.make",
 ]);
-const TRUE_NARROWS = new Set(["media.allowlist_only", "search.page_text_cleaning"]);
+const TRUE_NARROWS = new Set(["media.allowlist_only", "search.page_text_cleaning", "content.policy.chat", "content.policy.news"]);
 const SAFE_SEARCH_ORDER = ["off", "moderate", "strict"];
 
 function isListKey(key: string): "fewer-widens" | "fewer-narrows" | null {

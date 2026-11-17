@@ -77,7 +77,7 @@
   "backend/src/lib/news/records.ts": 6,
   "backend/src/lib/news/search.ts": 9,
   "backend/src/lib/news/summary.ts": 2,
-  "backend/src/lib/newsMinorFloor.ts": 4,
+  "backend/src/lib/newsMinorFloor.ts": 2,
   "backend/src/lib/packageHost.ts": 11,
   "backend/src/lib/persona.ts": 2,
   "backend/src/lib/personShape.ts": 3,

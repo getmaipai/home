@@ -1,5 +1,6 @@
 import { ContentRating, levelFromLabel, type ContentRater, type RatingLevel, type RatingReason, type RatedContentKind } from "@maipai/spec/ratings/ts/contentRating";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
+import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import { codingFloor } from "@/lib/codeSafety";
 import type { Audience } from "./ceiling";
@@ -8,11 +9,14 @@ import type { ImageCheck as HomeImageCheck, CheckedKind } from "@/lib/pictures/a
 import type { ChildSafetyCheck as HomeChildSafetyCheck } from "@/lib/pictures/laneGate";
 
 export type Surface = "reply" | "search" | "news" | "library" | "picture" | "clip" | "song" | "coding";
-export type TextInput = { kind: "text"; text: string; field: "prompt" | "lyrics" | "title" | "transcript"; lane?: "child" | "teen" | "adult"; point: "request" | "release"; surface: Surface };
+/** `whole`: the reply or article so far, read once more as a whole (the floor's cross-sentence check); its sentences already met `rules-check` one by one. */
+export type TextInput = { kind: "text"; text: string; field: "prompt" | "lyrics" | "title" | "transcript"; lane?: "child" | "teen" | "adult"; point: "request" | "release"; surface: Surface; whole?: true };
 export type ExplicitInput = { kind: "explicit"; explicit: boolean };
 export type PictureCheckInput = { kind: "picture_check"; checks: ImageCheck[]; childChecks?: ChildSafetyCheck[]; adultOnly: boolean; viewer: Viewer };
 export type RaterInput = TextInput | ExplicitInput | PictureCheckInput;
-export type RaterVerdict = { level: RatingLevel; reasons?: RatingReason[]; withhold?: true } | null;
+/** CONTENT-POLICY-02: `detail` is what the rater's own check returned (the floor's `SafetyResult`), carried to the caller on the verdict.
+ * `pass` is "this rater ran and found nothing to hold": the door keeps its detail and goes on to the next rater. */
+export type RaterVerdict = { level: RatingLevel; reasons?: RatingReason[]; withhold?: true; detail?: unknown } | { pass: true; detail?: unknown } | null;
 export interface Rater extends ContentRater { rate(input: RaterInput, audience: Audience): RaterVerdict }
 
 export type AgeLabel = "adult" | "possibly_minor" | "child" | "none";
@@ -42,10 +46,21 @@ export async function prepareRaters(options: { minor?: boolean; pictureCheck?: b
   if (options.pictureCheck && !ageModule) ageModule = await import("@/lib/pictures/ageCheck");
 }
 
-function refusal(result: { action: string; categories: readonly string[] }): RaterVerdict {
+/** The synchronous twin of `prepareRaters({ minor: true })`, for a caller that cannot await (the stream gate, the news gate): the modules are
+ * loaded once by a lazy `require` (they are cached by the runtime after the first load, the same way pass.ts reaches settings). */
+export function prepareMinorRatersSync(): void {
+  if (minorModules) return;
+  minorModules = {
+    pictures: require("@/lib/pictures/policy"), lane: require("@/lib/pictures/lane"), laneGate: require("@/lib/pictures/laneGate"),
+    music: require("@/lib/music/policy"), content: require("@/lib/contentPolicy"), videos: require("@/lib/videos/policy"),
+  };
+}
+export function minorRatersReady(): boolean { return !!minorModules; }
+
+function refusal(result: { action: string; categories: readonly string[] }, detail?: unknown): RaterVerdict {
   if (result.action !== "refuse") return null;
-  if (result.categories.includes("csam") || result.categories.includes("grooming")) return { level: "Prohibited", reasons: ["minor_line"] };
-  return { level: "Unrated", withhold: true };
+  if (result.categories.includes("csam") || result.categories.includes("grooming")) return { level: "Prohibited", reasons: ["minor_line"], ...(detail ? { detail } : {}) };
+  return { level: "Unrated", withhold: true, ...(detail ? { detail } : {}) };
 }
 
 const minorLine: Rater = {
@@ -68,7 +83,18 @@ const minorLine: Rater = {
       if (input.kind !== "text") return null;
       if (input.surface === "reply") {
         const result = evaluateSafety(input.text, band, input.point === "request" ? "message" : "reply");
-        return refusal(input.point === "release" ? forOutput(result) : result);
+        const checked = input.point === "release" ? forOutput(result) : result;
+        // A released reply still carries its result: an allow_with_resources (crisis) answer is not a hold, and the caller needs the signal.
+        return refusal(checked, checked) ?? { pass: true, detail: checked };
+      }
+      if (input.surface === "news" && input.point === "release") {
+        // News text for a minor meets the same floor a spoken reply does (news/childGate.ts), and a headline the minor floor (newsMinorFloor.ts).
+        if (input.field === "title") {
+          const result = checkSafety(input.text, { isMinor: true });
+          return result.flagged ? { level: "Unrated", withhold: true, detail: result } : { pass: true, detail: result };
+        }
+        const result = forOutput(evaluateSafety(input.text, band, "reply"));
+        return refusal(result, result) ?? { pass: true, detail: result };
       }
       if (input.surface === "coding") {
         const result = codingFloor(input.text, band, input.point === "request" ? "in" : "out");

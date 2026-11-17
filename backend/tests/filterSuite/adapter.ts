@@ -127,7 +127,7 @@ function held(check: string, value: any, band: Band): boolean {
     case "resolveSafeSearchLevel": return value !== "off" && band !== "adult";
     case "safeSearchDefaultFor": return value !== "off" && band !== "adult";
     case "floorSearchResult": return (value?.floor_dropped ?? 0) > 0 || value?.rows?.length < 1;
-    case "gateFor": return value === false && band === "child";
+    case "gateFor": return value === false; // CONTENT-POLICY-02: a teen's sentence meets the gate too
     case "bandOkAllowedFor": return band !== "adult" && !value.includes("adult");
     case "audienceOf": return band !== "adult" && !value.includes("adult");
     case "applyNewsMinorFloor": return Array.isArray(value?.data?.headlines) && value.data.headlines.length === 0;
@@ -154,7 +154,7 @@ export function buildAdapter(checks: CheckMap = TODAY_CHECKS as CheckMap) {
     // reply: safety.ts callers pass text, band and direction to evaluateSafety, a text/speech pair to evaluateReply,
     // and a classifier result to forOutput/carriesCrisisSignal.
     switch (c.surface) {
-      case "reply": return route(["evaluateSafety", "forOutput", "evaluateReply", "carriesCrisisSignal"]);
+      case "reply": return route(["evaluateSafety", "forOutput", "evaluateReply", "carriesCrisisSignal", "contentPolicyFor"]);
       // spoken: outputGate calls gateGrainFor(band, surface, spoken) before it releases speech.
       case "spoken": return route(["gateGrainFor"]);
       // search: minorFloor/minorRowFloor, packageHost and safeSearch receive the current band and the candidate/query.

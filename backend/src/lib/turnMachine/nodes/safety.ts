@@ -6,7 +6,9 @@
 // judgment: it stays a direct call to the deterministic floor, not a
 // reimplementation of it.
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
-import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
+import type { evaluateSafety } from "@/lib/safety";
+import { carriesCrisisSignal } from "@/lib/safety";
+import { checkRequest } from "@/lib/filter/door";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { turnAgeBand } from "../speaker";
 import { notifyOncePerTurn, conversationInCrisis } from "@/lib/turnShared";
@@ -25,7 +27,16 @@ export interface SafetyOutput {
 export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) => {
   // THIN-0N: the speaker's effective band, as the turn machine.
   const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
-  const safety = evaluateSafety(input.utterance, band, "message");
+  // CONTENT-POLICY-02: the request goes through the filter door; its `minor-line` rater runs the same evaluateSafety(text, band, "message")
+  // and the verdict carries that result, so the crisis, notify and credential handling below read what they always did.
+  const verdict = await checkRequest({
+    surface: "reply", audience: { actor: state.actor, band },
+    request: { kind: "text", text: input.utterance, field: "transcript", point: "request", surface: "reply" },
+  });
+  const found = verdict.safety;
+  // A held verdict with no result (the floor threw) is a refusal; the caller's own after-failure path reads the classifier directly.
+  if (!found) throw new Error("the filter door returned no safety result");
+  const safety: ReturnType<typeof evaluateSafety> = verdict.verdict === "held" && found.action !== "refuse" ? { ...found, flagged: true, action: "refuse" } : found;
   // SAFETY-NOTIFY-NEXT-01: the identical input-side call the old engine file's
   // own the turn machine makes (CHAT-02: "the input side shares the per-turn
   // dedupe with the output side") - fired regardless of `action`

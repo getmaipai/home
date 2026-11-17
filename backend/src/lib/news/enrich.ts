@@ -50,7 +50,7 @@ function extract(html: string, item: ShelfItem, band: AgeBand): Pick<Enrichment,
     const paragraphs = article.blocks.flatMap((block) => block.type === "paragraph" ? [plain(inlineText(block.inlines))] : []);
     if (acceptArticleText(paragraphs.join("\n\n"))) description = paragraphs.filter((p) => p.length >= 60).slice(0, 2).join("\n\n") || null;
   }
-  if (description && band === "child") description = gateFor("child").text(description) || null;
+  if (description && band !== "adult") description = gateFor(band).text(description) || null;
   if (description && band !== "adult" && tripsMinorFloor(description)) description = null;
   return { image_url, description };
 }

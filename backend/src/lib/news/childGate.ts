@@ -4,10 +4,12 @@
 // text built on the hub. A sentence that fails is dropped from both the page and the audio; the rest stay. No client ever holds
 // an ungated sentence, and no client assembles speech from other fields.
 //
-// Only a child's text goes through this (a teen's and an adult's strings meet the same floor whole, in filterAnswerBlocks).
+// A child's and a teen's text goes through this (an adult's strings meet the same floor whole, in filterAnswerBlocks).
 import { splitReadyChunks } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import type { AgeBand } from "@/lib/ageBand";
-import { carriesCrisisSignal, evaluateSafety, forOutput } from "@/lib/safety";
+import { carriesCrisisSignal } from "@/lib/safety";
+import { checkText, surfaceActor } from "@/lib/filter/textGate";
+import type { PersonRow } from "@/types";
 import type { ArticleBlock, ArticleInline } from "@/lib/retrieval/extractArticle";
 import { bumpNewsCounter } from "./newsCounters";
 
@@ -27,16 +29,18 @@ export function sentencesOf(value: string): string[] {
   return tail ? [...chunks, tail] : chunks;
 }
 
-/** A gate for this person. A band that is not child gets a pass-through (its strings meet the floor whole at release). */
-export function gateFor(band: AgeBand): Gate {
-  if (band !== "child") return { text: (value) => value, passes: () => true, sawCrisis: () => false };
+/** A gate for this band (CONTENT-POLICY-02): every sentence goes through the filter door, which runs today's floor and, for a child or teen,
+ * the content rules too. Without a person in hand the band's own role defaults decide. An adult gets a pass-through (its strings meet
+ * the floor whole at release). */
+export function gateFor(band: AgeBand, actor: PersonRow = surfaceActor(band)): Gate {
+  if (band === "adult") return { text: (value) => value, passes: () => true, sawCrisis: () => false };
   // No parent notification here: the child asked for nothing the publisher wrote, so a dropped sentence is not the child's
   // activity to report (the classifier still logs the category, never the text).
   let crisis = false;
   const refuses = (sentence: string): boolean => {
-    const safety = forOutput(evaluateSafety(sentence, band));
+    const { held, safety } = checkText({ surface: "news", actor, band, text: sentence });
     if (carriesCrisisSignal(safety)) { crisis = true; return true; }
-    return safety.action === "refuse";
+    return held;
   };
   return {
     sawCrisis: () => crisis,
