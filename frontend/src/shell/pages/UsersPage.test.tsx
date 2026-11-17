@@ -42,7 +42,7 @@ describe("UsersPage", () => {
     }
   });
 
-  test("an owner sees the real UsersSection", async () => {
+  test("an owner sees the Users page with its one Add user button", async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -53,8 +53,8 @@ describe("UsersPage", () => {
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     try {
-      const view = renderWithQueryClient(<UsersPage person={makePerson("owner")} />);
-      await waitFor(() => expect(view.getByText("Add someone")).toBeTruthy());
+      const view = renderWithQueryClient(<MemoryRouter><UsersPage person={makePerson("owner")} /></MemoryRouter>);
+      await waitFor(() => expect(view.getByRole("button", { name: "Add user" })).toBeTruthy());
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/people"), expect.anything());
     } finally {
       globalThis.fetch = originalFetch;
@@ -80,7 +80,8 @@ describe("UsersPage", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     try {
       const view = renderUsersPage(actor("owner"));
-      await view.findByText("Add someone");
+      fireEvent.click(await view.findByRole("button", { name: "Add user" }));
+      await view.findByPlaceholderText("Name");
       fireEvent.change(view.getByPlaceholderText("Name"), { target: { value: "Avery" } });
       fireEvent.submit(view.getByPlaceholderText("Name").closest("form")!);
       await view.findByText("This role requires a PIN or password. Enter one above, then try again.");
@@ -98,8 +99,8 @@ describe("UsersPage", () => {
 });
 
 // NEXT-RETIRE-02C: the removal, rename and role cases below are ported from
-// the retired old-shell apps/settings/UsersPage.test.tsx. The live UsersPage
-// renders the same UsersSection, so they keep guarding it.
+// the retired old-shell apps/settings/UsersPage.test.tsx. The batch removal now lives on the Users roster; one person's rename and
+// removal moved to PersonMore.test.tsx (the "More" section of their own page).
 function renderUsersPage(person: Roster) {
   return renderWithQueryClient(
     <MemoryRouter>
@@ -234,139 +235,6 @@ describe("blocked sites by person", () => {
   });
 });
 
-describe("removing a person", () => {
-  // Deleting a person erases their memories, conversations, settings and
-  // recordings. It is the most destructive action in the product, so
-  // pressing Remove must not remove anything.
-  test("Remove asks first, naming them and what goes", async () => {
-    const { calls, restore } = stubApi();
-    try {
-      const { findByRole, getByText } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
-
-      expect(getByText("Remove Bramble from your household?")).toBeInTheDocument();
-      expect(getByText(/every conversation they had/)).toBeInTheDocument();
-      expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  // STORE-DELETE-01, decision 5: an export is offered before a removed
-  // person's files are purged.
-  test("a parent removing a child is offered their files to download first", async () => {
-    const { calls, restore } = stubApi({
-      preview: {
-        files: { purged: { files: 2, bytes: 4096 }, keptForHousehold: { files: 1, bytes: 2048 } },
-        export: { allowed: true, url: "/api/people/person-bramble/files/export" },
-      },
-    });
-    try {
-      const { findByRole, findByText } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
-
-      expect(await findByText(/2 files only Bramble could see will be deleted too/)).toBeInTheDocument();
-      expect(await findByText(/1 file other people can still see will stay, kept by the household/)).toBeInTheDocument();
-      const download = await findByRole("link", { name: "Download Bramble's files" });
-      expect(download.getAttribute("href")).toBe("/api/people/person-bramble/files/export");
-      expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("the delete waits while the file preview is still loading", async () => {
-    const { calls, restore } = stubApi({ preview: new Promise(() => {}) });
-    try {
-      const { findByRole, getByRole } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
-      expect(getByRole("button", { name: "Yes, remove" })).toBeDisabled();
-      fireEvent.click(getByRole("button", { name: "Yes, remove" }));
-      expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("a teen's private files are never offered to the parent removing them", async () => {
-    const { restore } = stubApi({
-      preview: { files: { purged: { files: 3, bytes: 4096 }, keptForHousehold: { files: 0, bytes: 0 } }, export: { allowed: false, url: null } },
-    });
-    try {
-      const { findByRole, findByText, queryByRole } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Clover" }));
-
-      expect(await findByText(/Only Clover can download their own files/)).toBeInTheDocument();
-      expect(queryByRole("link", { name: /Download/ })).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("backing out removes nobody", async () => {
-    const { calls, restore } = stubApi();
-    try {
-      const { findByRole, getByRole } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
-      fireEvent.click(getByRole("button", { name: "Keep them" }));
-
-      await waitFor(() => expect(calls.some((c) => c.method === "DELETE")).toBe(false));
-    } finally {
-      restore();
-    }
-  });
-
-  test("confirming removes them", async () => {
-    const { calls, restore } = stubApi();
-    try {
-      const { findByRole, getByRole, getByText } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
-      // STORE-DELETE-01: the delete waits for the preview that offers the
-      // export, then goes through. The wait throws a plain Error while the
-      // button is disabled, never a jest-dom matcher: a failed
-      // not.toBeDisabled() dumps the whole happy-dom element into its
-      // message, which blocks the event loop for over a second on its first
-      // failure and made waitFor time out (FLAKY-USERSPAGE-01).
-      await waitFor(() => {
-        if ((getByText("Yes, remove") as HTMLButtonElement).disabled) throw new Error("the Yes, remove button is still disabled");
-      });
-      expect(getByRole("button", { name: "Yes, remove" })).not.toBeDisabled();
-      fireEvent.click(getByRole("button", { name: "Yes, remove" }));
-
-      await waitFor(() =>
-        expect(calls.some((c) => c.method === "DELETE" && c.url.includes("person-bramble"))).toBe(true),
-      );
-    } finally {
-      restore();
-    }
-  });
-
-  // The backend refuses "you cannot delete your own profile", so a
-  // button that only ever errors is worse than no button.
-  test("nobody is offered a Remove button for themselves", async () => {
-    const { restore } = stubApi();
-    try {
-      const { findByRole, queryByRole } = renderUsersPage(actor("owner"));
-      await findByRole("button", { name: "Remove Bramble" });
-      expect(queryByRole("button", { name: "Remove Sage" })).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("an admin is not offered Remove for the owner", async () => {
-    const { restore } = stubApi();
-    try {
-      const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, queryByRole } = renderUsersPage(admin);
-      await findByRole("button", { name: "Remove Bramble" });
-      expect(queryByRole("button", { name: "Remove Sage" })).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-});
-
 // docs/UI.md > Batch actions: every list a household can delete from
 // offers a multi-select, one confirmation naming the count, and reports
 // partial success rather than swallowing it.
@@ -374,10 +242,10 @@ describe("removing several people at once", () => {
   test("selecting people and removing them in one go", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole, getByLabelText, getByText } = renderUsersPage(actor("owner"));
+      const { findByRole, getByRole, getByText } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
-      fireEvent.click(getByLabelText("Select Bramble"));
-      fireEvent.click(getByLabelText("Select Clover"));
+      fireEvent.click(getByRole("button", { name: "Bramble, Child" }));
+      fireEvent.click(getByRole("button", { name: "Clover, Teen" }));
       expect(getByText("2 selected")).toBeInTheDocument();
 
       fireEvent.click(getByRole("button", { name: "Remove selected" }));
@@ -397,9 +265,9 @@ describe("removing several people at once", () => {
   test("the batch confirmation names the count, and backing out sends nothing", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole, getByLabelText } = renderUsersPage(actor("owner"));
+      const { findByRole, getByRole } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
-      fireEvent.click(getByLabelText("Select Bramble"));
+      fireEvent.click(getByRole("button", { name: "Bramble, Child" }));
       fireEvent.click(getByRole("button", { name: "Remove selected" }));
       fireEvent.click(getByRole("button", { name: "Keep them" }));
 
@@ -418,10 +286,10 @@ describe("removing several people at once", () => {
       ],
     });
     try {
-      const { findByRole, getByRole, getByLabelText, findByText } = renderUsersPage(actor("owner"));
+      const { findByRole, getByRole, findByText } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
-      fireEvent.click(getByLabelText("Select Bramble"));
-      fireEvent.click(getByLabelText("Select Clover"));
+      fireEvent.click(getByRole("button", { name: "Bramble, Child" }));
+      fireEvent.click(getByRole("button", { name: "Clover, Teen" }));
       fireEvent.click(getByRole("button", { name: "Remove selected" }));
       fireEvent.click(getByRole("button", { name: "Yes, remove 2" }));
 
@@ -431,66 +299,16 @@ describe("removing several people at once", () => {
     }
   });
 
-  test("only people this person may actually remove are selectable", async () => {
+  test("only people this person may actually remove are selected (never yourself)", async () => {
     const { restore } = stubApi();
     try {
-      const { findByRole, queryByLabelText } = renderUsersPage(actor("owner"));
+      const { findByRole, getByRole, getByText } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
-      expect(queryByLabelText("Select Bramble")).not.toBeNull();
+      fireEvent.click(getByRole("button", { name: "Bramble, Child" }));
+      expect(getByText("1 selected")).toBeInTheDocument();
       // Yourself is never selectable: the backend refuses it outright.
-      expect(queryByLabelText("Select Sage")).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-});
-
-describe("editing a person", () => {
-  test("renaming someone sends just the new name", async () => {
-    const { calls, restore } = stubApi();
-    try {
-      const { findByRole, getByRole, getByLabelText } = renderUsersPage(actor("owner"));
-      fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
-      fireEvent.change(getByLabelText("Name for Bramble"), { target: { value: "Bram" } });
-      fireEvent.click(getByRole("button", { name: "Save" }));
-
-      await waitFor(() => {
-        const call = calls.find((c) => c.method === "PATCH");
-        expect(call).toBeDefined();
-        expect(JSON.parse(call!.body!).displayName).toBe("Bram");
-      });
-    } finally {
-      restore();
-    }
-  });
-
-  // An admin may rename someone but may not change roles. Sending an
-  // unchanged role anyway would turn every rename by an admin into a 403.
-  test("an unchanged role is not sent, so an admin can still rename", async () => {
-    const { calls, restore } = stubApi();
-    try {
-      const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, getByRole, getByLabelText } = renderUsersPage(admin);
-      fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
-      fireEvent.change(getByLabelText("Name for Bramble"), { target: { value: "Bram" } });
-      fireEvent.click(getByRole("button", { name: "Save" }));
-
-      await waitFor(() => {
-        const call = calls.find((c) => c.method === "PATCH");
-        expect(JSON.parse(call!.body!).role).toBeUndefined();
-      });
-    } finally {
-      restore();
-    }
-  });
-
-  test("only the owner is offered a role picker", async () => {
-    const { restore } = stubApi();
-    try {
-      const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, queryByLabelText } = renderUsersPage(admin);
-      fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
-      expect(queryByLabelText("Role for Bramble")).toBeNull();
+      fireEvent.click(getByRole("button", { name: "Sage, you" }));
+      expect(getByText("1 selected")).toBeInTheDocument();
     } finally {
       restore();
     }

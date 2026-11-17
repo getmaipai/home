@@ -9,6 +9,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { PersonFeatures } from "@/apps/settings/FeatureAccess";
+import { PersonCompanions, PersonMore } from "@/apps/settings/PersonMore";
 import { PersonContentSection } from "@/shell/pages/PersonContentSection";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, creatableRoles } from "@/apps/people/roles";
@@ -43,7 +44,7 @@ export function PersonAccessEditor({ viewer, target, onBack }: { viewer: Pick<Ro
   const markSaved = () => setSaved(true);
   return <div className="flex flex-col gap-8" data-testid="person-access-editor">
     <div className="flex flex-col items-start gap-4">
-      <Button variant="ghost" size="control" onClick={onBack}>{i18n._({ id: "Back to everyone", message: "Back to everyone" })}</Button>
+      <Button variant="ghost" size="control" onClick={onBack}>{i18n._({ id: "Back to everyone", message: "Back to users" })}</Button>
       <div className="flex items-center gap-4">
         <Avatar name={target.display_name} seed={target.avatar_seed} size="profile" accent={target.accent ?? undefined} />
         <div className="flex min-w-0 flex-col items-start gap-1">
@@ -67,6 +68,8 @@ export function PersonAccessEditor({ viewer, target, onBack }: { viewer: Pick<Ro
       <h3 id="person-access-see" className="text-section">{i18n._({ id: "What {name} can see", message: "What {name} can see", values: { name: target.display_name } })}</h3>
       <PersonContentSection personId={target.id} viewingSelf={false} onSaved={markSaved} />
     </section>
+    <PersonCompanions target={target} />
+    <PersonMore viewer={viewer} target={target} onRemoved={onBack} />
   </div>;
 }
 

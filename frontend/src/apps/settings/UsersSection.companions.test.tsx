@@ -1,9 +1,10 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { UsersSection } from "@/apps/settings/UsersSection";
+import { PersonCompanions } from "@/apps/settings/PersonMore";
 import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 
 afterEach(cleanup);
@@ -35,13 +36,15 @@ test("the add form's companions box defaults to the household value", async () =
   });
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} onOpenPerson={() => {}} /></MemoryRouter></QueryClientProvider>);
+    // The household switch sits on the page; the new person's companions box is in the Add user form.
+    await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Add user" }));
     await waitFor(() => expect(view.getByRole("checkbox", { name: "AI companions" }).getAttribute("aria-checked")).toBe("false"));
-    expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy();
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 
-test("the person-editor switch is shown to owner and admin for every role, including child and teen", async () => {
+test("the companions row sits on each person's page for every role, and no longer repeats on the Users list", async () => {
   const rows = [
     rosterEntry("owner-one", "owner", "Sage"), rosterEntry("admin-one", "admin", "Avery"),
     rosterEntry("adult-one", "adult", "Jordan"), rosterEntry("teen-one", "teen", "Marlow"),
@@ -58,15 +61,22 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
   try {
     for (const role of ["owner", "admin"] as const) {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-      const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: `${role}-id`, role, display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
-    await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
-    expect(view.getByRole("switch", { name: "AI companions for Jordan" })).toBeTruthy();
+      const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: `${role}-id`, role, display_name: "Sage" } as Roster} onOpenPerson={() => {}} /></MemoryRouter></QueryClientProvider>);
+      await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
+      expect(view.queryByRole("switch", { name: "AI companions for Jordan" })).toBeNull();
+      view.unmount();
+    }
+    for (const entry of rows) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = render(<QueryClientProvider client={client}><MemoryRouter><PersonCompanions target={entry} /></MemoryRouter></QueryClientProvider>);
+      await waitFor(() => expect(view.getByRole("switch", { name: `AI companions for ${entry.display_name}` })).toBeTruthy());
+      expect(view.getByRole("heading", { name: "Companions" })).toBeTruthy();
       view.unmount();
     }
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 
-test("preview shells does not appear on the Users card", async () => {
+test("preview shells does not appear on the Users page", async () => {
   const rows = [rosterEntry("owner", "owner", "Sage"), rosterEntry("admin", "admin", "Avery"), rosterEntry("adult", "adult", "Jordan")];
   const people = spyOn(api, "people").mockResolvedValue(rows as never);
   const siteBlocks = noSiteBlocks();
@@ -78,9 +88,8 @@ test("preview shells does not appear on the Users card", async () => {
   });
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} onOpenPerson={() => {}} /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(view.getByRole("switch", { name: "AI companions for everyone" })).toBeTruthy());
-    expect(view.getByRole("switch", { name: "AI companions for Sage" })).toBeTruthy();
     expect(view.queryByRole("switch", { name: previewShellKey.label })).toBeNull();
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
@@ -94,7 +103,7 @@ test("memory controls appear for child profiles only in owner and admin Users se
   const memories = spyOn(api, "memories").mockResolvedValue([] as never);
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} onOpenPerson={() => {}} /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(view.getByText("Nothing remembered about Robin yet.")).toBeTruthy());
     expect(view.queryByText("Nothing remembered about Marlow yet.")).toBeNull();
     expect(view.queryByText("Nothing remembered about Jordan yet.")).toBeNull();

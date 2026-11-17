@@ -1,7 +1,7 @@
 // One screen per person: role, what they can use, what they can see (RULES.md C3, C7, C10). Content copy is the registry's.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PersonAccessEditor } from "@/apps/settings/PersonAccessEditor";
 import { PeopleAccess } from "@/apps/settings/PeopleAccess";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -58,7 +58,7 @@ const pick = async (view: ReturnType<typeof renderWithQueryClient>, trigger: str
 };
 
 describe("PersonAccessEditor", () => {
-  test("shows the three sections in order, Coding first, with the registry's content labels", async () => {
+  test("shows the sections in order (role, use, see, companions, more), Coding first, with the registry's content labels", async () => {
     const s = stub();
     try {
       const view = renderWithQueryClient(<MemoryRouter><PersonAccessEditor viewer={sage} target={marlowEntry} onBack={() => {}} /></MemoryRouter>);
@@ -66,7 +66,7 @@ describe("PersonAccessEditor", () => {
       expect(view.getByText("Unrated items in the library")).toBeTruthy();
       expect(view.getByText("Content filters")).toBeTruthy();
       const headings = view.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-      expect(headings).toEqual(["Role", "What Marlow can use", "What Marlow can see"]);
+      expect(headings).toEqual(["Role", "What Marlow can use", "What Marlow can see", "Companions", "More"]);
       await view.findByText("Weather");
       const titles = Array.from(view.container.querySelectorAll("[data-testid=person-features] [data-slot=item-title]")).map((e) => e.textContent);
       expect(titles[0]).toBe("Coding");
@@ -136,16 +136,33 @@ describe("PersonAccessEditor", () => {
 });
 
 describe("PeopleAccess", () => {
-  test("the roster opens one person's page and Back returns to the list; the viewer's own row has no access button", async () => {
+  test("a card opens one person's page and Back returns to the list; the viewer's own card says You", async () => {
     const s = stub();
     try {
       const view = renderWithQueryClient(<MemoryRouter initialEntries={["/settings/household?tab=people"]}><PeopleAccess person={sage} /></MemoryRouter>);
-      expect(await view.findByRole("button", { name: "Role and access for Marlow" })).toBeTruthy();
-      expect(view.queryByRole("button", { name: "Role and access for Sage" })).toBeNull();
-      fireEvent.click(view.getByRole("button", { name: "Role and access for Marlow" }));
+      expect(await view.findByRole("button", { name: "Marlow, Teen" })).toBeTruthy();
+      expect(view.getByRole("button", { name: "Sage, you" })).toBeTruthy();
+      expect(view.getByText("You")).toBeTruthy();
+      expect(view.queryByRole("button", { name: /Role and access/ })).toBeNull();
+      fireEvent.click(view.getByRole("button", { name: "Marlow, Teen" }));
       expect(await view.findByText("What Marlow can use")).toBeTruthy();
+      expect(view.getByRole("button", { name: "Edit name and PIN lock" })).toBeTruthy();
+      expect(view.getByRole("button", { name: "Remove Marlow" })).toBeTruthy();
       fireEvent.click(view.getByRole("button", { name: "Back to everyone" }));
-      expect(await view.findByRole("button", { name: "Role and access for Nova" })).toBeTruthy();
+      expect(await view.findByRole("button", { name: "Nova, Child" })).toBeTruthy();
+    } finally { s.restore(); }
+  });
+
+  test("your own card opens your own profile, never an access page for yourself", async () => {
+    const s = stub();
+    try {
+      const view = renderWithQueryClient(<MemoryRouter initialEntries={["/settings/household?tab=people"]}><Routes>
+        <Route path="/settings/household" element={<PeopleAccess person={sage} />} />
+        <Route path="/people/:id" element={<p>Profile page</p>} />
+      </Routes></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: "Sage, you" }));
+      expect(await view.findByText("Profile page")).toBeTruthy();
+      expect(view.queryByText("What Sage can use")).toBeNull();
     } finally { s.restore(); }
   });
 
@@ -153,7 +170,7 @@ describe("PeopleAccess", () => {
     const s = stub();
     try {
       const view = renderWithQueryClient(<MemoryRouter initialEntries={["/settings/household?tab=people&person=person-sage"]}><PeopleAccess person={sage} /></MemoryRouter>);
-      expect(await view.findByRole("button", { name: "Role and access for Marlow" })).toBeTruthy();
+      expect(await view.findByRole("button", { name: "Marlow, Teen" })).toBeTruthy();
       expect(view.queryByText("What Sage can use")).toBeNull();
     } finally { s.restore(); }
   });

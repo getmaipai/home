@@ -68,7 +68,6 @@
     "shell/pages/SoundExtras.tsx": 1,
     "shell/media/NowPlayingStage.tsx": 5,
     "dev/ElementsAdoptionPanel.tsx": 3,
-    "apps/settings/UsersSection.tsx": 11,
     "apps/settings/SiteBlocksSection.tsx": 1,
     "apps/settings/DevicesSection.tsx": 6,
     "apps/settings/SignInSecretSection.tsx": 2,

@@ -4,7 +4,7 @@ import { UsersSection } from "@/apps/settings/UsersSection";
 import { PersonAccessEditor } from "@/apps/settings/PersonAccessEditor";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster } from "@/lib/api";
 
-/** Settings > Household > People: the roster, and one page per person for their role, what they can use and what they can see
+/** Settings > Household > Users: the roster cards, and one page per person for their role, what they can use and what they can see
  * (PersonAccessEditor). The chosen person is the `person` search parameter, so the browser's Back button returns to the list.
  * RULES.md C10: it renders only for an owner or admin and never opens the viewer's own page. */
 export function PeopleAccess({ person }: { person: Roster }) {
