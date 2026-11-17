@@ -629,7 +629,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, filterList |
+| `backend/src/lib/filter/rateStored.ts` | __setRateHookForTests, rateStoredItem |
 | `backend/src/lib/filter/raters.ts` | prepareRaters, RATERS, ratersFor, contentKindForSurface |
+| `backend/src/lib/filter/ratingsSweep.ts` | mediaFingerprint, stampMediaRow, stampMediaById, stampAttachmentRow, stampAttachmentById, creationFingerprint |
+| `backend/src/lib/filter/shelfStamp.ts` | shelfFingerprint, stampShelfItem |
+| `backend/src/lib/filter/stampCompare.ts` | stampAllowed |
+| `backend/src/lib/filter/stamps.ts` | __setStoredRaterVersionForTests, putStamp, getStamp, getStamps, levelFor, allowedIds |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording, waitedForRoomLine |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
