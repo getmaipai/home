@@ -235,6 +235,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
 | `frontend/src/apps/settings/PersonAccessEditor.tsx` | PersonAccessEditor |
+| `frontend/src/apps/settings/PersonMore.tsx` | PersonCompanions, PersonMore, DeletionFilesNote |
 | `frontend/src/apps/settings/PlainSection.tsx` | PlainSection |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RobotActions.tsx` | robotHasDance, RobotActions |
