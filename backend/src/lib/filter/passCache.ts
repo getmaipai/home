@@ -6,7 +6,12 @@ type Entry = { pass: Pass; role: string; controls: string | null };
 const cache = new Map<string, Entry>();
 let rebuilds = 0;
 
-export function getCachedPass(key: string): Entry | undefined { return cache.get(key); }
+/** A pass whose `expires_at` (the next time one of the person's timed grants starts or ends) has passed is dropped, so a timed grant never outlives its time. */
+export function getCachedPass(key: string): Entry | undefined {
+  const hit = cache.get(key);
+  if (hit && hit.pass.expires_at !== null && Date.now() >= hit.pass.expires_at) { cache.delete(key); return undefined; }
+  return hit;
+}
 export function putCachedPass(key: string, entry: Entry): void { cache.set(key, entry); }
 export function nextPassVersion(): number { return ++rebuilds; }
 

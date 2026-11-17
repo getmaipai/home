@@ -1,4 +1,5 @@
 // CODE-API-01: the coding gateway at /code/v1, through the real app with a scripted Stack (loopback fixture server, the real Stack client).
+import { invalidatePass } from "@/lib/filter/passCache";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -37,6 +38,8 @@ function person(role = "adult", displayName = "Willow"): PersonRow {
 function grant(p: PersonRow, effect: "allow" | "deny") {
   const at = new Date().toISOString();
   db.insert(grants).values({ id: `grant-${crypto.randomBytes(6).toString("hex")}`, person: p.id, action: "use:code", effect, grantedByPersonId: p.id, createdAt: at, updatedAt: at, hlc: nextHlc() }).run();
+  invalidatePass(p.id); // a row written straight to the store: the pass is rebuilt on the next read, as a grants write would
+
 }
 function keyPermission(p: PersonRow, value: boolean) {
   const row = { scope: `person:${p.id}`, key: "coding.person.api_keys", value: JSON.stringify(value), hlc: "1:0:abcdef", source: "user" as const, updatedAt: new Date().toISOString() };
@@ -187,6 +190,7 @@ describe("who gets in", () => {
     keyPermission(p, true);
     expect((await say(secret)).status).toBe(200);
     db.delete(grants).run();
+    invalidatePass(p.id);
     expect((await say(secret)).status).toBe(403);
   });
 

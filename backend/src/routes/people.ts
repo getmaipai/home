@@ -21,6 +21,7 @@ import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
 import { exportPersonFiles, personFilesFate } from "@/lib/storage/personFiles";
 import { apiError } from "@/lib/apiErrorCopy";
+import { personFeatures, activePerson } from "@/lib/personFeatures";
 
 export const peopleRoutes = apiRouter();
 
@@ -634,6 +635,35 @@ peopleRoutes.openapi(permissionsRoute, (c) => {
     return c.json({ error: `${actor.role} cannot see a ${target.role} profile's permissions` }, 403);
   }
   return c.json(effectivePermissions(id), 200);
+});
+
+// ACCESS-UI-01 (C7, C10): the admin's feature list for one person. Owner or admin only: the people.grant grant does not open it, and a
+// person never reads their own row through it. Booleans and the grant id, nothing else.
+const featuresRoute = createRoute({
+  method: "get",
+  path: "/{id}/features",
+  tags: ["People"],
+  summary: "Each feature, what this person's role gives, what they can use now, and the grant that changes it",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ features: z.array(z.object({
+        id: z.string(), title: z.string(), min_role: z.string(), role_allows: z.boolean(), effective: z.boolean(),
+        grant: z.object({ id: z.string(), effect: z.enum(["allow", "deny"]) }).nullable(),
+        allow_for_minors: z.literal(true).optional().describe("Only the Coding row: an admin may allow it for a child or teen."),
+      })) }) } },
+      description: "Every installed feature a person could use, plus Coding (not for a guest).",
+    },
+    ...errorResponses({ 401: "Not signed in", 403: "Only an owner or admin may see this", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(featuresRoute, (c) => {
+  const actor = c.get("person");
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only an owner or admin can see this. Ask one of them." }, 403);
+  const target = activePerson(c.req.valid("param").id);
+  if (!target) return c.json({ error: "That person is not in this household. Refresh the people list." }, 404);
+  return c.json({ features: personFeatures(target) }, 200);
 });
 
 // SETTINGS-LAYERS-01d: a person's site-block categories as layers (global defaults column, user overrides

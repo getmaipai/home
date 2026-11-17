@@ -1,3 +1,4 @@
+import { invalidatePass } from "@/lib/filter/passCache";
 import { beforeEach, expect, test, spyOn } from "bun:test";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -25,6 +26,8 @@ function keyPermission(p: PersonRow, value: boolean) {
 function grant(p: PersonRow, effect: "allow" | "deny") {
   const at = new Date().toISOString();
   db.insert(grants).values({ id: `grant-${crypto.randomBytes(6).toString("hex")}`, person: p.id, action: "use:code", effect, grantedByPersonId: p.id, createdAt: at, updatedAt: at, hlc: nextHlc() }).run();
+  invalidatePass(p.id); // a row written straight to the store: the pass is rebuilt on the next read, as a grants write would
+
 }
 
 test("creation shows the secret once; owner and admin reads never disclose hashes or secrets", () => {
@@ -130,6 +133,7 @@ for (const role of ["child", "teen"]) test(`${role} needs an explicit grant and 
   expect(resolveApiKey(secret, "code")).toBeNull();
   keyPermission(p, true);
   db.delete(grants).run();
+  invalidatePass(p.id); // a store delete: the pass is rebuilt on the next read
   expect(resolveApiKey(secret, "code")).toBeNull();
 });
 

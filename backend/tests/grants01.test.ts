@@ -55,7 +55,7 @@ describe("with no grants every role sees today's packages", () => {
   test("the pass, the app list, the widgets and the writing formats match the role ladder", () => {
     for (const p of [owner, adult, teen, child]) {
       const expected = listInstalledManifests().filter((m) => meetsMinRole(p.role, m.min_role)).map((m) => m.id).sort();
-      expect([...passFor(p.id).access].filter((a) => a.startsWith("use:")).map((a) => a.slice(4)).sort()).toEqual(expected);
+      expect([...passFor(p.id).access].filter((a) => a.startsWith("use:") && a !== "use:code").map((a) => a.slice(4)).sort()).toEqual(expected); // `use:code` is Coding, not a package (ACCESS-UI-01)
       for (const m of listInstalledManifests()) expect(mayUse(p, m.id)).toBe(meetsMinRole(p.role, m.min_role));
       expect(listWidgets(p).map((w) => w.package).every((id) => expected.includes(id))).toBe(true);
       expect(writingFormatsFor(p).map((s) => s.manifest.id).sort()).toEqual(installedWritingFormats().filter((s) => meetsMinRole(p.role, s.manifest.min_role)).map((s) => s.manifest.id).sort());

@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
-import { Switch } from "@maipai/ui/src/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -17,13 +16,14 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, 
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { api, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
-import { bandOf, isMinor } from "@/lib/audience";
+import { isMinor } from "@/lib/audience";
+import { FeatureAccess } from "@/apps/settings/FeatureAccess";
 
 const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
@@ -31,7 +31,6 @@ const messageOf = (error: unknown, fallback: string) => errorLine(error, fallbac
 const sizeText = (bytes: number | null) => bytes == null ? i18n._({ id: "Size not reported", message: "Size not reported" }) : bytes >= 1024 ** 3 ? i18n._({ id: "{size} GB", message: "{size} GB", values: { size: (bytes / 1024 ** 3).toFixed(1) } }) : i18n._({ id: "{size} MB", message: "{size} MB", values: { size: Math.ceil(bytes / 1024 ** 2) } });
 const dateText = (date: string | null) => date ? formatDate(date) : i18n._({ id: "Never", message: "Never" });
 const timeText = (date: string | null) => date ? formatDateTime(date) : i18n._({ id: "Never", message: "Never" });
-const isAdult = (entry: PersonRosterEntry) => entry.age_band === "adult" || entry.role === "owner" || entry.role === "admin" || entry.role === "adult";
 
 /** Settings > Household > Coding. The settings rows stay on the shared SettingsRenderer and its spec descriptions. */
 const SELF_TEST_WAIT_MS = 15 * 60_000;
@@ -56,10 +55,8 @@ export function homeModeSentence(data: CodingModeView | undefined): string | nul
   return i18n._({ id: "Normal mode is on. Chat, pictures, videos and songs run as usual.", message: "Normal mode is on. Chat, pictures, videos and songs run as usual." });
 }
 
-export function CodingAdminSettings() {
+export function CodingAdminSettings({ viewer }: { viewer?: Pick<Roster, "id" | "role"> }) {
   const client = useQueryClient();
-  const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
-  const grants = useQuery({ queryKey: ["coding-grants"], queryFn: () => api.grants() });
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
   const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
@@ -77,7 +74,7 @@ export function CodingAdminSettings() {
   const [removePiece, setRemovePiece] = useState<CodingPiece | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
   const paused = settings.data?.find((setting) => setting.key === "coding.paused")?.value === true;
-  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["coding-pieces"] }), client.invalidateQueries({ queryKey: ["coding-grants"] }), client.invalidateQueries({ queryKey: ["people"] })]);
+  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["coding-pieces"] }), client.invalidateQueries({ queryKey: ["people"] })]);
   const refreshModeChecklist = () => Promise.all([mode.refetch(), pieces.refetch(), settings.refetch()]).then(() => undefined);
   const runModeAction = async (id: CodingModeReadinessItemId) => {
     setModeActionBusy(id); setModeActionError(null);
@@ -91,19 +88,6 @@ export function CodingAdminSettings() {
       setModeActionError(messageOf(reason, id === "self_test" ? i18n._({ id: "Home could not run the coding test. Try again.", message: "Home could not run the coding test. Try again." }) : i18n._({ id: "Home could not update coding mode. Try again.", message: "Home could not update coding mode. Try again." })));
       await refreshModeChecklist().catch(() => undefined);
     } finally { setModeActionBusy(null); }
-  };
-  const saveGrant = async (target: PersonRosterEntry, enabled: boolean) => {
-    const existing = (grants.data ?? []).filter((grant) => grant.person === target.id && grant.action === "use:code" && !grant.deleted_at);
-    const defaultAllowed = isAdult(target) && settings.data?.find((item) => item.key === "coding.adults_by_default")?.value !== false;
-    const desired: CodingGrant["effect"] = enabled ? "allow" : "deny";
-    if (enabled === defaultAllowed) {
-      await Promise.all(existing.map((grant) => api.revokeGrant(grant.id)));
-    } else {
-      await Promise.all(existing.map((grant) => api.revokeGrant(grant.id)));
-      await api.createGrant({ person: target.id, action: "use:code", effect: desired });
-    }
-    if (isMinor(target)) await api.setSetting(`person:${target.id}`, "coding.person.api_keys", enabled);
-    await refresh();
   };
   const install = async (piece: CodingPiece) => {
     setPieceError(null);
@@ -119,11 +103,6 @@ export function CodingAdminSettings() {
     catch (error) { setPieceError(messageOf(error, i18n._({ id: "Could not remove this piece.", message: "Could not remove this piece." }))); }
     finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
   };
-  const roster = (people.data ?? []).filter((entry) => entry.role !== "guest").sort((a, b) => {
-    const bandOrder = (entry: PersonRosterEntry) => bandOf(entry) === "adult" ? 0 : bandOf(entry) === "teen" ? 1 : 2;
-    return bandOrder(a) - bandOrder(b) || a.display_name.localeCompare(b.display_name);
-  });
-  const enabledValue = grants.data ?? [];
   return <div className="flex flex-col gap-4">
     <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled"]} titleOverrides={{ "household.coding": i18n._({ id: "Coding", message: "Coding" }) }} />
     <Card><CardHeader><CardTitle>{i18n._({ id: "Max chat checklist", message: "Max chat checklist" })}</CardTitle><CardDescription>{i18n._({ id: "Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself.", message: "Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself." })}</CardDescription></CardHeader><CardContent>
@@ -145,19 +124,7 @@ export function CodingAdminSettings() {
     </CardContent></Card>
     <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused" && key !== "coding.enabled")} titleOverrides={{ "household.coding": i18n._({ id: "More Coding settings", message: "More Coding settings" }) }} />
     <Card><CardHeader><CardTitle>{i18n._({ id: "Stop all coding now", message: "Stop all coding now" })}</CardTitle><CardDescription>{i18n._({ id: "Pause coding requests until you resume. This does not delete keys.", message: "Pause coding requests until you resume. This does not delete keys." })}</CardDescription></CardHeader><CardContent><Button type="button" variant={paused ? "default" : "destructive"} onClick={() => setPauseOpen(true)}>{paused ? i18n._({ id: "Resume coding", message: "Resume coding" }) : i18n._({ id: "Stop all coding now", message: "Stop all coding now" })}</Button>{settings.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load the pause setting.", message: "Could not load the pause setting." })} /> : null}</CardContent></Card>
-    <Card>
-      <CardHeader><CardTitle>{i18n._({ id: "Who can code", message: "Who can code" })}</CardTitle><CardDescription>{i18n._({ id: "Adults follow the household default. Teens and children need an admin grant.", message: "Adults follow the household default. Teens and children need an admin grant." })}</CardDescription></CardHeader>
-      <CardContent>
-        <AsyncState data={people.data && grants.data && settings.data ? roster : undefined} error={people.isError || grants.isError || settings.isError} isFetching={people.isFetching || grants.isFetching || settings.isFetching} onRetry={() => { void people.refetch(); void grants.refetch(); void settings.refetch(); }} errorMessage={i18n._({ id: "Could not load Coding access.", message: "Could not load Coding access." })} loadingLabel={i18n._({ id: "Loading Coding access", message: "Loading Coding access" })}>
-          {(entries) => <ItemGroup variant="card" aria-label={i18n._({ id: "People who can code", message: "People who can code" })}>{entries.map((entry) => {
-            const own = enabledValue.filter((grant) => grant.person === entry.id && grant.action === "use:code" && !grant.deleted_at);
-            const effect = own.some((grant) => grant.effect === "deny") ? "deny" : own.some((grant) => grant.effect === "allow") ? "allow" : null;
-            const on = effect ? effect === "allow" : isAdult(entry) && settings.data?.find((item) => item.key === "coding.adults_by_default")?.value !== false;
-            return <PersonGrantRow key={entry.id} entry={entry} checked={on} onChange={(value) => saveGrant(entry, value).catch((error: unknown) => setPieceError(messageOf(error, i18n._({ id: "Could not change Coding access.", message: "Could not change Coding access." }))))} />;
-          })}</ItemGroup>}
-        </AsyncState>
-      </CardContent>
-    </Card>
+    <FeatureAccess viewer={viewer} feature="code" />
     <Card><CardHeader><CardTitle>{i18n._({ id: "What Coding needs", message: "What Coding needs" })}</CardTitle><CardDescription>{i18n._({ id: "Home downloads these parts to this computer. Home does not install a coding app.", message: "Home downloads these parts to this computer. Home does not install a coding app." })}</CardDescription></CardHeader><CardContent>
       <AsyncState data={pieces.data} error={pieces.isError} isFetching={pieces.isFetching} onRetry={() => void pieces.refetch()} errorMessage={i18n._({ id: "Could not load Coding setup.", message: "Could not load Coding setup." })} loadingLabel={i18n._({ id: "Loading Coding setup", message: "Loading Coding setup" })}>
         {(view) => view.pieces.length === 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Coding needs these pieces.", message: "Coding needs these pieces." })}</p> : <ItemGroup variant="card" aria-label={i18n._({ id: "Coding pieces", message: "Coding pieces" })}>{view.pieces.map((piece) => <Item key={piece.id}>
@@ -184,12 +151,6 @@ const modeLabel = (id: CodingModeReadinessItemId): string => ({
   client: i18n._({ id: "Coding app", message: "Coding app" }),
   bench: i18n._({ id: "Speed check", message: "Speed check" }),
 } as Record<CodingModeReadinessItemId, string>)[id];
-
-function PersonGrantRow({ entry, checked, onChange }: { entry: PersonRosterEntry; checked: boolean; onChange: (value: boolean) => void }) {
-  const [grantOpen, setGrantOpen] = useState(false);
-  const minor = isMinor(entry);
-  return <><Item><ItemContent><ItemTitle>{entry.display_name}</ItemTitle><ItemDescription>{minor ? checked ? i18n._({ id: "Granted by an admin. Their protections stay on.", message: "Granted by an admin. Their protections stay on." }) : i18n._({ id: "Needs an admin grant. Their protections stay on.", message: "Needs an admin grant. Their protections stay on." }) : i18n._({ id: "Adult. Only they can turn their own Coding keys on or off.", message: "Adult. Only they can turn their own Coding keys on or off." })}</ItemDescription></ItemContent><ItemActions><Switch checked={checked} onCheckedChange={(value) => { if (minor && value) setGrantOpen(true); else onChange(Boolean(value)); }} aria-label={i18n._({ id: "Allow {name} to use Coding", message: "Allow {name} to use Coding", values: { name: entry.display_name } })} /></ItemActions></Item><AlertDialog open={grantOpen} onOpenChange={setGrantOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n._({ id: "Let {display_name} use Coding?", message: "Let {display_name} use Coding?", values: { display_name: entry.display_name } })}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "Their safety protections stay on. Their keys work only while Coding is on, and an admin can take back this grant at any time.", message: "Their safety protections stay on. Their keys work only while Coding is on, and an admin can take back this grant at any time." })}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Not now", message: "Not now" })}</AlertDialogCancel><AlertDialogAction onClick={() => { setGrantOpen(false); onChange(true); }}>{i18n._({ id: "Grant Coding", message: "Grant Coding" })}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>;
-}
 
 /** Settings > My account > Coding. Secrets are held only in state while the copy-once dialog is open. */
 export function CodingKeysSettings({ person }: { person: Pick<Roster, "id" | "role"> }) {

@@ -27,6 +27,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { useState } from "react";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
+import { FeatureAccess } from "@/apps/settings/FeatureAccess";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
@@ -114,7 +115,7 @@ function AiStorageTidy() {
   return <section className="flex flex-col gap-2"><h2 className="text-section font-semibold">{i18n._({ id: "Storage", message: "Storage" })}</h2><Button type="button" variant="outline" onClick={() => setOpen(true)}>{i18n._({ id: "Free up space", message: "Free up space" })}</Button><FreeUpSpaceDialog open={open} onOpenChange={setOpen} /></section>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
-function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
+function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <><UsersSection person={person} /><FeatureAccess viewer={person} /></>; }
 function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) {
   const { capabilities } = useSettingsCapabilities(person);
   const [params, setParams] = useSearchParams();

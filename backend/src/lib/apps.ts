@@ -291,6 +291,25 @@ export function appVisibleTo(
   return true;
 }
 
+/** ACCESS-UI-01: every installed package a person could be given or refused (an app, a tool the chat offers, a widget) that is switched on and
+ * could run here, whoever asks: `appVisibleTo` without the person's own pass, so an admin sees what a role gives. */
+export function userFacingManifests(): PackageManifest[] {
+  const statuses = allPackageStatuses();
+  const unavailable = unavailableCapabilities();
+  const out: PackageManifest[] = [];
+  for (const id of listPackageIds()) {
+    const loaded = loadManifestOnly(id);
+    if (!loaded.ok) continue;
+    const manifest = loaded.value;
+    if ((statuses.get(id) ?? { status: "enabled" }).status !== "enabled" || missingRequired(manifest, unavailable).length > 0 || !manifest.platforms.includes("home")) continue;
+    const app = loadApp(id);
+    const isApp = app !== null && app.problems.length === 0;
+    const offersTool = manifest.kind === "plugin" || manifest.kind === "skill" || manifest.kind === "project";
+    if (isApp || offersTool || (manifest.contributes?.widgets ?? []).length > 0) out.push(manifest);
+  }
+  return out;
+}
+
 /** NEWS-00: a page's own floor. A page may carry `min_role` to raise the package's floor (the lint refuses a page
  * that lowers it; a role the ladder does not know fails closed to owner, so a bad value never opens a page). */
 export function pageMinRole(manifest: PackageManifest, entry: AppPageEntry): string {

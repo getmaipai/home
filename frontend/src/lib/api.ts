@@ -164,6 +164,13 @@ export interface SetupCodingView {
   total_bytes: number;
   readiness: CodingModeReadinessView;
 }
+/** ACCESS-UI-01: one row of GET /api/people/:id/features (an owner's or admin's view of one person's feature access). */
+export interface PersonFeature {
+  id: string; title: string; min_role: string; role_allows: boolean; effective: boolean;
+  grant: { id: string; effect: "allow" | "deny" } | null;
+  /** Only the Coding row: an admin may allow it for a child or teen. */
+  allow_for_minors?: true;
+}
 export interface CodingGrant {
   id: string; person: string; action: string; effect: "allow" | "deny"; valid_from?: string | null; valid_to?: string | null;
   granted_by_person_id: string; created_at: string; deleted_at?: string | null;
@@ -1453,6 +1460,7 @@ export const api = {
   adminApiKeys: (personId: string) => request<{ keys: AdminApiKey[] }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}`),
   adminRevokeApiKey: (personId: string, id: string) => request<{ success: true }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}/${encodeURIComponent(id)}`, { method: "DELETE" }),
   adminRevokeAllApiKeys: (personId: string) => request<{ revoked: number }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}`, { method: "DELETE" }),
+  personFeatures: (personId: string) => request<{ features: PersonFeature[] }>(`/api/people/${encodeURIComponent(personId)}/features`),
   grants: (personId?: string) => request<CodingGrant[]>(`/api/grants${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
   createGrant: (input: { person: string; action: string; effect: "allow" | "deny" }) => request<CodingGrant>("/api/grants", { method: "POST", body: JSON.stringify(input) }),
   revokeGrant: (id: string) => request<{ id: string }>(`/api/grants/${encodeURIComponent(id)}`, { method: "DELETE" }),

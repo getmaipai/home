@@ -220,7 +220,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       : active.kind === "view"
       ? <>{(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view) ? <SettingsView view={(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view)!} person={person} onPersonChange={onPersonChange} tab={currentTab} /> : null}</>
       : area.id === "settings" && active.id === "ai" && tab === "coding"
-        ? <CodingAdminSettings />
+        ? <CodingAdminSettings viewer={person} />
         : area.id === "settings" && active.id === "ai"
           ? <><SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />{(viewer.role === "owner" || viewer.role === "admin") && !["overview","performance"].includes(currentTab ?? "") ? <AssistantKeysSettings /> : null}</>
           : <SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />;

@@ -7,8 +7,10 @@ import { resetDb } from "../reset-db";
 import { passFor, passForSurface, invalidatePass } from "@/lib/filter/pass";
 import { ceilingOf } from "@/lib/filter/ceiling";
 import { buildDoor } from "@/lib/filter/door";
-import { setValue, resetValue } from "@/lib/settings";
-import { createGrant } from "@/lib/grants";
+import { setValue, resetValue, setHouseholdSettingValue } from "@/lib/settings";
+import { createGrant, listGrants, revokeGrant } from "@/lib/grants";
+import { codeAdmission } from "@/lib/apiKeys";
+import { grants } from "@/db/schema";
 import { listApps } from "@/lib/apps";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { ACCESS_SETTINGS_KEYS } from "@/settings/accessKeys";
@@ -192,5 +194,47 @@ describe("rebuild on write", () => {
   test("the app list: a child holds nothing outside the pass; an adult's list is every visible app", () => {
     for (const app of listApps(child)) expect(passFor(child.id).access.has(`use:${app.package}`)).toBe(true);
     expect(listApps(adult).length).toBeGreaterThan(0);
+  });
+});
+
+describe("ACCESS-UI-01: Coding is a pass item, the rule codeAdmission applies", () => {
+  const give = (who: PersonRow, effect: "allow" | "deny") => expect(createGrant({ id: owner.id, role: "owner" } as never, { person: who.id, action: "use:code", effect } as never)).toMatchObject({ ok: true });
+  test("an adult has it with the household default on, not with it off", () => {
+    setHouseholdSettingValue("coding.adults_by_default", true);
+    expect(passFor(adult.id).access.has("use:code")).toBe(true);
+    expect(passFor(admin.id).access.has("use:code")).toBe(true);
+    setHouseholdSettingValue("coding.adults_by_default", false);
+    expect(passFor(adult.id).access.has("use:code")).toBe(false);
+  });
+  test("a child, a teen and a guest do not have it by role; an explicit allow admits a minor, never a guest", () => {
+    setHouseholdSettingValue("coding.adults_by_default", true);
+    for (const p of [child, teen, guest]) expect(passFor(p.id).access.has("use:code")).toBe(false);
+    give(child, "allow"); give(teen, "allow");
+    expect(passFor(child.id).access.has("use:code")).toBe(true);
+    expect(passFor(teen.id).access.has("use:code")).toBe(true);
+    // a guest row inserted straight into the store (the API would take it too) still never gets it
+    db.insert(grants).values({ id: "grant-guestcode", person: guest.id, action: "use:code", effect: "allow", grantedByPersonId: owner.id, createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix" } as never).run();
+    invalidatePass(guest.id);
+    expect(passFor(guest.id).access.has("use:code")).toBe(false);
+  });
+  test("an adult with a deny does not have it, and a deny beats an allow", () => {
+    setHouseholdSettingValue("coding.adults_by_default", true);
+    give(adult, "deny");
+    expect(passFor(adult.id).access.has("use:code")).toBe(false);
+    give(teen, "allow"); give(teen, "deny");
+    expect(passFor(teen.id).access.has("use:code")).toBe(false);
+    for (const g of listGrants(adult.id)) revokeGrant(g.id);
+    expect(passFor(adult.id).access.has("use:code")).toBe(true);
+  });
+  test("a timed allow ends by the clock alone: codeAdmission turns to not_allowed with no write in between", () => {
+    setHouseholdSettingValue("coding.enabled", true);
+    const soon = new Date(Date.now() + 120).toISOString();
+    expect(createGrant({ id: owner.id, role: "owner" } as never, { person: teen.id, action: "use:code", effect: "allow", valid_to: soon } as never)).toMatchObject({ ok: true });
+    expect(passFor(teen.id).expires_at).toBe(Date.parse(soon));
+    expect(passFor(teen.id).access.has("use:code")).toBe(true);
+    expect(["ok", "keys_off", "piece_missing"]).toContain(codeAdmission(teen));
+    const until = Date.now() + 200; while (Date.now() < until) { /* the clock moves; nothing is written */ }
+    expect(codeAdmission(teen)).toBe("not_allowed");
+    expect(passFor(teen.id).access.has("use:code")).toBe(false);
   });
 });

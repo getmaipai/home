@@ -29,6 +29,8 @@ export interface Pass {
   readonly ceiling: Readonly<Record<ContentKind, Ceiling>>;
   readonly unrated: ReadonlySet<ContentKind>;
   readonly band: AgeBand;
+  /** ACCESS-UI-01: the earliest time (ms since epoch) a grant of this person starts or ends that is still ahead; the cache rebuilds the pass once it has passed. */
+  readonly expires_at: number | null;
   /** The resolved values of the per-person protection settings the readers use (search.safe_search, media.allowlist_only, synths.*, topics.*) and the two household `content.policy.*` rollout flags. */
   readonly settings: Readonly<Record<string, unknown>>;
 }
@@ -102,14 +104,26 @@ function buildFrom(person: PassPerson): Pass {
     // `adult` or `teen` for a child or teen (chat rule 0's age gate), and a row inserted directly changes nothing for them.
     if (band === "adult" && (manifest.min_role === "admin" || manifest.min_role === "owner") && allowed.has(action)) access.add(action);
   }
+  // ACCESS-UI-01: Coding is not a package. Same rule as `codeAdmission`: the adult band has it while `coding.adults_by_default` is on, an
+  // allow adds it for anyone (a minor only by an explicit allow, never a guest), a deny removes it and beats an allow.
+  if (person.role !== "guest" && !denied.has("use:code") && (allowed.has("use:code") || (band === "adult" && settingsModule().getHouseholdSettingValue("coding.adults_by_default") === true))) access.add("use:code");
   for (const grant of grants) if (grant.effect === "allow" && !denied.has(grant.action) && !grant.action.startsWith("use:")) access.add(grant.action);
+
+  // A timed grant changes the pass when it starts or ends, so the pass must not outlive the next such moment (M).
+  let expiresAt: number | null = null;
+  for (const grant of grantsModule().listGrants(person.id)) {
+    for (const at of [grant.valid_from, grant.valid_to]) {
+      const ms = at ? Date.parse(at) : NaN;
+      if (Number.isFinite(ms) && ms > Date.parse(now) && (expiresAt === null || ms < expiresAt)) expiresAt = ms;
+    }
+  }
 
   const settings: Record<string, unknown> = {};
   for (const key of personProtectionKeys()) settings[key] = settingsModule().getPersonSettingValue(person as PersonRow, key);
   // CONTENT-POLICY-02: the rollout flags are household keys, read here once so the check path never reads settings (a write drops every pass).
   for (const key of CONTENT_POLICY_FLAG_KEYS) settings[key] = settingsModule().getHouseholdSettingValue(key);
 
-  return Object.freeze({ person_id: person.id, version: nextPassVersion(), access, ceiling: Object.freeze(ceiling), unrated, band, settings: Object.freeze(settings) });
+  return Object.freeze({ person_id: person.id, version: nextPassVersion(), access, ceiling: Object.freeze(ceiling), unrated, band, expires_at: expiresAt, settings: Object.freeze(settings) });
 }
 
 /** GRANTS-01 (C5, C7, C10): the one feature access check, called where a feature starts. A refusal looks like absence. */

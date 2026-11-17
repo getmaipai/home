@@ -8,7 +8,7 @@ import { apiKeys, people } from "@/db/schema";
 import { hashApiKeySecret } from "@/lib/secret";
 import { newApiKeyId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { effectivePermissions } from "@/lib/permissions";
+import { mayUse } from "@/lib/filter/pass";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { PersonRow } from "@/types";
@@ -60,10 +60,7 @@ export function codeAdmission(person: PersonRow): CodeAdmission {
   if (person.deletedAt || !person.enabled || person.memorializedAt || person.role === "guest") return "not_allowed";
   if (getHouseholdSettingValue("coding.enabled") !== true) return "coding_off";
   if (getHouseholdSettingValue("coding.paused") === true) return "coding_paused";
-  const effect = effectivePermissions(person.id).find(p => p.action === "use:code")?.effect;
-  if (effect === "deny") return "not_allowed";
-  const minor = person.role === "child" || person.role === "teen";
-  if ((minor || getHouseholdSettingValue("coding.adults_by_default") !== true) && effect !== "allow") return "not_allowed";
+  if (!mayUse(person, "code")) return "not_allowed"; // ACCESS-UI-01: the pass holds `use:code` (adult default, explicit allow, deny wins, timed grants)
   if (missingCodingPiece()) return "piece_missing"; // CODE-STACK-01 H1: the engine or model is not installed; keys are held suspended until it is.
   return getPersonSettingValue(person, "coding.person.api_keys") === true ? "ok" : "keys_off";
 }
