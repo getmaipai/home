@@ -679,3 +679,29 @@ W5. **The exact words are kept.** They are written in the prompt in quotes, "spe
     so Another take, Fix the words and Make clearer know them.
 W6. **Every outcome has a plain line.** Model missing, words wrong, check not run, chat model unavailable: one line beside the button that
     says what happened and what to do (RULES S6, never silence).
+
+## Engine boundary
+
+Record: [Catalog holds the data, the Stack acts, Home knows people](stack-home-catalog-separation-2026-11-16.md). Owner rule (Jesse,
+2026-11-16, in chat and confirmed in the question box the same day). Owner-approved: 2026-11-16. The rules apply to new work at once; the code that predates them is
+removed by the build rows of the record, each deleting what it replaces.
+
+Governs: backend/src/lib/stack/**, backend/src/lib/stackEngine.ts, backend/src/lib/modelCatalog.ts, backend/src/lib/engineCatalog.ts, backend/src/lib/tiers.ts, backend/src/lib/jobs/**, backend/src/lib/pictures/**, backend/src/lib/videos/**, backend/src/lib/music/**, backend/src/routes/aiChoices.ts, backend/src/routes/engines.ts, frontend/src/apps/settings/**, frontend/src/apps/setup/**, frontend/src/shell/installWords.ts
+
+E1. **Home holds no part data.** A part is anything the Stack installs and runs: a model, a tool or an engine. Its name, description,
+    download link, checksum, size and licence are the Stack's, served per request. Home's source holds none of them. Home knows a part by
+    an opaque id it was given, its category, its priority, whether it is on, the words the Stack sent to print, and the capability fields
+    the Stack serves for a turn (template features, sampling with its source, the measured record; chat rules 3 and 8).
+E2. **Home branches on what the Stack answers, never on which part it is.** No code path in Home tests a part id or a model family. Home
+    sends the request and reads the answer or the refusal (chat rule 6).
+E3. **Install, uninstall and update of a part are calls to the Stack by id.** Home never supplies a part's download link or checksum, and
+    never runs an engine, a model or a part's download itself.
+E4. **Home makes no fit decision.** Whether a part can run on this computer, what is loaded, what waits and why are the Stack's answers.
+    Home decides whose job goes first and passes that as a priority; it does not read memory or size a job's memory (the chat window of chat rule 4 is not
+    this).
+E5. **The household's choice is stored once, by Home.** The order and the on or off state per category live in the household's settings
+    and are sent to the Stack. No household's own choice is written into a repo, a default or a migration.
+E6. **A minor gets the minor's list, and only that.** Home asks the Stack for the minor's list: neutral names, and adult-only parts left
+    out (chat rules 0 and 8). The Stack runs a minor's job only on a part in that list. A part whose output can carry speech that is not
+    checked is not in a minor's list until its check ships (VIDEO-LTX-06). This adds to the age and surface gates and replaces none of
+    them; no check Home makes for a child or a teen is removed before the Stack enforces the same thing.
