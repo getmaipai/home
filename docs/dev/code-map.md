@@ -221,7 +221,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
-| `frontend/src/apps/settings/FeatureAccess.tsx` | FeatureAccess |
+| `frontend/src/apps/settings/FeatureAccess.tsx` | FeatureAccess, PersonFeatures |
 | `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
@@ -231,8 +231,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
+| `frontend/src/apps/settings/PeopleAccess.tsx` | PeopleAccess |
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
+| `frontend/src/apps/settings/PersonAccessEditor.tsx` | PersonAccessEditor |
 | `frontend/src/apps/settings/PlainSection.tsx` | PlainSection |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | referenceDownload, ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RobotActions.tsx` | robotHasDance, RobotActions |
