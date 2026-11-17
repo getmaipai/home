@@ -5,19 +5,19 @@ import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpret
 import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { checkText, surfaceActor } from "@/lib/filter/textGate";
+import { NOTHING_SUITABLE_HINT } from "@/lib/filter/nothingSuitable";
 
 // CONTENT-POLICY-02 (C10, chat rule 6): when nothing is left to show, no fixed line goes out (a fixed line is delivered with no model call, so
-// the model never redirects). The result carries no headlines and this hint, and the model says so in its own words. It names no age,
-// role, rule, rating or profile.
-const NOTHING_SUITABLE_HINT =
-  "there is nothing suitable to share right now; say that in a sentence of your own and offer something else to talk about or look up, with no list of headlines";
+// the model never redirects). The result carries no headlines and this hint, and the model says so in its own words. The shared wording is
+// `NOTHING_SUITABLE_HINT` (SEARCH-RATING-02); News adds its own clause about headlines.
+const NOTHING_SUITABLE_NEWS_HINT = `${NOTHING_SUITABLE_HINT}, with no list of headlines`;
 const CHILD_NEWS_HINT =
   "retell these headlines for a child in simple, calm words, a sentence or two each, with no links and no graphic detail; if something is too scary, leave it out";
 const TOP = 3;
 
 const nothingSuitable = (result: PluginResult): PluginResult => {
   const { reply: _reply, ...rest } = result;
-  return { ...rest, data: { headlines: [] }, synthesis_hint: NOTHING_SUITABLE_HINT } as PluginResult;
+  return { ...rest, data: { headlines: [] }, synthesis_hint: NOTHING_SUITABLE_NEWS_HINT } as PluginResult;
 };
 
 /** Applies the minor floor to a news result: each headline goes through the filter door (today's floor and, for a child or teen, the content

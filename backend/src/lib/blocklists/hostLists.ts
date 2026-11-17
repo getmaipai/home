@@ -252,6 +252,53 @@ export function checkHost(band: AgeBand, input: string | null | undefined, perso
   return hits[0]!;
 }
 
+/** SEARCH-RATING-02 (H): every reason a host may not be shown to the band, not only the first one `checkHost` names, for the search raters
+ * (`filter/raters.ts`), which rate a row X when the locked adult-site list is the only hit and withhold it for anything else.
+ * Read-only: it counts nothing. `deny` is the admin's always-block entry (wins over every allow); `notReady` is an enabled list that is
+ * not loaded (fail closed); `unreadable` is an address with no readable host for a band that has lists; `lists` is every enabled list
+ * naming the host, after the admin's allow list is applied to unlocked hits exactly as `checkHost` does. An empty value has nothing to check. */
+export interface HostHits { deny: boolean; notReady: boolean; unreadable: boolean; lists: string[] }
+export function hostHits(band: AgeBand, input: string | null | undefined, personId: string | null | undefined = currentBlockViewer()): HostHits {
+  const out: HostHits = { deny: false, notReady: false, unreadable: false, lists: [] };
+  if (input === null || input === undefined || input.trim() === "") return out;
+  const host = normalizeHost(input);
+  const enabled = enabledListIds(band, personId);
+  if (enabled.length > 0 && host === null) { out.unreadable = true; return out; }
+  const rules = customHostRules(band, personId);
+  if (host && hostInSet(host, rules.deny)) { out.deny = true; return out; }
+  if (enabled.length === 0) return out;
+  if (!listsReadyForBand(band, personId)) { out.notReady = true; return out; }
+  if (!host) return out;
+  let index: HostIndex;
+  try {
+    index = prepareHostIndex();
+  } catch {
+    out.notReady = true;
+    return out;
+  }
+  let mask = 0;
+  for (const id of enabled) {
+    const bit = index.bitOf.get(id);
+    if (bit === undefined) {
+      if (listsReadyOverride() === true) continue;
+      out.notReady = true;
+      return out;
+    }
+    mask |= 1 << bit;
+  }
+  const hitBits = hitMask(index, host) & mask;
+  if (hitBits === 0) return out;
+  const hits = enabled.filter((id) => {
+    const bit = index.bitOf.get(id);
+    return bit !== undefined && (hitBits & (1 << bit)) !== 0;
+  });
+  if (hits.length === 0) return out;
+  const locked = new Set(lockedListIds(band));
+  if (rules.allow.size > 0 && hostInSet(host, rules.allow) && hits.every((id) => !locked.has(id))) return out;
+  out.lists = hits;
+  return out;
+}
+
 // Drop counters: list id and band and a count, nothing that names a site.
 const drops = new Map<string, number>();
 function bumpCounter(key: string, by = 1): void {

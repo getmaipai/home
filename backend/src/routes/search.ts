@@ -55,7 +55,7 @@ const webSearchRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ results: z.array(SearchResultSchema), note: z.string().optional().describe("Plain words for why there are no rows (off, no source, not allowed, not answering).") }) } },
+      content: { "application/json": { schema: z.object({ results: z.array(SearchResultSchema), note: z.string().optional().describe("Plain words for why there are no rows (off, no source, not allowed, not answering)."), nothing_suitable: z.literal(true).optional().describe("Set when rows came back and none could be shown to this person; the palette shows its own neutral line.") }) } },
       description: "Web result rows, or an empty list with a reason in note.",
     },
     ...errorResponses({ 400: "Missing or too long q", 401: "Not signed in" }),

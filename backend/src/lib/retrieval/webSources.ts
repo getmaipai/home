@@ -12,6 +12,8 @@
 // dedupe are one step. A source that fails contributes nothing; only when every
 // picked source fails does the first one's error stand (rule 6).
 import type { AgeBand } from "@/lib/ageBand";
+import type { PersonRow } from "@/types";
+import type { SafeSearchLevel } from "@/lib/safeSearch";
 import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode, minorDdgsAllowed, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
@@ -54,6 +56,10 @@ export interface WebSearchContext {
   /** Whether the turn is not a plain written one (voice, Wyoming, robot, a shared glance screen), from the turn's own
    * surface. Required so a caller cannot forget it: a minor's ddgs search needs `false` (SEARCH-DDGS-TEEN-01). */
   spoken: boolean;
+  /** SEARCH-RATING-02: the person asking and the engine mode the search ran with, so a source that floors its own rows (ddgs) rates them for this
+   * person's web ceiling. Absent for a caller that names no person: the band's own role defaults decide. */
+  actor?: PersonRow;
+  safeSearchLevel?: SafeSearchLevel;
 }
 /** Rows-only search functions for sources other than SearXNG (whose step lives in packageHost.ts,
  * next to its tiers, cache and engine health). */

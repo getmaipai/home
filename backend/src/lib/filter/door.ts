@@ -49,7 +49,7 @@ export function __resetForTests(): void { loaded.clear(); }
 
 function makeStamp(rater: Rater, verdict: Exclude<RaterVerdict, null | { pass: true }>, label?: { system: string; value: string }): ContentRating {
   return ContentRating.parse({
-    level: verdict.level, source: rater.source, rater: rater.id, rater_version: rater.version,
+    level: verdict.level, source: verdict.source ?? rater.source, rater: rater.id, rater_version: rater.version,
     rated_at: new Date().toISOString(), ...(verdict.reasons ? { reasons: verdict.reasons } : {}), ...(label ? { label } : {}),
   });
 }
@@ -69,26 +69,33 @@ function rulesSkipped(surface: Surface, audience: Audience, item: RaterInput): b
   return passForSurface(audience).settings[key] === false;
 }
 
+/** SEARCH-RATING-02 (A): on every surface a ceiling of X means "the adult path", except web search, where it means that only for the adult band.
+ * A child or teen whose web ceiling an admin raised to X still has the raters run, so the host rule, the CSAM and grooming check and the injection
+ * check hold and only the adult-site list and the rating layers are lifted by the ceiling comparison. */
+function adultPathFor(surface: Surface, audience: Audience, ceiling: number): boolean {
+  return ceiling === 4 && (surface !== "search" || audience.band === "adult");
+}
+
 /** The minor modules are needed below X, and for a finished item a teen or a child will see even when an override raised their ceiling (its decision is the lane's). */
-function needsMinorModules(ceiling: number, item: RaterInput): boolean {
-  return ceiling < 4 || (item.kind === "picture_check" && item.viewer !== "adult");
+function needsMinorModules(item: RaterInput, adultPath: boolean): boolean {
+  return !adultPath || (item.kind === "picture_check" && item.viewer !== "adult");
 }
 
 export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string, surface: Surface) => void } = {}): Door {
   const raters = options.raters ?? [...RATERS];
   async function evaluate(surface: Surface, audience: Audience, item: RaterInput): Promise<DoorVerdict> {
     const ceiling = ceilingOf(audience, surface);
-    const adultPath = ceiling === 4;
+    const adultPath = adultPathFor(surface, audience, ceiling);
     const adultAllowed = surface === "reply" || surface === "picture" || surface === "clip" || surface === "song" || surface === "coding";
     if (adultPath && (!adultAllowed || item.kind === "explicit")) return { verdict: "released", rating: null };
-    if (needsMinorModules(ceiling, item)) await loadMinorModules();
+    if (needsMinorModules(item, adultPath)) await loadMinorModules();
     await ensureFor(item);
     return run(surface, audience, item, ceiling);
   }
   function run(surface: Surface, audience: Audience, item: RaterInput, ceiling: ReturnType<typeof ceilingOf>): DoorVerdict {
     const unratedOk = passForSurface(audience).unrated.has(kindOf(surface)); // OVERRIDES-01 (C4, C9): an admin allowed unrated here
     const kind: RatedContentKind = surface === "coding" ? "reply" : contentKindForSurface(surface);
-    const adultPath = ceiling === 4;
+    const adultPath = adultPathFor(surface, audience, ceiling);
     const skipRules = rulesSkipped(surface, audience, item);
     const selected = adultPath
       ? raters.filter((r) => r.id === "minor-line")
@@ -134,8 +141,9 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
   function releaseSync(surface: Surface, audience: Audience, item: RaterInput): DoorVerdict {
     const ceiling = ceilingOf(audience, surface);
     const adultAllowed = surface === "reply" || surface === "picture" || surface === "clip" || surface === "song" || surface === "coding";
-    if (ceiling === 4 && (!adultAllowed || item.kind === "explicit")) return { verdict: "released", rating: null };
-    if (needsMinorModules(ceiling, item) && !minorRatersReady()) {
+    const adultPath = adultPathFor(surface, audience, ceiling);
+    if (adultPath && (!adultAllowed || item.kind === "explicit")) return { verdict: "released", rating: null };
+    if (needsMinorModules(item, adultPath) && !minorRatersReady()) {
       try { prepareMinorRatersSync(); } catch { return { verdict: "held", rating: unratedStamp("filter-not-ready"), held_by: "filter-not-ready" }; }
     }
     return run(surface, audience, item, ceiling);
@@ -147,7 +155,7 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
     releaseSync: ({ surface, audience, item }) => releaseSync(surface, audience, item),
     async filterList<T>({ surface, audience, rows, rate }: { surface: Surface; audience: Audience; rows: T[]; rate: (row: T) => RaterInput | ContentRating | null }): Promise<T[]> {
       const ceiling = ceilingOf(audience, surface);
-      if (ceiling === 4) return rows;
+      if (adultPathFor(surface, audience, ceiling)) return rows;
       const unratedOk = passForSurface(audience).unrated.has(kindOf(surface));
       await loadMinorModules();
       const kept: T[] = [];

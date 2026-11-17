@@ -15,7 +15,8 @@ import { minorDdgsAllowed } from "@/lib/retrieval/sourceMode";
 import { ddgsBaseUrl, ddgsSetupNote } from "@/lib/retrieval/ddgsConfig";
 import { refreshDdgsFromStack } from "@/lib/retrieval/ddgsStackSync";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
-import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { minorRowAllowed, searchAudienceFor, searchFilterApplies, searchModeFor } from "@/lib/retrieval/minorRowFloor";
+import { NOTHING_SUITABLE_HINT } from "@/lib/filter/nothingSuitable";
 import { wantsSpoken } from "@/lib/spokenArg";
 import type { WebRows, WebRow, WebSearchContext } from "@/lib/retrieval/webSources";
 
@@ -103,6 +104,12 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
     }
     const body = (await response.json()) as { rows?: unknown };
     const rows: WebRow[] = [];
+    // SEARCH-RATING-02 (E): the row floor runs for every viewer whose band is not adult and for an adult whose own web ceiling is below X. The sidecar's
+    // `safesearch` parameter may be ignored by the ddgs text path, so its rows keep the engine mode's declared level (SEARCH-RATING-03 follows up).
+    const filtered = searchFilterApplies(ctx.band, ctx.actor);
+    const audience = filtered ? searchAudienceFor(ctx.band, ctx.actor) : undefined;
+    const mode = searchModeFor(ctx.band, ctx.safeSearchLevel);
+    let seen = 0;
     for (const raw of Array.isArray(body.rows) ? (body.rows as unknown[]) : []) {
       if (rows.length >= ROW_CAP) break;
       const item = raw as { title?: unknown; url?: unknown; snippet?: unknown };
@@ -110,14 +117,17 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
       if (typeof item.title !== "string" || item.title.trim() === "" || !rowUrl) continue;
       const snippet = typeof item.snippet === "string" ? item.snippet.trim() : "";
       const row: WebRow = { title: item.title.trim(), url: rowUrl, snippet: snippet || null };
-      // The same per-row floor every minor result passes (minorRowFloor.ts): a blocked site or an unsafe title or snippet is dropped here too.
-      if (minor && !minorRowAllowed(ctx.band, row)) continue;
+      seen += 1;
+      // The same per-row floor every filtered result passes (minorRowFloor.ts, through the filter door): a blocked site, an unsafe title or snippet, or a row
+      // over the viewer's web ceiling is dropped here too.
+      if (audience && !minorRowAllowed(ctx.band, row, { mode, audience, ...(ctx.actor ? { actor: ctx.actor } : {}) })) continue;
       rows.push(row);
     }
     // A normal answer (even an empty one) ends the back-off ladder.
     blockCount = 0;
     return {
-      text: rows.length === 0 ? "No web search results were found." : rows.map((r, i) => `${i + 1}. ${r.title} (${r.url})${r.snippet ? ` - ${r.snippet}` : ""}`).join("\n"),
+      // C10: a list the filter emptied says "nothing suitable", never "No web search results were found."; the plain line is for a search that returned nothing.
+      text: rows.length === 0 ? (filtered && seen > 0 ? NOTHING_SUITABLE_HINT : "No web search results were found.") : rows.map((r, i) => `${i + 1}. ${r.title} (${r.url})${r.snippet ? ` - ${r.snippet}` : ""}`).join("\n"),
       rows,
     };
   } catch (err) {

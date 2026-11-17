@@ -119,8 +119,30 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
       } catch { return fallback; }
     } } satisfies ContentPolicy);
   }
-  return Object.freeze({ contentPolicyFor: resolve, filtersFor: (person: Person) => resolve(person).filters });
+  /** SEARCH-RATING-02 (D, J): every hit of every kind in the text, with the term's severity, whoever is looking: all kinds on, mild and strong
+   * both read. `check` stops at the first hit in a fixed order, so a rater that needs the strictest level over the whole text asks here.
+   * Invalid data or an unreadable text reads as a `minor_line` hit (closed, as `check` is). The terms and exceptions are the same ones `check` reads. */
+  function checkAll(text: string): CheckHit[] {
+    try {
+      if (!compiled || typeof text !== "string") return [{ kind: "minor_line", severity: "strong" }];
+      const fold = foldForSafety(text);
+      const shared = contentChecksForFold(fold);
+      const hits: CheckHit[] = [];
+      const add = (hit: CheckHit) => { if (!hits.some((have) => have.kind === hit.kind && have.severity === hit.severity)) hits.push(hit); };
+      if (detectCsam(text).matched.length || shared.minorLine) add({ kind: "minor_line", severity: "strong" });
+      if (shared.adultContent) add({ kind: "sexual", severity: "strong" });
+      for (const t of compiled.terms) {
+        if (!t.matcher.matches(fold)) continue;
+        const remainder = { ...fold, forms: fold.forms.map(form => ({ ...form, text: t.exceptions.reduce((rest, pattern) => rest.replace(pattern, " "), form.text) })) };
+        if (t.matcher.matches(remainder)) add({ kind: t.kind, severity: t.severity });
+      }
+      return hits;
+    } catch { return [{ kind: "minor_line", severity: "strong" }]; }
+  }
+  return Object.freeze({ contentPolicyFor: resolve, filtersFor: (person: Person) => resolve(person).filters, checkAll });
 }
+export type CheckHit = { kind: ProtectionKind; severity: "mild" | "strong" };
 const resolver = createContentPolicyResolver({ readFilters: () => [] });
+export const checkAll: (text: string) => CheckHit[] = resolver.checkAll;
 export const contentPolicyFor: (subject: Person | Audience) => ContentPolicy = resolver.contentPolicyFor;
 export const filtersFor: (person: Person) => ReadonlySet<ProtectionKind> = resolver.filtersFor;

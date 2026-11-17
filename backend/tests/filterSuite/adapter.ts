@@ -89,12 +89,12 @@ function run(checks: CheckMap, c: SuiteCase, actor: PersonRow): any {
     case "gateGrainFor": return f(c.band, i.surface ?? "chat", Boolean(i.spoken));
     case "tripsMinorFloor": case "trips": case "childPromptUnsafe": case "teenPromptUnsafe": case "refusePrompt": case "promptViolatesMinorLine": case "minorSexualMatch": case "mixedScriptMinorCue": case "refuseVideoPrompt": case "checkVideoPrompt": case "refuseMusicPrompt": case "minorQueryHit": return f(i.text ?? i.query, ...(i.check === "minorQueryHit" ? [c.band] : i.check === "checkVideoPrompt" ? [i.options ?? {}] : i.check === "refusePrompt" || i.check === "refuseVideoPrompt" ? [{ lane: i.lane ?? "child" }] : []));
     case "minorRowTrips": return f(i.row);
-    case "minorRowAllowed": return f(c.band, i.row);
+    case "minorRowAllowed": return f(c.band, i.row, i.options);
     case "urlAllowedFor": return f(c.band, i.url, i.personId);
     case "checkHost": return f(c.band, i.url, i.personId);
     case "resolveSafeSearchLevel": return f(i.stored, c.band);
     case "safeSearchDefaultFor": return f(c.band);
-    case "floorSearchResult": return f(i.result, c.band);
+    case "floorSearchResult": return f(i.result, c.band, i.options);
     case "releaseToBand": return f(i.candidates, c.band);
     case "gateFor": return f(c.band).passes(i.text ?? "");
     case "bandOkAllowedFor": return f(c.band);

@@ -8,7 +8,8 @@ import { passFor } from "@/lib/filter/pass";
 import { resolveSafeSearchLevel } from "@/lib/safeSearch";
 import { NO_SOURCE_FOR_BAND_TEXT } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
-import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { minorRowAllowed, searchAudienceFor, searchFilterApplies } from "@/lib/retrieval/minorRowFloor";
+import { NOTHING_SUITABLE_HINT } from "@/lib/filter/nothingSuitable";
 import { bandSwitchOff, webSideOff } from "@/lib/retrieval/sourceMode";
 import { websearchGateAllows } from "@/lib/searchAssist/minorGate";
 import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
@@ -23,6 +24,8 @@ export interface WebTabAnswer {
   results: SearchResult[];
   /** A plain-words reason there are no rows (off, no source, not allowed, not answering); absent when rows came back. */
   note?: string;
+  /** SEARCH-RATING-02 (C10): the filter emptied a list that had rows. The palette shows its own neutral line; nothing names a filter, a rating or a rule. */
+  nothing_suitable?: true;
 }
 
 function hostOf(url: string): string | null {
@@ -55,15 +58,19 @@ export async function webTabSearch(actor: PersonRow, rawQuery: string, signal?: 
         role: actor.role,
         spoken: false,
         temporary: false,
-        searxOpts: { safeSearchLevel, signal, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), allowWikipediaFallback: false },
+        searxOpts: { safeSearchLevel, signal, speakerBand: band, actor, ...(band === "adult" ? {} : { minorBand: band }), allowWikipediaFallback: false },
         signal,
       }),
     );
     if (found.text === NO_SOURCE_FOR_BAND_TEXT && found.rows.length === 0) return { results: [], note: NO_SOURCE_FOR_BAND_TEXT };
     const results: SearchResult[] = [];
+    // The filter runs for every viewer whose band is not adult and for an adult whose own web ceiling is below X (E). The search already floored these
+    // rows; this is the same one door call again for the rows a blended source added after it.
+    const filtered = searchFilterApplies(band, actor);
+    const audience = filtered ? searchAudienceFor(band, actor) : undefined;
     for (const row of found.rows) {
       if (!row.url || !row.title) continue;
-      if (band !== "adult" && !minorRowAllowed(band, row)) continue;
+      if (audience && !minorRowAllowed(band, row, { mode: safeSearchLevel, actor, audience })) continue;
       const host = hostOf(row.url);
       if (!host) continue;
       results.push({
@@ -78,6 +85,8 @@ export async function webTabSearch(actor: PersonRow, rawQuery: string, signal?: 
       if (results.length >= WEB_TAB_MAX_RESULTS) break;
     }
     // An empty answer carries no note: the palette says "No web results found." itself. Model-facing text never reaches the wire.
+    // A list the filter emptied is told apart from a search that found nothing, so the palette can show its own neutral line.
+    if (results.length === 0 && filtered && (found.text === NOTHING_SUITABLE_HINT || found.rows.length > 0)) return { results, nothing_suitable: true };
     return { results };
   } catch {
     return { results: [], note: WEB_TAB_NOT_ANSWERING };

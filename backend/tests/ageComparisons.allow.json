@@ -148,7 +148,7 @@
   "backend/src/lib/voiceMatch.ts": 2,
   "backend/src/lib/weatherAlerts.ts": 2,
   "backend/src/lib/webSearchBudget.ts": 1,
-  "backend/src/lib/webTabSearch.ts": 4,
+  "backend/src/lib/webTabSearch.ts": 3,
   "backend/src/routes/aiChoices.ts": 1,
   "backend/src/routes/codeGateway.ts": 1,
   "backend/src/routes/companions.ts": 3,
