@@ -19,6 +19,7 @@ function actor(overrides: Partial<PersonRow> = {}): PersonRow {
     deletedAt: null,
     enabled: true,
     guestExpiresAt: null,
+    controls: null,
     memorializedAt: null,
     hlc: "1700000000000:0:test",
     ...overrides,
@@ -34,12 +35,18 @@ describe("speakerAgeBand()", () => {
         const person = actor({ role, birthdate });
         if (birthdate === undefined) delete (person as Partial<PersonRow>).birthdate;
         for (const now of [NOW, new Date("2100-01-01"), new Date(NaN)]) {
-          const expected = role === "guest" ? "teen" : role === "child" || role === "teen" ? role : "adult";
+          const expected = role === "guest" ? "child" : role === "child" || role === "teen" ? role : "adult";
           expect(speakerAgeBand(person, now)).toBe(expected);
         }
       }
     });
   }
+  test("guest controls choose the band, defaulting to child", () => {
+    for (const controls of ["child", "teen", "adult"] as const) {
+      expect(speakerAgeBand(actor({ role: "guest", controls }), NOW)).toBe(controls);
+    }
+    expect(speakerAgeBand(actor({ role: "adult", controls: "child" }), NOW)).toBe("adult");
+  });
   test("does not read birthdate", () => {
     const person = actor({ role: "teen" });
     Object.defineProperty(person, "birthdate", { get() { throw new Error("Birthdate must not be read"); } });

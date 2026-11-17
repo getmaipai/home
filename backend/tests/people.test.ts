@@ -45,6 +45,20 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("creating people", () => {
+  test("guest controls are required and determine the roster band", async () => {
+    const owner = await ownerClient();
+    const missing = await owner.post("/api/people", { displayName: "Visitor", role: "guest" });
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toMatchObject({ error: "Choose child, teen or adult controls for this guest." });
+    const teen = await owner.post("/api/people", { displayName: "Visitor Teen", role: "guest", controls: "teen" });
+    expect(teen.status).toBe(201);
+    expect(await teen.json()).toMatchObject({ controls: "teen", age_band: "teen" });
+    const child = await owner.post("/api/people", { displayName: "Visitor Child", role: "guest", controls: "child" });
+    expect(child.status).toBe(201);
+    expect(await child.json()).toMatchObject({ controls: "child", age_band: "child" });
+    expect((await owner.post("/api/people", { displayName: "Not guest", role: "adult", secret: "1234", controls: "teen" })).status).toBe(400);
+  });
+
   test("owner can create any role, including another owner", async () => {
     const owner = await ownerClient();
     for (const role of ["owner", "admin", "adult", "teen", "child", "guest"]) {
@@ -52,6 +66,7 @@ describe("creating people", () => {
       const res = await owner.post("/api/people", {
         displayName: `Test ${role}`,
         role,
+        ...(role === "guest" ? { controls: "teen" } : {}),
         secret: needsSecret ? "correcthorse2" : undefined,
       });
       expect(res.status).toBe(201);
@@ -167,6 +182,7 @@ describe("creating people", () => {
         displayName: `No birthdate ${role}`,
         role,
         ...(needsSecret ? { secret: "1234" } : {}),
+        ...(role === "guest" ? { controls: "teen" } : {}),
       });
       expect(res.status).toBe(201);
       const body = await res.json() as { id: string; age_band: string };
@@ -224,7 +240,7 @@ async function addPerson(
   role: string,
   secret?: string,
 ): Promise<{ id: string }> {
-  const res = await client.post("/api/people", { displayName, role, secret });
+  const res = await client.post("/api/people", { displayName, role, secret, ...(role === "guest" ? { controls: "teen" } : {}) });
   expect(res.status).toBe(201);
   return (await res.json()) as { id: string };
 }
@@ -243,6 +259,22 @@ async function sessionFor(personId: string, secret?: string): Promise<TestClient
 // the ones that decide whether a household can be taken over, locked
 // out, or left holding data it was told had been erased.
 describe("PATCH /api/people/:id", () => {
+  test("guests cannot change their own controls; an owner can set them and role changes clear them", async () => {
+    const owner = await ownerClient();
+    const guest = await addPerson(owner, "Visitor", "guest", "2468");
+    const guestClient = await sessionFor(guest.id, "2468");
+    const selfPatch = await guestClient.request(`/api/people/${guest.id}`, { method: "PATCH", body: { controls: "adult" } });
+    expect(selfPatch.status).toBe(403);
+    expect(await selfPatch.json()).toMatchObject({ error: "You cannot change your own controls. Ask an owner or admin." });
+    const loosen = await owner.request(`/api/people/${guest.id}`, { method: "PATCH", body: { controls: "adult" } });
+    expect(loosen.status).toBe(200);
+    expect(await loosen.json()).toMatchObject({ controls: "adult", age_band: "adult" });
+    const changeRole = await owner.request(`/api/people/${guest.id}`, { method: "PATCH", body: { role: "adult" } });
+    expect(changeRole.status).toBe(200);
+    expect(await changeRole.json()).toMatchObject({ role: "adult", controls: null, age_band: "adult" });
+    expect(toPersonRow(guest.id).controls).toBeNull();
+  });
+
   test("a guest cannot change or clear their own stay expiry", async () => {
     const owner = await ownerSession();
     const guest = await addPerson(owner, "Visitor", "guest");
@@ -1204,7 +1236,7 @@ describe("enabled and guest expiry", () => {
   test("a guest set to expire in the past cannot sign in", async () => {
     const owner = await ownerSession();
     const past = new Date(Date.now() - 1000).toISOString();
-    const created = await owner.post("/api/people", { displayName: "Guest", role: "guest", guestExpiresAt: past });
+    const created = await owner.post("/api/people", { displayName: "Guest", role: "guest", controls: "teen", guestExpiresAt: past });
     expect(created.status).toBe(201);
     const guest = (await created.json()) as { id: string };
 

@@ -86,6 +86,7 @@ import { startDdgsStackSync } from "@/lib/retrieval/ddgsStackSync";
 import { startStackSelfHealWatch } from "@/lib/stackSelfHeal";
 import { startCanary } from "@/lib/canary";
 import { startPerfWatch } from "@/lib/perfWatch";
+import { noticeGuestsWithoutControls } from "@/lib/guestControlsNotice";
 
 const configuredPort = configuredHubPort();
 startPerfWatch();
@@ -288,6 +289,7 @@ migrateWikipediaFallbackToSourceMode();
 migrateRobotsSwitch();
 migrateTierSlots();
 migrateMediaSettings();
+void noticeGuestsWithoutControls().catch((err: unknown) => console.error(`[boot] guest controls notice failed: ${(err as Error).message}`));
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

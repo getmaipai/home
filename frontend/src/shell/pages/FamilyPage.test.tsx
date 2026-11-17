@@ -10,7 +10,7 @@ import defaultManifest from "../../../../backend/packages/default/manifest.json"
 afterEach(cleanup);
 
 function makePerson(overrides: Partial<Roster> = {}): Roster {
-  return { id: "p1", display_name: "Sage", nickname: null, role: "owner", avatar_seed: "p1", bio: null, accent: null, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, ...overrides } as Roster;
+  return { id: "p1", display_name: "Sage", nickname: null, role: "owner", avatar_seed: "p1", bio: null, accent: null, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, ...overrides } as Roster;
 }
 
 function entry(overrides: Partial<PersonRosterEntry> = {}): PersonRosterEntry {

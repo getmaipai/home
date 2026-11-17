@@ -15,6 +15,7 @@ export interface NewPersonValues {
   displayName: string;
   role: Role;
   secret?: string;
+  controls?: "child" | "teen" | "adult";
 }
 
 interface NewPersonFormProps {
@@ -44,6 +45,7 @@ function secretProblem(value: string): string | null {
 export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, busy, error, extra, formRef, checkSecret = false, hideSubmit = false }: NewPersonFormProps) {
   const choices = [...new Set(creatableRoles(actorRole).map((role) => serverRoleToRoleAdmin(role).role))];
   const [role, setRole] = useState<NewPersonRole>(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
+  const [controls, setControls] = useState<"child" | "teen" | "adult">("teen");
   const [admin, setAdmin] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [secret, setSecret] = useState("");
@@ -76,7 +78,7 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
     setConfirmError(mismatch);
     if (!nameOk || problem || mismatch) return;
     try {
-      await onSubmit({ displayName, role: roleAdminToServerRole({ role, admin }), ...(secretRequired ? { secret } : {}) });
+      await onSubmit({ displayName, role: roleAdminToServerRole({ role, admin }), ...(role === "guest" ? { controls } : {}), ...(secretRequired ? { secret } : {}) });
       setDisplayName("");
       setSecret("");
       setConfirm("");
@@ -84,6 +86,7 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
       setConfirmBlurred(false);
       setAdmin(false);
       setRole(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
+      setControls("teen");
       setNameError(false);
       setSecretError(null);
     } catch {
@@ -105,6 +108,16 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
           <FieldLabel htmlFor="new-person-role">{i18n._({ id: "Role", message: "Role" })}</FieldLabel>
           <Select aria-label={i18n._({ id: "Role", message: "Role" })} value={role} onValueChange={(value) => { setRole(value as NewPersonRole); setAdmin(false); }}
             options={ROLE_OPTIONS.filter((option) => choices.includes(option))} getLabel={(value) => ROLE_LABELS[value as Role]} disabled={busy} />
+        </Field> : null}
+        {role === "guest" ? <Field>
+          <FieldLabel htmlFor="new-person-controls">{i18n._({ id: "Controls", message: "Controls" })}</FieldLabel>
+          <Select {...({ id: "new-person-controls" } as { id: string })} aria-label={i18n._({ id: "Controls", message: "Controls" })} value={controls} onValueChange={(value) => setControls(value as "child" | "teen" | "adult")}
+            options={["child", "teen", "adult"]} getLabel={(value) => ({ child: i18n._({ id: "Child controls", message: "Child controls" }), teen: i18n._({ id: "Teen controls", message: "Teen controls" }), adult: i18n._({ id: "Adult controls", message: "Adult controls" }) })[value as "child" | "teen" | "adult"]} disabled={busy} />
+          <FieldDescription>{controls === "child"
+            ? i18n._({ id: "The full set of protections. Every subject is gentle and replies are checked sentence by sentence.", message: "The full set of protections. Every subject is gentle and replies are checked sentence by sentence." })
+            : controls === "teen"
+              ? i18n._({ id: "Frank answers on most subjects, still no adult content, replies checked.", message: "Frank answers on most subjects, still no adult content, replies checked." })
+              : i18n._({ id: "Frank answers on every subject. Replies are still checked as they arrive and crisis help is always offered.", message: "Frank answers on every subject. Replies are still checked as they arrive and crisis help is always offered." })}</FieldDescription>
         </Field> : null}
         {role === "adult" || owner ? <Field>
           <FieldLabel htmlFor="new-person-admin">

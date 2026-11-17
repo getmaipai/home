@@ -26,6 +26,7 @@ export function toPerson(row: PersonRow): Person {
     hlc: row.hlc,
     enabled: row.enabled,
     guest_expires_at: row.guestExpiresAt,
+    controls: row.controls ?? null,
     memorialized_at: row.memorializedAt,
   });
 }
@@ -83,6 +84,7 @@ export function personToDbValues(person: Person) {
     hlc: person.hlc,
     enabled: person.enabled,
     guestExpiresAt: person.guest_expires_at,
+    controls: person.controls ?? null,
     memorializedAt: person.memorialized_at,
   };
 }
@@ -98,5 +100,11 @@ export function guestExpiryProblem(role: string, guestExpiresAt: string | null):
   if (guestExpiresAt !== null && role !== "guest") {
     return "guest_expires_at is only meaningful on a guest profile";
   }
+  return null;
+}
+
+export function guestControlsProblem(role: string, controls: "child" | "teen" | "adult" | null): string | null {
+  if (controls !== null && role !== "guest") return "controls is only meaningful on a guest profile";
+  if (role === "guest" && controls === null) return "Choose child, teen or adult controls for this guest.";
   return null;
 }

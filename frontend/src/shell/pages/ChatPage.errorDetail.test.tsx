@@ -38,7 +38,7 @@ function renderPage(ui: ReactElement) {
 }
 
 function makePerson(role: Roster["role"]): Roster {
-  return { id: "person-abc123", display_name: "Nova", nickname: null, role, avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true };
+  return { id: "person-abc123", display_name: "Nova", nickname: null, role, avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true };
 }
 
 function stubFailedTurn(failed: boolean): { urls: string[]; restore: () => void } {

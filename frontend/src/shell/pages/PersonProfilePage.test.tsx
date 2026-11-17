@@ -13,6 +13,7 @@ function viewer(overrides: Partial<Roster> = {}): Roster {
     id: "person-sage", display_name: "Sage", nickname: null, role: "adult", avatar_seed: "person-sage",
     bio: null, accent: null, source: "hub", local_only: false, created_at: "2026-09-05T00:00:00.000Z",
     updated_at: "2026-09-05T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null,
+    controls: null,
     memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, age_band: "adult", ...overrides,
   } as Roster;
 }

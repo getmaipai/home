@@ -39,6 +39,9 @@ export const people = sqliteTable("people", {
   // Step 7: meaningful only for role "guest" (lib/personShape.ts enforces
   // this, the same convention person.schema.json's own conditionals use).
   guestExpiresAt: text("guest_expires_at"),
+  // MODE-GUEST-01: the controls chosen by an admin for a guest profile.
+  // A null legacy value uses child controls until an admin chooses.
+  controls: text("controls"),
   // Step 7: set once, never cleared - lib/personLifecycle.ts's
   // memorializePerson() is the only writer.
   memorializedAt: text("memorialized_at"),

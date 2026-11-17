@@ -33,6 +33,7 @@ function adult(): Roster {
     deleted_at: null,
     enabled: true,
     guest_expires_at: null,
+    controls: null,
     memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,

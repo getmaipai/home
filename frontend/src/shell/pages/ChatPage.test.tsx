@@ -123,6 +123,7 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
     hasSecret: true,
     age_band: "adult",
     ...overrides,
+    controls: overrides.controls ?? null,
   };
 }
 

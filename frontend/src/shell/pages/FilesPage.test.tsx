@@ -13,7 +13,7 @@ afterEach(() => { cleanup(); localStorage.clear(); });
 beforeEach(() => stubMatchMedia({ [WIDE]: true, [VIEWER_WIDE]: true }));
 
 function person(role: Roster["role"] = "owner", id = "person-me"): Roster {
-  return { id, display_name: "Nova", nickname: null, role, avatar_seed: id, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
+  return { id, display_name: "Nova", nickname: null, role, avatar_seed: id, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, controls: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
 }
 function item(id: string, name: string, over: Partial<LibraryItem> = {}): LibraryItem {
   return {
