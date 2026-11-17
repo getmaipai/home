@@ -43,6 +43,7 @@ import { addCredits, addTitle, burnCaptions, makeCaptions, saveCaptionText } fro
 import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, startColorize, EXTEND_MAX_CHARS, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
 import { ceilingFor, startLongTake } from "@/lib/videos/longTake";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
+import { startSwap } from "@/lib/videos/swapStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { FILM_PAGE_ACTIONS, filmPageAction } from "@/lib/films/pageFilm";
 import { startStudioExport } from "@/lib/videos/studioExport";
@@ -392,6 +393,18 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!appRouteAllowed(person, appId, "actions", "voiceover")) return next();
     const body = await jsonBody(c);
     const started = await startVoiceover(person, typeof body.id === "string" ? body.id : typeof body.clip === "string" ? body.clip : "", { line: body.line, voice: body.voice, level: body.level });
+    if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
+    return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
+  });
+
+  // CREATOR-57b: the Swap character page. One cast member replaces the head of the person in a finished clip of the person's own (a window of up to 10 seconds).
+  // The same start as the chat tool (`edit_video` change `swap`): the gates are written once, in clipEditStart and the edit tool. The original is kept.
+  routes.post("/actions/swap", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "video") return next();
+    if (!appRouteAllowed(person, appId, "actions", "swap")) return next();
+    const body = await jsonBody(c);
+    const started = await startSwap(person, typeof body.id === "string" ? body.id : typeof body.clip === "string" ? body.clip : "", { cast: body.cast, from_s: body.from_s, seconds: body.seconds });
     if (!started.ok) return c.json({ error: started.error, code: started.code, ...(started.locked ? { locked: true } : {}) }, started.status as never);
     return c.json({ ok: true as const, id: started.job.id, state: started.job.state }, 200);
   });

@@ -254,9 +254,8 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     if (value.cast!.length > 1) return refused(callId, args, "Swap one person at a time.", "one_person");
     if (!holdsMax(actor, "video")) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
     const engine = await videoEngineStatus();
-    const h3Swap = (engine?.qualities as unknown as { h3_swap?: { ready?: boolean; memory?: { fits?: boolean } } } | undefined)?.h3_swap;
+    const h3Swap = (engine?.qualities as unknown as { h3_swap?: { ready?: boolean; sizes?: string[] } } | undefined)?.h3_swap;
     if (!h3Swap?.ready) return refused(callId, args, "Swapping a face is not available on this computer yet.", "swap_unavailable");
-    if (h3Swap.memory?.fits === false) return refused(callId, args, "Not enough free memory for a face swap right now. Close other big jobs, or try again in a few minutes.", "no_memory");
     const { castForTool } = await import("@/lib/cast"); // loaded here: cast.ts reaches the persona store, which imports this file back
     const chosen = await castForTool(actor, args, { band: audience.band, temporary });
     if (!chosen.ok) return refused(callId, args, chosen.line, "bad_cast");
@@ -275,7 +274,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     const duration = source.files[0]?.seconds ?? source.request.seconds;
     const from = value.from_s ?? 0, seconds = value.seconds ?? Math.min(10, Math.floor(duration));
     if (!Number.isFinite(from) || from + seconds > duration || seconds < 1 || seconds > 10) return refused(callId, args, "Choose a swap window of up to 10 seconds inside the video.", "bad_swap_window");
-    const size = h3Swap.memory?.fits === true ? "640x480" : "512x384";
+    const size = "512x384"; // 640x480 needs 112 GB of GPU memory, more than the 110 GB limit; the Stack refuses a swap that does not fit and says so
     const mark = await clipMarkOf(source);
     const edit: NonNullable<VideoRequest["edit"]> = { from: source.id, change: "swap" };
     const run: EditRun = async (signal, onProgress) => {

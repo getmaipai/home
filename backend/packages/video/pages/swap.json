@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "video-swap",
+  "title": "Swap character",
+  "body": [
+    {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Swap character",
+      "placeholder": "Pick a clip and one cast member. The swap uses up to 10 seconds of the clip.",
+      "prompt_state": "note",
+      "max_length": 200,
+      "submit_label": "Swap character",
+      "starts": "video",
+      "references": [
+        { "state": "clip", "label": "Clip", "kind": "video", "placement": "row" },
+        { "state": "cast", "label": "Cast", "kind": "character", "placement": "row" }
+      ],
+      "submit": {
+        "call": {
+          "target": "/api/plugins/video/actions/swap",
+          "method": "POST",
+          "args": {
+            "id": "{clip}",
+            "cast": "{cast}"
+          },
+          "then": { "navigate": { "to": "/apps/video/create" } }
+        }
+      }
+    }
+  ]
+}

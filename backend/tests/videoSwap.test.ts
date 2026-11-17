@@ -48,3 +48,31 @@ describe("Stack swap", () => {
 describe("edit_video swap schema", () => {
   test("accepts a cast id and refuses missing or multiple cast ids", () => { expect(editVideoArgs.safeParse({ clip: "latest", change: "swap", cast: ["person-id"] }).success).toBe(true); expect(editVideoArgs.safeParse({ clip: "latest", change: "swap" }).success).toBe(false); expect(editVideoArgs.safeParse({ clip: "latest", change: "swap", cast: ["one", "two"] }).success).toBe(false); });
 });
+
+// CREATOR-57b: the Swap character page and its action.
+import { beforeEach as swapBeforeEach } from "bun:test";
+import { TestClient } from "./client";
+import { startSwap } from "@/lib/videos/swapStart";
+
+swapBeforeEach(() => resetDb());
+test("the Swap character page is offered to an adult and its action asks for a clip and one cast member in plain words", async () => {
+  const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const page = await c.get("/api/plugins/video/pages/swap");
+  expect(page.status).toBe(200);
+  expect(JSON.stringify(await page.json())).toContain("Swap character");
+  const noClip = await c.post("/api/plugins/video/actions/swap", { cast: ["x"] });
+  expect(noClip.status).toBe(422); expect((await noClip.json() as { code: string }).code).toBe("no_clip");
+  const noCast = await c.post("/api/plugins/video/actions/swap", { id: "vid-x" });
+  expect(noCast.status).toBe(422); expect((await noCast.json() as { code: string }).code).toBe("no_cast");
+  const unfilled = await c.post("/api/plugins/video/actions/swap", { id: "vid-x", cast: "{cast}" });
+  expect((await unfilled.json() as { code: string }).code).toBe("no_cast");
+  const two = await c.post("/api/plugins/video/actions/swap", { id: "vid-x", cast: ["a", "b"] });
+  expect((await two.json() as { code: string }).code).toBe("one_person");
+});
+test("starting a swap on a clip that is not there is the plain not-found line", async () => {
+  const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const owner = db.select().from(people).get()! as PersonRow;
+  const started = await startSwap(owner, "vid-missing", { cast: ["someone"] });
+  expect(started.ok).toBe(false);
+  if (!started.ok) expect(started.error).toContain("isn't available");
+});

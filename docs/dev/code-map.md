@@ -137,6 +137,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/playlists.json` | video | Playlists |
 | `backend/packages/video/pages/search.json` | video | Search |
 | `backend/packages/video/pages/studio.json` | video | Studio |
+| `backend/packages/video/pages/swap.json` | video | Swap character |
 | `backend/packages/video/pages/talking-avatar.json` | video | Talking avatar |
 | `backend/packages/video/pages/templates.json` | video | Templates |
 | `backend/packages/video/pages/trim.json` | video | Trim and join |
@@ -1404,6 +1405,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, strengthWord, styleNamesOf, resolveStyles |
 | `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
 | `backend/src/lib/videos/swapReferences.ts` | swapReferencePhotos |
+| `backend/src/lib/videos/swapStart.ts` | SWAP_NO_CLIP, SWAP_NO_CAST, SWAP_ONE_PERSON, startSwap |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/voiceoverStart.ts` | VOICEOVER_MAX_LINE, VOICEOVER_NO_LINE, VOICEOVER_LONG_LINE, VOICEOVER_NO_CLIP, VOICEOVER_BAD_LEVEL, startVoiceover |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |

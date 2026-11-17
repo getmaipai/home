@@ -114,7 +114,8 @@
             "studio",
             "trim",
             "captions",
-            "voiceover"
+            "voiceover",
+            "swap"
           ]
         }
       ]
@@ -359,6 +360,15 @@
         "nav": false,
         "kind": "schema",
         "module": "voiceover",
+        "min_role": "adult"
+      },
+      {
+        "id": "swap",
+        "label": "Swap character",
+        "icon": "user-round",
+        "nav": false,
+        "kind": "schema",
+        "module": "swap",
         "min_role": "adult"
       },
       {
