@@ -213,3 +213,21 @@ Owner ask: the same bench as the October picture bakeoff plus pop-culture charac
 | Look | rougher, varied | more polished and cinematic |
 
 Notes. FLUX 3 Image Klein is a 5.6B transformer with a Qwen3-VL-4B encoder, distilled to 16 steps, gated on Hugging Face (accepted by the owner), the FLUX Kommunity licence. The README says to always run a prompt upsampler, a separate 9B model run before every picture; the hub's own chat model with the upsampler's published system prompt (`flux-3-image-klein-pup/system_prompts.json`, `t2i`) did that job in 2 to 6 s with no extra weights. The pipeline's built-in upsampler failed to load with transformers 5.23 (a config error), so the caption step was ours. The speed figures are a floor: they come from a generic route, not the dedicated MLX engines other projects publish (not yet measured here). Verdicts: H3-Image is the faster, leaner picture model and knows more of the characters people ask for; FLUX 3 Klein is more polished and as good at text, but needs a caption writer and missed several famous faces. Owner reaction: "9 to 11 seconds is super fast to me." Open: the quick-draft pass (FLUX.2 Klein 4B at 4 steps, the dedicated FLUX 3 MLX engine, H3-Image streaming on a small computer) and the slot decision (H3-SLOTS-HOME-01 for pictures).
+
+
+Owner decision (2026-11-16, written): "wire in minimax as the image and video models", "minimax as default and ltx 2.5 as alternate", "we need to decision for every tier and to put it in our app", "there are no licence decisions ... we already have a system where the user accepts licenses". The flag in section 7 is answered by [h3-tier-slots-2026-11-16.md](h3-tier-slots-2026-11-16.md); the licence is handled by the household acceptance flow and kept correct in the engine record.
+
+## 9. Word-picture bench and retry policies (2026-11-16)
+
+Twenty harder word prompts (`data-scratch/textbench/prompts.tsv`: long titles, several lines, dates and prices, a subtitle, a Spanish mat, a phone number, a password, curved text), 1024x1024, seed 7, scored by Apple Vision text recognition against the exact quoted words (strict: a stylised script or a decorative face can be mis-read, so by eye the scores are a little higher).
+
+| Policy | Pictures with every word right, of 20 |
+|---|---|
+| H3-Image, plain prompt, one take | 13 (15 by eye) |
+| H3-Image, special text prompt, one take (seeds 7 and 8) | 16 and 17 |
+| H3-Image, plain prompt, one retry with a new seed | 16 |
+| H3-Image then FLUX 3 on the first miss | 18 |
+| H3-Image, FLUX 3, then H3 with the special prompt and a new seed | 19 |
+| FLUX 3 Image Klein alone (captions by the hub's chat model) | 18 (19 by eye) |
+
+Only the curved text around a sticker ring failed on every model. The special prompt: the exact words quoted, "spell every word exactly as written, letter for letter, in a clean bold sans-serif typeface, large and high contrast, no other text anywhere, no extra letters, no misspellings, no logos, no watermarks". H3 misspelled "Pie", "ALBUM" and "ADVENTURE" and added a gibberish line above SALE; FLUX 3 mis-set only the ring. Seconds: H3 about 10 s a picture, FLUX 3 about 16 s plus 4.8 s for the caption. ERNIE-Image-Turbo is not installed on the live hub and was not run on this set (it matched H3 on the five easy prompts in October). Policy chosen by the owner (the other model takes the first retry) is in [model-choice-2026-11-16.md](model-choice-2026-11-16.md).
