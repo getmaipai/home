@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 // slot, same phone clearance above the nav) and drawn by the kit Player: `mini` is the bar, `audio` is the expanded player with the cover,
 // the karaoke lyrics, shuffle and repeat. This file adds what Music needs beside them: the waveform seek bar, time, volume, shuffle and
 // repeat on the bar, Open in Studio, and the keys. The song list, the details and the Studio all press play on `musicPlayer`; the bar only draws it.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Player } from "@maipai/ui/src/primitives/Player";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -106,12 +106,12 @@ function PlayModeButtons() {
 }
 
 /** Follows the active line of the expanded lyrics. Its own component so the frame clock re-draws only this. */
-function LyricsFollow({ track }: { track: Track }) {
+function LyricsFollow({ track, children }: { track: Track; children: (resume: () => void) => ReactNode }) {
   const { time } = useMusicClock();
   const [root, setRoot] = useState<HTMLElement | null>(null);
   useEffect(() => { setRoot(document.querySelector<HTMLElement>("[data-music-expanded]")); }, []);
   const follow = useLyricsFollow(root, track.timed, time, (seconds) => musicPlayer.seek(seconds));
-  return follow.following ? null : <Button type="button" variant="secondary" size="sm" data-testid="music-lyrics-follow" onClick={follow.resume}>{i18n._({ id: "Back to current line", message: "Back to current line" })}</Button>;
+  return follow.following ? null : children(follow.resume);
 }
 
 const SHORTCUTS = [
@@ -260,7 +260,7 @@ export function MusicPlayerBar() {
             {studioButton(track)}
           </> })} />
   );
-  const follow = expanded && track.timed?.length ? <LyricsFollow track={track} /> : null;
+  const follow = expanded && track.timed?.length ? <LyricsFollow track={track}>{(resume) => <Button type="button" variant="secondary" size="sm" data-testid="music-lyrics-follow" onClick={resume}>{i18n._({ id: "Back to current line", message: "Back to current line" })}</Button>}</LyricsFollow> : null;
   const title = i18n._({ id: "Now playing", message: "Now playing" });
   const lead = i18n._({ id: "The song, its words and the player controls.", message: "The song, its words and the player controls." });
   return (
