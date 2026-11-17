@@ -23,7 +23,7 @@ import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, fo
 const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
-import { videoEngineStatus, videoStatusReady } from "./ready";
+import { videoEngineStatus, videoNotReadyReason, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
 import { DETAILED_MAX_SECONDS, H3_MODEL, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, h3EndPictureReady, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
@@ -151,7 +151,11 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (!resolvedSubjects) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words: I couldn't use that saved subject. Choose a subject from your available list." }, data: { refused: "unknown_subject" }, actions: [] } });
   const subjectPrompt = [...resolvedSubjects.map(({ subject }) => subject.look), prompt].filter(Boolean).join(". ");
   const engine = await videoEngineStatus();
-  if (!videoStatusReady(engine, laneOf(audience) === "adult")) return failed(callId, args, "no_engine", "unavailable", "no video model is installed on the Stack");
+  if (!videoStatusReady(engine, laneOf(audience) === "adult")) {
+    // VIDEO-WAN-HIDE-01: an adult whose Stack has only the silent model gets the plain line and the accept step, never that model.
+    if (laneOf(audience) === "adult" && videoStatusReady(engine, false)) return styleRefusal(callId, args, videoNotReadyReason(engine, true), "not_ready");
+    return failed(callId, args, "no_engine", "unavailable", "no video model is installed on the Stack");
+  }
 
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
@@ -258,6 +262,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
   const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
+  if (!choice) return styleRefusal(callId, args, videoNotReadyReason(engine, true), "not_ready");
   if (ending || loop) {
     const endMaker = h3EndPictureReady(engine) ? "h3" : maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
     if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });
@@ -291,7 +296,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const maxWordsOnly = maxReady && tierAsked.tier === "max" && !maxMade && (image !== undefined || (adapters.length > 0 && !ltx25Route)) ? " Max cannot use a style, and cannot start from a picture on this computer yet, so this one was not made at Max; say so in one short sentence." : "";
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one has sound and speech; say so in one short sentence." : "";
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
-  const soundNote = choice.maker === "wan" ? (lane === "adult" && ltx25VideoReady(engine) ? " This video has no sound; if they wanted sound or spoken words, offer to make one from words only, which has sound." : " A Quick video has no sound; if they wanted sound or spoken words, offer to make a video from words.") : "";
+  const soundNote = choice.maker === "wan" && lane !== "adult" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a video from words." : "";
 
   // VIDEO-CREATE-01: a recipe's wording goes to the Stack after the person's words; the card keeps only what they typed. A child gets none.
   // VIDEO-CHAT-01: `camera` is the declared name; `recipe` is what older calls and the Create page send. `camera` wins.

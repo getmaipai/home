@@ -24,7 +24,7 @@ function plan(rows: Array<Partial<DiskRow> & { id: string }>): DiskPlan {
 }
 
 function unusedInput(plan: DiskPlan, components: UnusedComponent[], settings?: AiSettingsInput): UnusedInput {
-  return { copy: aiCopy, plan, components, settings: settings ?? { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null };
+  return { copy: aiCopy, plan, components, settings: settings ?? { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors: false }, freeBytes: null };
 }
 
 test("lists Detailed pictures when it is switched off and no style needs it", () => {
@@ -182,8 +182,9 @@ test("totalBytes is the sum, and nothing is listed when nothing is unused", () =
     part({ id: "zimage-m", size_bytes: 3000 }),
     part({ id: "ltx-m", size_bytes: 7400 }),
   ]));
-  expect(result.items.map((item) => item.id)).toEqual(["ltx-m", "zimage-m"]);
-  expect(result.totalBytes).toBe(10400);
+  // VIDEO-WAN-HIDE-01: an installed LTX-2.5 is in use at every adult level, so only the switched-off Detailed pictures are unused.
+  expect(result.items.map((item) => item.id)).toEqual(["zimage-m"]);
+  expect(result.totalBytes).toBe(3000);
 });
 
 test("does not mutate its input", () => {
@@ -202,7 +203,7 @@ test("does not mutate its input", () => {
   expect(restAfter).toEqual(before);
 });
 
-test("real p128 plan with everything installed and Quick chosen: Detailed pictures and Boost videos are unused, Klein and Always on are not", () => {
+test("real p128 plan with everything installed and Quick chosen: Detailed pictures are unused, LTX-2.5 videos, Klein and Always on are not", () => {
   const p: DiskPlan = structuredClone((table as unknown as { tiers: Record<string, DiskPlan> }).tiers["p128"]!);
   const components: UnusedComponent[] = [];
   for (const row of p.rows) {
@@ -213,18 +214,22 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
       components.push(part({ id: row.id, label: row.label, size_bytes: row.installed_bytes, plan_need: row.need }));
     }
   }
-  const input = unusedInput(p, components, { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: true });
+  const input = unusedInput(p, components, { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: true, householdHasMinors: false });
   const result = findUnused(input);
   const zimage = p.rows.find((row) => row.id === "pictures-zimage")!;
   const ltx = p.rows.find((row) => row.id === "video-ltx25")!;
   const klein = p.rows.find((row) => row.id === "pictures")!;
-  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align", "music-transcribe", "talking-pictures"].map((id) => p.rows.find((row) => row.id === id)!);
-  const expectedIds = [...zimage.model_ids, ...ltx.model_ids, ...extras.flatMap((row) => row.model_ids)];
+  // VIDEO-WAN-HIDE-01: with no child or teen in the household no card offers the silent video row, so it is unused too; the H3 picture
+  // model and the Best clearer rows are offered by no card yet.
+  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align", "music-transcribe", "talking-pictures", "video", "pictures-h3", "pictures-clearer"].map((id) => p.rows.find((row) => row.id === id)!);
+  // VIDEO-WAN-HIDE-01: LTX-2.5 serves an adult's Standard and Boost videos, so it is in use whatever the level setting says.
+  const expectedIds = [...zimage.model_ids, ...extras.flatMap((row) => row.model_ids)];
+  for (const id of ltx.model_ids) expect(result.items.map((item) => item.id)).not.toContain(id);
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
   // Music Boost and Max, the Max LTX-2.5 video row, subject masks and Best pictures (Qwen-Image, the Max pictures row), and the lyric timing aid are offered by no card yet and are unused too; with no group on these test parts they carry the generic name.
   const named = result.items.filter((item) => !extras.some((row) => row.model_ids.includes(item.id)));
-  expect(named.every((item) => item.name === "Detailed pictures" || item.name === "Boost videos")).toBe(true);
-  expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Standard videos and no saved style needs this.")).toBe(true);
+  expect(named.every((item) => item.name === "Detailed pictures")).toBe(true);
+  expect(named.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this.")).toBe(true);
   expect(result.totalBytes).toBe(result.items.reduce((total, item) => total + item.bytes, 0));
   for (const id of [...klein.model_ids, "judge", "embed", "stt", "search", "home"]) expect(result.items.map((item) => item.id)).not.toContain(id);
 });

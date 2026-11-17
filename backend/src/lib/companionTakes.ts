@@ -11,7 +11,7 @@ import { routeAudience } from "@/lib/pictures/audience";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
-import { ltx25EndPictureReady, maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
+import { ltx25EndPictureReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMatches, reportedVideoQualityMatches, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { makingStateOf } from "@/lib/pictures/plainLine";
@@ -313,7 +313,7 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   if (input.states.some((state) => (states.states[state]?.takes.length ?? 0) + input.count > 12)) throw Object.assign(new Error(TAKE_LIMIT_LINE), { status: 409 });
   starting.add(input.companionId);
   try {
-    if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
+    if (!ltx25VideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
     const id = crypto.randomUUID();
     const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null, ...(input.pack ? { pack: true, packJob: input.pack.job, ...(input.pack.gesture ? { packGesture: input.pack.gesture } : {}), ...(input.pack.frame ? { packFrame: input.pack.frame, ...(input.pack.frameSource ? { packFrameSource: input.pack.frameSource } : {}) } : {}) } : {}) };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);

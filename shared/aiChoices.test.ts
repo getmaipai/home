@@ -9,7 +9,7 @@ import { GIB, freeGb, needGb, sizeGb, type DiskPlan, type DiskRow, type DiskTota
 
 const TIERS = table.tiers as Record<DiskPlan["tier"], DiskPlan>;
 const TIERS_LIST = ["p16", "p32", "p64", "p128"] as const;
-const SETTINGS: AiSettingsInput = { pictureQuickModel: "ernie", pictureDetailedEnabled: true, videoQuality: "quick", musicEnabled: false };
+const SETTINGS: AiSettingsInput = { pictureQuickModel: "ernie", pictureDetailedEnabled: true, videoQuality: "quick", musicEnabled: false, householdHasMinors: false };
 
 const kindIsModel = (id: string): boolean => !id.startsWith("engine:") && id !== "home";
 function row(id: string, overrides: Partial<DiskRow> = {}): DiskRow {
@@ -206,7 +206,7 @@ test("no description, stateText, chip or blockedReason contains a model name or 
   for (const tier of TIERS_LIST) {
     const { cards } = buildAiCards({
       copy, plan: TIERS[tier], components: null,
-      settings: { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true },
+      settings: { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true, householdHasMinors: false },
       freeBytes: 1 * GIB,
     });
     for (const card of cards) {
@@ -230,7 +230,7 @@ test("a choice that does not fit says the numbers", () => {
     row("home", { kind: "home", need: "required", installed: true, download_bytes: 0, installed_bytes: 2 * GIB, peak_temp_bytes: 0 }),
     row("video", { need: "recommended", download_bytes: 82 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 10 * GIB }),
   ]);
-  const card = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: 38 * GIB }).cards.find((c) => c.id === "videos")!;
+  const card = buildAiCards({ copy, plan, components: null, settings: { ...SETTINGS, householdHasMinors: true }, freeBytes: 38 * GIB }).cards.find((c) => c.id === "videos")!;
   const quick = card.choices.find((choice) => choice.id === "videos.quick")!;
   const needBytes = Math.ceil(60 * GIB * 1.2) + 10 * GIB;
   expect(quick.blockedReason).toBe(`Needs about ${needGb(needBytes)} GB free. This computer has ${freeGb(38 * GIB)} GB free.`);
@@ -265,10 +265,11 @@ test("action: current none, installed-not-current use, missing get, installed sw
     component({ id: "video-ltx25", state: "installed" }),
     component({ id: "coding", state: "installed" }),
   ];
-  const { cards } = buildAiCards({ copy, plan, components, settings: { ...SETTINGS, videoQuality: "quick" }, freeBytes: null });
+  const { cards } = buildAiCards({ copy, plan, components, settings: { ...SETTINGS, videoQuality: "quick", householdHasMinors: true }, freeBytes: null });
   const videos = cards.find((card) => card.id === "videos")!;
   expect(videos.choices.find((choice) => choice.id === "videos.quick")!.action).toBe("get");
-  expect(videos.choices.find((choice) => choice.id === "videos.detailed")!.action).toBe("use");
+  // VIDEO-WAN-HIDE-01: an installed LTX-2.5 is current at every adult level, so there is nothing to switch to.
+  expect(videos.choices.find((choice) => choice.id === "videos.detailed")!.action).toBe("none");
   const coding = cards.find((card) => card.id === "coding")!;
   expect(coding.choices.find((choice) => choice.id === "coding.helper")!.action).toBe("remove");
   const voice = cards.find((card) => card.id === "voice")!;
@@ -312,9 +313,10 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
     row("engine:video", { kind: "engine", need: "required", download_bytes: 1 * GIB, installed_bytes: 1 * GIB, peak_temp_bytes: 0 }),
   ];
   const plan = planOf(base);
-  const result = recommendedPlan({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: 90 * GIB });
+  const result = recommendedPlan({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed", householdHasMinors: true }, freeBytes: 90 * GIB });
 
-  expect(result.changes).toEqual([{ job: "videos", from: "Boost", to: "Standard", setting: { key: "generation.video_tier", value: "standard" } }]);
+  // VIDEO-WAN-HIDE-01: Boost (LTX-2.5) is the adult recommendation now, so a household on Boost has nothing to change for videos.
+  expect(result.changes).toEqual([]);
   expect(result.installRowIds).toContain("pictures");
   expect(result.installRowIds).toContain("pictures-ernie");
   expect(result.installRowIds).toContain("video");
@@ -348,7 +350,7 @@ test("the plan, components and settings inputs are not mutated", () => {
   deepFreeze(plan);
   const components: AiComponentLike[] = [component({ id: "some-model", state: "installed" })];
   deepFreeze(components);
-  const settings: AiSettingsInput = { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true };
+  const settings: AiSettingsInput = { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true, householdHasMinors: false };
   deepFreeze(settings);
   const input = { copy, plan: plan as DiskPlan, components, settings, freeBytes: 90 * GIB };
   expect(() => {

@@ -94,16 +94,17 @@ describe("A: the Stack's picture flags decide, Home hard-codes nothing", () => {
     expect(chooseVideoQuality({ requested: "detailed", seconds: 5, engine, adultLane: true, hasPicture: true })).toMatchObject({ quality: "detailed", maker: "ltx25", note: null });
     expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, adultLane: true, hasPicture: true, max: true })).toMatchObject({ maker: "ltx25max", seconds: 10 });
     const old = READY();
-    expect(chooseVideoQuality({ requested: "quick", engine: old, adultLane: true, hasPicture: true })).toMatchObject({ maker: "wan", note: "picture_needs_quick" });
-    expect(chooseVideoQuality({ requested: "detailed", engine: old, adultLane: true, hasPicture: true, max: true }).maker).not.toBe("ltx25max");
+    expect(chooseVideoQuality({ requested: "quick", engine: old, adultLane: true, hasPicture: true })).toBeNull();
+    expect(chooseVideoQuality({ requested: "detailed", engine: old, adultLane: true, hasPicture: true, max: true })).toBeNull();
     // Standard and Boost flag true, Max flag false: Max falls back to the level below, never a Max picture clip.
-    expect(chooseVideoQuality({ requested: "detailed", engine: READY({ ltx25Picture: true }), adultLane: true, hasPicture: true, max: true }).maker).toBe("ltx25");
+    expect(chooseVideoQuality({ requested: "detailed", engine: READY({ ltx25Picture: true }), adultLane: true, hasPicture: true, max: true })!.maker).toBe("ltx25");
   });
 
   test("a style still keeps a clip off LTX-2.5, and a teen or a child never gets it (rule 8)", () => {
     const engine = PICTURES();
-    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, style: { base_model: "wan2.2-ti2v-5b" } }).maker).toBe("wan");
-    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, max: true, style: { base_model: "ltx-2.3" } }).maker).toBe("wan");
+    // A style made for the silent maker is unusable for an adult (VIDEO-WAN-HIDE-01).
+    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, style: { base_model: "wan2.2-ti2v-5b" } })).toBeNull();
+    expect(chooseVideoQuality({ engine, adultLane: true, hasPicture: true, max: true, style: { base_model: "ltx-2.3" } })).toBeNull();
     expect(chooseVideoQuality({ requested: "detailed", engine, quickOnly: true, adultLane: false, hasPicture: true, max: true })).toMatchObject({ quality: "quick", maker: "wan" });
     const sent = videoBodyForSlot({ prompt: BOAT, audience: "all-ages", model: LTX25_MODEL, size: "512x256", seconds: 5, image: "abc", end_image: "def" }, "standard", "teen", "teen", engine);
     expect(sent.body.model).toBe(WAN_QUICK_VIDEO_MODEL);
@@ -134,13 +135,11 @@ describe("A: the Stack's picture flags decide, Home hard-codes nothing", () => {
     });
   }
 
-  test("on a Stack without the flags the same request goes the old way: no LTX-2.5 model on the wire", async () => {
+  test("on a Stack without the flags an adult's picture clip is refused with the plain line, never sent to the silent maker (VIDEO-WAN-HIDE-01)", async () => {
     __setVideoStatusForTests(READY());
     const { res } = await pictureClip("owner", "max");
-    expect(res.status).toBe(200);
-    await until(() => video.submitted.length > 0);
-    expect(video.submitted[0]!.model).not.toBe(LTX25_MAX_MODEL);
-    expect(video.submitted[0]!.model).not.toBe(LTX25_MODEL);
+    expect(res.status).toBe(503);
+    expect(video.submitted).toHaveLength(0);
   });
 });
 

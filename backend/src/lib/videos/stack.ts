@@ -101,7 +101,7 @@ export interface StackLtx25Quality {
   loras?: { supported: boolean; max?: number; mode?: "fused" | "unfused"; negative_prompt?: "none" | "nag" };
   /** The pieces to download (LTX25-MAX-01 reports them; `download_bytes` is the whole pack). */
   install?: { download_bytes?: number; remaining_bytes?: number };
-  licence?: { id: string; name: string; url: string } | null;
+  licence?: { id: string; name: string; url: string; accepted_at?: string | null } | null;
 }
 
 export interface StackVideoStatus {

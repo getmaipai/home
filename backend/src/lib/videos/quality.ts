@@ -122,7 +122,7 @@ export interface VideoQualityChoice {
  * Standard, else the request's own choice, else the household's setting. Detailed
  * that is not installed falls back to Quick with a note and the five second ceiling.
  */
-export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; /** The clip starts from a picture: LTX-2.5 can take it only when the Stack reports `image_to_video`. */ hasPicture?: boolean; /** A teen or a child: Quick and nothing else, whatever was asked (the job starter enforces it again). */ quickOnly?: boolean; /** An adult: the only lane LTX-2.5 serves (a teen or a child never gets it, rules 0, 8 and 10). */ adultLane?: boolean; /** LTX25-MAX-01: Max was asked for and the person holds it (the caller read the grant); used only with a ready Max engine, words only. */ max?: boolean }): VideoQualityChoice {
+export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; hasPicture?: boolean; quickOnly?: boolean; adultLane?: boolean; max?: boolean }): VideoQualityChoice | null {
   const asked = typeof input.seconds === "number" && Number.isFinite(input.seconds) ? Math.round(input.seconds) : undefined;
   const base = qualityOfBase(input.style?.base_model);
   const quickOk = quickVideoReady(input.engine);
@@ -140,11 +140,12 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
   };
   if (ltx25MaxOk) return fit("detailed", null, true, "ltx25max");
   if (input.quickOnly) return fit("quick", null, false);
-  if (input.style && input.style.base_model === "ltx-2.3") return fit("quick", null, false);
+  const adultFallback = (): VideoQualityChoice | null => input.adultLane === true ? null : fit("quick", null, false);
+  if (input.style && input.style.base_model === "ltx-2.3") return input.adultLane === true ? null : fit("quick", null, false);
   if (h3Ok && input.requested === "detailed" && (!input.hasPicture || h3PictureReady(input.engine))) return fit("detailed", null, true, "h3");
   if (input.style && base) {
-    if (base === "detailed") return ltx25Ok ? fit("detailed", input.requested === "quick" ? "style_needs_quick" : null, input.requested === "quick", "ltx25") : fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
-    return fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
+    if (base === "detailed") return ltx25Ok ? fit("detailed", input.requested === "quick" ? "style_needs_quick" : null, input.requested === "quick", "ltx25") : adultFallback();
+    return input.adultLane === true ? null : fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
   }
   if (ltx25Ok) {
     // A length past Boost's five seconds is a Standard clip (10 s) unless Boost was asked for outright.
@@ -155,14 +156,14 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
   // A picture starts a Quick clip only on a Stack that does not say Detailed can start from one (VIDEO-LTX-02); the household's own default stays quiet, a request for Detailed is told why not.
   // VIDEO-TIERS-01: with LTX-2.5 ready, an adult's picture clip says why it is silent, since the Standard level now has sound from words.
   const pictureLtx25 = input.hasPicture && input.adultLane === true && ltx25VideoReady(input.engine);
-  if (input.hasPicture && wanted === "detailed" && !ltx25PictureReady(input.engine)) return fit("quick", input.requested === "detailed" || pictureLtx25 ? "picture_needs_quick" : null, false);
-  if (pictureLtx25 && wanted === "quick") return fit("quick", "picture_needs_quick", false);
+  if (input.hasPicture && wanted === "detailed" && !ltx25PictureReady(input.engine)) return adultFallback();
+  if (pictureLtx25 && wanted === "quick") return adultFallback();
   if (wanted === "detailed") {
     if (detailedOk) return fit("detailed", null, input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS), "ltx25");
-    return fit("quick", input.requested === "detailed" ? "detailed_not_installed" : null, false);
+    return adultFallback();
   }
-  if (!quickOk && detailedOk) return fit("quick", null, false);
-  return fit("quick", null, false);
+  if (!quickOk && detailedOk) return adultFallback();
+  return adultFallback();
 }
 
 /** The line the model relays for a quality note (plain words, no model names). */

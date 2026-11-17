@@ -148,6 +148,49 @@ describe("GET /api/ai/overview", () => {
   });
 });
 
+describe("GET /api/ai/overview never names the silent video model to an adult (VIDEO-WAN-HIDE-01)", () => {
+  const WAN = "fastwan2-2-ti2v-5b-mlx-bf16";
+  const LTX = "ltx-2-5-q8-distilled-mlx";
+  const component = (id: string, label: string, state: "installed" | "notInstalled") => ({ id, label, summary: label, group: "video", kind: "model", state, size_bytes: state === "installed" ? 2e9 : null, download_bytes: state === "installed" ? 0 : 2e9, full_bytes: 2e9, required_free_bytes: 2e9, plan_need: "recommended", requirement: "optional", requirement_reason: null, last_used_at: null, used_by: [], depends_on: [], job: null, percent: null, failure: null, can_install: state !== "installed", install_block: null, can_uninstall: state === "installed", uninstall_block: null, licence: null });
+  function scriptStack(ltxState: "installed" | "notInstalled") {
+    const components = [component(WAN, "Silent video", "installed"), component(LTX, "LTX-2.5 with sound", ltxState)];
+    const candidate = (id: string, label: string) => ({ id, label, family: id, peak_bytes: 2e9, verified: true, fits: true, refusal: null });
+    __setComponentsFetchForTests((async (input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(String(input), "http://stack");
+      if (url.pathname === "/stack/v1/components") return Response.json({ tier: "fixture", free_disk_bytes: 100e9, disk_margin_bytes: 0, installed_bytes: 4e9, components });
+      if (url.pathname === "/stack/v1/tiers/candidates") {
+        const category = url.searchParams.get("category") ?? "video";
+        const rows = category === "video" ? [candidate(WAN, "Silent video"), candidate(LTX, "LTX-2.5 with sound")] : [];
+        return Response.json({ category, profile: "fixture", room_bytes: 20e9, levels: ["standard", "boost", "max"].map((tier) => ({ tier, cap_bytes: 20e9, recommended: rows[0]?.id ?? null, candidates: rows })) });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch);
+    const slot = (tier: string, model: string | null) => ({ category: "video", tier, model, peak_bytes: model ? 2e9 : null, verified: Boolean(model), fits_ever: model !== null });
+    __setOverviewBudgetForTests({ slots: [slot("standard", WAN), slot("boost", null), slot("max", null)] } as never);
+  }
+  async function videoLevels(token: string) {
+    const response = await app.request("http://localhost/api/ai/overview", { headers: { cookie: `session=${token}` } });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { features: Array<{ id: string; levels: Array<{ tier: string; state: string; word: string; model_id: string | null; model_label: string | null; detail: string | null; options: Array<{ id: string }> }> }> };
+    return body.features.find((row) => row.id === "videos")!.levels;
+  }
+  test("with LTX-2.5 installed every adult video level resolves to it, and no level or option names the silent model", async () => {
+    const { token } = addPerson("person-ai-overview-wan-ltx", "owner");
+    scriptStack("installed");
+    const levels = await videoLevels(token);
+    for (const level of levels) { expect(level.model_id).not.toBe(WAN); expect(level.model_label ?? "").not.toContain("Silent video"); expect(level.options.map((option) => option.id)).not.toContain(WAN); }
+    expect(levels.find((level) => level.tier === "standard")).toMatchObject({ model_id: LTX, state: "ready" });
+    expect(levels.find((level) => level.tier === "boost")).toMatchObject({ model_id: LTX });
+  });
+  test("without LTX-2.5 the adult levels say how an admin gets it instead of the silent model the Stack assigns", async () => {
+    const { token } = addPerson("person-ai-overview-wan-missing", "owner");
+    scriptStack("notInstalled");
+    const levels = await videoLevels(token);
+    for (const level of levels) expect(level.model_id).not.toBe(WAN);
+    expect(levels.find((level) => level.tier === "standard")).toMatchObject({ state: "unset", word: "Not turned on", detail: "Videos with sound need the newer video model. An admin can install it in Settings, AI and models." });
+  });
+});
+
 describe("GET /api/ai/overview resolves a level to the model the Stack really assigns", () => {
   test("automatic levels name the Stack's own model; none-offered levels say why; Max chat stays off until picked", async () => {
     const { token } = addPerson("person-ai-overview-budget", "owner");
@@ -177,6 +220,7 @@ describe("GET /api/ai/overview resolves a level to the model the Stack really as
     expect(level("chat", "max")).toMatchObject({ state: "unset", model_label: null, detail: expect.stringContaining("Max has no model for Chat yet") });
     expect(level("chat", "standard").options[0]).toMatchObject({ id: "big", good_at: "Big Chat is good at things" });
     expect(level("pictures", "standard")).toMatchObject({ state: "missing", model_label: "Pic Model", automatic: true, action: { label: "Install" } });
-    expect(level("videos", "boost")).toMatchObject({ state: "unset", can_choose: false, detail: "Videos has no Boost model on this Mac; it uses Standard." });
+    // VIDEO-WAN-HIDE-01: an adult's video levels never resolve to the silent model; without LTX-2.5 the level says how an admin gets it.
+    expect(level("videos", "boost")).toMatchObject({ state: "unset", can_choose: false, word: "Not turned on", detail: "Videos with sound need the newer video model. An admin can install it in Settings, AI and models." });
   });
 });

@@ -9,7 +9,7 @@ import { rowHasModel, sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, ty
 
 export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "sounds" | "stems" | "voice" | "wakeword" | "vision" | "coding" | "faces" | "ingredients";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[]; licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string|null; covered?: boolean } | null }
-export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
+export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean; householdHasMinors: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
 export interface AiCopy {
   card(job: AiJobId): { title: string; summary: string };
@@ -333,8 +333,9 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const hasQuick = has("video");
         const hasDetailed = has("video-ltx25");
         const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
-        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: true, setting: { key: "generation.video_tier", value: "standard" } });
-        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-ltx25")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_tier", value: "boost" } });
+        if (hasQuick && settings.householdHasMinors) specs.push({ id: "videos.quick", job: "videos", kind: "switch", row: rows.get("video")!, current: true, recommended: false, setting: null });
+        // VIDEO-WAN-HIDE-01: LTX-2.5 is the adult video model at Standard and Boost alike, so it is in use whenever it is installed; the level setting only picks the default level.
+        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-ltx25")!, current: rowIsInstalled(rows.get("video-ltx25")!, components) || preferDetailed, recommended: true, setting: { key: "generation.video_tier", value: "boost" } });
         break;
       }
       case "music": {

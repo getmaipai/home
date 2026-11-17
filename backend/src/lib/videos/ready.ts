@@ -7,6 +7,12 @@ import { isStackConfigured } from "@/lib/stackEngine";
 import { videoStatus, type StackVideoStatus } from "./stack";
 import { h3VideoReady, ltx25MaxReady, ltx25VideoReady, quickVideoReady } from "./quality";
 
+// The two video part ids Home still names until HOME-PARTS-03 draws the cards from the Stack's parts list and VIDEO-WAN-REMOVE-01 deletes Wan.
+export const WAN_VIDEO_PART_ID = "fastwan2-2-ti2v-5b-mlx-bf16";
+export const LTX_VIDEO_PART_ID = "ltx-2-5-q8-distilled-mlx";
+export const ADULT_VIDEO_LICENCE_LINE = "Videos with sound need the newer video model. An admin can accept its licence and install it in Settings, AI and models.";
+export const ADULT_VIDEO_INSTALL_LINE = "Videos with sound need the newer video model. An admin can install it in Settings, AI and models.";
+
 let cached: { at: number; status: StackVideoStatus | null } | null = null;
 let forTests: StackVideoStatus | null | undefined;
 const TTL_MS = 20_000;
@@ -41,12 +47,13 @@ export function dropVideoStatusCache(): void { cached = null; }
 export function videoStatusReady(status: StackVideoStatus | null, adult = false): boolean {
   if (!status) return false;
   if (status.available === false) return false;
-  return quickVideoReady(status) || (adult && (h3VideoReady(status) || ltx25VideoReady(status) || ltx25MaxReady(status)));
+  return adult ? h3VideoReady(status) || ltx25VideoReady(status) || ltx25MaxReady(status) : quickVideoReady(status);
 }
 
 export async function videoEngineReady(adult = false): Promise<boolean> {
   return videoStatusReady(await videoEngineStatus(), adult);
 }
+
 
 /** A ready status for tests. `ltx25: "ready"` or `"missing"` adds LTX-2.5 status. */
 export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> & { quickMissing?: boolean; /** VIDEO-INPUTS-01: the Stack reports `image_to_video` true (and `end_image`) on LTX-2.5 Standard and Boost / on Max. */ ltx25Picture?: boolean; ltx25maxPicture?: boolean; /** LTX-2.5 as the Stack reports it (VIDEO-TIERS-01): `"ready"` serves it, `"missing"` reports it not ready; left out is a Stack without it. */ ltx25?: "ready" | "missing"; /** LTX25-MAX-01: the Max profile as the Stack reports it: `"ready"` serves it, `"not-installed"` has the engine without the 71 GB pack, `"missing"` has neither. Left out is a Stack without it. */ ltx25max?: "ready" | "not-installed" | "missing"; /** The seconds the Stack's Max profile allows (default 10). */ ltx25maxSeconds?: number } = {}): StackVideoStatus {
@@ -84,6 +91,7 @@ const NO_VIDEO_MODEL = "No video model is installed on this computer yet. An adm
 const VIDEO_ENGINE_UNREACHABLE = "Videos are not ready yet. Try again in a few minutes.";
 
 /** Why a video cannot be made now, in the person's terms (see pictureNotReadyReason). */
-export function videoNotReadyReason(engine: StackVideoStatus | null): string {
+export function videoNotReadyReason(engine: StackVideoStatus | null, adult = false): string {
+  if (adult && !h3VideoReady(engine) && !ltx25VideoReady(engine) && !ltx25MaxReady(engine)) return engine?.qualities?.ltx25?.licence && engine.qualities.ltx25.licence.accepted_at === null ? ADULT_VIDEO_LICENCE_LINE : ADULT_VIDEO_INSTALL_LINE;
   return (engine?.reason ? plainEngineLine(engine.reason) : null) ?? (engine === null ? VIDEO_ENGINE_UNREACHABLE : NO_VIDEO_MODEL);
 }

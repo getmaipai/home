@@ -191,7 +191,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   if (outcome.status === "succeeded") {
     // A refusal keeps its own line in the reply, after the instruction to the model; the person reads the line alone.
     const line = (outcome.result?.reply?.text ?? "").replace(/^No (?:new )?video was (?:made|started)\. Say this to the person in your own words and keep its meaning:\s*/, "").trim();
-    return { ok: false, status: 422, error: line || "That video could not be started. Change the words and try again.", code: data?.refused ?? "refused" };
+    return { ok: false, status: data?.refused === "not_ready" ? 503 : 422, error: line || "That video could not be started. Change the words and try again.", code: data?.refused ?? "refused" };
   }
   if (outcome.failureKind === "bad_arguments") return { ok: false, status: 422, error: "Describe the video in 3 to 1200 characters, then try again.", code: "bad_arguments" };
   return { ok: false, status: outcome.failureKind === "unavailable" ? 503 : 502, error: outcome.detail ?? "The video could not be made. Try again in a minute.", code: outcome.errorCode ?? "failed" };
