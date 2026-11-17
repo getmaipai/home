@@ -23,6 +23,7 @@ import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
+import { bandOf, isMinor } from "@/lib/audience";
 
 const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
@@ -31,7 +32,6 @@ const sizeText = (bytes: number | null) => bytes == null ? i18n._({ id: "Size no
 const dateText = (date: string | null) => date ? formatDate(date) : i18n._({ id: "Never", message: "Never" });
 const timeText = (date: string | null) => date ? formatDateTime(date) : i18n._({ id: "Never", message: "Never" });
 const isAdult = (entry: PersonRosterEntry) => entry.age_band === "adult" || entry.role === "owner" || entry.role === "admin" || entry.role === "adult";
-const isMinor = (entry: PersonRosterEntry) => entry.age_band === "child" || entry.age_band === "teen" || entry.role === "child" || entry.role === "teen";
 
 /** Settings > Household > Coding. The settings rows stay on the shared SettingsRenderer and its spec descriptions. */
 const SELF_TEST_WAIT_MS = 15 * 60_000;
@@ -120,7 +120,7 @@ export function CodingAdminSettings() {
     finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
   };
   const roster = (people.data ?? []).filter((entry) => entry.role !== "guest").sort((a, b) => {
-    const bandOrder = (entry: PersonRosterEntry) => isAdult(entry) ? 0 : entry.age_band === "teen" || entry.role === "teen" ? 1 : 2;
+    const bandOrder = (entry: PersonRosterEntry) => bandOf(entry) === "adult" ? 0 : bandOf(entry) === "teen" ? 1 : 2;
     return bandOrder(a) - bandOrder(b) || a.display_name.localeCompare(b.display_name);
   });
   const enabledValue = grants.data ?? [];
@@ -198,7 +198,7 @@ export function CodingKeysSettings({ person }: { person: Pick<Roster, "id" | "ro
   const access = useQuery({ queryKey: ["coding-access", person.id], queryFn: api.codingAccess });
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
-  const minor = person.role === "child" || person.role === "teen";
+  const minor = isMinor(person);
   const [expires, setExpires] = useState<7 | 30 | 90 | 365>(minor ? 30 : 90);
   const [created, setCreated] = useState<{ key: PersonalApiKey; secret: string } | null>(null);
   const [rename, setRename] = useState<PersonalApiKey | null>(null);

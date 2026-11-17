@@ -48,7 +48,7 @@ let showCompleter: typeof completeBackground | null = null;
 export function __clearTalentStageCacheForTests(): void { stageCache.clear(); }
 export function __setTalentShowCompleterForTests(value: typeof completeBackground | null): void { showCompleter = value; }
 function ageAudience(band: AgeBand): Show["audience"] { return band === "child" ? "all" : band; }
-function audienceBand(audience: Show["audience"]): AgeBand { return audience === "all" ? "child" : audience; }
+function showAudienceBand(audience: Show["audience"]): AgeBand { return audience === "all" ? "child" : audience; }
 function refusal(error: string): Error { return new Error(error); }
 
 export async function inventCast(actor: PersonRow, format: ReturnType<typeof loadFormats> extends Map<string, infer F> ? F : never, show: Pick<CreateShowInput, "title" | "audience">, complete: typeof completeBackground = completeBackground): Promise<Array<{ synth_id: string; part: Part }>> {
@@ -59,7 +59,7 @@ export async function inventCast(actor: PersonRow, format: ReturnType<typeof loa
     const counts = new Map<string, number>();
     for (const entry of entries) counts.set(entry.part, (counts.get(entry.part) ?? 0) + 1);
     if (entries.some((entry) => !format.parts.some((part) => part.id === entry.part)) || format.parts.some((part) => (counts.get(part.id) ?? 0) < part.min || (counts.get(part.id) ?? 0) > part.max)) throw new Error("cast shape mismatch");
-    const band = audienceBand(show.audience ?? "adult"), out: Array<{ synth_id: string; part: Part }> = [];
+    const band = showAudienceBand(show.audience ?? "adult"), out: Array<{ synth_id: string; part: Part }> = [];
     const usedVoices = new Set<string>();
     const { getOfferedVoices } = await import("@/lib/voiceResolve");
     const voices = (await getOfferedVoices() ?? []).filter((voice) => isPresetVoice(voice.id));
@@ -79,7 +79,7 @@ export async function inventCast(actor: PersonRow, format: ReturnType<typeof loa
 export async function createShow(actor: PersonRow, input: CreateShowInput): Promise<Production> {
   const format = formatById(input.format_id);
   if (!format) throw refusal("That show format does not exist. Pick one from the list.");
-  const band = speakerAgeBand(actor, new Date()), audience = input.audience ?? ageAudience(band), floor = audienceBand(audience);
+  const band = speakerAgeBand(actor, new Date()), audience = input.audience ?? ageAudience(band), floor = showAudienceBand(audience);
   const rank = { child: 0, teen: 1, adult: 2 };
   if (rank[floor] > rank[band]) throw refusal("You can only make shows for your own age group or younger.");
   if (band !== "adult" && getHouseholdSettingValue("talent.minors.make") === false) throw refusal("Shows are off for children and teens in this household. A parent can turn them on in Settings.");

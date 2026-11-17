@@ -61,7 +61,7 @@ describe("house tool", () => {
   });
   test("teen explicit lock allow requires confirmation", async () => {
     const s = setup({ permissionsOf: () => [{ action: "house.see:entity:lock.front_door", effect: "allow" }, { action: "house.control:entity:lock.front_door", effect: "allow" }] });
-    const out = await run({ action: "unlock", targets: [{ name: "Front door lock" }] }, s.deps, "member", "teen");
+    const out = await run({ action: "unlock", targets: [{ name: "Front door lock" }] }, s.deps, "adult", "teen");
     expect((out as unknown as { confirmNeeded?: boolean }).confirmNeeded).toBe(true); expect(s.performed).toHaveLength(0);
   });
   test("adult action performs each target, audits without names, writes one undo and confirmation block", async () => {

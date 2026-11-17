@@ -3,7 +3,7 @@
 // deterministic minor floor KS-05's shelf uses (lib/retrieval/minorFloor.ts, called by lib/shelf), otherwise child. The floor runs
 // again at every read for a minor, so a stored row is never trusted on its own word. Rule 0: age and surface gates outrank all.
 import type { AgeBand } from "@/lib/ageBand";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { audienceBand } from "@/lib/audience";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { bandOkAllowedFor } from "@/lib/shelf/shelfPolicy";
@@ -41,10 +41,9 @@ export function bandOkAtIngest(input: BandInput): BandVerdict {
   return { band: "child", advisorySource: "tag" };
 }
 
-/** The band a person reads media at. A guest is treated as a child: nothing the household has not cleared for everyone. */
+/** The band a person reads media at. */
 export function mediaBandOf(actor: PersonRow): AgeBand {
-  if (actor.role === "guest") return "child";
-  return speakerAgeBand(actor, new Date());
+  return audienceBand(actor);
 }
 
 /** The `band_ok` values a person may be shown. */

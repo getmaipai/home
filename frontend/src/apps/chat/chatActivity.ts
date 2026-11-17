@@ -8,10 +8,11 @@ import { api, type HomeJobView } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
 import { JOBS_KEY } from "@/lib/sharedReads";
+import { bandOf } from "@/lib/audience";
 import {
   runningNowView,
   type RunningNowActionKey,
-  type RunningNowBand,
+
   type RunningNowRow,
   type RunningNowView,
 } from "@/shell/runningNow";
@@ -26,10 +27,6 @@ export type ActivityCardPick = {
   kind: "waiting" | "running" | "done" | "failed";
   more: number;
 };
-
-function bandOf(role: string): RunningNowBand {
-  return role === "child" ? "child" : role === "teen" ? "teen" : "adult";
-}
 
 /** Picks the urgent row for TaskCard; other live jobs are shown in BackgroundInbox. */
 export function pickActivity(
@@ -66,7 +63,7 @@ export function useChatActivity() {
     },
     queryFn: () => api.jobs(),
   });
-  const viewer = useMemo(() => (person ? { id: person.id, band: bandOf(person.role), admin: person.role === "owner" || person.role === "admin" } : null), [person]);
+  const viewer = useMemo(() => (person ? { id: person.id, band: bandOf(person), admin: person.role === "owner" || person.role === "admin" } : null), [person]);
   const rows = Array.isArray(jobs.data) ? jobs.data : [];
   const now = Date.now();
   const view = viewer ? runningNowView({ jobs: rows.filter((row) => row.kind !== "model_download"), viewer, now }) : null;

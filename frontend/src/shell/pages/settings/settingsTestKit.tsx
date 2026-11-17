@@ -5,11 +5,12 @@ import { mock } from "bun:test";
 import registryJson from "@maipai/spec/settings/keys.json";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Roster } from "@/lib/api";
+import { bandOf } from "@/lib/audience";
 
 export const REGISTRY = registryJson as unknown as SettingsKey[];
 
 export function makePerson(role: Roster["role"], overrides: Partial<Roster> = {}): Roster & { age_band: "child" | "teen" | "adult" } {
-  const band = role === "child" ? "child" : role === "teen" ? "teen" : "adult";
+  const band = bandOf({ role });
   return {
     id: `person-${role}`,
     display_name: role[0]!.toUpperCase() + role.slice(1),

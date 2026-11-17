@@ -9,7 +9,8 @@
 // CSAM prevention applies across lanes.
 import { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
 export { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
-import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import type { AgeBand } from "@/lib/ageBand";
+import { audienceBand, stricterBand } from "@/lib/audience";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { kidUsage } from "@/db/schema";
@@ -20,12 +21,9 @@ import type { PersonRow } from "@/types";
 
 export type Lane = "adult" | "teen" | "child";
 
-const STRICT: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
-
 /** The lane: the stricter of the band the turn presents and the person's own band (role and birthdate). */
 export function laneOf(input: Pick<PictureAudience, "actor" | "band">): Lane {
-  const own = speakerAgeBand(input.actor, new Date());
-  return STRICT[input.band] <= STRICT[own] ? input.band : own;
+  return stricterBand(input.band, audienceBand(input.actor));
 }
 
 // ---------------------------------------------------------------- the settings

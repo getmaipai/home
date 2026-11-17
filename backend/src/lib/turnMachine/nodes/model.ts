@@ -7,6 +7,7 @@ import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "..
 import { ANSWER_WORDS, fallbackPlan, stageTimeoutMs, analyse, clarifyingQuestion, briefBlock, researchQuestion, filterFindings, ledgerForAnalysis, partsFor, planDataWithin, replyBrief, shouldAsk, understand, type Brief, type ReplyCoverage } from "../researchPipeline";
 import { EVIDENCE_FLOOR_NOTES_WAIT_MS, evidenceThin, researchNoNewRound, NO_WEB_RESULTS_CLAUSE, MEMORY_QUERY_SKIPPED_NOTE, REPEAT_SKIPPED_NOTE, RESEARCH_ANSWER_CLAUSE, continuationInstruction, firstRoundNote, isRepeatQuery, isResearchStyle, markResearch, noteResearchText, researchEvidence, researchCutAt, researchPastCut, researchProgress, resultDigest, shortKeywordQuery, suggestedSearchesNote, writeQueries, writeQueriesChecked, type QueryWriter } from "../research";
 import { comparePrompt } from "@/lib/promptPrefix";
+import { audienceBand } from "@/lib/audience";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
 // state table): one call, the fixed tool set from the budget, offered with
@@ -177,7 +178,7 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
   if ((id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID) && !state?.voiceoverAllowed) return null;
   if (id === MAKE_SPEECH_TOOL_ID && !state?.voiceoverAllowed) return null;
   if (id === MAKE_INSPIRED_VOICE_TOOL_ID && !state?.inspiredVoiceAllowed) return null;
-  if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec({ ...state.houseContext, actor: { id: state.actor.id, role: state.actor.role as import("@/lib/house/access").HouseActor["role"], band: state.actor.role === "child" || state.actor.role === "teen" ? state.actor.role : "adult" } }) : null;
+  if (id === HOUSE_TOOL_ID) return state?.houseAllowed && state.houseContext ? houseToolSpec({ ...state.houseContext, actor: { id: state.actor.id, role: state.actor.role as import("@/lib/house/access").HouseActor["role"], band: audienceBand(state.actor) } }) : null;
   if (id === UPTIME_TOOL_ID) return state?.uptimeAllowed ? uptimeToolSpec(visibleUptimeInstances()) : null;
   if (id === "edit_picture") return editPictureSpec(id, state);
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own

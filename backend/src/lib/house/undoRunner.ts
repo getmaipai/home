@@ -2,6 +2,7 @@ import type { PersonRow } from "@/types";
 import { effectivePermissions } from "@/lib/permissions";
 import { houseLanFetch } from "./connection";
 import type { HouseLanFetchResult } from "./connection";
+import { audienceBand } from "@/lib/audience";
 import { loadHouseRegistry } from "./cache";
 import { houseAccess, type HouseActor } from "./access";
 import type { HouseEntity } from "./registry";
@@ -34,7 +35,7 @@ export function houseUndoRunner(actor: PersonRow, deps: { connection?: () => Hou
       if (!registry.ok) return false;
       const entity = registry.entities.find((item) => item.id === data.entity_id);
       if (!entity || actionEntity[entity.kind] !== domain) return false;
-      const band: HouseActor["band"] = actor.role === "child" ? "child" : actor.role === "teen" ? "teen" : "adult";
+      const band: HouseActor["band"] = audienceBand(actor);
       const houseActor: HouseActor = { id: actor.id, role: actor.role as HouseActor["role"], band };
       const permissions = effectivePermissions(actor.id);
       const control = houseAccess({ actor: houseActor, permissions, entity, level: "control" });

@@ -4,6 +4,7 @@
 // usable only on a robot at or above that level). This file is the one definition of the pairing rule. A robot with no companion, or
 // one whose companion no longer fits its controls, reads as "none": the strictest (child) result, exactly as before.
 import type { AgeBand } from "@/lib/ageBand";
+export { stricterBand } from "@/lib/audience";
 import { getDeviceSettingValue } from "@/lib/settings";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
@@ -43,10 +44,6 @@ export function companionInfo(id: string): CompanionInfo | null {
 
 export function allCompanions(): CompanionInfo[] {
   return [...listPackageIds()].sort().flatMap((id) => companionInfo(id) ?? []);
-}
-
-export function stricterBand(a: AgeBand, b: AgeBand): AgeBand {
-  return RANK[a] <= RANK[b] ? a : b;
 }
 
 /** Whether a robot set to `controls` may use a companion whose audience floor is `floor`. */

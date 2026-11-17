@@ -19,6 +19,7 @@ import { ARRANGE_KEY, defaultSectionLayout, HOME_SECTIONS, type HomeSection } fr
 import { HomeHero, chooseHomeHero } from "@/shell/pages/dashboard/HomeHero";
 import { MakeShelf } from "@/shell/pages/dashboard/MakeShelf";
 import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
+import { isMinor } from "@/lib/audience";
 
 
 /** Home (docs/design/home-page-2026-10-17.md, option C): the greeting, then the ask box, then a short
@@ -66,7 +67,7 @@ export function DashboardPage({ person }: { person: Roster }) {
       case "hero": {
         const bot = companion?.kind === "companion" ? companion.companion : undefined;
         const source = sectionLayout.heroSource ?? defaults.heroSource;
-        const choice = source === "off" || source === "weather" ? null : source === "companion" ? chooseHomeHero([], bot ? { id: bot.id, name: bot.name, portrait: bot.portrait } : null, true) : chooseHomeHero(media.data?.made_at_home, bot ? { id: bot.id, name: bot.name, portrait: bot.portrait } : null, person.role === "child" || person.role === "teen");
+        const choice = source === "off" || source === "weather" ? null : source === "companion" ? chooseHomeHero([], bot ? { id: bot.id, name: bot.name, portrait: bot.portrait } : null, true) : chooseHomeHero(media.data?.made_at_home, bot ? { id: bot.id, name: bot.name, portrait: bot.portrait } : null, isMinor(person));
         return choice ? <div key={block} className="md:col-span-2 lg:col-span-12"><HomeHero choice={choice} /></div> : null;
       }
       case "pick_up": return incognito || person.role === "guest" ? null : <div key={block} className="lg:col-span-6"><ContinueShelf /></div>;

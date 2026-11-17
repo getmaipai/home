@@ -1,6 +1,8 @@
 import { checkSafety, REFUSE_CATEGORIES } from "@maipai/spec/safety/ts/classifier.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { isMinorBand } from "@/lib/audience";
+export { isMinorBand } from "@/lib/audience";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { notifyIfFlagged } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
@@ -20,10 +22,6 @@ import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpret
 // (lib/notifications.ts's resolveRecipients()). isMinorRole()/MINOR_ROLES
 // had no other caller left, so they're removed rather than kept as
 // exported dead code.
-function isMinorBand(band: AgeBand): boolean {
-  return band !== "adult";
-}
-
 /** The one, real caller in a running conversation turn (the retired turn engine's
  * the turn machine, runTurn(), and runTurnStream()'s gateOutputSafety() all
  * pass the actor's real AgeBand, computed once via lib/ageBand.ts's

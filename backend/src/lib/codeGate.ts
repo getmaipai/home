@@ -9,6 +9,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getStackClient } from "@/lib/stackEngine";
 import type { PersonRow } from "@/types";
+import { audienceBand } from "@/lib/audience";
 import { sqlite } from "@/db";
 
 export type GateRefusal = { status: 403 | 429 | 503; message: string; code: string; retryAfter?: number };
@@ -70,7 +71,7 @@ export function transportRefusal(c: Context): GateRefusal | null {
 // ---- 2. Rate, streams and daily tokens ------------------------------------------------------------------------------------------------
 
 const positive = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : null);
-const isMinor = (p: PersonRow) => p.role === "child" || p.role === "teen";
+const isMinor = (p: PersonRow) => audienceBand(p) !== "adult";
 
 /** The key's own limit and the household's, whichever is tighter; 60 a minute when neither is set. */
 export function requestsPerMinute(keyLimit: number | null): number {
