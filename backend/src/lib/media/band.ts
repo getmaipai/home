@@ -51,11 +51,16 @@ export function allowedBandsFor(actor: PersonRow): Band[] {
   return bandOkAllowedFor(mediaBandOf(actor));
 }
 
-/** Whether `actor` may see this item's band: the stored value, and for a minor the floor again on the words. */
+/** Whether `actor` may see this item's band: the stored `band_ok` and, for a minor, the explicit flag. The words are in the stored stamp. */
 export function bandAllows(actor: PersonRow, item: Pick<MediaItem, "band_ok" | "title" | "description" | "subtitle" | "advisory"> & Partial<Pick<MediaItem, "artist" | "album" | "album_artist" | "genre" | "lyrics">>): boolean {
   const band = mediaBandOf(actor);
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return false;
   if (band === "adult") return true;
-  if (item.advisory.explicit) return false;
-  return !trips(floorText({ title: item.title, description: item.description, lyrics: item.lyrics?.text, also: [item.subtitle, item.artist, item.album, item.album_artist, item.genre] }));
+  return !item.advisory.explicit;
+}
+
+/** The floor on words that are not a stored item's own (a fetched song summary, a line a model wrote): there is no stamp for them, so
+ * for a minor the same floor runs on the text as it is built (RULES.md C9: results that cannot be stored first are checked as they are built). */
+export function wordsAllowFor(actor: PersonRow, text: string): boolean {
+  return mediaBandOf(actor) === "adult" || !trips(text);
 }

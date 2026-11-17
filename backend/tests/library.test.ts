@@ -8,6 +8,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { db } from "@/db";
 import { attachments, people, shares, pictureJobs, videoJobs, musicJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { stampAttachmentById } from "@/lib/filter/ratingsSweep";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { personUsageByKind } from "@/lib/storage/usage";
@@ -25,6 +26,7 @@ async function fixture() {
   function file(n: number, mediaType = "image/png", provenance = "composer:upload") {
     const key = `file-${n.toString(16).padStart(16, "0")}`;
     db.insert(attachments).values({ id: key, ownerPersonId: id, conversationId: null, turnId: null, mediaType, size: n + 1, sha256: createHash("sha256").update(key).digest("hex"), storagePath: `people/${id}/attachments/${key}`, provenance, createdAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
+    stampAttachmentById(key); // the seeded file is rated the way an upload would be (RATE-INGEST-01); lists read the stamp
     return key;
   }
   return { client, id, file };

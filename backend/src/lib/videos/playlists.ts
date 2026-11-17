@@ -9,6 +9,7 @@ import type { PersonRow } from "@/types";
 import { mediaBandOf, trips } from "@/lib/media/band";
 import { addItem, createCollection, deleteCollection, listCollections, playlistsWithMember, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPlaylistMembers } from "@/lib/media/collections";
 import type { MediaCollection, MediaItem } from "@/lib/media/model";
+import { stampsForPage } from "@/lib/media/access";
 import { madeFiles, madeVideoRow, readableIn, rowOf, contextFor, type ActionResult, type MediaRow } from "@/lib/media/appHost";
 
 export type PlaylistResult = ActionResult<{ id: string; title: string; added?: boolean }>;
@@ -52,8 +53,9 @@ export function resolveEntries(person: PersonRow, ids: readonly string[]): Resol
   const madeMap = () => (made ??= new Map(madeFiles(person, "video").map((file) => [file.id, file])));
   const saved: Array<{ id: string; item: MediaItem }> = [];
   const slots: Array<{ id: string; item?: MediaItem }> = [];
+  const stamps = stampsForPage(person, ids);
   for (const id of ids) {
-    const item = readableIn(person, "video", id);
+    const item = readableIn(person, "video", id, stamps);
     slots.push(item ? { id, item } : { id });
     if (item) saved.push({ id, item });
   }

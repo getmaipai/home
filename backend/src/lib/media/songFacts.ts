@@ -6,7 +6,7 @@ import { isUnder18, wikimediaFetchJson, type FetchJson } from "@/lib/answerImage
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { nextHlc } from "@/lib/hlc";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { bandAllows } from "./band";
+import { bandAllows, wordsAllowFor } from "./band";
 import type { MediaItem } from "./model";
 import { artistWikimediaEnabled, shortBio, type ProfilePassResult } from "./artistProfiles";
 import { sharedMusicBrainzClient, type MusicBrainzClient } from "./musicbrainzMatch";
@@ -75,7 +75,7 @@ export function songFactFor(item: MediaItem, reader: PersonRow): SongFactView | 
   if (!item.musicbrainz_recording_id) return null;
   const row = db.select().from(musicSongFacts).where(eq(musicSongFacts.musicbrainzRecordingId, item.musicbrainz_recording_id)).get();
   if (!row || row.status !== "found" || !row.summary || !row.pageUrl) return null;
-  if (!bandAllows(reader, { ...item, description: row.summary })) return null;
+  if (!bandAllows(reader, item) || !wordsAllowFor(reader, [item.title, item.artist, row.summary].filter(Boolean).join(". "))) return null; // the stamp covers the item's own words; the fetched summary has none
   return { summary: row.summary, url: row.pageUrl };
 }
 

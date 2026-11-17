@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { mediaItems, people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import type { PersonRow } from "@/types";
 
 beforeEach(() => resetDb());
@@ -81,6 +82,7 @@ describe("the item view", () => {
   test("can_edit is false for a teen and true for an adult", async () => {
     const { adult, teen, track } = await setup();
     db.update(mediaItems).set({ bandOk: "child", advisoryExplicit: false }).where(eq(mediaItems.id, track.id)).run();
+    stampMediaById(track.id); // the direct edit re-rates the item the way the edit route does (RATE-INGEST-01)
     expect(await (await teen.post("/api/plugins/audio/data/item", { id: track.id })).json()).toMatchObject({ can_edit: false, cover_choices: [] });
     expect(await (await adult.post("/api/plugins/audio/data/item", { id: track.id })).json()).toMatchObject({ can_edit: true });
   });

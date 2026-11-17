@@ -28,7 +28,7 @@ import { stationItemView, previewStationItemView } from "./radio";
 import { previewStationFor } from "./radioDirectory";
 import { previewEpisodeView } from "./podcasts";
 import { nowPlayingOf } from "./radioStream";
-import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo } from "./access";
+import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo, stampsForPage } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
 import { itemFromRow, madeSourceId, sourcesFromRows, type MediaCollection, type MediaItem, type MediaSource } from "./model";
@@ -49,7 +49,7 @@ import { memberCandidates, memberPlaylists, ownPlaylists, playlistFor, playlistV
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 import type { Result } from "@/lib/result";
 import { stampMediaById } from "@/lib/filter/ratingsSweep";
-import { storedRatingFilter } from "@/lib/filter/stamps";
+import { storedRatingFilter, type StoredStamp } from "@/lib/filter/stamps";
 
 export type MediaKind = MediaItem["kind"];
 type ProductionSourceGate = (person: PersonRow, productionId: string) => boolean;
@@ -144,15 +144,14 @@ export function allowedSources(person: PersonRow): MediaSource[] {
 }
 
 /** The person may read this item in this app (band, source, kind, allowlist). */
-export function readableIn(person: PersonRow, appId: MediaAppId, id: string): MediaItem | null {
-  const item = readableItem(person, id);
+export function readableIn(person: PersonRow, appId: MediaAppId, id: string, stamps?: ReadonlyMap<string, StoredStamp>): MediaItem | null {
+  const item = readableItem(person, id, stamps);
   if (item && appId === "audio" && !allowedSources(person).some((source) => source.id === item.source_id && source.kind === "root")) return null;
   if (!item || !(MEDIA_APPS[appId].kinds as readonly string[]).includes(item.kind) && !(appId === "audio" && item.kind === "sound")) return null;
   if (item.kind === "chapter") {
-    const parent = item.parent_id ? readableItem(person, item.parent_id) : null;
+    const parent = item.parent_id ? readableItem(person, item.parent_id, stamps) : null;
     if (!parent || parent.kind !== "audiobook") return null;
   }
-  if (appId === "shows" && !showWordsAllowed(person, item)) return null;
   if (allowlistOnly(person) && !allowedSources(person).some((source) => source.id === item.source_id)) return null;
   return item;
 }
@@ -166,7 +165,7 @@ export interface ItemFilter {
   all?: boolean;
 }
 
-/** Items of the app's kinds this person may read, filtered through the band again (the floor runs for a minor), in the given order. */
+/** Items of the app's kinds this person may read, filtered by the stored stamp and the stored band (no word check runs here), in the given order. */
 export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFilter = {}): MediaItem[] {
   let sources = allowedSources(person);
   if (appId === "audio") sources = sources.filter((source) => source.kind === "root");
@@ -192,7 +191,7 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
       console.warn("[media] skipped a row that no longer parses:", row.id, error instanceof Error ? error.message.slice(0, 200) : String(error));
       continue;
     }
-    if (bandAllows(person, item) && !mediaItemLocked(person, item) && (appId !== "shows" || showWordsAllowed(person, item))) items.push(item);
+    if (bandAllows(person, item) && !mediaItemLocked(person, item)) items.push(item);
     if (!filter.all && items.length >= limit) break;
   }
   return items;
@@ -332,8 +331,9 @@ export function rowsOf(person: PersonRow, items: readonly MediaItem[]): MediaRow
 /** Items in the order of `ids`, the ones this person may read in this app. */
 export function itemsInOrder(person: PersonRow, appId: MediaAppId, ids: readonly string[], limit: number): MediaItem[] {
   const items: MediaItem[] = [];
+  const stamps = stampsForPage(person, ids);
   for (const id of ids) {
-    const item = readableIn(person, appId, id);
+    const item = readableIn(person, appId, id, stamps);
     if (item) items.push(item);
     if (items.length >= limit) break;
   }
@@ -949,7 +949,6 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
 }
 
 function showEpisodes(person: PersonRow, item: MediaItem): MediaItem[] { return item.kind === "episode" ? queryItems(person, "shows", { all: true, where: and(eq(mediaItems.sourceId, item.source_id), item.series === null ? isNull(mediaItems.series) : eq(mediaItems.series, item.series)) }).filter((entry) => item.series !== null || entry.id === item.id).sort((a,b) => (a.season ?? 0)-(b.season ?? 0) || (a.episode ?? 0)-(b.episode ?? 0) || a.id.localeCompare(b.id)) : [item]; }
-function showWordsAllowed(person: PersonRow, item: MediaItem): boolean { return bandAllows(person, { ...item, title: [item.title, item.series, item.genre].filter(Boolean).join(". ") }); }
 function showTitles(items: MediaItem[]): MediaItem[] { const seen = new Set<string>(); return items.filter((item) => { const key = item.kind === "episode" && item.series ? JSON.stringify([item.source_id, item.series]) : item.id; if (seen.has(key)) return false; seen.add(key); return true; }); }
 function showRow(person: PersonRow, item: MediaItem) {
   const episodes = showEpisodes(person, item); const context = contextFor(person, episodes);
@@ -961,7 +960,7 @@ function showRow(person: PersonRow, item: MediaItem) {
 }
 function showCollection(person: PersonRow, create = false): MediaCollection | null { return listCollections(person.id, "watchlist").find((c) => c.title === "Shows and Films") ?? (create ? createCollection(person.id, "watchlist", "Shows and Films") : null); }
 function showsData(person: PersonRow, dataId: string, params: DataParams, limit: number): unknown | null {
-  const all = () => queryItems(person, "shows", { all: true }).filter((item) => showWordsAllowed(person, item));
+  const all = () => queryItems(person, "shows", { all: true });
   const rows = (items: MediaItem[]) => showTitles(items).slice(0, limit).map((item) => showRow(person, item));
   const item = params.id ? readableIn(person, "shows", params.id) : null;
   switch (dataId) {

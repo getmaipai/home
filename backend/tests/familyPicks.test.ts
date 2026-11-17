@@ -5,6 +5,7 @@ import { addPick, listPicks, togglePickVote } from "@/lib/media/familyPicks";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
+import { stampSeededMedia } from "./support/stampSeeded";
 
 beforeEach(() => resetDb());
 
@@ -17,7 +18,7 @@ function makePerson(id: string, role: string, birthdate: string | null = null): 
 function video(id: string, bandOk = "child") {
   const now = new Date().toISOString();
   if (!db.select().from(mediaSources).all().some((row) => row.id === "msrc-test000")) db.insert(mediaSources).values({ id: "msrc-test000", kind: "root", scope: "household", ownerPersonId: null, label: "Test", rootMountId: null, rootPath: null, rootKinds: JSON.stringify(["video"]), visibleTo: JSON.stringify("household"), feedId: null, url: null, station: null, productionId: null, extractor: null, createdAt: now, hlc: nextHlc(), provenance: "test" }).run();
-  db.insert(mediaItems).values({ id, kind: "video", title: id, subtitle: null, description: null, sourceId: "msrc-test000", parentId: null, locFileId: null, locRootId: null, locPath: null, locUrl: `https://example.test/${id}`, mediaType: "video/mp4", durationS: 12, size: 1, width: 1, height: 1, videoCodec: null, audioCodec: null, playable: "original", artwork: null, previews: null, chapters: "[]", subtitles: "[]", lyrics: null, lockedFields: null, series: null, season: null, episode: null, artist: null, album: null, albumArtist: null, madeArtistId: null, musicbrainzRecordingId: null, musicbrainzArtistId: null, musicbrainzReleaseGroupId: null, musicbrainzCheckedKey: null, trackNo: null, discNo: null, year: null, genre: null, author: null, narrator: null, seriesIndex: null, locatorKind: "none", external: null, externalId: null, advisoryExplicit: false, advisorySource: "tag", bandOk, verifiedByPersonId: null, addedAt: now, fingerprint: null, hidden: false, lastSeenScan: null, missingSince: null, pages: null, probeFailedFp: null, deletedAt: null, trashUntil: null, createdAt: now, hlc: nextHlc(), provenance: "test" }).run();
+  db.insert(mediaItems).values({ id, kind: "video", title: id, subtitle: null, description: null, sourceId: "msrc-test000", parentId: null, locFileId: null, locRootId: null, locPath: null, locUrl: `https://example.test/${id}`, mediaType: "video/mp4", durationS: 12, size: 1, width: 1, height: 1, videoCodec: null, audioCodec: null, playable: "original", artwork: null, previews: null, chapters: "[]", subtitles: "[]", lyrics: null, lockedFields: null, series: null, season: null, episode: null, artist: null, album: null, albumArtist: null, madeArtistId: null, musicbrainzRecordingId: null, musicbrainzArtistId: null, musicbrainzReleaseGroupId: null, musicbrainzCheckedKey: null, trackNo: null, discNo: null, year: null, genre: null, author: null, narrator: null, seriesIndex: null, locatorKind: "none", external: null, externalId: null, advisoryExplicit: false, advisorySource: "tag", bandOk, verifiedByPersonId: null, addedAt: now, fingerprint: null, hidden: false, lastSeenScan: null, missingSince: null, pages: null, probeFailedFp: null, deletedAt: null, trashUntil: null, createdAt: now, hlc: nextHlc(), provenance: "test" }).run(); stampSeededMedia();
 }
 
 describe("Family Picks", () => {

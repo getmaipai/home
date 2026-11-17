@@ -112,7 +112,7 @@
   "backend/src/lib/settingsMinorSnapshot.ts": 2,
   "backend/src/lib/shares.ts": 1,
   "backend/src/lib/shelf/shelfNews.ts": 1,
-  "backend/src/lib/shelf/shelfRead.ts": 3,
+  "backend/src/lib/shelf/shelfRead.ts": 1,
   "backend/src/lib/storage/usage.ts": 1,
   "backend/src/lib/surfaceClass.ts": 1,
   "backend/src/lib/talent/brief.ts": 2,

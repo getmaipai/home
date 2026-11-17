@@ -3,10 +3,10 @@
 // What a user type gets is the intersection of: the shelf is on, the feed is
 // enabled, the feed's audience includes the user type, a package feed's list
 // is ticked for the user type AND offered to it by the policy, and the item's
-// band_ok rank is at or below the user type's. For a minor the floor runs
-// again on the text here, so a stored row is never trusted on its own word.
+// band_ok rank is at or below the user type's, and (FILTER-MEDIA-01, RULES.md C9) for a minor the stored stamp is within the
+// viewer's ceiling. The minor floor on the text ran once, when the story arrived (shelfStamp.ts), and the stamp carries it; no
+// word check runs on a read.
 import type { AgeBand } from "@/lib/ageBand";
-import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { storedRatingFilterForBand } from "@/lib/filter/stamps";
 import { listFeeds } from "./feedStore";
 import { adminAddresses } from "./shelfFeeds";
@@ -14,20 +14,8 @@ import { bumpShelfCounter } from "./shelfCounters";
 import { bandOkAllowedFor, feedOfferedTo, feedVisibleTo, shelfEnabled, tickedByBand } from "./shelfPolicy";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "./shelfStore";
 
-const FLOOR_MEMO_MS = 60_000;
-let floorMemo = new Map<string, { trips: boolean; expiresAt: number }>();
-
-function tripsMinorFloorMemo(text: string): boolean {
-  const now = Date.now();
-  const entry = floorMemo.get(text);
-  if (entry && entry.expiresAt > now) return entry.trips;
-  if (entry) floorMemo.delete(text);
-  const trips = tripsMinorFloor(text);
-  floorMemo.set(text, { trips, expiresAt: now + FLOOR_MEMO_MS });
-  return trips;
-}
-
-export function __resetFloorMemoForTests(): void { floorMemo.clear(); }
+/** Kept for tests written when a floor memo existed; the read path has no memo now (the stamp carries the verdict). */
+export function __resetFloorMemoForTests(): void { /* nothing to reset */ }
 
 /** The ids of every feed whose items may reach this user type right now. */
 export function visibleFeedIds(band: AgeBand): string[] {
@@ -54,18 +42,17 @@ export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStor
   if (!store || limit <= 0) return [];
   const feedIds = visibleFeedIds(band);
   if (feedIds.length === 0) return [];
-  // Over-read so the release floor can drop a few and still fill the page.
+  // Over-read so the stamp can drop a few and still fill the page.
   const candidates = store.list(feedIds, bandOkAllowedFor(band), band === "adult" ? limit : limit * 3);
   const released: ShelfItem[] = [];
-  // RATE-INGEST-01 (C9): beside today's checks, a minor reads the stored rating only (one query for the page; no rater runs here).
+  // RATE-INGEST-01 (C9): a minor reads the stored rating only (one query for the page; no rater runs here).
   // An item with no stamp yet is Unrated and waits for the ratings sweep. An adult reads no stamps.
   const stamped = storedRatingFilterForBand("shelf_item", band, candidates.map((item) => item.id));
   for (const item of candidates) {
-    if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
+    if (!stamped(item.id)) { // the stamp holds the floor's verdict (X) and an unrated story (Unrated): both are dropped and counted
       bumpShelfCounter("release_floor_dropped", band);
       continue;
     }
-    if (!stamped(item.id)) continue; // RATE-INGEST-01: after today's floor, so its counter still counts what it drops
     released.push(item);
     if (released.length >= limit) break;
   }
@@ -73,7 +60,7 @@ export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStor
 }
 
 /** NEWS-02: one item by id, released to this user type or null. The same rules as `releaseShelfItems` (a carrying feed visible to
- * the band, band_ok at or below it, the minor floor run again on the text), so a story, a picture or a save can never be reached by
+ * the band, band_ok at or below it, the stored stamp within the band's ceiling), so a story, a picture or a save can never be reached by
  * guessing an id the asker's lists do not release. */
 export function releaseShelfItem(band: AgeBand, id: string, store: ShelfStore | null = sharedShelfStore()): ShelfItem | null {
   if (!store || !shelfEnabled()) return null;
@@ -82,8 +69,7 @@ export function releaseShelfItem(band: AgeBand, id: string, store: ShelfStore | 
   const visible = new Set(visibleFeedIds(band));
   if (!store.feedIdsOf(item.canonical_url).some((feedId) => visible.has(feedId))) return null;
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return null;
-  if (!storedRatingFilterForBand("shelf_item", band, [item.id])(item.id)) return null;
-  if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
+  if (!storedRatingFilterForBand("shelf_item", band, [item.id])(item.id)) {
     bumpShelfCounter("release_floor_dropped", band);
     return null;
   }

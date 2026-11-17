@@ -72,11 +72,11 @@ export function listItems(actor: PersonRow, query: ItemQuery): ItemPage {
   const where = and(...conditions);
   const total = db.select({ n: sql<number>`count(*)` }).from(mediaItems).where(where).get()?.n ?? 0;
   const minor = actor.role === "guest" || allowedBandsFor(actor).length < 3;
-  // Over-read a little for a minor: the floor runs again on the words and may drop a row or two.
+  // Over-read a little for a minor: the stored stamp may drop a row or two.
   const rows = db.select().from(mediaItems).where(where).orderBy(...orderFor(query)).limit(query.limit + (minor ? query.limit : 0)).offset(query.offset).all();
   const items: MediaItem[] = [];
   let consumed = 0;
-  // RATE-INGEST-01 (C9): beside today's checks, a person below the adult ceiling reads the stored rating only (one query for the page).
+  // RATE-INGEST-01 (C9): a person below the adult ceiling reads the stored rating only (one query for the page).
   const stamped = storedRatingFilter("media_item", actor, rows.map((row) => row.id));
   for (const row of rows) {
     consumed++;

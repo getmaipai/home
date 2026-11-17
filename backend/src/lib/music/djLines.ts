@@ -16,7 +16,7 @@ import { composePersonaPrompt } from "@/lib/persona";
 import { readableItem } from "@/lib/media/access";
 import { artistProfileFor } from "@/lib/media/artistProfiles";
 import { songFactFor } from "@/lib/media/songFacts";
-import { bandAllows } from "@/lib/media/band";
+import { wordsAllowFor } from "@/lib/media/band";
 import { storeFile, attachmentFilePath, purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
 import { newFileId } from "@/lib/id";
 import type { PersonRow } from "@/types";
@@ -139,7 +139,7 @@ export async function ensureDjLines(person: PersonRow, afterId: string, nextIds:
         const voice = (deps.voice ?? voiceForSpeech)({ actor: person, ...(companionVoice ? { companionVoice } : {}) });
         const startedAt = Date.now();
         const text = await writeDjLine(input, deps.complete ?? complete, deps.random, composePersonaPrompt(selected, "spoken"));
-        if (!text || !bandAllows(person, { band_ok: "child", title: next.title, artist: next.artist ?? null, description: text, subtitle: null, advisory: { explicit: false } } as never)) return;
+        if (!text || !wordsAllowFor(person, [next.title, next.artist, text].filter(Boolean).join(". "))) return;
         const speech = await synthesizeDjLine(text, voice, deps.synthesize);
         if (!speech) return;
         const id = newFileId();

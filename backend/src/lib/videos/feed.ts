@@ -14,6 +14,9 @@ import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { videoJobLockItem, videoJobLockState, lockedJobView } from "@/lib/videos/lock";
 import { adultStateOf } from "@/lib/adultMarks";
 import { creationOfFile } from "@/lib/creations/store";
+import { audienceBand } from "@/lib/audience";
+import { ceilingFor } from "@/lib/filter/ceiling";
+import { getStamp, stampAllowed } from "@/lib/filter/stamps";
 import { clipFindingLine, type ClipFinding } from "@/lib/videos/frameCheck";
 import type { PersonRow } from "@/types";
 
@@ -52,6 +55,12 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
   if (videoJobLockState(person, job) !== "open") return lockedJobView(job);
   const file = job.state === "done" ? job.files[0] : undefined;
   if (job.state === "done" && (!file || !fileIsLive(person, file.id))) return null;
+  // FILTER-MEDIA-01 (C5, C9): a viewer below X sees a finished clip only when its creation's stored stamp is within the ceiling; no stamp is Unrated.
+  const ceiling = ceilingFor(audienceBand(person));
+  if (file && ceiling < 4) {
+    const creation = creationOfFile(person.id, file.id);
+    if (!creation || !stampAllowed(getStamp("creation", creation.id), ceiling)) return null;
+  }
   const [w, h] = (job.request.size ?? "").split("x").map(Number);
   const create = job.request.create ?? {};
   const level = levelOfJob(job);

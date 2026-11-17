@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { stampSeededMedia } from "./support/stampSeeded";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { attachments, people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { mediaAppData, startMusicQueue, saveProgress, setListed } from "@/lib/media/appHost";
@@ -63,6 +64,7 @@ test("shuffle preserves the authorized album membership", () => {
 });
 test("a minor never sees a track whose artist, album or genre trips the floor, even with a stored child band", () => {
   db.update(mediaItems).set({ genre: "Hardcore porn" }).where(eq(mediaItems.id, id(5))).run();
+  stampMediaById(id(5)); // an edit re-rates the item when it is saved (RATE-INGEST-01); lists read the stamp
   expect(data(sprout, "songs").map((row) => row.id)).toEqual([id(1), id(2), id(3)]);
   expect(data(sprout, "item", id(5))).toEqual([]);
   expect(data(atlas, "songs").map((row) => row.id)).toContain(id(5));

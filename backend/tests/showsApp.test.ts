@@ -12,6 +12,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { db } from "@/db";
 import { mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 
 beforeEach(() => { resetDb(); __resetProgressForTests(); });
 type Row = { id: string; title: string; play_id: string; copy_label: string; progress?: number };
@@ -138,6 +139,7 @@ test("a child's seasons, next-episode offer and up-next list skip an episode hel
   expect((await data(child, "up-next", { id: seen[0]!.id }) as Row[]).map((row) => row.id)).not.toContain(s1[1]!.id);
   expect(((await data(child, "seasons", { id: show.id })) as { rows: unknown[] }).rows).toHaveLength(2);
   db.update(mediaItems).set({ genre: "Hardcore porn" }).where(eq(mediaItems.id, s1[0]!.id)).run();
+  stampMediaById(s1[0]!.id); // the direct edit re-rates the item the way an edit does (RATE-INGEST-01)
   expect((await data(child, "episodes", { id: show.id, season: 1 }) as Row[]).map((row) => row.id)).not.toContain(s1[0]!.id);
   expect((await data(owner, "episodes", { id: show.id, season: 1 }) as Row[]).map((row) => row.id)).toContain(s1[0]!.id);
 });

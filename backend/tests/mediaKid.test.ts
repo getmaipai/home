@@ -16,6 +16,7 @@ import { mediaWatchDays, mediaWatchSessions } from "@/db/schema";
 import { __resetProgressForTests, writeProgress, getProgress } from "@/lib/media/progress";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { stampSeededMedia } from "./support/stampSeeded";
 
 // One injected clock for the whole file: the routes read the system clock, and `clock()` stamps ticks at 12:00 of "today". Pinning the
 // system clock to 12:30 of a fixed day keeps every route write after the ticks on the same day, whatever the real time or zone.
@@ -42,7 +43,7 @@ async function setup() {
     db.insert(mediaSources).values({ id, kind, scope, ownerPersonId: scope === "person" ? child.id : null, label: "Library", rootPath: kind === "root" ? "/fixture" : null, rootKinds: '["video","track"]', url: kind === "root" ? null : "https://example.com/channel", visibleTo: JSON.stringify(visibleTo), createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   }
   function item(id: string, sourceId: string, kind = "video", explicit = false) {
-    db.insert(mediaItems).values({ id, sourceId, kind, title: "Moon song", locUrl: "https://example.com/media", mediaType: "video/mp4", playable: "unknown", size: 100, bandOk: "child", advisoryExplicit: explicit, addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
+    db.insert(mediaItems).values({ id, sourceId, kind, title: "Moon song", locUrl: "https://example.com/media", mediaType: "video/mp4", playable: "unknown", size: 100, bandOk: "child", advisoryExplicit: explicit, addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run(); stampSeededMedia();
     return id;
   }
   source("msrc-library0001");

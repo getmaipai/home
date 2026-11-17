@@ -19,6 +19,7 @@ import { nextHlc } from "@/lib/hlc";
 import { runBackup, restoreBackup } from "@/lib/backup";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { stampSeededMedia } from "./support/stampSeeded";
 
 const dirs: string[] = [];
 beforeEach(() => { resetDb(); __resetProgressForTests(); });
@@ -39,7 +40,7 @@ async function setup() {
   const id = newMediaItemId();
   const now = new Date().toISOString();
   db.insert(mediaSources).values({ id: sourceId, kind: "root", scope: "household", label: "nova", rootPath: root, rootKinds: '["video"]', createdAt: now, hlc: nextHlc(), provenance: "hub" }).run();
-  db.insert(mediaItems).values({ id, kind: "video", title: "nova", sourceId, locRootId: sourceId, locPath: "nova.mp4", mediaType: "video/mp4", durationS: 100, size: 10, videoCodec: "h264", playable: "original", fingerprint: "10-1767225600000", bandOk: "child", addedAt: now, createdAt: now, hlc: nextHlc(), provenance: "hub", artwork: JSON.stringify({ path: "cover.jpg" }), chapters: JSON.stringify([{ start_s: 0, title: "nova", source: "manual" }]) }).run();
+  db.insert(mediaItems).values({ id, kind: "video", title: "nova", sourceId, locRootId: sourceId, locPath: "nova.mp4", mediaType: "video/mp4", durationS: 100, size: 10, videoCodec: "h264", playable: "original", fingerprint: "10-1767225600000", bandOk: "child", addedAt: now, createdAt: now, hlc: nextHlc(), provenance: "hub", artwork: JSON.stringify({ path: "cover.jpg" }), chapters: JSON.stringify([{ start_s: 0, title: "nova", source: "manual" }]) }).run(); stampSeededMedia();
   const issued = issueDeviceToken(actor.id, "phone", "atlas");
   const client = new TestClient();
   const allow = () => setDeviceOfflineScope(issued.deviceId, ["media.offline"]);

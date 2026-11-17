@@ -10,6 +10,9 @@ import { bandAllows, mediaBandOf } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { mediaItemLocked } from "@/lib/adultLock";
+import { audienceBand } from "@/lib/audience";
+import { ceilingFor } from "@/lib/filter/ceiling";
+import { getStamp, getStamps, stampAllowed, type StoredStamp } from "@/lib/filter/stamps";
 
 export function isMediaAdmin(actor: PersonRow): boolean {
   return isOwnerOrAdmin(actor);
@@ -49,15 +52,26 @@ export function liveSourceById(id: string): MediaSource | null {
   return row ? sourceFromRow(row) : null;
 }
 
-/** An item `actor` may read, or null (a missing item and a forbidden one look the same). */
-export function readableItem(actor: PersonRow, id: string): MediaItem | null {
+/** The stored stamps of a page of ids, in one query, for a viewer whose ceiling is below X; undefined for an adult (no stamp is read). */
+export function stampsForPage(actor: PersonRow, ids: readonly string[]): ReadonlyMap<string, StoredStamp> | undefined {
+  return ceilingFor(audienceBand(actor)) < 4 ? getStamps("media_item", ids) : undefined;
+}
+
+/** An item `actor` may read, or null (a missing item and a forbidden one look the same). FILTER-MEDIA-01 (RULES.md C5, C9): a viewer whose
+ * ceiling is below X also needs the item's stored stamp to be within it (no stamp is Unrated, so not shown); the stamp is read, never
+ * made here. `stamps` is a page of stamps already fetched with one `getStamps` call; an id missing from it is looked up singly. The
+ * stored `band_ok` and explicit checks stay beside the stamp as a second check until a later row drops those columns. */
+export function readableItem(actor: PersonRow, id: string, stamps?: ReadonlyMap<string, StoredStamp>): MediaItem | null {
   const row = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get();
   if (!row || row.deletedAt || row.hidden) return null;
   const source = liveSourceById(row.sourceId);
   if (!source || !sourceVisibleTo(source, actor)) return null;
   try {
     const item = itemFromRow(row);
-    return bandAllows(actor, item) && !mediaItemLocked(actor, item) ? item : null;
+    if (!bandAllows(actor, item) || mediaItemLocked(actor, item)) return null;
+    const ceiling = ceilingFor(audienceBand(actor));
+    if (ceiling < 4 && !stampAllowed(stamps?.get(id) ?? getStamp("media_item", id), ceiling)) return null;
+    return item;
   } catch {
     return null; // a row that no longer has the spec shape is not served
   }
