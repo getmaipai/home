@@ -7,10 +7,14 @@ export const CONTENT_SETTINGS_KEYS: SettingsKey[] = [SettingsKey.parse({
   range: { multiple: true, options: ["swearing", "drugs", "gambling", "gore", "sexual", "minor_line"] },
   default: [],
   label: "Content filters",
-  help: "Choose more content to block. The filters for your age stay on.",
-  copy: { does: "Adds filters to the ones for your age." },
+  help: "Choose more kinds of content to hold back. The filters this level already has stay on.",
+  copy: {
+    does: "Holds back more kinds of content on top of the level's own.",
+    options: { swearing: "Holds back swearing.", drugs: "Holds back drug and alcohol content.", gambling: "Holds back gambling content.", gore: "Holds back gory violence.", sexual: "Holds back sexual content.", minor_line: "Holds back anything that sexualizes a minor." },
+    option_labels: { swearing: "Swearing", drugs: "Drugs and alcohol", gambling: "Gambling", gore: "Gore", sexual: "Sexual content", minor_line: "Minors" },
+  },
   level: "basic",
-  lives_in: "person.preferences",
+  lives_in: "person.allowance",
   honoured_by: ["home"],
 })];
 
@@ -23,15 +27,15 @@ export const CONTENT_POLICY_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: CONTENT_POLICY_CHAT_KEY, scope: "household", selector: "boolean", default: true,
     label: "Content rules on chat replies",
-    help: "Holds a reply sentence that breaks the content rules for a child or teen. The safety floor stays on whatever this says.",
-    copy: { does: "Applies the content rules to chat replies for children and teens." },
-    level: "advanced", secret: false, lives_in: "household.content", honoured_by: ["home"],
+    help: "Holds a reply sentence that breaks the content rules below the X level. The safety floor stays on whatever this says.",
+    copy: { does: "Checks each reply sentence against the house wording limits below X." },
+    level: "advanced", secret: false, lives_in: "household.ai_advanced", honoured_by: ["home"],
   }),
   SettingsKey.parse({
     key: CONTENT_POLICY_NEWS_KEY, scope: "household", selector: "boolean", default: true,
     label: "Content rules on News",
-    help: "Holds a News sentence or headline that breaks the content rules for a child or teen. The safety floor stays on whatever this says.",
-    copy: { does: "Applies the content rules to News for children and teens." },
-    level: "advanced", secret: false, lives_in: "household.content", honoured_by: ["home"],
+    help: "Holds a News sentence or headline that breaks the content rules below the X level. The safety floor stays on whatever this says.",
+    copy: { does: "Checks each headline and story sentence against the wording limits below X." },
+    level: "advanced", secret: false, lives_in: "household.ai_advanced", honoured_by: ["home"],
   }),
 ];

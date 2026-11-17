@@ -33,6 +33,7 @@ import { WAKEWORD_SETTINGS_KEYS } from "../src/settings/wakewordKeys.js";
 import { ROBOT_SETTINGS_KEYS } from "../src/settings/robotSettingsKeys.js";
 import { ALARM_SETTINGS_KEYS } from "../src/settings/alarmKeys.js";
 import { ACCESS_SETTINGS_KEYS } from "../src/settings/accessKeys.js";
+import { CONTENT_SETTINGS_KEYS, CONTENT_POLICY_SETTINGS_KEYS } from "../src/settings/contentKeys.js";
 
 // DEPS-SELFHEAL-01: the output goes only where the caller says (MAIPAI_COMMONS_DIR: a commons worktree being edited, or a scratch
 // copy a check compares). With no variable it used to fall back to the shared ../commons checkout, which every session reads, and
@@ -64,6 +65,8 @@ const sorted = [
   ...ROBOT_SETTINGS_KEYS,
   ...ALARM_SETTINGS_KEYS,
   ...ACCESS_SETTINGS_KEYS,
+  ...CONTENT_SETTINGS_KEYS,
+  ...CONTENT_POLICY_SETTINGS_KEYS,
 ].sort((a, b) => a.key.localeCompare(b.key));
 writeFileSync(outPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`Wrote ${sorted.length} settings key(s) to ${outPath}`);
