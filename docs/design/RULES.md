@@ -82,7 +82,7 @@ companion. Owner-approved: 2026-10-21 (chat).
    re-parses or estimates what the engine already returns. Token counts
    are taken on the rendered messages, after credential redaction and
    note substitution. A request from a role whose defaults turn thinking off (the
-   child and teen roles, unless an admin overrides it for that person: rule C3,
+   child and teen roles, unless an admin's override allows it, for one person or the household: rule C3,
    Owner-approved 2026-11-16) sets thinking off, and any reasoning the engine
    returns anyway is dropped at the engine client.
    An adult's reasoning streams live as its own part, under the same
