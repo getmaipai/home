@@ -175,7 +175,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       normalized.cast = merged;
       args = { ...args, cast: merged };
     }
-    promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => name.startsWith("cast_") ? "this person" : String(blanks[name]).trim());
+    // A blank named photo_* is a picture slot: the person's own photo rides as the reference and the prompt calls it "the picture provided".
+    if (required.some((name) => name.startsWith("photo_")) && !(Array.isArray(args.references) && args.references.length > 0)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "This template needs your own photo. Add one with the picture button, then make the picture." }, actions: [] } });
+    promptOverride = template.prompt.replace(/\{\{([a-z][a-z0-9_]*)\|[^|}]+\|[^}]*\}\}/g, (_whole, name: string) => name.startsWith("cast_") ? "this person" : name.startsWith("photo_") ? "the picture provided" : String(blanks[name]).trim());
     normalized.prompt = promptOverride;
   }
   // CREATOR-13: the chosen look, light, angle and format are preset records; a name that is not one (or not this person's) is a bad argument.

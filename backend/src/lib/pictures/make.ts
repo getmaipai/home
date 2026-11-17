@@ -126,7 +126,9 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
         let promptUsed = false;
         for (const blank of blankSpecs) {
           if (typeof blanks[blank.name] === "string" && blanks[blank.name]!.trim()) continue;
-          if (blank.name.startsWith("cast_")) {
+          if (blank.name.startsWith("photo_")) {
+            blanks[blank.name] = "photo";
+          } else if (blank.name.startsWith("cast_")) {
             const castId = body.cast?.[castIndex++];
             if (castId) blanks[blank.name] = castId;
           } else if (!promptUsed && body.prompt.trim()) {

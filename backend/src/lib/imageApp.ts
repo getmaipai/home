@@ -78,16 +78,8 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
   return [...lockRows, ...visibleFinished];
 };
 
-/** What a picked template puts in the box. A template with no cast blank becomes its whole sentence (examples filled in), so the person reads and edits the real words and the box is a plain prompt (`pick` "none"). One that needs a cast member keeps its id and shows only the example for its first plain blank. */
-export function templateStarter(prompt: string, id: string): { starter: string; pick: string } {
-  const blanks = [...prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)];
-  if (!blanks.some((match) => match[1]!.startsWith("cast_"))) return { starter: prompt.replace(/\{\{[a-z][a-z0-9_]*\|[^|}]+\|([^}]*)\}\}/g, (_all, example: string) => example.trim()), pick: "none" };
-  const plain = blanks.find((match) => !match[1]!.startsWith("cast_"));
-  return { starter: plain ? plain[3]!.trim() : "", pick: id };
-}
-
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
-  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, ...templateStarter(template.prompt, template.id), thumbnail: templateCoverUrl(template.id) }));
+  if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: templateCoverUrl(template.id) }));
   if (dataId === "characters") return characterRows(person);
   if (dataId === "library") return rows(person, body);
   if (dataId === "recent") return rows(person, body, true);
@@ -143,8 +135,20 @@ registerAppPageFill("image", "create", (person, page) => {
   const templates = listTemplates({ actor: person, kind: "picture" });
   const templateState = page.state && typeof page.state === "object" ? (page.state as Record<string, unknown>).template : undefined;
   const selectedTemplate = typeof templateState === "string" ? templates.find((item) => item.id === templateState) : undefined;
-  const firstBlank = selectedTemplate?.prompt.match(/\{\{[a-z][a-z0-9_]*\|([^|}]+)\|[^}]*\}\}/)?.[1]?.toLowerCase();
-  if (selectedTemplate && firstBlank) bar.placeholder = `Describe your ${firstBlank}. Other fields use the template's example.`;
+  // A template is a recipe: each plain blank is its own labelled field above the box (shown only while that template is chosen) and the
+  // values ride as `blanks`. Cast and photo blanks use the cast and picture slots instead.
+  const blankFields: Array<{ state: string; label: string; placeholder: string; max_length: number; when: { state: string; equals: string } }> = [];
+  const blankNames = new Set<string>();
+  for (const template of templates) {
+    for (const match of template.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)) {
+      const name = match[1]!;
+      if (name.startsWith("cast_") || name.startsWith("photo_")) continue;
+      blankNames.add(name);
+      blankFields.push({ state: `blank_${name}`, label: match[2]!.trim().slice(0, 40), placeholder: match[3]!.trim().slice(0, 120), max_length: 200, when: { state: "template", equals: template.id } });
+    }
+  }
+  if (blankFields.length) (bar as Record<string, unknown>).fields = blankFields;
+  if (selectedTemplate) bar.placeholder = "Fill in the fields above, or just press Make picture to use the examples.";
   const existing = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   const templateChip = {
     state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true,
@@ -160,7 +164,10 @@ registerAppPageFill("image", "create", (person, page) => {
     shelf.making_field = "making";
     shelf.poll_while = { field: "making", values: ["yes"] };
   }
-  if (call?.args) call.args.template = "{template}";
+  if (call?.args) {
+    call.args.template = "{template}";
+    if (blankNames.size) call.args.blanks = Object.fromEntries([...blankNames].map((name) => [name, `{blank_${name}}`]));
+  }
   const chips = pictureFragmentChips(person);
   if (chips.length === 0) { bar.chips = [...existing, templateChip]; return; }
   for (const item of existing) if (item && typeof item === "object") {

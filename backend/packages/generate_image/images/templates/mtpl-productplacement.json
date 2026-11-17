@@ -5,7 +5,7 @@
   "summary": "Place a product in a real-looking scene. Add a picture of the product as the reference.",
   "category": "product",
   "audience": "all-ages",
-  "prompt": "{{item|Product|a handmade ceramic cup}} placed in {{scene|Scene|a sunny kitchen counter}}, natural light, shallow depth of field, the product sharp and centred, no extra text.",
+  "prompt": "{{photo_item|Your product photo|the product in your photo}} placed in {{scene|Scene|a sunny kitchen counter}}, natural light, shallow depth of field, the product exactly as it looks in the picture provided, sharp and centred, no extra text.",
   "references": [],
   "styles": [],
   "aspect": "1:1",

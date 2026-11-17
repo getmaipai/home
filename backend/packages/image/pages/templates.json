@@ -20,8 +20,7 @@
         "navigate": {
           "to": "/apps/image/create",
           "state": {
-            "template": "{pick}",
-            "prompt": "{starter}"
+            "template": "{id}"
           }
         }
       }
