@@ -10,6 +10,7 @@ import { personaFromManifest, reloadPersonas, type Persona } from "@/lib/persona
 import { companionFloor, registerGuiseVisibility } from "@/lib/robotCompanion";
 import { mayUseCompanion, pickRefusal } from "@/lib/companionsApp";
 import { getPersonSettingValue, getSettingValueForPerson, setValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { canManage } from "@/lib/personLifecycle";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { nextHlc } from "@/lib/hlc";
@@ -86,10 +87,10 @@ export function maySeeSynth(actor: PersonRow, synth: SynthRecord, now = new Date
   }
   if (synth.based_on.kind === "real_person" && speakerAgeBand(actor, now) !== "adult") {
     // A child or teen reaches a real-person synth only at "all", or at "ask" once a parent's yes put the id in the lasting-yes list.
-    const mode = getPersonSettingValue(actor, "synths.real_people");
+    const mode = passFor(actor.id).settings["synths.real_people"];
     if (mode === "all") return true;
     if (mode !== "ask") return false;
-    const allowed = getPersonSettingValue(actor, "synths.real_people_allowed");
+    const allowed = passFor(actor.id).settings["synths.real_people_allowed"];
     return Array.isArray(allowed) && allowed.includes(synth.id);
   }
   return true;

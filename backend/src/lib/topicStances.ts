@@ -5,7 +5,8 @@
 // adult's prompt is unchanged. No text is read: this maps settings to stances.
 import type { AgeBand } from "@/lib/ageBand";
 import { getCeilingForBand } from "@/lib/contentCeiling";
-import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { cleanStoryNames, type TopicFamily, type TopicStance } from "@maipai/spec/interpreters/ts/topicBlock.js";
 
 export interface TopicStances {
@@ -71,7 +72,7 @@ export function resolveTopicStances(band: AgeBand, settings: TopicSettingsInput 
 export function topicStancesForPerson(personId: string, band: AgeBand): TopicStances | null {
   if (band === "child") {
     const person: Record<string, unknown> = {};
-    for (const key of CHILD_PERSON_KEYS) person[key] = getSettingValueForPerson(personId, key);
+    for (const key of CHILD_PERSON_KEYS) person[key] = passFor(personId).settings[key];
     return resolveTopicStances(band, { person });
   }
   if (band === "teen") {

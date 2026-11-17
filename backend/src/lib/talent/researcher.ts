@@ -15,7 +15,7 @@ import { updateSynth, synthById, type SynthRecord } from "@/lib/synths";
 import { listHouseholdCompanionIds } from "@/lib/householdCompanions";
 import { synthFloor } from "@/lib/synths";
 import { resolveSafeSearchLevel } from "@/lib/safeSearch";
-import { getPersonSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import type { PersonRow } from "@/types";
 import { searchReference } from "@/lib/referenceSearch";
 import { loadArticleFor } from "@/lib/reference/article";
@@ -114,7 +114,7 @@ export async function researchSynth(synth: SynthRecord, actor: PersonRow, opts: 
   const name = synth.based_on.name;
   const query = (q: string) => (searchOverride ?? opts.search ?? searchPicked)({
     args: { query: q, read_page: true }, band: "adult", role: actor.role, spoken: false, temporary: false,
-    searxOpts: { safeSearchLevel: resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), "adult"), speakerBand: "adult", deadlineAt: Date.now() + 20_000 },
+    searxOpts: { safeSearchLevel: resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], "adult"), speakerBand: "adult", deadlineAt: Date.now() + 20_000 },
     deadlineAt: Date.now() + 20_000,
   });
   let web: SearchResult[] = [];

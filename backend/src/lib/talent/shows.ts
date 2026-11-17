@@ -12,6 +12,7 @@ import { synthById, listSynths, createSynth, ensureSubject, ownerActor, maySeeSy
 import { companionFits } from "@/lib/robotCompanion";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { newMediaSourceId, newMediaItemId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { completeBackground, type LlmMessage } from "@/lib/llm";
@@ -257,9 +258,9 @@ function cleanup(productionId: string, episodeId: string) { const dir = join(dat
 
 function realPersonHidden(actor: PersonRow, production: Production): boolean {
   if (speakerAgeBand(actor, new Date()) === "adult") return false;
-  const mode = getPersonSettingValue(actor, "synths.real_people");
+  const mode = passFor(actor.id).settings["synths.real_people"];
   if (mode === true || mode === "all") return false;
-  const allowed = getPersonSettingValue(actor, "synths.real_people_allowed");
+  const allowed = passFor(actor.id).settings["synths.real_people_allowed"];
   return production.cast.some((member) => { const synth = member.synth_id ? synthById(member.synth_id) : null; return synth?.based_on.kind === "real_person" && !(mode === "ask" && Array.isArray(allowed) && allowed.includes(synth.id)); });
 }
 /** The person's own briefing show for their band, if one exists: a tap on "Make me a morning briefing" reuses it instead of creating another. */

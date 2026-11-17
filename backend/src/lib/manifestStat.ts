@@ -1,6 +1,7 @@
 // AUDIT-PERF-01: loadPackage()/loadManifestOnly() stat two package files on every read (every turn, every tool list). The stat result is
 // kept for 5 s; the package install, rollback and remove paths (lib/store.ts) drop it at once, so a changed package is seen on the next read.
 import { statMtimeMs } from "@/lib/paths";
+import { invalidatePass } from "@/lib/filter/passCache";
 
 export const MANIFEST_STAT_TTL_MS = 5_000;
 const cache = new Map<string, { at: number; mtimeMs: number | null }>();
@@ -14,4 +15,5 @@ export function cachedMtimeMs(path: string): number | null {
   return mtimeMs;
 }
 
-export function invalidateManifestStats(): void { cache.clear(); }
+// OVERRIDES-01: an install, update, rollback or uninstall changes which packages a person may use, so every pass is rebuilt.
+export function invalidateManifestStats(): void { cache.clear(); invalidatePass(); }

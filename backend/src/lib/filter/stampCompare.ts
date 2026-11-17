@@ -3,11 +3,14 @@
 import { ContentRating, overCeiling } from "@maipai/spec/ratings/ts/contentRating";
 
 /** A missing or unparseable stamp is Unrated, which is over every ceiling below X (C4). */
-export function stampAllowed(stamp: unknown, ceiling: 0 | 1 | 2 | 3 | 4): boolean {
+export function stampAllowed(stamp: unknown, ceiling: 0 | 1 | 2 | 3 | 4, unratedAllowed = false): boolean {
   if (stamp === null || stamp === undefined) return !overCeiling("Unrated", ceiling);
   try {
     // A stored stamp carries its fingerprint beside the spec fields; the spec shape is strict, so compare the spec fields only.
     const { fingerprint: _fingerprint, ...rating } = stamp as Record<string, unknown>;
-    return !overCeiling(ContentRating.parse(rating).level, ceiling);
+    const level = ContentRating.parse(rating).level;
+    // OVERRIDES-01 (C4, C9): an override that allows unrated covers only a stamp a rater wrote and that says Unrated; never a missing or invalid stamp.
+    if (level === "Unrated" && unratedAllowed) return true;
+    return !overCeiling(level, ceiling);
   } catch { return !overCeiling("Unrated", ceiling); }
 }

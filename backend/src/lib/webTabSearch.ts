@@ -4,7 +4,7 @@
 import type { PersonRow } from "@/types";
 import type { SearchResult } from "@/lib/search/providers";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { getPersonSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { resolveSafeSearchLevel } from "@/lib/safeSearch";
 import { NO_SOURCE_FOR_BAND_TEXT } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
@@ -46,7 +46,7 @@ export async function webTabSearch(actor: PersonRow, rawQuery: string, signal?: 
   }
   // A closed personal detail in a child's or teen's words never leaves the house.
   if (minorQueryHit(query, band)) return { results: [], note: MINOR_QUERY_PERSONAL_NOTE };
-  const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
+  const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
   try {
     const found = await runAsBlockViewer(actor.id, () =>
       searchPickedWebSources({

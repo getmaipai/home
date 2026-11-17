@@ -109,6 +109,7 @@ import { hostedSearch, hostedSearchAllowed, hostedSearchKey } from "@/lib/hosted
 import { __resetSearchBackendsForTests, backendAvailable, pageCacheGet, pageCachePut, rotateSearch, type BackendAdapter } from "@/lib/retrieval/searchBackends";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { createHash } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { scheduledJobs } from "@/db/schema";
@@ -729,7 +730,7 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
   const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
   if (!baseUrl) return [];
   try {
-    const level = band === "child" ? "strict" : resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
+    const level = band === "child" ? "strict" : resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
     const safeEngines = band === "adult" ? undefined : await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 }, true);
     if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
@@ -2792,7 +2793,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // ROBOT-COMPANION-01: the turn's own band (a robot's companion type, or child for an unknown speaker) can only tighten it.
           const actorBand = speakerAgeBand(actor, new Date());
           const band = runtime.band ? stricterBand(actorBand, runtime.band) : actorBand;
-          const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
+          const safeSearchLevel = resolveSafeSearchLevel(passFor(actor.id).settings["search.safe_search"], band);
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;
           // THIN-INC row 4 (rule 12, Incognito): a temporary chat's query is not kept in the in-process

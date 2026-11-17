@@ -6,6 +6,7 @@
 // status, capabilities, platforms), the page is a spec `page` document, the place is `resolvePlace`,
 // the data is the package's own recipe through `runPlugin`, and the blocks leave through
 // `filterAnswerBlocks` exactly as a chat turn's do.
+import { passFor } from "@/lib/filter/pass";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -452,12 +453,14 @@ function settingsAreaFor(person: Pick<PersonRow, "role">, manifest: PackageManif
 export function listApps(person: PersonRow): AppRow[] {
   const statuses = allPackageStatuses();
   const unavailable = unavailableCapabilities();
+  const pass = passFor(person.id); // OVERRIDES-01: an app outside the person's pass is absent
   const rows: AppRow[] = [];
   for (const id of listPackageIds()) {
     const app = loadApp(id);
     if (!app || app.problems.length > 0) continue;
     const status = statuses.get(id) ?? { status: "enabled" as const };
     if (!appVisibleTo(person, app.manifest, status, unavailable)) continue;
+    if (!pass.access.has(`use:${id}`)) continue;
     const index = app.contributes.pages!.find((page) => page.id === "index")!;
     if (index.nav === false) continue;
     if (!pageVisibleTo(person, app.manifest, index)) continue;

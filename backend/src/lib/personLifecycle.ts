@@ -61,6 +61,7 @@ import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
 import type { Result } from "@/lib/result";
+import { invalidatePass } from "@/lib/filter/passCache";
 
 export type PersonOpResult<T> = Result<T, 400 | 403 | 404>;
 
@@ -215,6 +216,7 @@ export const commitPersonUpdate = sqlite.transaction(
     const lastOwnerError = lastOwnerGuardError(personId, wouldLeaveOwnerRole);
     if (lastOwnerError) return lastOwnerError;
     db.update(people).set(dbValues).where(eq(people.id, personId)).run();
+    invalidatePass(personId); // OVERRIDES-01: a role or controls change rebuilds the person's pass
     emitScheduleRecheck(); // SCHED-02: a role change or deactivation can end a person's right to a device schedule
     return { ok: true, value: true };
   },

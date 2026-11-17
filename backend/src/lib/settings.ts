@@ -27,6 +27,7 @@ import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
 import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayeredScalar } from "@/lib/layeredScalar";
 import { LIVE_PERSONA_IDS } from "@/lib/personaIds";
+import { invalidatePass, invalidatePassForSetting } from "@/lib/filter/passCache";
 import { validTimeZone } from "@/lib/wallClock";
 
 const HOUSEHOLD_HOME_KEY = "household.home";
@@ -511,6 +512,7 @@ function writeValue(
   }
 
   settingsCache.delete(settingsCacheKey(scope, key));
+  invalidatePassForSetting(scope, key);
   if (scope === "household") for (const listener of householdWriteListeners) listener(key, value);
   const descriptionContext = opts.viewer
     ? { viewer: opts.viewer, subject: opts.subject, adminName: opts.adminName }
@@ -609,6 +611,26 @@ function assertCanSetMediaProtection(actor: PersonRow, targetPersonId: string): 
   if (isOwnerOrAdmin(actor)) return assertOwnerAdminLadder(actor, targetPersonId, "You cannot change these media controls. Ask the person who manages Home.");
   if (actor.id === targetPersonId && speakerAgeBand(actor, new Date()) === "adult" && actor.role !== "guest") return { ok: true, value: true };
   return { ok: false, status: 403, error: "A grown-up sets your media controls. Ask a grown-up to change them." };
+}
+
+/** OVERRIDES-01 (RULES.md C3): the keys the content pass reads. The override keys (`content.ceiling*`, `content.unrated*`,
+ * `access.*`) are written only by an owner or admin, for any person's row or the household row, so a person can never change or
+ * erase an admin's override. The `content.own_*` keys are the person's own lowering: anyone writes their own (a guest included),
+ * an owner or admin writes anyone's. The effective value is the lower of the two, so the own value is free within its options. */
+export const isAccessKey = (key: string): boolean =>
+  key.startsWith("content.ceiling") || key.startsWith("content.unrated") || key.startsWith("content.own_") || key.startsWith("access.");
+export function assertCanSetAccessKey(actor: PersonRow, scope: string, targetId: string | null, key: string, _value?: unknown): SettingsOpResult<true> {
+  const adminError = { ok: false as const, status: 403 as const, error: "Only an owner or admin can change this." };
+  if (!isAccessKey(key)) return { ok: true, value: true };
+  if (key.startsWith("content.own_")) {
+    if (scope !== "person" || !targetId) return adminError;
+    if (!getPersonRole(targetId)) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
+    if (actor.id === targetId || isOwnerOrAdmin(actor)) return { ok: true, value: true };
+    return { ok: false, status: 403, error: "You can only change your own content level. Ask an owner or admin to change someone else's." };
+  }
+  if (!isOwnerOrAdmin(actor)) return adminError;
+  if (scope === "person" && (!targetId || !getPersonRole(targetId))) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
+  return { ok: true, value: true };
 }
 
 /** CODE-KEYS-01: the coding.person.* keys are held by the band's declared `control` (local-coding design 3.7). Where it says
@@ -739,7 +761,7 @@ function setValueGated(
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (key === ROBOT_FIRMWARE_INSTALLED_KEY) return { ok: false, status: 403, error: "Home records installed robot firmware after a successful flash." };
-  const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
+  const companionsLayer = (key === COMPANIONS_ALLOWED_KEY || isAccessKey(key)) && isLayeredScalar(keyDef)
     && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
   if (keyDef.scope !== parsed.kind && !companionsLayer) {
     return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
@@ -758,7 +780,9 @@ function setValueGated(
     return written.ok ? { ok: true, value: { ...written.value, layer: "person", locked: gate.setBy !== "self" } } : written;
   }
 
-  const auth = isMediaProtection(key) && parsed.kind === "person"
+  const auth = isAccessKey(key)
+    ? assertCanSetAccessKey(actor, parsed.kind, parsed.id, key, value)
+    : isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
     : (isCodingPersonKey(key) || key === "ui.home_layout" || key === "music.dj") && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
@@ -967,10 +991,12 @@ export function invalidateScopeCache(scope: string): void {
   for (const key of settingsCache.keys()) {
     if (key.startsWith(prefix)) settingsCache.delete(key);
   }
+  invalidatePass(scope.startsWith("person:") ? scope.slice(7) : undefined);
 }
 
 export function __resetSettingsCacheForTests(): void {
   settingsCache.clear();
+  invalidatePass();
 }
 
 /** Shared by getHouseholdSettingValue() and getPersonSettingValue() above
@@ -1026,7 +1052,7 @@ function resetValueGated(actor: PersonRow, scope: string, key: string): Settings
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (key === ROBOT_FIRMWARE_INSTALLED_KEY) return { ok: false, status: 403, error: "Home records installed robot firmware after a successful flash." };
-  const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
+  const companionsLayer = (key === COMPANIONS_ALLOWED_KEY || isAccessKey(key)) && isLayeredScalar(keyDef)
     && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
   if (keyDef.scope !== parsed.kind && !companionsLayer) return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   if (keyDef.selector === "location" && parsed.kind === "person" && parsed.id !== actor.id) {
@@ -1039,12 +1065,15 @@ function resetValueGated(actor: PersonRow, scope: string, key: string): Settings
     if (!gate.ok) return gate;
     db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
     settingsCache.delete(settingsCacheKey(scope, key));
+    invalidatePassForSetting(scope, key);
     const subject = responseSubject(actor, parsed);
     const layered = resolveLayeredScalar(keyDef, parsed.id!, speakerAgeBand(subject, new Date()));
     return { ok: true, value: { ...resolveForResponse(keyDef, layered.value, layered.layer === "person" ? "user" : "default", responseContext(actor, subject, parsed.kind)), layer: layered.layer, locked: false } };
   }
 
-  const auth = isMediaProtection(key) && parsed.kind === "person"
+  const auth = isAccessKey(key)
+    ? assertCanSetAccessKey(actor, parsed.kind, parsed.id, key, undefined)
+    : isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
     : (isCodingPersonKey(key) || key === "ui.home_layout" || key === "music.dj") && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
@@ -1064,6 +1093,7 @@ function resetValueGated(actor: PersonRow, scope: string, key: string): Settings
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
+  invalidatePassForSetting(scope, key);
   const restored = isLayeredScalar(keyDef) && parsed.kind === "person" && parsed.id
     ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
     : { value: keyDef.default, layer: "default" as const };
@@ -1092,12 +1122,14 @@ export function writeLayerRow(personId: string, key: string, jsonText: string, s
     db.insert(settingsValues).values({ scope, key, value: jsonText, hlc, source: "user", updatedAt: now, setBy: setBy ?? null }).run();
   }
   settingsCache.delete(settingsCacheKey(scope, key));
+  invalidatePassForSetting(scope, key);
 }
 
 export function deleteLayerRow(personId: string, key: string): void {
   const scope = `person:${personId}`;
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
+  invalidatePassForSetting(scope, key);
 }
 
 /** Clears every stored value at `key`, across every scope, whose stored
@@ -1127,4 +1159,5 @@ export function clearMatchingValues(key: string, valueContains: string): void {
   // of them (see the cache's own comment above); this path runs on an
   // admin deleting a cloned voice, not on any per-turn hot path.
   settingsCache.clear();
+  invalidatePass();
 }

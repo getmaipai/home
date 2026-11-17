@@ -39,6 +39,7 @@ import { packageStatus } from "@/db/schema";
 import { listPackageIds, loadManifestOnly, loadPackage, loadProjectPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { invalidatePass } from "@/lib/filter/passCache";
 import { isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir } from "@/lib/packageResolve";
 import { HostEmulator } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -69,6 +70,7 @@ interface SmokeFixture {
 }
 
 async function recordResult(id: string, result: SmokeResult): Promise<SmokeResult> {
+  invalidatePass(); // OVERRIDES-01: enabled or disabled changes who sees the package
   const now = new Date().toISOString();
   db.insert(packageStatus)
     .values({
@@ -190,6 +192,7 @@ export function setDenoLookupForTest(fn: (() => string | null) | null): void {
 let denoMissingLogged = false;
 
 async function recordSkipped(id: string, message: string): Promise<SmokeResult> {
+  invalidatePass();
   // Off, but not broken: no Repairs item, just a disabled status with the reason.
   const now = new Date().toISOString();
   db.insert(packageStatus)

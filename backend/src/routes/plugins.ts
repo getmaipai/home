@@ -30,6 +30,7 @@ import { visibleHouseEntities, houseToolSpec } from "@/lib/house/tool";
 import { uptimeAllowed } from "@/lib/uptime/tool";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import "@/lib/imageApp";
 
 export const pluginsRoutes = apiRouter();
@@ -41,7 +42,7 @@ export const pluginsRoutes = apiRouter();
 pluginsRoutes.get("/", requireAuth, async (c) => {
   const statuses = allPackageStatuses();
   const actor = c.get("person");
-  const manifests = listInstalledManifests().filter((manifest) => meetsMinRole(actor.role, manifest.min_role));
+  const manifests = listInstalledManifests().filter((manifest) => meetsMinRole(actor.role, manifest.min_role) && passFor(actor.id).access.has(`use:${manifest.id}`));
   const rows = manifests.map((manifest) => {
     const status = statuses.get(manifest.id);
     return {

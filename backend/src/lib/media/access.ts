@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
-import { getPersonSettingValue } from "@/lib/settings";
+import { passFor } from "@/lib/filter/pass";
 import { MEDIA_ALLOWLIST_KEY } from "@/settings/mediaKeys";
 import { bandAllows, mediaBandOf } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
@@ -17,7 +17,7 @@ export function isMediaAdmin(actor: PersonRow): boolean {
 
 /** App routes use this before assembling discovery shelves or chips. Library search still uses the access gate. */
 export function discoveryAllowed(actor: PersonRow): boolean {
-  return getPersonSettingValue(actor, MEDIA_ALLOWLIST_KEY) !== true;
+  return passFor(actor.id).settings[MEDIA_ALLOWLIST_KEY] !== true;
 }
 
 /** Source allowlist mode for every media read (MEDIA-KID-01): a guest always (a guest's settings resolve as an adult's, so the

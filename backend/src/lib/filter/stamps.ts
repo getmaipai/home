@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { audienceBand, type AgeBand } from "@/lib/audience";
 import type { PersonRow } from "@/types";
 import { ceilingFor } from "./ceiling";
+import { passForPerson } from "./pass";
 import { stampAllowed } from "./stampCompare";
 import { contentRatings } from "@/db/schema";
 
@@ -66,15 +67,22 @@ export function getStamps(kind: StampKind, ids: readonly string[]): Map<string, 
 export function levelFor(kind: StampKind, id: string): RatingLevel { return getStamp(kind, id)?.level ?? "Unrated"; }
 
 /** The ids whose stamp is not over the ceiling; a missing stamp is Unrated. */
-export function allowedIds(kind: StampKind, ids: readonly string[], ceiling: CeilingLevel): Set<string> {
+export function allowedIds(kind: StampKind, ids: readonly string[], ceiling: CeilingLevel, unratedAllowed = false): Set<string> {
   const stamps = getStamps(kind, ids);
-  return new Set(ids.filter((id) => stampAllowed(stamps.get(id) ?? null, ceiling)));
+  return new Set(ids.filter((id) => stampAllowed(stamps.get(id) ?? null, ceiling, unratedAllowed)));
 }
 
 /** For a list builder: a test of one id against the stored ratings of a page, for this person's ceiling (`ceilingFor(audienceBand(person))`).
  * An adult (ceiling X) runs no stamp query and every id passes. Reads the table only; no rater runs. */
 export function storedRatingFilter(kind: StampKind, person: Pick<PersonRow, "id" | "role" | "controls"> | null | undefined, ids: readonly string[]): (id: string) => boolean {
-  return storedRatingFilterForBand(kind, audienceBand(person), ids);
+  // OVERRIDES-01: the person's pass sets the ceiling and whether an allowed unrated stamp passes (stored files and media are the library; creations are made).
+  if (!person) return storedRatingFilterForBand(kind, audienceBand(person), ids);
+  const pass = passForPerson(person);
+  const content = kind === "creation" ? "made" : "library";
+  const ceiling = pass.ceiling[content];
+  if (ceiling === 4) return () => true;
+  const allowed = allowedIds(kind, ids, ceiling, pass.unrated.has(content));
+  return (id) => allowed.has(id);
 }
 /** The same, for a list that already holds the viewer's band (the shelf and news take it from the band the list was asked for). */
 export function storedRatingFilterForBand(kind: StampKind, band: AgeBand, ids: readonly string[]): (id: string) => boolean {

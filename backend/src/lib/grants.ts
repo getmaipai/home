@@ -23,6 +23,7 @@ import { validateGrant, matchGrantAction } from "@maipai/spec/records/ts/validat
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Grant as GrantT } from "@maipai/spec/gen/ts/grant.js";
 import { refusal } from "@/lib/result";
+import { invalidatePass } from "@/lib/filter/passCache";
 
 type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 404; error: string; code?: string };
 
@@ -169,6 +170,7 @@ export function createGrant(actor: { id: string; role: Role }, input: GrantCreat
   if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
 
   db.insert(grants).values(toRow(candidate.data)).run();
+  invalidatePass(input.person);
   if (input.action.startsWith("house.")) emitScheduleRecheck();
   return { ok: true, status: 201, value: candidate.data };
 }
@@ -184,10 +186,11 @@ export function listGrants(personId?: string): GrantT[] {
 }
 
 export function revokeGrant(id: string): OpResult<{ id: string }> {
-  const row = db.select({ id: grants.id, action: grants.action }).from(grants).where(and(eq(grants.id, id), isNull(grants.deletedAt))).get();
+  const row = db.select({ id: grants.id, action: grants.action, person: grants.person }).from(grants).where(and(eq(grants.id, id), isNull(grants.deletedAt))).get();
   if (!row) return refusal(404, "grant_missing");
   const now = new Date().toISOString();
   db.update(grants).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(grants.id, id)).run();
+  invalidatePass(row.person);
   if (row.action.startsWith("house.")) emitScheduleRecheck();
   return { ok: true, status: 200, value: { id } };
 }
