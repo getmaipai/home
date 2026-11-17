@@ -4252,6 +4252,124 @@
         }
       }
     },
+    "/api/people/{id}/overrides": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "A person's content level, unrated choices and filters, for an owner or admin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Only the override keys the viewer may set for this person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "nullable": true
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "default",
+                          "package",
+                          "sync"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "help": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "basic",
+                          "advanced",
+                          "expert"
+                        ]
+                      },
+                      "secret": {
+                        "type": "boolean"
+                      },
+                      "isSet": {
+                        "type": "boolean"
+                      },
+                      "does": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "layer": {
+                        "type": "string",
+                        "enum": [
+                          "person",
+                          "household",
+                          "band",
+                          "default"
+                        ]
+                      },
+                      "locked": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "source",
+                      "label",
+                      "level",
+                      "secret"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin can see these",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/people/{id}/site-blocks/reset": {
       "post": {
         "tags": [

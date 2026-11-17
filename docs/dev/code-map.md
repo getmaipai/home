@@ -357,6 +357,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
+| `frontend/src/shell/pages/PersonContentSection.tsx` | OWN_CONTENT_KEYS, useOwnContentKeys, PersonContentSection |
 | `frontend/src/shell/pages/PersonProfilePage.tsx` | PersonProfilePage |
 | `frontend/src/shell/pages/PrivacyPage.tsx` | PrivacyIcon, PrivacyPage |
 | `frontend/src/shell/pages/ProjectsPage.tsx` | ProjectsPage |
@@ -483,7 +484,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/assistWidened.ts` | WIDENED_SETTING_KEY, WIDENED_PACKAGE_IDS, readWidenedFile, widenedAssistOn, applyWidenedAssist |
 | `backend/src/lib/assistantStreamWire.ts` | createAssistantStreamSink |
 | `backend/src/lib/attachments.ts` | checkAttachmentCapacity, attachmentFilePath, storedFileIntact, toRecord, createAttachment, storeFile |
-| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand, controlsForNewPerson |
+| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand, controlsForNewPerson, isGuestRole |
 | `backend/src/lib/backgroundPriority.ts` | atBackgroundPriority |
 | `backend/src/lib/backgroundWork.ts` | trackBackgroundWork, __drainBackgroundWorkForTests |
 | `backend/src/lib/backup.ts` | cleanupStaleSnapshots, listBackups, runBackup, restoreBackup, pruneBackups, getBackupHealth |
@@ -567,7 +568,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/computerMemory.ts` | describeComputerMemory |
 | `backend/src/lib/connectors/instances.ts` | DEFAULT_INSTANCE, listInstances, resolveInstance, instanceLanFetch |
 | `backend/src/lib/consentVocab.ts` | CONSENT_WORD, AFFIRMATIVE_RE, NEGATIVE_RE, SHORT_ANSWERS |
-| `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant |
+| `backend/src/lib/contentCeiling.ts` | CONTENT_CEILINGS, getCeilingForBand, getMinorCeilingForBand, hasUnrestrictedGrant, dialsFor, projectionOf |
 | `backend/src/lib/contentPolicy.ts` | CHILD_UNSAFE_TERMS, CHILD_IP_NAMES, CHILD_UNSAFE_CLASSES, createContentPolicyResolver, checkAll, contentPolicyFor |
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
@@ -1068,7 +1069,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/recordedTags.ts` | FISH_DRAMA_TAGS, tagsForEngine |
 | `backend/src/lib/reducedChat.ts` | setReducedChat, reducedChatState, reducedChatNotice, resetReducedTruthForTests, enterStackReducedChat, leaveStackReducedChat |
 | `backend/src/lib/reference/article.ts` | __resetReferenceArticleCacheForTests, loadArticleFor, articlePayloadFor, readArticleImage |
-| `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, referenceKeyPoints, referenceItemId, readReferenceArticle |
+| `backend/src/lib/reference/keyPoints.ts` | __setReferenceKeyPointsModelForTests, articleText, keyPointsKey, referenceKeyPoints, referenceItemId, readReferenceArticle |
 | `backend/src/lib/reference/saves.ts` | listReferenceSaves, getReferenceSave, addReferenceSave, removeReferenceSave |
 | `backend/src/lib/referenceLibrary.ts` | KIWIX_CATALOG_URL, resolveReferenceFlavour, removeInstalledReferenceFlavour, installReferenceFlavour, listInstalledReferenceFlavours, getReferenceUpdates |
 | `backend/src/lib/referencePresetEngine.ts` | __setReferenceCatalogUrlForTests, planReference, listReferenceCatalog, getReferenceState, applyReference, resumeReferenceJobsOnBoot |
@@ -1173,7 +1174,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settings.ts` | parseScope, assertCanAccessScope, assertCanSetTtsVoice, validateSelectorValue, resolveForResponse, listValues |
 | `backend/src/lib/settingsAreas.ts` | getSettingsAreas, settingsViewerFor, placeSetting, settingHref |
 | `backend/src/lib/settingsAudit.ts` | newSettingsChangeId, recordSettingsChange, listSettingsChanges |
-| `backend/src/lib/settingsLayers.ts` | SELF, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion, bandOfPerson |
+| `backend/src/lib/settingsLayers.ts` | SELF, FILTERS_KEY, userDefaultItems, globalDefaultItems, layeredListKeys, resolveUnion |
 | `backend/src/lib/settingsMediaMigration.ts` | OLD_PICTURE_ADULT_KEY, OLD_VIDEO_ADULT_KEY, NEW_ADULT_STYLES_KEY, OLD_PICTURE_QUALITY_KEY, OLD_VIDEO_QUALITY_KEY, NEW_PICTURE_TIER_KEY |
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
 | `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, isRetiredKey, getRegistryKey, __reloadRegistryForTests |
