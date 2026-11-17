@@ -25,7 +25,7 @@ const base = { scope: "person" as const, merge: "override" as const, level: "bas
 const ceilingBands = { child: "G", teen: "PG-13", adult: "X" } as const;
 const LEVEL_LINES: Record<string, string> = {
   default: "Follows the main setting.",
-  G: "Gentle, for the youngest.",
+  G: "Gentle, nothing beyond G.",
   PG: "Mild, with a little that is grown-up.",
   "PG-13": "Some grown-up themes, nothing explicit.",
   R: "Strong language and themes.",
