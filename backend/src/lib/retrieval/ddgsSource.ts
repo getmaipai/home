@@ -19,6 +19,7 @@ import { minorRowAllowed, searchAudienceFor, searchFilterApplies, searchModeFor 
 import { NOTHING_SUITABLE_HINT } from "@/lib/filter/nothingSuitable";
 import { wantsSpoken } from "@/lib/spokenArg";
 import type { WebRows, WebRow, WebSearchContext } from "@/lib/retrieval/webSources";
+import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 
 /** What the privacy page names: the site the sidecar's search words reach. */
 export const DDGS_DESTINATION_HOST = "duckduckgo.com";
@@ -69,7 +70,7 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
   const minor = ctx.band !== "adult";
   // A minor's turn must be affirmed as not spoken by the caller (the turn's own surface, packageHost.ts); the `spoken` arg is a second signal.
   const spoken = ctx.spoken !== false || wantsSpoken(ctx.args as { spoken?: unknown } | undefined);
-  if (ctx.role === "guest" || (minor && (spoken || !minorDdgsAllowed(ctx.band)))) throw new HostError("permission_denied", "DuckDuckGo search is not allowed for this profile.");
+  if (ctx.role === "guest" || (minor && (spoken || !minorDdgsAllowed(ctx.band)))) throw new HostError("permission_denied", "That search source is not available here. Try a different one.");
   // The Stack may have just finished building the service: ask once, now, before calling it unavailable.
   const base = ddgsBaseUrl() ?? (await refreshDdgsFromStack(), ddgsBaseUrl());
   if (!base) throw new HostError("search_unavailable", ddgsSetupNote() ?? "DuckDuckGo search is not set up. The Stack sets it up by itself; if it stays off, open Repairs. Otherwise pick another web search source.");
@@ -120,7 +121,7 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
       seen += 1;
       // The same per-row floor every filtered result passes (minorRowFloor.ts, through the filter door): a blocked site, an unsafe title or snippet, or a row
       // over the viewer's web ceiling is dropped here too.
-      if (audience && !minorRowAllowed(ctx.band, row, { mode, audience, ...(ctx.actor ? { actor: ctx.actor } : {}) })) continue;
+      if (audience && !minorRowAllowed(ctx.band, row, { mode, audience, ...(ctx.actor ? { actor: ctx.actor } : {}) })) { bumpReferenceCounter("search_floor_dropped", ctx.band); continue; } // UNSEEN-01: a count only (RULES.md 6a)
       rows.push(row);
     }
     // A normal answer (even an empty one) ends the back-off ladder.

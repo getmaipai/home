@@ -50,7 +50,7 @@ export function SettingsHomePage({ person }: { person: Roster }) {
     onNavigate={(to) => navigate(to.href)}
   >
     <div className="flex flex-col gap-6">
-      <header><p className="text-supporting text-muted-foreground">{i18n._({ id: "{name}, {role} · checked just now", message: "{name}, {role} · checked just now", values: { name: person.display_name, role: person.role } })}</p></header>
+      <header><p className="text-supporting text-muted-foreground">{isOwnerOrAdminRole(person.role) ? i18n._({ id: "{name}, {role} · checked just now", message: "{name}, {role} · checked just now", values: { name: person.display_name, role: person.role } }) : i18n._({ id: "{name} · checked just now", message: "{name} · checked just now", values: { name: person.display_name } })}</p></header>
       <section aria-labelledby="settings-attention" className="flex flex-col gap-2">
         <h2 id="settings-attention" className="text-section font-semibold">{i18n._({ id: "Needs attention · {count}", message: "Needs attention · {count}", values: { count: summary?.items.length ?? 0 } })}</h2>
         <ItemGroup variant="card">

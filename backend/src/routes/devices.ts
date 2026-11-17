@@ -933,7 +933,7 @@ devicesRoutes.openapi(offlineScopeRoute, (c) => {
   const device = getDeviceById(c.req.valid("param").id);
   if (!device || (device.personId !== actor.id && !isOwnerOrAdmin(actor))) return c.json({ error: "This device is not yours to change. Choose your own device or ask an admin." }, 404);
   // A child's or teen's keep permission is a guardian's to give: they cannot grant it to themselves.
-  if (!isOwnerOrAdmin(actor) && mediaBandOf(actor) !== "adult") return c.json({ error: "A grown-up sets this. Ask a grown-up to allow keeping media on this device." }, 403);
+  if (!isOwnerOrAdmin(actor) && mediaBandOf(actor) !== "adult") return c.json({ error: "An owner or admin sets this." }, 403);
   const requested = c.req.valid("json").offline_scope;
   if (requested.length > 0 && !mayHoldMediaOffline(device)) return c.json({ error: "A shared device such as a robot, TV or pod cannot keep copies. Use a phone, computer or browser." }, 400);
   setDeviceOfflineScope(device.id, requested);

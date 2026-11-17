@@ -74,7 +74,7 @@ const REFUSALS: Record<TargetReason, { reason: Extract<CreateScheduleResult, { o
   bad_target: { reason: "invalid", text: "I could not tell which device you meant. Name a light, switch, fan or scene and try again.", offerReminder: false },
   sensitive: { reason: "sensitive", text: `A schedule runs on its own with nobody to confirm it, so locks, alarms, garage doors, cameras, entry doors and scripts cannot be scheduled.${REMINDER_OFFER}`, offerReminder: true },
   not_found: { reason: "not_found", text: "I could not find that device in your home. Check the name and try again.", offerReminder: false },
-  no_access: { reason: "no_access", text: "You are not set up to control that device, so you cannot schedule it. Ask a parent to give you access.", offerReminder: false },
+  no_access: { reason: "no_access", text: "You are not set up to control that device, so you cannot schedule it.", offerReminder: false },
   scene_unknown: { reason: "unavailable", text: "I could not read what that scene sets just now. Try again in a minute.", offerReminder: false },
   scene_changed: { reason: "sensitive", text: `That scene sets something a schedule is not allowed to run, such as a lock or a device you cannot control.${REMINDER_OFFER}`, offerReminder: true },
 };

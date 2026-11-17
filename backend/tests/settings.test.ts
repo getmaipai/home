@@ -243,7 +243,7 @@ describe("PUT /api/settings for tts.voice_id", () => {
     const { childClient, childId } = await ownerAndChild();
     const res = await childClient.request("/api/settings", { method: "PUT", body: { scope: `person:${childId}`, key: "tts.voice_id", value: "mira" } });
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "A parent chooses your voice. Ask the person who manages Home to pick one for you." });
+    expect(await res.json()).toEqual({ error: "An owner or admin sets this." });
   });
 
   test("an admin writing a child's tts.voice_id works; an admin writing a teen's is refused", async () => {

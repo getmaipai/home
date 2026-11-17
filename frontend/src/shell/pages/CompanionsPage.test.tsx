@@ -181,7 +181,7 @@ test("the gallery does not list robots; robot companions are set in Settings", a
 test("when companions are off for the person the page says so", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, can_discover: false, companions: [], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
-  await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
+  await waitFor(() => expect(view.getByText(/isn't available here/)).toBeTruthy());
 });
 
 test("the household detail shows settings icon and copy actions", async () => {

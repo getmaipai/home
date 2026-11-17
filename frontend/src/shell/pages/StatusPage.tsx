@@ -26,6 +26,11 @@ const engineComputerLabel = (state: EngineComputerStatusData["state"]): string =
   working: i18n._({ id: "Working", message: "Working" }), connecting: i18n._({ id: "Connecting", message: "Connecting" }), slow_to_answer: i18n._({ id: "Slow to answer", message: "Slow to answer" }), reconnecting: i18n._({ id: "Reconnecting", message: "Reconnecting" }), not_reachable: i18n._({ id: "Not reachable", message: "Not reachable" }),
 })[state];
 
+const heldBackName = (surface: string): string => ({
+  news: i18n._({ id: "News", message: "News" }), shelf: i18n._({ id: "Shelf", message: "Shelf" }),
+  reference: i18n._({ id: "Reference", message: "Reference" }), search: i18n._({ id: "Web search", message: "Web search" }),
+} as Record<string, string>)[surface] ?? surface;
+
 export const StatusIcon = getIcon("activity");
 
 export function StatusPage({ person }: { person: Roster }) {
@@ -42,6 +47,7 @@ export function StatusPage({ person }: { person: Roster }) {
   const boardQuery = useQuery({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const historyQuery = useQuery<StatusHistory>({ queryKey: ["status-history", 90], queryFn: () => api.statusHistory(90), refetchInterval: 60_000, retry: false, enabled: canSeeParts });
   const engineComputerQuery = useQuery({ queryKey: ["status", "engine-computer", canSeeParts ? "admin" : "member"], queryFn: api.engineComputerStatus, refetchInterval: 10_000 });
+  const heldBackQuery = useQuery({ queryKey: ["status", "held-back"], queryFn: api.heldBack, enabled: canSeeParts, retry: false });
   const missingToursQuery = useQuery({ queryKey: ["status", "tour-missing-targets"], queryFn: api.missingTourTargets, enabled: canSeeParts, retry: false });
   const queryClient = useQueryClient();
   const checksQuery = useQuery({ queryKey: ["health-checks"], queryFn: () => api.healthChecks(), refetchInterval: 30_000, retry: false, enabled: canSeeParts });
@@ -96,6 +102,10 @@ export function StatusPage({ person }: { person: Roster }) {
       {incident ? <Card>
         <CardHeader><CardTitle><AlertIcon className={`mr-2 inline size-5 ${incident.amber ? "text-attention-fg" : "text-destructive"}`} aria-hidden="true" />{incident.title}</CardTitle></CardHeader>
         <CardContent><StatusIncidentBody facts={incident} /></CardContent>
+      </Card> : null}
+      {canSeeParts && Array.isArray(heldBackQuery.data?.surfaces) ? <Card data-testid="held-back-card">
+        <CardHeader><CardTitle>{i18n._({ id: "Held back", message: "Held back" })}</CardTitle></CardHeader>
+        <CardContent><ul className="flex flex-col gap-1 text-supporting">{heldBackQuery.data!.surfaces.map(({ surface, count }) => <li key={surface} className="flex flex-wrap justify-between gap-2"><span>{heldBackName(surface)}</span><span className="text-muted-foreground">{i18n._({ id: "Held back since the hub started: {count}", message: "Held back since the hub started: {count}", values: { count } })}</span></li>)}</ul></CardContent>
       </Card> : null}
       {canSeeParts && (missingToursQuery.data?.length ?? 0) > 0 ? <Card>
         <CardHeader><CardTitle>{i18n._({ id: "Tour targets not found", message: "Tour targets not found" })}</CardTitle></CardHeader>

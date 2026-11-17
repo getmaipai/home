@@ -56,9 +56,10 @@ afterEach(() => {
 });
 
 describe("who may open Home settings", () => {
-  test.each(["adult", "teen", "child", "guest"] as const)("a %s opening /settings/home sees why it is refused and no household request is made", async (role) => {
+  test.each(["adult", "teen", "child", "guest"] as const)("a %s opening /settings/home gets a plain line or a quiet redirect, and no household request is made (UNSEEN-01)", async (role) => {
     const view = open(makePerson(role), "/settings/household");
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    if (role === "adult") expect(await view.findByText("An owner or admin sets this.")).toBeTruthy();
+    else await waitFor(() => expect(where(view)).not.toBe("/settings/household"));
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 

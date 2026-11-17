@@ -14,6 +14,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const LIVE_VIEW_MAX_MS = 10 * 60_000;
 /** A viewer has this long after the start to attach before the view is dropped. */
@@ -42,7 +43,7 @@ export function liveViewAdmits(person: PersonRow, now: Date = new Date()): { ok:
     return { ok: false, status: 403, error: "Live view is off. An admin can turn it on in the robot settings." };
   }
   if (speakerAgeBand(person, now) !== "adult") {
-    return { ok: false, status: 403, error: "Live view is for adults only. Ask an adult to watch it for you." };
+    return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   }
   if (isOwnerOrAdmin(person)) return { ok: true };
   const who = getHouseholdSettingValue("robot.live_view.who");

@@ -159,7 +159,7 @@ export function pictureCardOrLocked(actor: PersonRow, job: PictureJob, canVary: 
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
-const refusals = errorResponses({ 401: "Not signed in", 403: "Pictures are off for this profile", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "Pictures could not be made", 503: "Pictures are not ready" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Not available", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "Pictures could not be made", 503: "Pictures are not ready" });
 
 const statusRoute = createRoute({
   method: "get", path: "/status", tags: ["Pictures"], summary: "Whether this person can make pictures now, and why not", middleware: [requireAuth] as const,

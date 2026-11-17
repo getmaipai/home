@@ -4,7 +4,8 @@
 // old one), and Keep pins the song in the Library. Kit parts only, restyled by tokens (rule 9). Adults only, like the other studio pages.
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -22,7 +23,7 @@ import { api, request } from "@/lib/api";
 import { musicApi, type MakeSongBody, type MusicCard } from "@/lib/musicApi";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 
-export const MAKE_SONG_ADULT_LINE = () => i18n._({ id: "Making a song is for adults. Ask a grown-up to make one with you.", message: "Making a song is for adults. Ask a grown-up to make one with you." });
+export const MAKE_SONG_ADULT_LINE = NOT_AVAILABLE_HERE;
 /** Shown when the computer has no music model (or cannot run it): what is wrong and the one next step. */
 export const NO_MUSIC_ENGINE_LINE = () => i18n._({ id: "Songs cannot be made on this computer yet, because no music model is installed. An admin can add one in Settings, under Pictures, videos and music. Then come back here.", message: "Songs cannot be made on this computer yet, because no music model is installed. An admin can add one in Settings, under Pictures, videos and music. Then come back here." });
 
@@ -180,7 +181,7 @@ export function Maker({ search, simple = false, onMade }: { search: string; simp
 
 /** The Make a song page. `search` is the address's query string: `song` opens a made song; `style` and `band` preselect a sound. */
 export function MakeSongPage({ adult, search }: { adult: boolean; search: string }) {
-  if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
+  if (!adult) return <Navigate to="/" replace />;
   const song = new URLSearchParams(search).get("song");
   return <section className="flex flex-col gap-5" data-testid="music-make-song">
     <header className="flex flex-col gap-1 px-4 lg:px-0">

@@ -12,7 +12,7 @@ test("audio picker accepts supported song formats", () => {
 // the runtime's own "File type ... is not accepted. Accepted types: ..." text.
 describe("attachmentAddErrorMessage", () => {
   test("a pasted or dropped picture for a child with photos off says photos are off", () => {
-    expect(attachmentAddErrorMessage({ reason: "not-accepted", message: "File type image/png is not accepted. Accepted types: .pdf", contentType: "image/png" }, false)).toBe("Photo uploads are turned off for this profile.");
+    expect(attachmentAddErrorMessage({ reason: "not-accepted", message: "File type image/png is not accepted. Accepted types: .pdf", contentType: "image/png" }, false)).toBe("That one isn't available here. Try something else.");
   });
 
   test("a permitted photo is refused with the live-model reason while picture input is unavailable", () => {

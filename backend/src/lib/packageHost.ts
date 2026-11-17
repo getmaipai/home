@@ -1795,7 +1795,7 @@ function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
   const dropped = (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
   if (dropped === 0 && pageOk) return result;
   const { page: _page, pages: _pages, ...rest } = result;
-  const text = rows.length === result.rows.length ? result.text : rows.length === 0 ? SEARXNG_NO_RESULTS_TEXT : rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
+  const text = rows.length === result.rows.length ? result.text : rows.length === 0 ? NOTHING_SUITABLE_HINT : rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
   return { ...rest, text, rows, ...(pageOk && result.page ? { page: result.page } : {}), ...(pages && pages.length > 0 ? { pages } : {}), ...(dropped > 0 ? { floor_dropped: (result.floor_dropped ?? 0) + dropped } : {}) };
 }
 
@@ -1897,6 +1897,8 @@ export function floorSearchResult(result: SearxngSearchResult, band: AgeBand, op
     });
   const pages = result.pages?.filter((page) => releaseSync({ surface: "search", audience, item: { kind: "page_text", title: page.title, text: page.text, url: page.url, html: pageMarkup.get(page) ?? null, mode, viewerId } }).verdict === "released");
   const dropped = (result.floor_dropped ?? 0) + (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
+  // UNSEEN-01: the household count of what this floor held back (RULES.md 6a: a number, never the row or the person).
+  bumpReferenceCounter("search_floor_dropped", band, (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0)));
   // A minor never gets the whole-document `page` (up to 32,000 characters,
   // of which only the excerpt in `pages` is checked); only the checked
   // excerpts go on. The plain `text` form is rebuilt when a row was dropped.

@@ -24,6 +24,7 @@ import { __setMusicFetchForTests } from "@/lib/music/stack";
 import { attachmentFilePath } from "@/lib/attachments";
 import { writeFileSync } from "node:fs";
 import { TestClient } from "./client";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 let fakeVideo: ReturnType<typeof installFakeVideoStack>; let fakeEdit: FakeEditStack;
 beforeEach(() => { resetDb(); fakeVideo = installFakeVideoStack(); fakeVideo.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 99, label: "adult", is_nude_or_sexual: false, confidence: 0.99 } }))); __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]); fakeEdit = installFakeEditStack(); });
@@ -114,6 +115,6 @@ describe("cut-to-beat route", () => {
     const client = new TestClient(); await client.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
     const response = await client.post("/api/videos/cut-to-beat", { clips: ["anything"], track: "anything" });
     expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ code: "minor", error: "This edit is for adults on their own screen." });
+    expect(await response.json()).toMatchObject({ code: "minor", error: NOT_AVAILABLE_HERE });
   });
 });

@@ -44,7 +44,7 @@ export type ListedLevel = MediaLevel & LevelState;
 /** MAKE-CLEARER-01: the operation is ready when its first level is; each level also says whether it is, with the reason when it is not. */
 async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boolean; reason?: string; levels?: Record<string, LevelState> }> {
  if (!bandAllowed(actor, op.minBand)) {
-  return { ready: false, reason: "This operation isn't available for this profile." };
+  return { ready: false, reason: "That one isn't available here. Try something else." };
  }
  if (op.input === "video") {
   const { videoClearerLevels } = await import("@/lib/videos/clearerLevels");
@@ -56,7 +56,7 @@ async function availability(actor: PersonRow, op: MediaOp): Promise<{ ready: boo
   if (health.availability !== "ready") return { ready: false, reason: health.detail ?? health.reason ?? "Picture creation isn't set up yet." };
   // Describing a change is also refused to a profile that may not make pictures (the editor's own picture gate): say so here, so the button is off with the reason.
   const comment = (await editToolsStatus(actor)).tools.comment;
-  if (!comment.enabled) return { ready: false, reason: comment.reason ?? "Picture creation isn't available for this profile." };
+  if (!comment.enabled) return { ready: false, reason: comment.reason ?? "Picture creation isn't available here. Try something else." };
   // CREATOR-17: Expand needs the engine's masked fill; off with one plain line when the engine has none.
   if (op.id === "picture.expand") {
    const { pictureEngineStatus } = await import("@/lib/pictures/ready");
@@ -94,10 +94,10 @@ export async function runMediaOp(actor: PersonRow, id: string, input: { source: 
  const op = ops.get(id);
  if (!op) throw new ImageEditError(404, "Unknown media operation.", "not_found");
  if (op.input !== "video" && !photoUploadsAllowed(actor) && !(laneOfPerson(actor) === "child" && kidLaneOn(actor))) {
-  throw new ImageEditError(403, "Picture editing is off for this profile.", "pictures_off");
+  throw new ImageEditError(403, "Picture editing isn't available here. Try something else.", "pictures_off");
  }
  if (!bandAllowed(actor, op.minBand)) {
-  throw new ImageEditError(403, "This operation isn't available for this profile.", "forbidden");
+  throw new ImageEditError(403, "That one isn't available here. Try something else.", "forbidden");
  }
  let args: unknown;
  try { args = op.args.parse(input.args); }

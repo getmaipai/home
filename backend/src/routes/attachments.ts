@@ -11,6 +11,7 @@ import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { cleanChatImage, chatImageThumbnail } from "@/lib/imageUpload";
 import { MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL, MAX_CHAT_AUDIO, MAX_CHAT_AUDIO_BYTES, CHAT_AUDIO_REFUSAL } from "@/wire";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const attachmentsRoutes = apiRouter();
 const CHAT_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/aac", "audio/ogg", "audio/flac"]);
@@ -60,7 +61,7 @@ attachmentsRoutes.openapi(uploadRoute, async (c) => {
   const file = form.file;
   const turnId = String(form.turn_id ?? "");
   if (!(file instanceof File) || !/^turn-[a-z0-9]{8,40}$/.test(turnId)) return c.json({ error: "Invalid image upload." }, 400);
-  if (!photoUploadsAllowed(actor)) return c.json({ error: "Photo uploads are turned off for this profile." }, 403);
+  if (!photoUploadsAllowed(actor)) return c.json({ error: NOT_AVAILABLE_HERE }, 403);
   if (file.size > MAX_CHAT_IMAGE_BYTES) return c.json({ error: CHAT_IMAGE_REFUSAL }, 400);
   const temporary = form.temporary === "true";
   const resolved = resolveOrCreateConversation(actor, "chat", String(form.conversation_id || "") || undefined, { temporary });

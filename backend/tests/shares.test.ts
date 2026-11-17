@@ -13,6 +13,7 @@ import { TestClient } from "./client";
 import { eq } from "drizzle-orm";
 import { listPending } from "@/lib/notifications";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 beforeEach(() => resetDb());
 
@@ -184,7 +185,7 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
     const file = uploadFile(bramble);
     const refused = createShare(bramble, { fileId: file.id, to: lucia.id });
     expect(refused.ok).toBe(false);
-    if (!refused.ok) { expect(refused.status).toBe(403); expect(refused.error).toContain("Ask a grown-up"); }
+    if (!refused.ok) { expect(refused.status).toBe(403); expect(refused.error).toBe(NOT_AVAILABLE_HERE); }
     expect(createShare(bramble, { fileId: file.id, to: "household" }).ok).toBe(false);
     expect(db.select().from(shares).all()).toHaveLength(0);
     const teen = person("teen", "Riff");

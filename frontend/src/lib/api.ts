@@ -1086,6 +1086,11 @@ export type AiOverview = {
   right_now: { engine: "ready" | "problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };
 };
 
+/** UNSEEN-01: the derived access shape an owner or admin sees (role, a level per kind of content, the overrides that set a level, the kinds that show unrated items). */
+export interface PersonAccess { role: string; ceiling: Record<string, string>; overrides: Array<{ key: string; scope: "person" | "household" }>; unrated: string[] }
+/** UNSEEN-01: household counts of what the filters held back since the hub started. Counts only. */
+export interface HeldBack { since: string; surfaces: Array<{ surface: "news" | "shelf" | "reference" | "search"; count: number }> }
+
 export const api = {
   aiFeaturesOverview: () => request<AiOverview>("/api/ai/overview"),
   installComponent: (id: string) => request<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", body: JSON.stringify({}) }),
@@ -1865,6 +1870,9 @@ export const api = {
   countMissingTourTarget: (record: { tour_id: string; package_id: string; step_id: string }) =>
     request<{ success: true }>("/api/tours/missing-target", { method: "POST", body: JSON.stringify(record) }),
   missingTourTargets: () => request<Array<{ key: string; count: number }>>("/api/tours/missing-targets"),
+  // UNSEEN-01 (C10): an owner or admin reads one person's role, content levels and the overrides that set them, and the household's held-back counts.
+  personAccess: (id: string) => request<PersonAccess>(`/api/people/${encodeURIComponent(id)}/access`),
+  heldBack: () => request<HeldBack>("/api/status/held-back"),
   // SKILLS-PAGE-01: every installed plugin, skill and project package this
   // person may use, with whether their written chat offers it today.
   skills: () => request<SkillRow[]>("/api/plugins/skills"),

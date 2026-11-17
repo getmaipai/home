@@ -176,7 +176,7 @@ const createConversationRoute = createRoute({
   request: { body: { required: false, content: { "application/json": { schema: CreateConversationBody } } } },
   responses: {
     201: { content: { "application/json": { schema: Conversation } }, description: "The new conversation." },
-    ...errorResponses({ 400: "Bad surface, placement, mode, carry_from or folder_id", 401: "Sign in first", 403: "Temporary chat is not available for minors", 404: "carry_from not found" }),
+    ...errorResponses({ 400: "Bad surface, placement, mode, carry_from or folder_id", 401: "Sign in first", 403: "Not available", 404: "carry_from not found" }),
   },
 });
 

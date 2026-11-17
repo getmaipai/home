@@ -16,6 +16,7 @@ import { removeSource } from "./sources";
 import type { DirectoryStation } from "./radioDirectory";
 import { cleanStationName } from "./radioName";
 import type { Result } from "@/lib/result";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type RadioOutcome<T> = Result<T, 400 | 403 | 404 | 409>;
 
@@ -120,12 +121,12 @@ export interface AddStationInput {
 /** The person a station is saved for: the actor, or (a parent only) a child of the household. A child never adds one. */
 function targetOf(actor: PersonRow, forId: string | null | undefined): RadioOutcome<PersonRow> {
   if (!forId || forId === actor.id) {
-    if (mediaBandOf(actor) === "child") return { ok: false, status: 403, error: "A parent saves radio stations for you. Ask a parent to add one." };
+    if (mediaBandOf(actor) === "child") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
     return { ok: true, value: actor };
   }
   const target = db.select().from(people).where(eq(people.id, forId)).get() as PersonRow | undefined;
   if (!target || target.role !== "child") return { ok: false, status: 403, error: "A parent can save stations for their own children only. Pick one of the children in this home." };
-  if (!isMediaAdmin(actor) || mediaBandOf(actor) !== "adult") return { ok: false, status: 403, error: "Only a parent can save a station for a child." };
+  if (!isMediaAdmin(actor) || mediaBandOf(actor) !== "adult") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   return { ok: true, value: target };
 }
 
@@ -164,7 +165,7 @@ export function removeStation(actor: PersonRow, id: string): RadioOutcome<{ id: 
   const notFound = { ok: false, status: 404, error: "That station is not in your list." } as const;
   if (!row || !row.ownerPersonId) return notFound;
   if (row.ownerPersonId === actor.id) {
-    if (mediaBandOf(actor) === "child") return { ok: false, status: 403, error: "A parent changes your radio stations. Ask a parent." };
+    if (mediaBandOf(actor) === "child") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   } else {
     const owner = db.select().from(people).where(eq(people.id, row.ownerPersonId)).get();
     if (!owner || owner.role !== "child" || !isMediaAdmin(actor) || mediaBandOf(actor) !== "adult") return notFound;

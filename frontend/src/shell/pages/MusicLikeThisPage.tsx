@@ -34,8 +34,8 @@ export function MusicLikeThisPage({ person }: { person: Roster }) {
     if (genre === null) return null;
     return <Navigate to={`/chat?ask=${encodeURIComponent(likeThisMessage(op, id, genre))}`} replace />;
   }
-  const message = child || adultOnly
-    ? "Making a band is for adults. Ask a grown-up to make one with you."
-    : "This song is not available. Go back to Audio and pick it again.";
+  // UNSEEN-01 (C10): a page this person may not use is absent: it sends them home without a word.
+  if (child || adultOnly) return <Navigate to="/" replace />;
+  const message = "This song is not available. Go back to Audio and pick it again.";
   return <EmptyState icon="music" text={message} actionLabel="Back to Audio" onAction={() => navigate("/apps/audio")} />;
 }

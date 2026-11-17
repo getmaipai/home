@@ -17,14 +17,16 @@ describe("MINOR-SEARCH-01c web switches by band", () => {
     for (const band of ["child", "teen", "adult"] as const) expect(webSideOff(band)).toBe(false);
   });
 
-  test("child_mode off turns the web side off for a child only, with copy that says the fix", () => {
+  test("child_mode off turns the web side off for a child only, with a model-facing note that names no filter and no setting", () => {
     expect(setHouseholdSettingValue("search.web.child_mode", "off").ok).toBe(true);
     expect(effectiveMode("web", "child")).toBe("offline");
     expect(effectiveMode("web", "teen")).not.toBe("offline");
     expect(effectiveMode("web", "adult")).not.toBe("offline");
     const text = refuseWeb("child");
     expect(text).toBe(CHILD_WEB_OFF_NOTE);
-    expect(text).toContain("Settings, Search");
+    // UNSEEN-01 (C10): the model words the redirect; the note names no age, role, rule or setting and says it cannot look things up here.
+    expect(text).not.toMatch(/child controls|teen controls|Settings|admin|grown-up|age|rule|filter/i);
+    expect(text).toContain("cannot look things up online");
   });
 
   test("teen_mode off turns the web side off for a teen only", () => {
@@ -39,7 +41,7 @@ describe("MINOR-SEARCH-01c web switches by band", () => {
     expect(effectiveMode("web", "teen", true)).not.toBe("offline");
     expect(effectiveMode("web", "adult", true)).not.toBe("offline");
     expect(refuseWeb("child", true)).toBe(CHILD_TEMPORARY_WEB_OFF_NOTE);
-    expect(refuseWeb("child", true)).toContain("regular chat");
+    expect(refuseWeb("child", true)).not.toMatch(/child controls|regular chat|Settings|age|rule|filter/i);
   });
 
   test("an adult still gets the household copy", () => {

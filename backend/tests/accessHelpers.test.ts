@@ -4,6 +4,7 @@ import { canMakeCompanion, COMPANION_BAND_LINE, isOwnerOrAdmin } from "@/lib/acc
 import { conflictStatus } from "@/lib/result";
 import { child, owner } from "./support/testAuth";
 import { resetDb } from "./reset-db";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 beforeEach(() => resetDb());
 
@@ -19,7 +20,7 @@ describe("access helpers", () => {
     const kid = await child(client);
     expect(canMakeCompanion(row)).toBe(true);
     expect(canMakeCompanion(kid.row)).toBe(false);
-    expect(COMPANION_BAND_LINE).toBe("Only teens and adults can make a companion.");
+    expect(COMPANION_BAND_LINE).toBe(NOT_AVAILABLE_HERE); // UNSEEN-01: the refusal names no age or role
     expect((await kid.client.post("/api/companions/draft", { name: "Pippa" })).status).toBe(403);
     expect(await (await kid.client.post("/api/companions/draft", { name: "Pippa" })).json()).toEqual({ error: COMPANION_BAND_LINE });
   });

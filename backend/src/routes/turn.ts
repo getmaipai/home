@@ -41,6 +41,7 @@ import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { getDeviceById } from "@/lib/devices";
 import { attachTurnStats, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, setVoiceOutcome, type VoiceTimingRecord } from "@/lib/voiceTiming";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -527,7 +528,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // "route-level primary gate, structural backstop underneath"
   // ADMIN-COMPARE-01 (b) already established for bare mode.
   if (body.temporary === true && !canHaveTemporaryChat(actor)) {
-    return c.json({ error: "temporary chat is not available for minors" }, 403);
+    return c.json({ error: NOT_AVAILABLE_HERE }, 403);
   }
   // REASONING-03 (safety ruling, 2026-09-22): a minor's turn never even
   // asks the model to think, belt and braces alongside the composer's
@@ -1243,7 +1244,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   // clean 403, checked again as a structural backstop inside
   // resolveOrCreateConversation() itself.
   if (body.temporary === true && !canHaveTemporaryChat(actor)) {
-    return c.json({ error: "temporary chat is not available for minors" }, 403);
+    return c.json({ error: NOT_AVAILABLE_HERE }, 403);
   }
   // REASONING-03 (safety ruling, 2026-09-22): same belt-and-braces as
   // the non-stream route above - a minor's turn never asks the model to

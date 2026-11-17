@@ -8,6 +8,7 @@ import { mediaBandOf, trips } from "./band";
 import { addItem, listCollections, playlistsWithMember, removeItemFrom, resolveCollection, setItems, setPlaylistMembers } from "./collections";
 import type { MediaCollection } from "./model";
 import { readableIn, type ActionResult } from "./appHost";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const isMusic = (collection: MediaCollection): boolean => collection.kind === "playlist" && collection.media_kind !== "video";
 const isAdult = (person: PersonRow): boolean => person.role !== "guest" && speakerAgeBand(person, new Date()) === "adult";
@@ -56,7 +57,7 @@ export function changePlaylistMembers(person: PersonRow, op: "add" | "remove" | 
   const found = playlistFor(person, id);
   if (!found) return GONE;
   if (!found.owner) return { ok: false, status: 403, error: "Only the person who made this playlist can change who it is shared with." };
-  if (mediaBandOf(person) === "child" || person.role === "guest") return { ok: false, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this playlist for you." };
+  if (mediaBandOf(person) === "child" || person.role === "guest") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   const { collection } = found;
   if (op === "private") setPlaylistMembers(collection, []);
   else {
@@ -64,7 +65,7 @@ export function changePlaylistMembers(person: PersonRow, op: "add" | "remove" | 
     if (op === "remove") setPlaylistMembers(collection, collection.members.filter((member) => member !== target));
     else {
       const candidate = memberCandidates(person, collection).find((entry) => entry.id === target);
-      if (!candidate) return { ok: false, status: 403, error: "That person cannot be added. Choose someone else in your home; a child or teen can be added only by a grown-up." };
+      if (!candidate) return { ok: false, status: 403, error: "That person cannot be added. Choose someone else in your home." };
       setPlaylistMembers(collection, [...collection.members, target]);
     }
   }

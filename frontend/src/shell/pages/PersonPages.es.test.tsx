@@ -24,8 +24,6 @@ import { MediaHomePage } from "@/shell/pages/MediaHomePage";
 import { MediaSearchPage } from "@/shell/pages/MediaSearchPage";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { VoicesPage } from "@/shell/pages/VoicesPage";
-import { MakeSongPage } from "@/shell/pages/MakeSongPage";
-import { CreatePage } from "@/shell/pages/MusicStudioPages";
 import { MusicWorkspace } from "@/shell/pages/MusicWorkspacePage";
 import { BringSong } from "@/shell/pages/BringSong";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
@@ -74,11 +72,9 @@ const cases: Array<[string, () => ReactElement, string[], string?]> = [
   ["Media search", () => at("/media/search?q=zzz", <MediaSearchPage />, "/media/search"), ["MediaSearchPage.tsx"]],
   ["Home", () => at("/", <DashboardPage person={person("owner")} />), ["DashboardPage.tsx", "dashboard/Greeting.tsx", "dashboard/AskBox.tsx", "dashboard/GettingStarted.tsx", "dashboard/HomeShelves.tsx", "dashboard/TodaySection.tsx"]],
   ["Voices", () => at("/voices", <VoicesPage person={person("adult")} />), ["VoicesPage.tsx"]],
-  ["Make a song (child)", () => at("/music", <MakeSongPage adult={false} search="" />), ["MakeSongPage.tsx"]],
-  ["Make a band (child)", () => at("/music/create", <CreatePage kind="band" adult={false} />), ["MusicStudioPages.tsx"]],
   ["Music workspace", () => at("/music", <MusicWorkspace adult search="" />), ["MusicWorkspacePage.tsx"]],
   ["Bring a song", () => at("/music", <BringSong />), ["BringSong.tsx"]],
-  ["Companion flow", () => at("/companions/new", <CompanionFlowPage />), ["companionFlow/CompanionFlowPage.tsx"], "Making a synth is for teens and adults. Ask an owner or admin if you want one."],
+  ["Companion flow", () => at("/companions/new", <CompanionFlowPage />), ["companionFlow/CompanionFlowPage.tsx"]],
   ["Companion audience", () => at("/", <CompanionAudienceDialog companionId="sprout" name="Sprout" onClose={() => undefined} />), ["CompanionAudienceDialog.tsx"]],
   ["Showcase", () => at("/showcase", <UiShowcasePage person={person("owner")} />), ["UiShowcasePage.tsx"]],
 ];

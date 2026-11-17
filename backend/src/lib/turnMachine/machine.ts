@@ -115,6 +115,8 @@ interface MachineContext {
   decorativeDropped?: boolean;
   /** PROJECT-TOOL-REFUSAL-01: set once when a start_project call naming an unregistered type was dropped and the model asked again without tools. */
   projectTypeDropped?: boolean;
+  /** UNSEEN-01 (C10): set once when every call policy refused was a tool this person may not use; the model is told it is not available here and words the redirect itself, with no tools offered. */
+  notAvailableDropped?: boolean;
   /** A research turn's refused later-round call was dropped once and the answer written from the notes already gathered. */
   researchCallDropped?: boolean;
   // CF-SEARCH-02: set once when the model's search query was refused as ungrounded and the person's own
@@ -164,7 +166,7 @@ export const turnMachine = setup({
         deadlineFor(input, modelNodeDeadlineMs(input.turnState)),
         input.turnState,
         input.abortSignal,
-        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds && !researchNoNewRound(input.turnState), roundsUsed: input.roundsUsed, retry: retryRound(input) },
+        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds && !researchNoNewRound(input.turnState), roundsUsed: input.roundsUsed, retry: retryRound(input), notAvailable: input.notAvailableDropped === true },
         modelNode,
       ),
     ),
@@ -267,6 +269,16 @@ export const turnMachine = setup({
       if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
       const entries = (event as unknown as { output: PolicyOutput }).output.entries;
       return entries.some((e) => !e.decision.allow && e.decision.reason === "unknown_project_type") && entries.every((e) => !e.decision.allow && (e.decision.reason === "unknown_project_type" || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool"));
+    },
+    // UNSEEN-01 (C10, chat rule 6): a tool this person may not use (a role floor, a grant, the surface) reads as absent. No fixed line is sent:
+    // the call is dropped once and the model is told the tool is not available here, so it words the redirect in its own voice. Text the model
+    // wrote beside the call is already the answer (answerInputFrom). A second refusal takes the ordinary path, so this can never loop.
+    notAvailableCallDropped: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      if (toRun.length > 0 || parkedAsk !== null || context.notAvailableDropped || retryRound(context)) return false;
+      if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
+      const entries = (event as unknown as { output: PolicyOutput }).output.entries;
+      return entries.length > 0 && entries.every((e) => !e.decision.allow && (e.decision.reason === "not_available" || e.decision.reason === "min_role"));
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
@@ -521,6 +533,7 @@ export const turnMachine = setup({
           { guard: "decorativeCallDropped", actions: assign(({ context }) => ({ decorativeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "projectTypeCallDropped", actions: assign(({ context }) => ({ projectTypeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "researchCallDropped", actions: assign(({ context }) => ({ researchCallDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
+          { guard: "notAvailableCallDropped", actions: assign(({ context }) => ({ notAvailableDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
         ],

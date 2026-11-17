@@ -2,7 +2,7 @@
 // engine runs), the pairing wizard, the engines console (formerly /engines) and the AI model list (formerly /models)
 // are all inside the settings shell, so the person never leaves it.
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
@@ -65,9 +65,9 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.getAllByRole("link", { name: "AI and models" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
   });
 
-  test("a teen is blocked from the Features page by the household role gate", async () => {
+  test("a teen is sent to their own settings and never sees the Features page (UNSEEN-01)", async () => {
     const view = open(makePerson("teen"), "/settings/ai?tab=overview");
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    await waitFor(() => expect(view.queryByText(/Features/)).toBeNull());
     expect(view.queryByTestId("ai-features")).toBeNull();
   });
 

@@ -17,6 +17,7 @@ import { projectsDir } from "@/lib/paths";
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 /** The real PersonRow for someone already created through the API, so
  * these tests drive lib functions the same way a request would rather
@@ -281,7 +282,7 @@ describe("PATCH /api/people/:id", () => {
     const guestClient = await sessionFor(guest.id);
     const res = await guestClient.request(`/api/people/${guest.id}`, { method: "PATCH", body: { guestExpiresAt: null } });
     expect(res.status).toBe(403);
-    expect(((await res.json()) as { error: string }).error).toBe("Ask an adult in the household to change how long you stay.");
+    expect(((await res.json()) as { error: string }).error).toBe(NOT_AVAILABLE_HERE);
   });
   test("a new accent shows in the very next /api/auth/me read, not after the session cache expires", async () => {
     const ownerClient = await ownerSession();

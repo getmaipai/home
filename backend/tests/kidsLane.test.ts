@@ -180,13 +180,13 @@ describe("limits and switches", () => {
 
   test("the home switch and the child's own switch each block, with the profile line", async () => {
     setHouseholdSettingValue("generation.kids", false);
-    expect(text(await pic(kid, { prompt: "a friendly dragon" }))).toContain("off for this profile");
-    expect(text(await vid(kid, { prompt: "a friendly dragon" }))).toContain("off for this profile");
+    expect(text(await pic(kid, { prompt: "a friendly dragon" }))).toContain("isn't available here");
+    expect(text(await vid(kid, { prompt: "a friendly dragon" }))).toContain("isn't available here");
     setHouseholdSettingValue("generation.kids", true);
     expect((await pic(kid, { prompt: "a friendly dragon" })).status).toBe("succeeded");
     await until(() => true);
     expect(setValue(bench.owner, `person:${kid.id}`, "generation.kid_enabled", false).ok).toBe(true);
-    expect(text(await pic(kid, { prompt: "a friendly dragon" }))).toContain("off for this profile");
+    expect(text(await pic(kid, { prompt: "a friendly dragon" }))).toContain("isn't available here");
     expect(image.submitted).toHaveLength(1);
   });
 });

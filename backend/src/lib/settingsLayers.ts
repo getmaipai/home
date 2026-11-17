@@ -304,18 +304,18 @@ function changeOverridesGated(actor: PersonRow, targetId: string, key: string, c
   const tightens = addTightens(key);
   const delta: Delta = { add: [...current.add], remove: [...current.remove] };
   if (w.kind === "self" && minor) {
-    if (role === "child") return deny("A household owner or admin changes site blocks for a child. Ask one of them to open your page.");
+    if (role === "child") return deny("An owner or admin sets this.");
     // A teen only tightens: an added block is fine, an added allow is not, and a removal is fine only
     // for a block the teen added themself and that no layer above also holds.
-    if (!tightens && (adds.length > 0 || removes.length > 0)) return deny("A teen can add blocks but not allow a site. Ask a household owner or admin to change it.");
+    if (!tightens && (adds.length > 0 || removes.length > 0)) return deny("An owner or admin sets this.");
   }
   for (const item of removes) {
-    if (locked.has(item)) return deny("That block can't be turned off for this age group. It keeps the person safe.");
+    if (locked.has(item)) return deny("That block stays in place. An owner or admin sets this.");
   }
   if (!tightens && minor && lockedListIds(band).length > 0) {
     for (const item of adds) {
       const hit = checkHost(band, item);
-      if (hit && lockedListIds(band).includes(hit)) return deny("That site is on the adult-site list, which stays blocked for children and teens. It can't be allowed.");
+      if (hit && lockedListIds(band).includes(hit)) return deny("That site stays blocked here. An owner or admin sets this.");
     }
   }
 
@@ -337,7 +337,7 @@ function changeOverridesGated(actor: PersonRow, targetId: string, key: string, c
   if (w.kind === "self" && role === "teen" && tightens) {
     const ownAdds = new Set(delta.add.filter((e) => e.set_by === SELF).map((e) => e.item));
     for (const item of removes) {
-      if (!ownAdds.has(item) || baseline.has(item)) return deny("A teen can add blocks but not remove one that was already in place. Ask a household owner or admin to change it.");
+      if (!ownAdds.has(item) || baseline.has(item)) return deny("An owner or admin sets this.");
     }
   }
 
@@ -383,7 +383,7 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
   if (!role) return deny("That person could not be found. Pick someone from the People page.");
   const w = writer(actor, targetId, role);
   if ("error" in w) return deny(w.error);
-  if (w.kind === "self" && role === "child") return deny("A household owner or admin changes site blocks for a child. Ask one of them to open your page.");
+  if (w.kind === "self" && role === "child") return deny("An owner or admin sets this.");
   const names = keys.length > 0 ? keys : layeredListKeys();
   for (const key of names) {
     if (!unionKey(key)) return { ok: false, status: 400, error: `${key} is not a setting with user overrides. Pick one of the site-block settings.` };
@@ -469,7 +469,7 @@ export function resetBlocklistRow(actor: PersonRow, targetId: string, item: stri
   if (!role) return deny("That person could not be found. Pick someone from the People page.");
   const w = writer(actor, targetId, role);
   if ("error" in w) return deny(w.error);
-  if (w.kind === "self" && role === "child") return deny("A household owner or admin changes site blocks for a child. Ask one of them to open your page.");
+  if (w.kind === "self" && role === "child") return deny("An owner or admin sets this.");
   const band = bandOfPerson(targetId);
   const delta = readDeltaForWrite(targetId, BLOCKLISTS_KEY);
   if (!delta) return deny("This person's saved site settings could not be read, so Home will not change them. Use Back to the age group's settings on their page to reset them, then try again.");

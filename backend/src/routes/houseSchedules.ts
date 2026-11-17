@@ -33,7 +33,7 @@ const listRoute = createRoute({
   method: "get", path: "/", tags: ["House"], summary: "My scheduled device actions", middleware: [requireAuth] as const,
   responses: {
     200: { content: { "application/json": { schema: z.object({ schedules: z.array(ScheduleView), others: z.number().nullable() }) } }, description: "Own live schedules; others is a count for the owner and admins, otherwise null." },
-    ...errorResponses({ 401: "Sign in to see your schedules", 403: "Adults only" }),
+    ...errorResponses({ 401: "Sign in to see your schedules", 403: "Not available" }),
   },
 });
 const cancelRoute = createRoute({
@@ -41,7 +41,7 @@ const cancelRoute = createRoute({
   request: { params: z.object({ id: z.string().min(1) }) },
   responses: {
     200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Cancelled." },
-    ...errorResponses({ 401: "Sign in to cancel a schedule", 403: "Adults only", 404: "No such schedule of yours" }),
+    ...errorResponses({ 401: "Sign in to cancel a schedule", 403: "Not available", 404: "No such schedule of yours" }),
   },
 });
 

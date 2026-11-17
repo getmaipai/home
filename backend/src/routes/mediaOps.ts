@@ -29,7 +29,7 @@ const OperationSchema = z.object({
   levels: z.array(z.object({ id: z.string(), label: z.string(), summary: z.string(), eta: z.string(), enabled: z.boolean(), reason: z.string().optional() })).optional().describe("Operations with levels (Make clearer): each level's one-line description, time estimate and whether it can run now, with the reason when it cannot."),
   enabled: z.boolean(), reason: z.string().optional().describe("When not enabled: one plain line saying why and what to do."),
 });
-const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Pictures are off for this profile", 404: "Picture unavailable", 409: "Cancelled", 413: "Picture too large", 422: "The edit cannot be done", 423: "The picture is locked", 502: "The editing tools failed", 503: "The editing tools are not available" });
+const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Not available", 404: "Picture unavailable", 409: "Cancelled", 413: "Picture too large", 422: "The edit cannot be done", 423: "The picture is locked", 502: "The editing tools failed", 503: "The editing tools are not available" });
 
 function fail(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
   const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);
@@ -53,7 +53,7 @@ export async function describeOperations(actor: PersonRow, query: { input?: "pic
       enabled: blocked ? false : operation.enabled,
       ...(blocked ? { reason: blocked.message } : operation.reason ? { reason: operation.reason } : {}),
     })),
-    note: operations.length === 0 ? "Picture editing is off for this profile. A parent can turn pictures on in settings." : null,
+    note: operations.length === 0 ? "Picture editing isn't available here. Try something else." : null,
   };
 }
 

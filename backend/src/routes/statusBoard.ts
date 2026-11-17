@@ -14,6 +14,7 @@ import { readStackMemoryLedger } from "@/lib/stackHealthSync";
 import { readResourceDay } from "@/lib/resourceDay";
 import { hostGuardInstalled, hostGuardStatusView, readHostGuardMemory, readDevLease, readDevReaper, readHostGuardStatus, withDevLease, withDevReaper, withHostGuardMemory } from "@/lib/hostGuard";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { heldBackView } from "@/lib/heldBack";
 
 export const statusBoardRoutes = apiRouter();
 const NoteInput = z.object({ body: z.string().min(1).max(500), expires_at: z.string().datetime({ offset: true }).optional() });
@@ -49,6 +50,13 @@ statusBoardRoutes.openapi(historyRoute, async (c) => {
   const hostGuard = admin ? withDevLease(withDevReaper(withHostGuardMemory(hostGuardStatusView(readHostGuardStatus(), hostGuardInstalled()), readHostGuardMemory()), readDevReaper()), readDevLease()) : undefined;
   return c.json({ ...buildStatusHistory(days), chat_pauses: chatPauseSummary(), engine_crashes: engineCrashSummary(), ...(memoryLedger ? { memory_ledger: memoryLedger } : {}), ...(resourceDay ? { resource_day: resourceDay } : {}), ...(hostGuard ? { host_guard: hostGuard } : {}) }, 200);
 });
+
+// UNSEEN-01 (C10, 6a): the household counts of what the filters held back, for an owner or admin only (counts, no person, no item).
+const HeldBackResponse = z.object({ since: z.string(), surfaces: z.array(z.object({ surface: z.enum(["news", "shelf", "reference", "search"]), count: z.number() })) });
+const heldBackRoute = createRoute({ method: "get", path: "/held-back", tags: ["Status"], summary: "Count what the content filters held back since the hub started",
+  middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: HeldBackResponse } }, description: "One count per surface, kept in memory since the hub started." },
+    ...errorResponses({ 401: "Not signed in", 403: "Owner/admin only" }) } });
+statusBoardRoutes.openapi(heldBackRoute, (c) => c.json(heldBackView(), 200));
 
 const boardRoute = createRoute({ method: "get", path: "/board", tags: ["Status"], summary: "Read the household status board",
   middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: BoardResponse } }, description: "Current status note and scheduled maintenance." },

@@ -196,7 +196,7 @@ export function blendWebRows(lists: WebRow[][]): WebRow[] {
   return reciprocalRankFusion(lists, rowKey).map((entry) => (entry.item.snippet || !entry.last.snippet ? entry.item : { ...entry.item, snippet: entry.last.snippet }));
 }
 
-export const NO_SOURCE_FOR_BAND_TEXT = "No web search source is available for this profile. An adult can pick SearXNG under Settings, Search, Web search sources.";
+export const NO_SOURCE_FOR_BAND_TEXT = "No web search source is available here. An admin can pick one under Settings, Search, Web search sources.";
 export const WEB_NO_RESULTS_TEXT = "No web search results were found.";
 
 /** The same per-field cap the SearXNG-only text applies (packageHost.ts SEARXNG_FIELD_MAX_CHARS). */

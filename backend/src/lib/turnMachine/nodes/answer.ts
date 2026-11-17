@@ -1,3 +1,4 @@
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 import { markUnsourcedNames } from "../fabrication";
 import { checkClaims, dropUnknownCitations, dropUnsupportedCredits, evidenceBySource, researchEvidence, type ClaimJudge } from "../research";
 import { completeBackground } from "@/lib/llm";
@@ -85,9 +86,9 @@ export interface AnswerOutput {
  * (no such package, the ordinary case of a model inventing a tool
  * name) keeps the honesty line - GROUND-01's ruling stands. */
 /** GRANTS-01 (C10): a tool this person may not use reads as absent: no age, role or rule word, and no claim that the thing does not exist. */
-export const NOT_AVAILABLE_LINE = "I can't do that one here. I'm glad to help with something else, so tell me what you're after.";
+export const NOT_AVAILABLE_LINE = NOT_AVAILABLE_HERE;
 export const PARENT_REQUIRED_LINE = "That needs a grown-up at home to decide. Ask one of them, or ask me something else.";
-export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people in our family. I can tell you what I already know, or you can ask a grown-up at home.";
+export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people in our family. I can tell you what I already know, or you can ask me about something else.";
 
 function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "parent_required") return PARENT_REQUIRED_LINE;

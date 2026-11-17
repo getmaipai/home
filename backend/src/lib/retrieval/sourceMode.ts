@@ -45,7 +45,7 @@ export const SOURCE_MODE_OVERRIDE_KEYS = {
 } as const;
 export const DEFAULT_SOURCE_MODE: SourceMode = "mix";
 
-/** What the person is told when web search is switched off by the household. Problem, then the fix. */
+/** What the person is told when web search is switched off by the household. Problem, then the fix. The three notes below for a child or teen are model-facing only (UNSEEN-01, C10): the model words the redirect itself. */
 export const WEB_OFF_NOTE =
   "Web search is turned off in this household's search settings, so only the offline library was searched. An adult can change this in Settings under Search sources.";
 
@@ -54,11 +54,11 @@ export const LISTS_LOADING_NOTE =
   "Web search is not available for this person right now because the home's blocked-site lists have not finished loading. Only the offline library was searched. Do not tell them to change a setting; say that looking things up online is not ready yet and answer from what you know.";
 
 export const CHILD_WEB_OFF_NOTE =
-  "Web search is off for child controls in this home, so only the offline library was searched. A grown-up with an admin account can turn it on in Settings, Search.";
+  "Web search is not available for this person here, so only the offline library was searched. Do not give a reason or point to a setting; say you cannot look things up online here and answer from what you know.";
 export const TEEN_WEB_OFF_NOTE =
-  "Web search is off for teen controls in this home, so only the offline library was searched. An admin can turn it on in Settings, Search.";
+  "Web search is not available for this person here, so only the offline library was searched. Do not give a reason or point to a setting; say you cannot look things up online here and answer from what you know.";
 export const CHILD_TEMPORARY_WEB_OFF_NOTE =
-  "Web search isn't used in a temporary chat for child controls, so only the offline library was searched. Start a regular chat to look things up online.";
+  "Web search is not available for this person in this chat, so only the offline library was searched. Do not give a reason; say you cannot look things up online in this chat and answer from what you know.";
 
 function asMode(value: unknown): SourceMode | null {
   return value === "live" || value === "offline" || value === "mix" ? value : null;

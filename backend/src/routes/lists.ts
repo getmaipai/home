@@ -147,7 +147,7 @@ const deleteRoute = createRoute({
   request: { params: idParamSchema("id", "list-a1b2c3") },
   responses: {
     200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Removed." },
-    ...errorResponses({ 401: "Not signed in", 403: "Children cannot delete household lists", 404: "No such list" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Not available", 404: "No such list" }),
   },
 });
 listsRoutes.openapi(deleteRoute, (c) => {

@@ -21,6 +21,7 @@ import { readLook, versionPath } from "@/lib/companionLook";
 import { readFileSync } from "node:fs";
 import { storeFile } from "@/lib/attachments";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type SynthRecord = SynthShape;
 type Companion = NonNullable<PackageManifest["companion"]>;
@@ -106,7 +107,7 @@ export function listSynths(actor: PersonRow): SynthRecord[] {
 }
 function deniedUse(actor: PersonRow, synth: SynthRecord): string {
   const base = synthPersona(synth);
-  return (base && pickRefusal(actor, base)) || "You cannot use this companion. Ask a parent or admin to check its settings.";
+  return (base && pickRefusal(actor, base)) || NOT_AVAILABLE_HERE;
 }
 function stampSynth(id: string, persona: Companion, base: Partial<Synth>, owner: string, provenance: string): SynthRecord {
   const now = new Date().toISOString();

@@ -50,6 +50,7 @@ import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } f
 import type { Result } from "@/lib/result";
 import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { storedRatingFilter, type StoredStamp } from "@/lib/filter/stamps";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type MediaKind = MediaItem["kind"];
 type ProductionSourceGate = (person: PersonRow, productionId: string) => boolean;
@@ -456,7 +457,7 @@ export function changeVideoCreationShare(person: PersonRow, op: "add" | "remove"
   if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
   if (!madeFileFor(person, "video", id)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
   if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this video." };
-  if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
+  if (person.role === "child") return { ok: false as const, status: 403, error: NOT_AVAILABLE_HERE };
   if (op === "add") {
     if (!target) return { ok: false as const, status: 400, error: "Choose someone in your home." };
     const result = createShare(person, { fileId: id, to: target, provenance: "videos:creation-header" });
@@ -524,7 +525,7 @@ export function changeMusicCreationShare(person: PersonRow, op: "add" | "remove"
   const meta = libraryProvenance(file.provenance), jobId = typeof meta.job_id === "string" ? meta.job_id : typeof meta.job === "string" ? meta.job : "";
   if (jobId && musicRowIsLocked(person, jobId)) return { ok: false as const, status: 404, error: "Song unavailable. Go back to Audio and choose another." };
   if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this song." };
-  if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
+  if (person.role === "child") return { ok: false as const, status: 403, error: NOT_AVAILABLE_HERE };
   if (op === "add") {
     if (!target) return { ok: false as const, status: 400, error: "Choose someone in your home." };
     const result = createShare(person, { fileId, to: target, provenance: "music:creation-header" });

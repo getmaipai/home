@@ -34,6 +34,7 @@ import { REFERENCE_SHEET_NOTE } from "./referenceSheets";
 import { FIRST_FRAME_LINES, FIRST_FRAME_SENTENCE, FIRST_FRAME_STEP_NAMES, buildFirstPicture, decideReferenceRoute, firstFrameTools, measureClipFaces, LOOK_ALIKE_LINE, type FirstFramePicture, type FirstPictureResult } from "./referenceFirstFrame";
 
 import { MAKE_REFERENCE_VIDEO_TOOL_ID } from "./referenceToolId";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 export { MAKE_REFERENCE_VIDEO_TOOL_ID, FIRST_FRAME_STEP_NAMES };
 /** The first-picture route's default length (REFVIDEO-FIRSTFRAME-01): 5 to 8 seconds; the level's own ceiling lowers it. */
 export const FIRST_FRAME_SECONDS = 6;
@@ -59,7 +60,7 @@ export const makeReferenceVideoArgs = z.object({
 
 // The one plain line for each refusal (what went wrong, then what to do).
 export const REFERENCE_NO_PICTURES_LINE = "I need pictures for that. Attach the people, objects or places you want in the video to your message, then ask again.";
-export const REFERENCE_MINOR_LINE = "Videos from pictures are for adults on their own screen. Ask an adult in your home to help.";
+export const REFERENCE_MINOR_LINE = NOT_AVAILABLE_HERE;
 export const REFERENCE_SCREEN_LINE = "Videos from pictures can be made in your own written chat. Open a chat, attach the pictures there and ask again.";
 export const REFERENCE_BUSY_LINE = "You already have a video being made. Wait for it to finish, or stop it first.";
 export const REFERENCE_ADAPTER_LINE = INGREDIENTS_FAILURE_COPY.ic_lora_missing;

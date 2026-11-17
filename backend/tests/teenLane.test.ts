@@ -67,8 +67,8 @@ describe("a teen makes pictures", () => {
   test("a teen is in the teen lane (a child's cartoon lane is its own test file)", async () => {
     expect(laneOf({ actor: teen, band: "teen" })).toBe("teen");
     setHouseholdSettingValue("generation.kids", false);
-    expect(text(await pic(child, { prompt: "a friendly dragon" }))).toContain("Making pictures is off for this profile");
-    expect(text(await vid(child, { prompt: "a friendly dragon" }))).toContain("Making videos is off for this profile");
+    expect(text(await pic(child, { prompt: "a friendly dragon" }))).toContain("Making pictures isn't available here");
+    expect(text(await vid(child, { prompt: "a friendly dragon" }))).toContain("Making videos isn't available here");
     setHouseholdSettingValue("generation.kids", true);
     expect(image.submitted).toHaveLength(0);
     expect(video.submitted).toHaveLength(0);

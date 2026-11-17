@@ -32,6 +32,7 @@ import { SettingsView } from "@/shell/pages/settings/settingsViews";
 import { CodingAdminSettings } from "@/apps/settings/CodingSettings";
 import { AssistantKeysSettings } from "@/apps/settings/AssistantKeysSettings";
 import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
+import { isMinor } from "@/lib/audience";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
 import { useSetupChecklist, setupChecklistCountLine } from "@/shell/useSetupChecklist";
@@ -64,12 +65,15 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
   if (!area && !ready) return <Progress mode="spinner" label={i18n._({ id: "Loading settings", message: "Loading settings" })} />;
   if (!area) return <Navigate to={settingsPath("profile")} replace />;
   const routeViewer = { ...baseViewer(person), role: person.role === "owner" ? "admin" as const : person.role as SettingsViewer["role"] };
+  // UNSEEN-01 (C10): a child or teen has no household settings to see; the address sends them to their own settings without a word.
+  const keepsOut = isMinor(person);
   if (!areaAllows(area, routeViewer)) {
+    if (keepsOut) return <Navigate to={settingsPath("profile")} replace />;
     if (area.id === "settings" && area.sections.find((section) => section.id === areaId)?.scope === "household") return (
       <>
         <Empty>
           <EmptyHeader>
-            <EmptyDescription>{i18n._({ id: "Only a parent or admin can change these settings. Ask the person who set up Home.", message: "Only a parent or admin can change these settings. Ask the person who set up Home." })}</EmptyDescription>
+            <EmptyDescription>{i18n._({ id: "An owner or admin sets this.", message: "An owner or admin sets this." })}</EmptyDescription>
           </EmptyHeader>
           <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>{i18n._({ id: "Open your settings", message: "Open your settings" })}</Button>
         </Empty>
@@ -78,10 +82,11 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
     return <Navigate to={settingsPath("profile")} replace />;
   }
   const requestedSection = area.id === "settings" ? area.sections.find((section) => section.id === areaId) : undefined;
+  if (requestedSection?.scope === "household" && keepsOut) return <Navigate to={settingsPath("profile")} replace />;
   if (requestedSection?.scope === "household" && person.role !== "owner" && person.role !== "admin") return (
     <>
       <Empty>
-        <EmptyHeader><EmptyDescription>{i18n._({ id: "Only a parent or admin can change these settings. Ask the person who set up Home.", message: "Only a parent or admin can change these settings. Ask the person who set up Home." })}</EmptyDescription></EmptyHeader>
+        <EmptyHeader><EmptyDescription>{i18n._({ id: "An owner or admin sets this.", message: "An owner or admin sets this." })}</EmptyDescription></EmptyHeader>
         <Button variant="link" nativeButton={false} role="link" render={<Link to={settingsPath("profile")} />}>{i18n._({ id: "Open your settings", message: "Open your settings" })}</Button>
       </Empty>
     </>

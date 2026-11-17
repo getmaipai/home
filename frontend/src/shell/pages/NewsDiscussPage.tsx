@@ -38,8 +38,8 @@ export function NewsDiscussPage({ person }: { person: Roster }) {
   const id = typeof state?.id === "string" ? state.id : "";
   const child = person.age_band === "child";
   if (id && !child) return <Navigate to={`/chat?ask=${encodeURIComponent(discussMessage(id))}`} replace />;
-  const message = child
-    ? "Discuss is for teens and adults. Ask a grown-up to read this one with you."
-    : "This story is not available to discuss. Go back and open it again.";
+  // UNSEEN-01 (C10): Discuss is absent for a child: the address sends them back to News without a word.
+  if (child) return <Navigate to="/apps/news" replace />;
+  const message = "This story is not available to discuss. Go back and open it again.";
   return <EmptyState icon="newspaper" text={message} actionLabel="Back to News" onAction={() => navigate("/apps/news")} />;
 }

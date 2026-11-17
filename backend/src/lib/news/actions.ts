@@ -14,6 +14,7 @@ import { topicOfferedTo } from "./topics";
 import { viewerOf } from "./data";
 
 import { summarizeStory } from "./summary";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
@@ -96,7 +97,7 @@ function read(person: PersonRow, viewer: Viewer, body: Record<string, unknown>):
 
 function feedback(person: PersonRow, viewer: Viewer, body: Record<string, unknown>): ActionResult {
   // "Less like this" is for teens and adults; a child's News infers nothing about them.
-  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: "My Mix is not available for this profile. Open Today to read news." };
+  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   const item = releasedItem(viewer, body.item_id ?? body.story_id ?? body.id);
   if (!item) return gone();
   const kind = body.kind === "more" || body.kind === "less" ? body.kind : body.kind === "none" ? null : undefined;
@@ -106,7 +107,7 @@ function feedback(person: PersonRow, viewer: Viewer, body: Record<string, unknow
 }
 
 function resetMixAction(person: PersonRow, viewer: Viewer): ActionResult {
-  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: "My Mix is not available for this profile. Open Today to read news." };
+  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   return ok({ removed: resetMix(person.id).removed });
 }
 

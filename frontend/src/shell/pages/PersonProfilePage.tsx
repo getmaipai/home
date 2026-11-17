@@ -16,6 +16,8 @@ import { api, isOwnerOrAdminRole, type LibraryItem, type PersonRosterEntry, type
 import { canManagePerson, isProfileClosedTo, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { useTabItem } from "@/shell/tabIdentity";
+import { ACCESS_KINDS, accessKindName, accessSource } from "@/shell/pages/personAccessCopy";
+import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
 
@@ -31,6 +33,9 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const viewingSelf = id === person.id;
+  // UNSEEN-01 (C10): an owner or admin reads the person's role, levels and overrides (derived shape only, from the hub).
+  const accessQuery = useQuery({ queryKey: ["people", id, "access"], queryFn: () => api.personAccess(id!), enabled: !viewingSelf && Boolean(id) && isOwnerOrAdminRole(person.role), retry: false });
+  const access = accessQuery.data && typeof accessQuery.data.ceiling === "object" && Array.isArray(accessQuery.data.overrides) && Array.isArray(accessQuery.data.unrated) ? accessQuery.data : undefined;
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
   const activeTab = params.get("tab") === "limits" && canViewLimits
@@ -108,6 +113,13 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
                     {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
+                    {access ? <Card data-testid="person-access-card">
+                      <CardHeader><CardTitle>{i18n._({ id: "What {name} can see", message: "What {name} can see", values: { name: profile.display_name } })}</CardTitle></CardHeader>
+                      <CardContent>
+                        <p className="text-supporting text-muted-foreground">{i18n._({ id: "Role: {role}", message: "Role: {role}", values: { role: ROLE_LABELS[access.role as keyof typeof ROLE_LABELS] ?? access.role } })}</p>
+                        <ul className="mt-2 flex flex-col gap-1 text-supporting">{ACCESS_KINDS.map((kind) => <li key={kind} className="flex flex-wrap justify-between gap-2"><span>{accessKindName(kind)}</span><span className="text-muted-foreground">{access.ceiling[kind]}: {accessSource(access, kind)}{access.unrated.includes(kind) ? `, ${i18n._({ id: "shows unrated items", message: "shows unrated items" })}` : ""}</span></li>)}</ul>
+                      </CardContent>
+                    </Card> : null}
                     <CreationsSection profile={profile} />
                     <SharedMediaSection profile={profile} />
                   </div>

@@ -9,14 +9,13 @@ import { TrackStudio, defaultEffects, type StudioEffects, type StudioPanel, type
 import { errorLine } from "@/lib/hubReachability";
 import { i18n } from "@lingui/core";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Slider } from "@maipai/ui/src/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { musicApi, type EffectBody, type MusicCard } from "@/lib/musicApi";
-import { MAKE_SONG_ADULT_LINE } from "./MakeSongPage";
 import { Cover } from "@maipai/ui/src/ui/media-tiles";
 import { BringSong } from "./BringSong";
 import { useMusicPlayer } from "@/shell/music/musicPlayer";
@@ -101,7 +100,7 @@ export function MusicStudioView({ adult, search }: { adult: boolean; search: str
   // eslint-disable-next-line react-hooks/exhaustive-deps -- once per song
   }, [autoSplit, songId]);
 
-  if (!adult) return <EmptyState icon="music" text={MAKE_SONG_ADULT_LINE()} />;
+  if (!adult) return <Navigate to="/" replace />;
   if (!songId) return <EmptyState icon="music" text={i18n._({ id: "Open a song from your list, then choose Studio.", message: "Open a song from your list, then choose Studio." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/audio/create")} />;
   if (song.isError) return <EmptyState icon="music" text={i18n._({ id: "That song is not here any more. It may have been removed from your Library.", message: "That song is not here any more. It may have been removed from your Library." })} actionLabel={i18n._({ id: "Open Create", message: "Open Create" })} onAction={() => navigate("/apps/audio/create")} />;
 

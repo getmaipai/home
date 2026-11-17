@@ -10,6 +10,7 @@ import type { PersonRow } from "@/types";
 import { apiError } from "@/lib/apiErrorCopy";
 import { adultStateOf } from "@/lib/adultMarks";
 import { storedRatingFilter } from "@/lib/filter/stamps";
+import { passFor } from "@/lib/filter/pass";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; origin?: "made" | "sent" | "fetched"; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
@@ -125,8 +126,38 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
     next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null,
     locked: c === null && hasLockedLibraryItems(actor, q) };
 }
+/** UNSEEN-01 (C10): a count equals what is shown. The list drops a file the viewer's age gate or stored rating holds back after the SQL page is read, so a viewer
+ * below the adult ceiling gets the summary from the same rows through the same two checks. An adult at the top level keeps the SQL totals unchanged. */
+function summaryNeedsRowCheck(actor: PersonRow): boolean {
+  return speakerAgeBand(actor, new Date()) !== "adult" || passFor(actor.id).ceiling.library < 4;
+}
+function shownSummary(actor: PersonRow, b: ReturnType<typeof base>) {
+  type Held = { id: string; kind: string; size: number; sha256: string; owner_person_id: string; provenance: string };
+  const rows = sqlite.query<Held, (string | number)[]>(`${b.sql} SELECT id, kind, size, sha256, owner_person_id, provenance FROM filtered`).all(...b.params);
+  const tiles = new Set(sqlite.query<{ id: string }, (string | number)[]>(`${b.sql} SELECT id FROM tiles`).all(...b.params).map((row) => row.id));
+  const stamped = storedRatingFilter("attachment", actor, rows.filter((row) => row.owner_person_id !== actor.id).map((row) => row.id));
+  const shown = rows.filter((row) => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance }) && (row.owner_person_id === actor.id || stamped(row.id)));
+  const per_kind: Record<string, { items: number; bytes: number }> = Object.fromEntries(["image", "video", "audio", "document", "story", "file"].map((kind) => [kind, { items: 0, bytes: 0 }]));
+  const bySha = new Map<string, Map<string, number>>();
+  const allSha = new Map<string, number>();
+  for (const row of shown) {
+    const entry = per_kind[row.kind] ?? (per_kind[row.kind] = { items: 0, bytes: 0 });
+    if (tiles.has(row.id)) entry.items += 1;
+    const kindSizes = bySha.get(row.kind) ?? new Map<string, number>();
+    kindSizes.set(row.sha256, Math.max(kindSizes.get(row.sha256) ?? 0, row.size));
+    bySha.set(row.kind, kindSizes);
+    allSha.set(row.sha256, Math.max(allSha.get(row.sha256) ?? 0, row.size));
+  }
+  for (const [kind, sizes] of bySha) per_kind[kind]!.bytes = [...sizes.values()].reduce((n, size) => n + size, 0);
+  return { per_kind, bytes: [...allSha.values()].reduce((n, size) => n + size, 0) };
+}
 export function librarySummary(actor: PersonRow, q: LibraryQuery) {
   const b = base(actor,q);
+  if (summaryNeedsRowCheck(actor)) {
+    const shown = shownSummary(actor, b);
+    const expiring = expiringLibraryFiles(actor.id);
+    return { items: Object.values(shown.per_kind).reduce((n, row) => n + row.items, 0), bytes: shown.bytes, per_kind: shown.per_kind, trash: trashTotals(actor), expiring: { items: expiring.size, bytes: [...new Map([...expiring.values()].map((e) => [e.sha256, e.size] as const)).values()].reduce((n, size) => n + size, 0) } };
+  }
   const rows = sqlite.query<{ kind: string; items: number; bytes: number }, (string | number)[]>(`${b.sql} SELECT kind,
     (SELECT count(*) FROM tiles t WHERE t.kind = f.kind) AS items,
     (SELECT coalesce(sum(u.size),0) FROM (SELECT sha256, max(size) AS size FROM filtered g WHERE g.kind = f.kind GROUP BY sha256) u) AS bytes

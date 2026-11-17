@@ -114,7 +114,7 @@ describe("default off", () => {
     expect(sidecarHits).toEqual([]);
   });
   test("ddgsSearch refuses a minor directly while off", async () => {
-    await expect(ddgsSearch({ args: { query: "herons" }, band: "teen", spoken: false })).rejects.toThrow("not allowed for this profile");
+    await expect(ddgsSearch({ args: { query: "herons" }, band: "teen", spoken: false })).rejects.toThrow("not available here");
     expect(sidecarHits).toEqual([]);
   });
 });
@@ -162,7 +162,7 @@ describe("the other gates still hold", () => {
     expect(await ask("teen", {}, { spoken: true })).toEqual(["https://searx.example/p"]);
     expect(await ask("child", {}, { spoken: true })).toEqual(["https://searx.example/p"]);
     expect(sidecarHits).toEqual([]);
-    await expect(ddgsSearch({ args: { query: "x" }, band: "child", spoken: true })).rejects.toThrow("not allowed for this profile");
+    await expect(ddgsSearch({ args: { query: "x" }, band: "child", spoken: true })).rejects.toThrow("not available here");
   });
   test("the turn's own surface decides, not the args: no word from the caller counts as spoken, and an args flag is a second signal", async () => {
     setHouseholdSettingValue(MINOR_DDGS_KEY, "teens_and_children");
@@ -177,7 +177,7 @@ describe("the other gates still hold", () => {
     expect(await ask("teen", {}, { spoken: false })).toEqual(["https://searx.example/p", "https://duck.example/p"]);
     expect(sidecarHits).toHaveLength(1);
     // ddgsSearch itself, called by an untyped caller with no word on the surface, refuses a minor.
-    await expect(ddgsSearch({ args: { query: "x" }, band: "teen" } as unknown as Parameters<typeof ddgsSearch>[0])).rejects.toThrow("not allowed for this profile");
+    await expect(ddgsSearch({ args: { query: "x" }, band: "teen" } as unknown as Parameters<typeof ddgsSearch>[0])).rejects.toThrow("not available here");
   });
   test("an adult is not affected by the spoken flag", async () => {
     expect(await ask("adult", {}, {})).toEqual(["https://searx.example/p", "https://duck.example/p"]);

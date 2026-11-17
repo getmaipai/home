@@ -306,7 +306,7 @@ describe("the routes", () => {
     setHouseholdSettingValue("generation.kids", false);
     const teenBody = await (await adult.client.get("/api/videos/status")).json() as { can_make: boolean; reason: string | null; styles: unknown[] };
     expect(teenBody.can_make).toBe(false);
-    expect(teenBody.reason).toContain("off for this profile");
+    expect(teenBody.reason).toContain("isn't available here");
     expect(teenBody.styles).toEqual([]);
   });
 

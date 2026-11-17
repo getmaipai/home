@@ -26,7 +26,7 @@ export function __setTranslationCompleterForTests(fn: TestCompleter | null): voi
 
 const fail = (message: string, status = 502): never => { throw new TranscriptError(message, status); };
 
-const HELD_MESSAGE = "Part of the translation was held back by the age filter, so no track was made. Try a different language or edit the original captions.";
+const HELD_MESSAGE = "Part of the translation was could not be used, so no track was made. Try a different language or edit the original captions.";
 const MODEL_FAILURE = "The language model could not translate these captions. Check that it is running, then try again.";
 
 export type TranslationJob = { id: string; person: string; state: "running" | "done" | "failed"; progress: number; track?: CaptionTrackSummary; error?: string };
@@ -45,7 +45,7 @@ export function startCaptionTranslation(actor: PersonRow, transcriptId: string, 
   if (!source || source.transcriptId !== transcriptId) return fail("That caption track was not found. Reload the transcript and try again.", 404);
   if (source.language === language) return fail(`That track is already in ${target}. Pick a different language.`, 400);
   const band = mediaBandOf(actor);
-  if (band === "child") return fail("Transcripts are available to teens and adults.", 403);
+  if (band === "child") return fail("That transcript is not available to you.", 404);
   const cues = JSON.parse(source.cues) as Cue[];
   if (cues.length === 0) return fail("That caption track has no captions to translate.", 400);
   if (cues.length > MAX_TRANSLATED_CUES) return fail(`This track has ${cues.length} captions and translation handles up to ${MAX_TRANSLATED_CUES} at a time. Translate a shorter transcript.`, 413);

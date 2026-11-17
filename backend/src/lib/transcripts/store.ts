@@ -18,10 +18,10 @@ export class TranscriptError extends Error {
 export type Segment = Transcript["segments"][number];
 export type Speaker = Transcript["speakers"][number];
 export type Provenance = Transcript["provenance"];
-export const CHILD_TRANSCRIPT_ERROR = "Transcripts are available to teens and adults.";
+export const CHILD_TRANSCRIPT_ERROR = "That transcript is not available to you.";
 
 function gate(actor: PersonRow, itemId: string): void {
-  if (mediaBandOf(actor) === "child") throw new TranscriptError(CHILD_TRANSCRIPT_ERROR, 403);
+  if (mediaBandOf(actor) === "child") throw new TranscriptError(CHILD_TRANSCRIPT_ERROR, 404);
   if (!canSeeItem(actor, itemId)) {
     throw new TranscriptError("That Library item is not available to you.", 404);
   }

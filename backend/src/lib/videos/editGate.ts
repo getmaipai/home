@@ -24,8 +24,9 @@ import { videoRefusalFor, type VideoCallRefusal } from "./tool";
 import type { VideoAudience } from "./policy";
 import type { EditFile } from "./stackEdit";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
-export const EDIT_MINOR_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
+export const EDIT_MINOR_LINE = NOT_AVAILABLE_HERE;
 
 const EXTENSION_OF: Record<string, string> = { "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/flac": "flac", "audio/ogg": "ogg" };
 

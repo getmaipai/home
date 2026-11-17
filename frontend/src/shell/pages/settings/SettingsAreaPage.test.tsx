@@ -107,7 +107,7 @@ describe("the settings route", () => {
   test("an adult asking for Home settings sees why access is refused and can open their settings", async () => {
     const adult = makePerson("adult");
     const view = open(adult, "/settings/ai?tab=overview");
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(await view.findByText("An owner or admin sets this.")).toBeTruthy();
     expect(view.getByRole("link", { name: "Open your settings" }).getAttribute("href")).toBe("/settings/profile");
     expect(where(view)).toBe("/settings/ai?tab=overview");
     expect(fixture!.scopes).not.toContain("household");
@@ -166,18 +166,17 @@ describe("the settings route", () => {
     window.sessionStorage.clear();
   });
 
-  test("a child gets the Home settings access explanation on Offline books", async () => {
+  test("a child is sent to their own settings from Offline books without a word (UNSEEN-01)", async () => {
     const view = open(makePerson("child"), "/settings/search?tab=books");
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/search?tab=books");
+    await waitFor(() => expect(where(view)).toBe("/settings/profile"));
+    expect(view.queryByText("An owner or admin sets this.")).toBeNull();
     expect(view.queryByText("Disk space")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
-  test.each(["child", "teen"] as const)("a %s gets the Home settings access explanation for Engines and AI", async (role) => {
+  test.each(["child", "teen"] as const)("a %s is sent to their own settings from Engines and AI without a word (UNSEEN-01)", async (role) => {
     const view = open(makePerson(role), "/settings/ai?tab=overview");
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/ai?tab=overview");
+    await waitFor(() => expect(where(view)).toBe("/settings/profile"));
     expect(view.queryByText("Where the engine runs")).toBeNull();
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
   });
@@ -478,7 +477,7 @@ describe("old URLs through the route", () => {
   test("/settings?tab=household as an adult opens the explanation with no household request", async () => {
     const view = open(makePerson("adult"), "/settings?tab=household&section=ai");
     await waitFor(() => expect(where(view)).toBe("/settings/ai?tab=overview"));
-    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(await view.findByText("An owner or admin sets this.")).toBeTruthy();
     expect(fixture!.scopes).not.toContain("household");
   });
 

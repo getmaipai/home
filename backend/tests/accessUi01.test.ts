@@ -1,3 +1,4 @@
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 // ACCESS-UI-01 (RULES.md C7, C10): GET /api/people/:id/features, the admin's list of one person's feature access.
 import { beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
@@ -103,7 +104,7 @@ describe("a write shows in the next read", () => {
     const above = (await features(owner, teen.id)).find((r) => r.id !== "code" && !r.role_allows)!;
     const res = await owner.post("/api/grants", { person: teen.id, action: `use:${above.id}`, effect: "allow" });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBe("That one isn't available for this profile.");
+    expect(((await res.json()) as { error: string }).error).toBe(NOT_AVAILABLE_HERE);
     expect(row(await features(owner, teen.id), above.id)).toMatchObject({ effective: false, grant: null });
   });
 });

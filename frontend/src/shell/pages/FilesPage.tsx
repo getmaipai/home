@@ -49,7 +49,9 @@ function subscribeLibraryHeader(listener: () => void) { libraryHeaderListeners.a
 function libraryHeaderSnapshot() { return libraryCanAdd; }
 function LibraryHeaderAction() {
   const canUpload = useSyncExternalStore(subscribeLibraryHeader, libraryHeaderSnapshot, libraryHeaderSnapshot);
-  return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}>{canUpload ? <UploadIcon aria-hidden className="size-4" /> : null}{canUpload ? i18n._({ id: "Upload", message: "Upload" }) : i18n._({ id: "Ask to add a file", message: "Ask to add a file" })}</Button></>;
+  // UNSEEN-01 (C10): a control a person may not use is absent, not locked: no Upload button at all when they cannot add.
+  if (!canUpload) return null;
+  return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}><UploadIcon aria-hidden className="size-4" />{i18n._({ id: "Upload", message: "Upload" })}</Button></>;
 }
 const GridIcon = getIcon("layout-grid");
 const ListIcon = getIcon("layout-list");
@@ -69,7 +71,6 @@ function useWide(): boolean {
 }
 const editable = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
 const itemsWord = (count: number) => i18n._({ id: "{count, plural, one {# item} other {# items}}", message: "{count, plural, one {# item} other {# items}}", values: { count } });
-const CHILD_ADD = () => i18n._({ id: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.", message: "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile." });
 
 /** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering
  * and paging; the kit draws the tiles, the table, the viewer and the share dialog. No folders. */
@@ -219,12 +220,12 @@ export function FilesPage({ person }: { person: Roster }) {
   const uploads = useLibraryUploads(useCallback(() => { void actions.refresh(); }, [actions]));
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const openUpload = () => { if (canAdd) fileInput.current?.click(); else toast(CHILD_ADD()); };
+    const openUpload = () => { if (canAdd) fileInput.current?.click(); };
     window.addEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
     return () => window.removeEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
   }, [canAdd]);
   const [dragging, setDragging] = useState(false);
-  const addFiles = (files: readonly File[]) => { if (!canAdd) setProblem(CHILD_ADD()); else uploads.add(files); };
+  const addFiles = (files: readonly File[]) => { if (canAdd) uploads.add(files); };
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (editable(event.target)) return;

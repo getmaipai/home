@@ -36,6 +36,7 @@ import { allowedSources, queryItems, registerProductionSourceGate } from "@/lib/
 import { isPresetVoice } from "@/lib/voiceForSpeech";
 import { buildScriptedBriefing, canScriptBriefing } from "./scriptedBriefing";
 import { stampMediaById } from "@/lib/filter/ratingsSweep";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type ShowSource = Show["sources"][number];
 export type Schedule = NonNullable<Show["schedule"]>;
@@ -84,7 +85,7 @@ export async function createShow(actor: PersonRow, input: CreateShowInput): Prom
   const band = speakerAgeBand(actor, new Date()), audience = input.audience ?? ageAudience(band), floor = showAudienceBand(audience);
   const rank = { child: 0, teen: 1, adult: 2 };
   if (rank[floor] > rank[band]) throw refusal("You can only make shows for your own age group or younger.");
-  if (band !== "adult" && getHouseholdSettingValue("talent.minors.make") === false) throw refusal("Shows are off for children and teens in this household. A parent can turn them on in Settings.");
+  if (band !== "adult" && getHouseholdSettingValue("talent.minors.make") === false) throw refusal(NOT_AVAILABLE_HERE);
   if (({ child: 0, teen: 1, adult: 2 } as const)[floor] < ({ child: 0, teen: 1, adult: 2 } as const)[format.min_audience === "all" ? "child" : format.min_audience]!) throw refusal("This format is not for your age group.");
   for (const source of input.sources) if (!format.sources_allowed.includes(source.kind)) throw refusal(`This format cannot use ${source.kind} as a source.`);
   const cast = input.cast === "invent" ? await inventCast(actor, format, { title: input.title, audience }, showCompleter ?? completeBackground) : input.cast;

@@ -1,8 +1,7 @@
 import { i18n } from "@lingui/core";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { api } from "@/lib/api";
 import { CompanionFlowDialog } from "@/shell/pages/companionFlow/CompanionFlowDialog";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
@@ -17,7 +16,8 @@ export function CompanionFlowPage() {
   const existing = useQuery({ queryKey: ["companions", id, "edit"], queryFn: () => api.editCompanion(id!), enabled: Boolean(id) && list.data?.can_create === true, retry: false });
   if (list.isError) return <AsyncState data={null} error onRetry={() => void list.refetch()} errorMessage={flowErrorText(list.error)} loadingLabel={i18n._({ id: "Loading synths", message: "Loading synths" })}>{() => null}</AsyncState>;
   if (!list.data) return <AsyncState data={undefined} isFetching onRetry={() => void list.refetch()} loadingLabel={i18n._({ id: "Loading synths", message: "Loading synths" })}>{() => null}</AsyncState>;
-  if (!list.data.can_create) return <EmptyState icon="user" text={i18n._({ id: "Making a synth is for teens and adults. Ask an owner or admin if you want one.", message: "Making a synth is for teens and adults. Ask an owner or admin if you want one." })} />;
+  // UNSEEN-01 (C10): the flow is absent for a person who may not make one; its address sends them home without a word.
+  if (!list.data.can_create) return <Navigate to="/" replace />;
   if (!id) return <CompanionFlowDialog companionId={null} initialName="" />;
   if (existing.isError) return <AsyncState data={null} error onRetry={() => void existing.refetch()} errorMessage={flowErrorText(existing.error)} loadingLabel={i18n._({ id: "Loading synth", message: "Loading synth" })}>{() => null}</AsyncState>;
   if (!existing.data) return <AsyncState data={undefined} isFetching onRetry={() => void existing.refetch()} loadingLabel={i18n._({ id: "Loading synth", message: "Loading synth" })}>{() => null}</AsyncState>;

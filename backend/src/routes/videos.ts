@@ -58,6 +58,7 @@ import { editRefusal } from "@/lib/videos/editGate";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { editVideoArgs, type RunEditVideoInput } from "@/lib/videos/editTool";
 import { addPick, listPicks, togglePickVote } from "@/lib/media/familyPicks";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const videosRoutes = apiRouter();
 const picksResult = z.object({ collection_id: z.string(), items: z.array(z.object({ media_id: z.string(), added_at: z.string(), votes: z.number(), voted: z.boolean(), added_by: z.string().nullable(), top: z.boolean() })) });
@@ -192,7 +193,7 @@ async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed:
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
-const refusals = errorResponses({ 401: "Not signed in", 403: "Videos are off for this profile", 404: "No such video job", 422: "That request is not allowed", 502: "Videos could not be made", 503: "Videos are not ready" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Not available", 404: "No such video job", 422: "That request is not allowed", 502: "Videos could not be made", 503: "Videos are not ready" });
 
 const TierStatusSchema = z.object({ ready: z.boolean(), max_seconds: z.number(), sound: z.boolean(), model: z.enum(["wan", "ltx25", "ltx25max"]).nullable() });
 /** VIDEO-TIERS-01: what each level makes on this computer now (the one answer the Create page, the tools and the settings read). A teen or a child: Standard on Wan, silent. Max is the LTX-2.5 Max model when the Stack reports it ready. */
@@ -423,7 +424,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   if (source.request.reference) {
     if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
     const audience = videoRouteAudience(actor);
-    if (laneOf(audience) !== "adult") return c.json({ error: "Videos from pictures are for adults on their own screen. Ask an adult in your home to help.", code: "minor" }, 403) as never;
+    if (laneOf(audience) !== "adult") return c.json({ error: NOT_AVAILABLE_HERE, code: "minor" }, 403) as never;
     const engine = await videoEngineStatus();
     // The first-picture route (a real person's face) is an ordinary picture-to-video clip: any ready video level will do; the sheet route needs Max.
     if (source.request.reference.route === "first_frame") { if (!videoStatusReady(engine, true)) return c.json({ error: videoNotReadyReason(engine), code: "not_installed" }, 503) as never; }
@@ -610,7 +611,7 @@ const cutToBeatRoute = createRoute({
 videosRoutes.openapi(cutToBeatRoute, async (c) => {
   const actor = c.get("person"); const body = c.req.valid("json"); const audience = videoRouteAudience(actor);
   if (videoDenial(audience)) return c.json({ error: videoDenial(audience), code: "not_allowed" }, 403) as never;
-  if (laneOf(audience) !== "adult") return c.json({ error: "This edit is for adults on their own screen." , code: "minor" }, 422) as never;
+  if (laneOf(audience) !== "adult") return c.json({ error: NOT_AVAILABLE_HERE , code: "minor" }, 422) as never;
   const jobs = body.clips.map((id) => getVideoJobFor(actor, id) ?? getVideoJobByFileFor(actor, id));
   if (jobs.some((job) => !job)) return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
   const conversationId = body.conversation_id ?? jobs[0]!.conversationId;
@@ -636,7 +637,7 @@ const addMusicRoute = createRoute({
 videosRoutes.openapi(addMusicRoute, async (c) => {
   const actor = c.get("person"); const body = c.req.valid("json"); const audience = videoRouteAudience(actor);
   if (videoDenial(audience)) return c.json({ error: videoDenial(audience), code: "not_allowed" }, 403) as never;
-  if (laneOf(audience) !== "adult") return c.json({ error: "This edit is for adults on their own screen.", code: "minor" }, 422) as never;
+  if (laneOf(audience) !== "adult") return c.json({ error: NOT_AVAILABLE_HERE, code: "minor" }, 422) as never;
   const job = getVideoJobFor(actor, body.clip) ?? getVideoJobByFileFor(actor, body.clip);
   if (!job) return c.json({ error: "That video isn't available any more. Ask for it again.", code: "not_found" }, 404) as never;
   const conversationId = body.conversation_id ?? job.conversationId;

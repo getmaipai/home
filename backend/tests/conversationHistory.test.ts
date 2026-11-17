@@ -69,6 +69,7 @@ import { db } from "@/db";
 import { people, conversationTurns, conversations, memoryRecords } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type { TurnValue } from "@/wire";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const SAFE: TurnValue["safety"] = {
   flagged: false,
@@ -132,8 +133,8 @@ describe("logTurn (via runTurn)", () => {
     const { client } = await owner();
     const child = await addPerson(client, "Bramble", "child");
     const teen = await addPerson(client, "Rowan", "teen");
-    expect(createConversation(child, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: "temporary chat is not available for minors" });
-    expect(createConversation(teen, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: "temporary chat is not available for minors" });
+    expect(createConversation(child, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: NOT_AVAILABLE_HERE });
+    expect(createConversation(teen, { mode: "temporary" })).toEqual({ ok: false, status: 403, error: NOT_AVAILABLE_HERE });
   });
 
   test("a completed turn writes a real conversation_turns row", async () => {

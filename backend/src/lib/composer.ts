@@ -281,6 +281,8 @@ function lookupQuery(outcomes: readonly ToolExecutionOutcome[]): string {
 
 /** The deterministic line for a lookup that returned no rows. */
 export function emptyLookupLine(outcomes: readonly ToolExecutionOutcome[]): string {
+  // UNSEEN-01 (C10): a search a filter emptied is "nothing suitable", never "found nothing".
+  if (outcomes.some((o) => { const d = o.result?.data as { floor_dropped?: unknown; filtered_empty?: unknown } | undefined; return d?.filtered_empty === true || Number(d?.floor_dropped) > 0; })) return "I don't have anything good to share on that. Try asking about something else.";
   return `The search found nothing on that: ${lookupQuery(outcomes)}.`;
 }
 

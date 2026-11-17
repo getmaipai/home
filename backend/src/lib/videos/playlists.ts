@@ -11,6 +11,7 @@ import { addItem, createCollection, deleteCollection, listCollections, playlists
 import type { MediaCollection, MediaItem } from "@/lib/media/model";
 import { stampsForPage } from "@/lib/media/access";
 import { madeFiles, madeVideoRow, readableIn, rowOf, contextFor, type ActionResult, type MediaRow } from "@/lib/media/appHost";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type PlaylistResult = ActionResult<{ id: string; title: string; added?: boolean }>;
 
@@ -99,7 +100,7 @@ function ownerOf(collection: MediaCollection): PersonRow | undefined {
 
 /** A new empty playlist. A minor cannot pick a name that trips the floor. */
 export function createVideoPlaylist(person: PersonRow, rawTitle: unknown): PlaylistResult {
-  if (person.role === "guest") return { ok: false, status: 403, error: "Guests cannot make playlists. Ask a grown-up in the home." };
+  if (person.role === "guest") return { ok: false, status: 403, error: "Guests cannot make playlists. Ask someone in the household to sign you in." };
   const asked = typeof rawTitle === "string" ? rawTitle.trim().slice(0, TITLE_MAX) : "";
   const title = asked || `Playlist ${ownVideoPlaylists(person).length + 1}`;
   if (mediaBandOf(person) !== "adult" && trips(title)) return { ok: false, status: 422, error: "Pick another name for this playlist." };
@@ -207,7 +208,7 @@ export function changeVideoPlaylistMembers(person: PersonRow, op: "add" | "remov
   const found = videoPlaylistFor(person, id);
   if (!found) return GONE;
   if (!found.owner) return { ok: false, status: 403, error: "Only the person who made this playlist can change who it is shared with." };
-  if (mediaBandOf(person) === "child" || person.role === "guest") return { ok: false, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this playlist for you." };
+  if (mediaBandOf(person) === "child" || person.role === "guest") return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   const { collection } = found;
   if (op === "private") setPlaylistMembers(collection, []);
   else {
@@ -216,7 +217,7 @@ export function changeVideoPlaylistMembers(person: PersonRow, op: "add" | "remov
     else {
       const person_ = listActivePeople().find((p) => p.id === target);
       if (person_ && !isAdult(person_) && holdsAdultOnly(person, collection)) return MINOR_HAS_ADULT_LINE;
-      if (!videoMemberCandidates(person, collection).some((entry) => entry.id === target)) return { ok: false, status: 403, error: "That person cannot be added. Choose someone else in your home; a child or teen can be added only by a grown-up." };
+      if (!videoMemberCandidates(person, collection).some((entry) => entry.id === target)) return { ok: false, status: 403, error: "That person cannot be added. Choose someone else in your home." };
       setPlaylistMembers(collection, [...collection.members, target]);
     }
   }

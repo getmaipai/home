@@ -23,6 +23,7 @@ import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { child, owner, teen } from "./support/testAuth";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 setDefaultTimeout(30_000);
 const persona = { display_name: "Marlow Fox", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", audience: "all", examples: ["I like a good plan.", "Let us try that.", "Fine by me."], status: "ready" } as never;
@@ -84,7 +85,7 @@ describe("a crafted or unavailable cast id is refused", () => {
   });
   test("a child asking for a household member gets the existing real-person line, and nothing starts", async () => {
     const out = await pic(kid, { prompt: "a picture at the beach", cast: [sage.id] });
-    expect(text(out)).toContain("Real-person subjects are not available");
+    expect(text(out)).toContain(NOT_AVAILABLE_HERE);
     expect(image.submitted).toHaveLength(0);
   });
 });

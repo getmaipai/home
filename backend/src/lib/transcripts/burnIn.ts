@@ -39,7 +39,7 @@ async function sourceVideo(actor: PersonRow, itemId: string): Promise<{ bytes: U
 
 /** Starts the burn-in and returns at once; `burnJob` reports progress and the new file. */
 export async function startBurnIn(actor: PersonRow, transcriptId: string, trackId: string, position: BurnPosition): Promise<BurnJob> {
-  if (mediaBandOf(actor) === "child") return fail("Transcripts are available to teens and adults.", 403);
+  if (mediaBandOf(actor) === "child") return fail("That transcript is not available to you.", 404);
   const transcript = getTranscriptDatabaseRow(actor, transcriptId);
   const cues = captionTrackCues(actor, transcriptId, trackId);
   if (cues.length === 0) return fail("That caption track has no captions to burn in.", 400);

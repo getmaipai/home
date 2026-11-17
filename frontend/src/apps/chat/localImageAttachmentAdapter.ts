@@ -107,7 +107,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
         return { id, type: "file", name: file.name, contentType: file.type || "audio/mpeg", file, status: { type: "requires-action", reason: "composer-send" } };
       }
       validateImage(file);
-      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
+      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "That one isn't available here. Try something else.");
       if (stagedRecords.size >= MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
       const bytes = await file.arrayBuffer();
       const digest = await sha256(bytes);
@@ -136,7 +136,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
       if (doc) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Document: ${doc.name}` }] };
       const audio = stagedAudio.get(attachment.id);
       if (audio) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Audio: ${audio.name}` }] };
-      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
+      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "That one isn't available here. Try something else.");
       validateImage(attachment.file);
       return {
         ...attachment,

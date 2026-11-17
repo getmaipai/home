@@ -282,9 +282,9 @@ test("closing with no draft goes straight back to the companions list", async ()
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/companions"));
 });
 
-test("a child account gets the not-allowed message, not the dialog", async () => {
+test("a child account is sent home without a word, and never sees the dialog (UNSEEN-01)", async () => {
   const { view } = open({ canCreate: false });
-  expect(await view.findByText(/Making a synth is for teens and adults/)).toBeTruthy();
+  await waitFor(() => expect(view.queryByText(/synth is for|teens and adults|ask an owner/i)).toBeNull());
   expect(view.queryByLabelText("Character name")).toBeNull();
 });
 

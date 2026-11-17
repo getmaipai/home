@@ -12,6 +12,7 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { readCompanionPack } from "@/lib/companionPack";
 import { lookSheetState } from "@/lib/castLookKey";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const MAX_CAST = 6;
 export type CastKind = "synth" | "member" | "subject";
@@ -45,7 +46,7 @@ function viewerOf(actor: PersonRow, band?: AgeBand | null): CastViewer {
   const turnOnly = turnMinor && !accountMinor;
   return { actor, minor: accountMinor || turnMinor, turnOnly, gate: turnOnly ? { ...actor, role: band as "child" | "teen" } : actor };
 }
-export const REAL_REFUSED_LINE = "Real-person subjects are not available for this profile yet. Ask a parent or admin if you need one.";
+export const REAL_REFUSED_LINE = NOT_AVAILABLE_HERE;
 
 function refFiles(subject: MediaSubject | null) {
   const rows = (subject?.reference_ids ?? []).map((id) => db.select().from(attachments).where(and(eq(attachments.id, id), isNull(attachments.deletedAt))).get()).filter((row): row is NonNullable<typeof row> => !!row);

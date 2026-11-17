@@ -19,6 +19,8 @@ import { backToUserDefaults, changeOverrides, resetBlocklistRow, hiddenOwnChoice
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
+import { personAccessView } from "@/lib/accessView";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 import { exportPersonFiles, personFilesFate } from "@/lib/storage/personFiles";
 import { apiError } from "@/lib/apiErrorCopy";
 import { personFeatures, activePerson } from "@/lib/personFeatures";
@@ -664,6 +666,34 @@ peopleRoutes.openapi(featuresRoute, (c) => {
   const target = activePerson(c.req.valid("param").id);
   if (!target) return c.json({ error: "That person is not in this household. Refresh the people list." }, 404);
   return c.json({ features: personFeatures(target) }, 200);
+});
+
+// UNSEEN-01 (C10, rule 6a): an owner or admin sees one person's role, the level each kind of content is held to and which kinds an override
+// set. Only the derived shape (lib/accessView.ts); anyone else gets the answer a missing page gets.
+const accessRoute = createRoute({
+  method: "get",
+  path: "/{id}/access",
+  tags: ["People"],
+  summary: "A person's role, content levels and the overrides that set them (owner and admin)",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({
+        role: z.string(),
+        ceiling: z.record(z.string(), z.string()),
+        overrides: z.array(z.object({ key: z.string(), scope: z.enum(["person", "household"]) })),
+        unrated: z.array(z.string()),
+      }) } },
+      description: "The role, the level for each kind of content, the overrides that set a level and the kinds that show unrated items.",
+    },
+    ...errorResponses({ 401: "Not signed in", 404: "Not available" }),
+  },
+});
+peopleRoutes.openapi(accessRoute, (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: NOT_AVAILABLE_HERE }, 404);
+  const view = personAccessView(c.req.valid("param").id);
+  return view ? c.json(view, 200) : c.json({ error: NOT_AVAILABLE_HERE }, 404);
 });
 
 // SETTINGS-LAYERS-01d: a person's site-block categories as layers (global defaults column, user overrides

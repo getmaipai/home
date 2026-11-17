@@ -12,6 +12,7 @@ import { createSynth } from "@/lib/synths";
 import type { StackClient } from "@/lib/stack/client";
 import { queryItems } from "@/lib/media/appHost";
 import { storedTranscriptForItem } from "@/lib/transcripts/store";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 describe("TALENT-04 shows", () => {
   beforeEach(() => resetDb());
@@ -35,7 +36,7 @@ describe("TALENT-04 shows", () => {
     const { client } = await owner();
     const kid = await child(client);
     setHouseholdSettingValue("talent.minors.make", false);
-    await expect(createShow(kid.row, { title: "Kids", format_id: "kids_news", cast: "invent", sources: [], schedule: null })).rejects.toThrow("Shows are off for children and teens in this household. A parent can turn them on in Settings.");
+    await expect(createShow(kid.row, { title: "Kids", format_id: "kids_news", cast: "invent", sources: [], schedule: null })).rejects.toThrow(NOT_AVAILABLE_HERE);
     setHouseholdSettingValue("talent.minors.make", true);
     const made = await createSynth(kid.row, { persona: { display_name: "Pip", formality: "casual", complexity: "simple", engagement: "brief", filler_density: "light", audience: "all" } as never, based_on: { kind: "none", person_id: null, name: null, refresh: "7d", minor: false }, life: { enabled: false, seed: "" } });
     if (!made.ok) throw new Error("The child synth fixture could not be created. Check the test profile.");

@@ -40,6 +40,7 @@ import { canHaveTemporaryChat } from "@/lib/access";
 import { visibleText } from "@/lib/wellFormed";
 import type { ChatMessage, ChatCompletionResponse, ChatCompletionChunk } from "@maipai/spec/llm/ts/types.js";
 import type { AppEnv } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const openaiRoutes = new Hono<AppEnv>();
 
@@ -98,7 +99,7 @@ openaiRoutes.post("/v1/chat/completions", requireApiKey("turn"), bodyLimit({ max
   // as routes/turn.ts refuses it.
   const temporary = body.temporary === true || c.req.header("x-maipai-temporary")?.toLowerCase() === "true";
   if (temporary && !canHaveTemporaryChat(actor)) {
-    return c.json({ error: { message: "temporary chat is not available for minors", code: "forbidden" } }, 403);
+    return c.json({ error: { message: NOT_AVAILABLE_HERE, code: "forbidden" } }, 403);
   }
   const turnOpts = { spoken: true, thinking: false, ...(temporary ? { temporary: true } : {}) } as const;
 

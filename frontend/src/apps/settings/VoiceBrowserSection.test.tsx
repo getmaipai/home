@@ -138,9 +138,9 @@ describe("VoiceBrowserSection", () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { locked: true, reason: "Set by a guardian." }); await view.findByText("Set by a guardian.");
     expect((await trigger(view)).hasAttribute("disabled") || (await trigger(view)).getAttribute("data-disabled") !== null).toBe(true);
   });
-  test("a child gets the line asking a parent and cannot choose, but can test", async () => {
+  test("a child sees no reason line, cannot choose, but can test (UNSEEN-01)", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { role: "child" }); const box = await trigger(view);
-    expect(view.getByText("Ask a parent to choose your voice.")).toBeTruthy();
+    expect(view.queryByText(/ask a parent|grown-up/i)).toBeNull();
     expect(box.hasAttribute("disabled") || box.getAttribute("data-disabled") !== null).toBe(true);
     expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(false);
   });

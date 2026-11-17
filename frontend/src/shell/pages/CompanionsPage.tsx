@@ -37,6 +37,7 @@ import { formatDate, formatList } from "@/lib/format";
 import { MediaHostContext } from "@maipai/ui/src/schema/mediaHost";
 import { MediaShelf } from "@maipai/ui/src/primitives/MediaShelf";
 import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -147,7 +148,7 @@ function CompanionsDirectory() {
         {(data: CompanionList) => (
           <>
             {!data.allowed ? (
-              <EmptyState icon="user" text={i18n._({ id: "Synths are turned off for you. Ask an owner or admin to turn them on.", message: "Synths are turned off for you. Ask an owner or admin to turn them on." })} />
+              <EmptyState icon="user" text={NOT_AVAILABLE_HERE()} />
             ) : data.companions.length === 0 ? (
               <EmptyState icon="user" text={i18n._({ id: "No synths are installed yet.", message: "No synths are installed yet." })} />
             ) : (

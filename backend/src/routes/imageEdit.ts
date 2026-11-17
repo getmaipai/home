@@ -19,7 +19,7 @@ const ProgressSchema = z.union([
   z.object({ state: z.enum(["queued", "running"]), job: z.string(), percent: z.number().nullable(), label: z.string() }),
   z.object({ state: z.enum(["failed", "cancelled"]), error: z.string(), code: z.string() }),
 ]);
-const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Pictures are off for this profile, or the chat is not theirs", 404: "Picture unavailable", 409: "Cancelled", 413: "Picture too large", 422: "The edit cannot be done", 502: "The editing tools failed", 503: "The editing tools are not available" });
+const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Not available, or the chat is not theirs", 404: "Picture unavailable", 409: "Cancelled", 413: "Picture too large", 422: "The edit cannot be done", 502: "The editing tools failed", 503: "The editing tools are not available" });
 
 function fail(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
   const mapped = error instanceof ImageEditError ? error : editErrorFrom(error);

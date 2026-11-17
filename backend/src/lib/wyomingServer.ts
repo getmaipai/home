@@ -30,6 +30,7 @@ import { personWithinTurnBudget } from "@/lib/llm";
 import { canHaveTemporaryChat } from "@/lib/access";
 import { visibleText } from "@/lib/wellFormed";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const AUDIO_CHUNK_BYTES = 32_000; // ~1s of 16kHz mono 16-bit PCM per chunk - a real, bounded slice, not one giant frame
 
@@ -196,7 +197,7 @@ async function handleMessage(
       // honoured, never ignored, and refused for a child or teen.
       const temporary = msg.data?.temporary === true;
       if (temporary && !canHaveTemporaryChat(state.actor)) {
-        send(socket, { type: "not-handled", data: { text: "temporary chat is not available for minors" } });
+        send(socket, { type: "not-handled", data: { text: NOT_AVAILABLE_HERE } });
         return;
       }
       const result = await runTurnNext(state.actor, "chat", text, { spoken: true, thinking: false, ...(temporary ? { temporary: true } : {}) });

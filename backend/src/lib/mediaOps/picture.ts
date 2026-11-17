@@ -104,7 +104,7 @@ registerMediaOp({
     const loaded = loadSource(actor, chatSource(source).conversationId, source.id, false);
     const sourceIsGenerated = /^picture-gen:/.test(db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.id)).get()?.provenance ?? "");
     if (actor.role === "child" || actor.role === "teen") {
-      if (!sourceIsGenerated) throw new ImageEditError(422, "I can't save a real photo as a subject for this profile yet.", "real_minor_subject");
+      if (!sourceIsGenerated) throw new ImageEditError(422, "That one isn't available here. Try a drawn character instead.", "real_minor_subject");
       const screen = await screenInputImage(loaded.bytes, args.look, viewerOf(actor));
       if (!screen.ok) throw new ImageEditError(422, screen.line, screen.code);
     }

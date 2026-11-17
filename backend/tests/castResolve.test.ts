@@ -15,6 +15,7 @@ import type { FilmPlan } from "@/lib/films/plan";
 import { resetDb } from "./reset-db";
 import { child, owner, teen } from "./support/testAuth";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const persona: Parameters<typeof createSynth>[1]["persona"] = { display_name: "Marlow Fox", formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", audience: "all", examples: ["I like a good plan.", "Let us try that.", "Fine by me."], status: "ready" } as never;
 const none = { kind: "none", person_id: null, name: null, refresh: "7d", minor: false } as const;
@@ -76,7 +77,7 @@ describe("GET /api/cast lists what the viewer may cast", () => {
     const result = await resolveCast(kid, ["Sage", "Real friend", "Ada"]);
     expect(result.members).toEqual([]);
     expect(result.refused.map((r) => r.ref)).toEqual(["Sage", "Real friend", "Ada"]);
-    expect(result.refused[0]!.line).toMatch(/Real-person subjects are not available/);
+    expect(result.refused[0]!.line).toBe(NOT_AVAILABLE_HERE);
   });
 
   test("a teen's list follows synths.real_people the same way and never lists a household member", async () => {

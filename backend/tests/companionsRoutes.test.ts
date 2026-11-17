@@ -38,6 +38,7 @@ import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 import { __setBackstoryCompleteForTests } from "@/routes/companions";
 import { mock } from "bun:test";
 import { COMPANION_PERSONALITIES } from "@/lib/companionPersonality";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -151,7 +152,7 @@ describe("companion look styles", () => {
     expect(teenStyles.styles.some((style) => style.id === "custom")).toBe(false);
     const childResult = await request("companions/look-styles", child);
     expect(childResult.status).toBe(403);
-    expect(await childResult.json()).toEqual({ error: "Only teens and adults can make a companion." });
+    expect(await childResult.json()).toEqual({ error: NOT_AVAILABLE_HERE });
 
     const made = createHouseholdCompanion({ ...fixture(), display_name: "Style comparison" }, { display_name: "Adult", person_id: "look-styles-adult" });
     if (!made.ok) throw new Error(made.error);

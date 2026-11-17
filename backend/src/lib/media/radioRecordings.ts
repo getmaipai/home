@@ -20,6 +20,7 @@ import type { SavedStation } from "./radio";
 import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { publicRecordingAddress } from "./radioStream";
 import { radioAddressDeps } from "@/routes/radioApp";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 const active = new Map<string, { personId: string; station: SavedStation; jobId: string; outputDir: string; timer: ReturnType<typeof setTimeout> | null }>();
 const durations: Record<string, number | null> = { "15": 15, "30": 30, "60": 60, "120": 120, until_stopped: null };
@@ -35,7 +36,7 @@ function sourceFor(owner: PersonRow): string {
 }
 
 export async function startRadioRecording(person: PersonRow, station: SavedStation, length: string): Promise<RecordingOutcome<{ job_id: string; station_id: string }>> {
-  if (mediaBandOf(person) === "child" || person.role === "guest") return error(403, "Radio recording is available to teens and adults.");
+  if (mediaBandOf(person) === "child" || person.role === "guest") return error(403, NOT_AVAILABLE_HERE);
   if (!(length in durations)) return error(400, "Choose 15, 30, 60 or 120 minutes, or until stopped.");
   if ([...active.values()].some((r) => r.personId === person.id)) return error(409, "You already have a radio recording in progress.");
   if (active.size >= 4) return error(409, "Four recordings are already in progress in this home. Stop one before starting another.");

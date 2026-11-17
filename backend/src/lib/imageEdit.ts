@@ -74,7 +74,7 @@ const JOB_TTL_MS = 60 * 60_000;
 /** How long the first answer waits before the edit continues as a job the browser polls (fast tools finish inside it). */
 export const EDIT_WAIT_MS = 2500;
 
-export const PICTURES_OFF_REASON = "Picture editing is off for this profile. A parent can turn pictures on in settings.";
+export const PICTURES_OFF_REASON = "Picture editing isn't available here. Try something else.";
 export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing a change needs a picture-making model that is installed and running on this computer. An admin can check Settings, Pictures and videos.";
 
 // ---------------------------------------------------------------- tools status
@@ -771,7 +771,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     const { adapterAudiencesFor } = await import("@/lib/pictures/policy");
     const available = await adaptersFor(adapterAudiencesFor(editorAudience(actor)));
     const resolvedStyles = input.styles.map((name) => matchAdapter(available, name));
-    if (resolvedStyles.some((adapter) => adapter === null)) throw new ImageEditError(422, "That style is not available for this profile.", "style_unavailable");
+    if (resolvedStyles.some((adapter) => adapter === null)) throw new ImageEditError(422, "That style isn't available here. Pick another style.", "style_unavailable");
     throw new ImageEditError(501, "Styles are not available for picture changes yet.", "styles_not_available");
   }
   const refused = promptCheck(editorAudience(actor), "picture", prompt).refusal; // CONTENT-POLICY-03: through the filter door

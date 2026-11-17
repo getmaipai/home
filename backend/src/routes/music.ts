@@ -79,7 +79,7 @@ musicRoutes.openapi(nowPlayingRoute, (c) => {
   try { return c.json(reportNowPlaying(c.get("person"), c.req.valid("json")), 200); }
   catch { return c.json({ ok: true as const, pushed: 0 }, 200); }
 });
-const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song", 409: "Commercial export not allowed" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Not available", 404: "No such song", 409: "Commercial export not allowed" });
 
 const djPosition = z.enum(["intro", "transition", "outro"]);
 const djPrepareRoute = createRoute({ method: "post", path: "/dj/prepare", tags: ["Music"], summary: "Prepare short DJ lines for upcoming tracks", middleware: viewMiddleware, request: { body: { content: { "application/json": { schema: z.object({ after: z.string().min(1).max(80), next: z.array(z.string().min(1).max(80)).max(2), station: z.string().trim().max(120).optional() }) } } } }, responses: { 202: { description: "Preparation queued." }, 204: { description: "DJ is off." }, ...refusals } });
@@ -755,7 +755,7 @@ const identifyRoute = createRoute({ method: "post", path: "/identify", tags: ["M
   middleware: viewMiddleware,
   request: { query: z.object({ kind: z.enum(["pcm16", "container"]).optional(), rate: z.coerce.number().int().min(4000).max(48000).optional(), confirmed: z.enum(["0", "1"]).optional(), request: z.string().optional() }),
     body: { required: true, content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } } } },
-  responses: { 200: { content: { "application/json": { schema: identifyOutcomeSchema } }, description: "A typed result: matched, no_match, needs_confirm, not_ready, failed or rate_limited." }, 413: { description: "The clip is over 20 seconds or 2 MB." }, ...errorResponses({ 400: "No clip or a bad query", 401: "Not signed in", 403: "Music is off for this profile" }) } });
+  responses: { 200: { content: { "application/json": { schema: identifyOutcomeSchema } }, description: "A typed result: matched, no_match, needs_confirm, not_ready, failed or rate_limited." }, 413: { description: "The clip is over 20 seconds or 2 MB." }, ...errorResponses({ 400: "No clip or a bad query", 401: "Not signed in", 403: "Not available" }) } });
 const identifyView = (outcome: IdentifyOutcome) => outcome.status === "matched" ? { status: outcome.status, result: outcome.result }
   : outcome.status === "not_ready" ? { status: outcome.status, reason: outcome.reason, line: outcome.line }
   : outcome.status === "failed" ? { status: outcome.status, reason: outcome.reason }

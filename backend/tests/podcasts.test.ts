@@ -198,7 +198,7 @@ describe("podcast transcripts", () => {
     expect(db.select().from(transcriptRevisions).where(eq(transcriptRevisions.transcriptId, record.id)).all()).toHaveLength(1);
     expect(db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, id)).get()).toMatchObject({ text: null, segments: "[]" });
     // A child is refused and the stored transcript stays unread by them.
-    expect(await getPodcastTranscript(personRow(child.id), id)).toMatchObject({ ok: false, status: 403, error: "Transcripts are available to teens and adults." });
+    expect(await getPodcastTranscript(personRow(child.id), id)).toMatchObject({ ok: false, status: 404, error: "That episode is not available to you." }); // UNSEEN-01: absent for a child, answered like a missing episode
     // A correction made in the transcript editor is what the podcast app then shows and searches.
     applyOps(personRow(adult.id), record.id, adult.id, [{ kind: "edit_text", segment_id: "seg-1", text: "The harbor otters are sleeping." }]);
     expect(await getPodcastTranscript(personRow(adult.id), id)).toMatchObject({ ok: true, value: { transcript: { segments: [{ start_s: 12, text: "The harbor otters are sleeping." }] } } });

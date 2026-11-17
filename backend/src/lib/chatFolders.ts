@@ -38,6 +38,7 @@ import { newChatFolderId } from "@/lib/id";
 import { evaluateSafety } from "@/lib/safety";
 import type { PersonRow } from "@/types";
 import type { Result } from "@/lib/result";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type FolderAccess = "manage" | "edit" | "use";
 
@@ -371,7 +372,7 @@ export function setFolderShare(actor: PersonRow, folderId: string, targetId: str
   if (target.role === "guest") return { ok: false, status: 400, error: "a guest cannot be added to a project" };
   if (target.role === "child") {
     if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "only a parent adds a child to a project" };
-    if (role === "can_edit") return { ok: false, status: 400, error: "a child can use a project but not edit it" };
+    if (role === "can_edit") return { ok: false, status: 400, error: NOT_AVAILABLE_HERE };
   }
   // A child is shown the project's description, so it must pass the child floor now.
   if (target.role === "child" && row.description !== "" && evaluateSafety(row.description, "child").flagged) {

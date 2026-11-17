@@ -8,7 +8,7 @@ export type MusicAudience = PictureAudience;
 export type MusicDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off";
 export const MUSIC_DENIAL_LINE: Record<MusicDenial, string> = {
   guest: "Guests can't make songs. Ask someone in the household to sign you in.",
-  minor: "Making songs is off for children and teens for now.",
+  minor: "Making songs isn't available here. Try something else.",
   spoken: "Songs can only be made in a written chat on your own screen.",
   shared_screen: "Songs can only be made on your own screen, not a shared one.",
   household_off: "Making songs is switched off for adults in this home. An admin can switch it on in Settings, Pictures, videos and music.",

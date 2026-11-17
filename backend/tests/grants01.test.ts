@@ -17,6 +17,7 @@ import { policyNode } from "@/lib/turnMachine/nodes/policy";
 import { commandsNode } from "@/lib/turnMachine/nodes/commands";
 import { owner as ownerSession } from "./support/testAuth";
 import { NOT_AVAILABLE_LINE } from "@/lib/turnMachine/nodes/answer";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { TestClient } from "./client";
 import type { PersonRow } from "@/types";
@@ -149,7 +150,7 @@ describe("an allow grant (C7)", () => {
     installRemindWithFloor("adult");
     for (const p of [child, teen]) {
       const r = createGrant(ownerActor(), { person: p.id, action: "use:remind", effect: "allow" });
-      expect(r).toMatchObject({ ok: false, error: "That one isn't available for this profile." });
+      expect(r).toMatchObject({ ok: false, error: NOT_AVAILABLE_HERE });
       db.insert(grants).values({ id: `grant-direct${p.role}`, person: p.id, action: "use:remind", effect: "allow", validFrom: null, validTo: null, grantedByPersonId: owner.id, reason: null, acknowledgedAt: null, acknowledgedByPersonId: null, createdAt: now, updatedAt: now, deletedAt: null, hlc: "1700000000000:1:testfix" } as never).run();
       invalidatePass(p.id);
       expect(listGrants(p.id).some((g) => g.action === "use:remind")).toBe(true);
@@ -175,7 +176,9 @@ describe("a refusal is absence (C10)", () => {
   });
 
   test("the answer copy has no age, role or rule word, and the two old lines are gone from src", () => {
+    // UNSEEN-01: inside a chat turn the model words this redirect (see turnNext.test.ts); the fixed sentence is only the last resort and for API errors.
     expect(NOT_AVAILABLE_LINE).not.toMatch(/grown-up|adult|role|age|rule|allowed|permission/i);
+    expect(NOT_AVAILABLE_LINE).toBe(NOT_AVAILABLE_HERE);
     const hits: string[] = [];
     const walk = (dir: string) => { for (const name of readdirSync(dir)) { const full = join(dir, name); if (statSync(full).isDirectory()) { walk(full); continue; } if (!/\.(ts|tsx)$/.test(name) || name === "grants01.test.ts") continue; const text = readFileSync(full, "utf-8"); if (text.includes("That one needs a grown-up") || text.includes("needs role ${manifest.min_role}")) hits.push(full); } };
     walk(join(import.meta.dir, "..", "src"));

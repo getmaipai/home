@@ -45,7 +45,7 @@ export interface PictureAudience {
 
 export const PICTURE_DENIAL_LINE: Record<PictureDenial, string> = {
   guest: "Guests can't make pictures. Ask someone in the household to sign you in.",
-  minor: "Making pictures is off for this profile. A parent can turn it on in Settings, Pictures, videos and music.",
+  minor: "Making pictures isn't available here. Try something else.",
   spoken: "Pictures can only be made in a written chat on your own screen.",
   shared_screen: "Pictures can only be made on your own screen, not a shared one.",
   household_off: "Making pictures is switched off for adults in this home. An admin can switch it on in Settings, Pictures, videos and music.",

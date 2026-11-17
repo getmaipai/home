@@ -309,7 +309,7 @@ describe("the routes", () => {
     const child = await adult.client.get("/api/pictures/status");
     const childBody = await child.json() as { can_make: boolean; reason: string | null; styles: unknown[] };
     expect(childBody.can_make).toBe(false);
-    expect(childBody.reason).toContain("off for this profile");
+    expect(childBody.reason).toContain("isn't available here");
     expect(childBody.styles).toEqual([]);
   });
 

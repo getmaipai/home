@@ -25,7 +25,7 @@ const op=z.discriminatedUnion("kind",[
  z.object({kind:z.literal("replace_range"),start:z.number().nonnegative(),end:z.number().positive(),segments:z.array(z.object({id:z.string(),start:z.number().nonnegative(),end:z.number().positive(),text:z.string(),speaker:z.string().optional()})),speakers:z.array(z.object({id:z.string().min(1),label:z.string()})).optional()})
 ]);
 function handle(e:unknown,c:any){if(e instanceof TranscriptError)return c.json({error:e.message},e.status);throw e;}
-transcriptRoutes.openapi(createRoute({method:"post",path:"/library/{item}/transcript",tags:["Transcripts"],summary:"Start a local transcript job",middleware:[requireAuth] as const,request:{params:itemParam,body:{content:{"application/json":{schema:z.object({language:z.string().optional(),vocabulary:z.array(z.string()).optional()})}}}},responses:{201:{description:"Transcript created",content:{"application/json":{schema:z.any()}}},...errorResponses({401:"Not signed in",403:"Transcripts are available to teens and adults",404:"Library item unavailable",502:"Stack could not transcribe this item"})}}),async c=>{
+transcriptRoutes.openapi(createRoute({method:"post",path:"/library/{item}/transcript",tags:["Transcripts"],summary:"Start a local transcript job",middleware:[requireAuth] as const,request:{params:itemParam,body:{content:{"application/json":{schema:z.object({language:z.string().optional(),vocabulary:z.array(z.string()).optional()})}}}},responses:{201:{description:"Transcript created",content:{"application/json":{schema:z.any()}}},...errorResponses({401:"Not signed in",404:"Library item unavailable",502:"Stack could not transcribe this item"})}}),async c=>{
  try{const actor=c.get("person"),{item}=c.req.valid("param"),opts=c.req.valid("json");if(listTranscriptsForItem(actor,item)[0])return c.json({error:"This item already has a transcript."},409);
  const started=Date.now(),result=await transcribeJob(actor,{item_id:item,...opts});const record=createTranscript(actor,{itemId:item,language:result.language??opts.language??"und",segments:result.segments,speakers:result.speakers,vocabulary:result.vocabulary??opts.vocabulary,provenance:{engine:result.engine??"stack",model_id:result.model_id??"unknown",source_kind:"generated"}});
  console.info(JSON.stringify({event:"transcript.generated",segments:result.segments.length,elapsed_ms:Date.now()-started}));return c.json(record,201);
@@ -40,17 +40,17 @@ transcriptRoutes.openapi(createRoute({method:"get",path:"/transcripts/{id}/revis
 transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/restore",tags:["Transcripts"],summary:"Restore a prior revision as a new revision",middleware:[requireAuth] as const,request:{params:idParam,body:{content:{"application/json":{schema:z.object({revision:z.number().int().positive()})}}}},responses:{200:{description:"Restored transcript",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Revision unavailable",401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{const {id}=c.req.valid("param");restoreRevision(c.get("person"),id,c.req.valid("json").revision,c.get("person").id);return c.json(getTranscript(c.get("person"),id),200);}catch(e){return handle(e,c);}});
 transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/undo",tags:["Transcripts"],summary:"Undo by adding a new revision",middleware:[requireAuth] as const,request:{params:idParam},responses:{200:{description:"Transcript with an undo revision",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"No earlier revision",401:"Not signed in",404:"Transcript unavailable"})}}),c=>{try{const {id}=c.req.valid("param");undo(c.get("person"),id,c.get("person").id);return c.json(getTranscript(c.get("person"),id),200);}catch(e){return handle(e,c);}});
 transcriptRoutes.openapi(createRoute({method:"get",path:"/transcripts/{id}/export",tags:["Transcripts"],summary:"Export transcript",middleware:[requireAuth] as const,request:{params:idParam,query:z.object({format:z.enum(["srt","vtt","txt","md","json"]),track:z.string().optional()})},responses:{200:{description:"Exported transcript text",content:{"text/plain":{schema:z.string()},"application/json":{schema:z.any()}}},...errorResponses({400:"Unknown export format",401:"Not signed in",404:"Transcript or caption track unavailable"})}}),c=>{try{const value=getTranscript(c.get("person"),c.req.valid("param").id),fmt=c.req.valid("query").format,q=c.req.valid("query"),cues=q.track&&(fmt==="srt"||fmt==="vtt")?captionTrackCues(c.get("person"),c.req.valid("param").id,q.track):buildCues(value.segments),text=fmt==="srt"?writeSrt(cues):fmt==="vtt"?writeVtt(cues):fmt==="txt"?writeText(value):fmt==="md"?writeMarkdown(value):writeJson(value);return fmt==="json"?c.json(JSON.parse(text),200):c.text(text,200);}catch(e){return handle(e,c);}});
-transcriptRoutes.openapi(createRoute({method:"post",path:"/library/{item}/transcript/import",tags:["Transcripts"],summary:"Import a timed transcript",middleware:[requireAuth] as const,request:{params:itemParam,body:{content:{"application/json":{schema:z.object({format:z.enum(["srt","vtt","txt","text"]),text:z.string().max(2_000_000),language:z.string().optional()})}}}},responses:{201:{description:"Imported transcript",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Transcript file could not be read",401:"Not signed in",403:"Transcripts are available to teens and adults",404:"Library item unavailable"})}}),c=>{try{const b=c.req.valid("json");return c.json(importTranscript(c.get("person"),c.req.valid("param").item,b.text,b.format,b.language),201);}catch(e){return handle(e,c);}});
+transcriptRoutes.openapi(createRoute({method:"post",path:"/library/{item}/transcript/import",tags:["Transcripts"],summary:"Import a timed transcript",middleware:[requireAuth] as const,request:{params:itemParam,body:{content:{"application/json":{schema:z.object({format:z.enum(["srt","vtt","txt","text"]),text:z.string().max(2_000_000),language:z.string().optional()})}}}},responses:{201:{description:"Imported transcript",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Transcript file could not be read",401:"Not signed in",404:"Library item unavailable"})}}),c=>{try{const b=c.req.valid("json");return c.json(importTranscript(c.get("person"),c.req.valid("param").item,b.text,b.format,b.language),201);}catch(e){return handle(e,c);}});
 
 const STACK_FAILED = "The Stack could not finish this. Check that the local Stack is ready, then try again.";
-transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/detect-speakers",tags:["Transcripts"],summary:"Detect who is speaking and label the lines",description:"Optional JSON body {num_speakers: 1..20}. An empty body lets the Stack count the speakers.",middleware:[requireAuth] as const,request:{params:idParam},responses:{200:{description:"The transcript, plus whether detection worked. When diarization is unavailable the transcript is unchanged and note says why.",content:{"application/json":{schema:z.object({transcript:z.any(),diarization:z.enum(["done","unavailable"]),note:z.string().nullable()})}}},...errorResponses({401:"Not signed in",403:"Transcripts are available to teens and adults",404:"Transcript unavailable",502:"Stack could not detect speakers"})}}),async c=>{
+transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/detect-speakers",tags:["Transcripts"],summary:"Detect who is speaking and label the lines",description:"Optional JSON body {num_speakers: 1..20}. An empty body lets the Stack count the speakers.",middleware:[requireAuth] as const,request:{params:idParam},responses:{200:{description:"The transcript, plus whether detection worked. When diarization is unavailable the transcript is unchanged and note says why.",content:{"application/json":{schema:z.object({transcript:z.any(),diarization:z.enum(["done","unavailable"]),note:z.string().nullable()})}}},...errorResponses({401:"Not signed in",404:"Transcript unavailable",502:"Stack could not detect speakers"})}}),async c=>{
  try{const actor=c.get("person"),{id}=c.req.valid("param"),body=await c.req.json().catch(()=>({})) as {num_speakers?:unknown};
   const wanted=body.num_speakers===undefined?undefined:Number(body.num_speakers);
   if(wanted!==undefined&&(!Number.isInteger(wanted)||wanted<1||wanted>20))return c.json({error:"Give a number of speakers from 1 to 20, or leave it empty."},400);
   const outcome=await detectSpeakers(actor,id,{num_speakers:wanted});return c.json({transcript:getTranscript(actor,id),...outcome},200);
  }catch(e){if(e instanceof TranscriptError)return handle(e,c);return c.json({error:STACK_FAILED},502);}
 });
-transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/regenerate-range",tags:["Transcripts"],summary:"Redo one time range of a transcript",middleware:[requireAuth] as const,request:{params:idParam,body:{content:{"application/json":{schema:z.object({start:z.number().nonnegative(),end:z.number().positive(),language:z.string().min(1).optional()})}}}},responses:{200:{description:"The transcript with only that range redone, as one revision",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Invalid range",401:"Not signed in",403:"Transcripts are available to teens and adults",404:"Transcript unavailable",409:"No speech found in that range",502:"Stack could not redo this range"})}}),async c=>{
+transcriptRoutes.openapi(createRoute({method:"post",path:"/transcripts/{id}/regenerate-range",tags:["Transcripts"],summary:"Redo one time range of a transcript",middleware:[requireAuth] as const,request:{params:idParam,body:{content:{"application/json":{schema:z.object({start:z.number().nonnegative(),end:z.number().positive(),language:z.string().min(1).optional()})}}}},responses:{200:{description:"The transcript with only that range redone, as one revision",content:{"application/json":{schema:z.any()}}},...errorResponses({400:"Invalid range",401:"Not signed in",404:"Transcript unavailable",409:"No speech found in that range",502:"Stack could not redo this range"})}}),async c=>{
  try{const actor=c.get("person"),{id}=c.req.valid("param");await regenerateRange(actor,id,c.req.valid("json"));return c.json(getTranscript(actor,id),200);
  }catch(e){if(e instanceof TranscriptError)return handle(e,c);return c.json({error:STACK_FAILED},502);}
 });
@@ -67,7 +67,7 @@ const jsonAnswer = (description: string) => ({ description, content: { "applicat
 transcriptRoutes.openapi(createRoute({
   method: "get", path: "/transcripts/{id}/caption-tracks", tags: ["Transcripts"], summary: "List caption tracks and whether each needs refreshing",
   middleware: [requireAuth] as const, request: { params: idParam },
-  responses: { 200: jsonAnswer("Caption tracks"), ...errorResponses({ 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript unavailable" }) },
+  responses: { 200: jsonAnswer("Caption tracks"), ...errorResponses({ 401: "Not signed in", 404: "Transcript unavailable" }) },
 }), (c) => {
   try { return c.json(listCaptionTracks(c.get("person"), c.req.valid("param").id), 200); } catch (e) { return handle(e, c); }
 });
@@ -75,7 +75,7 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/caption-tracks", tags: ["Transcripts"], summary: "Make a caption track from the transcript as it is now",
   middleware: [requireAuth] as const, request: { params: idParam },
-  responses: { 201: jsonAnswer("The new caption track"), ...errorResponses({ 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript unavailable" }) },
+  responses: { 201: jsonAnswer("The new caption track"), ...errorResponses({ 401: "Not signed in", 404: "Transcript unavailable" }) },
 }), (c) => {
   try { return c.json(createCaptionTrack(c.get("person"), c.req.valid("param").id), 201); } catch (e) { return handle(e, c); }
 });
@@ -83,7 +83,7 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/caption-tracks/{track}/refresh", tags: ["Transcripts"], summary: "Rebuild a caption track from the current transcript, keeping hand-edited captions",
   middleware: [requireAuth] as const, request: { params: trackParam },
-  responses: { 200: jsonAnswer("The refreshed caption track"), ...errorResponses({ 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript or caption track unavailable" }) },
+  responses: { 200: jsonAnswer("The refreshed caption track"), ...errorResponses({ 401: "Not signed in", 404: "Transcript or caption track unavailable" }) },
 }), (c) => {
   try {
     const { id, track } = c.req.valid("param");
@@ -100,7 +100,7 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/caption-tracks/{track}/translate", tags: ["Transcripts"], summary: "Translate a caption track into another language as its own track",
   middleware: [requireAuth] as const, request: { params: trackParam, body: { content: { "application/json": { schema: z.object({ language: z.string().min(2).max(8) }) } } } },
-  responses: { 202: jsonAnswer("The running translation job"), ...errorResponses({ 400: "Unknown or same language", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript or caption track unavailable", 413: "Too many captions" }) },
+  responses: { 202: jsonAnswer("The running translation job"), ...errorResponses({ 400: "Unknown or same language", 401: "Not signed in", 404: "Transcript or caption track unavailable", 413: "Too many captions" }) },
 }), async (c) => {
   try {
     const { id, track } = c.req.valid("param");
@@ -119,7 +119,7 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/caption-tracks/{track}/burn-in", tags: ["Transcripts"], summary: "Start burning a caption track into a copy of the video",
   middleware: [requireAuth] as const, request: { params: trackParam, body: { content: { "application/json": { schema: z.object({ position: z.enum(["bottom", "middle", "top"]).default("bottom") }) } } } },
-  responses: { 202: jsonAnswer("The running burn-in job"), ...errorResponses({ 400: "Audio only or no captions", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript, caption track or video unavailable", 413: "Too many captions" }) },
+  responses: { 202: jsonAnswer("The running burn-in job"), ...errorResponses({ 400: "Audio only or no captions", 401: "Not signed in", 404: "Transcript, caption track or video unavailable", 413: "Too many captions" }) },
 }), async (c) => {
   try {
     const { id, track } = c.req.valid("param");
@@ -138,7 +138,7 @@ transcriptRoutes.openapi(createRoute({
 transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/find-replace/preview", tags: ["Transcripts"], summary: "Preview a find and replace without changing anything",
   middleware: [requireAuth] as const, request: { params: idParam, body: { content: { "application/json": { schema: findBody } } } },
-  responses: { 200: jsonAnswer("Matching lines, at most 500, with a more flag"), ...errorResponses({ 400: "Nothing to find", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript unavailable" }) },
+  responses: { 200: jsonAnswer("Matching lines, at most 500, with a more flag"), ...errorResponses({ 400: "Nothing to find", 401: "Not signed in", 404: "Transcript unavailable" }) },
 }), (c) => {
   try { return c.json(previewFindReplace(c.get("person"), c.req.valid("param").id, c.req.valid("json")), 200); } catch (e) { return handle(e, c); }
 });
@@ -147,7 +147,7 @@ transcriptRoutes.openapi(createRoute({
   method: "post", path: "/transcripts/{id}/find-replace", tags: ["Transcripts"], summary: "Apply a find and replace as one revision",
   middleware: [requireAuth] as const,
   request: { params: idParam, body: { content: { "application/json": { schema: findBody.extend({ segment_ids: z.array(z.string()).optional() }) } } } },
-  responses: { 200: jsonAnswer("The transcript and how many lines changed"), ...errorResponses({ 400: "Nothing to find", 401: "Not signed in", 403: "Transcripts are available to teens and adults", 404: "Transcript unavailable" }) },
+  responses: { 200: jsonAnswer("The transcript and how many lines changed"), ...errorResponses({ 400: "Nothing to find", 401: "Not signed in", 404: "Transcript unavailable" }) },
 }), (c) => {
   try {
     const actor = c.get("person"), { id } = c.req.valid("param");

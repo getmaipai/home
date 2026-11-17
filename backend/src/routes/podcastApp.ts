@@ -27,6 +27,7 @@ import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { setShowAutoSave, setShowPlayed, showSaveRows, episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -216,7 +217,7 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.post("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
     const body = await jsonBody(c);
     const item = typeof body.media_id === "string" ? readableIn(person, "podcasts", body.media_id) : null;
     if (!item) return c.json({ error: "That episode is not in your podcasts." }, 404);
@@ -233,13 +234,13 @@ const lookupPreferringV4: DnsLookup = async (hostname) => {
 
   routes.get("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
     return c.json({ ok: true, rows: podcastSnipRowsForRoute(person) }, 200);
   });
 
   routes.delete("/snips", requireAuth, async (c, next) => {
     const person = c.get("person");
-    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
     const body = await jsonBody(c);
     const mediaId = typeof body.media_id === "string" ? body.media_id : "";
     const at = coerceNumber(body.start_s);

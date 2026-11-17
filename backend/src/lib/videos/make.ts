@@ -16,10 +16,11 @@ import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
 import { fillTemplateBlanks, getTemplate, templateBlanks, videoTemplateSettings } from "@/lib/media/templates";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 /** The most takes one press of Generate makes (the Takes chip offers 1 to 4; a level may cap lower, `MAX_TAKES_BY_TIER`). */
 export const MAX_TAKES = 8;
-export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
+export const MINOR_MAKE_LINE = NOT_AVAILABLE_HERE;
 
 export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** The words for the template's blanks (`{{name|Label|example}}`), by blank name; a blank left out uses its example. */ blanks?: Record<string, string>; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** A second Library picture the clip ends on (needs a start_frame and a maker that reports end_image). */ end_frame?: string; /** TAKES-01: how many takes of this prompt to make (1 to 8; the level caps it). */ takes?: number; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */

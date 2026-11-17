@@ -24,6 +24,7 @@ import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Grant as GrantT } from "@maipai/spec/gen/ts/grant.js";
 import { refusal } from "@/lib/result";
 import { invalidatePass } from "@/lib/filter/passCache";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 type OpResult<T> = { ok: true; status: 200 | 201; value: T } | { ok: false; status: 400 | 404; error: string; code?: string };
 
@@ -142,7 +143,7 @@ function useGrantRefusal(input: GrantCreate, personId: string): string | null {
   if (role !== "child" && role !== "teen") return null;
   const { loadManifestOnly, meetsMinRole } = require("@/lib/plugins") as typeof import("@/lib/plugins");
   const loaded = loadManifestOnly(input.action.slice("use:".length));
-  return loaded.ok && !meetsMinRole(role, loaded.value.min_role) ? "That one isn't available for this profile." : null;
+  return loaded.ok && !meetsMinRole(role, loaded.value.min_role) ? NOT_AVAILABLE_HERE : null;
 }
 
 export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {

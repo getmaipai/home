@@ -38,7 +38,6 @@ const ASK: () => Record<Kind, string> = () => ({
   album: i18n._({ id: "Make me an album, with a cover and a first song. Ask me what sound I want if you need to.", message: "Make me an album, with a cover and a first song. Ask me what sound I want if you need to." }),
   song_style: i18n._({ id: "Save a song style for me. Ask me what sound I want if you need to.", message: "Save a song style for me. Ask me what sound I want if you need to." }),
 });
-const ADULT_ONLY_LINE = () => i18n._({ id: "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you.", message: "Making a song, a band, an album or a style is for adults. Ask a grown-up to make one with you." });
 
 const toKind = (value: string | null): Kind | null => (value === "band" || value === "album" || value === "song_style" ? value : null);
 
@@ -81,7 +80,7 @@ export function CreatePage({ kind, adult }: { kind: Kind; adult: boolean }) {
   const { push } = useToast();
   const queryClient = useQueryClient();
   const [problem, setProblem] = useState("");
-  if (!adult) return <EmptyState icon="music" text={ADULT_ONLY_LINE()} />;
+  if (!adult) return <Navigate to="/" replace />;
   const save = (patch: BandPatch & AlbumPatch & SongStylePatch) => {
     setProblem("");
     request<{ id: string }>(`/api/music/${COLLECTION[kind]}`, { method: "POST", body: JSON.stringify(createBody(kind, patch)) })
@@ -150,7 +149,7 @@ function CreationsPage({ adult }: { adult: boolean }) {
 /** A page that asks which song first (Studio, Stems, Remix), then goes where `go` says. */
 function PickSong({ adult, title, line, go }: { adult: boolean; title: string; line: string; go: (card: MusicCard) => string }) {
   const navigate = useNavigate();
-  if (!adult) return <EmptyState icon="music" text={ADULT_ONLY_LINE()} />;
+  if (!adult) return <Navigate to="/" replace />;
   return <section className="flex flex-col gap-6 px-4 lg:px-0" data-testid="music-pick-song">
     <Heading title={title} line={line} />
     <SongGallery selected={null} onOpen={(card) => navigate(go(card))} actionsFor={() => []} />

@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { canReadFileAudience } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export type SubjectKind = "character" | "prop" | "place";
 export interface SubjectInput { name: string; kind: SubjectKind; look: string; referenceIds?: string[]; real?: boolean }
@@ -61,7 +62,7 @@ export function createMediaSubject(actor: PersonRow, input: SubjectInput, source
   if (actor.role === "guest") throw new Error("Saved subjects aren't available to guest profiles.");
   const name = input.name.trim().slice(0, 80), look = input.look.trim().slice(0, 1000), ids = [...new Set(input.referenceIds ?? [])];
   if (!name || !look || !validateReferences(actor, ids)) throw new Error("Choose a name, look, and pictures from your Library.");
-  if (input.real && (actor.role === "child" || actor.role === "teen")) throw new Error("Real-person subjects are not available for this profile yet.");
+  if (input.real && (actor.role === "child" || actor.role === "teen")) throw new Error(NOT_AVAILABLE_HERE);
   const now = new Date().toISOString(), id = `msub-${randomSuffix(10)}`;
   db.insert(mediaSubjects).values({ id, ownerPersonId: actor.id, name, kind: input.kind, sharedWith: "[]", look, referenceIds: JSON.stringify(ids), real: input.real ?? false, createdAt: now, updatedAt: now, hlc: nextHlc(), provenance: `media-subject:${JSON.stringify({ v: 1, source })}` }).run();
   return getMediaSubject(actor, id)!;
@@ -70,7 +71,7 @@ export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<
   const existing = rowById(id); if (!existing || existing.personId || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
   const updated: SubjectInput = { name: patch.name ?? existing.name, kind: patch.kind ?? existing.kind as SubjectKind, look: patch.look ?? existing.look, referenceIds: patch.referenceIds ?? JSON.parse(existing.referenceIds), real: patch.real ?? existing.real };
   if (existing.synthId || existing.personId) updated.real = existing.real; // a linked subject's `real` is derived, never set by hand
-  if (updated.real && (actor.role === "child" || actor.role === "teen")) throw new Error("Real-person subjects are not available for this profile yet.");
+  if (updated.real && (actor.role === "child" || actor.role === "teen")) throw new Error(NOT_AVAILABLE_HERE);
   const name = updated.name.trim().slice(0, 80), look = updated.look.trim().slice(0, 1000), ids = [...new Set(updated.referenceIds ?? [])];
   if (!name || !look || !validateReferences(actor, ids)) throw new Error("Choose a name, look, and pictures from your Library.");
   db.update(mediaSubjects).set({ name, kind: updated.kind, look, referenceIds: JSON.stringify(ids), real: updated.real ?? false, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();

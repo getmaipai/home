@@ -156,6 +156,7 @@ import { ReplyPlan as ReplyPlanSchema, type ReplyPlan } from "@maipai/spec/gen/t
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { foldedBlock, FOLDED_NOTE_LABEL } from "@/lib/systemFold";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 export type { ConversationTurnRow } from "@/wire";
 
 export function turnOwnerId(turnId: string): string | null {
@@ -1292,7 +1293,7 @@ export function resolveOrCreateConversation(
   // still can't construct a minor's temporary chat).
   if (opts.temporary) {
     if (!canHaveTemporaryChat(actor)) {
-      return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+      return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
     }
     return { ok: true, value: createTemporaryConversation(actor, surface, undefined, placement) };
   }
@@ -1593,7 +1594,7 @@ export function createConversation(
     return { ok: false, status: 400, error: `invalid conversation mode: ${mode}` };
   }
   if (mode === "temporary" && !canHaveTemporaryChat(actor)) {
-    return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+    return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   }
   // THIN-INC row 6: a temporary conversation never takes the "currently
   // open" slot, so it must not close the person's saved chat either: that
@@ -2254,7 +2255,7 @@ export function updateConversationMode(actor: PersonRow, id: string, mode: Conve
   const found = getConversation(actor, id);
   if (!found.ok) return found;
   if (mode === "temporary" && actor.role !== "owner" && actor.role !== "admin" && actor.role !== "adult") {
-    return { ok: false, status: 403, error: "temporary chat is not available for minors" };
+    return { ok: false, status: 403, error: NOT_AVAILABLE_HERE };
   }
   const now = new Date().toISOString();
   const newHlc = nextHlc();

@@ -43,7 +43,7 @@ describe("local image attachment adapter", () => {
   test("hides image accept types and refuses add when a child's setting is off", async () => {
     const adapter = createLocalImageAttachmentAdapter({ enabled: () => false });
     expect(adapter.accept).not.toContain("image/*");
-    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("Photo uploads are turned off");
+    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("isn't available here");
   });
 
   test("reports the picture-capability reason when the upload setting is on but the model is not ready", async () => {

@@ -22,7 +22,7 @@ const viewGate = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 const NO_STORE = { "cache-control": "private, no-store" };
-const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song" });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Not available", 404: "No such song" });
 const route = createRoute({ method: "get", path: "/jobs/{id}/files/{fileId}/peaks", tags: ["Music"], summary: "About 600 waveform peaks (0 to 1) for one song file", middleware: [requireAuth, viewGate] as [typeof requireAuth, typeof viewGate],
   request: { params: z.object({ id: z.string().min(1).max(80), fileId: z.string().min(1).max(80) }) },
   responses: { 200: { content: { "application/json": { schema: z.object({ peaks: z.array(z.number()), duration: z.number() }) } }, description: "Peaks and the length in seconds." }, ...refusals, ...errorResponses({ 503: "No audio tool on this computer" }) } });

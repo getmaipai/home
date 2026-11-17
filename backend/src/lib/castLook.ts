@@ -23,9 +23,10 @@ import { gateFinished } from "@/lib/pictures/laneGate";
 import type { SheetPicture, MadeSheet } from "@/lib/films/sheetMaker";
 import type { PictureRole } from "@/lib/pictures/roles";
 import type { PersonRow } from "@/types";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 export const MAX_LOOK_SOURCES = 7; // a subject keeps at most 8 reference files and one of them is the sheet
-export const LOOK_MINOR_LINE = "A child's or teen's pictures are not turned into a look sheet. Ask a parent or admin if you need one.";
+export const LOOK_MINOR_LINE = NOT_AVAILABLE_HERE;
 export const LOOK_OWNER_LINE = "Only the person who saved this can capture its look. Ask them, or save your own copy and capture that.";
 export const LOOK_NO_PHOTOS_LINE = "To capture this person's look, add one or more clear photos of them from your Library, then try again.";
 export const LOOK_FAILED_LINE = "The look sheet could not be made. Try again in a moment.";

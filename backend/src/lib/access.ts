@@ -12,6 +12,7 @@ import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@/wire";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 // The role-string check itself now lives in @/wire (alias-free) so a
 // frontend client can share it too (a code review, 2026-09-04, found a
@@ -22,7 +23,7 @@ export function isOwnerOrAdmin(actor: Pick<PersonRow, "role">): boolean {
 }
 
 /** AUDIT-DUP-ROUTES-01: a child cannot make a companion (an owner or admin account always may, whatever its age band). */
-export const COMPANION_BAND_LINE = "Only teens and adults can make a companion.";
+export const COMPANION_BAND_LINE = NOT_AVAILABLE_HERE;
 export function canMakeCompanion(actor: PersonRow): boolean {
   return !(speakerAgeBand(actor, new Date()) === "child" && !isOwnerOrAdmin(actor));
 }

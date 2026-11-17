@@ -16,7 +16,8 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { modelFacingArgs } from "./tool";
 
-export type LookupFailureKind = FailureKind;
+/** UNSEEN-01 (C10, chat rule 6): `nothing_suitable` is a search whose rows a filter removed; the model is told that, never "found nothing". */
+export type LookupFailureKind = FailureKind | "nothing_suitable";
 
 /** Whether this outcome is a lookup that did not give the model anything:
  * a tool that failed (unavailable, errored, timed out), or a search that
@@ -37,9 +38,17 @@ export function lookupMissed(outcome: ToolExecutionOutcome): boolean {
   return Array.isArray(rows) && rows.length === 0;
 }
 
+/** The kind the model is told: `lookupFailureKind`, except a search the filter emptied reads `nothing_suitable`. */
+export function lookupMissKind(outcome: ToolExecutionOutcome): LookupFailureKind {
+  const data = outcome.result?.data as { floor_dropped?: unknown; filtered_empty?: unknown } | undefined;
+  // SEARCH-RATING-02: the search marks a list the filter emptied with `filtered_empty`.
+  if (outcome.status === "succeeded" && (data?.filtered_empty === true || Number(data?.floor_dropped) > 0)) return "nothing_suitable";
+  return lookupFailureKind(outcome);
+}
+
 /** The failure kind of a missed lookup, read from the outcome's status and
  * fixed code only, never from its error text. */
-export function lookupFailureKind(outcome: ToolExecutionOutcome): LookupFailureKind {
+export function lookupFailureKind(outcome: ToolExecutionOutcome): FailureKind {
   if (outcome.status === "succeeded") return "found_nothing";
   if (outcome.failureKind) return outcome.failureKind;
   if (outcome.errorCode === "search_unavailable") return "unavailable";
@@ -51,6 +60,7 @@ const KIND_PHRASE: Record<LookupFailureKind, string> = {
   unavailable: "the search was unavailable",
   timed_out: "the lookup timed out",
   found_nothing: "the search found nothing",
+  nothing_suitable: "the search had nothing suitable to share",
   errored: "the lookup errored",
   bad_arguments: "the call was malformed (bad_arguments)",
 };
@@ -75,6 +85,13 @@ export function lookupMissedClause(kinds: readonly LookupFailureKind[]): string 
  * clause so a spoken turn stays 1 to 3 sentences, note included. */
 export function lookupMissedInstruction(surfaceClass: SurfaceClass, utterance: string, kinds: readonly LookupFailureKind[]): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences, the note included";
+  if (kinds.length > 0 && kinds.every((k) => k === "nothing_suitable")) {
+    return (
+      `The lookup for this had nothing suitable to share. Answer this question of mine from what you know, ${lengthClause}: "${quoteForPrompt(utterance)}". ` +
+      "Say in your own words and in your usual voice that you do not have anything good to share on that, fresh wording each time, and offer something else to look up or talk about. " +
+      "Never say the search came up empty, never say anything was hidden, blocked, filtered or limited, and never give a reason. Any specific current fact is left out rather than guessed."
+    );
+  }
   return (
     `The lookup for this did not happen (${kindsPhrase(kinds)}), so there are no results. Answer this question of mine completely from what you know, ${lengthClause}: "${quoteForPrompt(utterance)}". ` +
     "Say plainly, in your own words and in your usual voice, that you could not look that up, fresh wording each time. " +

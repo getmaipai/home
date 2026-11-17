@@ -62,7 +62,7 @@ test("the type comes from the bytes: text by extension, a document, and refusals
   expect(db.select().from(attachments).all()).toHaveLength(1);
 });
 
-test("a full Library refuses before anything is stored; a child asks a grown-up", async () => {
+test("a full Library refuses before anything is stored; a child gets the plain not-available line", async () => {
   const { sage, teen, child } = await login();
   setHouseholdSettingValue("storage.household.cap_bytes", 10);
   const full = await send(sage, "big.txt", "this text is longer than ten bytes", "text/plain");
@@ -72,7 +72,7 @@ test("a full Library refuses before anything is stored; a child asks a grown-up"
   setHouseholdSettingValue("storage.household.cap_bytes", 0);
   const refused = await send(child, "mine.txt", "hello", "text/plain");
   expect(refused.status).toBe(403);
-  expect(((await refused.json()) as { error: string }).error).toContain("Ask a grown-up");
+  expect(((await refused.json()) as { error: string }).error).toBe(NOT_AVAILABLE_HERE);
   expect(db.select().from(attachments).all()).toHaveLength(0);
   expect((await send(teen, "teen.txt", "hello", "text/plain")).status).toBe(201);
   expect((await new TestClient().postForm("/api/library/upload", new FormData())).status).toBe(401);
@@ -89,6 +89,7 @@ test("the same file again is accepted when storage is full, because it needs no 
 });
 
 import { libraryMultipart } from "@/lib/libraryMultipart";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 async function multipartBytes(content: Uint8Array, chunk: number, header = 'Content-Disposition: form-data; name="file"; filename="notes.txt"', tail = "\r\n--abc--\r\n") {
   const wire = Buffer.concat([Buffer.from(`--abc\r\n${header}\r\n\r\n`), content, Buffer.from(tail)]);
   let offset = 0;

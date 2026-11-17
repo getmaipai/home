@@ -49,7 +49,7 @@ import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
 import { promptLimitLine } from "@/lib/failureCopy";
 import { thinkingModeFor } from "@/lib/modelCatalog";
-import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, markRetryMessage, recoveredRetry, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
+import { lookupMissed, lookupMissKind, lookupMissedClause, lookupMissedInstruction, markRetryMessage, recoveredRetry, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
@@ -154,7 +154,12 @@ export interface ModelInput {
    * (machine.ts sets it). Offered like the failed round (same tools block,
    * tool_choice auto) plus a plain line naming the failed tool and kind. */
   retry?: boolean;
+  /** UNSEEN-01 (C10): the tool the model just called is not available to this person here. The round is told so and writes the redirect itself. */
+  notAvailable?: boolean;
 }
+
+/** UNSEEN-01: the note a no-tool round gets after a refused call. It names no age, role, rule, rating or filter and says the thing is unavailable here, never that it does not exist. */
+export const NOT_AVAILABLE_NOTE = "What the person just asked for is not available here, and no tool can do it. In your own words, say plainly that you cannot do that one here (never that it does not exist, and never give a reason such as age, role, rules, ratings or filtering), then offer one or two things you can do that are close to what they want.";
 
 export type ModelOutput =
   | { kind: "text"; text: string; thinking: boolean; reasoning?: string }
@@ -1123,7 +1128,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // SEARCH-ANSWER-01: when the one retry round produced results, the retry's
     // own instruction and the first round's misses are history, not news.
     const recovered = phrasedOutcomes.length > 0 ? recoveredRetry(state.messages) : null;
-    const missedKinds = state.outcomes.slice(recovered?.outcomesBefore ?? 0).filter(lookupMissed).map(lookupFailureKind);
+    const missedKinds = state.outcomes.slice(recovered?.outcomesBefore ?? 0).filter(lookupMissed).map(lookupMissKind);
     const answering =
       phrasedOutcomes.length === 0
         ? `${lookupMissedInstruction(promptSurfaceClass, input.utterance, missedKinds)}${researching ? ` ${NO_WEB_RESULTS_CLAUSE}` : ""}`
@@ -1160,7 +1165,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // phrasing round does); the failed call and its error are not replayed, only
     // the tool id and the kind are named.
     const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(state.planBasis.surfaceClass ?? "spoken", state.plan.age_band);
-    const failures = state.outcomes.filter(lookupMissed).map((o) => ({ tool: o.packageId, kind: lookupFailureKind(o) }));
+    const failures = state.outcomes.filter(lookupMissed).map((o) => ({ tool: o.packageId, kind: lookupMissKind(o) }));
     const retrying = retryInstruction(promptSurfaceClass, input.utterance, failures);
     messages = [...state.messages, markRetryMessage({ role: "user", content: promptSurfaceClass === "written" ? retrying : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${retrying}` }, state.outcomes.length)];
     tools = retryTools(state.lastTools, state.temporary);
@@ -1250,6 +1255,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const firstRoundMessages = firstRoundWanted ? withResearchNote(messages, `${firstRoundNote(state.answerStyle!, state.budget.rounds)}${briefNote}${suggestedSearchesNote(firstRoundQueries)}`) : null;
   state.messages = continuing ? state.messages : messages;
   if (firstRoundMessages) messages = firstRoundMessages;
+  if (input.notAvailable && !isPhrasingRound) messages = withResearchNote(messages, NOT_AVAILABLE_NOTE);
   if (!isPhrasingRound) state.lastTools = tools;
 
   // STREAM-NEXT-01 (b): the gate settles at exactly one of this

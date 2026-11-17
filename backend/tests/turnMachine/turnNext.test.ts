@@ -1,4 +1,4 @@
-import { NOT_AVAILABLE_LINE } from "@/lib/turnMachine/nodes/answer";
+import { NOT_AVAILABLE_NOTE } from "@/lib/turnMachine/nodes/model";
 import { __setStageWritersForTests } from "@/lib/turnMachine/researchPipeline";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
 // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "Acceptance"):
@@ -884,7 +884,7 @@ describe("turnNext.ts: consent and confirmation", () => {
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       // MINOR-SEARCH-01b: never for a child, with its own line (what happened, what to do).
-      expect(result.value.reply.text).toBe("I don't search the web for people in our family. I can tell you what I already know, or you can ask a grown-up at home.");
+      expect(result.value.reply.text).toBe("I don't search the web for people in our family. I can tell you what I already know, or you can ask me about something else.");
       expect(result.value.confirm).toBeUndefined();
       expect(getPendingAsk(result.value.conversation_id)).toBeNull();
     } finally { entry.turn_budget = original; }
@@ -1378,7 +1378,7 @@ describe("turnNext.ts: the commands node's own guards", () => {
 });
 
 describe("turnNext.ts: policy refusals without a parked ask", () => {
-  test("a child's tool call below its role answers with the not-available line, not a blank reply", async () => {
+  test("a child's tool call below its role is answered in the model's own words after it is told the tool is not available here, not a blank reply or a fixed line", async () => {
     // A code review (2026-09-22) caught machine.ts's own `answer` step
     // with no producer for `policy`'s "every proposal refused, nothing
     // parked" exit (policyAllRefused) - it fell through to an empty
@@ -1387,11 +1387,16 @@ describe("turnNext.ts: policy refusals without a parked ask", () => {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
     CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "lock-doors"] };
     let result: Awaited<ReturnType<typeof runTurnNext>>;
+    const told: string[] = [];
     try {
       result = await withStub(
         {
           calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-          reply: () => "locking",
+          reply: (request) => {
+            const last = request.messages.at(-1)?.content;
+            if (typeof last === "string" && last.includes(NOT_AVAILABLE_NOTE)) { told.push(last); return "I can't do that one here, but I can set a timer or tell you a story instead."; }
+            return "locking";
+          },
         },
         () => runTurnNext(people.child, "chat", "lock the doors"),
       );
@@ -1400,7 +1405,9 @@ describe("turnNext.ts: policy refusals without a parked ask", () => {
     }
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe(NOT_AVAILABLE_LINE);
+    // UNSEEN-01 (C10, chat rule 6): no fixed wording reaches the person; the model was told and worded the redirect.
+    expect(told.length).toBe(1);
+    expect(result.value.reply.text).toBe("I can't do that one here, but I can set a timer or tell you a story instead.");
   });
 });
 

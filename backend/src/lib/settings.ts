@@ -114,7 +114,7 @@ export function assertCanSetTtsVoice(actor: PersonRow, targetId: string): Settin
   const targetRole = getPersonRole(targetId);
   if (!targetRole) return { ok: false, status: 403, error: "That person cannot choose a voice here. Ask the person who manages Home to check the household profiles." };
   if (actor.id === targetId) {
-    if (targetRole === "child") return { ok: false, status: 403, error: "A parent chooses your voice. Ask the person who manages Home to pick one for you." };
+    if (targetRole === "child") return { ok: false, status: 403, error: "An owner or admin sets this." };
     return { ok: true, value: true };
   }
   if (isOwnerOrAdmin(actor) && targetRole === "child") return { ok: true, value: true };
@@ -127,7 +127,7 @@ function assertCanSetVoicePrintEnrollment(actor: PersonRow, targetId: string): S
   const targetRole = getPersonRole(targetId);
   if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
   if (actor.id === targetId) {
-    if (targetRole === "child") return { ok: false, status: 403, error: "A parent must agree before a child's voice pattern is saved." };
+    if (targetRole === "child") return { ok: false, status: 403, error: "An owner or admin sets this." };
     return { ok: true, value: true };
   }
   if (isOwnerOrAdmin(actor) && targetRole === "child") return { ok: true, value: true };
@@ -610,7 +610,7 @@ function assertCanSetMediaProtection(actor: PersonRow, targetPersonId: string): 
   if (!target) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
   if (isOwnerOrAdmin(actor)) return assertOwnerAdminLadder(actor, targetPersonId, "You cannot change these media controls. Ask the person who manages Home.");
   if (actor.id === targetPersonId && speakerAgeBand(actor, new Date()) === "adult" && actor.role !== "guest") return { ok: true, value: true };
-  return { ok: false, status: 403, error: "A grown-up sets your media controls. Ask a grown-up to change them." };
+  return { ok: false, status: 403, error: "An owner or admin sets this." };
 }
 
 /** OVERRIDES-01 (RULES.md C3): the keys the content pass reads. The override keys (`content.ceiling*`, `content.unrated*`,
@@ -694,7 +694,7 @@ function assertCanSetPageTextCleaning(actor: PersonRow, targetId: string): Setti
   if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
   if (actor.id === targetId) {
     if (targetRole !== "child" && targetRole !== "teen") return { ok: true, value: true };
-    return { ok: false, status: 403, error: "A household owner or admin changes the page text check for a child or teen. Ask one of them to open your page." };
+    return { ok: false, status: 403, error: "An owner or admin sets this." };
   }
   if (isOwnerOrAdmin(actor) && (targetRole === "child" || targetRole === "teen")) return { ok: true, value: true };
   return { ok: false, status: 403, error: "Only a household owner or admin changes this for a child or teen, and only an adult changes their own." };
@@ -714,7 +714,7 @@ const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   // The band, not the role alone: a birthdate under 13 makes an adult-role person a child here too (speakerAgeBand is role-floored).
   if (actor.id === targetId && speakerAgeBand(actor, new Date()) === "child") {
-    return { ok: false, status: 403, error: "A parent sets this for you. Ask the person who manages Home." };
+    return { ok: false, status: 403, error: "An owner or admin sets this." };
   }
   return assertCanAccessScope(actor, { kind: "person", id: targetId }, "write");
 }

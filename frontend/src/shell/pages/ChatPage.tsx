@@ -438,7 +438,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const imageAttachmentAllowedRef = useRef(photoUploadsEnabled && imagePartsAvailable);
   imageAttachmentAllowedRef.current = photoUploadsEnabled && imagePartsAvailable;
   const imageDisabledMessageRef = useRef("Pictures need a ready vision model.");
-  imageDisabledMessageRef.current = !photoUploadsEnabled ? "Photo uploads are turned off for this profile." : "Pictures need a ready vision model.";
+  imageDisabledMessageRef.current = !photoUploadsEnabled ? "That one isn't available here. Try something else." : "Pictures need a ready vision model.";
   const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({
     enabled: () => imageAttachmentAllowedRef.current,
     disabledMessage: () => imageDisabledMessageRef.current,

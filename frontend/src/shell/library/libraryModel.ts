@@ -125,7 +125,7 @@ export function spokenDetail(item: LibraryItem, me: Pick<Roster, "id">): string 
 }
 export const daysLeft = (until: string | null, now = Date.now()): number | null => until === null ? null : Math.max(0, Math.ceil((Date.parse(until) - now) / 86_400_000));
 
-/** Roles that may add and share. A child asks a grown-up; the hub refuses too. */
+/** Roles that may add and share. The hub refuses the rest. */
 export const canAddFiles = (person: Pick<Roster, "role">): boolean => person.role !== "child" && person.role !== "guest";
 export const canShareFiles = canAddFiles;
 /** Who may be offered "Mark all-ages": an adult who owns the picture. The hub decides again. */

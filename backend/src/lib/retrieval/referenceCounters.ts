@@ -18,6 +18,8 @@ export const REFERENCE_COUNTER_NAMES = [
   "source_excluded",
   "floor_dropped",
   "ingest_floor_dropped",
+  // UNSEEN-01: web search rows the minor floor removed from a result (a count only, never the row).
+  "search_floor_dropped",
   "unavailable",
   "extract_empty",
   "scope_reference",

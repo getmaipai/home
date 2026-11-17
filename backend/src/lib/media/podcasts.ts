@@ -513,7 +513,7 @@ export async function getPodcastTranscript(actor: PersonRow, itemId: string, dep
   const item = readableItem(actor, itemId);
   const row = item ? itemRow(itemId) : undefined;
   if (!row || row.kind !== "podcast_episode") return { ok: false, status: 404, error: "That episode is not available to you." };
-  if (mediaBandOf(actor) === "child") return { ok: false, status: 403, error: "Transcripts are available to teens and adults." };
+  if (mediaBandOf(actor) === "child") return { ok: false, status: 404, error: "That episode is not available to you." };
   const stored = transcriptOf(row);
   if (stored) return { ok: true, value: { transcript: stored } };
   const transcriptRow = db.select().from(podcastTranscripts).where(eq(podcastTranscripts.itemId, row.id)).get();

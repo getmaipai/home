@@ -27,6 +27,7 @@ import { storeFile } from "@/lib/attachments";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { PACKAGES_DIR } from "@/lib/paths";
 import { people as peopleTable } from "@/db/schema";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 let fake: FakeVideoStack;
 beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); });
@@ -100,7 +101,7 @@ describe("POST /api/videos/make", () => {
       const res = await who.client.post("/api/videos/make", { prompt: BOAT });
       expect(res.status).toBe(403);
       const body = await res.json() as { error: string };
-      expect(body.error).toContain("adult");
+      expect(body.error).toBe(NOT_AVAILABLE_HERE); // UNSEEN-01: no age or role as the reason
     }
     expect(fake.submitted).toHaveLength(0);
   });

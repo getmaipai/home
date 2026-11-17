@@ -83,7 +83,7 @@ const REMINDER = " I can set a reminder instead.";
 const REFUSAL_TEXT: Partial<Record<TargetReason, string>> = {
   sensitive: `A schedule runs on its own with nobody to confirm it, so locks, alarms, garage doors, cameras, entry doors and scripts cannot be scheduled.${REMINDER}`,
   scene_changed: `That scene sets something a schedule is not allowed to run, such as a lock or a device you cannot control.${REMINDER}`,
-  no_access: "You are not set up to control that device, so you cannot schedule it. Ask a parent to give you access.",
+  no_access: "You are not set up to control that device, so you cannot schedule it.",
   scene_unknown: "I could not read what that scene sets just now. Try again in a minute.",
 };
 

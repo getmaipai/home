@@ -4,6 +4,7 @@ import { people } from "@/db/schema";
 import { createMediaSubject, deleteMediaSubject, listMediaSubjects, shareMediaSubject, subjectsForNames } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
+import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 function addPerson(id: string, role: string): PersonRow {
   const now = new Date().toISOString();
@@ -30,8 +31,8 @@ describe("saved picture subjects", () => {
     const child = addPerson("subject-child", "child");
     const teen = addPerson("subject-teen", "teen");
     const adult = addPerson("subject-adult", "adult");
-    expect(() => createMediaSubject(child, { name: "Person", kind: "character", look: "person", real: true })).toThrow(/Real-person/);
-    expect(() => createMediaSubject(teen, { name: "Person", kind: "character", look: "person", real: true })).toThrow(/Real-person/);
+    expect(() => createMediaSubject(child, { name: "Person", kind: "character", look: "person", real: true })).toThrow(NOT_AVAILABLE_HERE);
+    expect(() => createMediaSubject(teen, { name: "Person", kind: "character", look: "person", real: true })).toThrow(NOT_AVAILABLE_HERE);
     const real = createMediaSubject(adult, { name: "Person", kind: "character", look: "person", real: true });
     shareMediaSubject(adult, real.id, child.id, true);
     expect(subjectsForNames(child, [real.name])).toBeNull();
