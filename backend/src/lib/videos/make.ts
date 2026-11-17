@@ -15,13 +15,13 @@ import { resolveStyles, strengthWord } from "./styleChoice";
 import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
-import { getTemplate, videoTemplateSettings } from "@/lib/media/templates";
+import { fillTemplateBlanks, getTemplate, templateBlanks, videoTemplateSettings } from "@/lib/media/templates";
 
 /** The most takes one press of Generate makes (the Takes chip offers 1 to 4; a level may cap lower, `MAX_TAKES_BY_TIER`). */
 export const MAX_TAKES = 8;
 export const MINOR_MAKE_LINE = "Making videos on the Create page is for adults. Ask an adult in your home to help.";
 
-export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** A second Library picture the clip ends on (needs a start_frame and a maker that reports end_image). */ end_frame?: string; /** TAKES-01: how many takes of this prompt to make (1 to 8; the level caps it). */ takes?: number; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
+export interface MakeVideoBody { prompt: string; orientation?: "landscape" | "portrait"; seconds?: number; tier?: "standard" | "boost" | "max"; recipe?: string; look?: string; voices?: string; cast?: string[]; line?: string; loop?: boolean; template?: string; /** The words for the template's blanks (`{{name|Label|example}}`), by blank name; a blank left out uses its example. */ blanks?: Record<string, string>; /** A Library picture the person owns (VIDEO-CREATE-02): the clip starts from it. */ start_frame?: string; /** A second Library picture the clip ends on (needs a start_frame and a maker that reports end_image). */ end_frame?: string; /** TAKES-01: how many takes of this prompt to make (1 to 8; the level caps it). */ takes?: number; /** VIDEO-LORA-09: the styles chosen (ids the picker lists, at most two), read again through the person's own access; with Less, Normal or More. */ styles?: string[]; strength?: StyleStrength; /** Keep this seed (a Remix that keeps the picture's luck); left out, the clip gets a new one. */ seed?: number; }
 /** Who is asking: a chat turn passes its own audience and state so the clip lands on that chat; the Create page passes neither. */
 export interface MakeVideoContext { audience?: VideoAudience; state?: GenerateVideoState; callId?: string; prepared?: RunGenerateVideoInput["prepared"]; /** The new clip is adult-only whatever its words say (continue from an adult-only clip). */ adultOnly?: boolean; /** The source clip's Adult lock (design 3.10); absent means on. */ adultLock?: "on" | "off"; parent?: VideoJob; /** TAKES-01: the first clip of the set this one is a take of. */ takeOf?: string }
 export type MakeVideoResult = { ok: true; job: VideoJob; /** One plain line when the length was cut to fit the level, else null. */ notice: string | null } | { ok: false; status: 403 | 404 | 422 | 502 | 503; error: string; code: string };
@@ -40,10 +40,14 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   const template = typeof raw.template === "string" ? raw.template.trim() : "";
   const line = typeof raw.line === "string" ? raw.line : "";
   const effectivePrompt = prompt.length >= 3 ? prompt : line ? "A close-up of the person talking to the camera, looking natural." : prompt;
-  if (effectivePrompt.length < 3 || effectivePrompt.length > 1200) return { ok: false, error: "Describe the video in 3 to 1200 characters, then try again." };
+  if ((effectivePrompt.length < 3 && !template) || effectivePrompt.length > 1200) return { ok: false, error: "Describe the video in 3 to 1200 characters, then try again." };
   const text = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
   const body: MakeVideoBody = { prompt: effectivePrompt };
   if (template) body.template = template;
+  if (raw.blanks !== undefined && raw.blanks !== "") {
+    if (!raw.blanks || typeof raw.blanks !== "object" || Array.isArray(raw.blanks) || Object.values(raw.blanks).some((value) => typeof value !== "string")) return { ok: false, error: "Fill in the template's words, then try again." };
+    body.blanks = Object.fromEntries(Object.entries(raw.blanks).map(([key, value]) => [key, notGiven(value) ? "" : String(value).trim().slice(0, 300)]));
+  }
   if (raw.loop === true || raw.loop === "true") body.loop = true;
   if (line) { if (line.length > 1200) return { ok: false, error: "Type a line up to 1200 characters, then try again." }; body.line = line; }
   const castValue = raw.cast;
@@ -133,7 +137,11 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
     const settings = videoTemplateSettings()[template.id];
     if (!settings) return { ok: false, status: 422, error: "That video template is not available. Choose another template or make a video without one.", code: "template_unavailable" };
     templateStyles = template.styles;
-    body = { ...body, prompt: `${template.prompt}${body.prompt.trim() && body.prompt !== template.prompt ? `\n\nAdditional direction: ${body.prompt.trim()}` : ""}`, seconds: body.seconds && body.seconds !== 5 && body.seconds !== 10 ? body.seconds : settings.seconds, look: body.look && body.look !== "natural" && body.look !== "warm" ? body.look : settings.look ?? body.look, recipe: body.recipe && body.recipe !== "none" ? body.recipe : settings.camera ?? body.recipe, orientation: body.orientation && body.orientation !== "landscape" ? body.orientation : settings.orientation ?? body.orientation, tier: body.tier && body.tier !== "standard" ? body.tier : settings.tier ?? body.tier, styles: [...new Set([...(body.styles ?? []), ...templateStyles])] };
+    const blanks = templateBlanks(template.prompt);
+    if (blanks.some((blank) => blank.name.startsWith("photo_")) && !body.start_frame) return { ok: false, status: 422, error: "This template needs your own photo. Add one as the Start picture, then make the video.", code: "photo" };
+    if (blanks.some((blank) => blank.name.startsWith("cast_")) && !(body.cast && body.cast.length > 0)) return { ok: false, status: 422, error: "This template needs a person from your cast. Pick one in Cast, then try again.", code: "cast" };
+    const recipe = fillTemplateBlanks(template.prompt, body.blanks);
+    body = { ...body, prompt: `${recipe}${body.prompt.trim() && body.prompt !== template.prompt ? `\n\nAdditional direction: ${body.prompt.trim()}` : ""}`, seconds: body.seconds && body.seconds !== 5 && body.seconds !== 10 ? body.seconds : settings.seconds, look: body.look && body.look !== "natural" && body.look !== "warm" ? body.look : settings.look ?? body.look, recipe: body.recipe && body.recipe !== "none" ? body.recipe : settings.camera ?? body.recipe, orientation: body.orientation && body.orientation !== "landscape" ? body.orientation : settings.orientation ?? body.orientation, tier: body.tier && body.tier !== "standard" ? body.tier : settings.tier ?? body.tier, styles: [...new Set([...(body.styles ?? []), ...templateStyles])] };
   }
   // A level this person may not use is refused with one plain line (the chat tool lowers it and says so instead).
   if (body.tier && tierArgument({ person: actor, category: "video", arg: body.tier, band: audience.band }).line === MAX_NEEDS_ADMIN_LINE) {

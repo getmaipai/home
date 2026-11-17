@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fillTemplateBlanks } from "@/lib/media/templates";
 import { TEMPLATE_COVER_IDS, templateCoverUrl } from "@/lib/templateCovers";
 
 const TEMPLATES = join(import.meta.dir, "..", "packages", "generate_image", "images", "templates");
@@ -47,7 +48,7 @@ test("every video template has its own real cover, made from its current prompt"
     expect(bytes.length).toBeGreaterThan(14_000); // the gradient tiles were 8 to 11 KB; a real picture is larger
     const src = sources[t.id];
     expect(src).toBeDefined();
-    expect(src!.prompt).toBe(sha(t.prompt));
+    expect(src!.prompt).toBe(sha(fillTemplateBlanks(t.prompt))); // the cover shows the recipe with its examples filled in
     expect(src!.file).toBe(sha(bytes));
     expect(seen.has(src!.file)).toBe(false);
     seen.add(src!.file);

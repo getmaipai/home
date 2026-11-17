@@ -27,7 +27,7 @@ import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { getLoraRecord } from "@/lib/loras/store";
-import { listFragments, listTemplates } from "@/lib/media/templates";
+import { listFragments, listTemplates, templateBlanks } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
@@ -173,6 +173,17 @@ registerAppPageFill("video", "create", (person, page) => {
   }
   const call = (bar.submit as { call?: { args?: Record<string, unknown> } } | undefined)?.call;
   if (call?.args) call.args.template = "{template}";
+  // A template is a recipe (same shape as Images): each plain blank is a labelled field above the box, shown only while that template is chosen, and the values ride as `blanks`.
+  const blankFields: Array<{ state: string; label: string; placeholder: string; max_length: number; when: { state: string; equals: string } }> = [];
+  const blankNames = new Set<string>();
+  for (const template of templates) for (const blank of templateBlanks(template.prompt)) {
+    if (blank.name.startsWith("cast_") || blank.name.startsWith("photo_")) continue;
+    blankNames.add(blank.name);
+    blankFields.push({ state: `blank_${blank.name}`, label: blank.label.slice(0, 40), placeholder: blank.example.slice(0, 120), max_length: 300, when: { state: "template", equals: template.id } });
+  }
+  if (blankFields.length) (bar as Record<string, unknown>).fields = blankFields;
+  if (selectedTemplate) bar.placeholder = "Fill in the field above, add any extra direction here, or just press Make video to use the example.";
+  if (call?.args && blankNames.size) call.args.blanks = Object.fromEntries([...blankNames].map((name) => [name, `{blank_${name}}`]));
   const lengths = lengthOptions();
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   // Owner rule (2026-11-13): every chip is icon-only (the dropdown names the choices, the tooltip says "Label: value"). Orientation comes from the page JSON, so it gets its icons here.

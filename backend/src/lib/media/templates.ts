@@ -52,3 +52,13 @@ export function listFragments(input: { actor: PersonRow; group?: FragmentRecord[
 }
 /** One preset record by id, whoever may see it (callers check `audience`). Null for a template id. */
 export function getFragment(id: string): FragmentRecord | null { return all().fragments.find((row) => row.id === id) ?? null; }
+
+const BLANK = /\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g;
+/** The named blanks of a template prompt (`{{name|Label|example}}`), in order. */
+export function templateBlanks(prompt: string): Array<{ name: string; label: string; example: string }> {
+  return [...prompt.matchAll(BLANK)].map((match) => ({ name: match[1]!, label: match[2]!.trim(), example: match[3]!.trim() }));
+}
+/** The recipe's sentence with each blank filled: the person's words, else the blank's own example. A `cast_*` blank reads "this person" and a `photo_*` blank "the picture provided". */
+export function fillTemplateBlanks(prompt: string, values: Record<string, string> = {}): string {
+  return prompt.replace(BLANK, (_whole, name: string, _label: string, example: string) => name.startsWith("cast_") ? "this person" : name.startsWith("photo_") ? "the picture provided" : (values[name]?.trim() || example.trim()));
+}
