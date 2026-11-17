@@ -481,7 +481,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/assistWidened.ts` | WIDENED_SETTING_KEY, WIDENED_PACKAGE_IDS, readWidenedFile, widenedAssistOn, applyWidenedAssist |
 | `backend/src/lib/assistantStreamWire.ts` | createAssistantStreamSink |
 | `backend/src/lib/attachments.ts` | checkAttachmentCapacity, attachmentFilePath, storedFileIntact, toRecord, createAttachment, storeFile |
-| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand |
+| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand, controlsForNewPerson |
 | `backend/src/lib/backgroundPriority.ts` | atBackgroundPriority |
 | `backend/src/lib/backgroundWork.ts` | trackBackgroundWork, __drainBackgroundWorkForTests |
 | `backend/src/lib/backup.ts` | cleanupStaleSnapshots, listBackups, runBackup, restoreBackup, pruneBackups, getBackupHealth |
@@ -631,7 +631,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, filterList |
-| `backend/src/lib/filter/pass.ts` | passForPerson, buildPass, passFor, passForSurface |
+| `backend/src/lib/filter/pass.ts` | mayUse, passForPerson, buildPass, passFor, passForSurface |
 | `backend/src/lib/filter/passCache.ts` | getCachedPass, putCachedPass, nextPassVersion, invalidatePass, invalidatePassForSetting |
 | `backend/src/lib/filter/rateStored.ts` | __setRateHookForTests, rateStoredItem |
 | `backend/src/lib/filter/raters.ts` | prepareRaters, RATERS, ratersFor, contentKindForSurface |
@@ -1318,7 +1318,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/languageLine.ts` | LANGUAGE_LINES, languageLineFor |
 | `backend/src/lib/turnMachine/machine.ts` | turnMachine |
 | `backend/src/lib/turnMachine/messages.ts` | dataContextHeaderPatternSource, contextToMessages, bareMessages, continuationMessages |
-| `backend/src/lib/turnMachine/nodes/answer.ts` | PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine, __setClaimJudgeForTests |
+| `backend/src/lib/turnMachine/nodes/answer.ts` | NOT_AVAILABLE_LINE, PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine |
 | `backend/src/lib/turnMachine/nodes/commands.ts` | commandsNode |
 | `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, sceneSpeakerForTurn, fitSceneBlock, renderScene, decideReasoning |
 | `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible, retryTools |
