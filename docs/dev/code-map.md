@@ -1376,7 +1376,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/moments.ts` | MOMENT_PREFIX, MOMENT_GONE_PREFIX, MOMENT_CAP, momentsOf, addMoment, removeMoment |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
 | `backend/src/lib/videos/nleExport.ts` | writeEdl, writeFcpxml, writeZip |
-| `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, FIRST_FRAME_PHASE, phaseLabel |
+| `backend/src/lib/videos/phaseLabel.ts` | REFERENCE_PHASE, FIRST_FRAME_PHASE, SWAP_PHASE, phaseLabel |
 | `backend/src/lib/videos/playlistData.ts` | SUGGEST_MAX, SUGGEST_MIN_CHARS, videoSuggestions, channelStrip, withChannelAvatars, videoScopedData |
 | `backend/src/lib/videos/playlists.ts` | GONE, VIDEO_GONE, ownVideoPlaylists, memberVideoPlaylists, videoPlaylistFor, resolveEntries |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_TIER_KEY, VIDEO_END_ANCHOR_KEY, endAnchorEnabled, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE |
@@ -1395,6 +1395,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, START_PICTURE_MAX_SIDE, START_PICTURE_MAX_BYTES, pictureNeedsFit, fitPictureForStack |
 | `backend/src/lib/videos/stackClipCheck.ts` | checkClipFile |
 | `backend/src/lib/videos/stackEdit.ts` | EDIT_UNAVAILABLE_LINE, EDIT_REMOTE_LINE, EDIT_FAILED_LINE, EDIT_TIMEOUT_LINE, EDIT_MISSING_LINE, __setStackEditTimingForTests |
+| `backend/src/lib/videos/stackSwap.ts` | __setSwapFetchForTests, __setStackSwapTimingForTests, runStackSwap |
 | `backend/src/lib/videos/studio.ts` | STUDIO_TITLE, STUDIO_NO_CLIP_LINE, STUDIO_LOCKED_LINE, STUDIO_NO_SONG_LINE, STUDIO_SPEECH_LINE, STUDIO_SAY_LINE |
 | `backend/src/lib/videos/studioExport.ts` | STUDIO_VOICE_GONE_LINE, resolveStudioPlan, studioRun, startStudioExport |
 | `backend/src/lib/videos/studioNleExport.ts` | makeStudioNleExport |
@@ -1402,6 +1403,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/studioVoices.ts` | VOICE_TTL_MS, VOICES_PER_PERSON, estimatedSpeechSeconds, putStudioVoice, getStudioVoice, VOICE_REF_PREFIX |
 | `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, strengthWord, styleNamesOf, resolveStyles |
 | `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
+| `backend/src/lib/videos/swapReferences.ts` | swapReferencePhotos |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |
 | `backend/src/lib/videos/voiceoverStart.ts` | VOICEOVER_MAX_LINE, VOICEOVER_NO_LINE, VOICEOVER_LONG_LINE, VOICEOVER_NO_CLIP, VOICEOVER_BAD_LEVEL, startVoiceover |
 | `backend/src/lib/videos/waitLine.ts` | STACK_WAIT_RUNNING_PHASE, STACK_WAIT_COMPUTER_PHASE, videoWaitLine |
