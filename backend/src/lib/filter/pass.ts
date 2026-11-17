@@ -56,6 +56,10 @@ function scalar(key: string, personId: string, band: AgeBand): unknown {
   const def = getRegistryKey(key);
   return def ? resolveLayeredScalar(def, personId, band).value : undefined;
 }
+/** Rules 0 and 8: no override or grant gives a child Max, or a teen Max beyond pictures. */
+function maxAllowed(band: AgeBand, work: string): boolean {
+  return band === "adult" || (band === "teen" && work === "image");
+}
 function listOf(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && (ACCESS_WORKS as readonly string[]).includes(entry)) : [];
 }
@@ -86,10 +90,7 @@ function buildFrom(person: PassPerson): Pass {
   const access = new Set<string>();
   if (scalar(ACCESS_THINKING_KEY, person.id, band) === true) access.add("thinking");
   for (const work of listOf(scalar(ACCESS_TIER_BOOST_KEY, person.id, band))) access.add(`tier.boost:${work}`);
-  for (const work of listOf(scalar(ACCESS_TIER_MAX_KEY, person.id, band))) {
-    if (band === "child" || (band === "teen" && work !== "image")) continue; // rules 0 and 8: no override gives a child Max, or a teen Max beyond pictures
-    access.add(`tier.max:${work}`);
-  }
+  for (const work of listOf(scalar(ACCESS_TIER_MAX_KEY, person.id, band))) if (maxAllowed(band, work)) access.add(`tier.max:${work}`);
   if (person.role === "owner" || person.role === "admin") access.add("tier.max:*");
 
   const now = new Date().toISOString();
@@ -108,7 +109,14 @@ function buildFrom(person: PassPerson): Pass {
   // ACCESS-UI-01: Coding is not a package. Same rule as `codeAdmission`: the adult band has it while `coding.adults_by_default` is on, an
   // allow adds it for anyone (a minor only by an explicit allow, never a guest), a deny removes it and beats an allow.
   if (person.role !== "guest" && !denied.has("use:code") && (allowed.has("use:code") || (band === "adult" && settingsModule().getHouseholdSettingValue("coding.adults_by_default") === true))) access.add("use:code");
-  for (const grant of grants) if (grant.effect === "allow" && !denied.has(grant.action) && !grant.action.startsWith("use:")) access.add(grant.action);
+  for (const grant of grants) {
+    if (grant.effect !== "allow" || denied.has(grant.action) || grant.action.startsWith("use:")) continue;
+    // AGE-ROUTING-REMOVE-01 (C7: a grant allows only within rule 0's gates): a Max grant follows the same band gate as the override above. `tier.max:<work>` is
+    // dropped for a child and, for a teen, unless the work is pictures; the bare `tier.max` (Max in every work) is the adult band's alone and becomes `tier.max:*`.
+    if (grant.action === "tier.max") { if (band === "adult") access.add("tier.max:*"); continue; }
+    if (grant.action.startsWith("tier.max:") && !maxAllowed(band, grant.action.slice("tier.max:".length))) continue;
+    access.add(grant.action);
+  }
 
   // A timed grant changes the pass when it starts or ends, so the pass must not outlive the next such moment (M).
   let expiresAt: number | null = null;
@@ -165,8 +173,20 @@ export function passFor(personId: string): Pass {
 }
 
 const CHILD_SURFACE: PassPerson = { id: "surface:child", role: "child", controls: null } as PassPerson;
+const BAND_DEFAULT_PERSON: Record<AgeBand, PassPerson> = {
+  child: CHILD_SURFACE,
+  teen: { id: "surface:teen", role: "teen", controls: null } as PassPerson,
+  adult: { id: "surface:adult", role: "adult", controls: null } as PassPerson,
+};
+/** The pass of a person who has only the band's role defaults and the household's own settings for it (no person overrides, no grants). A surface stricter than its actor reads this for `access`. */
+export function passForBandDefaults(band: AgeBand): Pass {
+  return passForPerson(BAND_DEFAULT_PERSON[band]);
+}
+
 /** The pass a surface gets: the actor's own, tightened to the surface band's role defaults when the surface is stricter than the actor
- * (an unknown speaker on a shared surface gets the child result, rule 0); with no actor, the child role's default pass. */
+ * (an unknown speaker on a shared surface gets the child result, rule 0); with no actor, the child role's default pass. The ceiling is the
+ * lower of the two, and `access` (thinking, Boost, Max, features) is the surface band's role defaults, never the signed-in person's overrides
+ * (design record 5a: an unconfirmed speaker gets the pass of the surface). */
 export function passForSurface(audience: { actor?: PassPerson | null; band: AgeBand }): Pass {
   const actor = audience.actor ?? CHILD_SURFACE;
   const base = passForPerson(actor);
@@ -178,7 +198,7 @@ export function passForSurface(audience: { actor?: PassPerson | null; band: AgeB
   const floor = ceilingFor(band);
   const ceiling = {} as Record<ContentKind, Ceiling>;
   for (const kind of KINDS) ceiling[kind] = Math.min(base.ceiling[kind], floor) as Ceiling;
-  const derived: Pass = Object.freeze({ ...base, ceiling: Object.freeze(ceiling), unrated: new Set<ContentKind>(), band });
+  const derived: Pass = Object.freeze({ ...base, ceiling: Object.freeze(ceiling), unrated: new Set<ContentKind>(), band, access: passForBandDefaults(band).access });
   putCachedPass(key, { pass: derived, role: actor.role, controls: actor.controls ?? null });
   return derived;
 }

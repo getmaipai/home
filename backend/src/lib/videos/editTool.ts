@@ -252,7 +252,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
   if (value.change === "swap") {
     if (laneOf(audience) !== "adult") return refused(callId, args, MINOR_MAKE_LINE, "minor");
     if (value.cast!.length > 1) return refused(callId, args, "Swap one person at a time.", "one_person");
-    if (!holdsMax(actor, "video")) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
+    if (!holdsMax(actor, "video", audience.band)) return refused(callId, args, MAX_NEEDS_ADMIN_LINE, "max_needs_admin");
     const engine = await videoEngineStatus();
     const h3Swap = (engine?.qualities as unknown as { h3_swap?: { ready?: boolean; sizes?: string[] } } | undefined)?.h3_swap;
     if (!h3Swap?.ready) return refused(callId, args, "Swapping a face is not available on this computer yet.", "swap_unavailable");

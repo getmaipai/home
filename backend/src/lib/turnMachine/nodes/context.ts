@@ -20,6 +20,7 @@ import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "../messages";
 import { toolSpecFor, replyMaxTokensFor } from "./model";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { passForSurface } from "@/lib/filter/pass";
 import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { runWeatherAssistShadow } from "@/lib/searchAssist/weatherAssist";
 import { recall, embedQueryForRecall, bumpUsage, list as listMemory } from "@/lib/memory";
@@ -178,24 +179,26 @@ function severityRank(value: string): number { return ({ extreme: 4, severe: 3, 
 function weatherTokenShare(lines: string[]): number { return lines.filter((line) => line.startsWith("Weather ")).join(" ").split(/\s+/).filter(Boolean).length; }
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
- * here, from the age band and the surface - "a minor's turn never
- * receives reasoning" (the old engine file's own `ageBand === "child" ||
- * ageBand === "teen"` is the established "not a full adult" check,
- * reused rather than a second one) and "the typed chat screen is the
- * only surface that may emit it." VOICE-LIVE-02: a spoken turn is
- * withheld the same way even when `surface` is literally "chat" (a
- * live voice session posts on the chat surface too) - the state
- * record's own words name "voice" as one of the surfaces that never
- * shows reasoning, and there is nowhere for a spoken reply to put a
- * Reasoning Element regardless of which surface field it arrived on.
- * Presence is left out on purpose: no presence signal exists on the
- * hub yet (this file's own header note), so `"presence"` is never
- * produced until one is built. */
+ * here, from the surface and the pass - "the typed chat screen is the
+ * only surface that may emit it" and, on it, only a person whose pass
+ * holds `thinking` (AGE-ROUTING-REMOVE-01, RULES.md C3: thinking is an
+ * access default of the role, not an age gate; a child's and a teen's
+ * role default is off, an admin's override turns it on for one person
+ * or the household). The pass is the turn's surface pass, so an
+ * unconfirmed speaker on an adult's device gets the child default. The
+ * surface rule outranks the pass: VOICE-LIVE-02, a spoken turn is
+ * withheld even when `surface` is literally "chat" (a live voice session
+ * posts on the chat surface too) - there is nowhere for a spoken reply
+ * to put a Reasoning Element, whatever the pass holds. A person without
+ * `thinking` is `withheld_for: "access"`; the value "minor" is no longer
+ * produced (it stays in the type for turns recorded before). Presence is
+ * left out on purpose: no presence signal exists on the hub yet, so
+ * `"presence"` is never produced until one is built. */
 export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken" | "speakerEvidence" | "deviceId">): TurnState["reasoning"] {
-  // THIN-0N: the speaker's effective band, as the old path derives it.
-  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
-  if (band === "child" || band === "teen") return { emit: false, withheld_for: "minor" };
   if (state.surface !== "chat" || state.spoken) return { emit: false, withheld_for: "surface" };
+  // THIN-0N: the speaker's effective band, as the old path derives it, picks the pass.
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+  if (!passForSurface({ actor: state.actor, band }).access.has("thinking")) return { emit: false, withheld_for: "access" };
   return { emit: true, withheld_for: null };
 }
 

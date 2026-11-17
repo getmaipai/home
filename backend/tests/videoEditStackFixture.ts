@@ -31,6 +31,8 @@ export interface FakeEditStack {
   spatial?: { applied: boolean; reason: string | null; note: string | null; notes: string[]; sources?: string[]; rear_quiet?: boolean } | null;
   /** SPATIAL-04: when set with `failWith`, the failed job also carries `failure: { code, detail }` as the Stack's new job shape does. */
   failureCode?: string | null;
+  /** AGE-ROUTING-REMOVE-01: when set, a finished edit has a sound track only when one of its steps adds sound (`audio_overlay`), as an edit of a silent clip does. */
+  silent?: boolean;
   restore(): void;
 }
 
@@ -85,7 +87,7 @@ export function installFakeEditStack(): FakeEditStack {
           }
           spatialFields = { files, ...(fake.spatial ? { spatial: { segments: 2, surround: spatialStep.surround === true, rear_quiet: false, side_level_db: -20, frames: 20, people_frames: 18, speech_spans: 2, ...fake.spatial } } : {}) };
         }
-        return { ...stamp(job), result: { ...spatialFields, path, size_bytes: bytes.byteLength, container: webm ? "webm" : "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: webm ? "vp9" : "h264", ...(webm ? { alpha: true } : { audio_codec: "aac" }), elapsed_ms: 1200 } };
+        return { ...stamp(job), result: { ...spatialFields, path, size_bytes: bytes.byteLength, container: webm ? "webm" : "mp4", duration_s: fake.durationS, width: 832, height: 480, video_codec: webm ? "vp9" : "h264", ...(webm ? { alpha: true } : { ...(fake.silent && !job.input.ops.some((op) => op.op === "audio_overlay") ? {} : { audio_codec: "aac" }) }), elapsed_ms: 1200 } };
       }
       return stamp(job);
     },

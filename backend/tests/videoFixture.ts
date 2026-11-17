@@ -41,6 +41,8 @@ export interface FakeVideoStack {
   ltx25maxSeconds: number | undefined;
   /** VIDEO-INPUTS-01: the Stack reports `image_to_video` (and `end_image`) true on LTX-2.5 Standard and Boost / on Max. */
   ltx25Picture: boolean;
+  /** AGE-ROUTING-REMOVE-01: the Stack reports no sound track on the LTX-2.5 clips it makes (a clip with sound is marked adult-only, so audience tests that need a clean clip ask for a silent one). */
+  silent: boolean;
   ltx25maxPicture: boolean;
   /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
   handler: typeof fetch;
@@ -76,7 +78,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -115,7 +117,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";
-        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", ...(job.body.model === "ltx25-max" ? { width: 1024, height: 576, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25max", audio: true, model: "ltx-2-5-bf16-distilled-mlx-max" } : job.body.model === "ltx25-q8" ? { width: Number(String(job.body.size ?? "768x448").split("x")[0] ?? 768), height: Number(String(job.body.size ?? "768x448").split("x")[1] ?? 448), frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25", audio: true, model: "ltx-2-5-q8" } : { width: 832, height: 480, frames: 121, seconds: 5, quality: "quick", audio: false, model: "wan2.2-ti2v-5b-fastwan-mlx" }), fps: 24, seed: 77, mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
+        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", ...(job.body.model === "ltx25-max" ? { width: 1024, height: 576, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25max", audio: !fake.silent, model: "ltx-2-5-bf16-distilled-mlx-max" } : job.body.model === "ltx25-q8" ? { width: Number(String(job.body.size ?? "768x448").split("x")[0] ?? 768), height: Number(String(job.body.size ?? "768x448").split("x")[1] ?? 448), frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "ltx25", audio: !fake.silent, model: "ltx-2-5-q8" } : { width: 832, height: 480, frames: 121, seconds: 5, quality: "quick", audio: false, model: "wan2.2-ti2v-5b-fastwan-mlx" }), fps: 24, seed: 77, mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
       }
       job.state = job.polls <= fake.queuedPolls ? "queued" : "running";
       const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 4, stage: "frames", stage_label: fake.live.stage_label, step: null, steps: null, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/videos/generations/${job.id}/preview.jpg?v=1` : null } : {};

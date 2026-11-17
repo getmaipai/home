@@ -21,15 +21,15 @@ describe("clampTier", () => {
     for (const category of ["chat", "image", "video", "music", "voice"] as const) expect(run("child", "child", category, "max").tier).toBe("standard");
   });
   test("a teen's chat and video clamp to Standard whatever the grant says (RULES.md rule 8)", () => {
-    expect(run("teen", "teen", "chat", "max")).toEqual({ tier: "standard", note: "minor_standard" });
+    expect(run("teen", "teen", "chat", "max")).toEqual({ tier: "standard", note: "no_minor_part" });
     expect(run("teen", "teen", "video", "boost").tier).toBe("standard");
   });
   test("a teen reaches Max pictures only with the picture grant", () => {
-    expect(run("teen", "teen", "image", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "max_not_granted" });
+    expect(run("teen", "teen", "image", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "no_max_access" });
     expect(run("teen", "teen", "image", "max", { who: () => "everyone" }).tier).toBe("max");
   });
   test("an adult without the grant gets Boost with a note", () => {
-    expect(run("adult", "adult", "chat", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "max_not_granted" });
+    expect(run("adult", "adult", "chat", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "no_max_access" });
   });
   test("a switched-off Max falls back to Boost, and Boost off to Standard", () => {
     expect(run("admin", "adult", "video", "max", { slotOff: (_c, t) => t === "max" })).toEqual({ tier: "boost", note: "slot_off" });

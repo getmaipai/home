@@ -1,4 +1,4 @@
-import { WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
+import { WAN_QUICK_VIDEO_MODEL, type Lane } from "@/lib/pictures/lane";
 import { createHash } from "node:crypto";
 import { chooseQuality, PICTURE_MODEL } from "@/lib/pictures/quality";
 import { pictureEngineStatus, __setPictureStatusForTests, __setPictureStatusReaderForTests } from "@/lib/pictures/ready";
@@ -43,9 +43,9 @@ export function resolveCompanionStillFromStatus(engine: StackImageStatus | null)
 export async function resolveCompanionStill(): Promise<CompanionArtChoice> { return resolveCompanionStillFromStatus(await (statusReaders?.picture ?? pictureEngineStatus)()); }
 export function resolveCompanionEdit(): CompanionArtChoice { return { model: COMPANION_EDIT_MODEL, quality: "quick" }; }
 
-/** Adult companions ask for sound; picture starts use Quick until LTX-2.5 reports picture support. */
-export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick", max = false): CompanionArtChoice {
-  const choice = chooseVideoQuality({ engine, hasPicture: true, requested, adultLane: true, ...(max ? { max: true } : {}) });
+/** Adult companions ask for sound; picture starts use Quick until LTX-2.5 reports picture support. `lane` is the lane of the person who will see the take (`laneOf`): only the adult lane gets the sound maker, any other lane the silent Quick one (AGE-ROUTING-REMOVE-01). */
+export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick", max = false, lane: Lane = "adult"): CompanionArtChoice {
+  const choice = chooseVideoQuality({ engine, hasPicture: true, requested, adultLane: lane === "adult", ...(max ? { max: true } : {}) });
   if (!choice) refusal(COMPANION_CLIP_MODEL_MISSING_LINE);
   const model = choice.maker === "ltx25max" ? "ltx25-max" : choice.maker === "ltx25" ? "ltx25-q8" : engine?.qualities?.quick.id ?? engine?.model?.id ?? QUICK_BASE;
   const q = choice.maker === "ltx25max" ? engine?.qualities?.ltx25max : choice.maker === "ltx25" ? engine?.qualities?.ltx25 : engine?.qualities?.quick;
@@ -62,4 +62,4 @@ export const reportedVideoModelMatches = (reported: string, art: CompanionArtCho
 export const reportedVideoQualityMatches = (reported: string, art: CompanionArtChoice): boolean =>
   reported === art.quality || (reported === "ltx25" && art.model === "ltx25-q8") || (reported === "ltx25max" && art.model === "ltx25-max");
 export const stackVideoModel = (art: CompanionArtChoice): string => (art.model === "ltx25-q8" || art.model === "ltx25-max" ? art.model : WAN_QUICK_VIDEO_MODEL);
-export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick", max = false): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested, max); }
+export async function resolveCompanionClip(requested: "quick" | "detailed" = "quick", max = false, lane: Lane = "adult"): Promise<CompanionArtChoice> { return resolveCompanionClipFromStatus(await (statusReaders?.video ?? videoEngineStatus)(), requested, max, lane); }

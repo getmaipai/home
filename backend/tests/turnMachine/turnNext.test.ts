@@ -1513,7 +1513,7 @@ describe("turnNext.ts: reasoning is a second output", () => {
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reasoning).toBeUndefined();
-    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "minor" });
+    expect(await modelNodeReasoning(result.value.turn_id)).toEqual({ emitted: false, withheld_for: "access" });
   });
 
   test("a robot-surface turn emits no reasoning, and the trace says why", async () => {

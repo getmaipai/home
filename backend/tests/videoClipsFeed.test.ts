@@ -12,7 +12,11 @@ import { people as peopleTable } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
-import { __setVideoStatusForTests } from "@/lib/videos/ready";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
+import { storeFile } from "@/lib/attachments";
+import { putStamp } from "@/lib/filter/stamps";
+import { ContentRating } from "@maipai/spec/ratings/ts/contentRating";
+import { testMp4 } from "./videoFixture";
 import { until } from "./pictureFixture";
 import { PACKAGES_DIR } from "@/lib/paths";
 import { SHORT_CLIP_MAX_S, isShortClip, shortClipRows } from "@/lib/media/videoCreateApp";
@@ -20,7 +24,8 @@ import { PACKAGE_PAGE_NODE_TYPES } from "@maipai/spec/ui/app-check.js";
 import type { PersonRow } from "@/types";
 
 let fake: FakeVideoStack;
-beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); });
+// AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker (the adult lane), so the Stack reports it ready.
+beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); });
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
 
 const BOAT = "A paper boat floats down a rainy street, soft evening light";
@@ -49,6 +54,14 @@ async function household() {
 const specAllowsClipFeed = PACKAGE_PAGE_NODE_TYPES.includes("clip_feed");
 const short = async (client: TestClient) => (await client.post("/api/plugins/video/data/recipes", { scope: "short" })).json() as Promise<Row[]>;
 const action = (client: TestClient, name: string, body: Record<string, unknown>) => client.post(`/api/plugins/video/actions/${name}`, body);
+/** A silent clip (the Stack reported no sound) as the finished-clip job stores it, with the stored G stamp RATE-INGEST-01 writes for an all-ages mark. */
+function silentClip(owner: PersonRow): string {
+  const provenance = `video-gen:${JSON.stringify({ v: 1, audience: "all-ages", made_audience: "all-ages", lock: "off", creation: "crt-silent0001", job: "vid-silent0001", seed: 1, model: "wan2.2-ti2v-5b-fastwan-mlx", seconds: 5, width: 832, height: 480, quality: "quick", audio: false })}`;
+  const stored = storeFile(owner, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: testMp4(), provenance, retention: "kept", deduplicate: false });
+  if (!stored.ok) throw new Error(stored.error);
+  putStamp({ kind: "attachment", id: stored.value.id }, ContentRating.parse({ level: "G", source: "given", rater: "audience-mark", rater_version: 1, rated_at: new Date().toISOString(), label: { system: "audience", value: "all-ages" } }), "test-silent-clip");
+  return stored.value.id;
+}
 async function makeClip(client: TestClient, actor: PersonRow, body: Record<string, unknown> = { prompt: BOAT }) {
   const made = await (await client.post("/api/videos/make", body)).json() as { id: string };
   await until(() => getVideoJobFor(actor, made.id)?.state === "done");
@@ -112,15 +125,25 @@ describe("scope short: the clips feed rows", () => {
     const { adult, child, teen, row } = await household();
     const { fileId } = await makeClip(adult.client, row("Marlow"));
     expect(shortClipRows(row("Sprout"))).toEqual([]);
+    // A clip with sound is not released to anyone whose ceiling is below X (its speech was not checked), so the shared clip never reaches the child or the teen.
     await action(adult.client, "share-add", { id: fileId, person_id: child.id });
     await action(adult.client, "share-add", { id: fileId, person_id: teen.id });
+    expect(shortClipRows(row("Sprout"))).toEqual([]);
+    expect(shortClipRows(row("Nova"))).toEqual([]);
+    // A silent clip with a stored G stamp clears the child's G ceiling: it is shared, listed, and the first row says autoplay is off.
+    const silent = silentClip(row("Marlow"));
+    await action(adult.client, "share-add", { id: silent, person_id: child.id });
+    await action(adult.client, "share-add", { id: silent, person_id: teen.id });
     const kid = shortClipRows(row("Sprout"));
     // Whatever the Library lists for the child is what the feed lists: nothing more.
     const library = await (await child.client.get("/api/library?type=video&origin=made")).json() as { items: Array<{ id: string }> };
-    expect(kid.map((r) => r.id)).toEqual(library.items.map((i) => i.id).filter((id) => id === fileId));
+    expect(kid.map((r) => r.id)).toEqual(library.items.map((i) => i.id).filter((id) => id === silent));
+    expect(kid.length).toBeGreaterThan(0);
     for (const r of kid) expect(r.prompt).toBeUndefined();
-    if (kid.length > 0) { expect(kid[0]!.autoplay).toBe(false); expect(kid.slice(1).some((r) => "autoplay" in r)).toBe(false); }
+    expect(kid[0]!.autoplay).toBe(false);
+    expect(kid.slice(1).some((r) => "autoplay" in r)).toBe(false);
     const teens = shortClipRows(row("Nova"));
+    expect(teens.map((r) => r.id)).toEqual([silent]);
     for (const r of teens) { expect(r.prompt).toBeUndefined(); expect("autoplay" in r).toBe(false); }
   });
 

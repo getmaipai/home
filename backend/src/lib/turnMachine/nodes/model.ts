@@ -1267,12 +1267,13 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const gate = state.streamGate;
 
   // GROUND-01: `context`'s own decideReasoning() already decided
-  // `reasoning.withheld_for === "minor"` from the age band, reused here
-  // rather than a second age check - a minor's turn sends `thinking:
-  // false` to the engine by default (budget.thinking_for_minors), a
-  // cost control since the reasoning span would be consumed and
+  // `reasoning.withheld_for === "access"` from the pass (no `thinking`
+  // item), reused here rather than a second check - such a turn sends
+  // `thinking: false` to the engine unless the model has a measured
+  // record for it (budget.thinking_for_minors, kept as the fail-safe),
+  // a cost control since the reasoning span would be consumed and
   // dropped below regardless (see `reasoning` a few lines down).
-  const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
+  const minorThinkingOff = state.reasoning.withheld_for === "access" && !state.budget.thinking_for_minors;
   // THIN-5A: a turn that shows no reasoning never asks the engine to think
   // (llm.ts forces it off with dropReasoning), so the reply ceiling, the
   // record and the empty-reply retry all see the effective flag.

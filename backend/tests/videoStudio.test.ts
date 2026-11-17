@@ -195,12 +195,12 @@ beforeEach(() => {
   __resetAdultLockForTests();
   __resetStudioVoicesForTests();
   __resetVideoAdapterCacheForTests();
-  video = installFakeVideoStack();
+  video = installFakeVideoStack(); video.silent = true; // AGE-ROUTING-REMOVE-01: these tests are about the audience of edits, so their clips are silent (a clip with sound is adult-only)
   video.ltx25 = "ready";
   __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never })));
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
-  stack = installFakeEditStack();
+  stack = installFakeEditStack(); stack.silent = true;
 });
 afterEach(() => { stack.restore(); video.restore(); __setKeyframesForTests(null); __setVideoStatusForTests(undefined); });
 

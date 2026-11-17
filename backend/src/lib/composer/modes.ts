@@ -162,7 +162,7 @@ function buildModes(person: PersonRow, health: EngineHealth | null): { band: Age
         placeholder: text(bar.placeholder) ?? d.fallback?.placeholder ?? "",
         references, chips: chipsOf(bar), presets: presetsOf(person, d), tools: d.tools ?? [],
         primary: { label: text(bar.submit_label) ?? d.fallback?.primary ?? d.label },
-        quality: d.tier_category ? qualityFor(person, band, d.tier_category, bar) : null,
+        quality: d.tier_category ? qualityFor(person, audience.band, d.tier_category, bar) : null,
         availability: row?.availability ?? null,
         disabledReason: row && row.availability !== "ready" && notice ? (band === "adult" ? notice.adult : band === "teen" ? notice.teen : notice.child) : null,
         comingSoon: d.coming_soon ?? null,

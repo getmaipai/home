@@ -194,9 +194,11 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         let engineFailure = false;
         try {
           let seed = Math.floor(Math.random() * 2_147_483_647);
-          const lane = laneOfPerson(actor) === "adult" ? "detailed" : "quick";
+          const personLane = laneOfPerson(actor);
+          const lane = personLane === "adult" ? "detailed" : "quick";
           // A pack clip is made on the Max model when the engine has it (the demo's clips were, and it moves more naturally); the standard one otherwise.
-          const art = run.pack && lane === "detailed" && process.env.MAIPAI_PACK_MAX !== "0" ? await resolveCompanionClip(lane, true).catch(() => resolveCompanionClip(lane)) : await resolveCompanionClip(lane);
+          // The take is made in the lane of the person who will see it: a teen's or child's take is never made on the sound maker (AGE-ROUTING-REMOVE-01).
+          const art = run.pack && lane === "detailed" && process.env.MAIPAI_PACK_MAX !== "0" ? await resolveCompanionClip(lane, true, personLane).catch(() => resolveCompanionClip(lane, false, personLane)) : await resolveCompanionClip(lane, false, personLane);
           const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
           const engineNow = await videoEngineStatus().catch(() => null);
           const clipSize = takeClipSize(art.model, art.quality, run.pack ? false : (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);

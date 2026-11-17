@@ -318,7 +318,7 @@ export interface TurnNodeExecution {
    * turnMachine/contract.ts's NodeExecution.reasoning structurally
    * (see this file's own header note on why these two are hand-kept
    * in step rather than imported). */
-  reasoning?: { emitted: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
+  reasoning?: { emitted: boolean; withheld_for: "minor" | "access" | "surface" | "presence" | "gate" | null };
   scene?: { people: number; strong: number; typed: number; place_known: boolean; child_present: boolean; events: number; scene_tokens: number };
 }
 

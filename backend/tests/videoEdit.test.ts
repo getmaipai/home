@@ -32,7 +32,7 @@ let fake: FakeVideoStack;
 beforeEach(() => {
   resetDb();
   __resetVideoAdapterCacheForTests();
-  fake = installFakeVideoStack();
+  fake = installFakeVideoStack(); fake.silent = true; // AGE-ROUTING-REMOVE-01: these tests are about the audience of edits, so their clips are silent (a clip with sound is adult-only)
   fake.ltx25 = "ready";
   __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
 });

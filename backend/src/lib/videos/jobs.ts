@@ -24,7 +24,7 @@ import { logAutoMark } from "@/lib/adultMarks";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { passForPerson } from "@/lib/filter/pass";
 import { videoBodyForSlot } from "./slotBody";
 import { LTX25_DEFAULTS, LTX25_MAX_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
 import { videoEngineStatus } from "./ready";
@@ -287,7 +287,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     // TIER-HOME-04: the level's saved slot is read now, so the pick made in the dialog is what this job runs with.
     const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
     const base = storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds };
-    const slotted = owner ? videoBodyForSlot(base, requestTier(job.request), speakerAgeBand(owner, new Date()), laneOfPerson(owner), await videoEngineStatus()) : null;
+    const slotted = owner ? videoBodyForSlot(base, requestTier(job.request), passForPerson(owner), laneOfPerson(owner), await videoEngineStatus()) : null;
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const submitted = await submitVideo({ ...(slotted?.body ?? base), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
@@ -709,6 +709,9 @@ async function waitForTurnRow(turnId: string): Promise<boolean> {
 /** SPATIAL-04: the Library name of the 5.1 file of a spatial-sound clip. */
 export const SURROUND_FILE_NAME = "Spatial sound 5.1.mp4";
 
+/** Whether a finished clip carries sound whose speech no check has heard (every clip with sound today: the finished-clip check reads frames only). */
+export const clipSoundUnchecked = (clip: Pick<StackClip, "audio">): boolean => clip.audio === true;
+
 /** An mp4 starts with a box header: four size bytes, then `ftyp`. Anything else is not a clip and is never stored. */
 export function looksLikeMp4(bytes: Uint8Array): boolean {
   return bytes.byteLength > 1024 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
@@ -756,7 +759,10 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.request.adultLock = lock;
   const madeAdult = adult || verdictNude;
   job.request.adultOnly = madeAdult;
-  const markNote = markFields({ madeAudience: madeAdult ? "adult-only" : "all-ages", lock });
+  // AGE-ROUTING-REMOVE-01 (RULES.md C4, C9): a clip with sound is checked by its frames only; nothing in Home hears its speech. Until a check does, it is not released to anyone
+  // whose ceiling is below X, so its audience mark (only the audience fields, never `lock`) says adult-only, which RATE-INGEST-01 turns into the given level X. The Stack's own
+  // `audio` field says whether the clip has sound (never the part id or a model family, rule E2). A clip with no sound keeps the audience its words and frames earned. An edit (`video-edit`) follows its sources (`request.adultOnly`, so an edit of a clip with sound is adult-only) and adds only sound Home checked: a voice line (its words go through the prompt check) or a song.
+  const markNote = markFields({ madeAudience: madeAdult || (writer === "video-gen" && clipSoundUnchecked(clip)) ? "adult-only" : "all-ages", lock });
   const conversationId = job.conversationId;
   // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
   if (!conversationId && job.temporary) throw new Error("no conversation");

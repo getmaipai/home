@@ -24,7 +24,7 @@ import { readClonedVoiceClip } from "@/lib/clonedVoices";
 import { refuseMusicPrompt } from "./policy";
 import { musicJobLockState } from "./lock";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { passForPerson } from "@/lib/filter/pass";
 import { slotRun } from "@/lib/tiers";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, jobsForPerson, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
@@ -66,7 +66,7 @@ export function slotBodyFor(job: MusicJob, base: Omit<MusicBody, "timeout_ms">):
   const body = { ...base }; delete body.tier;
   if (body.task === "edit") return body;
   const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
-  const run = slotRun("music", requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child");
+  const run = slotRun("music", requestTier(job.request), owner ? passForPerson(owner) : "child");
   // A level switched off since the song was queued is made at the level below it (Max to Boost, then Standard); the request records what it really ran as.
   if (run.lowered) { const quality = run.tier === "standard" ? "quick" : "detailed"; body.quality = quality; const request = job.request as { quality?: string; tier?: string }; request.quality = quality; request.tier = run.tier; }
   if (run.tier === "boost" || run.tier === "max") body.tier = run.tier;

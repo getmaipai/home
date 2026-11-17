@@ -104,19 +104,23 @@ function streamedSpeech(band: AgeBand, reply: { text: string; speech?: string },
 
 const FIXED_MINOR_REFUSAL_LINES: ReadonlySet<string> = new Set([PROMPT_REFUSAL_LINE.minor_sexual, VIDEO_REFUSAL_LINE.minor_sexual]);
 
-/** THIN-5B (rules 2 and 10): the reasoning lane of the streaming gate. An
- * adult's reasoning is released as it is generated and checked as it
- * arrives: every delta is checked as part of the sentence it extends
- * before it is released, and each finished sentence is checked again
- * against the reasoning so far (that cross-sentence check follows the
- * release of the sentence that completes it, so at worst one sentence
- * shows before a combined claim is caught; the owner's ruling accepts
- * this for an adult). Released text is never
- * retracted. A refusal ends the reasoning only (the answer carries on
- * and the parent is notified, as for any flagged text). Only ever fed
- * for a turn the context node decided may show reasoning (an adult's
- * written chat); a minor's or a spoken turn's reasoning never reaches
- * it, because the engine client drops it first (llm.ts dropReasoning). */
+/** THIN-5B (rules 2 and 10): the reasoning lane of the streaming gate. It
+ * follows the turn's grain, the same as the reply (AGE-ROUTING-REMOVE-01,
+ * RULES.md rule 10 and C6). At the `arrival` grain (an adult's written chat)
+ * reasoning is released as it is generated and checked as it arrives: every
+ * delta is checked as part of the sentence it extends before it is released,
+ * and each finished sentence is checked again against the reasoning so far
+ * (that cross-sentence check follows the release of the sentence that
+ * completes it, so at worst one sentence shows before a combined claim is
+ * caught; the owner's ruling accepts this for an adult). At the `sentence`
+ * grain (a child, a teen and every spoken turn, so a minor whose admin turned
+ * thinking on) each sentence is checked, with the reasoning so far, before it
+ * is released, and a held sentence ends the reasoning there. Released text is
+ * never retracted. A refusal ends the reasoning only (the answer carries on
+ * and the parent is notified, as for any flagged text). Only ever fed for a
+ * turn the context node decided may show reasoning (written chat, a pass that
+ * holds `thinking`); a spoken turn's reasoning never reaches it, because the
+ * engine client drops it first (llm.ts dropReasoning). */
 class ReasoningLane {
   private pending = "";
   private checked = "";
@@ -124,12 +128,15 @@ class ReasoningLane {
   private isFirstChunk = true;
   private refused = false;
   private joinNext = false;
+  /** Sentence grain: the clause held until its sentence ends. */
+  private heldClause = "";
 
   constructor(
     private readonly band: AgeBand,
     private readonly actor: PersonRow,
     private readonly turnId: string,
     private readonly release: (text: string) => void,
+    private readonly grain: GateGrain = "arrival",
   ) {}
 
   private refuses(text: string): boolean {
@@ -138,20 +145,53 @@ class ReasoningLane {
     return safety.action === "refuse";
   }
 
+  /** Releases text. A later generation (after a tool round) starts a new paragraph, so the stored reasoning and the wire stay one and the same text. */
+  private out(text: string): void {
+    const shown = this.joinNext && this.released.trim() ? `\n\n${text}` : text;
+    this.joinNext = false;
+    this.released += shown;
+    this.release(shown);
+  }
+
+  /** Sentence grain: checks one sentence, alone and with the reasoning so far, then releases it; a refusal ends the reasoning and drops what was held. */
+  private releaseSentence(span: string): boolean {
+    if (!span) return true;
+    if (!span.trim()) { this.checked += span; this.out(span); return true; }
+    if (this.refuses(span.trim()) || (this.checked.trim() && this.refuses(`${this.checked}${span}`))) {
+      this.refused = true;
+      this.pending = "";
+      this.heldClause = "";
+      return false;
+    }
+    this.checked += span;
+    this.out(span);
+    return true;
+  }
+
   push(delta: string): void {
     if (this.refused || !delta) return;
+    if (this.grain === "sentence") {
+      this.pending += delta;
+      for (;;) {
+        const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
+        if (end < 0) break;
+        this.isFirstChunk = false;
+        const piece = this.pending.slice(0, end);
+        this.pending = this.pending.slice(end);
+        if (piece.trim() && !endsSentence(piece)) { this.heldClause += piece; continue; }
+        const span = this.heldClause + piece;
+        this.heldClause = "";
+        if (!this.releaseSentence(span)) return;
+      }
+      return;
+    }
     const candidate = this.pending + delta;
     if (candidate.trim() && this.refuses(candidate.trim())) {
       this.refused = true;
       return;
     }
     this.pending = candidate;
-    // A later generation (after a tool round) starts a new paragraph, so
-    // the stored reasoning and the wire stay one and the same text.
-    const out = this.joinNext && this.released.trim() ? `\n\n${delta}` : delta;
-    this.joinNext = false;
-    this.released += out;
-    this.release(out);
+    this.out(delta);
     for (;;) {
       const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
       if (end < 0) break;
@@ -167,10 +207,16 @@ class ReasoningLane {
   }
 
   /** One generation is over: whatever sentence was still open is checked
-   * against the reasoning so far, and the next generation starts clean. */
+   * against the reasoning so far (at the sentence grain, before it is
+   * released), and the next generation starts clean. */
   endGeneration(): void {
-    if (!this.refused && this.pending.trim() && this.checked.trim() && this.refuses(`${this.checked}${this.pending}`)) this.refused = true;
-    this.checked += this.pending;
+    if (this.grain === "sentence") {
+      if (!this.refused) this.releaseSentence(this.heldClause + this.pending);
+      this.heldClause = "";
+    } else {
+      if (!this.refused && this.pending.trim() && this.checked.trim() && this.refuses(`${this.checked}${this.pending}`)) this.refused = true;
+      this.checked += this.pending;
+    }
     this.pending = "";
     this.isFirstChunk = true;
     this.joinNext = true;
@@ -282,7 +328,7 @@ export class StreamGate {
     private readonly onDone: () => void,
     opts: StreamGateOptions = {},
   ) {
-    if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, actor, turnId, opts.releaseReasoning);
+    if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, actor, turnId, opts.releaseReasoning, opts.grain ?? gateGrainFor(band, "chat", false));
     this.grain = opts.grain ?? "sentence";
   }
 

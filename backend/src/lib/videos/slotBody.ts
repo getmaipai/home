@@ -5,8 +5,7 @@
 // not read by it (a distilled model with fixed steps; sound comes with LTX-2.5): `SLOT_OPTIONS_READ` in shared/tierSlotOptions.ts.
 import type { Lane } from "@/lib/pictures/lane";
 import { videoModelForLane } from "@/lib/pictures/lane";
-import type { AgeBand } from "@/lib/ageBand";
-import { slotRun, type Tier } from "@/lib/tiers";
+import { slotRun, type SlotReader, type Tier } from "@/lib/tiers";
 import { H3_MODEL, LTX25_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL, ltx25Profile, videoSizeFor, QUICK_MAX_SECONDS, VIDEO_SIZES_BY_QUALITY, maxSecondsFor, type VideoQuality } from "@/lib/videos/quality";
 import type { StackVideoStatus, VideoBody } from "@/lib/videos/stack";
 
@@ -41,8 +40,8 @@ function scaledSize(quality: VideoQuality, portrait: boolean, resolution: number
 }
 
 /** The body to send for a job queued at `requested`: the slot's model, options and tier applied. */
-export function videoBodyForSlot(base: Body, requested: Tier, band: AgeBand, lane: Lane, engine: Pick<StackVideoStatus, "qualities"> | null = null): { body: Body; tier: Tier; quality: VideoQuality } {
-  const run = slotRun("video", requested, band);
+export function videoBodyForSlot(base: Body, requested: Tier, reader: SlotReader, lane: Lane, engine: Pick<StackVideoStatus, "qualities"> | null = null): { body: Body; tier: Tier; quality: VideoQuality } {
+  const run = slotRun("video", requested, reader);
   const body: Body = { ...base };
   delete body.tier;
   // VIDEO-TIERS-01: an adult's LTX-2.5 clip keeps its model at whatever level the slot lowers it to; its size and ceiling follow that level. A

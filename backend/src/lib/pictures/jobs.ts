@@ -15,7 +15,7 @@ import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
 import { pictureBodyForSlot } from "./slotBody";
 import { pictureEngineStatus } from "./ready";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { passForPerson } from "@/lib/filter/pass";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { compareWords, readPictureWords } from "./readWords";
 import { gateFinished } from "./laneGate";
@@ -60,7 +60,7 @@ async function slotBodyOf(job: PictureJob): Promise<Omit<GenerationBody, "timeou
     ...(job.request.seed !== null ? { seed: job.request.seed } : {}),
   };
   const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
-  const run = pictureBodyForSlot(base, requestTier(job.request), owner ? speakerAgeBand(owner, new Date()) : "child", await pictureEngineStatus());
+  const run = pictureBodyForSlot(base, requestTier(job.request), owner ? passForPerson(owner) : "child", await pictureEngineStatus());
   if (run.tier === "standard") delete request.tier; else request.tier = run.tier;
   if (run.lowered) request.lowered = true; else delete request.lowered;
   if (run.line) request.line = run.line; else delete request.line;

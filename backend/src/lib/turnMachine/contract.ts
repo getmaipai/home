@@ -149,9 +149,11 @@ export interface TurnBudget {
   /** GROUND-01 ("Reasoning is a second output"): whether the model node
    * even asks the engine to think on a minor's turn - false by default.
    * A cost control only, never the safety gate: `context.ts`'s
-   * decideReasoning() already forces `reasoning.emit` false for a minor
-   * from the age band alone, so a minor's turn never emits or persists
-   * reasoning whichever way this is set. */
+   * decideReasoning() already forces `reasoning.emit` false for a person
+   * whose pass lacks `thinking` (a child's and a teen's role default),
+   * so such a turn never emits or persists reasoning whichever way this
+   * is set. When an admin's override turns thinking on for a minor, the
+   * reasoning text follows the turn's gate grain (sentence by sentence). */
   thinking_for_minors: boolean;
   /** The reply floor (spec-v0.1.28, turn-machine-state-record-2026-09-22.md
    * "The reply floor", owner's rule 2026-09-23): the most visible tokens
@@ -422,7 +424,7 @@ export interface TurnState {
    * hub yet (the old engine file's own "Presence unknown for now"), so
    * nothing sets it today - included in the type because the record
    * names it, never produced until a presence source is built. */
-  reasoning: { emit: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
+  reasoning: { emit: boolean; withheld_for: "minor" | "access" | "surface" | "presence" | "gate" | null };
   /** STREAM-NEXT-01: set only by turnNext.ts's own runTurnNextStream(),
    * undefined for every other caller (runTurnNext(), the bench harness) -
    * the identical StatusChannel the old engine file's own old-path stream kind

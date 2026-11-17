@@ -16,7 +16,6 @@ import { readPictureRoles, type PictureReading, type PictureRole } from "@/lib/p
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { laneOf } from "@/lib/pictures/lane";
 import { readAttachment, storeFile } from "@/lib/attachments";
-import { speakerAgeBand } from "@/lib/ageBand";
 import { allowedQuality, jobTier, tierArgument, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE } from "@/lib/tiers";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
 import { endAnchorEnabled, householdVideoQuality, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "./policy";
@@ -268,14 +267,13 @@ function runIngredients(sheets: Uint8Array[], recipe: ReferenceRecipe, actor: Pe
  *  (the same choice a clip from one attached photo gets: `chooseVideoQuality` with a picture). Null only when no video level is ready. */
 export async function planFirstFrameClip(actor: PersonRow, engine: Parameters<typeof chooseVideoQuality>[0]["engine"], seconds: number): Promise<{ size: string; seconds: number; quality: "quick" | "detailed"; tier: "standard" | "boost" | "max"; model?: string; line?: string } | null> {
   if (!videoStatusReady(engine, true)) return null;
-  const band = speakerAgeBand(actor, new Date());
   const maxReady = ltx25MaxReady(engine);
   const capabilities = await import("@/lib/memoryRoom").then(({ readCapabilities }) => readCapabilities());
   const maxFits = capabilities.available ? capabilities.rows.find((row) => row.category === "video")?.cells.find((cell) => cell.tier === "max")?.fits : undefined;
-  const tierAsked = tierArgument({ person: actor, category: "video", arg: "max", band, maxAvailable: maxReady && maxFits !== false, capabilityFits: maxFits });
+  const tierAsked = tierArgument({ person: actor, category: "video", arg: "max", maxAvailable: maxReady && maxFits !== false, capabilityFits: maxFits });
   const choice = chooseVideoQuality({
-    requested: tierAsked.quality ? allowedQuality(actor, "video", tierAsked.quality, band) : undefined, household: allowedQuality(actor, "video", householdVideoQuality(), band), seconds, engine, hasPicture: true,
-    quickOnly: allowedQuality(actor, "video", "detailed", band) === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady && maxFits !== false,
+    requested: tierAsked.quality ? allowedQuality(actor, "video", tierAsked.quality) : undefined, household: allowedQuality(actor, "video", householdVideoQuality()), seconds, engine, hasPicture: true,
+    quickOnly: allowedQuality(actor, "video", "detailed") === "quick", adultLane: true, max: tierAsked.tier === "max" && maxReady && maxFits !== false,
   });
   if (!choice) return null;
   const model = choice.maker === "ltx25max" ? LTX25_MAX_MODEL : choice.maker === "ltx25" ? LTX25_MODEL : undefined;
@@ -342,7 +340,7 @@ function sourceFor(actor: PersonRow, context: Context, id: string, prompt: strin
 
 /** REFVIDEO-STEPS-01: the whole job from the pictures. The tool call returns at once; this is step 1 (read, cut out, draw views, put the sheet together, keep it) and then step 2 (the clip),
  * so the card shows each step with its own progress. A refusal or failure after the call returned ends the job with one plain line. */
-function runFresh(actor: PersonRow, context: Context, loaded: LoadedPicture[], request: string, seconds: number, audienceBand: Parameters<typeof viewerOf>[1]): EditRun {
+function runFresh(actor: PersonRow, context: Context, loaded: LoadedPicture[], request: string, seconds: number, viewerBand: Parameters<typeof viewerOf>[1]): EditRun {
   return async (signal, onProgress, hooks) => {
     const failed = (line: string) => ({ ok: false as const, line });
     const sheetStep = (done: number, total: number, line: string) => hooks?.steps((progress) => { progress.step = 1; progress.sheet = { done, total, line }; });
@@ -358,7 +356,7 @@ function runFresh(actor: PersonRow, context: Context, loaded: LoadedPicture[], r
       // The same input-side floor a photo gets, on what actually goes to the video model.
       for (const sheet of built.sheets) {
         const jpeg = new Uint8Array(await sharp(Buffer.from(sheet.png)).jpeg({ quality: 90 }).toBuffer());
-        const screened = await screenInputImage(jpeg, request, viewerOf(actor, audienceBand));
+        const screened = await screenInputImage(jpeg, request, viewerOf(actor, viewerBand));
         if (!screened.ok) return failed(screened.line);
       }
       if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
@@ -388,7 +386,7 @@ const promptOf = (route: "sheet" | "first_frame", description: string, paragraph
 
 /** REFVIDEO-FIRSTFRAME-01: the whole job for pictures with a real person's face. Step 1 makes the first picture (cut-outs, the edit model's composition, the face check, or a plain paste of the
  *  people's own pixels), shows it on the card as soon as it is kept, and step 2 starts the clip from it. The tool call returned at once; a refusal or failure after that ends the job with one plain line. */
-function runFirstFrame(actor: PersonRow, context: Context, loaded: LoadedPicture[], readings: PictureReading[], request: string, seconds: number, audienceBand: Parameters<typeof viewerOf>[1]): EditRun {
+function runFirstFrame(actor: PersonRow, context: Context, loaded: LoadedPicture[], readings: PictureReading[], request: string, seconds: number, viewerBand: Parameters<typeof viewerOf>[1]): EditRun {
   return async (signal, onProgress, hooks) => {
     const failed = (line: string) => ({ ok: false as const, line });
     const stepOne = (done: number, total: number, line: string) => hooks?.steps((progress) => { progress.step = 1; progress.route = "first_frame"; progress.sheet = { done, total, line }; });
@@ -403,7 +401,7 @@ function runFirstFrame(actor: PersonRow, context: Context, loaded: LoadedPicture
       if (promptRefusal) return failed(VIDEO_REFUSAL_LINE[promptRefusal]);
       // The same input-side floor a photo gets, on the picture that actually goes to the video model.
       const jpeg = new Uint8Array(await sharp(Buffer.from(first.png)).jpeg({ quality: 90 }).toBuffer());
-      const screened = await screenInputImage(jpeg, request, viewerOf(actor, audienceBand));
+      const screened = await screenInputImage(jpeg, request, viewerOf(actor, viewerBand));
       if (!screened.ok) return failed(screened.line);
       if (signal.aborted) return failed(`${VIDEO_FAILED_PREFIX} It did not finish. Try again.`);
       const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: first.png, provenance: `${REFERENCE_SHEET_NOTE}${JSON.stringify({ v: 1, provided: false, index: 0, route: "first_frame" })}`, deduplicate: false, retention: "kept", name: "First picture.png" });

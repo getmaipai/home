@@ -132,11 +132,11 @@ describe("part 1, step 3: what stays as it was", () => {
     expect(gateGrainFor("adult", "robot", false)).toBe("sentence");
   });
 
-  test("no reasoning to a minor, whatever the pass says", () => {
+  test("no reasoning to a minor, whatever the content pass says (AGE-ROUTING-REMOVE-01: withheld for access, the role default has no thinking)", () => {
     setHouseholdSettingValue("content.policy.chat", false);
     invalidatePass();
     for (const band of ["child", "teen"] as const) {
-      expect(decideReasoning({ actor: actorOf(band), surface: "chat", spoken: false } as never)).toEqual({ emit: false, withheld_for: "minor" });
+      expect(decideReasoning({ actor: actorOf(band), surface: "chat", spoken: false } as never)).toEqual({ emit: false, withheld_for: "access" });
     }
   });
 
