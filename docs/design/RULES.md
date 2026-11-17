@@ -705,3 +705,45 @@ E6. **A minor gets the minor's list, and only that.** Home asks the Stack for th
     out (chat rules 0 and 8). The Stack runs a minor's job only on a part in that list. A part whose output can carry speech that is not
     checked is not in a minor's list until its check ships (VIDEO-LTX-06). This adds to the age and surface gates and replaces none of
     them; no check Home makes for a child or a teen is removed before the Stack enforces the same thing.
+
+## Content filter and feature access
+
+Record: [One content filter by rating, with a top level nobody gets, and one feature access check](content-ratings-and-access-2026-11-16.md).
+Owner rule (Jesse, 2026-11-16, in chat and confirmed in the question box the same day). Owner-approved: 2026-11-16. These rules add to
+chat rules 0, 2, 8 and 10 and change none of them. They bind new work at once; existing checks are reached through the filter one
+surface at a time by the build rows of the record, each proven the same or stricter first.
+
+Governs: backend/src/lib/safety.ts, backend/src/lib/contentPolicy.ts, backend/src/lib/contentCeiling.ts, backend/src/lib/ageBand.ts, backend/src/lib/grants.ts, backend/src/lib/turnMachine/nodes/outputGate.ts, backend/src/lib/turnMachine/nodes/safety.ts, backend/src/lib/turnMachine/nodes/policy.ts, backend/src/lib/pictures/**, backend/src/lib/videos/**, backend/src/lib/music/**, backend/src/lib/media/**, backend/src/lib/retrieval/**, backend/src/lib/news/**
+
+C1. **Content has a rating; a viewer has a ceiling.** One scale (G, PG, PG-13, R, X, Prohibited, and Unrated) and one stamp on every item
+    and result. Content over the viewer's ceiling is not released. No feature writes its own age rule for content.
+C2. **An adult's ceiling is X; the only question asked about an adult's content is Prohibited.** It is asked only where chat rules 0 and
+    10 ask it today; it is not added to an adult's search, news, lists or outside titles. The filter adds no other check, model, wait or
+    error to an adult's path. An adult's ceiling moves only by that adult's own opt-in filter for themselves.
+C3. **A child's and a teen's ceiling cannot be removed or raised past the mode.** A child G, a teen PG-13. An admin may lower a child's
+    or a teen's ceiling. More is given by changing the person's mode, or through an override that exists today (chat rule 0's search
+    defaults, the topic levels), never to R or above and never past the hard lines. A child's pictures, clips and songs stay at G (C8).
+    A child or teen never sets their own. An unknown speaker and a shared surface get what chat rule 0 says.
+C4. **Unrated is over the ceiling.** Always for a child. An admin may allow one teen Unrated outside content (a title or feed item with
+    no outside label), which still passes that teen's other floors. Content Home makes, and any item whose check could not run, is never
+    released to a child or a teen.
+C5. **Four choke points, and nowhere else in Home.** Feature access where a feature starts; the filter at the request, at the result and
+    where a list is built. A list never leaves the server with a row over the viewer's ceiling. Rule E6's minor list in the Stack stays
+    as a second check until AGE-ROUTING-REMOVE-01 is ruled on.
+C6. **Prohibited is the top of the scale and everyone's ceiling is below it.** Sexual content involving a minor is rated Prohibited and
+    is made or shown to no one. An unrun check on an adult-only media job withholds the item (chat rule 0); for a child or a teen, every
+    generated item whose check cannot run is withheld. The Prohibited check that chat rules 0 and 10 require always runs, whatever
+    another rater or a declared rating returned. No ceiling, admin's rating, grant, setting or other rater lowers a Prohibited result.
+    Not ratings, and standing for everyone they cover today: crisis handling and the crisis overlay, prompt injection, jailbreak, the
+    credential and private-data catches, age and surface access, feature switches, quotas, technical validation, the output gate's grain
+    (a child's and every spoken turn per sentence; a teen's admin-chosen mode), no reasoning to a minor, the band topic block and its
+    hard lines, family stories, the adult-site host list, SafeSearch and the cleaning of fetched page text.
+C7. **Feature access is also by person.** A grant may deny any feature to anyone, and allows one only within chat rule 0's age and
+    surface gates. It never weakens a protection in C1 to C6.
+C8. **What G means for pictures is kept.** The child picture protections (the cartoon look, no photos, no reference pictures, no real
+    people, edits only of their own pictures, the child rewrite, the finished-item check that fails closed) are part of the G level; for
+    a teen, no real person outside the household and no public figure (synths under `synths.real_people`).
+C9. **Nothing is rated while a person waits for a list.** Stored content is rated when it arrives and the rating is stored; a list is
+    built from stored ratings. An item not yet rated is Unrated and is shown to no viewer with a ceiling until it is rated; C4's teen
+    allowance covers only an item every rater ran on and could not rate. Results that cannot be stored first (web search rows, fetched
+    page text) are checked as they are built, by today's floors.
