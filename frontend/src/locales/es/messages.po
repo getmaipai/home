@@ -1281,7 +1281,7 @@ msgid "{name} will be closed when a big job needs room."
 msgstr "{name} se cerrará cuando una tarea grande necesite espacio."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:135
+#: src/apps/settings/PersonAccessEditor.tsx:136
 msgid "{name} will get fewer protections: more subjects answered plainly and replies checked as they arrive instead of sentence by sentence. You can put stricter controls back any time."
 msgstr ""
 
@@ -2333,7 +2333,7 @@ msgid "A token is saved. Home keeps it private and never shows it again."
 msgstr "Se guardó un token. Home lo mantiene privado y nunca lo muestra de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:25
+#: src/apps/settings/PersonAccessEditor.tsx:26
 msgid "A visitor. The controls below decide which protections apply."
 msgstr ""
 
@@ -2946,7 +2946,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/settings/PersonAccessEditor.tsx:31
+#: src/apps/settings/PersonAccessEditor.tsx:32
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Adult controls"
 msgstr ""
@@ -4458,7 +4458,7 @@ msgid "Back to draft"
 msgstr "Volver al borrador"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:45
+#: src/apps/settings/PersonAccessEditor.tsx:46
 msgid "Back to everyone"
 msgstr ""
 
@@ -6302,7 +6302,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/settings/PersonAccessEditor.tsx:29
+#: src/apps/settings/PersonAccessEditor.tsx:30
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Child controls"
 msgstr ""
@@ -6313,7 +6313,7 @@ msgid "Child profiles start restricted, and parents choose what they can reach. 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:24
+#: src/apps/settings/PersonAccessEditor.tsx:25
 msgid "Child protections are on."
 msgstr ""
 
@@ -6708,7 +6708,7 @@ msgid "Choose Voice"
 msgstr "Elige voz"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:62
+#: src/apps/settings/PersonAccessEditor.tsx:63
 msgid "Choose what each person can use. A feature someone cannot use is simply absent for them."
 msgstr ""
 
@@ -7711,7 +7711,7 @@ msgstr "Controla un dispositivo de hogar inteligente"
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:113
 #: src/apps/people/NewPersonForm.tsx:114
-#: src/apps/settings/PersonAccessEditor.tsx:114
+#: src/apps/settings/PersonAccessEditor.tsx:115
 #: src/apps/settings/RobotCompanionChoices.tsx:57
 #: src/apps/settings/RobotCompanionChoices.tsx:58
 msgid "Controls"
@@ -7922,12 +7922,12 @@ msgid "Could not cancel the schedule."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:97
+#: src/apps/settings/PersonAccessEditor.tsx:98
 msgid "Could not change {name}'s controls. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:96
+#: src/apps/settings/PersonAccessEditor.tsx:97
 msgid "Could not change {name}'s role. Check your connection and try again."
 msgstr ""
 
@@ -11152,7 +11152,7 @@ msgid "Every change keeps the earlier version, so nothing is lost."
 msgstr "Cada cambio guarda la versión anterior, así que nada se pierde."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:53
+#: src/apps/settings/PersonAccessEditor.tsx:54
 msgid "Every change saves as you make it."
 msgstr ""
 
@@ -12843,12 +12843,12 @@ msgid "setting.coding.person.git_hosts.label"
 msgstr "Servidores Git"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:139
+#: src/apps/settings/PersonAccessEditor.tsx:140
 msgid "Give {level} controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:134
+#: src/apps/settings/PersonAccessEditor.tsx:135
 msgid "Give {name} {level} controls?"
 msgstr ""
 
@@ -15785,7 +15785,7 @@ msgid "Keep {media}"
 msgstr "Conservar {media}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:126
+#: src/apps/settings/PersonAccessEditor.tsx:127
 msgid "Keep {role}"
 msgstr ""
 
@@ -15802,7 +15802,7 @@ msgid "setting.coding.home_mode.option.normal"
 msgstr "Mantener el chat y las imágenes funcionando como de costumbre."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:138
+#: src/apps/settings/PersonAccessEditor.tsx:139
 msgid "Keep current controls"
 msgstr ""
 
@@ -17922,7 +17922,7 @@ msgid "setting.search.dictionary_fallback.does"
 msgstr "Busca una palabra en Wiktionary si la Biblioteca sin conexión no tiene entrada."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:21
+#: src/apps/settings/PersonAccessEditor.tsx:22
 msgid "Looks after the household: people, settings and what each person can use."
 msgstr ""
 
@@ -18302,12 +18302,12 @@ msgid "Make"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:122
+#: src/apps/settings/PersonAccessEditor.tsx:123
 msgid "Make {name} {role}?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:127
+#: src/apps/settings/PersonAccessEditor.tsx:128
 msgid "Make {role}"
 msgstr ""
 
@@ -22328,7 +22328,7 @@ msgid "Only the name changes. The recording stays the same, and everyone and eve
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:111
+#: src/apps/settings/PersonAccessEditor.tsx:112
 msgid "Only the owner can change a role."
 msgstr ""
 
@@ -23069,12 +23069,6 @@ msgid "People"
 msgstr "Personas"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1939
-#, needs-review
-msgid "area.People"
-msgstr "Personas"
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:124
 #, needs-review
 msgid "People can grow attached to AI"
@@ -23107,7 +23101,7 @@ msgid "Performance"
 msgstr "Rendimiento"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1940
+#: src/lib/settingCopy.generated.ts:1939
 #, needs-review
 msgid "area.Performance"
 msgstr "Rendimiento"
@@ -23152,7 +23146,7 @@ msgid "setting.persona.active_id.label"
 msgstr "Personalidad"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1941
+#: src/lib/settingCopy.generated.ts:1940
 #, needs-review
 msgid "area.Personality"
 msgstr "Personalidad"
@@ -23164,7 +23158,7 @@ msgid "Personality notes"
 msgstr "Notas sobre la personalidad"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1942
+#: src/lib/settingCopy.generated.ts:1941
 #, needs-review
 msgid "area.Personalization"
 msgstr "Personalización"
@@ -23649,7 +23643,7 @@ msgid "setting.access.tier.max.option_label.image"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1943
+#: src/lib/settingCopy.generated.ts:1942
 #, needs-review
 msgid "area.Pictures"
 msgstr "Imágenes"
@@ -24002,7 +23996,7 @@ msgid "setting.topics.teen.risk.option_label.redirect"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1944
+#: src/lib/settingCopy.generated.ts:1943
 #, needs-review
 msgid "area.Port"
 msgstr "Puerto"
@@ -24240,7 +24234,7 @@ msgid "Privacy"
 msgstr "Privacidad"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1945
+#: src/lib/settingCopy.generated.ts:1944
 #, needs-review
 msgid "area.Privacy and safety"
 msgstr "Privacidad y seguridad"
@@ -24276,7 +24270,7 @@ msgid "Profile"
 msgstr "Perfil"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1946
+#: src/lib/settingCopy.generated.ts:1945
 #, needs-review
 msgid "area.Profile"
 msgstr "Perfil"
@@ -24878,7 +24872,7 @@ msgid "setting.reference.download.when.label"
 msgstr "Hora de descarga de referencia"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1947
+#: src/lib/settingCopy.generated.ts:1946
 #, needs-review
 msgid "area.Reference library"
 msgstr "Biblioteca de referencia"
@@ -25322,7 +25316,7 @@ msgid "Repairs"
 msgstr "Reparaciones"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1948
+#: src/lib/settingCopy.generated.ts:1947
 #, needs-review
 msgid "area.Repairs"
 msgstr "Reparaciones"
@@ -25912,7 +25906,7 @@ msgid "Robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1949
+#: src/lib/settingCopy.generated.ts:1948
 msgid "area.Robot"
 msgstr ""
 
@@ -26075,7 +26069,7 @@ msgid "setting.home.robots.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1950
+#: src/lib/settingCopy.generated.ts:1949
 msgid "area.Robots"
 msgstr ""
 
@@ -26107,7 +26101,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:108
 #: src/apps/people/NewPersonForm.tsx:109
-#: src/apps/settings/PersonAccessEditor.tsx:57
+#: src/apps/settings/PersonAccessEditor.tsx:58
 #: src/shell/pages/EnginesPage.tsx:46
 #: src/shell/pages/StoragePage.tsx:177
 #, needs-review
@@ -26132,7 +26126,7 @@ msgid "Role default"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:108
+#: src/apps/settings/PersonAccessEditor.tsx:109
 #, needs-review
 msgid "Role for {name}"
 msgstr "Rol para {name}"
@@ -26283,7 +26277,7 @@ msgid "Running..."
 msgstr "Ejecutando..."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:20
+#: src/apps/settings/PersonAccessEditor.tsx:21
 msgid "Runs the household and can change anything."
 msgstr ""
 
@@ -26540,7 +26534,7 @@ msgstr "Lugar guardado"
 #. js-lingui-explicit-id
 #: src/apps/people/ProfileForm.tsx:170
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
-#: src/apps/settings/PersonAccessEditor.tsx:55
+#: src/apps/settings/PersonAccessEditor.tsx:56
 #: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
 #, needs-review
@@ -26857,7 +26851,7 @@ msgid "Search"
 msgstr "Buscar"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1951
+#: src/lib/settingCopy.generated.ts:1950
 #, needs-review
 msgid "area.Search"
 msgstr "Búsqueda"
@@ -26880,13 +26874,13 @@ msgid "setting.engines.embed.choice.label"
 msgstr "Elección de modelo de embeddings"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1952
+#: src/lib/settingCopy.generated.ts:1951
 #, needs-review
 msgid "area.Search and memory"
 msgstr "Búsqueda y memoria"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1953
+#: src/lib/settingCopy.generated.ts:1952
 #, needs-review
 msgid "area.Search and web"
 msgstr "Búsqueda y web"
@@ -27365,7 +27359,7 @@ msgid "setting.health.keep_warm.does"
 msgstr "Envía un mensaje de prueba pequeño cada pocos minutos para que las respuestas sean rápidas."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1954
+#: src/lib/settingCopy.generated.ts:1953
 msgid "area.Sensitive subjects with teen controls"
 msgstr ""
 
@@ -27381,7 +27375,7 @@ msgid "Service, e.g. turn_off"
 msgstr "Servicio, p. ej. turn_off"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1955
+#: src/lib/settingCopy.generated.ts:1954
 #, needs-review
 msgid "area.Session lock"
 msgstr "Bloqueo de sesión"
@@ -27713,7 +27707,7 @@ msgid "Settings"
 msgstr "Ajustes"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1956
+#: src/lib/settingCopy.generated.ts:1955
 #, needs-review
 msgid "area.Settings"
 msgstr "Ajustes"
@@ -27832,7 +27826,7 @@ msgid "shared with {count, plural, one {# person} other {# people}}"
 msgstr "compartido con {count, plural, one {# persona} other {# personas}}"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1957
+#: src/lib/settingCopy.generated.ts:1956
 #, needs-review
 msgid "area.Sharing the computer"
 msgstr "Compartir el ordenador"
@@ -28288,7 +28282,7 @@ msgid "Signed in away from home"
 msgstr "Sesión iniciada fuera de casa"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1958
+#: src/lib/settingCopy.generated.ts:1957
 #, needs-review
 msgid "area.Signed-in devices"
 msgstr "Dispositivos iniciados"
@@ -28455,7 +28449,7 @@ msgid "Skill"
 msgstr "Habilidad"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1959
+#: src/lib/settingCopy.generated.ts:1958
 #, needs-review
 msgid "area.Skills"
 msgstr "Habilidades"
@@ -29583,7 +29577,7 @@ msgid "Status"
 msgstr "Estado"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1960
+#: src/lib/settingCopy.generated.ts:1959
 #, needs-review
 msgid "area.Status"
 msgstr "Estado"
@@ -29808,7 +29802,7 @@ msgid "Storage"
 msgstr "Almacenamiento"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1961
+#: src/lib/settingCopy.generated.ts:1960
 #, needs-review
 msgid "area.Storage"
 msgstr "Almacenamiento"
@@ -29820,7 +29814,7 @@ msgid "Storage & hardware"
 msgstr "Almacenamiento y hardware"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1962
+#: src/lib/settingCopy.generated.ts:1961
 #, needs-review
 msgid "area.Storage and backups"
 msgstr "Almacenamiento y copias de seguridad"
@@ -29984,7 +29978,7 @@ msgid "Styles"
 msgstr "Estilos"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1963
+#: src/lib/settingCopy.generated.ts:1962
 #, needs-review
 msgid "area.Styles"
 msgstr "Estilos"
@@ -30085,7 +30079,7 @@ msgid "Synth actions"
 msgstr "Acciones del synth"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1964
+#: src/lib/settingCopy.generated.ts:1963
 msgid "area.Synth controls"
 msgstr ""
 
@@ -30110,7 +30104,7 @@ msgid "Synths"
 msgstr "Seres sintéticos"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1965
+#: src/lib/settingCopy.generated.ts:1964
 msgid "area.Synths"
 msgstr ""
 
@@ -30256,7 +30250,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:115
-#: src/apps/settings/PersonAccessEditor.tsx:30
+#: src/apps/settings/PersonAccessEditor.tsx:31
 #: src/apps/settings/RobotCompanionChoices.tsx:14
 msgid "Teen controls"
 msgstr ""
@@ -30267,12 +30261,12 @@ msgid "Teen protections apply, whichever companion is chosen. Still no adult con
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:23
+#: src/apps/settings/PersonAccessEditor.tsx:24
 msgid "Teen protections are on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1966
+#: src/lib/settingCopy.generated.ts:1965
 msgid "area.Teens"
 msgstr ""
 
@@ -30288,7 +30282,7 @@ msgid "Teens and children"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1967
+#: src/lib/settingCopy.generated.ts:1966
 #, needs-review
 msgid "area.Telegram"
 msgstr "Telegram"
@@ -30654,7 +30648,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/settings/ModelsAndStorageSection.tsx:214
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
-#: src/apps/settings/PersonAccessEditor.tsx:118
+#: src/apps/settings/PersonAccessEditor.tsx:119
 #: src/apps/settings/ReferenceLibrarySettings.tsx:224
 #: src/apps/settings/RoutingStatsSection.tsx:33
 #: src/apps/settings/SignInSecretSection.tsx:72
@@ -31473,7 +31467,7 @@ msgid "The home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1968
+#: src/lib/settingCopy.generated.ts:1967
 #, needs-review
 msgid "area.The home"
 msgstr "El hogar"
@@ -32643,7 +32637,7 @@ msgid "This counts only what the Stack has loaded. Home's own engines still run:
 msgstr "Esto cuenta solo lo que el Stack ha cargado. Los motores propios de Home siguen activos: {describeHomeOwnedRoles}."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1969
+#: src/lib/settingCopy.generated.ts:1968
 #, needs-review
 msgid "area.This device"
 msgstr "Este dispositivo"
@@ -34241,13 +34235,13 @@ msgid "Updates"
 msgstr "Actualizaciones"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1970
+#: src/lib/settingCopy.generated.ts:1969
 #, needs-review
 msgid "area.Updates"
 msgstr "Actualizaciones"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1971
+#: src/lib/settingCopy.generated.ts:1970
 msgid "area.Updates and repairs"
 msgstr ""
 
@@ -34608,7 +34602,7 @@ msgid "Users"
 msgstr "Usuarios"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1972
+#: src/lib/settingCopy.generated.ts:1971
 #, needs-review
 msgid "area.Users"
 msgstr "Usuarios"
@@ -34626,7 +34620,7 @@ msgid "Uses about {formatBytes} of memory."
 msgstr "Usa unos {formatBytes} de memoria."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:22
+#: src/apps/settings/PersonAccessEditor.tsx:23
 msgid "Uses MaiPai fully. Cannot change other people's settings."
 msgstr ""
 
@@ -34850,7 +34844,7 @@ msgid "setting.access.tier.max.option_label.video"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1973
+#: src/lib/settingCopy.generated.ts:1972
 #, needs-review
 msgid "area.Videos"
 msgstr "Vídeos"
@@ -34998,13 +34992,13 @@ msgid "setting.robot.voice.id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1974
+#: src/lib/settingCopy.generated.ts:1973
 #, needs-review
 msgid "area.Voice"
 msgstr "Voz"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1975
+#: src/lib/settingCopy.generated.ts:1974
 msgid "area.Voice and robot"
 msgstr ""
 
@@ -35082,7 +35076,7 @@ msgid "setting.person.voice_print.enrollment.title"
 msgstr "Registro de huella de voz"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1976
+#: src/lib/settingCopy.generated.ts:1975
 #, needs-review
 msgid "area.Voice print enrollment"
 msgstr "Registro de huella de voz"
@@ -35133,7 +35127,7 @@ msgid "Voices"
 msgstr "Voces"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1977
+#: src/lib/settingCopy.generated.ts:1976
 #, needs-review
 msgid "area.Voices"
 msgstr "Voces"
@@ -35302,7 +35296,7 @@ msgid "setting.engines.wakeword.choice.label"
 msgstr "Elección de modelo de palabra de activación"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1978
+#: src/lib/settingCopy.generated.ts:1977
 #, needs-review
 msgid "area.Wake word"
 msgstr "Palabra de activación"
@@ -35400,13 +35394,13 @@ msgid "Web search"
 msgstr "Búsqueda web"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1979
+#: src/lib/settingCopy.generated.ts:1978
 #, needs-review
 msgid "area.Web search"
 msgstr "Búsqueda web"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1980
+#: src/lib/settingCopy.generated.ts:1979
 #, needs-review
 msgid "area.Web search and memory settings"
 msgstr "Ajustes de búsqueda web y memoria"
@@ -35486,19 +35480,19 @@ msgid "Welcome to MaiPai Home"
 msgstr "Bienvenido a MaiPai Home"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:66
+#: src/apps/settings/PersonAccessEditor.tsx:67
 #: src/shell/pages/PersonProfilePage.tsx:127
 msgid "What {name} can see"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FeatureAccess.tsx:81
-#: src/apps/settings/PersonAccessEditor.tsx:61
+#: src/apps/settings/PersonAccessEditor.tsx:62
 msgid "What {name} can use"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/PersonAccessEditor.tsx:123
+#: src/apps/settings/PersonAccessEditor.tsx:124
 msgid "What {name} can use and see follows the new role from now on. You can change it back any time."
 msgstr ""
 
@@ -35521,7 +35515,7 @@ msgid "What Coding needs"
 msgstr "Lo que Coding necesita"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1981
+#: src/lib/settingCopy.generated.ts:1980
 #, needs-review
 msgid "area.What connects to the internet"
 msgstr "Lo que se conecta a internet"
@@ -36001,7 +35995,7 @@ msgid "Who"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1982
+#: src/lib/settingCopy.generated.ts:1981
 #, needs-review
 msgid "area.Who can code"
 msgstr "Quién puede programar"
@@ -36916,7 +36910,7 @@ msgid "Your current PIN or password is not right. Try again."
 msgstr "Tu PIN o contraseña actual no es correcto. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1983
+#: src/lib/settingCopy.generated.ts:1982
 #, needs-review
 msgid "area.Your data"
 msgstr "Tus datos"
@@ -37277,7 +37271,7 @@ msgid "Yours"
 msgstr "Tus"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1984
+#: src/lib/settingCopy.generated.ts:1983
 #, needs-review
 msgid "area.Yours"
 msgstr "Tuyo"

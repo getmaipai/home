@@ -1936,7 +1936,6 @@ export const AREA_COPY: Record<string, () => string> = {
   "Offline books": () => i18n._({ id: "area.Offline books", message: "Offline books" }),
   "Online radio and podcasts": () => i18n._({ id: "area.Online radio and podcasts", message: "Online radio and podcasts" }),
   "Overview": () => i18n._({ id: "area.Overview", message: "Overview" }),
-  "People": () => i18n._({ id: "area.People", message: "People" }),
   "Performance": () => i18n._({ id: "area.Performance", message: "Performance" }),
   "Personality": () => i18n._({ id: "area.Personality", message: "Personality" }),
   "Personalization": () => i18n._({ id: "area.Personalization", message: "Personalization" }),
