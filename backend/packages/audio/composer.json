@@ -1,5 +1,5 @@
 {
-  "owner": "music session: the Song mode's chips, references, presets and quality go here or in pages/create.json's prompt_bar (MP-U1); until then it is a plain words-only mode",
+  "owner": "music session: the Song and Sound effect modes' chips and slots are defined HERE, once (ONE-COMPOSER). Home's ask box, the chat composer and the Music Create page all read them through GET /api/composer/modes and draw them with the same kitChipsOf; chat_args says which tool argument each chip fills (name, name:bool:<true value>, name:num, name:hint). Saved styles and bands (Presets) are still the Create page's own.",
   "modes": [
     {
       "id": "song",
@@ -19,23 +19,331 @@
       },
       "chat_tool": "generate_music",
       "chat_args": {
-        "quality": "tier"
-      }
+        "quality": "tier",
+        "vocals": "instrumental:bool:instrumental",
+        "language": "language",
+        "length": "length",
+        "starter": "description:hint"
+      },
+      "chips": [
+        {
+          "state": "vocals",
+          "label": "Singing",
+          "group": "Song details",
+          "icon": "mic-vocal",
+          "icon_only": true,
+          "default": "vocals",
+          "options": [
+            {
+              "value": "vocals",
+              "label": "With vocals",
+              "icon": "mic-vocal"
+            },
+            {
+              "value": "instrumental",
+              "label": "Instrumental",
+              "icon": "music-2",
+              "detail": "No singing, just the music."
+            }
+          ]
+        },
+        {
+          "state": "language",
+          "label": "Vocal language",
+          "group": "Song details",
+          "icon": "captions",
+          "icon_only": true,
+          "quiet_value": "",
+          "default": "",
+          "options": [
+            {
+              "value": "",
+              "label": "Auto"
+            },
+            {
+              "value": "en",
+              "label": "English"
+            },
+            {
+              "value": "es",
+              "label": "Spanish"
+            },
+            {
+              "value": "fr",
+              "label": "French"
+            },
+            {
+              "value": "de",
+              "label": "German"
+            },
+            {
+              "value": "it",
+              "label": "Italian"
+            },
+            {
+              "value": "pt",
+              "label": "Portuguese"
+            },
+            {
+              "value": "ja",
+              "label": "Japanese"
+            },
+            {
+              "value": "ko",
+              "label": "Korean"
+            },
+            {
+              "value": "zh",
+              "label": "Chinese"
+            },
+            {
+              "value": "ru",
+              "label": "Russian"
+            }
+          ],
+          "disabled_when": {
+            "chip": "vocals",
+            "value": "instrumental",
+            "reason": "Instrumental is on, so there are no words to sing."
+          }
+        },
+        {
+          "state": "length",
+          "label": "Length",
+          "group": "Song details",
+          "icon": "clock",
+          "icon_only": true,
+          "quiet_value": "",
+          "default": "",
+          "options": [
+            {
+              "value": "",
+              "label": "Auto",
+              "icon": "sparkles"
+            },
+            {
+              "value": "quick",
+              "label": "Quick",
+              "icon": "zap",
+              "detail": "About 45 seconds"
+            },
+            {
+              "value": "full",
+              "label": "Full",
+              "icon": "music",
+              "detail": "A whole song"
+            }
+          ]
+        },
+        {
+          "state": "starter",
+          "label": "Style",
+          "group": "Style",
+          "icon": "palette",
+          "icon_only": true,
+          "quiet_value": "",
+          "default": "",
+          "options": [
+            {
+              "value": "",
+              "label": "No style"
+            },
+            {
+              "value": "Dreamy indie pop",
+              "label": "Dreamy indie pop"
+            },
+            {
+              "value": "Lo-fi beats",
+              "label": "Lo-fi beats"
+            },
+            {
+              "value": "Cinematic score",
+              "label": "Cinematic score"
+            },
+            {
+              "value": "Upbeat funk",
+              "label": "Upbeat funk"
+            },
+            {
+              "value": "Acoustic folk",
+              "label": "Acoustic folk"
+            },
+            {
+              "value": "Synthwave",
+              "label": "Synthwave"
+            },
+            {
+              "value": "Jazz ballad",
+              "label": "Jazz ballad"
+            },
+            {
+              "value": "Epic orchestral",
+              "label": "Epic orchestral"
+            },
+            {
+              "value": "Bedroom pop",
+              "label": "Bedroom pop"
+            },
+            {
+              "value": "Soul",
+              "label": "Soul"
+            },
+            {
+              "value": "Bossa nova",
+              "label": "Bossa nova"
+            },
+            {
+              "value": "Classic rock",
+              "label": "Classic rock"
+            },
+            {
+              "value": "Ambient",
+              "label": "Ambient"
+            },
+            {
+              "value": "Hip hop",
+              "label": "Hip hop"
+            },
+            {
+              "value": "Reggae",
+              "label": "Reggae"
+            },
+            {
+              "value": "Country",
+              "label": "Country"
+            }
+          ]
+        }
+      ],
+      "references": [
+        {
+          "state": "song",
+          "label": "Song to change",
+          "kind": "audio",
+          "max": 1
+        }
+      ]
     },
     {
       "id": "sound",
       "label": "Sound effect",
       "icon": "music",
       "page": "create",
-      "route": "/apps/audio/create",
+      "route": "/apps/audio/create?make=sound",
       "engine": "music",
       "gate": "music",
       "fallback": {
-        "placeholder": "Describe the sound effect or ambience you want.",
+        "placeholder": "Describe the sound you want, like a door creaking or rain on a tin roof.",
         "primary": "Make sound"
       },
       "chat_tool": "generate_music",
-      "chat_args": {}
+      "chat_args": {
+        "seconds": "seconds:num",
+        "loop": "loop:bool:on",
+        "stick": "stick_to_words:bool:words",
+        "takes": "takes:hint"
+      },
+      "chips": [
+        {
+          "state": "seconds",
+          "label": "Length",
+          "group": "Sound",
+          "icon": "clock",
+          "icon_only": true,
+          "default": "3",
+          "options": [
+            {
+              "value": "3",
+              "label": "3 seconds"
+            },
+            {
+              "value": "5",
+              "label": "5 seconds"
+            },
+            {
+              "value": "10",
+              "label": "10 seconds"
+            },
+            {
+              "value": "20",
+              "label": "20 seconds"
+            },
+            {
+              "value": "30",
+              "label": "30 seconds"
+            },
+            {
+              "value": "60",
+              "label": "60 seconds"
+            }
+          ]
+        },
+        {
+          "state": "loop",
+          "label": "Loop it",
+          "group": "Sound",
+          "icon": "refresh-cw",
+          "icon_only": true,
+          "quiet_value": "off",
+          "default": "off",
+          "options": [
+            {
+              "value": "off",
+              "label": "Once",
+              "icon": "play"
+            },
+            {
+              "value": "on",
+              "label": "Loop it",
+              "icon": "refresh-cw"
+            }
+          ]
+        },
+        {
+          "state": "stick",
+          "label": "Words",
+          "group": "Sound",
+          "icon": "pencil",
+          "icon_only": true,
+          "quiet_value": "words",
+          "default": "words",
+          "options": [
+            {
+              "value": "words",
+              "label": "Stick to my words",
+              "icon": "pencil"
+            },
+            {
+              "value": "surprise",
+              "label": "Surprise me",
+              "icon": "shuffle"
+            }
+          ]
+        },
+        {
+          "state": "takes",
+          "label": "Takes",
+          "group": "Sound",
+          "icon": "layers",
+          "icon_only": true,
+          "quiet_value": "1",
+          "default": "1",
+          "options": [
+            {
+              "value": "1",
+              "label": "1 take"
+            },
+            {
+              "value": "2",
+              "label": "2 takes"
+            },
+            {
+              "value": "3",
+              "label": "3 takes"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

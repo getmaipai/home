@@ -1,9 +1,12 @@
 // MUSIC-CLICKS-01: every control on Create does something you can see, and Remix never sends anything to chat. Each test clicks the control.
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { musicRecords } from "../../../tests/musicRecords";
+import { api } from "@/lib/api";
+import { COMPOSER_MODES_KEY } from "@/shell/composer/composerModes";
 import { MusicWorkspace } from "./MusicWorkspacePage";
 import { MAKES } from "./MusicWorkspacePage";
 import { soundCardCopy } from "@/apps/chat/MusicCardView";
@@ -42,7 +45,7 @@ beforeEach(() => {
     return Promise.resolve(Response.json({}));
   }) as typeof fetch;
 });
-afterEach(() => { cleanup(); globalThis.fetch = baseFetch; });
+afterEach(() => { cleanup(); mock.restore(); globalThis.fetch = baseFetch; });
 
 const openMenu = (trigger: HTMLElement) => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" }); };
 const withJobs = (cards: unknown[]) => {
@@ -53,7 +56,14 @@ const withJobs = (cards: unknown[]) => {
     return before(input, init);
   }) as typeof fetch;
 };
-const open = (search = "") => renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
+// The Song and Sound chips are the hub's record (composer.json of the audio package); the hub lists Standard and Boost for this person.
+const open = (search = "") => {
+  const records = musicRecords().map((record) => record.id === "song" ? { ...record, quality: { default: "standard", options: [{ value: "standard", label: "Standard" }, { value: "boost", label: "Boost" }] } } : record);
+  spyOn(api, "composerModes").mockResolvedValue({ band: "adult", modes: records });
+  const view = renderWithQueryClient(<ToastProvider><MemoryRouter><MusicWorkspace adult search={search} /></MemoryRouter></ToastProvider>);
+  view.queryClient.setQueryData(COMPOSER_MODES_KEY, { band: "adult", modes: records });
+  return view;
+};
 
 /** Pick a mode in the pill: Song, Sound effect, Voiceover, Band, Album or Style. */
 const chooseMode = async (view: ReturnType<typeof open>, label: string) => {

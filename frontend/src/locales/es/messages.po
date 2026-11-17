@@ -162,7 +162,7 @@ msgid "setting.engines.stack.where.help"
 msgstr "\"Esta computadora\" ejecuta el motor en la máquina donde está instalado Home. \"Otra computadora\" lo ejecuta en otra computadora de tu hogar a la que accedes a través de tu red. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:211
+#: src/shell/pages/MusicComposer.tsx:217
 msgid "[Verse]\n"
 "Write your own words here, a line at a time.\n"
 "\n"
@@ -353,8 +353,7 @@ msgid "{count, plural, one {# song} other {# songs}}"
 msgstr "{count, plural, one {# canción} other {# canciones}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:229
-#: src/shell/pages/musicComposerMode.ts:87
+#: src/shell/pages/MusicComposer.tsx:235
 msgid "{count, plural, one {# take} other {# takes}}"
 msgstr ""
 
@@ -520,12 +519,7 @@ msgid "settings.attention.robots.many"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:160
-msgid "{count} seconds"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:184
+#: src/shell/pages/MusicComposer.tsx:190
 msgid "{count} songs are made one after another, about a minute each, and show on one card you can step through."
 msgstr ""
 
@@ -750,7 +744,7 @@ msgid "{kind, select, band {Opening your band} album {Opening your album} other 
 msgstr "{kind, select, band {Abriendo tu banda} album {Abriendo tu álbum} other {Abriendo tu estilo}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:151
+#: src/shell/pages/MusicComposer.tsx:156
 #: src/shell/pages/MusicStudioPages.tsx:88
 #, needs-review
 msgid "{kind, select, band {Saved. Your band is in My creations.} album {Saved. Your album is in My creations.} other {Saved. Your style is in My creations.}}"
@@ -769,7 +763,7 @@ msgid "{kind, select, band {That band is not here. It may have been discarded.} 
 msgstr "{kind, select, band {Esa banda no está aquí. Puede que se haya descartado.} album {Ese álbum no está aquí. Puede que se haya descartado.} other {Ese estilo no está aquí. Puede que se haya descartado.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:152
+#: src/shell/pages/MusicComposer.tsx:157
 #: src/shell/pages/MusicStudioPages.tsx:89
 #, needs-review
 msgid "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}"
@@ -2026,7 +2020,7 @@ msgid "A few quick changes help the AI run well. All are optional."
 msgstr "Unos pocos cambios rápidos ayudan a que la IA funcione bien. Todos son opcionales."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:75
+#: src/shell/pages/musicComposerMode.ts:78
 msgid "A few seconds"
 msgstr ""
 
@@ -2387,11 +2381,6 @@ msgid "setting.robot.face.color.option.peach"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:112
-msgid "A whole song"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:328
 #: src/shell/pages/CompanionsPage.tsx:335
@@ -2419,7 +2408,7 @@ msgid "About {count, plural, one {# second} other {# seconds}}"
 msgstr "Aproximadamente {count, plural, one {# segundo} other {# segundos}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:74
+#: src/shell/pages/musicComposerMode.ts:77
 msgid "About {count} minutes"
 msgstr ""
 
@@ -2454,12 +2443,7 @@ msgid "about 1 minute left"
 msgstr "Queda un minuto"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:112
-msgid "About 45 seconds"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:74
+#: src/shell/pages/musicComposerMode.ts:77
 msgid "About a minute"
 msgstr ""
 
@@ -2579,7 +2563,7 @@ msgid "Add a pair"
 msgstr "Añadir un par"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:207
+#: src/shell/pages/MusicComposer.tsx:213
 msgid "Add a part"
 msgstr ""
 
@@ -2627,7 +2611,7 @@ msgid "Add a style"
 msgstr "Añadir un estilo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:145
+#: src/shell/pages/musicComposerMode.ts:146
 msgid "Add a tag"
 msgstr ""
 
@@ -2697,7 +2681,7 @@ msgid "Add an app to {title}"
 msgstr "Añadir una app a {title}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:67
+#: src/shell/pages/musicComposerMode.ts:70
 msgid "Add an audio or video file with the plus button, then pick the new voice."
 msgstr ""
 
@@ -2729,7 +2713,7 @@ msgstr "Añadir red"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/BringSong.tsx:12
-#: src/shell/pages/MusicComposer.tsx:42
+#: src/shell/pages/MusicComposer.tsx:43
 #, needs-review
 msgid "Add one audio file under 40 MB: mp3, m4a, wav, aac, ogg or flac."
 msgstr "Agrega un archivo de audio menor a 40 MB: mp3, m4a, wav, aac, ogg o flac."
@@ -2873,13 +2857,13 @@ msgid "Adding"
 msgstr "Añadiendo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:178
+#: src/shell/pages/musicComposerMode.ts:173
 #, needs-review
 msgid "Adding your file…"
 msgstr "Agregando tu archivo…"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:175
+#: src/shell/pages/MusicComposer.tsx:181
 msgid "Adding your song."
 msgstr ""
 
@@ -3135,7 +3119,7 @@ msgid "Adults only."
 msgstr "Solo adultos."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:224
+#: src/shell/pages/MusicComposer.tsx:230
 msgid "Advanced"
 msgstr ""
 
@@ -3326,7 +3310,7 @@ msgid "setting.tts.voice_id.option_label.alba"
 msgstr "Alba"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:20
+#: src/shell/pages/musicComposerMode.ts:21
 #, needs-review
 msgid "Album"
 msgstr "Álbum"
@@ -4114,7 +4098,7 @@ msgid "Articles picked at random from the Wikipedia on this computer."
 msgstr "Artículos elegidos al azar de la Wikipedia en este equipo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:99
+#: src/shell/pages/dashboard/AskBox.tsx:94
 #, needs-review
 msgid "Ask"
 msgstr "Pregunta"
@@ -4195,7 +4179,7 @@ msgid "api.minor.guest_stay_ask_adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/AskBox.tsx:16
+#: src/shell/pages/dashboard/AskBox.tsx:15
 #, needs-review
 msgid "Ask anything"
 msgstr "Pregunta lo que quieras"
@@ -4341,7 +4325,7 @@ msgid "Audience"
 msgstr "Público"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:178
+#: src/shell/pages/musicComposerMode.ts:173
 msgid "Audio or video"
 msgstr ""
 
@@ -4365,10 +4349,9 @@ msgstr "Código QR para configurar el autenticador"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:169
-#: src/shell/pages/MusicComposer.tsx:245
-#: src/shell/pages/MusicComposer.tsx:249
-#: src/shell/pages/MusicComposer.tsx:252
-#: src/shell/pages/musicComposerMode.ts:112
+#: src/shell/pages/MusicComposer.tsx:251
+#: src/shell/pages/MusicComposer.tsx:255
+#: src/shell/pages/MusicComposer.tsx:258
 #: src/shell/pages/musicCreateForm.ts:43
 #, needs-review
 msgid "Auto"
@@ -4668,7 +4651,7 @@ msgid "Balanced is a good start. You can change it any time."
 msgstr "Equilibrado es un buen comienzo. Puedes cambiarlo cuando quieras."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:19
+#: src/shell/pages/musicComposerMode.ts:20
 #, needs-review
 msgid "Band"
 msgstr "Banda"
@@ -4812,7 +4795,7 @@ msgid "Belongs to {owner}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:95
+#: src/shell/pages/musicComposerMode.ts:93
 msgid "Best quality"
 msgstr ""
 
@@ -5126,7 +5109,7 @@ msgstr ""
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:55
 #: src/shell/library/LibraryViewer.tsx:164
-#: src/shell/pages/musicComposerMode.ts:94
+#: src/shell/pages/musicComposerMode.ts:92
 #, needs-review
 msgid "Boost"
 msgstr "Impulso"
@@ -5638,7 +5621,7 @@ msgstr "Celsius"
 #. js-lingui-explicit-id
 #: src/apps/settings/AiGlance.tsx:138
 #: src/apps/settings/RobotPasswordSection.tsx:152
-#: src/shell/pages/musicComposerMode.ts:121
+#: src/shell/pages/musicComposerMode.ts:122
 #: src/shell/pages/settings/SettingField.tsx:157
 msgid "Change"
 msgstr ""
@@ -5650,7 +5633,7 @@ msgid "Change a few settings"
 msgstr "Cambiar algunos ajustes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:140
+#: src/shell/pages/musicComposerMode.ts:141
 msgid "Change a voice"
 msgstr ""
 
@@ -5702,18 +5685,18 @@ msgid "Change the request"
 msgstr "Cambia la solicitud"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:79
+#: src/shell/pages/musicComposerMode.ts:82
 #, needs-review
 msgid "Change the style"
 msgstr "Cambia el estilo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:196
+#: src/shell/pages/musicComposerMode.ts:191
 msgid "Change the voice of {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:173
+#: src/shell/pages/musicComposerMode.ts:168
 #, needs-review
 msgid "Change voice"
 msgstr "Cambiar voz"
@@ -6493,7 +6476,7 @@ msgid "api.error.world_place_zone_invalid"
 msgstr "Elige una zona horaria válida."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:129
+#: src/shell/pages/musicComposerMode.ts:130
 #: src/shell/pages/MusicSpeechPage.tsx:57
 #, needs-review
 msgid "Choose a voice"
@@ -9237,7 +9220,7 @@ msgstr "Trabajo actual"
 #: src/apps/settings/VoiceManagerSection.tsx:112
 #: src/apps/settings/VoiceManagerSection.tsx:119
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:23
-#: src/shell/pages/MusicComposer.tsx:202
+#: src/shell/pages/MusicComposer.tsx:208
 #, needs-review
 msgid "Custom"
 msgstr "Personalizado"
@@ -9754,12 +9737,12 @@ msgid "Describe the new cover"
 msgstr "Describe la nueva portada"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:71
+#: src/shell/pages/musicComposerMode.ts:74
 msgid "Describe the song you want. Add details like instruments or the kind of voice."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:188
+#: src/shell/pages/MusicComposer.tsx:194
 #, needs-review
 msgid "Describe the sound"
 msgstr "Describe el sonido"
@@ -9770,7 +9753,7 @@ msgid "Describe the sound in at least 3 characters to start."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:66
+#: src/shell/pages/musicComposerMode.ts:69
 msgid "Describe the sound you want, like a door creaking or rain on a tin roof."
 msgstr ""
 
@@ -9782,7 +9765,7 @@ msgstr "Describe lo que quieres cambiar. El original se queda."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:141
-#: src/shell/pages/MusicComposer.tsx:188
+#: src/shell/pages/MusicComposer.tsx:194
 #, needs-review
 msgid "Describe your song"
 msgstr "Describe tu canción"
@@ -10442,7 +10425,7 @@ msgid "Each row is a big job. Each column says what that category does while the
 msgstr "Cada fila es una tarea grande. Cada columna indica qué hace esa categoría mientras corre la tarea. El chat nunca se pausa, solo se simplifica."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:231
+#: src/shell/pages/MusicComposer.tsx:237
 msgid "Each take is a different song from the same words."
 msgstr ""
 
@@ -11342,7 +11325,7 @@ msgid "setting.tts.voice_id.option_label.fantine"
 msgstr "Fantine"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:93
+#: src/shell/pages/musicComposerMode.ts:91
 msgid "Fast"
 msgstr ""
 
@@ -12025,7 +12008,6 @@ msgstr "Frontal"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:166
-#: src/shell/pages/musicComposerMode.ts:112
 #: src/shell/pages/MusicLibrary.tsx:83
 #, needs-review
 msgid "Full"
@@ -13302,13 +13284,13 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:133
-#: src/shell/pages/MusicComposer.tsx:147
+#: src/shell/pages/MusicComposer.tsx:152
 #, needs-review
 msgid "Home could not start the song. Check the request and try again."
 msgstr "Home no pudo iniciar la canción. Revisa la solicitud e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:147
+#: src/shell/pages/MusicComposer.tsx:152
 #, needs-review
 msgid "Home could not start the sound. Check the request and try again."
 msgstr "Home no pudo iniciar el sonido. Revisa la solicitud e intenta de nuevo."
@@ -13674,7 +13656,7 @@ msgstr "Home solo descarga lo que cabe aquí."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:162
-#: src/shell/pages/MusicComposer.tsx:215
+#: src/shell/pages/MusicComposer.tsx:221
 #, needs-review
 msgid "Home picks one if you leave this empty"
 msgstr "Home elige uno si dejas esto vacío"
@@ -13897,13 +13879,13 @@ msgid "Household total"
 msgstr "Total del hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:128
+#: src/shell/pages/musicComposerMode.ts:129
 #, needs-review
 msgid "Household voice"
 msgstr "Voz del hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:122
+#: src/shell/pages/musicComposerMode.ts:123
 msgid "Household voices are made on the Voices page. Make one first."
 msgstr ""
 
@@ -14916,19 +14898,13 @@ msgstr "Inmediato"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:151
-#: src/shell/pages/MusicComposer.tsx:211
-#: src/shell/pages/musicComposerMode.ts:107
+#: src/shell/pages/MusicComposer.tsx:217
 #, needs-review
 msgid "Instrumental"
 msgstr "Instrumental"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:109
-msgid "Instrumental is on, so there are no words to sing."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:206
+#: src/shell/pages/MusicComposer.tsx:212
 msgid "Instrumental is on, so there are no words."
 msgstr ""
 
@@ -15549,7 +15525,7 @@ msgstr "Guardado. Esta canción se queda en tu Biblioteca hasta que la borres."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:170
-#: src/shell/pages/MusicComposer.tsx:242
+#: src/shell/pages/MusicComposer.tsx:248
 #: src/shell/pages/performance/LabelsBody.tsx:28
 #, needs-review
 msgid "Key"
@@ -15892,7 +15868,7 @@ msgid "Layout"
 msgstr "Diseño"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:206
+#: src/shell/pages/MusicComposer.tsx:212
 msgid "Leave empty and Home writes the words."
 msgstr ""
 
@@ -15943,8 +15919,6 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:140
 #: src/shell/pages/MakeSongPage.tsx:164
 #: src/shell/pages/MakeSongPage.tsx:165
-#: src/shell/pages/musicComposerMode.ts:111
-#: src/shell/pages/musicComposerMode.ts:160
 #, needs-review
 msgid "Length"
 msgstr "Duración"
@@ -17320,13 +17294,6 @@ msgid "Loop is not seamless: this computer has no audio tool to blend the ends"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:161
-#: src/shell/pages/musicComposerMode.ts:161
-#, needs-review
-msgid "Loop it"
-msgstr "Hacer bucle"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:663
 #, needs-review
 msgid "setting.network.lan_exposure.option_label.loopback"
@@ -17420,8 +17387,8 @@ msgstr "LTX-2.5"
 #: src/shell/media/NowPlayingStage.tsx:199
 #: src/shell/music/MusicPlayerBar.tsx:257
 #: src/shell/music/MusicPlayerBar.tsx:257
-#: src/shell/pages/MusicComposer.tsx:206
-#: src/shell/pages/MusicComposer.tsx:210
+#: src/shell/pages/MusicComposer.tsx:212
+#: src/shell/pages/MusicComposer.tsx:216
 #: src/shell/pages/MusicSongDetails.tsx:111
 #: src/shell/pages/MusicSongDetails.tsx:112
 #: src/shell/pages/MusicSongDetails.tsx:174
@@ -17616,7 +17583,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:161
-#: src/shell/pages/musicComposerMode.ts:174
+#: src/shell/pages/musicComposerMode.ts:169
 #: src/shell/pages/MusicStudioPages.tsx:91
 #, needs-review
 msgid "Make a band"
@@ -17677,7 +17644,7 @@ msgid "Make a song style"
 msgstr "Hacer un estilo de canción"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:174
+#: src/shell/pages/musicComposerMode.ts:169
 msgid "Make a style"
 msgstr ""
 
@@ -17732,7 +17699,7 @@ msgid "Make all ages"
 msgstr "Hacer para todas las edades"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:174
+#: src/shell/pages/musicComposerMode.ts:169
 #: src/shell/pages/MusicStudioPages.tsx:91
 #, needs-review
 msgid "Make an album"
@@ -17891,7 +17858,7 @@ msgid "Make voice"
 msgstr "Crear voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:173
+#: src/shell/pages/musicComposerMode.ts:168
 #, needs-review
 msgid "Make voiceover"
 msgstr "Crear doblaje"
@@ -18204,7 +18171,7 @@ msgstr "Malva"
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:56
 #: src/shell/library/LibraryViewer.tsx:164
-#: src/shell/pages/musicComposerMode.ts:95
+#: src/shell/pages/musicComposerMode.ts:93
 #, needs-review
 msgid "Max"
 msgstr "Máximo"
@@ -18712,7 +18679,7 @@ msgid "More Coding settings"
 msgstr "Más ajustes de Coding"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:94
+#: src/shell/pages/musicComposerMode.ts:92
 msgid "More detail"
 msgstr ""
 
@@ -18995,7 +18962,7 @@ msgid "Muted"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:169
+#: src/shell/pages/musicComposerMode.ts:164
 msgid "My bands"
 msgstr ""
 
@@ -19025,7 +18992,7 @@ msgid "setting.news.my_mix.label"
 msgstr "Mi mezcla"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:167
+#: src/shell/pages/musicComposerMode.ts:162
 msgid "My styles"
 msgstr ""
 
@@ -19047,7 +19014,7 @@ msgstr ""
 #: src/apps/settings/styles/StyleEditor.tsx:83
 #: src/shell/library/useSaveAsCharacter.tsx:42
 #: src/shell/pages/FilesPage.tsx:425
-#: src/shell/pages/MusicComposer.tsx:188
+#: src/shell/pages/MusicComposer.tsx:194
 #: src/shell/pages/ProjectsPage.tsx:160
 #: src/shell/pages/UpdatesPage.tsx:49
 msgid "Name"
@@ -19088,7 +19055,7 @@ msgid "Name your album to start."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:69
+#: src/shell/pages/musicComposerMode.ts:72
 msgid "Name your album. You add the sound and the cover next."
 msgstr ""
 
@@ -19104,7 +19071,7 @@ msgid "Name your band to start."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:68
+#: src/shell/pages/musicComposerMode.ts:71
 msgid "Name your band. You add the sound and the story next."
 msgstr ""
 
@@ -19114,7 +19081,7 @@ msgid "Name your style to start."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:70
+#: src/shell/pages/musicComposerMode.ts:73
 msgid "Name your style. You say how it sounds next."
 msgstr ""
 
@@ -20029,7 +19996,6 @@ msgstr "Aún no hay ajustes."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:151
-#: src/shell/pages/musicComposerMode.ts:107
 #, needs-review
 msgid "No singing, just the music."
 msgstr "Sin canto, solo la música."
@@ -20077,11 +20043,6 @@ msgstr "sin Stack configurado"
 #, needs-review
 msgid "No Stack configured"
 msgstr "Stack no configurado"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:115
-msgid "No style"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:163
@@ -20186,7 +20147,7 @@ msgid "No vocals"
 msgstr "Sin voces"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:142
+#: src/shell/pages/musicComposerMode.ts:143
 msgid "No voices are ready yet."
 msgstr ""
 
@@ -20246,8 +20207,8 @@ msgstr "Nodo"
 #: src/apps/clock/AlarmEditor.tsx:98
 #: src/apps/clock/AlarmRecordRow.tsx:34
 #: src/shell/media/VisualizerMenu.tsx:23
-#: src/shell/pages/musicComposerMode.ts:168
-#: src/shell/pages/musicComposerMode.ts:170
+#: src/shell/pages/musicComposerMode.ts:163
+#: src/shell/pages/musicComposerMode.ts:165
 #: src/shell/pages/settings/HouseSettings.tsx:49
 #: src/shell/pages/settings/HouseSettings.tsx:50
 #, needs-review
@@ -21310,7 +21271,6 @@ msgstr "Activado. Busca y descarga estilos de Hugging Face. Solo necesitas un to
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:10
-#: src/shell/pages/musicComposerMode.ts:161
 #, needs-review
 msgid "Once"
 msgstr "Una vez"
@@ -22492,7 +22452,7 @@ msgid "Pick one of your own clips to put after this one."
 msgstr "Elige uno de tus clips para ponerlo después de este."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:217
+#: src/shell/pages/MusicComposer.tsx:223
 msgid "Pick up to 8. Words only, never lyrics."
 msgstr ""
 
@@ -22521,7 +22481,7 @@ msgid "Pick which model answers chat. The household keeps working while a new on
 msgstr "Elige qué modelo responde al chat. El hogar sigue funcionando mientras se descarga uno nuevo, y tu elección se mantiene tras reiniciar."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:195
+#: src/shell/pages/MusicComposer.tsx:201
 msgid "Picked styles"
 msgstr ""
 
@@ -23201,7 +23161,7 @@ msgid "setting.ease.word_help.option_label.preset"
 msgstr "Predeterminado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:182
+#: src/shell/pages/musicComposerMode.ts:177
 msgid "Presets"
 msgstr ""
 
@@ -23472,7 +23432,6 @@ msgstr "Colas"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:166
-#: src/shell/pages/musicComposerMode.ts:112
 #, needs-review
 msgid "Quick"
 msgstr "Rápido"
@@ -23573,8 +23532,8 @@ msgid "Raise or lower volume"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:236
-#: src/shell/pages/MusicComposer.tsx:237
+#: src/shell/pages/MusicComposer.tsx:242
+#: src/shell/pages/MusicComposer.tsx:243
 msgid "Random"
 msgstr ""
 
@@ -24035,7 +23994,7 @@ msgstr "¿Eliminar {label}?"
 #: src/apps/settings/DevicesSection.tsx:147
 #: src/apps/settings/UsersSection.tsx:421
 #: src/shell/pages/MakeSongPage.tsx:146
-#: src/shell/pages/MusicComposer.tsx:196
+#: src/shell/pages/MusicComposer.tsx:202
 #, needs-review
 msgid "Remove {name}"
 msgstr "Quitar {name}"
@@ -24127,7 +24086,7 @@ msgid "Remove the connected Hugging Face token?"
 msgstr "¿Eliminar el token de Hugging Face conectado?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:79
+#: src/shell/pages/musicComposerMode.ts:82
 #, needs-review
 msgid "Remove the vocals"
 msgstr "Quita la voz"
@@ -25534,7 +25493,7 @@ msgstr "Guardando tus muestras faciales…"
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/SignInSecretSection.tsx:74
-#: src/shell/pages/MusicComposer.tsx:126
+#: src/shell/pages/MusicComposer.tsx:131
 #: src/shell/pages/MusicSpeechPage.tsx:80
 #: src/shell/pages/settings/SettingField.tsx:138
 #: src/shell/pages/status/StatusBoard.tsx:114
@@ -25553,7 +25512,7 @@ msgid "Say how the song should sound instead, in at least 3 characters."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:64
+#: src/shell/pages/musicComposerMode.ts:67
 msgid "Say how the song should sound instead, like soft jazz with a slow piano."
 msgstr ""
 
@@ -25774,7 +25733,7 @@ msgid "Score for {song}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:188
+#: src/shell/pages/MusicComposer.tsx:194
 #: src/shell/pages/MusicSpeechPage.tsx:55
 #, needs-review
 msgid "Script"
@@ -26160,7 +26119,7 @@ msgstr "ver la lista en vivo"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:162
-#: src/shell/pages/MusicComposer.tsx:234
+#: src/shell/pages/MusicComposer.tsx:240
 msgid "Seed"
 msgstr ""
 
@@ -27208,15 +27167,10 @@ msgid "Since {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:80
+#: src/shell/pages/musicComposerMode.ts:83
 #, needs-review
 msgid "Sing it in another voice"
 msgstr "Cántala con otra voz"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:106
-msgid "Singing"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:95
@@ -27708,7 +27662,7 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:138
 #: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:165
-#: src/shell/pages/musicComposerMode.ts:18
+#: src/shell/pages/musicComposerMode.ts:19
 #: src/shell/pages/PersonProfilePage.tsx:176
 #: src/shell/pages/SoundExtras.tsx:75
 #: src/shell/pages/SoundExtras.tsx:77
@@ -27722,7 +27676,6 @@ msgid "Song controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:103
 #: src/shell/pages/MusicLibrary.tsx:206
 #: src/shell/pages/MusicLibrary.tsx:211
 msgid "Song details"
@@ -27747,7 +27700,7 @@ msgid "Song style (optional)"
 msgstr "Estilo de canción (opcional)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:177
+#: src/shell/pages/musicComposerMode.ts:172
 msgid "Song to change"
 msgstr ""
 
@@ -27788,7 +27741,7 @@ msgid "setting.storage.library.songs.threshold_percent.label"
 msgstr "Aviso de almacenamiento de canciones (%)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:227
+#: src/shell/pages/MusicComposer.tsx:233
 msgid "Songs to make"
 msgstr ""
 
@@ -27808,19 +27761,18 @@ msgstr "Ordenar por"
 #: src/apps/clock/AlarmEditor.tsx:94
 #: src/apps/clock/AlarmEditor.tsx:96
 #: src/shell/pages/CompanionsPage.tsx:261
-#: src/shell/pages/musicComposerMode.ts:158
 #: src/shell/pages/MusicLibrary.tsx:130
 #, needs-review
 msgid "Sound"
 msgstr "Sonido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:18
+#: src/shell/pages/musicComposerMode.ts:19
 msgid "Sound effect"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:198
+#: src/shell/pages/MusicComposer.tsx:204
 msgid "Sound effects are Powered by Stability AI."
 msgstr ""
 
@@ -27867,7 +27819,7 @@ msgid "setting.person.locale.option.es"
 msgstr "Español, traducido por el propio modelo de Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:140
+#: src/shell/pages/musicComposerMode.ts:141
 msgid "Speak my words"
 msgstr ""
 
@@ -28002,7 +27954,7 @@ msgstr "Separa una canción en voces, batería, bajo y el resto."
 #: src/apps/chat/MusicCardView.tsx:97
 #: src/shell/library/LibraryViewer.tsx:120
 #: src/shell/pages/BringSong.tsx:39
-#: src/shell/pages/musicComposerMode.ts:80
+#: src/shell/pages/musicComposerMode.ts:83
 #: src/shell/pages/MusicStudioView.tsx:151
 #, needs-review
 msgid "Split into stems"
@@ -28113,7 +28065,7 @@ msgstr "En espera"
 #: src/apps/settings/performanceModel.ts:54
 #: src/apps/settings/ReferenceLibrarySettings.tsx:67
 #: src/shell/library/LibraryViewer.tsx:164
-#: src/shell/pages/musicComposerMode.ts:93
+#: src/shell/pages/musicComposerMode.ts:91
 #, needs-review
 msgid "Standard"
 msgstr "Estándar"
@@ -28453,12 +28405,6 @@ msgid "Step {value} of {length}: {STEPS}"
 msgstr "Paso {value} de {length}: {STEPS}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:162
-#, needs-review
-msgid "Stick to my words"
-msgstr "Usar mis palabras"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1039
 msgid "setting.robot.idle.level.option_label.still"
 msgstr ""
@@ -28741,8 +28687,7 @@ msgstr "Studio"
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:164
-#: src/shell/pages/musicComposerMode.ts:20
-#: src/shell/pages/musicComposerMode.ts:104
+#: src/shell/pages/musicComposerMode.ts:21
 #: src/shell/pages/MusicRemix.tsx:45
 #, needs-review
 msgid "Style"
@@ -28759,8 +28704,8 @@ msgstr ""
 #: src/shell/library/LibraryViewer.tsx:165
 #: src/shell/pages/MakeSongPage.tsx:144
 #: src/shell/pages/MakeSongPage.tsx:145
-#: src/shell/pages/MusicComposer.tsx:217
-#: src/shell/pages/MusicComposer.tsx:218
+#: src/shell/pages/MusicComposer.tsx:223
+#: src/shell/pages/MusicComposer.tsx:224
 #: src/shell/pages/MusicStudioPages.tsx:146
 #: src/shell/pages/settings/MediaCardViews.tsx:92
 #, needs-review
@@ -28838,12 +28783,6 @@ msgstr "Resumen para copiar"
 #, needs-review
 msgid "Sun"
 msgstr "Dom"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:162
-#, needs-review
-msgid "Surprise me"
-msgstr "Sorpréndeme"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:88
@@ -28950,7 +28889,6 @@ msgid "Take {number}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:163
 #: src/shell/pages/MusicSongDetails.tsx:179
 msgid "Takes"
 msgstr ""
@@ -29122,7 +29060,7 @@ msgstr "Unidad de temperatura"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:169
-#: src/shell/pages/MusicComposer.tsx:249
+#: src/shell/pages/MusicComposer.tsx:255
 #, needs-review
 msgid "Tempo (BPM)"
 msgstr "Tempo (BPM)"
@@ -30649,7 +30587,7 @@ msgid "notification.safety.alarm_dismissed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:239
+#: src/shell/pages/MusicComposer.tsx:245
 msgid "The same seed with the same words makes a very similar song."
 msgstr ""
 
@@ -30891,7 +30829,7 @@ msgid "setting.ease.reading_level.option.standard"
 msgstr "La redacción habitual."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:140
+#: src/shell/pages/musicComposerMode.ts:141
 #, needs-review
 msgid "The video's own sound is replaced. The original file is not changed."
 msgstr "Se reemplaza el sonido del video. El archivo original no cambia."
@@ -31684,8 +31622,8 @@ msgstr "Tiempo"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:91
-#: src/shell/pages/MusicComposer.tsx:214
-#: src/shell/pages/MusicComposer.tsx:215
+#: src/shell/pages/MusicComposer.tsx:220
+#: src/shell/pages/MusicComposer.tsx:221
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/status/StatusBoard.tsx:107
 #, needs-review
@@ -32479,7 +32417,7 @@ msgid "Type what the voice should say."
 msgstr "Escribe lo que debe decir la voz."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:67
+#: src/shell/pages/musicComposerMode.ts:70
 msgid "Type what you want said. Add a tag like [sighs] where the voice should."
 msgstr ""
 
@@ -32705,7 +32643,7 @@ msgstr "Sin título"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:122
-#: src/shell/pages/musicComposerMode.ts:170
+#: src/shell/pages/musicComposerMode.ts:165
 #, needs-review
 msgid "Untitled band"
 msgstr "Banda sin título"
@@ -32729,7 +32667,7 @@ msgstr "Canción sin título"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:121
-#: src/shell/pages/musicComposerMode.ts:168
+#: src/shell/pages/musicComposerMode.ts:163
 #, needs-review
 msgid "Untitled style"
 msgstr "Estilo sin título"
@@ -32755,7 +32693,7 @@ msgstr "Subir un nivel"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:164
-#: src/shell/pages/MusicComposer.tsx:231
+#: src/shell/pages/MusicComposer.tsx:237
 #, needs-review
 msgid "Up to {minutes, plural, one {# minute} other {# minutes}} on this computer."
 msgstr "Hasta {minutes, plural, one {# minuto} other {# minutos}} en este equipo."
@@ -33521,11 +33459,6 @@ msgid "Vocal clarity"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:108
-msgid "Vocal language"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicRemix.tsx:47
 #: src/shell/pages/MusicRemix.tsx:47
 #, needs-review
@@ -33545,7 +33478,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:160
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:160
 #: src/shell/pages/CompanionsPage.tsx:366
-#: src/shell/pages/musicComposerMode.ts:135
+#: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
 #: src/shell/pages/settings/settingsViews.tsx:178
 #: src/shell/pages/status/StatusComponents.tsx:30
@@ -33678,7 +33611,7 @@ msgid "Voice source"
 msgstr "Fuente de voz"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:19
+#: src/shell/pages/musicComposerMode.ts:20
 #: src/shell/pages/MusicVoiceCreate.tsx:96
 #, needs-review
 msgid "Voiceover"
@@ -34149,7 +34082,7 @@ msgid "What to add"
 msgstr "Qué añadir"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:139
+#: src/shell/pages/musicComposerMode.ts:140
 msgid "What to do"
 msgstr ""
 
@@ -34678,11 +34611,6 @@ msgid "setting.reference.download.when.option_label.window"
 msgstr "Ventana"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:107
-msgid "With vocals"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceBox.tsx:58
 msgid "Woman"
 msgstr ""
@@ -34704,11 +34632,6 @@ msgstr "Significados de palabras en inglés sencillo."
 #, needs-review
 msgid "Word meanings, origins and translations."
 msgstr "Significados, orígenes y traducciones de palabras."
-
-#. js-lingui-explicit-id
-#: src/shell/pages/musicComposerMode.ts:162
-msgid "Words"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleEditor.tsx:124
@@ -35431,7 +35354,7 @@ msgid "setting.resources.preset.option.custom"
 msgstr "Tus propios valores."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:202
+#: src/shell/pages/MusicComposer.tsx:208
 msgid "Your own words, a title, styles, seed"
 msgstr ""
 
@@ -35513,14 +35436,13 @@ msgstr "Tus programas, música y cosas que hiciste están al frente con el día 
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:842
-#: src/shell/composer/homeMusicModes.ts:38
-#: src/shell/pages/MusicComposer.tsx:116
+#: src/shell/pages/MusicComposer.tsx:121
 #, needs-review
 msgid "Your song"
 msgstr "Tu canción"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/MusicComposer.tsx:127
+#: src/shell/pages/MusicComposer.tsx:132
 #: src/shell/pages/musicCreateForm.ts:105
 msgid "Your song is being started."
 msgstr ""

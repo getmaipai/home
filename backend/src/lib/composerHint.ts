@@ -56,7 +56,7 @@ export async function resolveComposerHint(actor: PersonRow, raw: unknown, offere
       }
       const chip = spec.mode.chips.find((c) => c.id === key);
       const option = chip?.options.find((o) => o.value === value);
-      if (chip && option && key in spec.fill) { settings[key] = option.value; lines.push(`${chip.label.toLowerCase()} ${option.label.toLowerCase()}`); }
+      if (chip && option && key in spec.fill && value !== "") { settings[key] = option.value; lines.push(`${chip.label.toLowerCase()} ${option.label.toLowerCase()}`); }
     }
 
     const available = parsed.data.cast?.length ? (await import("@/lib/cast")).listCast(actor) : [];
@@ -97,8 +97,10 @@ export function fillComposerDefaults(hint: ComposerHint | undefined, tool: strin
       hasCard = true;
       continue;
     }
-    if (args[argument] !== undefined) continue;
-    filled[argument] = value;
+    // `name`, or `name:bool:<the value that means true>`, `name:num`, `name:hint` (the setting reaches the model as words only). An empty value is Auto and fills nothing.
+    const [name = argument, kind, truthy] = argument.split(":");
+    if (value === "" || kind === "hint" || args[name] !== undefined) continue;
+    filled[name] = kind === "bool" ? value === truthy : kind === "num" ? Number(value) : value;
     changed = true;
   }
   if (hasCard) {

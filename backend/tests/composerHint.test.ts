@@ -90,7 +90,7 @@ describe("validation against the person's band", () => {
 
   test("Sound effect mode points to generate_music and changes no offered tools", async () => {
     const soundMode = (await composerModesFor(people.owner)).modes.find((mode) => mode.id === "sound");
-    expect(soundMode).toMatchObject({ label: "Sound effect", engine: "music", route: "/apps/audio/create" });
+    expect(soundMode).toMatchObject({ label: "Sound effect", engine: "music", route: "/apps/audio/create?make=sound" });
     const hint = await resolveComposerHint(people.owner, { mode: "sound" }, OFFERED);
     expect(hint).toMatchObject({ tool: "generate_music", mode: "sound", label: "Sound effect", settings: {} });
     expect(composerHintItem(hint!).text).toContain("The person chose Sound effect in the composer");
@@ -207,4 +207,28 @@ describe("the turn", () => {
       expect(written).not.toMatch(/landscape|"quality"|composer-hint|The person chose/);
     } finally { for (const spy of spies) spy.mockRestore(); }
   }, 30000);
+});
+
+describe("the Song and Sound chips (one definition, in the audio package)", () => {
+  const OFFER = ["generate_music"];
+  const song = (settings: Record<string, string | number>) => ({ mode: "song", settings });
+  test("the modes list carries the Song chips, with the song slot and each option's detail", async () => {
+    const modes = (await composerModesFor(people.owner)).modes;
+    const found = modes.find((m) => m.id === "song")!;
+    expect(found.chips.map((c) => c.id)).toEqual(["vocals", "language", "length", "starter"]);
+    expect(found.references).toEqual([{ id: "song", label: "Song to change", kind: "audio", max: 1 }]);
+    expect(found.chips[0]!.options[1]).toMatchObject({ value: "instrumental", detail: "No singing, just the music." });
+    expect(modes.find((m) => m.id === "sound")!.chips.map((c) => c.id)).toEqual(["seconds", "loop", "stick", "takes"]);
+  });
+  test("Chat fills the tool's unset arguments from them: instrumental, language, length; Auto fills nothing; the model's own values win", async () => {
+    const made = (await resolveComposerHint(people.owner, song({ vocals: "instrumental", language: "es", length: "", starter: "Lo-fi beats" }), OFFER))!;
+    expect(made.lines.join(" | ")).toContain("style lo-fi beats");
+    expect(made.lines.join(" | ")).not.toContain("auto");
+    expect(fillComposerDefaults(made, "generate_music", { description: "a lullaby" })).toEqual({ description: "a lullaby", instrumental: true, language: "es" });
+    expect(fillComposerDefaults(made, "generate_music", { description: "a lullaby", instrumental: false, language: "fr" })).toEqual({ description: "a lullaby", instrumental: false, language: "fr" });
+  });
+  test("Sound fills seconds, loop and stick-to-words", async () => {
+    const made = (await resolveComposerHint(people.owner, { mode: "sound", settings: { seconds: "10", loop: "on", stick: "surprise" } }, OFFER))!;
+    expect(fillComposerDefaults(made, "generate_music", { description: "rain", kind: "sound" })).toEqual({ description: "rain", kind: "sound", seconds: 10, loop: true, stick_to_words: false });
+  });
 });

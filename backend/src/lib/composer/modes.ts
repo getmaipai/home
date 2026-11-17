@@ -27,7 +27,7 @@ import type { PersonRow } from "@/types";
 export type ComposerEngine = "image" | "video" | "music" | "voices";
 export type ComposerTool = "clear" | "improve" | "lyrics";
 
-export interface ComposerModeChip { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
+export interface ComposerModeChip { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; /** While this value is chosen the chip adds nothing to its popover trigger (an "Auto" or "None" start), so the trigger reads the group name. */ quiet?: string | number; /** While another chip of the mode holds `value`, this chip is off and says `reason`. */ disabledWhen?: { chip: string; value: string | number; reason: string }; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string;
   label: string;
@@ -55,6 +55,9 @@ interface Descriptor {
   gate: "pictures" | "videos" | "music"; tier_category?: TierCategory; tools?: ComposerTool[];
   presets?: { label?: string; source: "templates"; kind: "picture" | "video" };
   fallback?: { placeholder?: string; primary?: string };
+  /** Chips and reference slots for a page that is not a schema page (Music's Create page is built by hand and has no `prompt_bar`): the same node shape a `prompt_bar` carries, defined once here and read by every composer. A `prompt_bar` on the page wins. */
+  chips?: Node[];
+  references?: Node[];
   /** The plain line that replaces the primary button's action while no backend route exists for this mode (never a dead control, never hidden). */
   coming_soon?: string;
   /** COMPOSER-04: the one tool a chat hint for this mode may fill, and which chip (or `quality`) fills which of its arguments. Chat only; never an offer. */
@@ -94,13 +97,15 @@ function text(value: unknown): string | undefined { return typeof value === "str
 function chipsOf(bar: Node): ComposerModeChip[] {
   const chips = Array.isArray(bar.chips) ? bar.chips as Node[] : [];
   return chips.flatMap((chip): ComposerModeChip[] => {
-    const options = (Array.isArray(chip.options) ? chip.options as Node[] : []).flatMap((o) => (typeof o.value === "string" || typeof o.value === "number") && text(o.label) ? [{ value: o.value, label: o.label as string, ...(text(o.icon) ? { icon: text(o.icon)! } : {}) }] : []);
+    const options = (Array.isArray(chip.options) ? chip.options as Node[] : []).flatMap((o) => (typeof o.value === "string" || typeof o.value === "number") && text(o.label) ? [{ value: o.value, label: o.label as string, ...(text(o.icon) ? { icon: text(o.icon)! } : {}), ...(text(o.detail) ? { detail: text(o.detail)! } : {}) }] : []);
     const id = text(chip.state), label = text(chip.label);
     if (!id || !label || options.length === 0) return [];
     const group = text(chip.group);
     const quiet = typeof chip.quiet_value === "string" || typeof chip.quiet_value === "number" ? chip.quiet_value : undefined;
     const icon = text(chip.icon);
-    return [{ id, label, ...(group ? { group } : {}), ...(icon ? { icon } : {}), ...(chip.icon_only === true ? { iconOnly: true } : {}), ...(quiet !== undefined ? { quiet } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
+    const dw = chip.disabled_when as { chip?: unknown; value?: unknown; reason?: unknown } | undefined;
+    const disabledWhen = dw && text(dw.chip) && (typeof dw.value === "string" || typeof dw.value === "number") && text(dw.reason) ? { chip: dw.chip as string, value: dw.value, reason: dw.reason as string } : undefined;
+    return [{ id, label, ...(group ? { group } : {}), ...(icon ? { icon } : {}), ...(chip.icon_only === true ? { iconOnly: true } : {}), ...(quiet !== undefined ? { quiet } : {}), ...(disabledWhen ? { disabledWhen } : {}), options, default: (chip.default as string | number | undefined) ?? options[0]!.value }];
   });
 }
 
@@ -146,7 +151,8 @@ function buildModes(person: PersonRow, health: EngineHealth | null): { band: Age
       if (!allowed[d.gate]) continue;
       const page = getAppPage(person, packageId, d.page);
       if (!page.ok) continue;
-      const bar = findPromptBar(page.value) ?? {};
+      const found = findPromptBar(page.value) ?? {};
+      const bar: Node = { ...found, ...(d.chips && !found.chips ? { chips: d.chips } : {}), ...(d.references && !found.references ? { references: d.references } : {}) };
       const row = health?.[d.engine];
       const references = (Array.isArray(bar.references) ? bar.references as Node[] : []).flatMap((ref) => text(ref.state) && text(ref.label) && text(ref.kind) ? [{ id: ref.state as string, label: ref.label as string, kind: ref.kind as "picture", ...(typeof ref.max === "number" ? { max: ref.max } : ref.placement === "in_field" ? { max: 1 } : {}) }] : []);
       const notice = row?.notice;

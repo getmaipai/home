@@ -21,6 +21,7 @@ import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, request } from "@/lib/api";
+import { useComposerModes } from "@/shell/composer/composerModes";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { MAKE_SONG_ADULT_LINE, NO_MUSIC_ENGINE_LINE } from "./MakeSongPage";
 import { COLLECTION, createBody as recordBody, editPath } from "./MusicStudioPages";
@@ -29,7 +30,7 @@ import { VoiceResults, useVoiceMode } from "./MusicVoiceCreate";
 import { RECORD_MAKES, fieldOf, isMake, musicModes, musicQuality, type Make } from "./musicComposerMode";
 import { householdVoicesApi } from "@/lib/householdVoicesApi";
 import {
-  BPM_MAX, BPM_MIN, EMPTY_FORM, EMPTY_SOUND, KEYS, STARTER_STYLE_CHIPS, STRUCTURE_TAGS,
+  BPM_MAX, BPM_MIN, EMPTY_FORM, EMPTY_SOUND, KEYS, STARTER_STYLE_CHIPS, STRUCTURE_TAGS, setStarter,
   createBlocker, createBody, editBlocker, editBody, formLikeSong, insertStructureTag, recordBlocker, soundBody, toggleTag, type CreateForm, type EditChange, type RecordKind, type SoundForm, type Takes, type Tier,
 } from "./musicCreateForm";
 
@@ -101,20 +102,24 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
   useEffect(() => { const next = new URLSearchParams(search).get("make"); if (isMake(next)) setMake(next); }, [search]);
   useEffect(() => { const params = new URLSearchParams(search); setFormState((current) => ({ ...current, styleId: params.get("style") ?? current.styleId, bandId: params.get("band") ?? current.bandId })); }, [search]);
 
-  // Home's composer carries its Song and Sound chips here (composer/homeMusicModes.ts): read each one once, when the page opens with them.
+  // Home and Chat carry the chips as the hub's record names them (chip ids from `GET /api/composer/modes`): read each one once, when the page opens with them.
   const carried = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(search);
-    if (carried.current || !["prompt", "tier", "instrumental", "language", "length", "tags", "seconds", "loop", "stick", "reference"].some((key) => params.has(key))) return;
+    if (carried.current || !["prompt", "tier", "vocals", "language", "length", "starter", "seconds", "loop", "stick", "takes", "song"].some((key) => params.has(key))) return;
     carried.current = true;
-    const length = params.get("length"), tier = params.get("tier");
-    setFormState((current) => ({ ...current, ...(params.get("prompt") ? { idea: params.get("prompt")! } : {}), ...(tier === "boost" || tier === "max" ? { tier } : {}), instrumental: params.get("instrumental") === "1", language: params.get("language") ?? "", length: length === "quick" || length === "full" ? length : "" }));
-    const carriedTags = params.get("tags");
-    if (carriedTags) onTags(carriedTags.split(",").filter(Boolean).slice(0, 8));
-    setSoundState((current) => ({ seconds: params.get("seconds") ?? current.seconds, loop: params.get("loop") === "1", stick: params.get("stick") === "surprise" ? "surprise" : "words" }));
-    const ref = params.get("reference");
+    const length = params.get("length"), tier = params.get("tier"), takes = Number(params.get("takes"));
+    setFormState((current) => ({
+      ...current, ...(params.get("prompt") ? { idea: params.get("prompt")! } : {}), ...(tier === "boost" || tier === "max" ? { tier } : {}),
+      instrumental: params.get("vocals") === "instrumental", language: params.get("language") ?? "", length: length === "quick" || length === "full" ? length : "",
+      ...(takes === 1 || takes === 2 || takes === 3 ? { takes } : {}),
+    }));
+    const starter = params.get("starter");
+    if (starter) onTags(setStarter(tags, starter));
+    setSoundState((current) => ({ seconds: params.get("seconds") ?? current.seconds, loop: params.get("loop") === "on", stick: params.get("stick") === "surprise" ? "surprise" : "words" }));
+    const ref = params.get("song");
     if (ref) { setReference({ id: ref, name: i18n._({ id: "Your song", message: "Your song" }) }); void api.libraryFile(ref).then((file) => setReference((current) => (current?.id === ref ? { id: ref, name: file.name ?? current.name } : current)), () => {}); }
-  }, [search, onTags]);
+  }, [search, onTags, tags]);
 
   const withTags: CreateForm = { ...form, tags };
   const engineMissing = status.data ? !(make === "sound" ? status.data.can_make_sound ?? status.data.can_make : status.data.can_make) : false;
@@ -167,9 +172,10 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
     requestAnimationFrame(() => { lyricsRef.current?.focus(); lyricsRef.current?.setSelectionRange(next.caret, next.caret); });
   };
 
+  const composerRecords = useComposerModes().modes;
   const tiers: readonly Tier[] = status.data?.tiers ?? ["standard"];
   const input = {
-    make, form: withTags, sound, tiers,
+    make, form: withTags, sound, tiers, records: composerRecords,
     styles: Array.isArray(styles.data) ? styles.data : [], bands: Array.isArray(bands.data) ? bands.data : [],
     change, householdVoice, householdVoices: Array.isArray(householdVoices.data?.voices) ? householdVoices.data!.voices : [], setChange, setHouseholdVoice, voice, onPickSource: () => sourcePicker.current?.click(),
     reference, referenceReason: adult ? (uploading ? i18n._({ id: "Adding your song.", message: "Adding your song." }) : "") : MAKE_SONG_ADULT_LINE(),
@@ -187,7 +193,7 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
     <PromptBar
       label={make === "sound" ? i18n._({ id: "Describe the sound", message: "Describe the sound" }) : make === "voice" ? i18n._({ id: "Script", message: "Script" }) : recordKind ? i18n._({ id: "Name", message: "Name" }) : i18n._({ id: "Describe your song", message: "Describe your song" })}
       value={shown.value} onValueChange={setField} maxLength={make === "voice" ? 2000 : recordKind ? 200 : make === "sound" ? 600 : 1200}
-      layout="chat" modes={modes} mode={make} onModeChange={(next) => { if (isMake(next)) { setMake(next); setProblem(""); } }} quality={make === "song" && !reference ? musicQuality(input) : undefined}
+      layout="chat" modes={modes} mode={make} onModeChange={(next) => { if (isMake(next)) { setMake(next); setProblem(""); } }} quality={make === "song" && !reference && composerRecords.find((record) => record.id === "song")?.quality ? musicQuality(input) : undefined}
       onSubmit={create} busy={making || voice.making} disabledReason={blocker} error={(make === "voice" ? voice.problem : problem) || null} submitLabel={mode.primaryLabel}
     />
     <input ref={sourcePicker} type="file" hidden accept="audio/*,video/*" data-testid="voice-source-input" onChange={(event) => { const picked = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (picked) void voice.addSource(picked); }} />

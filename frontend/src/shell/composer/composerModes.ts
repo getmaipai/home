@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ComposerQualityData, ComposerModeData } from "@maipai/ui/src/elements/composer-parts";
+import type { ComposerChipData, ComposerQualityData, ComposerModeData } from "@maipai/ui/src/elements/composer-parts";
 import type { PromptBarMode } from "@maipai/ui/src/elements/prompt-bar";
 import { api } from "@/lib/api";
 import { makingAvailability, type MakingKind } from "@/apps/chat/useMakingAvailability";
@@ -11,7 +11,7 @@ import { useHealthQuery } from "@/apps/chat/useChatAvailability";
 // composer's `modes`, used by the Home ask box and every Create page host. Hand-copied from backend lib/composer/modes.ts (that file
 // has "@/" imports of its own); the route's zod schema is the contract.
 
-export interface ComposerChipRecord { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; quiet?: string | number; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
+export interface ComposerChipRecord { id: string; label: string; group?: string; icon?: string; iconOnly?: boolean; quiet?: string | number; disabledWhen?: { chip: string; value: string | number; reason: string }; options: Array<{ value: string | number; label: string; detail?: string; icon?: string }>; default: string | number }
 export interface ComposerModeRecord {
   id: string; label: string; icon: string; route: string | null; engine: MakingKind | null; placeholder: string;
   references: Array<{ id: string; label: string; kind: "picture" | "character" | "place" | "audio" | "video"; max?: number }>;
@@ -55,7 +55,7 @@ export function composerHref(route: string | null, text: string, settings: Recor
   if (route === null) return `/chat?ask=${encodeURIComponent(words)}`;
   const query = new URLSearchParams({ prompt: words });
   for (const [key, value] of Object.entries(settings)) query.set(key, String(value));
-  return `${route}?${query.toString()}`;
+  return `${route}${route.includes("?") ? "&" : "?"}${query.toString()}`;
 }
 
 /** The coming-soon line of the Create page this path is, if its mode has no route behind it yet (the page's bar shows it as its not-ready line). */
@@ -75,6 +75,21 @@ export interface ComposerState {
   current: ComposerModeRecord;
 }
 
+/** The kit's chips from a mode record's chips. ONE definition of the drawing: Home, Chat and the Music Create page all call it, each giving where the value lives. */
+export function kitChipsOf(chips: ComposerChipRecord[], valueOf: (chip: ComposerChipRecord) => string | number, onChange: (chip: ComposerChipRecord, value: string | number) => void): ComposerChipData[] {
+  return chips.map((c) => {
+    const when = c.disabledWhen;
+    const off = when && chips.some((other) => other.id === when.chip && valueOf(other) === when.value) ? when.reason : undefined;
+    return {
+    id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.icon ? { icon: c.icon as never } : {}), ...(c.iconOnly ? { iconOnly: true } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
+    options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}), ...(o.icon ? { icon: o.icon as never } : {}) })),
+    value: valueOf(c),
+    onValueChange: (value: string | number) => onChange(c, value),
+    ...(off ? { disabledReason: words(off) } : {}),
+  };
+  });
+}
+
 /** The kit composer's props for the current mode, from the data. Readiness is read from the existing `["health"]` query only. */
 export function useComposerState(response: ComposerModesResponse, setText: (text: string) => void, initialMode = "ask"): ComposerState {
   const [picked, setMode] = useState(initialMode);
@@ -90,12 +105,7 @@ export function useComposerState(response: ComposerModesResponse, setText: (text
     primaryLabel: words(m.primary.label),
     placeholder: words(m.placeholder),
     references: m.references.map((r) => ({ id: r.id, label: r.label, kind: r.kind, ...(r.max ? { max: r.max } : {}) })),
-    chips: m.chips.map((c) => ({
-      id: c.id, label: c.label, ...(c.group ? { group: c.group } : {}), ...(c.icon ? { icon: c.icon as never } : {}), ...(c.iconOnly ? { iconOnly: true } : {}), ...(c.quiet !== undefined ? { quietValue: c.quiet } : {}),
-      options: c.options.map((o) => ({ value: o.value, label: o.label, ...(o.detail ? { detail: o.detail } : {}), ...(o.icon ? { icon: o.icon as never } : {}) })),
-      value: valueOf(m.id, c.id, c.default),
-      onValueChange: (value: string | number) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value })),
-    })),
+    chips: kitChipsOf(m.chips, (c) => valueOf(m.id, c.id, c.default), (c, value) => setChosen((all) => ({ ...all, [`${m.id}.${c.id}`]: value }))),
     ...(m.presets ? { presets: { label: m.presets.label, chips: m.presets.chips.map((c) => ({
       id: c.id, label: c.label,
       options: c.options.map((o) => ({ value: o.value, label: o.label })),

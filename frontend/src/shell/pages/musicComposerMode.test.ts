@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { EMPTY_FORM, EMPTY_SOUND } from "./musicCreateForm";
 import { MAKES, RECORD_MAKES, PRESET_LIMIT, fieldOf, isMake, musicMode, musicModes, musicQuality, type MusicComposerInput } from "./musicComposerMode";
 import type { VoiceMode } from "./MusicVoiceCreate";
+import { musicRecords } from "../../../tests/musicRecords";
 
 const voiceState = (patch: Partial<VoiceMode> = {}): VoiceMode => ({
   voices: [{ id: "fish", label: "Recorded voice", kind: "preset", engine: "fish-audio-drama-3", tags: ["sighs"] }, { id: "plain", label: "Plain voice", kind: "preset", engine: "chatterbox-turbo", tags: [] }],
@@ -10,7 +11,7 @@ const voiceState = (patch: Partial<VoiceMode> = {}): VoiceMode => ({
   addSource: async () => undefined, uploading: false, making: false, problem: "", results: [], blocker: "", run: () => undefined, clear: () => undefined, ...patch,
 }) as VoiceMode;
 const base = (patch: Partial<MusicComposerInput> = {}): MusicComposerInput => ({
-  make: "song", form: EMPTY_FORM, sound: EMPTY_SOUND, styles: [], bands: [], tiers: ["standard"], reference: null, referenceReason: "", change: "restyle", householdVoices: [], householdVoice: "",
+  make: "song", form: EMPTY_FORM, sound: EMPTY_SOUND, records: musicRecords(), styles: [], bands: [], tiers: ["standard"], reference: null, referenceReason: "", change: "restyle", householdVoices: [], householdVoice: "",
   setChange: () => undefined, setHouseholdVoice: () => undefined, voice: voiceState(),
   setForm: () => undefined, setSound: () => undefined, onPickReference: () => undefined, onPickSource: () => undefined, onClearReference: () => undefined, onTags: () => undefined, onClear: () => undefined, ...patch,
 });
