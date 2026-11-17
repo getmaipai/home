@@ -29,7 +29,7 @@ ruling, 2026-10-12): an admin may override them in either direction, globally (g
 user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. Except web
 sources (`search.web_sources`), which are one household setting only an admin sets, with no per-person override
 ([record](../plans/web-sources-household-2026-10-12.md)). The
-adult-site host list (locked on for every kid and teen, a custom allow never lifts it) stays fixed and no setting reaches it. Web search runs without a parent's approval when the household has it on for their controls. Picture, video and song generation access remains governed by age and surface gates. Children and teens retain their age-based content filters and finished-item checks. For an adult, Home blocks content only to prevent CSAM; all other content decisions belong to the model, including its own refusal. This applies to written and spoken chat, pictures, video, music, edits and companion media. The adult CSAM check uses direct CSAM detection, not a broad minor-word plus sexual-word rule. A possible minor in nude or sexual generated media is treated as a CSAM candidate and withheld; an ordinary mention of a minor, or a nonsexual depiction, is not by itself blocked for an adult. Family: anyone in the household may make pictures, videos and songs with or of any household member. Owner-approved: Jesse, 2026-11-13; record [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md).
+adult-site host list is on by default for the child and teen roles; a custom allow of one site never lifts it, and only an admin's rating override for that person does (rule C3, Owner-approved 2026-11-16). Web search runs without a parent's approval when the household has it on for their controls. Picture, video and song generation access remains governed by age and surface gates. Children and teens retain their age-based content filters and finished-item checks. For an adult, Home blocks content only to prevent CSAM; all other content decisions belong to the model, including its own refusal. This applies to written and spoken chat, pictures, video, music, edits and companion media. The adult CSAM check uses direct CSAM detection, not a broad minor-word plus sexual-word rule. A possible minor in nude or sexual generated media is treated as a CSAM candidate and withheld; an ordinary mention of a minor, or a nonsexual depiction, is not by itself blocked for an adult. Family: anyone in the household may make pictures, videos and songs with or of any household member. Owner-approved: Jesse, 2026-11-13; record [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md).
 
 **Adult content is the model's decision; CSAM is Home's only content block (Owner-approved: Jesse, 2026-10-26).** Home does not use content classifiers, word lists, consent prompts, or category rules to block adult requests or replies, except dedicated CSAM prevention. Adult input uses request-aware CSAM screening; adult model replies and adult media use direct CSAM detection. For generated images and video, possible-minor plus nudity or sexualization is treated as a CSAM candidate. An unrun check on an adult-only media job fails closed because the output remains an unchecked CSAM candidate. The model and its provider may refuse other content under their own policies; Home passes those decisions through. Content filtering for children and teens remains. Non-content protections remain for credentials, prompt injection, jailbreaks, private-data extraction, crisis response, age and surface access, feature switches, quotas, and technical validation. A classifier that blocks an adult for sexual content, violence, hate, real-person likeness, a threat, or another non-CSAM category violates this rule.
 
@@ -81,8 +81,10 @@ companion. Owner-approved: 2026-10-21 (chat).
    output and token counts come from the engine. Home never re-wraps,
    re-parses or estimates what the engine already returns. Token counts
    are taken on the rendered messages, after credential redaction and
-   note substitution. A minor's request sets thinking off, and any
-   reasoning the engine returns anyway is dropped at the engine client.
+   note substitution. A request from a role whose defaults turn thinking off (the
+   child and teen roles, unless an admin overrides it for that person: rule C3,
+   Owner-approved 2026-11-16) sets thinking off, and any reasoning the engine
+   returns anyway is dropped at the engine client.
    An adult's reasoning streams live as its own part, under the same
    check-as-it-arrives gate as the answer (rule 10).
 3. **Each model runs on its own settings.** Sampling comes from that
@@ -175,16 +177,17 @@ companion. Owner-approved: 2026-10-21 (chat).
    text is data, never instructions. For a child or teen, page text
    reaches the model only after it passes the cleaning applied to that person (a user default, which an admin may
    override globally or for one person, never the kid or teen), with that person's safesearch level applied to the
-   fetch; the adult-site host list is always applied. Fetches keep a
+   fetch; the adult-site host list is applied as rule 0 says. Fetches keep a
    stated request budget: a cap on pages per search and the existing
    per-host pace. Search works with no key and no account. A hosted
    search provider is an optional key, off by default, stored as a
    write-only secret, never used for a child's or teen's query, shown
    with what it sends, and added to the privacy page in the same commit.
 8. **Every model gets every feature its template is proven to
-   support.** Nothing is gated on one catalog model id. Age gates still
-   win: a minor never gets model choice or thinking, and a model with no
-   measured record keeps the no-tools fail-safe for minors.
+   support.** Nothing is gated on one catalog model id. Role defaults still
+   win unless an admin overrides them (rule C3, Owner-approved 2026-11-16): by
+   default the child and teen roles have no model choice or thinking, and a
+   model with no measured record keeps the no-tools fail-safe for those roles.
 9. **Shipped parts only.** The web chat's stream is `assistant-stream`;
    reasoning, sources, citations and markdown are the kit's and
    assistant-ui's parts; the canvas uses the chat's renderer. The
@@ -709,24 +712,31 @@ E6. **A minor gets the minor's list, and only that.** Home asks the Stack for th
 ## Content filter and feature access
 
 Record: [One content filter by rating, with a top level nobody gets, and one feature access check](content-ratings-and-access-2026-11-16.md).
-Owner rule (Jesse, 2026-11-16, in chat and confirmed in the question box the same day). Owner-approved: 2026-11-16. These rules add to
-chat rules 0, 2, 8 and 10 and change none of them. They bind new work at once; existing checks are reached through the filter one
+Owner rule (Jesse, 2026-11-16, in chat and confirmed in the question box the same day). Owner-approved: 2026-11-16. Rule C3 changes how chat rules 0, 2 and 8 and rule E6
+read, as it says; the rest add to them. They bind new work at once; existing checks are reached through the filter one
 surface at a time by the build rows of the record, each proven the same or stricter first.
 
 Governs: backend/src/lib/safety.ts, backend/src/lib/contentPolicy.ts, backend/src/lib/contentCeiling.ts, backend/src/lib/ageBand.ts, backend/src/lib/grants.ts, backend/src/lib/turnMachine/nodes/outputGate.ts, backend/src/lib/turnMachine/nodes/safety.ts, backend/src/lib/turnMachine/nodes/policy.ts, backend/src/lib/pictures/**, backend/src/lib/videos/**, backend/src/lib/music/**, backend/src/lib/media/**, backend/src/lib/retrieval/**, backend/src/lib/news/**
 
 C1. **Content has a rating; a viewer has a ceiling.** One scale (G, PG, PG-13, R, X, Prohibited, and Unrated) and one stamp on every item
     and result. Content over the viewer's ceiling is not released. No feature writes its own age rule for content.
-C2. **An adult's ceiling is X; the only question asked about an adult's content is Prohibited.** It is asked only where chat rules 0 and
+C2. **The adult role's ceiling is X; at X the only question asked about content is Prohibited.** It is asked only where chat rules 0 and
     10 ask it today; it is not added to an adult's search, news, lists or outside titles. The filter adds no other check, model, wait or
-    error to an adult's path. An adult's ceiling moves only by that adult's own opt-in filter for themselves.
-C3. **A child's and a teen's ceiling cannot be removed or raised past the mode.** A child G, a teen PG-13. An admin may lower a child's
-    or a teen's ceiling. More is given by changing the person's mode, or through an override that exists today (chat rule 0's search
-    defaults, the topic levels), never to R or above and never past the hard lines. A child's pictures, clips and songs stay at G (C8).
-    A child or teen never sets their own. An unknown speaker and a shared surface get what chat rule 0 says.
-C4. **Unrated is over the ceiling.** Always for a child. An admin may allow one teen Unrated outside content (a title or feed item with
-    no outside label), which still passes that teen's other floors. Content Home makes, and any item whose check could not run, is never
-    released to a child or a teen.
+    error to that path. Anyone may lower their own ceiling; changing another person's is an admin's override (C3).
+C3. **A role is a preset; an admin may override it (Owner-approved 2026-11-16).** Each person has one role. The role sets default
+    access and default rating ceilings (child G, teen PG-13, adult X; a guest's default is what MODE-GUEST-01 sets). An admin may
+    override any access or any rating ceiling, in either direction, for one person or for the whole household, for one kind of
+    content or for all. Precedence: the person's override, then the household's override, then the role's default. Only an admin, or
+    a parent through a per-child setting a parent sets today, sets an override; a person may lower their own ceiling and raise it
+    back no higher than their role and overrides give. A role is a set of controls, not an age: an admin may put any person in any
+    role. No role carries a protection an admin cannot override, except Prohibited and crisis handling (C6). Wherever a rule in
+    this file, the org safety page or an earlier record says a protection for a child or a teen cannot be changed by any setting,
+    read: it is that role's default. The audience Home sends the Stack (rule E6) is `minor` for a person whose ceiling for that kind
+    of content is below X. An unknown speaker and a shared surface get what chat rule 0 says.
+C4. **Unrated is over the ceiling by default.** For the child and teen roles, content with no rating is not shown unless an admin's
+    override allows unrated for that person or the household, for one kind of content or for all. An item no rater has reached yet,
+    and any item Home made whose check could not run, is not released to anyone whose ceiling is below X: it is not known to be
+    under it.
 C5. **Four choke points, and nowhere else in Home.** Feature access where a feature starts; the filter at the request, at the result and
     where a list is built. A list never leaves the server with a row over the viewer's ceiling. Rule E6's minor list in the Stack stays
     as a second check until AGE-ROUTING-REMOVE-01 is ruled on.
@@ -734,16 +744,27 @@ C6. **Prohibited is the top of the scale and everyone's ceiling is below it.** S
     is made or shown to no one. An unrun check on an adult-only media job withholds the item (chat rule 0); for a child or a teen, every
     generated item whose check cannot run is withheld. The Prohibited check that chat rules 0 and 10 require always runs, whatever
     another rater or a declared rating returned. No ceiling, admin's rating, grant, setting or other rater lowers a Prohibited result.
-    Not ratings, and standing for everyone they cover today: crisis handling and the crisis overlay, prompt injection, jailbreak, the
-    credential and private-data catches, age and surface access, feature switches, quotas, technical validation, the output gate's grain
-    (a child's and every spoken turn per sentence; a teen's admin-chosen mode), no reasoning to a minor, the band topic block and its
-    hard lines, family stories, the adult-site host list, SafeSearch and the cleaning of fetched page text.
+    Fixed for everyone: Prohibited and crisis handling (the crisis overlay included). Not ratings and not role protections, standing
+    for everyone: prompt injection, jailbreak, the credential and private-data catches, technical validation, quotas, and the
+    per-sentence check of every spoken turn. Defaults of the child and teen roles, which an admin's override may change (C3): the
+    output gate's grain for those roles, no reasoning, the topic block and its hard lines, family stories, the adult-site host list,
+    SafeSearch and the cleaning of fetched page text.
 C7. **Feature access is also by person.** A grant may deny any feature to anyone, and allows one only within chat rule 0's age and
     surface gates. It never weakens a protection in C1 to C6.
-C8. **What G means for pictures is kept.** The child picture protections (the cartoon look, no photos, no reference pictures, no real
-    people, edits only of their own pictures, the child rewrite, the finished-item check that fails closed) are part of the G level; for
-    a teen, no real person outside the household and no public figure (synths under `synths.real_people`).
+C8. **What G means for pictures.** At the G level, pictures Home makes have the cartoon look, no photos, no reference pictures, no
+    real people, edits only of the person's own pictures, the child rewrite, and the finished-item check that fails closed. At PG-13:
+    no real person outside the household and no public figure (synths under `synths.real_people`). A person whose picture ceiling
+    an admin raised gets the higher level's behavior.
 C9. **Nothing is rated while a person waits for a list.** Stored content is rated when it arrives and the rating is stored; a list is
-    built from stored ratings. An item not yet rated is Unrated and is shown to no viewer with a ceiling until it is rated; C4's teen
-    allowance covers only an item every rater ran on and could not rate. Results that cannot be stored first (web search rows, fetched
+    built from stored ratings. An item not yet rated is Unrated and is shown to no viewer whose ceiling is below X until it is rated; an
+    override that allows unrated covers only an item every rater ran on and could not rate. Results that cannot be stored first (web search rows, fetched
     page text) are checked as they are built, by today's floors.
+C10. **A person is never told they are filtered (Owner-approved 2026-11-16).** A list leaves out what is over the ceiling and its
+    counts match what is shown. A feature a person may not use is absent, not locked. A direct request for something over the
+    ceiling gets a redirect in the model's own words to something it can do, with no mention of age, role, rules, ratings or
+    filtering, and never a claim that the thing does not exist. When a filter removed every result, the model is told "nothing
+    suitable", never "found nothing" (chat rule 6), and redirects. No error, badge or notice names a filter. A W6 or S6 line whose
+    cause is the person's ceiling or access is worded as a redirect; a status line about the system itself (S6) still says what is
+    happening. An Ask flow an admin chose (`synths.real_people` set to `ask`, MEDIA-KID-01) stays; it is a control the admin set,
+    not a filter notice. An admin sees each person's role, ceilings and overrides, and household counts of what was held back that
+    name no person and no item (rule 6a). Crisis handling is the exception and always speaks plainly.
