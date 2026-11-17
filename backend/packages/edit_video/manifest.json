@@ -75,7 +75,7 @@
           "restyle",
           "swap"
         ],
-        "description": "remix: redo, changed. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows speaker. restyle: colorize (Max only, up to 10 s). swap: cast, optional description, from_s and seconds (up to 10). Max only. Claim a video only if you called this."
+        "description": "remix: redo, changed. another_take: same again. trim: from_s, to_s. join: clips. film: production. mix: sound. extend, retake, swap: Max only. cut_to_beat: track, clips, beats_per_cut 1|2|4|8, length_s 5-60. spatial_sound: sound follows speaker. restyle: colorize (Max, 10 s). swap: cast, from_s, seconds. Claim a video only if you called this."
       },
       "prompt": {
         "type": "string",
@@ -136,7 +136,7 @@
       },
       "keep_seed": {
         "type": "boolean",
-        "description": "remix: stay close to the first."
+        "description": "remix: same seed."
       },
       "from_s": {
         "type": "number",
@@ -181,7 +181,7 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "mix, cut_to_beat: a song's job or Library file id, or latest. Locked or unfinished is refused; say so."
+        "description": "mix, cut_to_beat: a song id or latest; locked is refused."
       },
       "make_music": {
         "type": "string",
@@ -314,8 +314,7 @@
         "grounded": false,
         "description": "black, white, green, blur, transparent, hex."
       },
-      "cast": {"type":"array","minItems":1,"maxItems":6,"items":{"type":"string","maxLength":80},"description":"swap: one cast id."},
-      "description": {"type":"string","minLength":1,"maxLength":120,"grounded":false,"description":"swap: brief description of the person."},
+      "cast": {"type":"array","maxItems":1,"items":{"type":"string"}},
       "restyle": {
         "type": "string",
         "enum": [

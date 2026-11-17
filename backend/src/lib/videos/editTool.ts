@@ -60,7 +60,6 @@ export const editVideoArgs = z.object({
   clip: z.string().trim().min(1).max(80).optional(),
   change: z.enum(["another_take", "remix", "make_it_max", "trim", "join", "film", "mix", "cut_to_beat", "reframe", "grade", "film_look", "letterbox", "speed", "captions", "title_card", "credits", "effect", "upscale", "remove_background", "spatial_sound", "restyle", "continue", "extend", "retake", "swap"]),
   cast: z.array(z.string().trim().min(1).max(80)).max(6).optional(),
-  description: z.string().trim().min(1).max(120).optional(),
   restyle: z.enum(["colorize"]).optional(),
   words: z.string().trim().max(600).optional(),
   background: z.string().optional(),
@@ -140,7 +139,7 @@ export const editVideoArgs = z.object({
   if (value.change !== "upscale" && value.clarity !== undefined) ctx.addIssue({ code: "custom", path: ["clarity"], message: "Clarity is only for upscale." });
   if (value.change === "remove_background") for (const key of Object.keys(value)) if (!["clip", "change", "background"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Background removal takes only a clip and background." });
   if (value.change === "swap") { if (!value.cast?.length) ctx.addIssue({ code: "custom", path: ["cast"], message: "Choose one cast member." }); if ((value.cast?.length ?? 0) > 1) ctx.addIssue({ code: "custom", path: ["cast"], message: "Swap one person at a time." }); for (const key of Object.keys(value)) if (!["clip", "change", "cast", "description", "from_s", "seconds"].includes(key)) ctx.addIssue({ code: "custom", path: [key], message: "Swap takes a clip, one cast member, an optional description and a window." }); }
-  if (value.change !== "swap" && (value.cast !== undefined || value.description !== undefined)) ctx.addIssue({ code: "custom", path: ["cast"], message: "Cast and description are only for swap." });
+  if (value.change !== "swap" && (value.cast !== undefined)) ctx.addIssue({ code: "custom", path: ["cast"], message: "Cast is only for swap." });
 });
 
 export const NO_CLIP_LINE = "I can't find that video. Ask for a new one, or open the video you mean and try again.";
@@ -280,7 +279,7 @@ export async function runEditVideo(input: RunEditVideoInput): Promise<ToolExecut
     const mark = await clipMarkOf(source);
     const edit: NonNullable<VideoRequest["edit"]> = { from: source.id, change: "swap" };
     const run: EditRun = async (signal, onProgress) => {
-      const made = await runStackSwap({ sourcePath, references: ordinary, description: value.description ?? member.name, size, startSeconds: from, seconds, signal, onProgress: (pct) => onProgress?.(pct) });
+      const made = await runStackSwap({ sourcePath, references: ordinary, description: member.name, size, startSeconds: from, seconds, signal, onProgress: (pct) => onProgress?.(pct) });
       return made.ok ? { ok: true, clip: { video: made.bytes, seconds: made.seconds, width: made.width, height: made.height, audio: made.audio, ms: made.ms } } : { ok: false, line: made.line };
     };
     const started = startVideoEditJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary: false, source, edit, request: { swap_cast_id: member.id, subject_ids: [member.subject_id] }, run, phase: "Swapping a face", adultOnly: mark.madeAudience === "adult-only", adultLock: mark.lock });
