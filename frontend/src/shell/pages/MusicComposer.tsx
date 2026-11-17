@@ -101,6 +101,21 @@ export function MusicComposer({ search = "", tags, onTags, onMade, adult = true 
   useEffect(() => { const next = new URLSearchParams(search).get("make"); if (isMake(next)) setMake(next); }, [search]);
   useEffect(() => { const params = new URLSearchParams(search); setFormState((current) => ({ ...current, styleId: params.get("style") ?? current.styleId, bandId: params.get("band") ?? current.bandId })); }, [search]);
 
+  // Home's composer carries its Song and Sound chips here (composer/homeMusicModes.ts): read each one once, when the page opens with them.
+  const carried = useRef(false);
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (carried.current || !["prompt", "tier", "instrumental", "language", "length", "tags", "seconds", "loop", "stick", "reference"].some((key) => params.has(key))) return;
+    carried.current = true;
+    const length = params.get("length"), tier = params.get("tier");
+    setFormState((current) => ({ ...current, ...(params.get("prompt") ? { idea: params.get("prompt")! } : {}), ...(tier === "boost" || tier === "max" ? { tier } : {}), instrumental: params.get("instrumental") === "1", language: params.get("language") ?? "", length: length === "quick" || length === "full" ? length : "" }));
+    const carriedTags = params.get("tags");
+    if (carriedTags) onTags(carriedTags.split(",").filter(Boolean).slice(0, 8));
+    setSoundState((current) => ({ seconds: params.get("seconds") ?? current.seconds, loop: params.get("loop") === "1", stick: params.get("stick") === "surprise" ? "surprise" : "words" }));
+    const ref = params.get("reference");
+    if (ref) setReference({ id: ref, name: i18n._({ id: "Your song", message: "Your song" }) });
+  }, [search, onTags]);
+
   const withTags: CreateForm = { ...form, tags };
   const engineMissing = status.data ? !(make === "sound" ? status.data.can_make_sound ?? status.data.can_make : status.data.can_make) : false;
   const blocked = status.isError ? text(status.error, "") : "";
