@@ -689,7 +689,7 @@ Record: [Catalog holds the data, the Stack acts, Home knows people](stack-home-c
 2026-11-16, in chat and confirmed in the question box the same day). Owner-approved: 2026-11-16. The rules apply to new work at once; the code that predates them is
 removed by the build rows of the record, each deleting what it replaces.
 
-Governs: backend/src/lib/stack/**, backend/src/lib/stackEngine.ts, backend/src/lib/modelCatalog.ts, backend/src/lib/engineCatalog.ts, backend/src/lib/tiers.ts, backend/src/lib/jobs/**, backend/src/lib/pictures/**, backend/src/lib/videos/**, backend/src/lib/music/**, backend/src/routes/aiChoices.ts, backend/src/routes/engines.ts, frontend/src/apps/settings/**, frontend/src/apps/setup/**, frontend/src/shell/installWords.ts
+Governs: backend/src/lib/stack/**, backend/src/lib/stackEngine.ts, backend/src/lib/modelCatalog.ts, backend/src/lib/engineCatalog.ts, backend/src/lib/tiers.ts, backend/src/lib/jobs/**, backend/src/lib/pictures/**, backend/src/lib/videos/**, backend/src/lib/music/**, backend/src/routes/aiChoices.ts, backend/src/routes/engines.ts, frontend/src/apps/settings/**, frontend/src/apps/setup/**, frontend/src/shell/installWords.ts, backend/src/packs/** (Stack)
 
 E1. **Home holds no part data.** A part is anything the Stack installs and runs: a model, a tool or an engine. Its name, description,
     download link, checksum, size and licence are the Stack's, served per request. Home's source holds none of them. Home knows a part by
@@ -708,6 +708,20 @@ E6. **A minor gets the minor's list, and only that.** Home asks the Stack for th
     out (chat rules 0 and 8). The Stack runs a minor's job only on a part in that list. A part whose output can carry speech that is not
     checked is not in a minor's list until its check ships (VIDEO-LTX-06). This adds to the age and surface gates and replaces none of
     them; no check Home makes for a child or a teen is removed before the Stack enforces the same thing.
+
+E7. **A model's own knowledge lives in its pack on the Stack, and nowhere else.** Everything specific to one model (its limits, sizes,
+    memory peaks, reference counts, shapes, prompt wording and recipes, quirks, style bases, how a job is built for it) is in that model's
+    pack folder (`backend/src/packs/<part-id>/` in the Stack: `model-pack.json`, `recipes/`, and an `adapter.ts` only when data cannot say
+    it). A Stack route or shared library never tests a model's name; it reads the pack. Home asks for generic jobs (picture, picture_edit,
+    clip, clip_from_sheet, restyle, swap, character_sheet, contact_sheet) and reads the jobs catalog; it never builds a model-specific
+    prompt, size, limit or fallback. Adding, changing or retiring a model changes its pack folder and its part row and nothing in Home.
+    Record: [Model packs](model-packs-2026-11-17.md). Owner-approved: Jesse, 2026-11-17 ("we need a rule to prevent model specific things
+    being built in the home app and to ensure model specific things are built and self contained in packs on the stack").
+E8. **The rule is enforced by tests, not by memory.** Home: `lint:no-model-names` fails the build on any model brand, family or part id in
+    `frontend/src`, `shared` or `backend/src` outside tests and generated locale files, widened folder by folder as the MODELPACK-HOME rows
+    land and repo-wide by MODELPACK-HOME-05. Stack: a test fails when a model brand or part id appears in `backend/src` outside
+    `backend/src/packs/` and the part table, and the boot loads and validates every pack. New model-specific code in Home is rejected in
+    review; the fix is a pack field, a recipe or an adapter in the Stack, never a Home branch.
 
 ## Content filter and feature access
 
