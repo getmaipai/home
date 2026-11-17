@@ -351,6 +351,14 @@ export function FilesPage({ person }: { person: Roster }) {
   const batchActions = (
     <>
       {canShare ? <Button type="button" variant="secondary" disabled={selectedItems.length === 0} onClick={() => setSharing(selectedItems)}>{i18n._({ id: "Share", message: "Share" })}</Button> : null}
+      <Button type="button" variant="secondary" disabled={!selectedItems.some((item) => item.kind === "image" || item.kind === "video") || busy} onClick={() => {
+        const chosen = selectedItems.filter((item) => item.kind === "image" || item.kind === "video");
+        setBusy(true);
+        void api.libraryContactSheet({ ids: chosen.map((item) => item.id), labels: "details" })
+          .then((made) => { toast(i18n._({ id: "Contact sheet saved to your Library", message: "Contact sheet saved to your Library" }), { action: { label: i18n._({ id: "Open", message: "Open" }), onClick: () => update({ file: made.id }) } }); leaveSelection(); })
+          .catch((error: unknown) => setProblem(error instanceof ApiError ? error.message : i18n._({ id: "The contact sheet could not be made. Check that Home is running, then try again.", message: "The contact sheet could not be made. Check that Home is running, then try again." })))
+          .finally(() => setBusy(false));
+      }}>{i18n._({ id: "Contact sheet", message: "Contact sheet" })}</Button>
       <Button type="button" variant="secondary" disabled={selectedItems.length === 0 || busy} onClick={() => { setBusy(true); void actions.keep(selectedItems).then((result) => { toast(batchSentence(result, (n) => i18n._({ id: "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}", message: "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}", values: { count: n } }), keepFailed)); leaveSelection(); }).finally(() => setBusy(false)); }}>{i18n._({ id: "Keep", message: "Keep" })}</Button>
       <Button type="button" variant="destructive" disabled={selectedItems.length === 0 || busy} onClick={() => requestTrash(selectedItems)}>{i18n._({ id: "Delete", message: "Delete" })}</Button>
     </>

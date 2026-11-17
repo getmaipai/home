@@ -50,7 +50,7 @@ export async function startLibraryOp(actor: PersonRow, opId: string, body: Media
   try {
     const op = await getMediaOp(opId);
     // A helper (locate, save_subject) is not offered to a person, so it is not run from a page either.
-    if (!op || op.listed === false || op.input !== "picture" || op.output !== "picture") throw new ImageEditError(404, "That picture operation doesn't exist. Choose one from the list.", "unknown_operation");
+    if (!op || op.listed === false || op.id === "picture.contact_sheet" || op.input !== "picture" || op.output !== "picture") throw new ImageEditError(404, "That picture operation doesn't exist. Choose one from the list.", "unknown_operation");
     const result = await runMediaOp(actor, op.id, { source: { kind: "picture", via: "file", id: body.file_id }, args: withAttachments(op, body) }, signal);
     return { ok: true, progress: ("job" in result ? result.job : result.file) as EditProgress };
   } catch (error) {

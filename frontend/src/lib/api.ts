@@ -1904,6 +1904,8 @@ export const api = {
   clearAutoLocks: (expected: number) => request<AutoLocksClearResult>("/api/adult-lock/auto-locks/clear", { method: "POST", body: JSON.stringify({ expected }) }),
   undoAutoLocks: (runId: string) => request<AutoLocksUndoResult>("/api/adult-lock/auto-locks/undo", { method: "POST", body: JSON.stringify({ run_id: runId }) }),
   libraryAdultMark: (id: string, body: { action: "clear" | "mark"; ticket?: string }) => request<{ made_audience: "all-ages" | "adult-only"; lock: "on" | "off" }>(`/api/library/files/${encodeURIComponent(id)}/adult-mark`, { method: "POST", body: JSON.stringify(body) }),
+  /** CONTACT-SHEET-01: one labeled picture from chosen Library pictures and clips (a clip shows several frames). */
+  libraryContactSheet: (body: { ids: string[]; labels?: "none" | "name" | "details"; per_clip?: number; columns?: number; title?: string }) => request<{ id: string; name: string; width: number; height: number; tiles: number; files: number }>("/api/library/contact-sheet", { method: "POST", body: JSON.stringify(body), timeoutMs: 120_000 }),
   libraryTrash: () => request<{ rows: LibraryTrashItem[] }>("/api/trash"),
   restoreLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}/restore`, { method: "POST" }),
   purgeLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}`, { method: "DELETE" }),

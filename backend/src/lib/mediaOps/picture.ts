@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { startEdit, loadSource, editToolsStatus, ImageEditError, LIBRARY_SOURCE } from "@/lib/imageEdit";
+import { startEdit, loadSource, editToolsStatus, ImageEditError, LIBRARY_SOURCE, pictureUrl } from "@/lib/imageEdit";
 import { storeFile } from "@/lib/attachments";
 import { startComment } from "@/lib/imageEdit";
 import { runPictureTool } from "@/lib/pictures/people";
@@ -255,6 +255,40 @@ registerMediaOp({
     const result = await startComment(actor, chat.conversationId, chat.id, { prompt: combineInstruction(used.length + 1, args.words), references: used });
     const note = chosen.length > used.length ? { note: COMBINE_EXTRAS_LINE } : {};
     return "job" in result ? { job: { ...result, ...note } } : { file: { ...(result as object), ...note } };
+  },
+});
+
+const contactSheetArgs = z.object({
+  items: z.array(z.string().min(1).max(80)).max(24).default([]).describe("Library file ids (pictures or video clips) to put on the sheet, in order. The source file is always included first."),
+  sections: z.array(z.object({ caption: z.string().max(200).optional(), ids: z.array(z.string().min(1).max(80)).min(1).max(8) })).max(12).optional().describe("Compare mode: one section per prompt, each with the files from the models being compared (one file per model). Use instead of items."),
+  per_clip: z.number().int().min(1).max(8).optional().describe("Frames taken from each video clip (default 3)."),
+  columns: z.number().int().min(1).max(8).optional().describe("Tiles per row."),
+  title: z.string().max(90).optional().describe("A title across the top, for example the models and date."),
+  labels: z.enum(["none", "name", "details"]).optional().describe("none, the file name, or details (name, model, size and seconds when recorded). Default name."),
+});
+
+/** CONTACT-SHEET-01: any pictures and video clips from the Library become one picture on a board, labeled. It makes no AI call, so it works with any model's output and any selection. */
+registerMediaOp({
+  id: "picture.contact_sheet",
+  label: "Contact sheet",
+  summary: "Put several Library pictures and video clips (a clip shows several frames) on one labeled sheet, or compare two models on the same prompts side by side. Saved as one new picture.",
+  input: "picture",
+  output: "picture",
+  args: contactSheetArgs,
+  controls: [{ kind: "number", name: "columns", label: "Tiles per row", min: 1, max: 8 }],
+  needs: null,
+  minBand: "child",
+  run: async ({ actor }, { source, args }: { source: import("@/lib/mediaOps/types").MediaRef; args: z.infer<typeof contactSheetArgs> }) => {
+    const { makeContactSheet, SheetError } = await import("@/lib/contactSheet");
+    const base = chatSource(source);
+    const flat = args.sections?.length ? undefined : [...new Set([base.id, ...args.items])];
+    try {
+      const made = await makeContactSheet(actor, { ...(flat ? { ids: flat } : { sections: args.sections }), ...(args.per_clip ? { perClip: args.per_clip } : {}), ...(args.columns ? { columns: args.columns } : {}), ...(args.title ? { title: args.title } : {}), ...(args.labels ? { labels: args.labels } : {}) });
+      return { file: { id: made.id, url: pictureUrl(LIBRARY_SOURCE, made.id), label: made.name, created_at: new Date().toISOString(), op: "contact_sheet", width: made.width, height: made.height, media_type: "image/png", source: base.id, tiles: made.tiles, files: made.files } as never };
+    } catch (error) {
+      if (error instanceof SheetError) throw new ImageEditError(error.status, error.message, "contact_sheet");
+      throw error;
+    }
   },
 });
 

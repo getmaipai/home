@@ -308,7 +308,7 @@ msgid "{count, plural, one {# kept because it is in use. } other {# kept because
 msgstr "{count, plural, one {# se mantiene porque está en uso.} other {# se mantienen porque están en uso.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:354
+#: src/shell/pages/FilesPage.tsx:362
 #, needs-review
 msgid "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 msgstr "{count, plural, one {# se mantiene hasta que lo borres} other {# se mantienen hasta que los borres}}"
@@ -1490,7 +1490,7 @@ msgid "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the c
 msgstr "Se guardaron {saved} de {total} MB. La copia de seguridad tarda unos 6 minutos; deja el cable conectado y esta pestaña abierta."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 #, needs-review
 msgid "{shared}{access}You can get it back from Trash for 30 days."
 msgstr "{shared}{access}Puedes recuperarlo de la Papelera durante 30 días."
@@ -5383,7 +5383,7 @@ msgstr ""
 #: src/shell/pages/ChatPage.tsx:1727
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:184
-#: src/shell/pages/FilesPage.tsx:428
+#: src/shell/pages/FilesPage.tsx:436
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
 #: src/shell/pages/settings/SettingsRenderer.tsx:175
@@ -6573,7 +6573,7 @@ msgid "Choose companion"
 msgstr "Elige tu compañía"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:374
+#: src/shell/pages/FilesPage.tsx:382
 #, needs-review
 msgid "Choose files to add"
 msgstr "Elige archivos para añadir"
@@ -7597,6 +7597,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1906
 msgid "area.Connections"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:361
+msgid "Contact sheet"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:358
+msgid "Contact sheet saved to your Library"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9728,7 +9738,7 @@ msgstr "Grados Fahrenheit, como 72 F."
 #: src/shell/library/LibraryViewer.tsx:212
 #: src/shell/pages/CompanionsPage.tsx:83
 #: src/shell/pages/CompanionsPage.tsx:184
-#: src/shell/pages/FilesPage.tsx:355
+#: src/shell/pages/FilesPage.tsx:363
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/SoundExtras.tsx:47
 #, needs-review
@@ -9736,7 +9746,7 @@ msgid "Delete"
 msgstr "Eliminar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:401
+#: src/shell/pages/FilesPage.tsx:409
 #, needs-review
 msgid "Delete ‘{name}’?"
 msgstr "¿Borrar ‘{name}’?"
@@ -10527,7 +10537,7 @@ msgid "Drawing your character..."
 msgstr "Dibujando tu personaje..."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:408
+#: src/shell/pages/FilesPage.tsx:416
 #, needs-review
 msgid "Drop to add to your Library"
 msgstr "Suelta para añadir a tu Biblioteca"
@@ -11725,7 +11735,7 @@ msgid "Filter results by book"
 msgstr "Filtrar resultados por libro"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:387
+#: src/shell/pages/FilesPage.tsx:395
 #, needs-review
 msgid "Filters"
 msgstr "Filtros"
@@ -13007,7 +13017,7 @@ msgid "Got it"
 msgstr "Entendido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:391
+#: src/shell/pages/FilesPage.tsx:399
 #, needs-review
 msgid "Grid view"
 msgstr "Vista en cuadrícula"
@@ -15610,7 +15620,7 @@ msgid "It is easy to feel close to a chatbot or companion, so keep real relation
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 #, needs-review
 msgid "It is shared with everyone in the home."
 msgstr "Está compartido con todos del hogar."
@@ -15759,7 +15769,7 @@ msgstr "Acaba de empezar"
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:39
 #: src/shell/library/LibraryViewer.tsx:118
-#: src/shell/pages/FilesPage.tsx:354
+#: src/shell/pages/FilesPage.tsx:362
 #, needs-review
 msgid "Keep"
 msgstr "Conservar"
@@ -15838,7 +15848,7 @@ msgstr ""
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 #: src/apps/settings/ModelsAndStorageSection.tsx:124
 #: src/apps/settings/styles/StyleEditor.tsx:182
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
 #: src/shell/pages/status/StatusBoard.tsx:73
@@ -16465,7 +16475,7 @@ msgid "Layers"
 msgstr "Capas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:390
+#: src/shell/pages/FilesPage.tsx:398
 #, needs-review
 msgid "Layout"
 msgstr "Diseño"
@@ -16476,7 +16486,7 @@ msgid "Leave empty and Home writes the words."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:424
+#: src/shell/pages/FilesPage.tsx:432
 #, needs-review
 msgid "Leave it empty to go back to the name Home chose."
 msgstr "Déjalo vacío para volver al nombre que eligió Home."
@@ -16935,7 +16945,7 @@ msgid "Library only"
 msgstr "Solo Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:387
 #, needs-review
 msgid "Library sections"
 msgstr "Secciones de la Biblioteca"
@@ -17148,7 +17158,7 @@ msgid "List options"
 msgstr "Opciones de la lista"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:392
+#: src/shell/pages/FilesPage.tsx:400
 #, needs-review
 msgid "List view"
 msgstr "Vista de lista"
@@ -19203,7 +19213,7 @@ msgid "setting.content.own_ceiling.web.option.PG"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:387
+#: src/shell/pages/FilesPage.tsx:395
 #, needs-review
 msgid "Mine"
 msgstr "Míos"
@@ -19513,7 +19523,7 @@ msgid "motors"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:401
+#: src/shell/pages/FilesPage.tsx:409
 #, needs-review
 msgid "Move {count} files to Trash?"
 msgstr "¿Mover {count} archivos a la Papelera?"
@@ -19560,7 +19570,7 @@ msgid "Move section {title} up"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 #, needs-review
 msgid "Move to Trash"
 msgstr "Mover a la Papelera"
@@ -19582,7 +19592,7 @@ msgid "setting.news.default_topics.teen.option.entertainment"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 #, needs-review
 msgid "Moving"
 msgstr "Moviendo"
@@ -19771,7 +19781,7 @@ msgstr ""
 #: src/apps/settings/styles/StyleConfirm.tsx:85
 #: src/apps/settings/styles/StyleEditor.tsx:83
 #: src/shell/library/useSaveAsCharacter.tsx:42
-#: src/shell/pages/FilesPage.tsx:426
+#: src/shell/pages/FilesPage.tsx:434
 #: src/shell/pages/MusicComposer.tsx:194
 #: src/shell/pages/ProjectsPage.tsx:160
 #: src/shell/pages/UpdatesPage.tsx:49
@@ -22346,6 +22356,7 @@ msgstr ""
 #: src/shell/pages/ActivityPage.tsx:34
 #: src/shell/pages/ActivityPage.tsx:35
 #: src/shell/pages/dashboard/HomeHero.tsx:22
+#: src/shell/pages/FilesPage.tsx:358
 #: src/shell/pages/musicSongStatus.tsx:37
 #: src/shell/pages/performance/EnginesHealthBody.tsx:30
 #, needs-review
@@ -25219,7 +25230,7 @@ msgid "Rename conversation"
 msgstr "Renombrar conversación"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:424
+#: src/shell/pages/FilesPage.tsx:432
 #, needs-review
 msgid "Rename file"
 msgstr "Cambiar nombre del archivo"
@@ -25243,7 +25254,7 @@ msgid "Rename quick timer"
 msgstr "Renombrar temporizador rápido"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:422
+#: src/shell/pages/FilesPage.tsx:430
 #, needs-review
 msgid "Renamed."
 msgstr "Nombre cambiado."
@@ -26359,7 +26370,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:152
-#: src/shell/pages/FilesPage.tsx:428
+#: src/shell/pages/FilesPage.tsx:436
 #, needs-review
 msgid "Save name"
 msgstr "Guardar nombre"
@@ -26991,7 +27002,7 @@ msgstr "Buscar en Wikipedia"
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:314
 #: src/shell/pages/FilesPage.tsx:314
-#: src/shell/pages/FilesPage.tsx:366
+#: src/shell/pages/FilesPage.tsx:374
 #, needs-review
 msgid "Search your Library"
 msgstr "Buscar en tu Biblioteca"
@@ -27196,7 +27207,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
-#: src/shell/pages/FilesPage.tsx:394
+#: src/shell/pages/FilesPage.tsx:402
 #, needs-review
 msgid "Select"
 msgstr "Seleccionar"
@@ -28695,7 +28706,7 @@ msgid "setting.content.own_ceiling.web.option.PG-13"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 #, needs-review
 msgid "Some of it is shared with people in your home."
 msgstr "Parte de esto está compartido con personas de tu hogar."
@@ -28911,7 +28922,7 @@ msgid "Sort"
 msgstr "Ordenar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:388
+#: src/shell/pages/FilesPage.tsx:396
 #, needs-review
 msgid "Sort by"
 msgstr "Ordenar por"
@@ -30635,8 +30646,8 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/shell/pages/EnginesPage.tsx:147
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
-#: src/shell/pages/FilesPage.tsx:409
-#: src/shell/pages/FilesPage.tsx:425
+#: src/shell/pages/FilesPage.tsx:417
+#: src/shell/pages/FilesPage.tsx:433
 #: src/shell/pages/MusicLibrary.tsx:218
 #: src/shell/pages/MusicRemix.tsx:39
 #: src/shell/pages/MusicSpeechPage.tsx:53
@@ -31233,6 +31244,11 @@ msgstr "El ordenador tenía poca memoria para ejecutar el motor de chat."
 #, needs-review
 msgid "the connection is unavailable."
 msgstr "la conexión no está disponible."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:359
+msgid "The contact sheet could not be made. Check that Home is running, then try again."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/library/CutToBeatDialog.tsx:33
@@ -32356,7 +32372,7 @@ msgid "These instructions shape answers in this project."
 msgstr "Estas instrucciones definen las respuestas en este proyecto."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 #, needs-review
 msgid "They lose access now."
 msgstr "Ahora pierden el acceso."
@@ -32933,7 +32949,7 @@ msgid "setting.robot.initiative.tiers_spoken.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:389
+#: src/shell/pages/FilesPage.tsx:397
 #, needs-review
 msgid "Tile size"
 msgstr "Tamaño de mosaico"

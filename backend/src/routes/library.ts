@@ -125,3 +125,26 @@ libraryRoutes.openapi(createRoute({
   try { await cancelLibraryUpload(c.get("person"), c.req.valid("param").id); return c.json({ ok: true }, 200); }
   catch (e) { if (e instanceof UploadError) return c.json(uploadBody(e), e.status); throw e; }
 });
+
+// CONTACT-SHEET-01: any pictures and video clips from the Library on one labeled sheet, saved as a new picture. No picture model is used.
+const sheetBody = z.object({
+  ids: z.array(z.string().min(1).max(80)).max(24).optional().describe("Library file ids in order (pictures, or clips that show several frames each)."),
+  sections: z.array(z.object({ caption: z.string().max(200).optional(), ids: z.array(z.string().min(1).max(80)).min(1).max(8) })).max(12).optional().describe("Compare mode: one section per prompt with one file per model. Use instead of ids."),
+  per_clip: z.number().int().min(1).max(8).optional().describe("Frames taken from each clip (default 3)."),
+  columns: z.number().int().min(1).max(8).optional().describe("Tiles per row."),
+  title: z.string().max(90).optional(),
+  labels: z.enum(["none", "name", "details"]).optional().describe("none, file name (default), or details: name, model, size and seconds when recorded."),
+});
+libraryRoutes.openapi(createRoute({
+  method: "post", path: "/contact-sheet", tags: ["Library"], summary: "Make one contact sheet picture from chosen Library pictures and clips", middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: sheetBody } } } },
+  responses: { 201: { description: "The new kept Library picture.", content: { "application/json": { schema: z.object({ id: z.string(), name: z.string(), width: z.number(), height: z.number(), tiles: z.number(), files: z.number() }) } } },
+    ...errorResponses({ 400: "Nothing chosen or too many files", 403: "A chosen file is locked, or storage is full", 404: "A chosen file is not in the Library", 422: "A chosen file is not a picture or clip, or a clip could not be read" }) },
+}), async c => {
+  const body = c.req.valid("json");
+  const { makeContactSheet, SheetError } = await import("@/lib/contactSheet");
+  try {
+    const made = await makeContactSheet(c.get("person"), { ...(body.ids ? { ids: body.ids } : {}), ...(body.sections ? { sections: body.sections } : {}), ...(body.per_clip ? { perClip: body.per_clip } : {}), ...(body.columns ? { columns: body.columns } : {}), ...(body.title ? { title: body.title } : {}), ...(body.labels ? { labels: body.labels } : {}) });
+    return c.json({ id: made.id, name: made.name, width: made.width, height: made.height, tiles: made.tiles, files: made.files }, 201);
+  } catch (e) { if (e instanceof SheetError) return c.json({ error: e.message }, e.status as never); throw e; }
+});

@@ -273,7 +273,7 @@ msgid "{count, plural, one {# kept because it is in use. } other {# kept because
 msgstr "{count, plural, one {# kept because it is in use. } other {# kept because they are in use. }}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:354
+#: src/shell/pages/FilesPage.tsx:362
 msgid "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 msgstr "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 
@@ -1299,7 +1299,7 @@ msgid "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the c
 msgstr "{saved} of {total} MB saved. The backup takes about 6 minutes; keep the cable in and this tab open."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 msgid "{shared}{access}You can get it back from Trash for 30 days."
 msgstr "{shared}{access}You can get it back from Trash for 30 days."
 
@@ -4733,7 +4733,7 @@ msgstr "Can use it now"
 #: src/shell/pages/ChatPage.tsx:1727
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:184
-#: src/shell/pages/FilesPage.tsx:428
+#: src/shell/pages/FilesPage.tsx:436
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
 #: src/shell/pages/settings/SettingsRenderer.tsx:175
@@ -5778,7 +5778,7 @@ msgid "Choose companion"
 msgstr "Choose companion"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:374
+#: src/shell/pages/FilesPage.tsx:382
 msgid "Choose files to add"
 msgstr "Choose files to add"
 
@@ -6678,6 +6678,16 @@ msgstr "Connection"
 #: src/lib/settingCopy.generated.ts:1906
 msgid "area.Connections"
 msgstr "Connections"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:361
+msgid "Contact sheet"
+msgstr "Contact sheet"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:358
+msgid "Contact sheet saved to your Library"
+msgstr "Contact sheet saved to your Library"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonContentSection.tsx:22
@@ -8535,14 +8545,14 @@ msgstr "Degrees Fahrenheit, like 72 F."
 #: src/shell/library/LibraryViewer.tsx:212
 #: src/shell/pages/CompanionsPage.tsx:83
 #: src/shell/pages/CompanionsPage.tsx:184
-#: src/shell/pages/FilesPage.tsx:355
+#: src/shell/pages/FilesPage.tsx:363
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/SoundExtras.tsx:47
 msgid "Delete"
 msgstr "Delete"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:401
+#: src/shell/pages/FilesPage.tsx:409
 msgid "Delete ‘{name}’?"
 msgstr "Delete ‘{name}’?"
 
@@ -9227,7 +9237,7 @@ msgid "Drawing your character..."
 msgstr "Drawing your character..."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:408
+#: src/shell/pages/FilesPage.tsx:416
 msgid "Drop to add to your Library"
 msgstr "Drop to add to your Library"
 
@@ -10281,7 +10291,7 @@ msgid "Filter results by book"
 msgstr "Filter results by book"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:387
+#: src/shell/pages/FilesPage.tsx:395
 msgid "Filters"
 msgstr "Filters"
 
@@ -11420,7 +11430,7 @@ msgid "Got it"
 msgstr "Got it"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:391
+#: src/shell/pages/FilesPage.tsx:399
 msgid "Grid view"
 msgstr "Grid view"
 
@@ -13695,7 +13705,7 @@ msgid "It is easy to feel close to a chatbot or companion, so keep real relation
 msgstr "It is easy to feel close to a chatbot or companion, so keep real relationships first and talk with children about it. In Home settings, under Users, you can turn off AI companions for one person or for the household."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 msgid "It is shared with everyone in the home."
 msgstr "It is shared with everyone in the home."
 
@@ -13824,7 +13834,7 @@ msgstr "Just started"
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:39
 #: src/shell/library/LibraryViewer.tsx:118
-#: src/shell/pages/FilesPage.tsx:354
+#: src/shell/pages/FilesPage.tsx:362
 msgid "Keep"
 msgstr "Keep"
 
@@ -13893,7 +13903,7 @@ msgstr "Keep installing"
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 #: src/apps/settings/ModelsAndStorageSection.tsx:124
 #: src/apps/settings/styles/StyleEditor.tsx:182
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
 #: src/shell/pages/status/StatusBoard.tsx:73
@@ -14432,7 +14442,7 @@ msgid "Layers"
 msgstr "Layers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:390
+#: src/shell/pages/FilesPage.tsx:398
 msgid "Layout"
 msgstr "Layout"
 
@@ -14442,7 +14452,7 @@ msgid "Leave empty and Home writes the words."
 msgstr "Leave empty and Home writes the words."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:424
+#: src/shell/pages/FilesPage.tsx:432
 msgid "Leave it empty to go back to the name Home chose."
 msgstr "Leave it empty to go back to the name Home chose."
 
@@ -14852,7 +14862,7 @@ msgid "Library only"
 msgstr "Library only"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:379
+#: src/shell/pages/FilesPage.tsx:387
 msgid "Library sections"
 msgstr "Library sections"
 
@@ -15040,7 +15050,7 @@ msgid "List options"
 msgstr "List options"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:392
+#: src/shell/pages/FilesPage.tsx:400
 msgid "List view"
 msgstr "List view"
 
@@ -16857,7 +16867,7 @@ msgid "setting.content.own_ceiling.web.option.PG"
 msgstr "Mild, with a little that is grown-up."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:387
+#: src/shell/pages/FilesPage.tsx:395
 msgid "Mine"
 msgstr "Mine"
 
@@ -17127,7 +17137,7 @@ msgid "motors"
 msgstr "motors"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:401
+#: src/shell/pages/FilesPage.tsx:409
 msgid "Move {count} files to Trash?"
 msgstr "Move {count} files to Trash?"
 
@@ -17171,7 +17181,7 @@ msgid "Move section {title} up"
 msgstr "Move section {title} up"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 msgid "Move to Trash"
 msgstr "Move to Trash"
 
@@ -17191,7 +17201,7 @@ msgid "setting.news.default_topics.teen.option.entertainment"
 msgstr "Movies, television, music, books, games, celebrities and the arts."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:403
+#: src/shell/pages/FilesPage.tsx:411
 msgid "Moving"
 msgstr "Moving"
 
@@ -17365,7 +17375,7 @@ msgstr "My styles"
 #: src/apps/settings/styles/StyleConfirm.tsx:85
 #: src/apps/settings/styles/StyleEditor.tsx:83
 #: src/shell/library/useSaveAsCharacter.tsx:42
-#: src/shell/pages/FilesPage.tsx:426
+#: src/shell/pages/FilesPage.tsx:434
 #: src/shell/pages/MusicComposer.tsx:194
 #: src/shell/pages/ProjectsPage.tsx:160
 #: src/shell/pages/UpdatesPage.tsx:49
@@ -19632,6 +19642,7 @@ msgstr "Only when I ask"
 #: src/shell/pages/ActivityPage.tsx:34
 #: src/shell/pages/ActivityPage.tsx:35
 #: src/shell/pages/dashboard/HomeHero.tsx:22
+#: src/shell/pages/FilesPage.tsx:358
 #: src/shell/pages/musicSongStatus.tsx:37
 #: src/shell/pages/performance/EnginesHealthBody.tsx:30
 msgid "Open"
@@ -22156,7 +22167,7 @@ msgid "Rename conversation"
 msgstr "Rename conversation"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:424
+#: src/shell/pages/FilesPage.tsx:432
 msgid "Rename file"
 msgstr "Rename file"
 
@@ -22176,7 +22187,7 @@ msgid "Rename quick timer"
 msgstr "Rename quick timer"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:422
+#: src/shell/pages/FilesPage.tsx:430
 msgid "Renamed."
 msgstr "Renamed."
 
@@ -23171,7 +23182,7 @@ msgstr "Save character"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:152
-#: src/shell/pages/FilesPage.tsx:428
+#: src/shell/pages/FilesPage.tsx:436
 msgid "Save name"
 msgstr "Save name"
 
@@ -23723,7 +23734,7 @@ msgstr "Search Wikipedia"
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:314
 #: src/shell/pages/FilesPage.tsx:314
-#: src/shell/pages/FilesPage.tsx:366
+#: src/shell/pages/FilesPage.tsx:374
 msgid "Search your Library"
 msgstr "Search your Library"
 
@@ -23904,7 +23915,7 @@ msgstr "Seek 5 seconds"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
-#: src/shell/pages/FilesPage.tsx:394
+#: src/shell/pages/FilesPage.tsx:402
 msgid "Select"
 msgstr "Select"
 
@@ -25217,7 +25228,7 @@ msgid "setting.content.own_ceiling.web.option.PG-13"
 msgstr "Some grown-up themes, nothing explicit."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 msgid "Some of it is shared with people in your home."
 msgstr "Some of it is shared with people in your home."
 
@@ -25414,7 +25425,7 @@ msgid "Sort"
 msgstr "Sort"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:388
+#: src/shell/pages/FilesPage.tsx:396
 msgid "Sort by"
 msgstr "Sort by"
 
@@ -26949,8 +26960,8 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/EnginesPage.tsx:147
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
-#: src/shell/pages/FilesPage.tsx:409
-#: src/shell/pages/FilesPage.tsx:425
+#: src/shell/pages/FilesPage.tsx:417
+#: src/shell/pages/FilesPage.tsx:433
 #: src/shell/pages/MusicLibrary.tsx:218
 #: src/shell/pages/MusicRemix.tsx:39
 #: src/shell/pages/MusicSpeechPage.tsx:53
@@ -27473,6 +27484,11 @@ msgstr "The computer was too low on memory to run the chat engine."
 #: src/shell/pages/status/StatusComponents.tsx:140
 msgid "the connection is unavailable."
 msgstr "the connection is unavailable."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/FilesPage.tsx:359
+msgid "The contact sheet could not be made. Check that Home is running, then try again."
+msgstr "The contact sheet could not be made. Check that Home is running, then try again."
 
 #. js-lingui-explicit-id
 #: src/shell/library/CutToBeatDialog.tsx:33
@@ -28462,7 +28478,7 @@ msgid "These instructions shape answers in this project."
 msgstr "These instructions shape answers in this project."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:402
+#: src/shell/pages/FilesPage.tsx:410
 msgid "They lose access now."
 msgstr "They lose access now."
 
@@ -28970,7 +28986,7 @@ msgid "setting.robot.initiative.tiers_spoken.help"
 msgstr "Tier 1 may speak; tiers 2 and 3 ask first by default."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/FilesPage.tsx:389
+#: src/shell/pages/FilesPage.tsx:397
 msgid "Tile size"
 msgstr "Tile size"
 
