@@ -1,0 +1,70 @@
+{
+ "mtpl-shotstarterquietportrait": {
+  "prompt": "7528961e8f58da6045768fceae1890de51608a5bf4f329b74977c4092eadd050",
+  "file": "254530e68792d72dc2b5240ec0eea4b2148055c63e2935890df9ec82ec3dad9d"
+ },
+ "mtpl-shotstarterkitefield": {
+  "prompt": "ff4b0d23e161de74f01eb4211cb67dd1004b40e9d44ebbe56fa916095dfc5eb2",
+  "file": "bd350e6416c9afa09c8a5f55bdb9a247d8af580aab61ea8db49e881957f46db7"
+ },
+ "mtpl-shotstarterrainwindow": {
+  "prompt": "9dde495c0d41f4e69e03da135c6b0a5e96151bc51aef2b106bd94d13c38ecdac",
+  "file": "77930e6f57a146ed0fc1c1b33b25609e6ff891cce778a6829f1dc00773c9a81e"
+ },
+ "mtpl-shotstarterbicycleride": {
+  "prompt": "5755ff74e704380507e78d8521f57735be9e648bedadd2cb0ff6b5b6b10a81a3",
+  "file": "964246f052f2a22954ead14ba802e623cceb46e16c9157321a2d2a7262dcedba"
+ },
+ "mtpl-shotstartercoastaerial": {
+  "prompt": "c73c081aedf6955a8de73351b27ca2b7c04c34b292561ff1391f44acb5628987",
+  "file": "dc829e2e408bc79cc7db5cb8f41ff28a6edc6df2b9d5d1448f1fc5c29534f181"
+ },
+ "mtpl-shotstarterhandscooking": {
+  "prompt": "926c1e0be72591c1b85173356b702419c0e5290c9cbacaddfd35c2e156731339",
+  "file": "73b53a604d36ccd9d75d0d4b374d60137cf19c15f763903c659aaaaababbff3e"
+ },
+ "mtpl-vtproductspin": {
+  "prompt": "20c9d25438cf971ec6d7cb500927c419d90f35801178aac91b8c4b33a8e419d7",
+  "file": "557843a9458580fcbb2b5218aba67dc363298382d0f8a4ea587301af595acaf3"
+ },
+ "mtpl-vttravelpostcard": {
+  "prompt": "f5dd5d694d53b05951ce80233ea50ec7940ac94adfac48ec2a7c0b7d9829f054",
+  "file": "589aa682fc3161281fe76fecde05b3fd3771b079550e7d65674f82014d8aa403"
+ },
+ "mtpl-vtbirthdaygreeting": {
+  "prompt": "0d415ce751ffe539d4460de7ad5537337203d7109746950a175545ecd53f4bef",
+  "file": "95691fc058925d670c3e6dcf93ce5f52e5048e6cf64301b57eaa5b8cd3946e7c"
+ },
+ "mtpl-vtpetmoment": {
+  "prompt": "2f4a43e24bbff140980f05c5e2b0d6dc560a40f3421f6cd8cfc76a5bcef3e3e7",
+  "file": "9fedaf65275beb4a7e1890117fd9539689bf27f269aadf7cc17b6734325fb3ec"
+ },
+ "mtpl-vttimelapsesky": {
+  "prompt": "97b19d507eb3f83288cd6e192fa2f16f53097e6642546c36d0699ad7cde6cd4a",
+  "file": "572d111bf749a8947f0d9ce98cf8336d9944fd62ea67d1413c2b47710c121a4a"
+ },
+ "mtpl-vtdanceloop": {
+  "prompt": "93178f623d99bf163e094098de8adafcfd399effe416fb30c61cd5d8a645e517",
+  "file": "6dbd6d87a057482ba860164c15f21e474db57db313b93656b7c226e64ed79b2e"
+ },
+ "mtpl-vtstoryintro": {
+  "prompt": "bd15eb7e4984ef552d6cef42199379d258f9d624747e23a9154dfb94af7cfb92",
+  "file": "ede9f08d5072bc7bdf2be9c087f668c5d4c947344203dde34a210c24c85182c0"
+ },
+ "mtpl-vtrealestatewalkthrough": {
+  "prompt": "2adc6784d9f8de11a5d586eedac25fead1a66bfcfba197adca89a0f56014f9bc",
+  "file": "e9921f672d32977b998fe5bcb1ec35e7f0bb547b3b6e1d0b282208dde71bcb12"
+ },
+ "mtpl-vtunboxing": {
+  "prompt": "00d5463270106da9c8ffdfa02b88ab7e12d09c29c0ea12101dacacedb029e68b",
+  "file": "193fb89bfe5df77ade9396731ce11508e6c1f9adfed44efd0585b5b934baeac7"
+ },
+ "mtpl-vtsportshighlight": {
+  "prompt": "cc932356587ea3c8a43574698c77d29c82bcbabc9f5bdc962588bf2c89e46b39",
+  "file": "32cabbd1e53ed21e859b306e6b5748a5e4c82e450750263d27f8561a0af7ceda"
+ },
+ "mtpl-vtcozyrain": {
+  "prompt": "e16f0639b2e87e454b8d550d384e519eadc9a241eb0178a909e981573d59e78f",
+  "file": "0f7bdbf8bc2a8b23de554f203ee6d7f640247603996eb47fd70486df8c7eee96"
+ }
+}
