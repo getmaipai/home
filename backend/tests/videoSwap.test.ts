@@ -33,14 +33,32 @@ describe("swap reference selection", () => {
 });
 
 describe("Stack swap", () => {
-  test("submits multipart, reports progress and returns the job result bytes", async () => {
+  test("sends the Stack's own field names, follows the job to done and downloads video.mp4", async () => {
     const source = join(mkdtempSync(join(tmpdir(), "swap-test-")), "source.mp4"); writeFileSync(source, new Uint8Array([0, 0, 0, 8, 102, 116, 121, 112]));
-    let polls = 0; const base = (await import("./videoFixture")).testMp4(); const handler = async (_input: string | URL | Request, init?: RequestInit) => { const method = init?.method ?? "GET"; if (method === "POST") return new Response(JSON.stringify({ job: "swap-1" }), { status: 202 }); if (method === "GET" && ++polls === 1) return new Response(JSON.stringify({ state: "running", progress: 52, phase: "Segment 2 of 4" })); if (method === "GET") { const resultDir = join(tmpdir(), "never"); void resultDir; return new Response(JSON.stringify({ state: "done", progress: 100, data: { path: "" } })); } return new Response("{}", { status: 200 }); };
-    // Stack output paths must be inside the runner's generated work folder, so this handler targets the live job directory from multipart's source filename is not practical;
-    // test the mapped 404 and multipart behavior directly below, with unreadable output as the terminal result.
+    const seen: { url: string; method: string }[] = []; let form: FormData | null = null; let polls = 0; const clip = new Uint8Array([9, 8, 7, 6]);
+    const handler = async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(typeof input === "object" && "url" in input ? input.url : input); const method = init?.method ?? "GET"; seen.push({ url, method });
+      if (method === "POST") { form = init!.body as FormData; return new Response(JSON.stringify({ created: 1, job: "job-swap-1", state: "running" }), { status: 200 }); }
+      if (url.endsWith("/video.mp4")) return new Response(clip, { status: 200 });
+      if (++polls === 1) return new Response(JSON.stringify({ job: "job-swap-1", state: "running", progress: 52, status: "Swapping segment 2 of 3", result: null }));
+      return new Response(JSON.stringify({ job: "job-swap-1", state: "done", progress: 100, status: "done", result: { video: "/v1/videos/swap/job-swap-1/video.mp4" } }));
+    };
     __setSwapFetchForTests(handler as unknown as typeof fetch);
-    const progress: number[] = []; const result = await runStackSwap({ sourcePath: source, references: [{ bytes: new Uint8Array([1]), mediaType: "image/jpeg" }], description: "A person", size: "512x384", startSeconds: 0, seconds: 2, onProgress: (n) => progress.push(n) });
-    expect(result).toMatchObject({ ok: false, code: "unreadable" }); expect(progress).toEqual([52, 100]); expect(base.length).toBeGreaterThan(1);
+    const progress: Array<[number, string | undefined]> = [];
+    const result = await runStackSwap({ sourcePath: source, references: [{ bytes: new Uint8Array([1]), mediaType: "image/jpeg" }, { bytes: new Uint8Array([2]), mediaType: "image/png" }], description: "A person", size: "512x384", startSeconds: 1, seconds: 2.33, onProgress: (n, line) => progress.push([n, line]) });
+    expect(result).toMatchObject({ ok: true, audio: true }); if (result.ok) expect([...result.bytes]).toEqual([9, 8, 7, 6]);
+    // The field names are the swap route's: a wrong name would be refused by the real Stack with "Send the source MP4 as source_video."
+    expect([...(form as FormData | null)!.keys()].sort()).toEqual(["description", "references", "references", "seconds", "size", "source_video", "start_seconds"]);
+    expect((form as FormData | null)!.get("start_seconds")).toBe("1"); expect((form as FormData | null)!.get("seconds")).toBe("2.33");
+    expect(progress.map((p) => p[0])).toEqual([52, 100]); expect(progress[0]![1]).toBe("Swapping segment 2 of 3.");
+    expect(seen.map((r) => `${r.method} ${r.url.replace(/^.*\/v1/, "/v1")}`)).toEqual(["POST /v1/videos/swap", "GET /v1/videos/swap/job-swap-1", "GET /v1/videos/swap/job-swap-1", "GET /v1/videos/swap/job-swap-1/video.mp4"]);
+  });
+  test("a failed job gives the Stack's own sentence, and a refusal at submit gives its sentence too", async () => {
+    const source = join(mkdtempSync(join(tmpdir(), "swap-test-")), "source.mp4"); writeFileSync(source, new Uint8Array([1]));
+    __setSwapFetchForTests((async (_i: unknown, init?: RequestInit) => (init?.method ?? "GET") === "POST" ? new Response(JSON.stringify({ created: 1, job: "j", state: "running" })) : new Response(JSON.stringify({ state: "failed", progress: 45, error: "The head swap could not finish segment 2. Try again with a shorter clip." }))) as unknown as typeof fetch);
+    expect(await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 2.33 })).toMatchObject({ ok: false, line: "The head swap could not finish segment 2. Try again with a shorter clip." });
+    __setSwapFetchForTests((async () => new Response(JSON.stringify({ error: "Not enough free memory for a face swap right now. Try again when nothing else is being made.", code: "no_memory" }), { status: 503 })) as unknown as typeof fetch);
+    expect(await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 2.33 })).toMatchObject({ ok: false, line: expect.stringContaining("Not enough free memory") });
   });
   test("maps a route 404 to the plain unavailable line", async () => { const source = join(mkdtempSync(join(tmpdir(), "swap-test-")), "source.mp4"); writeFileSync(source, new Uint8Array([1])); __setSwapFetchForTests((async () => new Response("{}", { status: 404 })) as unknown as typeof fetch); expect(await runStackSwap({ sourcePath: source, references: [], description: "x", size: "512x384", startSeconds: 0, seconds: 1 })).toMatchObject({ ok: false, line: "Swapping a face is not available on this computer yet." }); });
 });
