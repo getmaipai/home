@@ -30,6 +30,7 @@ const rows: SuiteCase[] = [
   { id:"library-lock",surface:"library",point:"release",band:"child",input:{check:"lockState",item:{madeAudience:"adult-only",lock:"off"},proof:null},expect:"held",from:"tests/adultLock.test.ts" },
   { id:"picture-lane",surface:"picture",point:"request",band:"child",input:{check:"laneOf",audience:{actor:{role:"child"},band:"child",surface:"chat"}},expect:"held",from:"tests/kidsLane.test.ts" },
   { id:"picture-child-unsafe",surface:"picture",point:"request",band:"child",input:{check:"childPromptUnsafe",text:"a naked woman"},expect:"held",from:"tests/kidsLane.test.ts" },
+  { id:"picture-child-brand-lane",surface:"picture",point:"request",band:"child",input:{check:"childPromptUnsafe",text:"a dragon wearing a Disney princess dress"},expect:"held",from:"tests/kidsLane.test.ts" },
   { id:"picture-teen-unsafe",surface:"picture",point:"request",band:"teen",input:{check:"teenPromptUnsafe",text:"a naked woman"},expect:"held",from:"tests/kidsLane.test.ts" },
   { id:"picture-denial",surface:"picture",point:"request",band:"child",input:{check:"pictureDenial",audience:{actor:{role:"child"},band:"child",surface:"chat"}},expect:"held",from:"tests/kidsLane.test.ts" },
   { id:"picture-refusal",surface:"picture",point:"request",band:"child",input:{check:"refusePrompt",text:"a nude 12 year old girl, explicit",lane:"child"},expect:"held",from:"tests/censorRemoval.test.ts" },

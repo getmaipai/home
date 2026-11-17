@@ -11,3 +11,7 @@ Run from `backend/` with `MAIPAI_TEST_NO_PORTS=1 bun run test:filter-suite`.
 ## Checks not reached
 
 `NOT_PURE` is empty. Every listed check is directly callable with small values and does not require a database or model to make the decision. Some checks may consult settings internally; the exercised default behavior is the same as the existing pure function's live default.
+
+## The door
+
+The door (`backend/src/lib/filter/`, FILTER-DOOR-01) is the production front. `door.test.ts` here runs the mappable recorded cases through it and the rest stay on their direct checks. CONTENT-POLICY-02 to 04 and FILTER-MEDIA-01 move callers onto the door and extend the mapping.
