@@ -204,6 +204,9 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   finally { starting.delete(input.actor.id); }
 }
 
+/** A sound's failure line says "sound", never "song", wherever the shared song wording is reused. */
+export const soundWording = (line: string): string => line.replace(/\bsongs?\b/g, (word) => (word === "songs" ? "sounds" : "sound"));
+
 /** MP-07: what a failed sound from the sound-effects model says, in the person's terms. Other codes fall back to the song wording. */
 export function plainSoundFailure(code: string): string {
   const prefix = "I couldn't make that sound.";
@@ -215,11 +218,11 @@ export function plainSoundFailure(code: string): string {
     case "queue_full": return `${prefix} Other sounds are waiting. Try again when one finishes.`;
     case "out_of_memory": return `${prefix} The computer ran out of memory. Try again in a minute.`;
     case "timeout": return `${prefix} It took longer than expected. Try a shorter sound.`;
-    case "no_memory": case "storage_full": case "coding_mode": case "already_making": return plainMusicFailure(code);
+    case "no_memory": case "storage_full": case "coding_mode": case "already_making": return soundWording(plainMusicFailure(code));
     default: return `${prefix} It did not finish. Try again or change the description.`;
   }
 }
-function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : job.request.sound?.engine === "sfx" ? plainSoundFailure(code) : plainMusicFailure(code); saveMusicJob(job); }
+function fail(job: MusicJob, code: string): void { job.state = "failed"; job.errorCode = code; job.errorLine = job.request.voiceSwap ? plainMusicFailure("voice_swap") : job.request.parts || job.task === "stems" ? plainMusicFailure("stems_failed") : job.request.sound?.engine === "sfx" ? plainSoundFailure(code) : job.request.sound ? soundWording(plainMusicFailure(code)) : plainMusicFailure(code); saveMusicJob(job); }
 const stopped = (job: MusicJob): boolean => job.state === "cancelled";
 async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
