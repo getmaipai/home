@@ -75,3 +75,22 @@ minutes. Free memory with the household chat model loaded was about 78 GB, so a 
 - The donor keeps its own gentle smile in cowl frames instead of following the original's speech.
 - Hard jaw and hair edges where the head is cut from the donor; the original's hair stays around the new face.
 - Small brightness steps at segment joins.
+
+## Added later the same day
+
+- **Bare-head mode must start late.** The mode that takes the donor's whole head started when the original showed more than 12 percent skin, which is while
+  the cowl is still being dragged off; it painted bare scalp over the cowl so the cowl "vanished". The threshold is now 20 percent, the grown mask is limited
+  to 30 px (not 50) around the original's skin, and the feather is 1.2 px. Before that point the cowl-on rule (donor skin only where the original shows skin)
+  applies, so the cowl, glove and cape keep sliding frame by frame. In the blue-minus-red map, skin is a clean dark blob and fabric is bright or mid grey.
+- **Cowl outline check.** Cowl = blue minus red at least 11, luminance 10 to 80, after a 2.5 px blur. Compare the original's cowl mask with the composite's
+  inside the swap area (grown 40 px); report the overlap. Measured on the reveal piece: mean 0.72, worst frame 0.52. This colour test is noisy on dark
+  footage, so it must be read next to the strip with the outline drawn on it.
+- **A head cut off by the frame cannot be swapped by the generator.** A canvas widened 40 percent with an edge-smeared guide fits in memory (66 GB at
+  352x448) but the generator copied the smear and did not draw a head. What is left for those frames: recolour leftover original skin with the donor's
+  skin tone while keeping the original's light and shadow, or extend from neighbouring swapped frames. The original silhouette still shows.
+- **Leftover-head check.** Per frame, the share of the original's skin pixels (eroded 5 px) that the composite left unchanged within 4 levels. On very dark
+  footage small tone changes count as unchanged, so the result (20 to 39 percent on most frames) is an upper bound; always read it beside a strip.
+- **Landmarks.** MediaPipe face landmarks (0.10.21, model file float16) find the face on the front-on frames only (0.2 s and 1.0 s here) and return nothing on
+  turned, occluded or half-out frames.
+- **Takes.** A segment that comes back unswapped is retaken with seed 21 and adapter strength 1.6; retaking a start 0.33 s early removed the unswapped
+  first frames.
