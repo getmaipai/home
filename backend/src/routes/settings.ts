@@ -12,6 +12,8 @@ import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
 import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, codeAdmission, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { SettingsChange } from "@maipai/spec/gen/ts/settings-change.js";
+import { listSettingsChanges } from "@/lib/settingsAudit";
 import { closeRobotDeviceCommandChannels, listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
 import { renderClipBundle } from "@/lib/robotClips";
@@ -255,6 +257,19 @@ const capabilitiesRoute = createRoute({
   },
 });
 settingsRoutes.openapi(capabilitiesRoute, (c) => c.json({ robotsEnabled: getHouseholdSettingValue("home.robots.enabled") === true }, 200));
+
+// SETTINGS-AUDIT-01: recent owner and admin changes to safety-relevant settings, by role only (rule 6a).
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/changes", tags: ["Settings"],
+  summary: "Recent changes to safety settings",
+  description: "Owner and admin only. Each row names the setting, the layer, the actor's role and the new value, never a person.",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50).optional() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ changes: z.array(SettingsChange) }) } }, description: "Newest first." }, ...errorResponses({ 401: "Not signed in", 403: "Only an owner or admin can see this" }) },
+}), (c) => {
+  const { limit } = c.req.valid("query");
+  return c.json({ changes: listSettingsChanges(limit ?? 50) }, 200);
+});
 
 const listRoute = createRoute({
   method: "get",

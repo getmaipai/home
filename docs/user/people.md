@@ -25,6 +25,8 @@ Choose **Child**, **Teen**, or **Adult** for the controls the person needs. Home
 
 Only an owner or admin can add, edit, or remove people. Only the owner can add another owner or admin.
 
+Owners and admins can also see a list of recent changes to safety settings under **Users**, which shows who changed what by role, never by name.
+
 ### What happens to their files
 
 When you remove someone, their pictures and other files go too, unless they shared them:

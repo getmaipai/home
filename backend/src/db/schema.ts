@@ -2782,3 +2782,17 @@ export const contentRatings = sqliteTable("content_ratings", {
   primaryKey({ columns: [table.subjectKind, table.subjectId] }),
   index("content_ratings_kind_level_idx").on(table.subjectKind, table.level),
 ]);
+
+// SETTINGS-AUDIT-01: spec `settings_change` record. One row per accepted owner or admin write of a safety-relevant
+// setting. Rule 6a: the actor's role only, never a person id or name; a person-scope change names no person.
+export const settingsChanges = sqliteTable("settings_changes", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull(),
+  scope: text("scope").notNull(),
+  actorRole: text("actor_role").notNull(),
+  value: text("value").notNull(),
+  previous: text("previous"),
+  direction: text("direction").notNull(),
+  changedAt: text("changed_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (table) => [index("settings_changes_changed_at_idx").on(table.changedAt)]);

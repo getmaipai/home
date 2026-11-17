@@ -8,6 +8,7 @@ import { checkTierSlotOptions } from "@maipai/spec/records/ts/tierSlot.js";
 import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
+import { recordSettingsChange } from "@/lib/settingsAudit";
 import { settingsValues, people, entities } from "@/db/schema";
 import { getRegistry, getRegistryKey, isRetiredKey, registerStoredHouseholdReader } from "@/lib/settingsRegistry";
 import { calledAdminForOwnSettings } from "@/lib/relationships";
@@ -696,7 +697,37 @@ function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): Settin
   return assertCanAccessScope(actor, { kind: "person", id: targetId }, "write");
 }
 
+/** SETTINGS-AUDIT-01: the stored value before a write, null when the key has no row (or is a secret). Read before the write. */
+function storedBefore(scope: string, key: string): unknown {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef || keyDef.secret) return null;
+  const row = db.select({ value: settingsValues.value }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).get();
+  if (!row) return null;
+  try { return decodeStoredRow(keyDef, row.value); } catch { return null; }
+}
+
+/** The audit layer of a scope string: household or person; a device scope is not recorded. */
+function auditScope(scope: string): "household" | "person" | null {
+  const parsed = parseScope(scope);
+  return parsed && (parsed.kind === "household" || parsed.kind === "person") ? parsed.kind : null;
+}
+
 export function setValue(
+  actor: PersonRow,
+  scope: string,
+  key: string,
+  value: unknown,
+): SettingsOpResult<ResolvedSetting> {
+  const layer = auditScope(scope);
+  const previous = layer ? storedBefore(scope, key) : null;
+  const result = setValueGated(actor, scope, key, value);
+  // SETTINGS-AUDIT-01: after the write succeeded and only then.
+  if (result.ok && layer) recordSettingsChange({ key, scope: layer, actorRole: actor.role, value, previous });
+  return result;
+}
+
+function setValueGated(
   actor: PersonRow,
   scope: string,
   key: string,
@@ -981,6 +1012,15 @@ registerStoredHouseholdReader((key, fallback) => {
  * every caller into a second round trip (a full list re-fetch) just to
  * learn the value it already knew was the registry default. */
 export function resetValue(actor: PersonRow, scope: string, key: string): SettingsOpResult<ResolvedSetting> {
+  const layer = auditScope(scope);
+  const previous = layer ? storedBefore(scope, key) : null;
+  const result = resetValueGated(actor, scope, key);
+  // SETTINGS-AUDIT-01: after the reset succeeded and only then.
+  if (result.ok && layer) recordSettingsChange({ key, scope: layer, actorRole: actor.role, value: null, previous });
+  return result;
+}
+
+function resetValueGated(actor: PersonRow, scope: string, key: string): SettingsOpResult<ResolvedSetting> {
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const keyDef = getRegistryKey(key);

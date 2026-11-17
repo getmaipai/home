@@ -83,7 +83,7 @@ describe("companions.allowed", () => {
       { role: "adult", secret: "correcthorse3" },
       { role: "teen" },
       { role: "child" },
-      { role: "guest", guestExpiresAt: new Date(Date.now() + 86_400_000).toISOString() },
+      { role: "guest", controls: "teen", guestExpiresAt: new Date(Date.now() + 86_400_000).toISOString() },
     ] as const;
     const personIds = [ownerPerson.id];
     for (const [index, input] of roles.entries()) {

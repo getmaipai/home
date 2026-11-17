@@ -2,6 +2,7 @@ import { i18n } from "@lingui/core";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { UsersSection } from "@/apps/settings/UsersSection";
+import { SafetyChangesSection } from "@/apps/settings/SafetyChangesSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -14,7 +15,10 @@ export function UsersPage({ person }: { person: Roster }) {
   return (
     <div className="flex flex-col gap-4">
       {canManage ? (
-        <UsersSection person={person} headed={false} />
+        <>
+          <UsersSection person={person} headed={false} />
+          <SafetyChangesSection viewerRole={person.role} />
+        </>
       ) : (
         <Card>
           <CardContent>

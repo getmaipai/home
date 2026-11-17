@@ -8,6 +8,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
 import type { MaintenanceWindow } from "@maipai/spec/gen/ts/maintenance-window.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import type { SettingsChange } from "@maipai/spec/gen/ts/settings-change.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -279,7 +280,7 @@ export type { Project };
 export { isOwnerOrAdminRole, canHaveTemporaryChatRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
-export type { SettingsKey };
+export type { SettingsKey, SettingsChange };
 // SafetyResult flows through TurnValue.safety; re-exported for callers
 // that want it by name without reaching into @maipai/spec directly.
 export type { SafetyResult };
@@ -1434,6 +1435,7 @@ export const api = {
   searchWebResults: (q: string) => request<WebSearchResponse>(`/api/search/web-results?q=${encodeURIComponent(q)}`),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsAttention: () => request<SettingsAttention>("/api/settings/attention"),
+  settingsChanges: (limit = 50) => request<{ changes: SettingsChange[] }>(`/api/settings/changes?limit=${limit}`),
   settingsCapabilities: () => request<{ robotsEnabled: boolean }>("/api/settings/capabilities"),
   codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),
   codingPieces: () => request<CodingPiecesView>("/api/coding/pieces"),

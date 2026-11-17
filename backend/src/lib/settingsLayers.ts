@@ -30,6 +30,7 @@ import { BLOCKLIST_POLICY, blocklistIds, defaultListIds, lockedListIds } from "@
 import { parseHostEntries } from "@/lib/blocklists/customHosts";
 import { checkHost } from "@/lib/blocklists/hostLists";
 import { nextHlc } from "@/lib/hlc";
+import { recordSettingsChange } from "@/lib/settingsAudit";
 import {
   deleteLayerRow,
   getHouseholdSettingValue,
@@ -269,6 +270,13 @@ function writer(actor: PersonRow, targetId: string, targetRole: string): { by: s
 /** The one write gate for a person's overrides of a layered list key. Returns the person's new effective
  * list. The band's locked lists are never removable and a locked adult-site host is never allowed. */
 export function changeOverrides(actor: PersonRow, targetId: string, key: string, change: LayerChange): SettingsOpResult<UnionResult> {
+  const result = changeOverridesGated(actor, targetId, key, change);
+  // SETTINGS-AUDIT-01: after the write succeeded and only then; the record names the layer, never the person.
+  if (result.ok) recordSettingsChange({ key, scope: "person", actorRole: actor.role, value: { add: change.add ?? [], remove: change.remove ?? [] }, previous: null });
+  return result;
+}
+
+function changeOverridesGated(actor: PersonRow, targetId: string, key: string, change: LayerChange): SettingsOpResult<UnionResult> {
   if (!unionKey(key)) return { ok: false, status: 400, error: `${key} is not a setting with user overrides. Pick one of the site-block settings.` };
   const role = getPersonRole(targetId);
   if (!role) return deny("That person could not be found. Pick someone from the People page.");
@@ -391,8 +399,11 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
       return e.set_by === SELF || isAdultRole(role);
     };
     const keep = { add: delta.add.filter((e) => !mayClear(e)), remove: delta.remove.filter((e) => !mayClear(e)) };
-    cleared += delta.add.length + delta.remove.length - keep.add.length - keep.remove.length;
+    const clearedHere = delta.add.length + delta.remove.length - keep.add.length - keep.remove.length;
+    cleared += clearedHere;
     saveDelta(targetId, key, keep);
+    // SETTINGS-AUDIT-01: a back-to-defaults that cleared something is a change; the record names the layer, never the person.
+    if (clearedHere > 0) recordSettingsChange({ key, scope: "person", actorRole: actor.role, value: null, previous: null });
   }
   return { ok: true, value: { cleared } };
 }

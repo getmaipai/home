@@ -1387,6 +1387,13 @@
       "when": 1794902518139,
       "tag": "0198_content_ratings",
       "breakpoints": true
+    },
+    {
+      "idx": 199,
+      "version": "6",
+      "when": 1794904611293,
+      "tag": "0199_settings_changes",
+      "breakpoints": true
     }
   ]
 }

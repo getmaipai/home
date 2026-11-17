@@ -42,6 +42,7 @@ import {
   memoryConsolidationCursor,
   idSequences,
   settingsValues,
+  settingsChanges,
   notificationHolds,
   safetyAlarms,
   scheduledJobs,
@@ -279,6 +280,7 @@ export function resetDb(): void {
   db.delete(notificationHolds).run();
   db.delete(safetyAlarms).run();
   db.delete(settingsValues).run();
+  db.delete(settingsChanges).run();
   // lib/settings.ts's own resolveStoredValue() cache (added in a latency
   // pass, 2026-09-06): the same "cleared here too" fix idSequences got
   // below, and for the identical reason - a value cached by one test file
