@@ -18,6 +18,8 @@ import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
 import { extractArticle } from "@/lib/retrieval/extractArticle";
 import { sharedKnowledgeDb, type KnowledgeDb } from "@/lib/retrieval/knowledgeDb";
+import { searchAudienceFor } from "@/lib/retrieval/minorRowFloor";
+import type { PersonRow } from "@/types";
 import { articleFloorText, releaseToBand, tripsMinorFloor, type ReferenceRow, type ReleaseCandidate } from "@/lib/retrieval/minorFloor";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { licenceLabel, readableBooks, type ReadableBook } from "@/lib/retrieval/referenceSources";
@@ -50,6 +52,8 @@ export interface ReferenceLookupInput {
   /** First source number (KS-02 numbers tier K rows after web rows). */
   startAt?: number;
   maxRows?: number;
+  /** The person asking, when the caller knows (SEARCH-RATING-04): their own overrides apply to the release. Otherwise the block viewer, else the band's defaults. */
+  actor?: PersonRow | null;
 }
 
 export interface ReferenceReaderDeps {
@@ -371,7 +375,7 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
       }
     }
     if (candidates.length === 0 && failure) return NOT_FOUND("unavailable", { unavailableReason: failure });
-    const rows = releaseToBand(candidates, input.band, input.startAt ?? 1);
+    const rows = await releaseToBand(candidates, searchAudienceFor(input.band, input.actor), input.startAt ?? 1);
     if (rows.length === 0) {
       bumpReferenceCounter("no_match", input.band);
       return NOT_FOUND("no_match");
@@ -417,7 +421,7 @@ export async function librarySnapshotDate(band: AgeBand, deps: ReferenceReaderDe
  * extract and cache, and the same release point as a lookup, so a link
  * cannot reach what a search could not. `null` for anything that is not
  * readable by this band, not installed, or dropped by the floor. */
-export async function readReferencePage(input: { book: string; path: string; band: AgeBand }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
+export async function readReferencePage(input: { book: string; path: string; band: AgeBand; actor?: PersonRow | null }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
   const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
   if (!baseUrl || input.path.length === 0 || input.path.split("/").includes("..")) return null;
   const ctx: Ctx = { baseUrl: baseUrl.replace(/\/+$/, ""), fetchImpl: deps.fetch ?? fetch, now: deps.now ?? Date.now, signal: AbortSignal.timeout(TOTAL_DEADLINE_MS) };
@@ -432,7 +436,7 @@ export async function readReferencePage(input: { book: string; path: string; ban
     }
     const candidate = await readArticle(ctx, db, rb, { title: input.path, path: input.path, exact: true });
     if (!candidate) return null;
-    return releaseToBand([candidate], input.band, 1)[0] ?? null;
+    return (await releaseToBand([candidate], searchAudienceFor(input.band, input.actor), 1))[0] ?? null;
   } catch (err) {
     if (err instanceof Unavailable) return null;
     throw err;
@@ -447,7 +451,7 @@ export async function readReferencePage(input: { book: string; path: string; ban
  * caller then goes online as it did before, so a failed read never fails the
  * answer. A disambiguation page comes back as a row with `disambiguation`
  * set; nothing here chooses an option. */
-export async function resolveReferenceTitle(input: { title: string; band: AgeBand }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
+export async function resolveReferenceTitle(input: { title: string; band: AgeBand; actor?: PersonRow | null }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
   const term = input.title.trim();
   const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
   if (!baseUrl || term.length === 0) return null;
@@ -461,7 +465,7 @@ export async function resolveReferenceTitle(input: { title: string; band: AgeBan
     const pick = picks[0];
     if (!pick) return null;
     const candidate = await readArticle(ctx, db, pick.rb, pick.hit);
-    return candidate ? (releaseToBand([candidate], input.band, 1)[0] ?? null) : null;
+    return candidate ? ((await releaseToBand([candidate], searchAudienceFor(input.band, input.actor), 1))[0] ?? null) : null;
   } catch (err) {
     if (err instanceof Unavailable) return null;
     throw err;
@@ -488,7 +492,7 @@ export type LibraryImage = {
  * the same extract cache and the one release point as a lookup. Returns `[]`
  * on any error or when the library is not running. Lead images come first,
  * then the rest, in book order; the total is capped at `limit ?? 6`. */
-export async function libraryArticleImages(input: { title: string; band: AgeBand; leadOnly?: boolean; limit?: number }, deps: ReferenceReaderDeps = {}): Promise<LibraryImage[]> {
+export async function libraryArticleImages(input: { title: string; band: AgeBand; actor?: PersonRow | null; leadOnly?: boolean; limit?: number }, deps: ReferenceReaderDeps = {}): Promise<LibraryImage[]> {
   const term = input.title.trim();
   const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
   if (!baseUrl || term.length === 0) return [];
@@ -504,7 +508,7 @@ export async function libraryArticleImages(input: { title: string; band: AgeBand
       try {
         const candidate = await readArticle(ctx, db, pick.rb, pick.hit);
         if (!candidate) continue;
-        const rows = releaseToBand([candidate], input.band, 1);
+        const rows = await releaseToBand([candidate], searchAudienceFor(input.band, input.actor), 1);
         const row = rows[0];
         if (!row || row.disambiguation) continue;
         const { status, text } = await getText(ctx, `/content/${encodeURIComponent(pick.rb.book)}/${encodePath(pick.hit.path)}`);

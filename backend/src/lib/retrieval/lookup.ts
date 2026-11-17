@@ -17,6 +17,7 @@
 // row. A minor's floor and the closed per-band source list live in the tier K
 // reader (referenceReader.ts, minorFloor.ts); this module never reads a book
 // itself, so there is no second path past them.
+import type { PersonRow } from "@/types";
 import type { AgeBand } from "@/lib/ageBand";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { lookupReference, type ReferenceLookup, type ReferenceReaderDeps } from "@/lib/retrieval/referenceReader";
@@ -83,6 +84,8 @@ export interface FederatedInput<R extends LookupResultShape> {
   scope: SearchScope;
   /** True in a temporary chat (a child's web side is offline there). */
   temporary?: boolean;
+  /** The person asking, when the caller has them (SEARCH-RATING-04); otherwise the block viewer the search runs under. */
+  actor?: PersonRow | null;
   /** Runs the live web side. `kMatched` tells it the library already answered,
    *  so the live Wikimedia fallback must stay quiet. */
   web: (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => Promise<R>;
@@ -97,7 +100,7 @@ export interface FederatedDeps {
 export async function federatedLookup<R extends LookupResultShape>(input: FederatedInput<R>, deps: FederatedDeps = {}): Promise<LookupResultShape> {
   bumpReferenceCounter(input.scope === "reference" ? "scope_reference" : input.scope === "web" ? "scope_web" : "scope_both", input.band);
   const reader = deps.lookupReference ?? lookupReference;
-  const ref: ReferenceLookup = await reader({ query: input.query, band: input.band }, deps.reference);
+  const ref: ReferenceLookup = await reader({ query: input.query, band: input.band, ...(input.actor ? { actor: input.actor } : {}) }, deps.reference);
   const kRows = ref.rows.map(referenceToLookupRow);
   const kPages = ref.rows.map(referenceToPage).filter((p): p is LookupPage => p !== null);
   const kOnly = { text: ref.text, rows: kRows, ...(kPages.length > 0 ? { pages: kPages } : {}) };

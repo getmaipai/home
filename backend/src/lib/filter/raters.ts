@@ -18,7 +18,9 @@ export type PictureCheckInput = { kind: "picture_check"; checks: ImageCheck[]; c
 /** SEARCH-RATING-02: a search row as it is built (title, snippet, address) and a fetched page (its extracted text and, where the fetch has it in hand, the start of
  * its HTML), with the engine mode the search ran with. `viewerId` is the person whose own host lists and overrides apply (the block viewer). */
 export type SearchMode = "strict" | "moderate" | "off";
-export type SearchRowInput = { kind: "search_row"; title: string; snippet?: string | null; url?: string | null; mode: SearchMode; viewerId?: string | null };
+/** SEARCH-RATING-04: a row has either an engine `mode` (a web result) or a `given` level (a reference article: `G` when its saved floor check passed
+ * at ingest, `X` when it failed or was never marked). Never both, and a reference row never carries a made-up mode. */
+export type SearchRowInput = { kind: "search_row"; title: string; snippet?: string | null; url?: string | null; viewerId?: string | null } & ({ mode: SearchMode; given?: undefined } | { given: "G" | "X"; mode?: undefined });
 export type PageTextInput = { kind: "page_text"; title: string; text: string; url?: string | null; html?: string | null; mode: SearchMode; viewerId?: string | null };
 export type RaterInput = TextInput | ExplicitInput | PictureCheckInput | SearchRowInput | PageTextInput;
 /** CONTENT-POLICY-02: `detail` is what the rater's own check returned (the floor's `SafetyResult`), carried to the caller on the verdict.
@@ -218,6 +220,9 @@ function rateSearch(input: SearchRowInput | PageTextInput, audience: Audience, m
     if (best === null || rank > (LEVEL_RANK[best.level] ?? -1)) best = found;
   };
   // 1. The host lists (a host rule is applied to everyone and never lifted; every matching list is read, not only the first).
+  // A reference article's saved floor failure is the given X (SEARCH-RATING-04, C1): noted first, so it competes in the strictest-wins comparison
+  // and a gambling word can never lower it, and an unmarked article that also trips the floor keeps the given stamp.
+  if (input.kind === "search_row" && input.given === "X") note({ level: "X", source: "given" });
   const hits = lists.hostHits(band, input.url, personId);
   if (hits.deny) { lists.bumpListDrop(lists.CUSTOM_DENY, band); return WITHHOLD; }
   if (hits.notReady) { lists.bumpListDrop(lists.LISTS_NOT_READY, band); return WITHHOLD; }
@@ -254,7 +259,8 @@ function rateSearch(input: SearchRowInput | PageTextInput, audience: Audience, m
   if (found) return { level: found.level, source: found.source, ...(found.reasons ? { reasons: found.reasons } : {}) };
   // 4. The fallback: nothing rated it. A row with nothing to read (no title and no snippet, or no letters the folder can read) is Unrated.
   if (!foldForSafety(text).hasLatin) return { level: "Unrated", source: "worked_out" };
-  return { level: MODE_LEVEL[input.mode] ?? "Unrated", source: "declared" };
+  if (input.kind === "search_row" && input.given === "G") return { level: "G", source: "given" };
+  return { level: input.mode ? MODE_LEVEL[input.mode] ?? "Unrated" : "Unrated", source: "declared" };
 }
 
 function searchRater(id: string, priority: number, kind: SearchRowInput["kind"] | PageTextInput["kind"]): Rater {

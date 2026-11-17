@@ -20,6 +20,8 @@ export const REFERENCE_COUNTER_NAMES = [
   "ingest_floor_dropped",
   // UNSEEN-01: web search rows the minor floor removed from a result (a count only, never the row).
   "search_floor_dropped",
+  // SEARCH-RATING-04: a reference row the door held for its level or for being unrated (not a floor hold, not the unmarked case).
+  "level_dropped",
   "unavailable",
   "extract_empty",
   "scope_reference",

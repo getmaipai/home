@@ -1,7 +1,7 @@
 import { evaluateSafety, forOutput, evaluateReply, carriesCrisisSignal } from "@/lib/safety";
 import { gateGrainFor } from "@/lib/turnMachine/nodes/outputGate";
 import { tripsMinorFloor, releaseToBand } from "@/lib/retrieval/minorFloor";
-import { minorRowTrips, minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { minorRowTrips, minorRowAllowed, searchAudienceFor } from "@/lib/retrieval/minorRowFloor";
 import { minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { urlAllowedFor, checkHost } from "@/lib/blocklists/hostLists";
 import { resolveSafeSearchLevel, safeSearchDefaultFor } from "@/lib/safeSearch";
@@ -78,7 +78,7 @@ export function person(role: string, controls?: unknown): PersonRow {
   return row as PersonRow;
 }
 
-function run(checks: CheckMap, c: SuiteCase, actor: PersonRow): any {
+async function run(checks: CheckMap, c: SuiteCase, actor: PersonRow): Promise<any> {
   const i = c.input;
   const f = checks[i.check as Key];
   switch (i.check as Key) {
@@ -95,7 +95,7 @@ function run(checks: CheckMap, c: SuiteCase, actor: PersonRow): any {
     case "resolveSafeSearchLevel": return f(i.stored, { actor, band: c.band });
     case "safeSearchDefaultFor": return f(c.band);
     case "floorSearchResult": return f(i.result, c.band, i.options);
-    case "releaseToBand": return f(i.candidates, c.band);
+    case "releaseToBand": return await f(i.candidates, searchAudienceFor(c.band, actor));
     case "gateFor": return f(c.band).passes(i.text ?? "");
     case "bandOkAllowedFor": return f(c.band);
     case "feedVisibleTo": return f(i.feed, c.band, i.ticked);
@@ -145,7 +145,7 @@ function held(check: string, value: any, band: Band): boolean {
 }
 
 export function buildAdapter(checks: CheckMap = TODAY_CHECKS as CheckMap) {
-  const evaluate = (c: SuiteCase) => {
+  const evaluate = async (c: SuiteCase) => {
     const actor = (c.input.actor ?? person(c.band)) as PersonRow;
     const route = (allowed: readonly Key[]) => {
       if (!allowed.includes(c.input.check as Key)) throw new Error(`${c.input.check} is not a ${c.surface} check`);
@@ -176,10 +176,10 @@ export function buildAdapter(checks: CheckMap = TODAY_CHECKS as CheckMap) {
     }
   };
   return {
-    checkRequest(c: SuiteCase): "held" | "released" { return held(c.input.check, evaluate(c), c.band) ? "held" : "released"; },
-    release(c: SuiteCase): "held" | "released" { return held(c.input.check, evaluate(c), c.band) ? "held" : "released"; },
-    filterList(c: SuiteCase): unknown[] {
-      const result = evaluate(c);
+    async checkRequest(c: SuiteCase): Promise<"held" | "released"> { return held(c.input.check, await evaluate(c), c.band) ? "held" : "released"; },
+    async release(c: SuiteCase): Promise<"held" | "released"> { return held(c.input.check, await evaluate(c), c.band) ? "held" : "released"; },
+    async filterList(c: SuiteCase): Promise<unknown[]> {
+      const result = await evaluate(c);
       if (Array.isArray(result) && c.input.check === "releaseToBand") return result;
       if (result?.rows && Array.isArray(result.rows)) return result.rows;
       return held(c.input.check, result, c.band) ? [] : (c.input.rows ?? [result]);

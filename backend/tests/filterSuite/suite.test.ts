@@ -14,11 +14,11 @@ beforeAll(() => { rmSync(blockListsDir, { recursive: true, force: true }); __res
 afterAll(() => __setListsReadyForTests(null));
 
 describe("recorded child and teen protection cases", () => {
-  for (const c of CASES) test(c.id, () => {
+  for (const c of CASES) test(c.id, async () => {
     __setListsReadyForTests(false);
     const outcome = c.point === "list"
-      ? (adapter.filterList(c).length === 0 ? "held" : "released")
-      : c.point === "request" ? adapter.checkRequest(c) : adapter.release(c);
+      ? ((await adapter.filterList(c)).length === 0 ? "held" : "released")
+      : c.point === "request" ? await adapter.checkRequest(c) : await adapter.release(c);
     expect(outcome).toBe(c.expect);
   });
 });

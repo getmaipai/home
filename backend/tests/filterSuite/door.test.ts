@@ -3,10 +3,11 @@ import { buildDoor, type Door } from "@/lib/filter/door";
 import { __setListsReadyForTests } from "@/lib/blocklists/listStore";
 import { RATERS, type Rater, type RaterInput, type Surface } from "@/lib/filter/raters";
 import type { Audience } from "@/lib/filter/ceiling";
+import { articleFloorText } from "@/lib/retrieval/minorFloor";
 import { CASES } from "./cases";
 import type { SuiteCase } from "./adapter";
 
-const MAPPED = new Set(["refusePrompt", "promptViolatesMinorLine", "minorSexualMatch", "refuseVideoPrompt", "refuseMusicPrompt", "contentPolicyFor", "decideAgeCheck", "bandOkAtIngest", "childPromptUnsafe", "teenPromptUnsafe", "evaluateSafety", "codingFloor", "minorRowAllowed", "floorSearchResult", "pageLabel"]);
+const MAPPED = new Set(["refusePrompt", "promptViolatesMinorLine", "minorSexualMatch", "refuseVideoPrompt", "refuseMusicPrompt", "contentPolicyFor", "decideAgeCheck", "bandOkAtIngest", "childPromptUnsafe", "teenPromptUnsafe", "evaluateSafety", "codingFloor", "minorRowAllowed", "floorSearchResult", "pageLabel", "releaseToBand"]);
 // SEARCH-RATING-02: a fetched page cannot be written as a recorded case (its HTML is not in a case), so the page-label witness lives here.
 const PAGE_LABEL_CASE: SuiteCase = { id: "search-page-label-teen", surface: "search", point: "release", band: "teen", input: { check: "pageLabel", title: "A page", text: "Herons nest in the reeds.", html: '<meta name="rating" content="adult">' }, expect: "held", from: "tests/filter/searchRating02.test.ts" };
 function subject(c: SuiteCase): Audience { return { actor: (c.input.actor ?? { id: `door-suite-${c.band}`, role: c.band }) as never, band: c.band }; }
@@ -21,6 +22,7 @@ function requestFor(c: SuiteCase): RaterInput {
   if (c.input.check === "decideAgeCheck") return { kind: "picture_check", checks: c.input.checks, adultOnly: c.input.adultOnly, viewer: c.band };
   if (c.input.check === "bandOkAtIngest") return { kind: "explicit", explicit: true };
   if (c.input.check === "minorRowAllowed") return { kind: "search_row", title: c.input.row.title, snippet: c.input.row.snippet ?? null, url: c.input.row.url ?? null, mode: c.input.options?.mode ?? (c.band === "child" ? "strict" : "moderate") };
+  if (c.input.check === "releaseToBand") { const cand = c.input.candidates[0]; return { kind: "search_row", title: "", snippet: articleFloorText(cand.article), url: null, given: cand.minorOk ? "G" : "X" }; }
   if (c.input.check === "pageLabel") return { kind: "page_text", title: c.input.title, text: c.input.text, html: c.input.html ?? null, url: c.input.url ?? null, mode: "moderate" };
   return { kind: "text", surface: s, point, text: c.input.text ?? "", field: c.input.field ?? "prompt", lane: c.input.lane ?? c.band };
 }
@@ -30,7 +32,7 @@ function covered(c: SuiteCase): boolean {
   if (c.input.check === "codingFloor" && c.surface !== "coding") return false;
   if (c.input.check === "contentPolicyFor" && c.surface !== "central" && c.surface !== "reply") return false;
   if (c.input.check === "bandOkAtIngest" && c.input.input?.explicit !== true) return false;
-  if ((c.input.check === "minorRowAllowed" || c.input.check === "floorSearchResult") && c.surface !== "search") return false;
+  if ((c.input.check === "minorRowAllowed" || c.input.check === "floorSearchResult" || c.input.check === "releaseToBand") && c.surface !== "search") return false;
   return true;
 }
 /** The door's answer for one recorded case, whatever its shape: a request, a release, or (a search result's rows) a list the door filters. */

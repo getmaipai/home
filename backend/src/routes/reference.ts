@@ -227,7 +227,7 @@ referenceRoutes.openapi(getRoute, async (c) => {
   const band = speakerAgeBand(c.get("person"), new Date());
   let row: ReferenceRow | null = null;
   try {
-    row = await readReferencePage({ book, path, band });
+    row = await readReferencePage({ book, path, band, actor: c.get("person") });
   } catch {
     row = null;
   }

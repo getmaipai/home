@@ -171,7 +171,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const kind = (input.kind ?? "").trim().slice(0, 80);
     // KS-02C: tier K (the installed library) names the Wikipedia page first.
     const library = deps.library ?? (async (title: string, band: AgeBand): Promise<LibraryPage | null> => {
-      const row = await resolveReferenceTitle({ title, band });
+      const row = await resolveReferenceTitle({ title, band, actor: input.actor });
       return row ? { title: row.title, disambiguation: row.disambiguation, lead: row.lead } : null;
     });
     const resolved = await resolveWikimediaSubject(subject, fetchJson, kind, { band: input.band, library: (title) => library(title, input.band) });
@@ -251,7 +251,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const fromLibrary = async (): Promise<Candidate[]> => {
       const title = (entity.wikipediaTitle || entity.queryTitle || subject).trim();
       if (!title) return [];
-      const libraryImages = deps.libraryImages ?? ((t: string, band: AgeBand, leadOnly: boolean) => libraryArticleImages({ title: t, band, leadOnly }));
+      const libraryImages = deps.libraryImages ?? ((t: string, band: AgeBand, leadOnly: boolean) => libraryArticleImages({ title: t, band, leadOnly, actor: input.actor }));
       const found = await libraryImages(title, input.band, entity.human).catch((): LibraryImage[] => []);
       return found.map((image): Candidate => ({
         url: libraryImageUrl(image.book, image.imagePath),

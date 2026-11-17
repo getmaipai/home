@@ -16,7 +16,9 @@ export type { Audience } from "./ceiling";
  * crisis signal (`allow_with_resources`) reaches the caller. */
 /** `detail` (CONTENT-POLICY-03): what the rater that decided returned beyond the level, for a caller that needs it: the lane rater's refusal code on a held request
  * (`minor_sexual`, `child_content`, `teen_content`), the finished-item `AgeDecision` on a `picture_check`. The text of the person's line stays the caller's. */
-export type DoorVerdict = { verdict: "held" | "released"; rating: ContentRating | null; held_by?: string; safety?: SafetyResult; detail?: unknown };
+export type DoorVerdict = { verdict: "held" | "released"; rating: ContentRating | null; held_by?: string; safety?: SafetyResult; detail?: unknown;
+  /** SEARCH-RATING-04: set on a held verdict when the rater's result was a withhold (a floor, injection or list catch), so a caller can tell it from a level hold. */
+  withhold?: true };
 export type Door = {
   checkRequest(input: { surface: Surface; audience: Audience; request: RaterInput & { kind: "text" } }): Promise<DoorVerdict>;
   release(input: { surface: Surface; audience: Audience; item: RaterInput }): Promise<DoorVerdict>;
@@ -119,7 +121,7 @@ export function buildDoor(options: { raters?: Rater[]; onRate?: (raterId: string
         const rating = makeStamp(rater, result, rater.source === "given" ? labelFor(item) : undefined);
         // C9: an allowed Unrated covers only a verdict a rater ran and gave without a withhold; a withhold and Prohibited are never released.
         const unratedReleased = result.level === "Unrated" && !result.withhold && unratedOk;
-        if (result.withhold || (overCeiling(result.level, ceiling) && !unratedReleased)) return { verdict: "held", rating, held_by: rater.id, ...carry() };
+        if (result.withhold || (overCeiling(result.level, ceiling) && !unratedReleased)) return { verdict: "held", rating, held_by: rater.id, ...(result.withhold ? { withhold: true as const } : {}), ...carry() };
         // Prohibited is terminal even if a custom ceiling or downstream rater says otherwise.
         if (result.level === "Prohibited") return { verdict: "held", rating, held_by: rater.id, ...carry() };
         return { verdict: "released", rating, ...carry() };

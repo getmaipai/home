@@ -92,7 +92,6 @@
   "backend/src/lib/register.ts": 5,
   "backend/src/lib/relationships.ts": 2,
   "backend/src/lib/retrieval/ddgsSource.ts": 2,
-  "backend/src/lib/retrieval/minorFloor.ts": 1,
   "backend/src/lib/retrieval/minorQueryCheck.ts": 1,
   "backend/src/lib/retrieval/sourceMode.ts": 8,
   "backend/src/lib/retrieval/wayback.ts": 1,
