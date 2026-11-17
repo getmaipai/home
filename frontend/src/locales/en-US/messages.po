@@ -777,12 +777,12 @@ msgid "{made} is ready. Pick it from the list and press Preview to hear it."
 msgstr "{made} is ready. Pick it from the list and press Preview to hear it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:107
+#: src/apps/settings/VoiceBrowserSection.tsx:108
 msgid "{madeName} is ready. Ask a parent to pick it for you."
 msgstr "{madeName} is ready. Ask a parent to pick it for you."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:107
+#: src/apps/settings/VoiceBrowserSection.tsx:108
 msgid "{madeName} is ready. Choose it in the list above."
 msgstr "{madeName} is ready. Choose it in the list above."
 
@@ -1304,12 +1304,12 @@ msgid "{size} drive"
 msgstr "{size} drive"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:30
+#: src/apps/settings/CodingSettings.tsx:31
 msgid "{size} GB"
 msgstr "{size} GB"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:30
+#: src/apps/settings/CodingSettings.tsx:31
 msgid "{size} MB"
 msgstr "{size} MB"
 
@@ -1688,11 +1688,6 @@ msgid "90 days"
 msgstr "90 days"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:766
-msgid "setting.notifications.backups.target_failing.telegram.label"
-msgstr "Telegram me when backups start failing"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:785
 msgid "setting.notifications.telegram.bot_token.help"
 msgstr "A bot token from @BotFather, used to send notifications to Telegram. One bot for the whole household; each person links their own chat below."
@@ -1716,11 +1711,6 @@ msgstr "A child can't be given Max. Children keep the Standard level."
 #: src/apps/people/FaceEnrollmentPage.tsx:271
 msgid "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you."
 msgstr "A child can't enroll themself for face recognition. Ask an owner or admin to run this for you."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:781
-msgid "setting.notifications.person.band_changed.telegram.label"
-msgstr "Telegram me when a child or teen's profile band updates on a birthday"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1013
@@ -1816,11 +1806,6 @@ msgstr "A guardian chooses whether to use your likeness."
 #: src/lib/settingCopy.generated.ts:1450
 msgid "setting.tours.autostart.enabled.help"
 msgstr "A guide opens on a page's first visit when enabled. Help can open Show me around at any time."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:791
-msgid "setting.notifications.updates.available.telegram.label"
-msgstr "Telegram me when a MaiPai Home update is available"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:235
@@ -1928,16 +1913,6 @@ msgid "setting.home.access_token.help"
 msgstr "A long-lived access token from your Home Assistant profile page, used to control your smart-home devices."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:779
-msgid "setting.notifications.model.download_failed.telegram.label"
-msgstr "Telegram me when a model download fails"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:780
-msgid "setting.notifications.model.download_ready.telegram.label"
-msgstr "Telegram me when a model finishes downloading"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:908
 msgid "A new chat always uses one of your companions. Choose a companion to switch."
 msgstr "A new chat always uses one of your companions. Choose a companion to switch."
@@ -1946,11 +1921,6 @@ msgstr "A new chat always uses one of your companions. Choose a companion to swi
 #: src/shell/pages/MusicSongDetails.tsx:91
 msgid "A new cover could not start. Try again."
 msgstr "A new cover could not start. Try again."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:783
-msgid "setting.notifications.repairs.new.telegram.label"
-msgstr "Telegram me about new Repairs items"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:835
@@ -1968,9 +1938,9 @@ msgid "A real person"
 msgstr "A real person"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1537
-msgid "setting.vision.on_request.enabled.label"
-msgstr "Allow vision when requested"
+#: src/lib/settingCopy.generated.ts:1271
+msgid "setting.storage.critical_free_gb.help"
+msgstr "A Repairs item is raised once free space on the hub's own disk drops below this."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:158
@@ -2036,11 +2006,6 @@ msgstr "A teen can be given Max only for pictures. Chat, video and music stay St
 #: src/shell/pages/PersonProfilePage.tsx:74
 msgid "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
 msgstr "A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1265
-msgid "setting.status.internet_probe.enabled.help"
-msgstr "Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AllAppsPage.tsx:125
@@ -3040,6 +3005,11 @@ msgid "setting.search.hosts.teen.allow.label"
 msgstr "Allow these sites for teen"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1537
+msgid "setting.vision.on_request.enabled.label"
+msgstr "Allow vision when requested"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:451
 msgid "setting.generation.adult_adapters.option_label.allowed"
 msgstr "Allowed"
@@ -3063,6 +3033,11 @@ msgstr "Allowed to close"
 #: src/lib/settingCopy.generated.ts:372
 msgid "setting.engines.stack.remote.allow_tailnet.does"
 msgstr "Allows a private tailnet route to the engine when nobody is at the house."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1538
+msgid "setting.vision.on_request.enabled.help"
+msgstr "Allows a requested camera turn. Frames are never kept for a child."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1338
@@ -3206,26 +3181,6 @@ msgstr "An admin turned chat off for now."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:45
 msgid "An encyclopedia written for children."
 msgstr "An encyclopedia written for children."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:772
-msgid "setting.notifications.engines.update_failed.telegram.label"
-msgstr "Telegram me when a Stack engine fails to update"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:769
-msgid "setting.notifications.engines.problem.telegram.label"
-msgstr "Telegram me when a Stack engine reports an open warning or critical problem"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:771
-msgid "setting.notifications.engines.update_available.telegram.label"
-msgstr "Telegram me when a Stack engine has an update available"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:770
-msgid "setting.notifications.engines.update_applied.telegram.label"
-msgstr "Telegram me when a Stack engine updates"
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:221
@@ -3582,12 +3537,12 @@ msgid "Area"
 msgstr "Area"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:82
+#: src/shell/pages/dashboard/ArrangeHome.tsx:84
 msgid "Arrange"
 msgstr "Arrange"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:87
+#: src/shell/pages/dashboard/ArrangeHome.tsx:89
 msgid "Arrange Home"
 msgstr "Arrange Home"
 
@@ -3647,7 +3602,7 @@ msgid "api.minor.list_child_delete_household"
 msgstr "Ask a grown-up to delete a household list. Children can't delete them."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:91
+#: src/apps/settings/VoiceBrowserSection.tsx:92
 msgid "Ask a parent to choose your voice."
 msgstr "Ask a parent to choose your voice."
 
@@ -5400,6 +5355,11 @@ msgid "Check what it is, then download it. It starts for admins only."
 msgstr "Check what it is, then download it. It starts for admins only."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1264
+msgid "setting.status.internet_probe.enabled.label"
+msgstr "Check whether the internet is reachable"
+
+#. js-lingui-explicit-id
 #: src/lib/useHubMutation.ts:16
 msgid "Check your connection and try again."
 msgstr "Check your connection and try again."
@@ -5693,12 +5653,12 @@ msgid "Choose a voice"
 msgstr "Choose a voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "Choose a voice for"
 msgstr "Choose a voice for"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:94
+#: src/apps/settings/VoiceBrowserSection.tsx:95
 msgid "Choose a voice for {who}"
 msgstr "Choose a voice for {who}"
 
@@ -5919,7 +5879,7 @@ msgid "Choose which levels exist, the model each one uses and who can use it."
 msgstr "Choose which levels exist, the model each one uses and who can use it."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:88
+#: src/shell/pages/dashboard/ArrangeHome.tsx:90
 msgid "Choose which sections show on Home and the order they come in."
 msgstr "Choose which sections show on Home and the order they come in."
 
@@ -6310,7 +6270,7 @@ msgid "Close the song details"
 msgstr "Close the song details"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:92
+#: src/shell/pages/dashboard/ArrangeHome.tsx:94
 msgid "Close this and open Arrange again."
 msgstr "Close this and open Arrange again."
 
@@ -6472,7 +6432,7 @@ msgid "setting.ease.preset.option_label.comfortable"
 msgstr "Comfortable"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:33
+#: src/shell/pages/dashboard/ArrangeHome.tsx:35
 msgid "Coming up"
 msgstr "Coming up"
 
@@ -6502,7 +6462,7 @@ msgstr "Companies, markets, jobs, prices, the economy and personal money."
 #: src/apps/library/appPresentation.ts:9
 #: src/apps/settings/RobotCompanionChoices.tsx:62
 #: src/apps/settings/RobotCompanionChoices.tsx:64
-#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:106
 #: src/shell/pages/FamilyPage.tsx:66
 msgid "Companion"
 msgstr "Companion"
@@ -7085,7 +7045,7 @@ msgid "Could not hide this item. Try again."
 msgstr "Could not hide this item. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:92
+#: src/shell/pages/dashboard/ArrangeHome.tsx:94
 msgid "Could not load"
 msgstr "Could not load"
 
@@ -7160,7 +7120,7 @@ msgid "Could not load faded memories. Check your connection and try again."
 msgstr "Could not load faded memories. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:84
+#: src/shell/pages/DashboardPage.tsx:85
 msgid "Could not load Home cards. Refresh Home to try again."
 msgstr "Could not load Home cards. Refresh Home to try again."
 
@@ -7612,7 +7572,7 @@ msgid "Could not run a backup."
 msgstr "Could not run a backup."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:93
+#: src/shell/pages/dashboard/ArrangeHome.tsx:95
 msgid "Could not save"
 msgstr "Could not save"
 
@@ -7627,7 +7587,7 @@ msgid "Could not save Home's default voice. Try again."
 msgstr "Could not save Home's default voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatActivity.ts:87
+#: src/apps/chat/chatActivity.ts:84
 msgid "Could not save that answer. Try again."
 msgstr "Could not save that answer. Try again."
 
@@ -7728,7 +7688,7 @@ msgid "Could not save your appearance."
 msgstr "Could not save your appearance."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:68
+#: src/shell/pages/dashboard/ArrangeHome.tsx:70
 msgid "Could not save your Home layout. Check your connection and try again."
 msgstr "Could not save your Home layout. Check your connection and try again."
 
@@ -7824,7 +7784,7 @@ msgid "Could not stop {name}."
 msgstr "Could not stop {name}."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatActivity.ts:81
+#: src/apps/chat/chatActivity.ts:78
 msgid "Could not stop that. Try again."
 msgstr "Could not stop that. Try again."
 
@@ -8326,6 +8286,11 @@ msgstr "Default"
 #: src/apps/setup/StorageStep.tsx:165
 msgid "Default folder"
 msgstr "Default folder"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1329
+msgid "setting.storage.person.default_cap_bytes.label"
+msgstr "Default per-person storage cap (bytes)"
 
 #. js-lingui-explicit-id
 #: src/shell/statusApps.ts:9
@@ -8993,7 +8958,7 @@ msgid "Downloading and installing"
 msgstr "Downloading and installing"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:102
+#: src/apps/settings/VoiceBrowserSection.tsx:103
 msgid "Downloading this voice, one moment."
 msgstr "Downloading this voice, one moment."
 
@@ -11073,8 +11038,8 @@ msgid "Here are the short clips it will move with. Do they look right?"
 msgstr "Here are the short clips it will move with. Do they look right?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:104
-#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:106
+#: src/shell/pages/dashboard/ArrangeHome.tsx:106
 msgid "Hero source"
 msgstr "Hero source"
 
@@ -11170,7 +11135,7 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/coreLabels.ts:7
 #: src/shell/pageHeaderTitle.tsx:94
 #: src/shell/pages/ActivityPage.tsx:44
-#: src/shell/pages/DashboardPage.tsx:30
+#: src/shell/pages/DashboardPage.tsx:31
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:155
@@ -11277,7 +11242,7 @@ msgid "failure.voice.listening_engine.adult"
 msgstr "Home can't hear you right now. Type your message instead, or open Repairs to check it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:95
+#: src/apps/settings/VoiceBrowserSection.tsx:96
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/shell/pages/CompanionsPage.tsx:418
 msgid "Home can't reach its voice service. Check Repairs, then come back."
@@ -11578,7 +11543,7 @@ msgid "Home could not save that choice. Check your connection and try again; you
 msgstr "Home could not save that choice. Check your connection and try again; you can also change it later under Settings, then AI and models, then Performance."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:66
+#: src/apps/settings/VoiceBrowserSection.tsx:67
 msgid "Home could not save that voice. Try again."
 msgstr "Home could not save that voice. Try again."
 
@@ -11933,11 +11898,6 @@ msgid "setting.coding.engine.option.auto"
 msgstr "Home picks the best engine for this computer."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:778
-msgid "setting.notifications.memory.updated.telegram.label"
-msgstr "Telegram me when I remember something from our conversation"
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:144
 msgid "Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup."
 msgstr "Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup."
@@ -11966,11 +11926,6 @@ msgstr "Home shows it only once. Give it to the assistant. Anyone with it can do
 #: src/apps/settings/AiSlotDialog.tsx:24
 msgid "Home stays up, but other big jobs wait their turn."
 msgstr "Home stays up, but other big jobs wait their turn."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1271
-msgid "setting.storage.critical_free_gb.help"
-msgstr "A Repairs item is raised once free space on the hub's own disk drops below this."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:146
@@ -12104,6 +12059,11 @@ msgstr "Household robots"
 #: src/shell/pages/settings/SettingField.tsx:248
 msgid "Household storage cap"
 msgstr "Household storage cap"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1272
+msgid "setting.storage.household.cap_bytes.label"
+msgstr "Household storage cap (bytes)"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:243
@@ -13075,11 +13035,6 @@ msgstr "IP address"
 #: src/apps/settings/HouseholdRobotsSection.tsx:184
 msgid "IP address {ip}"
 msgstr "IP address {ip}"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1264
-msgid "setting.status.internet_probe.enabled.label"
-msgstr "Check whether the internet is reachable"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleAddFile.tsx:59
@@ -14198,6 +14153,16 @@ msgid "Level unknown"
 msgstr "Level unknown"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:501
+msgid "setting.generation.picture_tier.label"
+msgstr "Level when nobody says"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:528
+msgid "setting.generation.video_tier.label"
+msgstr "Level when nobody says"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MicTestPage.tsx:52
 msgid "Level: {toFixed} percent"
 msgstr "Level: {toFixed} percent"
@@ -14681,7 +14646,7 @@ msgid "Loading folders"
 msgstr "Loading folders"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/DashboardPage.tsx:83
+#: src/shell/pages/DashboardPage.tsx:84
 msgid "Loading Home"
 msgstr "Loading Home"
 
@@ -14887,7 +14852,7 @@ msgstr "Loading voice samples"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceBox.tsx:65
-#: src/apps/settings/VoiceBrowserSection.tsx:95
+#: src/apps/settings/VoiceBrowserSection.tsx:96
 #: src/apps/settings/VoiceManagerSection.tsx:104
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:143
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:161
@@ -14906,7 +14871,7 @@ msgid "Loading your {noun}"
 msgstr "Loading your {noun}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:91
+#: src/shell/pages/dashboard/ArrangeHome.tsx:93
 msgid "Loading your cards"
 msgstr "Loading your cards"
 
@@ -15202,7 +15167,7 @@ msgid "Lyrics (optional)"
 msgstr "Lyrics (optional)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:106
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/dashboard/HomeShelves.tsx:86
@@ -15396,7 +15361,7 @@ msgid "Make a new version"
 msgstr "Make a new version"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
+#: src/apps/settings/VoiceBrowserSection.tsx:113
 msgid "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it."
 msgstr "Make a new voice based on a WAV, MP3 or FLAC recording of 6 to 30 seconds. It is not a copy. A parent can see it, listen to it and delete it."
 
@@ -15444,22 +15409,22 @@ msgid "Make a video from this"
 msgstr "Make a video from this"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:111
+#: src/apps/settings/VoiceBrowserSection.tsx:112
 msgid "Make a voice"
 msgstr "Make a voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:106
+#: src/apps/settings/VoiceBrowserSection.tsx:107
 msgid "Make a voice from a recording"
 msgstr "Make a voice from a recording"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
+#: src/apps/settings/VoiceBrowserSection.tsx:113
 msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it."
 msgstr "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. A parent can see it, listen to it and delete it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:112
+#: src/apps/settings/VoiceBrowserSection.tsx:113
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:206
 msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
 msgstr "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
@@ -15484,8 +15449,8 @@ msgid "Make an assistant key"
 msgstr "Make an assistant key"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:106
-#: src/apps/settings/VoiceBrowserSection.tsx:111
+#: src/apps/settings/VoiceBrowserSection.tsx:107
+#: src/apps/settings/VoiceBrowserSection.tsx:112
 msgid "Make an Inspired voice"
 msgstr "Make an Inspired voice"
 
@@ -16043,11 +16008,6 @@ msgid "Memory"
 msgstr "Memory"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:777
-msgid "setting.notifications.memory.judge_failed.telegram.label"
-msgstr "Telegram me when I have trouble remembering something from our conversation"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:148
 msgid "Memory in use by chat and voice: {gb} GB"
 msgstr "Memory in use by chat and voice: {gb} GB"
@@ -16426,12 +16386,12 @@ msgid "Move {name} up"
 msgstr "Move {name} up"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:114
+#: src/shell/pages/dashboard/ArrangeHome.tsx:116
 msgid "Move {title} down"
 msgstr "Move {title} down"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:113
+#: src/shell/pages/dashboard/ArrangeHome.tsx:115
 msgid "Move {title} up"
 msgstr "Move {title} up"
 
@@ -16441,12 +16401,12 @@ msgid "Move an EQ band in the EQ panel first."
 msgstr "Move an EQ band in the EQ panel first."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:99
+#: src/shell/pages/dashboard/ArrangeHome.tsx:101
 msgid "Move section {title} down"
 msgstr "Move section {title} down"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:98
+#: src/shell/pages/dashboard/ArrangeHome.tsx:100
 msgid "Move section {title} up"
 msgstr "Move section {title} up"
 
@@ -16856,8 +16816,8 @@ msgstr "Neutral is the standard black-and-white theme, the same as shadcn's own 
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:26
-#: src/apps/settings/CodingSettings.tsx:31
 #: src/apps/settings/CodingSettings.tsx:32
+#: src/apps/settings/CodingSettings.tsx:33
 #: src/apps/settings/CodingSettings.tsx:226
 #: src/shell/pages/status/StatusBoard.tsx:113
 #: src/shell/pages/status/StatusBoard.tsx:113
@@ -17092,7 +17052,7 @@ msgid "Next song"
 msgstr "Next song"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:34
+#: src/shell/pages/dashboard/ArrangeHome.tsx:36
 msgid "Next up"
 msgstr "Next up"
 
@@ -18174,7 +18134,7 @@ msgstr "off"
 #: src/apps/settings/ReferenceLibrarySettings.tsx:286
 #: src/apps/settings/RobotBody.tsx:213
 #: src/lib/settingCopy.ts:42
-#: src/shell/pages/dashboard/ArrangeHome.tsx:104
+#: src/shell/pages/dashboard/ArrangeHome.tsx:106
 #: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Off"
 msgstr "Off"
@@ -18618,6 +18578,11 @@ msgstr "Once · {day}"
 #: src/apps/reminders/ComingUpRow.tsx:38
 msgid "Once · {weekday}"
 msgstr "Once · {weekday}"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1265
+msgid "setting.status.internet_probe.enabled.help"
+msgstr "Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:56
@@ -19575,7 +19540,7 @@ msgid "Pick a level to change its model or who can use it."
 msgstr "Pick a level to change its model or who can use it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "Pick a person to see or change their voice."
 msgstr "Pick a person to see or change their voice."
 
@@ -20171,7 +20136,7 @@ msgid "Preparing"
 msgstr "Preparing"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:98
+#: src/apps/settings/VoiceBrowserSection.tsx:99
 msgid "Preparing the voice test"
 msgstr "Preparing the voice test"
 
@@ -20817,9 +20782,19 @@ msgid "Reference"
 msgstr "Reference"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:869
+msgid "setting.reference.download.when.label"
+msgstr "Reference download time"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1661
 msgid "area.Reference library"
 msgstr "Reference library"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:878
+msgid "setting.reference.library_dir.label"
+msgstr "Reference library location"
 
 #. js-lingui-explicit-id
 #: src/shell/reader/SearchResults.tsx:48
@@ -21352,7 +21327,7 @@ msgid "Reset {text}"
 msgstr "Reset {text}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:124
+#: src/shell/pages/dashboard/ArrangeHome.tsx:126
 #: src/shell/pages/settings/SettingField.tsx:255
 msgid "Reset to default"
 msgstr "Reset to default"
@@ -21765,6 +21740,11 @@ msgid "setting.robot.companion.guise.label"
 msgstr "Robot impression"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1047
+msgid "setting.robot.initiative.enabled.label"
+msgstr "Robot initiative"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:811
 msgid "setting.person.robot.may_address.label"
 msgstr "Robot may address this person"
@@ -21875,11 +21855,6 @@ msgstr "Robots"
 #: src/apps/settings/AddRobotSection.tsx:176
 msgid "Robots found on your network"
 msgstr "Robots found on your network"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1047
-msgid "setting.robot.initiative.enabled.label"
-msgstr "Robot initiative"
 
 #. js-lingui-explicit-id
 #: ../backend/src/routes/settings.ts:91
@@ -22255,7 +22230,7 @@ msgstr "Saved place"
 #: src/apps/people/ProfileForm.tsx:187
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
 #: src/apps/settings/styles/StyleEditor.tsx:48
-#: src/apps/settings/VoiceBrowserSection.tsx:105
+#: src/apps/settings/VoiceBrowserSection.tsx:106
 msgid "Saved."
 msgstr "Saved."
 
@@ -23421,7 +23396,7 @@ msgid "Show {length} advanced settings"
 msgstr "Show {length} advanced settings"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:115
+#: src/shell/pages/dashboard/ArrangeHome.tsx:117
 msgid "Show {title} on Home"
 msgstr "Show {title} on Home"
 
@@ -23525,7 +23500,7 @@ msgid "setting.ui.reasoning_open.label"
 msgstr "Show reasoning expanded"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:100
+#: src/shell/pages/dashboard/ArrangeHome.tsx:102
 msgid "Show section {title}"
 msgstr "Show section {title}"
 
@@ -23823,7 +23798,7 @@ msgid "Size"
 msgstr "Size"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:30
+#: src/apps/settings/CodingSettings.tsx:31
 #: src/apps/setup/SetupWizard.tsx:480
 msgid "Size not reported"
 msgstr "Size not reported"
@@ -24088,11 +24063,6 @@ msgid "someone"
 msgstr "someone"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:765
-msgid "setting.notifications.approvals.requested.telegram.label"
-msgstr "Telegram me when someone is asking for approval"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1339
 msgid "setting.synths.real_people.does_child"
 msgstr "Someone at home decides which lookalikes you can talk with."
@@ -24103,24 +24073,9 @@ msgid "setting.synths.real_people.does_teen"
 msgstr "Someone at home says yes, for all of them or one at a time."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1538
-msgid "setting.vision.on_request.enabled.help"
-msgstr "Allows a requested camera turn. Frames are never kept for a child."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:167
 msgid "Someone in your home"
 msgstr "Someone in your home"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:775
-msgid "setting.notifications.file.shared_with_household.telegram.label"
-msgstr "Telegram me when someone shares a file with the household"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:776
-msgid "setting.notifications.file.shared_with_you.telegram.label"
-msgstr "Telegram me when someone shares a file with me"
 
 #. js-lingui-explicit-id
 #: src/shell/activity.ts:56
@@ -24603,6 +24558,11 @@ msgid "setting.generation.video_tier.option_label.standard"
 msgstr "Standard"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:529
+msgid "setting.generation.video_tier.help"
+msgstr "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:502
 msgid "setting.generation.picture_tier.help"
 msgstr "Standard is fast. Boost has finer detail and takes longer. Anyone can pick a level for one picture."
@@ -24876,7 +24836,7 @@ msgstr "Stone"
 #: src/apps/clock/StopwatchTab.tsx:66
 #: src/apps/settings/AddVoiceBox.tsx:69
 #: src/apps/settings/StackChanInstallDialog.tsx:146
-#: src/apps/settings/VoiceBrowserSection.tsx:99
+#: src/apps/settings/VoiceBrowserSection.tsx:100
 #: src/apps/settings/VoiceManagerSection.tsx:123
 #: src/shell/pages/companionFlow/AnimateStep.tsx:139
 #: src/shell/pages/companionFlow/AnimateStep.tsx:148
@@ -25025,16 +24985,6 @@ msgstr "Storage and backups"
 #: src/shell/pages/performance/DiskHardwareBody.tsx:32
 msgid "Storage areas"
 msgstr "Storage areas"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1272
-msgid "setting.storage.household.cap_bytes.label"
-msgstr "Household storage cap (bytes)"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1329
-msgid "setting.storage.person.default_cap_bytes.label"
-msgstr "Default per-person storage cap (bytes)"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:181
@@ -25397,9 +25347,54 @@ msgid "setting.notifications.telegram.bot_token.label"
 msgstr "Telegram bot token"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:783
+msgid "setting.notifications.repairs.new.telegram.label"
+msgstr "Telegram me about new Repairs items"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:781
+msgid "setting.notifications.person.band_changed.telegram.label"
+msgstr "Telegram me when a child or teen's profile band updates on a birthday"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:791
+msgid "setting.notifications.updates.available.telegram.label"
+msgstr "Telegram me when a MaiPai Home update is available"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:779
+msgid "setting.notifications.model.download_failed.telegram.label"
+msgstr "Telegram me when a model download fails"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:780
+msgid "setting.notifications.model.download_ready.telegram.label"
+msgstr "Telegram me when a model finishes downloading"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:782
 msgid "setting.notifications.remind.due.telegram.label"
 msgstr "Telegram me when a reminder is due"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:772
+msgid "setting.notifications.engines.update_failed.telegram.label"
+msgstr "Telegram me when a Stack engine fails to update"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:771
+msgid "setting.notifications.engines.update_available.telegram.label"
+msgstr "Telegram me when a Stack engine has an update available"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:769
+msgid "setting.notifications.engines.problem.telegram.label"
+msgstr "Telegram me when a Stack engine reports an open warning or critical problem"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:770
+msgid "setting.notifications.engines.update_applied.telegram.label"
+msgstr "Telegram me when a Stack engine updates"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:790
@@ -25410,6 +25405,36 @@ msgstr "Telegram me when a timer is done"
 #: src/lib/settingCopy.generated.ts:764
 msgid "setting.notifications.alarm.due.telegram.label"
 msgstr "Telegram me when an alarm is due"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:766
+msgid "setting.notifications.backups.target_failing.telegram.label"
+msgstr "Telegram me when backups start failing"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:777
+msgid "setting.notifications.memory.judge_failed.telegram.label"
+msgstr "Telegram me when I have trouble remembering something from our conversation"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:778
+msgid "setting.notifications.memory.updated.telegram.label"
+msgstr "Telegram me when I remember something from our conversation"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:765
+msgid "setting.notifications.approvals.requested.telegram.label"
+msgstr "Telegram me when someone is asking for approval"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:776
+msgid "setting.notifications.file.shared_with_you.telegram.label"
+msgstr "Telegram me when someone shares a file with me"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:775
+msgid "setting.notifications.file.shared_with_household.telegram.label"
+msgstr "Telegram me when someone shares a file with the household"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:188
@@ -25448,9 +25473,9 @@ msgid "setting.companion.voice.tessa.label"
 msgstr "Tessa's voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceBrowserSection.tsx:96
-#: src/apps/settings/VoiceBrowserSection.tsx:99
+#: src/apps/settings/VoiceBrowserSection.tsx:97
+#: src/apps/settings/VoiceBrowserSection.tsx:100
 #: src/apps/settings/VoiceManagerSection.tsx:123
 #: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/pages/settings/WebSearchSettings.tsx:103
@@ -27010,7 +27035,7 @@ msgid "setting.tts.home_voice.help"
 msgstr "The voice Home and its robots speak with for anyone who has not chosen their own. \"default\" is the voice built into the speech engine now in use."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:94
+#: src/apps/settings/VoiceBrowserSection.tsx:95
 msgid "The voice Home speaks with when it talks to {who}."
 msgstr "The voice Home speaks with when it talks to {who}."
 
@@ -27662,7 +27687,7 @@ msgstr "Timer actions"
 #. js-lingui-explicit-id
 #: src/apps/clock/ClockPage.tsx:43
 #: src/apps/clock/TimersTab.tsx:109
-#: src/shell/pages/dashboard/ArrangeHome.tsx:35
+#: src/shell/pages/dashboard/ArrangeHome.tsx:37
 msgid "Timers"
 msgstr "Timers"
 
@@ -27997,7 +28022,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:160
-#: src/apps/settings/VoiceBrowserSection.tsx:95
+#: src/apps/settings/VoiceBrowserSection.tsx:96
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/PlanStep.tsx:126
@@ -28013,7 +28038,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/shell/pages/ActivityPage.tsx:37
 #: src/shell/pages/companionFlow/AnimateStep.tsx:133
 #: src/shell/pages/companionFlow/PackSection.tsx:106
-#: src/shell/pages/dashboard/ArrangeHome.tsx:92
+#: src/shell/pages/dashboard/ArrangeHome.tsx:94
 #: src/shell/pages/FamilyPage.tsx:49
 #: src/shell/pages/FamilyPage.tsx:50
 #: src/shell/pages/FilesPage.tsx:320
@@ -28982,11 +29007,6 @@ msgid "Used today"
 msgstr "Used today"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:529
-msgid "setting.generation.video_tier.help"
-msgstr "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:34
 msgid "Used yesterday"
 msgstr "Used yesterday"
@@ -29063,16 +29083,6 @@ msgstr "Uses your reading on this hub to choose stories for My Mix."
 #: src/shell/pages/SignInPage.tsx:160
 msgid "Using a password? Tap \"Use a password instead\"."
 msgstr "Using a password? Tap \"Use a password instead\"."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:501
-msgid "setting.generation.picture_tier.label"
-msgstr "Level when nobody says"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:528
-msgid "setting.generation.video_tier.label"
-msgstr "Level when nobody says"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ActivityPage.tsx:50
@@ -29352,7 +29362,7 @@ msgid "Voice conversation"
 msgstr "Voice conversation"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:97
+#: src/apps/settings/VoiceBrowserSection.tsx:98
 msgid "Voice for {who}"
 msgstr "Voice for {who}"
 
@@ -29432,7 +29442,7 @@ msgid "area.Voices"
 msgstr "Voices"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:96
+#: src/apps/settings/VoiceBrowserSection.tsx:97
 #: src/apps/settings/VoiceManagerSection.tsx:105
 msgid "Voices are still getting ready. This takes a minute after setup."
 msgstr "Voices are still getting ready. This takes a minute after setup."
@@ -29857,11 +29867,6 @@ msgid "When a Max job needs more room than is free, chat switches to a simpler m
 msgstr "When a Max job needs more room than is free, chat switches to a simpler model while it runs."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:869
-msgid "setting.reference.download.when.label"
-msgstr "Reference download time"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:14
 msgid "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry."
 msgstr "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry."
@@ -30000,11 +30005,6 @@ msgstr "When:"
 #: src/lib/settingCopy.generated.ts:1200
 msgid "setting.search.source_mode.help"
 msgstr "Where MaiPai looks for answers: Internet first, Library only, or Library first (the recommended choice). Library only turns off just the live Wikipedia-style lookup; web search stays on unless web search is itself set to Library only. Children and teens keep their current protections in every mode, and this choice never widens what they can reach."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:878
-msgid "setting.reference.library_dir.label"
-msgstr "Reference library location"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:18
@@ -30213,7 +30213,7 @@ msgid "Whole word"
 msgstr "Whole word"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "Whose voice"
 msgstr "Whose voice"
 
@@ -30505,12 +30505,12 @@ msgid "Yesterday {time}"
 msgstr "Yesterday {time}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:56
+#: src/apps/settings/VoiceBrowserSection.tsx:57
 msgid "you"
 msgstr "you"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceBrowserSection.tsx:90
+#: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "You"
 msgstr "You"
 
@@ -30730,7 +30730,7 @@ msgid "failure.voice.microphone_setup.adultNoRepairs"
 msgstr "Your browser could not start the microphone. Tap the waveform to try again, or copy the details below."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:92
+#: src/shell/pages/dashboard/ArrangeHome.tsx:94
 msgid "Your cards did not load"
 msgstr "Your cards did not load"
 
@@ -30750,7 +30750,7 @@ msgid "Your cast is empty."
 msgstr "Your cast is empty."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/dashboard/ArrangeHome.tsx:93
+#: src/shell/pages/dashboard/ArrangeHome.tsx:95
 msgid "Your change was not saved"
 msgstr "Your change was not saved"
 
