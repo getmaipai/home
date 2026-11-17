@@ -672,7 +672,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
 | `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
-| `backend/src/lib/imageApp.ts` | templateStarter, imageAppData |
+| `backend/src/lib/imageApp.ts` | imageAppData |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, BEST_NEEDS_DOWNLOAD |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
 | `backend/src/lib/imageSimilarity/fingerprint.ts` | FINGERPRINT_VERSION, hamming, fingerprint, hashDistance |
