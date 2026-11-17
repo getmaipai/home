@@ -183,7 +183,8 @@ registerAppPageFill("video", "create", (person, page) => {
   }
   if (blankFields.length) (bar as Record<string, unknown>).fields = blankFields;
   if (selectedTemplate) bar.placeholder = "Fill in the field above, add any extra direction here, or just press Make video to use the example.";
-  if (call?.args && blankNames.size) call.args.blanks = Object.fromEntries([...blankNames].map((name) => [name, `{blank_${name}}`]));
+  // The page fills `{state}` only in top-level arguments, so each blank rides as its own `blank_<name>` argument and the server gathers them.
+  if (call?.args) for (const name of blankNames) call.args[`blank_${name}`] = `{blank_${name}}`;
   const lengths = lengthOptions();
   // Look, Camera (and Voices, folded under More settings) are the Style control: two thumbnails that open one popover (a sheet on a phone).
   // Owner rule (2026-11-13): every chip is icon-only (the dropdown names the choices, the tooltip says "Label: value"). Orientation comes from the page JSON, so it gets its icons here.

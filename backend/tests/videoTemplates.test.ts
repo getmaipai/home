@@ -63,7 +63,7 @@ test("the typed words fill the template's blank; a blank left empty uses its exa
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const template = getTemplate("mtpl-vtpetmoment")!;
-    const typed = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blanks: { subject: "A grey cat naps on a sunny windowsill" } });
+    const typed = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blank_subject: "A grey cat naps on a sunny windowsill" });
     expect(typed.status).toBe(200);
     expect(fake.submitted[0]!.prompt).toContain("A grey cat naps on a sunny windowsill");
     expect(fake.submitted[0]!.prompt).not.toContain("curious dog");
@@ -74,7 +74,7 @@ test("a blank left empty uses its example, and a malformed blanks value is refus
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const template = getTemplate("mtpl-vtpetmoment")!;
-    const bare = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blanks: { subject: "{blank_subject}" } });
+    const bare = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blank_subject: "{blank_subject}" });
     expect(bare.status).toBe(200);
     expect(fake.submitted[0]!.prompt).toContain(fillTemplateBlanks(template.prompt));
     const bad = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blanks: "words" });

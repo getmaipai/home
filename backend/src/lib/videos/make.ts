@@ -44,6 +44,9 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   const text = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
   const body: MakeVideoBody = { prompt: effectivePrompt };
   if (template) body.template = template;
+  // The Create page sends each blank as its own top-level `blank_<name>` argument.
+  const flatBlanks = Object.fromEntries(Object.entries(raw).filter(([key, value]) => key.startsWith("blank_") && typeof value === "string" && String(value).trim()).map(([key, value]) => [key.slice(6), String(value).trim().slice(0, 300)]));
+  if (Object.keys(flatBlanks).length) body.blanks = flatBlanks;
   if (raw.blanks !== undefined && raw.blanks !== "") {
     if (!raw.blanks || typeof raw.blanks !== "object" || Array.isArray(raw.blanks) || Object.values(raw.blanks).some((value) => typeof value !== "string")) return { ok: false, error: "Fill in the template's words, then try again." };
     body.blanks = Object.fromEntries(Object.entries(raw.blanks).map(([key, value]) => [key, notGiven(value) ? "" : String(value).trim().slice(0, 300)]));
