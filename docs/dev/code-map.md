@@ -635,7 +635,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, releaseSync |
 | `backend/src/lib/filter/nothingSuitable.ts` | NOTHING_SUITABLE_HINT |
-| `backend/src/lib/filter/pass.ts` | mayUse, passForPerson, buildPass, passFor, passForSurface |
+| `backend/src/lib/filter/pass.ts` | mayUse, passForPerson, buildPass, passFor, passForBandDefaults, passForSurface |
 | `backend/src/lib/filter/passCache.ts` | getCachedPass, putCachedPass, nextPassVersion, invalidatePass, invalidatePassForSetting |
 | `backend/src/lib/filter/rateStored.ts` | __setRateHookForTests, rateStoredItem |
 | `backend/src/lib/filter/raters.ts` | prepareRaters, prepareMinorRatersSync, minorRatersReady, pageCarriesAdultLabel, RATERS, ratersFor |
