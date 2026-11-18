@@ -1395,3 +1395,22 @@ Item M8, optional local memory package (M, host only):
 | Packaging | An optional install extra and package, so the core stays small and the dependency is not forced on anyone |
 
 The friend test (27.2) gains a line: with the memory package on, two people in one home each get their own memories, and each can see and delete theirs.
+
+### 27.5 Local memory must be super simple and lightweight (owner, 2026-11-18)
+
+Owner: "has to be super simple, lightweight". This replaces the component choice in 27.4. Mem0 and the other memory libraries need a second model for embeddings, a vector store and an extraction pass on every turn: too heavy for a Raspberry Pi host and not simple.
+
+M8 becomes:
+
+| Part | Design |
+|---|---|
+| Store | One small plain-text notes file per person on the host (for example `memory/sam.md`), capped at about 2,000 characters. No database server, no embedding model, no vector store, no new dependency |
+| How it is used | The person's notes are added to the model's instructions for their turn. At this size nothing needs to be searched |
+| How it changes | Two model tools, `remember(text)` and `forget(text)`, used only when the person asks ("remember that...", "forget that..."). Nothing is saved silently |
+| When it is full | The oldest lines are dropped, or the person is told it is full; no background summarizing |
+| Control | The settings page shows each person's notes as editable text with Delete all; the file can be opened in any editor |
+| Several people | One file per profile; the active person comes from "it's Sam", the screen picker, or their wake phrase (27.4); unknown speaker means no file is read or written |
+| Later, only if wanted | Search with SQLite's built-in full-text index (already part of Python, still no new dependency) if someone wants more than fits in the instructions |
+| Size of the work | S (1 to 2 days), not M |
+
+Everything else in 27.4 stands: optional, off by default, adults only, Home's memory takes over when paired.
