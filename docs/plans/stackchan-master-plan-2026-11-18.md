@@ -771,3 +771,65 @@ Considered and not chosen: a scripting language on the unit for behavior (costs 
 - With T4 and T7 the daily "one combined image" becomes many small pushes a day; the 10-minute gate and soak stay daily and nightly.
 - With T10 the calendar estimate could shorten by one to two weeks. Without it, T4 to T8 still remove most waiting but not the single-unit queue.
 - Risk: T1 changes how the patch series is kept. It must reproduce the exact released image before anything else builds on it, and it depends on the own-firmware decision only in where the branch lives.
+
+## 17. Operating model: little owner time, no pausing, many sessions (added 2026-11-18)
+
+Owner requirements: his involved time is minimal; work does not pause waiting for him; work runs in many parallel sessions, cloud included.
+
+### 17.1 What only the owner does
+
+Everything else is done by agents (org rule: "you run the commands, never Jesse").
+
+| Owner-only | How it is kept small |
+|---|---|
+| Change a rule in `RULES.md` | Rule text is drafted, with the evidence, and queued; he answers yes or no |
+| Ship to the live hub or to the family's own robot | One batched release a week, one yes |
+| Hands-on checks (pick it up, pet it, speak across the room, judge a face or a sound) | Batched into one 15-minute session, twice a week, with a checklist of at most 10 steps |
+| Buy hardware, third-party sign-ins, physical moves of a unit | Asked once, with the exact item |
+| Product taste calls that are not reversible | Queued with a recommendation and a default |
+
+### 17.2 Decisions never block work
+
+1. **Decision queue, not questions in chat.** One file, `docs/plans/stackchan-decisions.md`: each entry has the question, the recommendation, what happens by default, the date the default takes effect, and what is blocked meanwhile. The owner reads it when he wants; a push notice goes out only for an entry that blocks more than one lane.
+2. **Defaults on a timer.** A reversible decision takes its recommended option after 24 hours with no answer and is marked "defaulted" so it can be reversed. Rule changes, shipping, spending and anything touching children's protections never default; work routes around them.
+3. **Agents decide what is theirs.** Naming, layout within the screen standard, test design, refactors, patch numbering, memory trade-offs inside a leased budget, which of two equal libraries: decided by the agent, recorded in one line, never asked.
+4. **A blocked item is swapped, not waited on.** Each lane keeps three ready items. An agent that hits a blocker files it in the queue and takes the next item in the same turn.
+5. **Standing approvals** (proposed; each needs the owner's one-time yes, recorded in memory): land to `main` through the lander in `bot`, `stackchan`, `commons` and `home` when the gate is green; tag `commons` spec versions; flash and wirelessly update the bench units (not the family's robot); start and archive cloud sessions for this plan; open backlog rows.
+
+### 17.3 Sessions
+
+| Session | Where | Lives | Job |
+|---|---|---|---|
+| Coordinator | Mac Studio, long-lived | Whole project | Holds the plan, ledgers and decision queue; starts and feeds lane sessions; merges; writes the daily digest; the only one that talks to the owner |
+| Bench | Mac Studio, long-lived | Whole project | Owns the test units; runs the quick check and gate on every candidate; reports numbers |
+| Firmware lanes (3 to 4) | Mac worktrees | Per item | Build and renderer work that needs the toolchain |
+| Cloud lanes (8 to 10) | Cloud sessions, one per item | Hours, then archived | Spec, Bot service, Home, tester, docs, catalog, cloud compile checks |
+| Reviewer | Cloud | Per change | Independent review of safety, auth and governor changes |
+
+How they stay in step:
+
+- **One item, one session, one branch, one handoff file.** A session is started from a prompt that names the item, its acceptance test, its files, its dependencies and its ledger leases. It ends by pushing its branch, writing a five-line result, and stopping. No session waits on another: dependencies are met by pinned tags or stubs.
+- **Cloud work lands without the owner.** Today cloud sessions stop at "pushed; landing needs your Mac" (several recent sessions ended this way). Item O1 fixes that: the Mac's lander watches for branches from this plan, runs the gate, lands or reports, and tells the coordinator. Nobody types a land command.
+- **Scheduled checks, not a person watching.** The coordinator wakes on a schedule (and on lane results) to assign the next items, so work continues overnight.
+- **Daily digest.** One short page a day: landed, in flight, blocked, numbers from the bench, decisions that defaulted, what needs the owner (usually nothing). A push notice only for a stop-the-line event: a safety regression, a dead unit, or a decision that blocks more than one lane.
+
+### 17.4 Items
+
+| ID | Item | Size | Acceptance |
+|---|---|---|---|
+| O1 | Lander picks up plan branches from cloud sessions by itself in each repo; result posted back | M | A cloud session's work reaches `main` with no person and no hand-run command |
+| O2 | Decision queue file, default timer, and the notice rule | S | First entries are the open decisions in section 15 |
+| O3 | Ledger: patch numbers, tool names, memory budgets, bench slots, item owners | S | Two agents cannot take the same number |
+| O4 | Item prompts generated from this plan (one per item, with acceptance and files) | S | Any session can be started from its prompt alone |
+| O5 | Coordinator schedule and daily digest | S | A digest exists each day; work is assigned overnight |
+| O6 | Standing approvals recorded once | S | Listed in memory with the date and scope |
+| O7 | Owner test session kit: a checklist page the owner taps through, results recorded | S | 15 minutes, twice a week |
+
+O1 to O6 are Wave 0. They come before any lane starts, because every later hour depends on them.
+
+### 17.5 What the owner's week looks like
+
+- Two 15-minute hands-on sessions.
+- One weekly release yes.
+- The decision queue when he chooses, usually five minutes.
+- Nothing else unless a stop-the-line notice arrives.
