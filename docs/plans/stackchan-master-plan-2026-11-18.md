@@ -727,3 +727,47 @@ The owner's words in chat: "i agree with all your suggestions - add to the plan"
 4. Open backlog rows for every item in sections 7, 12, 13 and 14 through the usual route; lease patch numbers and memory budgets in the ledger.
 5. Pin sync and changelog catch-up (Z3, Z4).
 6. Start Wave 1 agents: spec (A1, A2, M0, P2 spec half), bench baseline (A5, P1), security quick wins (S1, S5, S8, Q1, Q2), tester (F1, F2), screen standard (B17), docs (H4, H8).
+
+## 16. Lane T: build and test at speed (added 2026-11-18)
+
+Owner requirement: building firmware, pushing it and testing it takes too long; speed is part of the plan. I do not know today's real times (clean build, incremental build, flash, bench window); T0 measures them. Targets below are goals, not measurements.
+
+### 16.1 Principle: four loops, each as fast as it can be, and most work never reaches the slow one
+
+| Loop | What is proven | Target time | Needs the unit |
+|---|---|---|---|
+| 1. Pixels and logic | Screens, faces, layout rules, gestures, games, governors, wire schema | Under 10 seconds from save to result | No |
+| 2. Whole flow | Tools, turns, modes, Home and Home Assistant paths against the software unit | Under 1 minute | No |
+| 3. On the unit, quick | Boot, link, memory, frame time, one snapshot, one tool round trip | Under 3 minutes from push to result | Yes, no person |
+| 4. On the unit, full | 10-minute gate, hands-on checks, overnight soak | Daily | Yes, sometimes a person |
+
+Rule: an item is not allowed a loop 3 or 4 slot until loops 1 and 2 pass. Every bug found on the unit gets a loop 1 or 2 test so it is never found there twice.
+
+### 16.2 Items
+
+| ID | Item | Where | Size | Acceptance |
+|---|---|---|---|---|
+| T0 | Measure today: clean build, incremental build, patch apply, flash by USB, update by Wi-Fi, a typical bench window, time waiting in the queue | FW, BOT | S | A table; every later item reports against it |
+| T1 | **Patched tree as a real branch.** Keep the firmware as commits on top of the pinned upstream, not as patches applied to a fresh tree each build; generate the numbered patch files from the commits for release and review | FW | M | An edit rebuilds only what changed; patch files still reproduce the same image |
+| T2 | Warm incremental builds: one persistent build directory per worktree, shared compiler cache across worktrees and agents, pinned component cache | FW | S | Incremental build time recorded; goal under 1 minute |
+| T3 | Cloud compile check: container build with the pinned ESP-IDF on every push, with a cached layer, so cloud agents learn in minutes that it compiles, links and fits the slot, and what the static memory size is | FW, CI | M | Every firmware branch gets size and static RAM numbers without the Mac |
+| T4 | **Update over Wi-Fi as the normal bench path.** Our notes record 26 seconds for a direct wireless update. The bench agent pushes candidate images by Wi-Fi to the second slot; a failed boot rolls back by itself; USB is only for recovery and first flash | FW, BOT | M | No USB step in a normal test; a deliberately broken image recovers unattended |
+| T5 | App-only and assets-only images: flash or push only the part that changed | FW | S | Asset changes do not rebuild or reflash the app |
+| T6 | **Live data, no rebuild.** Faces, timings, palettes, overlay positions, ring tables, mode tables, strings and screen layouts load as data; a development build accepts them over the link into PSRAM and redraws at once | FW, BOT | M | Tuning a face or a screen on the real unit takes seconds, with no build and no flash; release builds refuse live data |
+| T7 | Quick smoke on the unit, fully automatic: boot, link, memory numbers, frame period, a screen snapshot compared with the golden frame, three tool round trips, movement governor status | BOT | M | Under 3 minutes from push; result posted to the branch |
+| T8 | Firmware landing queue like Home's lander: branch, cloud compile and host tests, golden frames, combined image, wireless push to the bench unit, smoke, then land | FW, BOT | M | One command; no hand-run steps; a failing branch never blocks others |
+| T9 | Bench that needs no person: powered USB hub with per-port power switching for hard resets, the unit on a stand that is safe for motion, a camera on the screen and ring for a recorded frame per test | bench | S | The bench agent recovers a hung unit by itself |
+| T10 | Two more units: one for integration smoke, one for soak, the owner's stays the family's | owner | n/a | Three test lanes instead of one; removes the main schedule limit |
+| T11 | Test selection: a change runs only the tests its files touch in loops 1 and 2, full suites nightly | BOT, FW | S | Loop 1 stays under 10 seconds as the suite grows |
+| T12 | Record and replay: capture real sessions from the unit (events, audio levels, sensor streams) and replay them into the software unit and host tests | BOT | M | A field bug becomes a replayable test the same day |
+| T13 | Spike: screens described as data loaded at run time by the UI library, if our LVGL version supports it [unverified] | FW | S | Written finding |
+
+Considered and not chosen: a scripting language on the unit for behavior (costs internal RAM we do not have; behavior already lives on the host, where a change is instant); chip emulation for timing (still not faithful).
+
+### 16.3 What this does to the schedule
+
+- T0, T1, T2, T4, T7 go into Wave 1, ahead of the UI lane, because every firmware item after them is faster.
+- T3, T5, T6, T8, T9, T11 in Wave 2. T12, T13 in Wave 3.
+- With T4 and T7 the daily "one combined image" becomes many small pushes a day; the 10-minute gate and soak stay daily and nightly.
+- With T10 the calendar estimate could shorten by one to two weeks. Without it, T4 to T8 still remove most waiting but not the single-unit queue.
+- Risk: T1 changes how the patch series is kept. It must reproduce the exact released image before anything else builds on it, and it depends on the own-firmware decision only in where the branch lives.
