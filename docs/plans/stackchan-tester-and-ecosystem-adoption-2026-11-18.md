@@ -20,6 +20,23 @@ Sources: [virtual-stackchan-tester-2026-11-18.md](../reports/virtual-stackchan-t
 
 Non-goals: chip emulation (QEMU, Wokwi, Renode), MuJoCo physics, copying AGPL or non-commercial material, a second brain or cloud relay.
 
+## Reality check against our own hub code (added 2026-11-18)
+
+The first draft treated several audit ideas as gaps. Reading `backend/src` shows the hub already has them, so the answer to "rearchitect?" is no. Verified in code:
+
+| Audit idea | Our hub today | Effect on this plan |
+|---|---|---|
+| Reconnect "reflex layer" (cloud-mcp) | `lib/deviceCommands.ts`: on every robot connect, replaces the pending settings snapshot, issues a `time` command and replays unacked commands | W18 shrinks to checking the firmware applies the snapshot; no hub work |
+| Durable commands with ack, replay, heartbeat | ROBOT-CHANNEL-01: SQLite commands for 24 h, ack stops replay, 15 s heartbeat, one connection per robot, spec-validated frames from `@maipai/spec` | W12 becomes "test that firmware, hub and fake unit all use the spec", not a new schema |
+| Capability list | devices carry `capabilities`; `robotSelfTest.ts` derives testable parts from it | Add limits and version fields only if the spec lacks them |
+| Smart end-of-turn | `lib/sttSession.ts` has a Stack-served Smart Turn endpointer behind `stack.engines.stt.smart_turn`, plus Silero VAD with RMS fallback; `turnEnd.ts` and `talkOver.ts` exist | W19 becomes "measure it on the robot and on short child utterances", not "build it". Our server pre-roll is 0.32 s (Dotty uses 1.2 s): test clipped first words |
+| Per-device revocable tokens | `deviceTokens.ts`: hashed, 1 year, unused 180 days revoked, 20 per person, listed and revocable; robot credential rotation exists | W1 hub side is mostly done; the firmware side is still unchecked |
+| Telemetry for a health page | `robotCheckin.ts` reports heap, minimum heap, PSRAM, boot reason, crash resets, RSSI, battery, timers, restarts | W7 is UI work only; confirm which fields the admin page shows |
+| Output safety gate | `turnMachine/nodes/outputGate.ts`, `safety.ts`, `news/childGate.ts` | W5 stays: enumerate all speech paths and prove each uses it |
+| Wake word safety invariants | HANDSFREE-01 rules, off by default | Keep |
+
+Real gaps confirmed: no `SECURITY.md`, `CONTRIBUTING.md` or code of conduct at the hub repo root (they may live in the org `.github` repo [verify]); MCP is still Planned; nothing in the hub repo gates face frame time; no golden-frame CI for robot screens was found in the hub tree [verify in the Bot repo]; firmware-side security is unchecked.
+
 ## Work items
 
 Effort is one experienced developer with AI agents, in days, ranges. "Real unit" means a bench window on the one robot.
