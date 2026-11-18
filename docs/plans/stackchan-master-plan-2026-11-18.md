@@ -191,8 +191,8 @@ Proposed text for `RULES.md` (owner approval needed), as rule group "Robot bound
 - **R-B2. Safety lives lowest.** Anything that protects a person or the hardware (movement limits, servo stall and thermal cutoff, e-stop, volume cap, camera and microphone indicators, hard mute) is enforced on the unit, works with no host, and cannot be turned off by a tool, a model or a setting. Policy that depends on who is present (age band, quiet hours) is Home's and is pushed down as numbers the unit enforces.
 - **R-B3. The model never reaches hardware directly.** A turn produces cues and tool calls from the shared vocabulary; the Bot service turns them into body calls; the movement governor (section 6) and the indicators have the last word.
 - **R-B4. Home never learns a vendor name; a body never learns a person.** Unchanged from today, stated as a rule. The unit receives a band and limits, never a name, birthday or memory.
-- **R-B5. One management place, two fallbacks.** The family manages a robot in Home. The Bot service keeps only pairing and a debug dashboard. The unit keeps only what must work when nothing else does: Wi-Fi setup, volume, brightness, mute, vision off, quiet, info, and games or clips that were installed. No second settings store: every setting is a spec key; the unit's quick settings write the same keys.
-- **R-B6. Alone mode is real and small.** With no hub and no host a unit shows faces, reacts to touch and handling, keeps time, rings timers it already holds, plays installed offline clips and games, and says plainly that it cannot talk. It never pretends to think.
+- **R-B5. One management place per mode.** With Home, the family manages a robot in Home and nowhere else. Without Home, the Bot service serves a small local settings page (connections, voice, robot basics) built from the same spec keys. The unit keeps only what must work when nothing else does: Wi-Fi setup, volume, brightness, mute, vision off, quiet, info, and installed games or clips. No second definition of any setting: every setting is a spec key whichever page writes it.
+- **R-B6. Four ways to run, one robot (revised 2026-11-18, section 12).** (a) Unit alone: faces, reactions, time, held timers, installed clips and games; it says plainly that it cannot talk. (b) Bot service with Home Assistant: voice commands and camera snapshots through Home Assistant's own pipeline, no AI model. (c) Bot service with a brain the person chooses (a local model by default; a cloud model only by explicit opt-in with an indicator) and with agent tools for Claude, Codex and others. (d) Bot service with Home: Home runs the turn, memory and age gates and proxies the agent tools. The unit firmware, movement governor and indicators are identical in all four. Modes (b) and (c) have no age gates: they are labeled for adults, and a robot set up for a child or teen requires Home.
 - **R-B7. Features are packages.** A new robot feature that is not sensing, acting or safety ships as a catalog package with its assets, runs through the same gates on robot and hub, and declares the capabilities it needs. Firmware changes only when a package needs a new capability.
 - **R-B8. Spec first, every body.** A new capability is added to the spec, then to the fake body, then to each real body or declared `NotSupported`. No capability is named after a robot.
 
@@ -276,7 +276,7 @@ All drawing work is done in the desktop renderer first, reviewed as images, then
 | B6 | Pick-up, put-down and carried faces tied to the governor | FW, BOT | S | yes | none | Lift shows the face and motion is zero |
 | B7 | First-run and Wi-Fi: welcome, flat-surface note, QR, secured hotspot, priority list, waiting for approval; touchscreen Wi-Fi entry only if it fits | FW, BOT, HOME | L | yes | Setup window estimated 20 to 30 KB while open: measure | A new person sets up with a phone and no computer after first flash |
 | B8 | Quick settings page 2: mute, vision, quiet, night, idle motion level, info (version, IP, battery, motion status, last restart) | FW | M | yes | LVGL objects created on open, freed on close | Opens and closes 100 times with no low-water drop |
-| B9 | Picture channel without JPEG (decision 2): weather card, timer card art, camera snapshot from Home | FW, BOT, HOME | L | yes | PSRAM frame; measure internal | Gate holds; else stop and report |
+| B9 | Picture channel without JPEG (decision 2), raised to wave 2 because the front-door camera (M2) and camera preview (B12) depend on it: weather card, timer card art, camera snapshot | FW, BOT, HOME | L | yes | PSRAM frame; measure internal | Gate holds; else stop and report |
 | B10 | Subtitles: 2-line box with paging, default off | FW, BOT | M | yes | One label | Text in step with speech |
 | B11 | Attention card with dismiss; used by approvals, reminders, medicine | FW, SPEC, BOT | S | yes | reuse timer card | Raise, show, dismiss by touch or voice |
 | B12 | Camera moment: shutter mark on the face with the pink ring; frame preview if B9 lands | FW | S | yes | none | Visible on every capture |
@@ -312,7 +312,7 @@ All drawing work is done in the desktop renderer first, reviewed as images, then
 | E3 | Medicine reminders (MEDS-01) with the attention card and confirm | HOME, BOT | M | Private to the person |
 | E4 | Smart home by voice on the robot through Home's tools, with confirm on locks | HOME | S | Rule on confirmations holds |
 | E5 | Ambient status on idle face and ring (door open, laundry done) | HOME, BOT | M | Opt-in; quiet hours |
-| E6 | MCP: robot tools on Home's MCP server (CREATOR-32): say, face, move, status, health, attention, describe; never a picture; adults only | HOME, BOT | M | Tool descriptions with "use when / do not use for" |
+| E6 | MCP: robot tools served by the Bot service (works without Home); Home's MCP server (CREATOR-32) proxies them with its gates: say, face, move, status, health, attention, describe; never a picture; adults only | BOT, HOME | M | Tool descriptions with "use when / do not use for"; same tools with and without Home |
 | E7 | Play Home's music and radio on the robot with the music face | HOME, BOT | M | Volume cap by band |
 | E8 | Dance teach and record for StackChan (reuse `moves/teach.py`) | BOT | M | A taught dance replays under the governor |
 
@@ -489,3 +489,90 @@ Screens to bring under the standard first: link and setup screens, quick setting
 4. The movement governor shape in section 6.1 as the shared concept for every body.
 5. Whether to buy a second StackChan for the bench.
 6. Whether the hold-for-review of a child's statements (G5) is wanted.
+
+## 12. Additions agreed with the owner, 2026-11-18
+
+These came from the owner's follow-up questions. Where they conflict with earlier sections, this section wins. Sizes are estimates.
+
+### 12.1 Four users, one product
+
+Every item is checked against four people. A feature that serves none of them is cut; a screen is judged by the least technical person who will touch it.
+
+| | Kid (child band) | Teen | Non-technical adult | Technical adult |
+|---|---|---|---|---|
+| Wants | A friend that reacts, plays, tells stories | A companion with personality, music, homework help, privacy from siblings | It just works; safe for the kids; easy to fix | Home Assistant, Claude, Codex, MCP, scripts, their own models |
+| Touches | The robot itself: voice, petting, games | Robot, their own Home profile | Phone: QR setup, Home's robot page | Bot service, config, API, MCP, Home Assistant |
+| Must never | Reach settings that weaken controls; hear unfiltered output; be recorded silently | See another person's memories; lose controls set by a parent | Need a terminal, a cable after first flash, or a manual | Be forced to run Home; be blocked from the wire schema |
+| Runs in | Mode (d), Home required | Mode (d), Home required | Mode (d) | Any mode |
+| Today | B: safe, reactive; no games or stories, no quiet hours | B-: companions and voices; nothing teen-specific | C-: setup rough, page hides health, docs stale | D: no way in without Home |
+| Plan items | B1 to B6 reflexes and faces; E1 games; E2 stories; C9 quiet hours and bedtime; S7 child lock; S9 gates | Companion and face packs (B14, G9); E7 music; C8 "who am I talking to"; teen band rules as today | K1 to K4 setup; G1 to G3, G8; B7, B8, B17 big-text screens; H2 guide | M1 to M4 modes; E6 MCP; N1 agent companion; H7 developer docs; F3 software unit |
+| After wave 3 | A- | B+ | B+ | B+ |
+| After wave 4 | A | A- | A- | A- |
+
+Design rules that follow:
+
+1. **The robot screen is designed for the kid and the non-technical adult** (section 9b): big words, big buttons, one idea per screen, no jargon, no version numbers outside the info page.
+2. **Home's robot page has two depths**: a plain family view first, an Advanced disclosure for the technical adult. Nothing a parent needs is under Advanced.
+3. **The Bot service is the technical adult's front door**: one command to install, a small local page, a documented wire schema and MCP tools. It must be useful with no Home.
+4. **A child or teen robot requires Home.** Modes without age gates say so at setup and cannot be given child or teen controls.
+5. **A teen is not a small adult or a big child**: teen band keeps its own rules from `RULES.md`; this plan adds no teen exception.
+6. **README and docs have four entrances**: "For families", "For kids and teens (what it can do)", "For Home Assistant users", "For developers and agents".
+
+### 12.2 Lane K: getting connected
+
+| ID | Item | Where | Size | Bench | Acceptance |
+|---|---|---|---|---|---|
+| K1 | Captive portal page rebuilt to the screen standard: our branding, big text and buttons, network scan with signal bars, saved networks with priority and forget, clear "what happens next", ends on the Home approval step, small diagnostics block (version, signal, last error), light and dark, phone first | FW | M | yes | A non-technical adult finishes it unaided; internal RAM while open measured against the 25 KB gate (estimate 20 to 30 KB, unmeasured) |
+| K2 | QR on the robot: Wi-Fi join code for the secured hotspot (with S4), then a pairing code that opens Home's approval page for this robot | FW, BOT, HOME | M | yes | Phone camera joins and opens the page with no typing; pairing needs no developer step |
+| K3 | Wi-Fi details handed over the USB cable at flash time, offered beside the QR flow | HOME, FW | S | yes | Needs the owner's yes: the user guide says Home never asks for the Wi-Fi password. If yes, the guide is reworded |
+| K4 | Spike: robot camera reads a QR shown on a phone (backlog patch 135) | FW | S | yes | Decoder memory cost and read rate measured; build only if the gate holds |
+| K5 | Bluetooth: not built. Record the decision: the chip has Bluetooth Low Energy only, it was stripped for memory, it shares the radio with Wi-Fi, and it needs a phone app we do not have | docs | S | no | Decision note; revisit only with a phone app |
+| K6 | One-command install of the Bot service on macOS, Linux and a Raspberry Pi, with the browser flasher for people without Home | BOT | M | yes | A technical adult goes from nothing to a talking robot from the README alone |
+
+### 12.3 Lane M: works with and without Home
+
+One Bot service, a swappable brain. The spec gains a `Brain` interface (turn in, cues and speech out) so the unit and behaviors cannot tell which is running.
+
+| ID | Item | Where | Size | Acceptance |
+|---|---|---|---|---|
+| M0 | Brain interface in the Bot service; Home becomes one implementation; mode shown on the info page and local settings page | SPEC, BOT | M | Contract tests run every brain against the fake body |
+| M1 | Home Assistant voice satellite mode: robot audio to Home Assistant's Assist pipeline and back; address and token in local settings; no AI model | BOT | M | "Turn on the light" works with Home absent; confirmation on locks, garage doors and alarms |
+| M2 | "Show me the front door camera": snapshot from Home Assistant, resized on the host, sent over the picture channel (B9); refresh about once a second (estimate, unmeasured); auto-dismiss | BOT, FW | M | Works in modes (b) and (d); pink ring is not used for a remote camera, a distinct mark is |
+| M3 | Robot as a Home Assistant device: battery, online, mute, vision off, quiet, announce, say, attention | BOT | M | Appears through discovery; automations can announce |
+| M4 | Standalone brain: any OpenAI-compatible endpoint, local by default; local speech; basic content filter on by default; cloud endpoints only by explicit opt-in with an indicator | BOT | L | A technical adult talks to the robot with a local model and no Home; labeled adult mode |
+| M5 | Local settings page for modes (b) and (c): connections, voice, wake sensitivity, robot basics; loopback by default; token to open from another device | BOT | M | Same spec keys as Home; no second store |
+| M6 | Handover: when Home pairs, it takes the brain and settings; when Home is removed, the robot returns to its local mode without a reflash | BOT, HOME | S | Round trip tested on the fake body |
+
+Owner rulings needed before M4: an adult-only mode with no Home age gates (rule 0 says the gates outrank everything, so this needs explicit approval), and cloud brains as an opt-in against the promise that nothing leaves the home. M1 to M3 need neither: Home Assistant replies are fixed sentences and stay on the home network.
+
+How much of the Bot's earlier local speech stack is reusable for M4 was not checked.
+
+### 12.4 Lane N: desk companion for coding agents
+
+What the field does (round 1 audits of stackchan-mcp, stackchan-cloud-mcp, stackchan-local, stackchan-claude-bridge, the xiaozhi fork): agents drive the robot through MCP; hooks mirror the agent's thinking and speaking state on the face and ring; a "needs you" alert shakes the head and pins a label until dismissed; a spoken sentence becomes an agent task. Nobody shows usage. Their failures: voice straight to a shell with permissions bypassed, an unauthenticated alert endpoint, one long-lived token for everything.
+
+| ID | Item | Where | Size | Acceptance |
+|---|---|---|---|---|
+| N1 | Agent status mirror: Claude Code and Codex hooks post to an authenticated loopback endpoint on the Bot service; faces for working, waiting, done, error; quiet chime on done | BOT, CAT | M | Hooks installed by one command; works without Home |
+| N2 | "Needs you" card: project name, pinned until tapped or dismissed by the agent; uses the attention card (B11) | BOT, FW | S | Raised within 2 s of the agent asking |
+| N3 | Usage meter spike: what Claude Code and Codex expose to hooks about session usage and limits; if available, a ring segment or small card | BOT | S | Written finding; build only if the data exists |
+| N4 | Spoken one-line summary when a task ends, optional | BOT | S | Off by default |
+| N5 | Agent tools over MCP (E6) with setup docs for Claude Code, Claude Desktop, Codex, Cursor | BOT, docs | S | Each client configured from the docs |
+
+Lines held: the robot never approves a permission request by voice; voice never starts a shell task; only state, project name and counts reach the robot, never code or prompt text; the movement governor and quiet hours apply; the endpoint needs a token and listens on loopback unless the person opens it.
+
+### 12.5 Effect on the schedule and team
+
+- Wave 1 gains: M0, K5, B17 (already moved), N3 spike.
+- Wave 2 gains: K1, K2, M1, M3, B9 (moved up), N1, N2.
+- Wave 3 gains: K3 (if yes), K4, K6, M2, M5, M6, N4, N5, H entrances for four audiences.
+- Wave 4 gains: M4 (if approved).
+- One more Bot service agent (cloud) for Lane M; the firmware "screens" agent takes K1 and K2. Peak is about 15 agents.
+- Calendar estimate: about 7 to 8 weeks to the end of wave 3, about 10 with wave 4. The single unit remains the limit.
+
+### 12.6 More decisions for the owner
+
+7. Standalone AI brain without Home's age gates, adults only (M4): yes or no.
+8. Cloud brains as an explicit opt-in (M4): yes or no.
+9. Wi-Fi details over USB at flash time (K3): yes or no.
+10. Management without Home lives in a small Bot service page (R-B5 as revised): yes or no.
