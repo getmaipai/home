@@ -32012,6 +32012,273 @@
         }
       }
     },
+    "/api/ai/feature-models": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The models behind each feature, in order, as the Stack names them",
+        "responses": {
+          "200": {
+            "description": "Names, descriptions, sizes, states and the order, all from the Stack's parts list and jobs catalog; the household's own order only reorders them. A child or teen's list is the Stack's minor list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "audience": {
+                      "type": "string",
+                      "enum": [
+                        "adult",
+                        "minor"
+                      ]
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "pictures",
+                              "videos",
+                              "music"
+                            ]
+                          },
+                          "ordered": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          },
+                          "order": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "rank": {
+                                  "type": "number"
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ready",
+                                    "missing",
+                                    "installing",
+                                    "updating",
+                                    "failed",
+                                    "unsupported"
+                                  ]
+                                },
+                                "size_bytes": {
+                                  "type": "number"
+                                },
+                                "download_bytes": {
+                                  "type": "number"
+                                },
+                                "percent": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "running": {
+                                  "type": "boolean"
+                                },
+                                "failure": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "install_block": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "description",
+                                "rank",
+                                "state",
+                                "size_bytes",
+                                "download_bytes",
+                                "percent",
+                                "running",
+                                "failure",
+                                "install_block"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ordered",
+                          "order",
+                          "models"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "audience",
+                    "features"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The AI engine did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/feature-models/{feature}/order": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Move models to the top of a feature (empty list = the Stack's own order)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "feature",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "maxItems": 40
+                  }
+                },
+                "required": [
+                  "order"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved and sent to the AI engine.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a feature with an order, or a bad list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Saved, but the AI engine did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai/overview": {
       "get": {
         "tags": [

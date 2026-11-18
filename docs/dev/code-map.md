@@ -222,6 +222,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
 | `frontend/src/apps/settings/FeatureAccess.tsx` | FeatureAccess, PersonFeatures |
+| `frontend/src/apps/settings/FeatureModelChooser.tsx` | FeatureModelChooser |
+| `frontend/src/apps/settings/FeatureModelLine.tsx` | Dot, priorityTag, FeatureModelLine |
 | `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
@@ -615,6 +617,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/failureCopy.ts` | formatMessage, VOICE_FAILURE_COPY, voiceFailureMessage, voiceFailureLine, SPATIAL_FAILURE_COPY, isSpatialFailureCode |
 | `backend/src/lib/familyActivity.ts` | familyActivityPath, trackFamilyTurn, __resetFamilyActivityForTests |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
+| `backend/src/lib/featureModels.ts` | featureModels, isOrderedFeature, setFeatureOrder |
 | `backend/src/lib/ffmpegPath.ts` | findFfmpeg |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
