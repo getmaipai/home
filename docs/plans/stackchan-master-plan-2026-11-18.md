@@ -1338,3 +1338,39 @@ Priority changes: the "no reply after wake" problem goes first (C1, G8). The spe
 ### 26.4 Still needed
 
 A review of the code itself (firmware patches, host, tests, snapshots). It has been requested from the work session as a pushed branch `review/2026-11-18`. Until then every status above is the draft's claim.
+
+## 27. Boundary rule: agreed replacement, and the friend without Home (added 2026-11-18)
+
+Owner, 2026-11-18: "agreed", to the four tests below and to the public-copy trade-off; and "I want my buddy (who doesn't use MaiPai Home) to be able to use this and gain all its benefits."
+
+This supersedes section 5 and the R-B lines of section 12 of this plan. It is a proposed replacement for the rule in the StackChan repository (`docs/dev/scope-core-vs-home.md`, including its App Store test) and it keeps `docs/design/repo-boundaries.md`'s decisions: no shared robot code repository; the shared part is a spec in `commons`; `bot` becomes the Reachy Mini repository. The plan's earlier "Bot service as a framework for every robot" is withdrawn: where the plan says "Bot service", read "the StackChan host program"; shared concepts (movement governor, memory governor, brain interface, indicators, vocabularies) are definitions in `commons/spec` that each robot's own host implements.
+
+### 27.1 The four tests
+
+1. **Body.** If it needs this robot's body, or must work with the host off, it lives in the robot repository. Safety limits and the camera and microphone cues are enforced on the unit.
+2. **Standalone parity.** If the stock firmware or a leading community StackChan project delivers a feature with no hub, we deliver it locally too, as an optional package on the owner's own host, off by default, needing no household data.
+3. **Household.** MaiPai Home is the only owner of anything about a household: several people, identity and recognition by name, shared memory, child and teen rules, outside services (weather, news, calendars, mail), other rooms, policy. A child's or teen's robot requires Home.
+4. **Thin connector, one owner.** A local integration is a thin connector to someone else's system (Home Assistant's API, the agent tool protocol, a home-platform bridge). It never rebuilds a Home feature. When Home is paired, Home's version takes over; the two never run side by side.
+
+Unchanged around them: features are packages, not firmware forks; spec first; local by default, cloud only by explicit opt-in with a cue; accepted trade-off: connectors and games are public code under AGPL.
+
+The rule text lands in the StackChan repository by the work session, as the owner's decision dated 2026-11-18, with the tables in `scope-core-vs-home.md` and `repo-boundaries.md` updated (games, coding companion, home-automation tools and agent tools move from "Home" to "local package; Home takes over when paired").
+
+### 27.2 The friend test (new acceptance gate for a first public release)
+
+A person who owns a StackChan and a Mac, Linux machine or Raspberry Pi, has never heard of MaiPai Home, and has no help from us:
+
+1. Finds the public repository, understands in one screen what it is and that Home is optional.
+2. Flashes from the web flasher and installs the host with one command.
+3. Joins Wi-Fi and pairs using the robot's screen and a phone, with no terminal step after the install.
+4. Talks to it with a local model, with sensible defaults chosen for their hardware.
+5. Uses, without Home: voice, faces and picture faces, overlays, swipe pages, timers and alarms, games, dance, privacy switches, the settings page, away-from-home, signed updates, Home Assistant voice and camera snapshots, agent tools and the coding companion.
+6. Sees plainly, in one table, what Home would add and why.
+
+The test is run on the virtual playground for steps 4 to 6 and by a real outside person (the owner's friend) for steps 1 to 3 before the first tag. Every failure is a release blocker.
+
+### 27.3 What the friend does not get without Home, and one open question
+
+By the household test: recognition by name, several people, child and teen rules, live outside information, other rooms.
+
+Open for the owner: **a single adult's own memory** ("remember that I take my coffee black") is the benefit a solo user will miss most, and the household test as written keeps memory in Home. Recommendation: allow a small local memory package for one adult (explicit remember and forget, a plain file the owner can read and delete, no people, no recognition), with Home's memory taking over when paired. Queued as a decision.
