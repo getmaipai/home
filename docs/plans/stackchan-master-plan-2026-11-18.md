@@ -1080,3 +1080,62 @@ Supporting rules:
 - **Docs:** every gesture in the user guide with a renderer capture.
 
 Decision queue entries: adopt the map; privacy shortcuts as holds or keep taps (after the accidental-toggle count); clock as an optional idle view.
+
+## 21. Build what is best: the deferrals reopened (added 2026-11-18)
+
+Owner: "dont be limited to what we did or didnt do. we should build what will be best." Section 20.1 leaned on our own history (a patch that failed, a feature that was parked). That is the wrong test. New rule for this plan:
+
+**A "no" must rest on physics, safety, privacy or product judgment, never on what we tried before or what is easy on the current patch series.** Where the best design needs a different architecture, the plan builds the architecture.
+
+Correction to section 20.2: the owner confirms the clock view is in the code (newer than the 0.2.213 tree I can read). The gesture proposal in 20.4 therefore integrates the existing clock rather than adding one, and the handover must list the current gestures as they really are before B19 changes anything.
+
+### 21.1 Items reopened, with the best-design target
+
+| Item | Was | Target now | How |
+|---|---|---|---|
+| Talking over the robot (voice barge-in, full duplex) | Off | **Yes. Natural interruption within about 300 ms (goal).** | Three routes, tried in this order and measured: (1) echo cancel on the unit with a correct reference: our failed attempt used the second microphone as the reference; the right reference is the audio being played, taken from the codec's loopback if the board routes one [verify on the schematic] or fed in software with delay alignment; (2) echo cancel on the host, which knows exactly what it sent to the speaker and has the CPU for a strong canceller; the unit only streams the microphone while speaking; (3) both, with the on-unit stop word as the fast path. Add ducking, a host check that the speech is addressed to the robot, and Home's talk-over rules. New item V1 (L, bench). |
+| Wake word | One fixed phrase | **The robot answers to its own name, chosen by the family, with fewer false wakes than today.** | A wake-word maker: generate training speech locally with Home's voices, train a small model on the Mac, publish it as a catalog package, load it from the assets partition. On the unit a small detector; on the host a second check before the turn opens (two-stage), which removes most false wakes. Sensitivity setting and a "say it now" test. New item V2 (L, bench). Replaces "custom wake phrase: not now". |
+| Turning to whoever speaks | Parked (microphones stacked vertically) | **Yes, by sight and sound together.** | The microphones cannot give left or right; that is physics. The camera can: when a voice starts, pick the face that is talking (mouth movement, nearest, most centered) and turn to it. New item V3 (M, bench), uses on-unit detection if Q8 fits, else the host. |
+| Following a person | Opt-in | **Good enough to be on by default: slow, quiet, small, and never fighting a command.** | Deadband, smoothing, speed cap, torque release, the movement governor, single writer. Default decided by a noise and wear measurement, not by habit. C3 upgraded. |
+| Pictures on the screen | Conditional | **Yes: weather, cameras, photos, cards.** | Whichever measures best: light decoder (Q10) or host tiles (B9). The memory work in section 13 exists to make room. |
+| Away from home in the normal image | Separate build | **Yes, one image.** | Fits after the memory governor and stack work; the governor pauses lower-priority subsystems when the tunnel is up. |
+| Phone experience | Not scheduled | **Yes: an installable web app from Home** with the robot page, live face mirror, talk-through, head control under the governor, dance teach, notifications. The native app remains MaiPai Go's job. New item G12 (L). |
+| Music face and visualizer | Later | **Yes**, with the flash-rate cap. B20 (M). |
+| Sentry and presence | Not scheduled | **Designed properly, then built**: a privacy design note first (who is told, what is kept, indicators, child rules), then motion-triggered alerts through Home. E11 (design S, build L). |
+| Apple Home, Google Home | Left out on the unit | **Yes, as a bridge in the Bot service** (Matter), so the robot appears there without Home or Home Assistant. M7 (M), after M3. |
+| Secure boot and flash encryption | Decision note only | **Yes for release builds**, as a documented build option with a recovery story, proven first in Espressif's emulator (which models the fuses) so the one unit is never bricked; development units stay open. S10 upgraded (M). |
+| Fixed memory pools, few tasks, binary wire, no JSON on the unit | Waiting | **Yes**: this is the best design for a device with this little internal memory. It lands in our own firmware (below). |
+| Several local profiles without Home; standalone brain | Later | Standalone brain moves to Wave 3; local profiles follow it. |
+
+### 21.2 Our own firmware (decision 9 answered on merit)
+
+Our own design note from 2026-10-14 already says a firmware of our own "is the better design on merit"; patches were chosen for speed. Everything this plan now asks for (governors, one wire schema, fixed pools, a host build for the virtual unit, live data, signed updates, full duplex audio, one image with the tunnel) is easier, smaller and faster in a thin firmware we own than in 128 or more patches over two moving upstreams. The work session already started this ("wave 0", its own repository, a unit protocol note).
+
+Recommendation, recorded as the plan's direction unless the owner says otherwise:
+
+- **Target:** our own thin firmware in `getmaipai/stackchan`: drivers reused from M5Stack and Espressif with notices; our protocol generated from the shared spec; our screens on the style standard; governors, indicators and safety limits on the unit; everything else on the host.
+- **Bridge, not a big bang:** the patched firmware keeps the family's robot working. The new firmware is built against the virtual unit and the ESP-IDF host target first, then boots on the real unit in the nightly window, subsystem by subsystem (display and touch, ring, servos, audio, camera, link, update). It replaces the patched image only when it passes the same contract tests, golden frames and gates.
+- **No double work:** from now on, new logic is written as portable modules (faces, gestures, governors, views, games) that build for the patched tree, the new firmware and the virtual unit. Only drivers and glue differ.
+- **Lane X (new):** X1 repository and build on the current ESP-IDF with the host target (M); X2 wire protocol from the spec (M); X3 display, touch, ring (M); X4 servos with the governor (M); X5 audio in and out with the echo-cancel design of V1 (L); X6 camera (M); X7 link, pairing, signed update, rollback (L); X8 parity gate and switch (M). Two firmware agents, starting in Wave 2, in parallel with lane B on portable modules.
+- **Risk stated plainly:** audio quality and the echo canceller are the hard part and may take longer than everything else; that is why V1's host-side route exists.
+
+### 21.3 What still stays "no", and the real reason
+
+| Item | Reason |
+|---|---|
+| Left or right from sound alone | Physics: both microphones are on one vertical line |
+| Bluetooth for setup | Product: QR and the portal cover it; it would cost memory and airtime for a path only a phone app could use. Revisit with G12 if web Bluetooth proves worth it |
+| A launcher of apps as the home screen | Product: the face is the home screen; views are reached by swipe |
+| Espressif's cloud services | Privacy |
+| A scripting language on the unit | Revisit after the new firmware's memory numbers; today it would starve audio |
+| Chip emulation for timing | It does not reproduce timing; it is used only for fuse and boot checks |
+| User-editable colors for safety states | Safety: one meaning everywhere |
+| More test units | Owner: one unit |
+
+### 21.4 Schedule effect
+
+- Wave 1 adds: V1 route measurements (reference signal check on the board, host canceller trial on recorded audio), V2 data and training pipeline on the Mac.
+- Wave 2 adds: lane X starts (X1 to X3), V3, B20, G12 design.
+- Wave 3 adds: V1 and V2 on the unit, X4 to X6, G12, M7, E11 design, secure boot proof in the emulator.
+- Wave 4 adds: X7, X8 and the switch to our firmware, E11 build.
+- Estimate: this adds about three to four weeks to the full program (about 13 to 14 weeks to the end of wave 4), with two more firmware agents. The family-visible improvements in waves 1 to 3 are not delayed, because they are written as portable modules and ship on the patched image first.
