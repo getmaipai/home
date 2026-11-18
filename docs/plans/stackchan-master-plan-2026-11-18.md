@@ -1260,3 +1260,28 @@ Everything that runs on the robot.
 ### 23.5 Session count
 
 About 16 to 18 agents at peak across the three tracks and the shared layer, limited by the account's usage allowance (section 18.4). If the allowance forces a cut, the order of protection is: shared layer, playground, firmware F-1 and F-2, app A-1 and A-3, then the rest.
+
+## 24. Who types what: Codex, the local coder, Claude (added 2026-11-18)
+
+Owner: include the use of our local coder. The org rule already sets the order for parallel work (`getmaipai/.github` `AGENTS.md`, Jesse 2026-10-19), and `docs/local-coding-model.md` says what the local model is good for. This plan follows both.
+
+| Lane | What | Gets | Never gets |
+|---|---|---|---|
+| 1. Codex (first) | Decided, verifiable work, through `scripts/wt.sh run codex` | Any item with a written brief, named files and a test that can fail; gate runs; mechanical sweeps | Design, diagnosis, rule-adjacent choices |
+| 2. Local coder (second, and whenever Codex is limited) | OpenCode on the household's Qwen3.8-27B through `local-lane dispatch`, Studio only, no cost per token | Small and medium decided tasks: one to about six files with a failing test; schema, fixture and test work; mechanical refactors; follow-ups where a review named the exact fix | Anything spanning two subsystems; anything asking it to choose; files the safety floor refuses; safety, auth and governor logic |
+| 3. Claude agents | Judgment and design | Design notes, briefs, reviews, firmware changes that touch timing or memory, anything ambiguous | Typing that lanes 1 and 2 could do |
+| 4. Cloud Claude sessions | Parallel lanes that need a full environment and no local hardware | Spec, Home, Bot service, playground, docs | Unit bench work |
+
+How it applies here:
+
+- **Manager and typists.** A Claude session (the track lead) reads the design, cuts each item into pieces that fit the local model's window, writes each brief in the proven shape (one-sentence task; folder and branch; exact files; numbered rules naming function and line; the test file to add to and the test to mirror; the verify commands; the commit message), dispatches, then reads the diff, reruns the checks and compares the commit message. The typist's own report is never evidence.
+- **Good fits in this plan for the local coder and Codex:** the wire schema tables and generated code (A2), spec shapes and fixtures (A1, M0, P2 spec halves), golden-frame fixtures and layout checks (F2, B17), settings keys (G7), contract tests (F4), each new face as data plus its sheet (B18), overlay definitions (B3), the docs cleanup items (R8 to R14, Z4), translations of fixed strings, per-item test backfill, portal and page markup once the design is fixed (K1), the 3D view's plain plumbing (F3b steps 2 and 3).
+- **Not fits:** governors' logic (A1, P2), echo cancel (V1), security items (lane S), firmware memory work, anything on the bench, the gesture decision (B19), rule text.
+- **Window limit.** The local model failed a medium task at a 32,000-token window and passed at 48,000 or more; briefs name files and lines so it does not spend its window reading.
+- **Known slips to check for:** its own commit message instead of the given one, a skipped regeneration step, a widened type, a reach outside its folder, "all tests pass" with one failing. Its permissions allow no git command except commit.
+- **Capacity.** One OpenCode session on the Studio and the Codex lanes are free of Claude usage, so they run continuously on a queue of ready briefs. This is the main answer to the account usage limit in section 18.4: Claude writes briefs and reviews; the free lanes type.
+- **Brief queue.** Each track lead keeps at least five ready briefs for the free lanes so they never idle (O4 generates the first set from the item tables).
+
+## 25. Kickoff belongs to the work session (added 2026-11-18)
+
+Owner: the worker session ("STACKCHAN - WORK", on the Mac Studio) kicks this off, not the research session that wrote this plan. The kickoff brief is [stackchan-kickoff-2026-11-18.md](stackchan-kickoff-2026-11-18.md).
