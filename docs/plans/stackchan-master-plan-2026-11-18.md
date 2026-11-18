@@ -1178,3 +1178,85 @@ Promised-but-missing features (section 1.2), memory budget (1.4), version and pi
 | R20 | The README's StackChan section and Home's README barely mention the robot; no screenshot exists anywhere | H1 to H3 | n/a |
 
 R1 to R4, R8 to R14 and R16 go into Wave 1. R5 is a decision queue entry.
+
+## 23. Three parallel tracks (added 2026-11-18)
+
+Owner: run parallel tracks: the virtual playground, the app, and the firmware. The lanes above are regrouped into three tracks that run at the same time from Wave 1, plus a thin shared layer. Each track has its own lead session, its own agents and its own definition of done; they meet only at the shared spec.
+
+### 23.0 Shared layer (small, first, never a bottleneck)
+
+- **Owns:** `commons/spec` (robot interface, wire schema, vocabularies, settings keys), the ledger, the decision queue, the lander pickup, the daily digest.
+- **Lanes:** O (operating model), the spec halves of A1, A2, M0, P2, B2, B19, plus Z (wave 0).
+- **Agents:** coordinator, one spec agent, one reviewer.
+- **Contract between tracks:** a track never waits for another track's code, only for a spec tag. Until the real thing exists, each track builds against the fake body and the recorded sessions.
+
+### 23.1 Track 1: Virtual playground
+
+Goal: anyone, and any agent, has a robot on their screen that runs our real screens and logic, in 3D, without the unit.
+
+| Stage | Delivers | Items |
+|---|---|---|
+| P-1 | Headless virtual unit: real drawing and logic code, real link, scripted events, fake clock, PNG frames | F1, F3a, Q4 spike |
+| P-2 | Golden frames and layout checks in CI; every face, overlay, screen and view as sheets | F2, B17 checks |
+| P-3 | 3D view, face first: real frames on the head of the `stackchan-simulator` scene; orbit and zoom | F3b step 1 |
+| P-4 | Touch on the 3D screen, ring lights, side panel | F3b steps 2 and 3, F3d |
+| P-5 | Motion and handling: head from our commands; drag to lift, tilt, shake; governors visible | F3b steps 4 and 5, F3c |
+| P-6 | Record on the real unit, replay everywhere; contract tests shared by fake, virtual, real and Reachy Mini | T12, F4 |
+| P-7 | Embedded in Home's robot page and on the docs site; Reachy Mini view | F3e, F3f |
+
+- **Agents:** 3 (cloud), 1 more for the 3D view.
+- **Needs from others:** spec tags; snapshots from the real unit to prove "same pixels" (a few bench slots).
+- **Gives to others:** every other track tests on it from P-1 onward.
+- **Done when:** a person with no robot can set it up, talk to it, pet it, pick it up and play a game on screen, and its frames match the real unit.
+
+### 23.2 Track 2: The app
+
+Everything that runs on a computer or phone: the Bot service, Home's robot features, packages, docs.
+
+| Stream | Delivers | Items |
+|---|---|---|
+| A-1 Bot service core | Movement and memory governors on the host side, brain interface, behaviors, turn quality, people and preferences | A1, A2 host, M0, C1 to C14, V3, P4 |
+| A-2 Without Home | One-command install, local settings page, Home Assistant mode, camera snapshots, robot as a Home Assistant device, Apple and Google bridge, standalone brain, agent tools, coding-agent companion | K6, M1 to M7, E6, N1 to N5 |
+| A-3 Home | Now card, add and update flows, health tab, live mirror, mic and wake test, memory filter, packs install, pack builder, phone web app, settings keys, speech-path gate test | G1 to G12, S9, E3, E4, E7 |
+| A-4 Packages | Package host, games, stories, face packs, sound packs, companions with robot parts, wake-word maker | E0 to E2, E9, E10, B14 catalog side, B16, V2 training side |
+| A-5 Docs | Four entrances, real captures, user guide, developer reference generated from the spec, measurements page, cleanup items | H1 to H10, R8, R11 to R14 |
+
+- **Agents:** 6 to 8 (cloud).
+- **Needs from others:** spec tags; the virtual unit for end-to-end checks.
+- **Done when:** each of the four users can do their top tasks (section 12.1) against the virtual unit, with and without Home.
+
+### 23.3 Track 3: Firmware
+
+Everything that runs on the robot.
+
+| Stream | Delivers | Items |
+|---|---|---|
+| F-1 Speed and truth | Measured build, flash and memory baselines; patched tree as a branch; wireless bench path; quick check; landing queue; code review of the patches | T0 to T9, A4, A5, P1, P3, R1 |
+| F-2 Safety and security on the unit | Movement governor on the unit, single servo writer, memory governor, signed updates, encrypted storage, secured hotspot, encrypted link, child lock, indicators | A1b, A3, P2, S1 to S7, Q1, Q2, R2 to R5 |
+| F-3 Screens and faces (portable modules) | Style standard and components, motion pass, overlays, lip sync, about 30 faces, palettes, system faces, views and gestures, quick settings, portal, QR, cards, subtitles, status bar, illustrated pack player | B1 to B20, K1, K2 |
+| F-4 Audio and senses | Talking over the robot, own-name wake word on the unit, wake sensitivity, on-unit detection spike, pictures on screen | V1, V2 unit side, A6, C2, Q8 to Q10, B9 |
+| F-5 Our own firmware | Repository, host build, protocol, drivers one by one, parity gate, switch | X1 to X8, P9, P10 |
+| F-6 Performance and components | Safe memory wins, binary wire, plain-audio trial, Espressif spikes | P5 to P13, Q3 to Q16 |
+
+- **Agents:** 4 to 5 on the Mac (they need the toolchain), 1 bench agent, plus cloud compile checks.
+- **Rule:** F-3 is written as portable modules and proven on the virtual unit first, so it serves the patched image now and our own firmware later.
+- **The real unit:** only F-1, F-2, F-4 and the final check of F-3 use it, through the one bench queue.
+- **Done when:** the release gates pass on the unit and our own firmware reaches parity.
+
+### 23.4 How the three run together
+
+| Week (estimate) | Playground | App | Firmware |
+|---|---|---|---|
+| 1 | P-1, P-2 | Spec work, A-5 cleanup, A-3 settings keys | F-1 baselines and speed, R1 review |
+| 2 to 3 | P-3, P-4 | A-1 governors and brain interface, A-2 Home Assistant mode, A-3 Now card and health | F-2 governors and quick security wins, F-3 standard, motion, overlays |
+| 4 to 6 | P-5, P-6 | A-2 agents and companion, A-3 flows, mirror, tests, A-4 package host and packs | F-3 views, gestures, portal, faces; F-4 measurements; F-5 starts |
+| 7 to 10 | P-7 | A-3 phone web app, A-4 games, stories, characters, wake-word maker | F-4 talking-over and wake word on the unit; F-5 drivers; F-6 |
+| 11 to 14 | Reachy Mini view | Standalone brain, bridges, polish | F-5 parity and switch |
+
+- From week 2 every app and firmware item is demonstrated on the playground before it asks for the unit.
+- A weekly combined demo on the playground replaces most status reading: the owner opens one link and plays with it.
+- The waves in section 8.4 still set the order inside each track; this section sets who works beside whom.
+
+### 23.5 Session count
+
+About 16 to 18 agents at peak across the three tracks and the shared layer, limited by the account's usage allowance (section 18.4). If the allowance forces a cut, the order of protection is: shared layer, playground, firmware F-1 and F-2, app A-1 and A-3, then the rest.
