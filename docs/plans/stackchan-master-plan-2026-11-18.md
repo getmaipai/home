@@ -218,6 +218,8 @@ The robot API draft already has parts, leases, e-stop, clamped motion, capabilit
 8. **Health and diagnostics.** Per-part status with code and plain sentence (already drafted in 4b), plus frame period, internal memory low-water, link quality, last restart reason.
 9. **Unit wire schema.** For bodies with a remote unit: every tool name, argument, range and event in one generated file used by firmware, host and fake.
 10. **Media.** `display.show(kind, payload)` with declared limits; `subtitle.cue`.
+11. **Memory governor** (section 13.1): declared peaks, one admission point, a mode table, `robot.resources.status`.
+12. **Brain interface** (section 12.3): turn in, cues and speech out, so Home, Home Assistant, a standalone model or an agent can drive any body.
 
 Acceptance for the group: the fake body and the Reachy Mini profile pass the same contract tests as StackChan for 1 to 8; an absent capability raises `NotSupported`; no test above the seam names a body.
 
@@ -576,3 +578,100 @@ Lines held: the robot never approves a permission request by voice; voice never 
 8. Cloud brains as an explicit opt-in (M4): yes or no.
 9. Wi-Fi details over USB at flash time (K3): yes or no.
 10. Management without Home lives in a small Bot service page (R-B5 as revised): yes or no.
+
+## 13. Lane P: memory and performance (added 2026-11-18)
+
+Gains in this section are estimates. Nothing here has been measured on our unit. The order is fixed: measure, take the safe wins, then the structural moves.
+
+Where internal RAM goes today (from our own notes): task stacks (the Opus codec holds 24 KB; the tailnet client wants 42 to 52 KB), 168 KB of static data, and many small allocations that fragment the heap. About 7 MB of PSRAM is unused.
+
+### 13.1 Memory governor (shared concept, twin of the movement governor)
+
+Added to section 6 as item 11 of the shared robot interface, so every body gets it.
+
+- Each subsystem (wake word, stop word, camera, codec, setup portal, tailnet, picture channel, a game) declares a measured internal RAM peak and CPU class, as data.
+- One admission point decides what may run together. A request that does not fit is refused with a typed reason, or a lower-priority subsystem is paused first. Priority order: safety and indicators, the live voice turn, link, setup, looks.
+- A mode table states the allowed sets, for example: setup portal open means voice stack released; speaking means stop word loaded and camera paused; idle means wake word and optional tracking.
+- Status is one read (`robot.resources.status`): free, low-water, largest block, who holds what, refusals. Shown in Home's health tab.
+- Same design as the Stack's parts with measured peaks and one budget, applied to a robot.
+
+| ID | Item | Where | Size | Bench | Acceptance |
+|---|---|---|---|---|---|
+| P1 | Baseline map: internal RAM by task stack, static segment and heap owner; CPU by task; frame period; with heap task tracking on | FW | S | yes | One table in the measurements file; repeats A5 in more depth |
+| P2 | Memory governor in the spec and fake body; StackChan mode table | SPEC, BOT, FW | M | yes | Portal, voice, camera and tailnet never exceed the budget together; refusals counted |
+| P3 | Per-release memory and performance report from the bench agent | BOT | S | yes | A regression fails the release gate (A4) |
+
+### 13.2 Reflex terminal: move work to the host
+
+| ID | Item | Where | Size | Bench | Acceptance |
+|---|---|---|---|---|---|
+| P4 | Host-computed mouth cues sent with speech audio; unit does no audio analysis (replaces the on-unit half of B4) | BOT, FW, SPEC | S | yes | Lip sync matches; no new unit task |
+| P5 | Plain audio on home Wi-Fi instead of Opus, Opus kept for away links; trial only | FW, BOT | M | yes | Frees the codec stack and CPU without the frame-burst stalls recorded in our notes; otherwise dropped |
+| P6 | Compact binary tool frames generated from the wire schema (A2) instead of JSON text on the unit | SPEC, FW, BOT | M | yes | Parser memory and tool latency lower than today (tool latency is 13 to 834 ms now) |
+| P7 | Host draws cards, QR codes and resized pictures; unit only blits | BOT, FW | S | yes | With B9 |
+
+### 13.3 Fixed pools and fewer tasks
+
+| ID | Item | Where | Size | Bench | Acceptance |
+|---|---|---|---|---|---|
+| P8 | Stack right-sizing from measured high-water marks; report per task | FW | S | yes | Table before and after |
+| P9 | Fixed pools for message buffers, audio frames and screen objects; no allocation in steady state | FW | L | yes | Largest free block stable over a 24-hour soak |
+| P10 | Merge small tasks into shared workers | FW | L | yes | Fewer stacks; no missed deadlines |
+
+P9 and P10 are hard on a patch series over someone else's firmware. They are decided together with decision 9 (own firmware) and are not scheduled before it.
+
+### 13.4 Safe wins
+
+| ID | Item | Where | Size | Bench | Acceptance |
+|---|---|---|---|---|---|
+| P11 | Static data and read-only data placed in PSRAM, code fetched from PSRAM, where ESP-IDF allows it for this chip [verify the options against our IDF version] | FW | S | yes | Internal static size down; no speed loss on the face or audio |
+| P12 | Screen objects built on open and freed on close, everywhere | FW | S | yes | With B8 and K1 |
+| P13 | Dynamic frequency scaling when idle | FW | S | yes | Lower temperature; wake word still works |
+
+Target, to be confirmed by P1: roughly double the free internal RAM, so the encrypted link, the tailnet client and the new screens fit together.
+
+## 14. Lane Q: Espressif components to adopt (added 2026-11-18)
+
+From knowledge of the Espressif ecosystem. Versions and memory costs were not checked against our build, so each starts as a spike with a measured result.
+
+### Take first
+
+| ID | Component | Gives | Replaces or closes |
+|---|---|---|---|
+| Q1 | Signed app verification without secure boot | Unit verifies a signature on every update; no fuse changes | S3 |
+| Q2 | NVS encryption, HMAC scheme | Wi-Fi passwords and device token encrypted at rest | The dropped NVS encryption |
+| Q3 | `esp_mmap_assets` | Face packs, sounds, icons read from flash with no RAM copy | Enables B14, B16 cheaply |
+| Q4 | ESP-IDF Linux host target | Real firmware components run on a computer | Base for the software unit (F3) |
+| Q5 | Heap task tracking, core dump summary sent to our host | Per-task memory, crash reports | Feeds P1, G3 |
+| Q6 | Power management with frequency scaling | Less heat | P13 |
+| Q7 | `pytest-embedded` | Standard runner for unit, QEMU and Wokwi tests | Bench scripts |
+
+### Spike
+
+| ID | Component | Question to answer |
+|---|---|---|
+| Q8 | ESP-DL face and person detection on the unit | Can tracking run with no frames leaving the robot, within CPU and PSRAM? |
+| Q9 | Audio front end with a correct speaker reference | Can echo cancel work on this board, making voice barge-in possible? |
+| Q10 | `esp_new_jpeg` | Does a light JPEG decoder fit, simplifying B9? |
+| Q11 | Wi-Fi Easy Connect (DPP) | Does QR provisioning from Android's Wi-Fi settings work beside the portal? |
+| Q12 | Built-in roaming | Can it replace patch 154? |
+| Q13 | Delta updates | How much smaller and faster are wireless updates? |
+| Q14 | USB device classes | Can the robot be a USB microphone, speaker or webcam, and take Wi-Fi over the cable, without breaking flashing? |
+| Q15 | `led_indicator`, `esp_codec_dev` | Do they remove patches? |
+| Q16 | Digital Signature peripheral | Hardware-held identity key for mutual TLS after S2 |
+
+### Leave out, with the reason recorded
+
+- ESP RainMaker and ESP Insights: data goes to Espressif's cloud.
+- Matter on the unit: too heavy and needs Bluetooth; a Matter bridge, if wanted, belongs in the Bot service.
+- ESP-Brookesia: a launcher framework; the face is the product.
+- ESP WebRTC: large memory cost; revisit only with our own firmware.
+- Secure boot and flash encryption: irreversible; Q1 and Q2 first, then S10's decision.
+
+### Schedule effect of sections 13 and 14
+
+- Wave 1 gains P1, P3, Q1, Q2, Q5, Q7 and the memory governor's spec (P2 spec half).
+- Wave 2 gains P2 on the unit, P4, P8, P11, P12, P13, Q3, Q4, Q10 spike, Q9 spike.
+- Wave 3 gains P5 trial, P6, P7, Q8, Q11 to Q15.
+- P9, P10, Q16 wait for decision 9 and S2.
+- One more firmware agent (performance) on the Mac; bench slots rise to about 40. Calendar estimate unchanged if the Q spikes stay time-boxed to a day each.
