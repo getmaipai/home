@@ -869,3 +869,22 @@ Owner, 2026-11-18: "we only have the one unit", "which is why i asked about a vi
 ### 18.4 A limit on parallel sessions
 
 The work session's status showed a seven-day usage warning on the account. Running 10 to 15 sessions at once will reach account limits sooner. The coordinator sizes the number of sessions to the remaining allowance and prefers fewer, longer cloud sessions per lane over many short ones. I do not know the account's actual limits.
+
+### 18.5 The virtual unit is a visual simulator (added 2026-11-18)
+
+Owner: it should be like the Reachy Mini simulator: see the robot on screen, rotate it, interact with it. F3 as first written was a flat window with a drawn head. It is widened:
+
+| ID | Item | Size | Acceptance |
+|---|---|---|---|
+| F3a | Core virtual unit, headless: real drawing and logic code, the real link, scripted events, PNG frames (what CI and agents use) | L | As F3 before |
+| F3b | 3D view in the browser: a model of the robot you can orbit and zoom; the real screen frame shown live on its face; the 12 ring lights glowing in their real colors; the head turning and nodding through a simple servo model (speed and range limits, no physics engine) | M | Opens from one command on the Mac, and from a cloud session through its preview link |
+| F3c | Interaction: click or drag on the screen for taps and swipes; click the head strip to pet; drag the body to pick up, tilt, turn upside down or shake (feeds the motion sensor, so the movement governor reacts); plug and unplug power; battery slider; day and night; microphone from the computer or a file, speaker to the computer; a webcam or video as its camera | M | A person with no robot can set it up, talk to it, pet it, pick it up and play a game |
+| F3d | Side panel: governor status and reasons, memory governor status, current mode, last tool calls, event log, record and replay controls | S | The same numbers Home's health tab shows |
+| F3e | Embed the same view in Home's robot page as the live mirror (G6) and in the docs site as a demo | S | One component, three places |
+| F3f | Second body: Reachy Mini shown through the same shared interface (its own MuJoCo simulator already exists and the Bot's tests can run against it) | later | Same contract tests |
+
+Notes:
+- Prior art: `qua121/stackchan-simulator` (Apache-2.0) uses three.js with the screen as a texture on the head; we take the pattern, not MuJoCo.
+- The 3D model: the official app ships a model of the robot (`stack_chan_model.glb` in the StackChan-GPT fork's app assets); its license must be checked before use. Fallback: simple shapes drawn in code.
+- The 3D view never replaces the headless core: tests run without it.
+- Estimate: 6 to 9 days for F3b to F3d on top of F3a.
