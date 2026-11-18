@@ -757,7 +757,7 @@ Rule: an item is not allowed a loop 3 or 4 slot until loops 1 and 2 pass. Every 
 | T7 | Quick smoke on the unit, fully automatic: boot, link, memory numbers, frame period, a screen snapshot compared with the golden frame, three tool round trips, movement governor status | BOT | M | Under 3 minutes from push; result posted to the branch |
 | T8 | Firmware landing queue like Home's lander: branch, cloud compile and host tests, golden frames, combined image, wireless push to the bench unit, smoke, then land | FW, BOT | M | One command; no hand-run steps; a failing branch never blocks others |
 | T9 | Bench that needs no person: powered USB hub with per-port power switching for hard resets, the unit on a stand that is safe for motion, a camera on the screen and ring for a recorded frame per test | bench | S | The bench agent recovers a hung unit by itself |
-| T10 | Two more units: one for integration smoke, one for soak, the owner's stays the family's | owner | n/a | Three test lanes instead of one; removes the main schedule limit |
+| T10 | Withdrawn 2026-11-18: there is one unit and no more are planned. See section 18 | owner | n/a | n/a |
 | T11 | Test selection: a change runs only the tests its files touch in loops 1 and 2, full suites nightly | BOT, FW | S | Loop 1 stays under 10 seconds as the suite grows |
 | T12 | Record and replay: capture real sessions from the unit (events, audio levels, sensor streams) and replay them into the software unit and host tests | BOT | M | A field bug becomes a replayable test the same day |
 | T13 | Spike: screens described as data loaded at run time by the UI library, if our LVGL version supports it [unverified] | FW | S | Written finding |
@@ -833,3 +833,39 @@ O1 to O6 are Wave 0. They come before any lane starts, because every later hour 
 - One weekly release yes.
 - The decision queue when he chooses, usually five minutes.
 - Nothing else unless a stop-the-line notice arrives.
+
+## 18. One unit only: the virtual unit carries the load (added 2026-11-18)
+
+Owner, 2026-11-18: "we only have the one unit", "which is why i asked about a virtual environment / tester". Every earlier line that assumes a second or third unit is withdrawn (T10, decision 24, the "second unit" risk answer). The plan is reshaped around that.
+
+### 18.1 What changes
+
+1. **The virtual unit is Wave 1's first deliverable, not a tester lane on the side.** F1 (scenario runner), F2 (golden frames) and F3 (software unit) move ahead of every UI and behavior item. Q4 (ESP-IDF's host target) is tried first as its base, with our existing real-code renderer as the fallback.
+2. **Every session gets its own virtual unit.** It runs anywhere, including cloud sessions: the real drawing and logic code, the same link to the Bot service, mouse and keys for touch and handling, a drawn head and ring, files for microphone, speaker and camera, a fake clock. Ten agents means ten virtual units.
+3. **The real unit is only for what the virtual one cannot show.** That list is short and fixed: memory and frame time, radio, real audio (wake word, echo, speaker), camera, servos, touch feel, heat, battery. Everything else is forbidden from asking for it.
+4. **The real unit's time is rationed by the coordinator.** One queue, one bench agent, wireless pushes (T4), the 3-minute quick check (T7), and a nightly window for the 10-minute gate and soak when the family is not using it.
+5. **The unit is also the family's robot.** It always ends a bench window on the last released image unless the owner said to leave a test image on it. A test image that fails rolls back by itself (T4).
+6. **Predict, then confirm.** The cloud compile check (T3) reports static memory and image size for every branch, and the memory governor's declared peaks (P2) are summed before a bench slot is granted. A branch predicted to break the gate never reaches the unit.
+7. **Record once, replay everywhere (T12 moves to Wave 2).** Each real session on the unit is recorded: events, sensor streams, audio levels, timings. Virtual units replay them, so one real run feeds many agents.
+8. **A dead unit stops only the hardware checks.** Feature work continues on virtual units; the release waits.
+
+### 18.2 What the virtual unit must pass before anyone trusts it
+
+| Check | How |
+|---|---|
+| Same pixels | Golden frames from the virtual unit match snapshots taken from the real unit for every face, overlay and screen |
+| Same wire | The same contract tests pass against the fake, the virtual unit and the real unit |
+| Same behavior under the governors | Recorded carried, tilted, low-battery and plugged-in sessions replay to the same motion decisions |
+| Honest gaps | A check that depends on timing, memory, radio, audio or motors is labeled "needs the unit" and cannot be marked passed virtually |
+
+### 18.3 Revised first actions
+
+1. Handover from the work session (Z1). At last read it had flashed and locally committed the movement limiter and dance v2 and was waiting for the owner to test (play a song, pick up or tilt the robot). It has not written the handover, and it has used about 830,000 of its 1,000,000-token context, so the handover should be written before it does more work.
+2. O1 to O6 (lander pickup, decision queue, ledger, prompts, schedule, approvals).
+3. Virtual unit: Q4 spike (one day), then F1, F2, F3 in parallel on three sessions.
+4. T0, T1, T2, T4, T7 on the Mac.
+5. Then the lanes, each on its own virtual unit.
+
+### 18.4 A limit on parallel sessions
+
+The work session's status showed a seven-day usage warning on the account. Running 10 to 15 sessions at once will reach account limits sooner. The coordinator sizes the number of sessions to the remaining allowance and prefers fewer, longer cloud sessions per lane over many short ones. I do not know the account's actual limits.
