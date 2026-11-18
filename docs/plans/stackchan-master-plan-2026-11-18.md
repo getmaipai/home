@@ -913,3 +913,69 @@ Things to check before step 1 ships:
 General robot viewers were also found (NASA JPL's `urdf-loaders`, `mechaverse` under MIT). They are a fallback for Reachy Mini and later bodies, which have standard robot description files.
 
 Order in Wave 1: F3a headless core and step 1 in parallel; steps 2 and 3 next; steps 4 and 5 after the movement governor is in the spec.
+
+## 19. Faces, our own illustrated characters, people and personalities (added 2026-11-18)
+
+Owner questions: the anime-style faces were ruled out or left out, and making our own is a good idea; should the robot support several users (what to call you, your face and color); are personalities included; are adding and updating our faces included, given other projects have many faces and more color.
+
+### 19.1 What the plan already had, and what was missing
+
+| Topic | Already in the plan | Missing until this section |
+|---|---|---|
+| Our drawn faces | Motion pass (B1), emotion vocabulary (B2), overlays (B3), lip sync (B4), system-state faces (B5), reflex faces (B6), face packs as data (B14) | A target for how many faces, and a color plan |
+| Illustrated faces | B14b, deferred and "only on a yes" | Now a yes: our own original characters |
+| Several users | Speaker identity by voice (C7), face recognition measured and opt-in (C8), Home's people roster already reaches the robot | Per-person preferences applied by the robot; a way to say who you are without recognition |
+| Personalities | Home's companions (personality, voice, look) already drive how the robot talks; four are bundled | A companion did not carry a face, colors, motion style or sounds for the robot |
+
+The work session has a "Face Design Board" artifact from 2026-11-16 that I have not read; lane B starts from it.
+
+### 19.2 Drawn face set: more faces, more color (B18, M, bench)
+
+Today: 17 faces, 7 palettes and a night face, two decorators. The field: the xiaozhi fork has 21 expressions and 13 overlays; Nous-Girl 12 emotes in three characters; alive 4 personas by 6 states.
+
+- **Target: about 30 expressions** in one consistent style. Add to today's set: laughing, crying, embarrassed, proud, bored, confused, determined, mischievous, relieved, scared, grateful, focused, yawning; and real faces for dizzy and silly (today they fall back).
+- **Overlays (B3) raise the count without new faces:** any face can carry a tear, hearts, blush, sweat, zzz, "!", "?", thought dots, sparkle, anger mark, music note, check, mail, pill, moon.
+- **Color with meaning, not decoration:** blush pink, tear blue, heart red-pink (never the ring's red rule: the ring stays never red), anger mark orange, sparkle yellow, sleepy lavender. Mouth interior and tongue get color. Each palette defines these accents so every pack stays readable.
+- **More palettes:** from 7 to about 12, plus two high-contrast palettes and a color-blind-safe set for accessibility.
+- **Eye styles as a pack option:** dot (today), round with highlight, tall oval, soft square. Same expressions, different character.
+- **Every face ships with:** a renderer sheet (still, blink, speaking frames, each overlay), a transition filmstrip, a fold entry in the vocabulary, and a golden frame.
+- Memory: drawn faces are code and numbers; the cost is flash, not RAM. Measured with the gate as usual.
+
+### 19.3 Our own illustrated characters (B14b promoted; L, bench)
+
+Decision 2 in section 15 is revised: illustrated packs are a yes, built in Wave 3, with our own original art. Nobody else's art is used.
+
+- **Method (from pet-fw and Nous-Girl, logic only):** per emotion one still of the character, plus small mouth patches (5 shapes) and eyelid patches (open, half, closed) drawn over it. Lip sync and blink come from patches, so 12 emotions need 12 stills, not hundreds of frames.
+- **Budget estimate (unmeasured):** a full 320x240 still is 153,600 bytes uncompressed; 12 stills are about 1.8 MB, patches about 0.2 MB, against about 3.6 MB free in the assets partition. Read straight from flash with memory-mapped assets (Q3), so internal RAM cost should be near zero. Simple compression for flat-color art is a bonus, not required. A pack that fails to load falls back to the drawn face.
+- **Where the art comes from:** Home already makes pictures and keeps characters consistent across shots. A pack builder in Home (G11, M) generates a character's emotion sheet from a description or a reference, a person reviews and fixes it, and a validator checks size, patch alignment and safe areas. Art we ship is original, reviewed by a person, and licensed with the repo; the starter set is offered CC0 like our drawn starter faces.
+- **First characters:** two original characters at launch, chosen by the owner from generated candidates (a decision queue entry, with candidates shown as sheets). The companions' existing looks are the natural starting point, so a companion can appear on the robot as itself.
+- **Limits:** illustrated packs follow the same emotion vocabulary, overlays and system-state marks (muted, vision off, offline) as drawn faces; privacy marks are never hidden by art. Child-band robots only load packs marked for everyone.
+- **Community packs:** the pack format, validator and preview sheet are public; packs install from the Catalog (G9).
+
+### 19.4 Several people, one robot (C11 to C14)
+
+Rules that stay: the robot's controls set the band and identification never raises it; an unknown speaker reaches no memories; the unit never receives a name, birthday or memory (it receives a palette, a pack id and audio).
+
+| ID | Item | Where | Size | Acceptance |
+|---|---|---|---|---|
+| C11 | Per-person robot preferences in each person's Home profile: what to call them, favorite palette or face pack accent, greeting style, volume preference within the band's cap | SPEC, HOME | M | Editable by the person (a child's by a parent); used by any robot body |
+| C12 | Applying them: when voice or face identification is confident (C7, C8, both opt-in), the robot greets by the chosen name, shifts to that person's color accent, and shows a small colored mark for who it thinks it is talking to; when unsure it stays neutral and says nothing personal | BOT, FW | M | Wrong-person rate measured before default on; one tap or "that's not me" corrects it |
+| C13 | No-recognition path: "who's here?" by voice ("it's Sam") checked against voice only if enrolled, or a picker on the robot screen with each person's color and initial; times out to nobody | FW, BOT, HOME | M | A family that never enrolls faces or voices still gets names and colors; a child cannot pick an adult to raise controls (band stays the robot's) |
+| C14 | Several people at once: the robot addresses the current speaker, keeps one conversation, and keeps each person's private memories out of a shared moment (Home's existing sharing rules) | HOME, BOT | M | Test with two profiles |
+
+Without Home (modes b and c): one local profile only at first; several local profiles are later work.
+
+### 19.5 Personalities (E9, E10)
+
+- **Yes, and they already exist as Home's companions.** What is added is the body: a companion pack gains optional robot parts (E9, M): face pack or eye style, palette, motion style (energy, idle level, how big the gestures are), earcon set, ring mood colors. One companion then looks, sounds and moves like itself on any body; a body without a screen folds face to light or pose.
+- **One character per robot by default.** The robot stays the same character for everyone and adapts name, greeting and color accent per person (C12). A robot that changes its whole personality depending on who walks up is confusing for small children.
+- **Optional (E10, S): "my companion on the shared robot".** A household may let an identified teen or adult bring their own companion to the robot for their turn, within the robot's controls. Off by default; queued as an owner decision.
+- **Personality packs for standalone mode:** the same pack format works without Home with a prompt, voice and face; child and teen use still requires Home.
+- Bundled companions (Rivet, Nova, Riff, Sprout) each get robot parts in Wave 3 so the difference is visible on day one.
+
+### 19.6 Schedule and decisions
+
+- Wave 2: B18 first half (new drawn faces and color accents), C11.
+- Wave 3: B18 second half (palettes, eye styles), B14b format and validator, G11 pack builder, E9, C12, C13.
+- Wave 4: first two illustrated characters, C14, E10 if approved.
+- New owner decisions (queue): pick the two launch characters from candidates; E10 on or off; whether identification-based greeting by name is on by default once measured or stays opt-in (recommendation: opt-in).
