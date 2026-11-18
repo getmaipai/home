@@ -979,3 +979,104 @@ Without Home (modes b and c): one local profile only at first; several local pro
 - Wave 3: B18 second half (palettes, eye styles), B14b format and validator, G11 pack builder, E9, C12, C13.
 - Wave 4: first two illustrated characters, C14, E10 if approved.
 - New owner decisions (queue): pick the two launch characters from candidates; E10 on or off; whether identification-based greeting by name is on by default once measured or stays opt-in (recommendation: opt-in).
+
+## 20. Deferral register and the touch-gesture review (added 2026-11-18)
+
+### 20.1 Everything this plan defers, rejects or leaves conditional
+
+So nothing is deferred silently. "Owner can reverse" applies to every row.
+
+| Item | Status in the plan | Why |
+|---|---|---|
+| Voice barge-in (interrupting by speaking) | Off | No working echo cancel on this board; spike Q9 could change it |
+| Custom wake phrase | Not now | Second speech model costs a core and made audio choppy elsewhere |
+| Sound-direction head turn | Parked | Microphones are stacked vertically |
+| Continuous face following | Opt-in, not default | Off by default in 5 of 7 projects; servo wear and noise |
+| Sentry mode, mmWave presence, self-charging | Not scheduled | Not in any wave; sentry needs a privacy design |
+| Phone app (face mirroring, dance recorder, video call, remote control) | Not scheduled | Home in a phone browser is the app for now |
+| Launcher carousel of apps | Rejected | The face is the product |
+| Music visualizer and equalizer face | Later | Only the flash-rate cap is adopted now |
+| Meme maker, email from the robot | Skipped | Low value for families |
+| User-editable ring colors for safety states | Rejected | Safety colors keep one meaning; mood colors are editable |
+| Wi-Fi setup by sound | Rejected | Novel but fragile |
+| Bluetooth | Not built | Memory, radio sharing, needs a phone app |
+| Matter on the unit, ESP WebRTC, ESP-Brookesia, Espressif cloud services | Left out | Section 14 |
+| Secure boot and flash encryption | Decision note only | Irreversible on the one unit |
+| JPEG decoder back in firmware | Spike only (Q10) | Host-sent tiles first |
+| Tailnet client in the main image | Separate build | Memory gate unmeasured |
+| Hub pictures and camera snapshots on the screen (B9, M2) | Conditional | Ship only if the memory gate holds |
+| Touchscreen Wi-Fi keyboard | Only if it fits | QR and portal come first |
+| Robot camera reads a QR code (K4), usage meter (N3), run-time screen layouts (T13) | Spikes | Unknown cost or data |
+| Vowel-shaped lip sync | Only if it fits | Level-driven shapes first |
+| Fixed memory pools, merged tasks (P9, P10) | Wait for the firmware decision | Hard on a patch series |
+| Our own firmware instead of patches | Open | Decide after the handover |
+| Standalone AI brain (M4) | Wave 4 | Needs rule wording first |
+| Several local profiles without Home | Later | One profile first |
+| Browser-only build of the virtual unit (F5), Reachy Mini in the 3D view (F3f) | Optional, later | |
+| Scripting language on the unit | Rejected | Internal RAM |
+| Chip emulation | Rejected | Not faithful for timing |
+| Holding a child's statements for review (G5) | Open | Needs a design note |
+| Second and third units | Withdrawn | One unit only |
+
+### 20.2 Touch gestures on the robot: what exists
+
+From the firmware patches and the user guide at 0.2.213. The owner also described a center gesture that changes to a clock or other view; no clock is in the repository I can read, so that is either newer work on the Mac or an idea. The handover should say which.
+
+| Gesture | Does today | Source |
+|---|---|---|
+| Tap the face | Start listening; tap again to stop | patch 047 |
+| Tap the mouth | Mute on or off | 105 (was a 0.5 s hold until 0.2.72) |
+| Tap an eye | Vision off or on | 105 |
+| Tap the forehead | Full quiet on or off | 105 |
+| Swipe left / right | Volume down / up by 10, with a toast | 036 |
+| Swipe down | Stop talking | 036 |
+| Swipe up | Quick settings: volume, brightness, saved Wi-Fi, Done | 036 |
+| Pet or tap the head strip | Smile or heart | several |
+| Touch during a ringing timer | Ends the ring | 093 |
+| Hold the power key | Shut down | 114 |
+
+A swipe-down control panel was written (patch 045) and never flashed. The user guide lists only tap, pet, shake, swipe up and the power key: the volume swipes, the stop swipe and the three privacy taps are not documented for the family.
+
+### 20.3 Review: what works and what should change
+
+I have not used the unit. This is a design review from the code, the docs and what the 15 projects do, to be tested on the virtual unit and then by the four kinds of user.
+
+Works and stays:
+- Tap to talk, tap to stop. Every project does this.
+- Swipe up for quick settings. Discoverable once shown, and it matches the request for big controls.
+- Touching the screen ends a ringing timer.
+
+Problems:
+
+1. **Three privacy switches sit on single taps inside the tap-to-talk area.** A child poking an eye turns vision off; a tap meant to start listening that lands on the mouth mutes the robot instead. They are also invisible: nothing on the face says the mouth is a button. The earlier hold was changed to a tap in 0.2.72, I assume at the owner's request for speed, so this is raised as a question with a measurement, not a ruling.
+2. **Left and right swipes change volume.** It is hidden, coarse (steps of 10) and easy to trigger while wiping or petting the screen. It also uses up the one gesture people expect to move between views, which blocks a clock, a "now" card or any second page.
+3. **Swipe down means stop only while talking**, and nothing otherwise. A gesture should do one thing everywhere.
+4. **No way to learn any of it.** No hint, no first-run tour, and the guide omits most gestures.
+5. **Nothing is locked for a child.** Brightness, volume to the maximum, Wi-Fi switching and the privacy toggles are open to anyone who touches the screen.
+6. **Gestures are spread over several patches** with their own thresholds; the gesture library gives direction only, so edge swipes ("from the sides") need the zone code from patch 105 extended.
+
+### 20.4 Proposed gesture map (B19, M, bench; needs the owner's yes)
+
+One rule: **tap talks, sideways moves between views, up is controls, down dismisses, hold is deliberate.**
+
+| Gesture | Proposed | Change from today |
+|---|---|---|
+| Tap anywhere on the face | Listen; tap again stops | Same, but the mouth, eyes and forehead no longer steal taps |
+| Swipe left / right | Move between views with page dots: Face, Clock, Now (timers, reminders, weather if installed), and installed packages such as a game. Returns to Face after a short idle | Replaces volume swipes |
+| Swipe up | Quick settings, page 1: volume and brightness sliders, then big toggles for Mute, Vision, Quiet. Page 2: night, idle motion, Wi-Fi, info | Privacy switches become labeled buttons |
+| Swipe down | Dismiss whatever is on top: speech, a ringing timer, a card, quick settings | One meaning everywhere |
+| Hold the mouth, an eye, or the forehead for about 0.7 s | Shortcut for mute, vision off, full quiet, with a fill animation so it is visible and cancellable | Hold instead of tap; or keep taps if the accidental-toggle count on the unit is low (measured first) |
+| Drag up or down along the right edge | Volume, fine steps, with a level bar | Replaces left and right for volume; optional |
+| Hold the center for about 1.5 s | Settings and info (same as quick settings page 2) | New; matches Nous-Girl |
+| Head strip | Pet reactions | Same |
+| Any touch while a timer rings | Stops it | Same |
+
+Supporting rules:
+- **Child band:** volume capped, Wi-Fi and info pages locked, privacy switches can always be turned on (more private) but turning them off follows the parent's setting (S7).
+- **Hints:** a first-run tour of four screens; faint chevrons for a second after wake; "what can I do?" answered by voice with the gestures.
+- **Gestures as data:** one table in the shared spec maps gesture to action per view, so the map can be tuned live on the unit (T6), tested on the virtual unit, and reused by another body with a touch screen.
+- **Ignored touches:** while the head is moving, and for a moment after a shake or lift, so handling does not trigger controls.
+- **Clock view:** large time, date, next timer or alarm, in the active palette, dim at night; shown by swipe and optionally as the idle view (a setting).
+- **Docs:** every gesture in the user guide with a renderer capture.
+
+Decision queue entries: adopt the map; privacy shortcuts as holds or keep taps (after the accidental-toggle count); clock as an optional idle view.
