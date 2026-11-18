@@ -888,3 +888,28 @@ Notes:
 - The 3D model: the official app ships a model of the robot (`stack_chan_model.glb` in the StackChan-GPT fork's app assets); its license must be checked before use. Fallback: simple shapes drawn in code.
 - The 3D view never replaces the headless core: tests run without it.
 - Estimate: 6 to 9 days for F3b to F3d on top of F3a.
+
+### 18.6 3D view: start from an existing project, face first (added 2026-11-18)
+
+Owner: wants 3D, wants an open source project we can easily use, and "we can start with the face and have motion later".
+
+**Base: `qua121/stackchan-simulator` (Apache-2.0, compatible with our AGPL repos).** It is the only StackChan-specific 3D simulator found (a web search for others found none). It already has what the first step needs: a three.js scene with orbit controls, the robot's meshes in a base, pan and head hierarchy, the screen drawn as a live texture on the front of the head, a FastAPI server with a WebSocket, one contract file for its messages, 35 tests and CI. Its meshes come from rostack-chan (Apache-2.0) with notices. Read by an audit agent, not run.
+
+What we change:
+
+| Step | Work | Size |
+|---|---|---|
+| 1. Face first | Replace its redrawn JavaScript face with frames from our real-code renderer, streamed over the WebSocket to the head texture; keep orbit and zoom; head fixed | S to M |
+| 2. Touch | Clicks and drags on the textured screen become taps and swipes sent to the virtual unit | S |
+| 3. Ring | Twelve glowing lights driven by our ring commands (the project has none) | S |
+| 4. Motion, later | Drive pan and tilt from our head commands with a plain speed and range model; its MuJoCo physics stays optional and off by default | M |
+| 5. Handling, later | Drag the body to lift, tilt and shake; feed the movement governor | M |
+
+Things to check before step 1 ships:
+- **The body shape.** Its meshes are the classic community shell, not the M5Stack K151 body we own [unverified which it matches]. Candidates for the right shape: M5Stack's published K151 structure files (license not checked) and the 3D model in the official app (`stack_chan_model.glb`, 3.3 MB; license not checked). Until one is cleared, the classic shell or plain shapes are used; the face is correct either way.
+- **Its open routes.** The audit found no authentication on its WebSocket and state-changing routes. Ours binds to loopback and takes a token.
+- Notices: keep its NOTICE and the rostack-chan attribution.
+
+General robot viewers were also found (NASA JPL's `urdf-loaders`, `mechaverse` under MIT). They are a fallback for Reachy Mini and later bodies, which have standard robot description files.
+
+Order in Wave 1: F3a headless core and step 1 in parallel; steps 2 and 3 next; steps 4 and 5 after the movement governor is in the spec.
