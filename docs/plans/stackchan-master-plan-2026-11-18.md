@@ -1139,3 +1139,42 @@ Recommendation, recorded as the plan's direction unless the owner says otherwise
 - Wave 3 adds: V1 and V2 on the unit, X4 to X6, G12, M7, E11 design, secure boot proof in the emulator.
 - Wave 4 adds: X7, X8 and the switch to our firmware, E11 build.
 - Estimate: this adds about three to four weeks to the full program (about 13 to 14 weeks to the end of wave 4), with two more firmware agents. The family-visible improvements in waves 1 to 3 are not delayed, because they are written as portable modules and ship on the patched image first.
+
+## 22. Review of our own firmware and docs: what was covered, and fixes not yet in a lane (added 2026-11-18)
+
+### 22.1 What the review was, stated plainly
+
+- **Covered:** the public `getmaipai/bot` repository at firmware 0.2.213 (2026-11-17): its docs, backlog, changelog, the patch list and patch headers, the host code structure, the settings keys, and Home's robot code. An agent read these and wrote [round2/bot-state.md](../reports/stackchan-ecosystem-audit-attachments/round2/bot-state.md) with file and line evidence; I read its report and spot-checked the user guide, the control-panel note, the robot API and the HAL seam.
+- **Not covered:** a line-by-line review of the 128 patches or of the host's Python for bugs; anything newer than 0.2.213 on the Mac (the clock view, the movement limiter, dance v2, the own-repository work); behavior on the unit. Nothing was run.
+- **So:** the plan reflects every gap that review found in what was built, promised, documented and secured. It does not yet reflect a code-quality review, and it will change when the handover arrives. Item R1 below schedules the missing review.
+
+### 22.2 Findings already placed in lanes
+
+Promised-but-missing features (section 1.2), memory budget (1.4), version and pin drift, missing wire schema and the five undefined tools, Home's missing settings keys and unmounted robot card (1.5), plain-text link, hash-only update check, open setup hotspot, no encryption at rest, no child lock, no egress capture (lane S), stale README, setup guide and user guide (lane H), gestures (section 20).
+
+### 22.3 Findings from the review that had no item until now
+
+| ID | Finding | Fix | Size |
+|---|---|---|---|
+| R1 | No line-by-line review of the patches and host code has been done | A read-only review by two agents (firmware patches; host Python), each bug or risk filed as its own row; runs in Wave 1 alongside the handover | M |
+| R2 | The photo upload route accepts the device token in the address (`?token=`) | Header only (already in S1; listed here so it is not lost) | S |
+| R3 | The pairing token is visible in the process list on the host (`--pairing-token` on the command line) | Read it from a file or the keychain | S |
+| R4 | The Bot's debug dashboard lets any local page call `POST /api/primitive/*` and `/api/muted` with only a same-origin check | Require the admin token on state-changing routes | S |
+| R5 | The camera ring does not light during silent local watching (`stream(silent=True)`), by design | Revisit against the indicator rule in section 6: decide whether "the camera is on" always shows, even when frames stay on the host; owner decision with a recommendation of always showing a low, steady mark | S |
+| R6 | The update file is downloaded over plain HTTP and checked only by a hash sent on the same plain link | Closed by Q1 (signature checked on the unit) and S2; until then, say so in the docs | n/a |
+| R7 | The setup page sends the Wi-Fi password from phone to robot over an open hotspot | Closed by S4; until then, say so in the setup guide | n/a |
+| R8 | An "independent security review" is cited but its text is not in the repository | Commit it or remove the citation | S |
+| R9 | `bump.sh` checks only six early patches against a new upstream commit | Check the whole series, or retire it when T1 lands | S |
+| R10 | The user guide says "shake it or lift it"; lifting is not detected | B6 builds lift detection; fix the sentence now | S |
+| R11 | Night volume is "40 percent" in the guide and "half" in the changelog; idle shutdown is 10 minutes in one note and 60 in the changelog; the faces note says the new faces are off while the code says on | One reference page generated from the code's own constants (H7), so numbers cannot drift | S |
+| R12 | The changelog has two "Unreleased" headings, a misplaced version and a duplicate entry; the backlog says the StackChan body is "not built yet" | Clean up with Z4 | S |
+| R13 | A referenced note is missing (`stackchan-self-healing-2026-11-13.md`); about 45 dated developer notes supersede each other with no index | An index page marking each note current, superseded or historical (as Home's `docs/design/INDEX.md` does) | S |
+| R14 | The license of the patch series is not stated in one place (repo is AGPL-3.0; notices say parts are MIT) | One licensing page: what is ours under AGPL, what is derived MIT with notices | S |
+| R15 | `measurements.md` has no StackChan rows; duplex, latency, stop-word reliability, face recognition rates and wake-word cost were never measured | A5, P1, C1, C8, C10 fill it; H8 publishes it | n/a |
+| R16 | The firmware version identity is split (`pins.toml` says `1.5.1-maipai.1`; the unit reports a build-time value) | One version source | S |
+| R17 | The profile lacks `mic` and `screen` capabilities that Home's self test expects (BOT-SELF-TEST-01) | Add with A1's capability work | S |
+| R18 | Five built pieces are not wired or have no caller: `speaker_gaze.py`, `ambient_vision.py`, `robot/display.py`, the `goodbye` earcon, most of `meeting_faces.py` | Wire (C3, B9, C12) or delete (decision 5); none left half-in | S |
+| R19 | The front-shell tap is built but switched off in code | Decide in B19 with the gesture map | S |
+| R20 | The README's StackChan section and Home's README barely mention the robot; no screenshot exists anywhere | H1 to H3 | n/a |
+
+R1 to R4, R8 to R14 and R16 go into Wave 1. R5 is a decision queue entry.
