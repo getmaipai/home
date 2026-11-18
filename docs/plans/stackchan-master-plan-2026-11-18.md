@@ -1414,3 +1414,17 @@ M8 becomes:
 | Size of the work | S (1 to 2 days), not M |
 
 Everything else in 27.4 stands: optional, off by default, adults only, Home's memory takes over when paired.
+
+## 28. Corrections after reading the code (pointer; added 2026-11-18)
+
+The current StackChan code was read on 2026-11-18 from a private review repository. Findings about that unreleased code, including security findings, are **not** recorded in this public repository. They are in the private repository `getmaipai/stackchan-review`, branch `review/2026-11-18-findings`, folder `docs/review/2026-11-18/code-review/`, with `PLAN-CORRECTIONS.md` as the entry point.
+
+That file overrides this plan where they disagree. In summary, without detail:
+
+- This plan's picture of what is built was too low and its base facts were stale (the firmware was rebased; free memory is higher; the product already runs without Home).
+- Withdrawn: our own firmware as the target (section 21.2, lane X); the "double the free memory" target; the auto-hiding status bar; growing the face count before fixing consistency.
+- Changed: the typing order follows the StackChan repository's own decision (Claude cloud, then Codex, then the local coder); hosted CI and lander pickup wait until the repository is public; the emotion fallback maps named tags only.
+- Added ahead of everything else: a release floor (rebuild from the repository, release key, secret scan, license cleanup, doc claims), safety fixes on the unit, the "no reply after wake" problem, and a gate that includes a real spoken turn.
+- Standing: the three parallel tracks, the virtual playground (it starts from pieces that already exist), the boundary rule agreed in section 27, the friend test, local memory notes, the four users.
+
+The review is interim until the remaining slices finish.
