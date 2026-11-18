@@ -1,6 +1,6 @@
 # StackChan master plan: finish the vision, beat the field, build it in parallel (2026-11-18)
 
-Status: draft for the owner. Nothing in this plan is built. It replaces [stackchan-tester-and-ecosystem-adoption-2026-11-18.md](stackchan-tester-and-ecosystem-adoption-2026-11-18.md) as the plan of record; the tester work is Lane F here.
+Status: owner agreed to the recommendations on 2026-11-18 (section 15 records each decision and what is still open). Nothing in this plan is built. It replaces [stackchan-tester-and-ecosystem-adoption-2026-11-18.md](stackchan-tester-and-ecosystem-adoption-2026-11-18.md) as the plan of record; the tester work is Lane F here.
 
 Rule changes proposed here (sections 5 and 6) are proposals only. Only the owner changes a rule (`docs/design/RULES.md`).
 
@@ -675,3 +675,55 @@ From knowledge of the Espressif ecosystem. Versions and memory costs were not ch
 - Wave 3 gains P5 trial, P6, P7, Q8, Q11 to Q15.
 - P9, P10, Q16 wait for decision 9 and S2.
 - One more firmware agent (performance) on the Mac; bench slots rise to about 40. Calendar estimate unchanged if the Q spikes stay time-boxed to a day each.
+
+## 15. Owner decisions recorded, 2026-11-18
+
+The owner's words in chat: "i agree with all your suggestions - add to the plan". Each recommendation below is recorded as decided on that basis. Where a question had no recommendation, or the recommendation was to decide later, it stays open and is listed as such. Rule text is not edited by this plan: each rule change lands in `docs/design/RULES.md` as its own commit marked `Owner-approved`, in Wave 0.
+
+### Decided
+
+| # | Decision | Outcome |
+|---|---|---|
+| 1 | Start Wave 0 and Wave 1 | Yes |
+| 2 | Faces | Drawn faces stay the default and get the motion work; an optional illustrated pack format comes later (B14b), with a per-pack cap and fallback |
+| 3 | Image path on the unit | No JPEG decoder restored by default; raw tiles from the host over the existing channel, shipped only if the memory gate holds. Q10 still tests the light decoder as a spike |
+| 4 | Tailnet client | Stays a separate build until its memory gate is measured; no UI feature may spend its margin |
+| 5 | Ambient vision | Remove the unwired path after confirming nothing is lost |
+| 6 | Custom wake phrase | Not now; add sensitivity levels; run the microWakeWord spike (A6) |
+| 7 | Agent "see" tool | Describes the scene in words; never returns a picture. No change to vision rules R1 to R4 |
+| 8 | Activity on admin pages | States, counts and ages only (rule 6a unchanged) |
+| 9 | Licenses | Copy logic with notices from MIT, Apache, BSD and AGPL sources; never the non-commercial art or voice; verify the M5Stack firmware license before copying |
+| 10 | Boundary rule | The eight "Robot boundary" lines of section 5, with R-B5 and R-B6 as revised in section 12, approved as text to land in `RULES.md` |
+| 11 | Shared robot interface | Movement governor, memory governor, brain interface and the other additions of section 6 approved as shared concepts for every body |
+| 12 | Screen style standard | Section 9b approved; a gate for every robot screen |
+| 13 | Captive portal | Rebuilt as its own item (K1) |
+| 14 | QR setup and pairing | Yes (K2); camera-reads-QR as a spike (K4) |
+| 15 | Bluetooth | Not built (K5) |
+| 16 | Management | In Home when Home is present; a small Bot service page without Home (R-B5) |
+| 17 | Home Assistant without Home | Yes: voice satellite mode, camera snapshots, robot as a device (M1 to M3) |
+| 18 | Standalone AI brain without Home | Yes, labeled for adults; a child or teen robot requires Home; on-unit limits and a basic filter stay on. Needs a sentence in rule 0's robot paragraph: land with `Owner-approved` before M4 starts |
+| 19 | Cloud brains | Allowed only as an explicit opt-in with an indicator; local is the default. Needs matching wording in the privacy page and README before M4 ships |
+| 20 | Coding-agent companion | Yes (N1 to N5), with the lines held in section 12.4 |
+| 21 | Four users | Every item checked against kid, teen, non-technical adult, technical adult (section 12.1) |
+| 22 | Memory and performance lane | Yes (section 13), measurement first |
+| 23 | Espressif components | Take-first list adopted; spikes time-boxed to a day each; leave-out list recorded (section 14) |
+| 24 | Second StackChan for the bench | Recommended yes; the owner buys it or says no |
+
+### Recorded as agreed, flagged because it changes a published promise
+
+- **Wi-Fi details over USB at flash time (K3).** I suggested it as an option beside the QR flow. The user guide says Home never asks for the Wi-Fi password. Recorded as: offered as an option only, never required, and the guide is reworded in the same change. If the owner did not mean to include this one, K3 is dropped with no effect on the rest.
+
+### Still open
+
+- **Patches or our own firmware (section 4, decision 9).** The recommendation was to decide after the work session's handover. It gates P9, P10 and where every firmware item lands.
+- **Hold a child's statements for review before they become memories (G5).** No recommendation was made; it needs a design note and the owner's view.
+- **The handover itself.** Not received at the time of writing. Wave 0 item Z1 cannot finish without it.
+
+### First actions (Wave 0, in order)
+
+1. Get the handover from the work session; correct sections 0 and 1 (Z1).
+2. Park or land the in-flight movement limiter and dance v2 on a pushed branch (Z2).
+3. Land the approved rule text in `RULES.md` with `Owner-approved` (decisions 10, 18).
+4. Open backlog rows for every item in sections 7, 12, 13 and 14 through the usual route; lease patch numbers and memory budgets in the ledger.
+5. Pin sync and changelog catch-up (Z3, Z4).
+6. Start Wave 1 agents: spec (A1, A2, M0, P2 spec half), bench baseline (A5, P1), security quick wins (S1, S5, S8, Q1, Q2), tester (F1, F2), screen standard (B17), docs (H4, H8).
