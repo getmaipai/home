@@ -1285,3 +1285,56 @@ How it applies here:
 ## 25. Kickoff belongs to the work session (added 2026-11-18)
 
 Owner: the worker session ("STACKCHAN - WORK", on the Mac Studio) kicks this off, not the research session that wrote this plan. The kickoff brief is [stackchan-kickoff-2026-11-18.md](stackchan-kickoff-2026-11-18.md).
+
+## 26. Reconciliation with the current work (first pass, from the docs draft only; added 2026-11-18)
+
+**This section overrides sections 1, 9a, 12.1, 19 and 20 where they disagree.** Source: the "MaiPai StackChan Docs Draft" written by the documentation session from the current local `getmaipai/stackchan` tree, read in full by an agent and compared with every item in this plan: [round2/reconcile-with-docs-draft.md](../reports/stackchan-ecosystem-audit-attachments/round2/reconcile-with-docs-draft.md). The code itself has not been read: it is only on the Mac. The work session's own log adds: commit `cd61a75` (movement limiter, dance v2) flashed; 12-minute soak passed with about 86 KB internal free and a 33 KB low point; 4,999 host tests passing.
+
+Caveat from the draft itself: it is "written as if v1.0.0 is finished"; most "built and flashed" items have not been checked by a person (no real voice wake, swipe feel, game by touch, sound or dance verified), and the draft contradicts itself in about ten places.
+
+### 26.1 Where we really stand
+
+- The product is "MaiPai for StackChan": a local `getmaipai/stackchan` tree (firmware patches with a build recipe, and a `pipx`-installed host). Unpublished, no tag, no release key.
+- **It already runs without Home by default** (`brain = "llm"`, any OpenAI-compatible address); `brain = "home"` switches to Home with no reflash.
+- Flashed, per the draft: five face styles, picture faces (still, still with drawn eyes and mouth, short frame loops), 26 overlays, CRT and color effects, word reactions; swipe pages (clock, timers, games, quick actions, pictures, dashboard tiles), a control sheet (volume, brightness, Mute, Quiet, Lock, Apps, Games, Settings), Apps and Games walls with themed tiles, tabbed settings, a passcode lock; seven games; voice timers and alarms with no model; wake word, replies by sentence, subtitles, fillers, six language packs; remote controls with a violet banner that cannot be hidden, find my robot, photo; movement limiter; dance to music.
+- Built, not flashed: six talk games including bedtime stories; a newer Wi-Fi setup page; an on-robot face detector experiment.
+- Not built: face turning, pick-up detection, scenes and data cards, live view, watching and monitor, the encrypted home link, roaming, more wake words, offline voice commands.
+- Open problem: after the wake word one owner heard no reply; audio reaches the host loud and the speech engine returns no words.
+- Measured: eyes 28 to 33 frames a second with gaps over 50 ms; the mouth while speaking 4 to 11 frames a second.
+
+### 26.2 What happens to the plan's items (about 195)
+
+| Outcome | Count | Examples |
+|---|---|---|
+| Drop the build | 2 | B8 (the control sheet and tabbed settings exist), E1 (seven games exist) |
+| Shrink to verify, polish, flash or publish | about 48 | A1 and A1b (limiter exists: move it into the shared interface), B1, B3, B4, B10, B16, B20, E2, K1, K6, M0, M5, M6, S3 and Q1 (signature check built, never run: no release key), G6, most of lane H (a full docs set exists) |
+| Change, because the built product chose differently | about 27 | B13, B14, B14b, B18, B19, S4, S7, S9, K2, K5, M3, M4, E6, E7, E11, N1, N2, N5, C10, V1, G2, G7 |
+| Keep | about 117 | A2 to A6, S1, S2, S5, S6, S8, S10, all of F (virtual playground), O, P, T, X, most of G, C and Q |
+| Withdrawn | 1 | T10 |
+
+Priority changes: the "no reply after wake" problem goes first (C1, G8). The speaking-mouth frame rate makes host-computed mouth cues and the performance lane more urgent (P4, P1). Getting a release key and publishing the repository unblock signed updates and outside users (Z2, K6, Q1).
+
+### 26.3 Conflicts between the built product and this plan, for the owner
+
+| # | Topic | Built product | This plan | Recommendation |
+|---|---|---|---|---|
+| 1 | Content filter without Home | "We add no content filter", no adult label | Basic filter on, adult label, a child's robot requires Home | Plan's position; it is a safety matter |
+| 2 | Cloud models | Any address, an FAQ warning | Explicit opt-in with an indicator | Plan's position |
+| 3 | Privacy taps | Single silent taps on mouth, eye, forehead | Holds, or taps after an accidental-toggle count | Measure, then decide |
+| 4 | Talking over the robot | Docs say it works; no test; radio was dropped because the robot answered its own speaker | Build it properly (V1) | Test the claim first; V1 stays |
+| 5 | Coding companion and agent tools | Home only; shows request text; dictation to the agent; red build light | Works without Home; no prompt text on the robot; no voice to task; never red | Decide; the plan's limits are safety and privacy limits |
+| 6 | Indicators | Violet remote banner, white updating, dim amber watching, red and blue alarm, two bars of six lights | Ring standard "never red", twelve lights | Adopt the banner into the shared indicator contract; settle red for alarms; correct the light layout in the spec |
+| 7 | Lock | Owner passcode for the whole robot | Child lock by age band | Both: the passcode exists; add band limits pushed from Home |
+| 8 | Setup | Typed six-digit setup and pairing codes; pairing needs a terminal; the flasher already takes Wi-Fi | QR, secured hotspot, no terminal | Keep the codes, add QR and remove the terminal step; K3 is already how it works |
+| 9 | Faces | Five styles; six older faces deleted | Grow to about 30 expressions | Reconcile in B18 from the real face system and the Face Design Board |
+| 10 | Apps wall | Exists | "Launcher rejected" | The plan was wrong: the wall exists as a page; keep the face as home |
+| 11 | Bluetooth | "Saved almost no memory", under review | Cut for memory | Re-decide on product grounds only |
+| 12 | Phone app, radio | Excluded | Web app (G12), music (E7) | Owner's call; radio needs echo control first, which V1 provides |
+| 13 | Face turning default | Always | Once at wake | Measure noise and wear |
+| 14 | Mood guessing | Removed on purpose | B2's fallback table | B2 maps named emotions only; no guessing |
+| 15 | Settings in three places; names on the unit | As built | One definition (R-B5); the unit never gets a name (R-B4) | Review against the boundary rule when the code is read |
+| 16 | Shared robot interface | The draft never mentions the Bot service, the spec or a second body | Everything goes through it | Largest structural gap; first job of the shared layer |
+
+### 26.4 Still needed
+
+A review of the code itself (firmware patches, host, tests, snapshots). It has been requested from the work session as a pushed branch `review/2026-11-18`. Until then every status above is the draft's claim.
