@@ -4,30 +4,30 @@
   "headroom_warn_bytes": 5368709120,
   "gib_bytes": 1073741824,
   "installer": {
-    "p16.required_free_bytes": 50970898149,
-    "p16.minimum_required_free_bytes": 13976383571,
-    "p16.everything_required_free_bytes": 69790820392,
-    "p16.needed_bytes": 43251549248,
+    "p16.required_free_bytes": 17444519451,
+    "p16.minimum_required_free_bytes": 13806214750,
+    "p16.everything_required_free_bytes": 68899738564,
+    "p16.needed_bytes": 15024083299,
     "p16.home_required_free_bytes": 3176323277,
-    "p16.ai_required_free_bytes": 47794574872,
-    "p32.required_free_bytes": 69722709669,
-    "p32.minimum_required_free_bytes": 31047800378,
-    "p32.everything_required_free_bytes": 93626806949,
-    "p32.needed_bytes": 58878058848,
+    "p16.ai_required_free_bytes": 14268196174,
+    "p32.required_free_bytes": 36196330971,
+    "p32.minimum_required_free_bytes": 30877631556,
+    "p32.everything_required_free_bytes": 87651550084,
+    "p32.needed_bytes": 30650592899,
     "p32.home_required_free_bytes": 3176323277,
-    "p32.ai_required_free_bytes": 66546386392,
-    "p64.required_free_bytes": 215841234678,
-    "p64.minimum_required_free_bytes": 56939912009,
-    "p64.everything_required_free_bytes": 316535829849,
-    "p64.needed_bytes": 180993416952,
+    "p32.ai_required_free_bytes": 33020007694,
+    "p64.required_free_bytes": 122646637033,
+    "p64.minimum_required_free_bytes": 56636960034,
+    "p64.everything_required_free_bytes": 217766009524,
+    "p64.needed_bytes": 103029101880,
     "p64.home_required_free_bytes": 3176323277,
-    "p64.ai_required_free_bytes": 212664911401,
-    "p128.required_free_bytes": 250507553227,
-    "p128.minimum_required_free_bytes": 56939912009,
-    "p128.everything_required_free_bytes": 601912645603,
-    "p128.needed_bytes": 210008479520,
+    "p64.ai_required_free_bytes": 119470313756,
+    "p128.required_free_bytes": 157312955582,
+    "p128.minimum_required_free_bytes": 56636960034,
+    "p128.everything_required_free_bytes": 503142825278,
+    "p128.needed_bytes": 132044164448,
     "p128.home_required_free_bytes": 3176323277,
-    "p128.ai_required_free_bytes": 247331229950
+    "p128.ai_required_free_bytes": 154136632305
   },
   "tiers": {
     "p16": {
@@ -54,7 +54,7 @@
         {
           "id": "chat",
           "label": "Chat AI (Qwen3 8B)",
-          "note": "The AI you talk to. A small starter chat AI comes first so you can talk while the big one downloads.",
+          "note": "The AI you talk to. A small starter chat AI (Qwen3 1.7B) comes first so you can talk while the big one downloads.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -71,8 +71,8 @@
         },
         {
           "id": "embed",
-          "label": "Memory and search model",
-          "note": "Lets Home find the right memory or page by meaning.",
+          "label": "Memory search model",
+          "note": "Finds what Home remembers when you ask.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -88,8 +88,8 @@
         },
         {
           "id": "stt",
-          "label": "Moonshine Tiny English",
-          "note": "Turns what you say into text.",
+          "label": "Speech to text",
+          "note": "Turns what you say into words, on this computer.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -109,8 +109,8 @@
         },
         {
           "id": "voice",
-          "label": "Pocket TTS",
-          "note": "The standard speaking voice.",
+          "label": "Voice (Pocket TTS)",
+          "note": "Home's spoken voice.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -131,19 +131,18 @@
         },
         {
           "id": "image-tools",
-          "label": "Image editor",
-          "note": "Remove a background, erase an object, upscale, resize or make a depth map for a picture.",
+          "label": "Edit pictures tools",
+          "note": "Remove a background, erase something, make a picture bigger.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
-          "download_bytes": 488126642,
-          "installed_bytes": 488126642,
+          "download_bytes": 389065803,
+          "installed_bytes": 389065803,
           "peak_temp_bytes": 0,
           "model_ids": [
             "image-tool-isnet-general",
             "image-tool-lama-big",
-            "image-tool-realesrgan-general-x4v3",
-            "image-tool-depth-anything-v2-small"
+            "image-tool-realesrgan-general-x4v3"
           ],
           "engines": [
             "engine:image-tools",
@@ -154,8 +153,8 @@
         },
         {
           "id": "tool-look",
-          "label": "Look",
-          "note": "Names household objects, wall colour and light in a picture.",
+          "label": "Look at pictures",
+          "note": "Name household objects, wall colour and light. Runs only when Home sends a picture.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -174,27 +173,9 @@
           "basis": "pins"
         },
         {
-          "id": "score-transcription",
-          "label": "Spotify Basic Pitch",
-          "note": "Turns audio into MIDI and a note list using the bundled model.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 0,
-          "installed_bytes": 0,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [
-            "engine:score",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
           "id": "stems",
-          "label": "HTDemucs",
-          "note": "Separates a song made here into vocals, drums, bass and other.",
+          "label": "Split songs into stems (HTDemucs)",
+          "note": "Separates songs made in Home into vocals, drums, bass and other. Recommended, about 0.3 GB.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -213,8 +194,8 @@
         },
         {
           "id": "stems-ft",
-          "label": "HTDemucs fine-tuned",
-          "note": "Separates songs into four finer stems.",
+          "label": "Finer stem splitter (HTDemucs fine-tuned)",
+          "note": "An optional four model package for finer stem separation.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -233,8 +214,8 @@
         },
         {
           "id": "stems-6s",
-          "label": "HTDemucs 6-stem",
-          "note": "Separates songs into six stems, including guitar and piano.",
+          "label": "Six-part stem splitter (guitar and piano)",
+          "note": "An optional model that separates guitar and piano too.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -253,8 +234,8 @@
         },
         {
           "id": "align",
-          "label": "MMS aligner",
-          "note": "Finds when each word of a song's lyrics is sung.",
+          "label": "Time song lyrics (MMS aligner)",
+          "note": "Finds when each word of a song's lyrics is sung, for the lyrics display. Optional, about 1.3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -273,8 +254,8 @@
         },
         {
           "id": "voice-convert",
-          "label": "SoulX-Singer",
-          "note": "Changes the singer in a vocal toward a reference voice.",
+          "label": "Change the singing voice (SoulX-Singer)",
+          "note": "Converts a vocal toward a reference voice. Optional, about 3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -295,10 +276,10 @@
         },
         {
           "id": "recorded-speech",
-          "label": "Fish Audio Drama 3",
-          "note": "Makes a finished speech recording with optional voice references and dialogue.",
+          "label": "Recorded speech (Fish Audio Drama 3)",
+          "note": "Makes a finished voice recording from typed words, including dialogue. Optional, about 24 GB; needs a 64 GB or larger computer.",
           "kind": "model",
-          "need": "recommended",
+          "need": "optional",
           "selectable": true,
           "download_bytes": 23781114058,
           "installed_bytes": 23781114058,
@@ -310,36 +291,6 @@
             "engine:recorded-speech",
             "engine:python"
           ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "ffmpeg",
-          "label": "FFmpeg",
-          "note": "Cuts, mixes and changes sound and video.",
-          "kind": "model",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 32902204,
-          "installed_bytes": 114388848,
-          "peak_temp_bytes": 32902204,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "shazam-signature",
-          "label": "Shazam signature",
-          "note": "Makes a small signature from a few seconds of music so Home can name the song.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 1700000,
-          "installed_bytes": 1700000,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [],
           "installed": false,
           "basis": "pins"
         },
@@ -404,21 +355,6 @@
           "basis": "measured"
         },
         {
-          "id": "engine:score",
-          "label": "Score engine tools",
-          "note": "What turning audio into notes runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 180000000,
-          "installed_bytes": 350000000,
-          "peak_temp_bytes": 180000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
           "id": "engine:stems",
           "label": "Stem splitting tools",
           "note": "What separating song stems runs on.",
@@ -480,25 +416,25 @@
         }
       ],
       "default": {
-        "download_bytes": 35670410279,
-        "installed_bytes": 38596744502,
-        "peak_temp_bytes": 4654804746,
-        "needed_bytes": 43251549248,
-        "required_free_bytes": 50970898149
+        "download_bytes": 10057333178,
+        "installed_bytes": 12102180757,
+        "peak_temp_bytes": 2921902542,
+        "needed_bytes": 15024083299,
+        "required_free_bytes": 17444519451
       },
       "minimum": {
-        "download_bytes": 8495179560,
-        "installed_bytes": 10090944090,
-        "peak_temp_bytes": 1867250663,
-        "needed_bytes": 11958194753,
-        "required_free_bytes": 13976383571
+        "download_bytes": 8462277356,
+        "installed_bytes": 9976555242,
+        "peak_temp_bytes": 1834348459,
+        "needed_bytes": 11810903701,
+        "required_free_bytes": 13806214750
       },
       "everything": {
-        "download_bytes": 45260216138,
-        "installed_bytes": 50421679705,
-        "peak_temp_bytes": 9284804746,
-        "needed_bytes": 59706484451,
-        "required_free_bytes": 69790820392
+        "download_bytes": 44946553095,
+        "installed_bytes": 49856530018,
+        "peak_temp_bytes": 9071902542,
+        "needed_bytes": 58928432560,
+        "required_free_bytes": 68899738564
       },
       "measured_on": "2026-10-17",
       "default_selected": [
@@ -509,8 +445,6 @@
         "voice",
         "image-tools",
         "stems",
-        "recorded-speech",
-        "ffmpeg",
         "search"
       ]
     },
@@ -537,8 +471,8 @@
         },
         {
           "id": "chat",
-          "label": "Chat AI (Muse Glimmer 30B Q4_K_M)",
-          "note": "The AI you talk to. A small starter chat AI comes first so you can talk while the big one downloads.",
+          "label": "Chat AI (Muse Glimmer 30B)",
+          "note": "The AI you talk to. A small starter chat AI (Qwen3 1.7B) comes first so you can talk while the big one downloads.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -555,7 +489,7 @@
         },
         {
           "id": "reads-pictures",
-          "label": "Qwen3-VL 8B",
+          "label": "Reads pictures (projector)",
           "note": "Lets the chat AI look at a picture you send it.",
           "kind": "model",
           "need": "recommended",
@@ -572,7 +506,7 @@
         },
         {
           "id": "judge",
-          "label": "Qwen3 4B",
+          "label": "Quick helper AI",
           "note": "A second, smaller AI that double-checks answers.",
           "kind": "model",
           "need": "required",
@@ -589,8 +523,8 @@
         },
         {
           "id": "embed",
-          "label": "Memory and search model",
-          "note": "Lets Home find the right memory or page by meaning.",
+          "label": "Memory search model",
+          "note": "Finds what Home remembers when you ask.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -606,8 +540,8 @@
         },
         {
           "id": "stt",
-          "label": "Moonshine Tiny English",
-          "note": "Turns what you say into text.",
+          "label": "Speech to text",
+          "note": "Turns what you say into words, on this computer.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -627,8 +561,8 @@
         },
         {
           "id": "voice",
-          "label": "Pocket TTS",
-          "note": "The standard speaking voice.",
+          "label": "Voice (Pocket TTS)",
+          "note": "Home's spoken voice.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -649,19 +583,18 @@
         },
         {
           "id": "image-tools",
-          "label": "Image editor",
-          "note": "Remove a background, erase an object, upscale, resize or make a depth map for a picture.",
+          "label": "Edit pictures tools",
+          "note": "Remove a background, erase something, make a picture bigger.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
-          "download_bytes": 488126642,
-          "installed_bytes": 488126642,
+          "download_bytes": 389065803,
+          "installed_bytes": 389065803,
           "peak_temp_bytes": 0,
           "model_ids": [
             "image-tool-isnet-general",
             "image-tool-lama-big",
-            "image-tool-realesrgan-general-x4v3",
-            "image-tool-depth-anything-v2-small"
+            "image-tool-realesrgan-general-x4v3"
           ],
           "engines": [
             "engine:image-tools",
@@ -672,8 +605,8 @@
         },
         {
           "id": "tool-look",
-          "label": "Look",
-          "note": "Names household objects, wall colour and light in a picture.",
+          "label": "Look at pictures",
+          "note": "Name household objects, wall colour and light. Runs only when Home sends a picture.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -692,47 +625,9 @@
           "basis": "pins"
         },
         {
-          "id": "sound-effects",
-          "label": "Stable Audio 3 Small-SFX",
-          "note": "Makes short sound effects and ambience from a sentence, up to 47 seconds.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 3492094340,
-          "installed_bytes": 3492094340,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "stable-audio-3-small-sfx"
-          ],
-          "engines": [
-            "engine:sound-effects",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "score-transcription",
-          "label": "Spotify Basic Pitch",
-          "note": "Turns audio into MIDI and a note list using the bundled model.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 0,
-          "installed_bytes": 0,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [
-            "engine:score",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
           "id": "stems",
-          "label": "HTDemucs",
-          "note": "Separates a song made here into vocals, drums, bass and other.",
+          "label": "Split songs into stems (HTDemucs)",
+          "note": "Separates songs made in Home into vocals, drums, bass and other. Recommended, about 0.3 GB.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -751,8 +646,8 @@
         },
         {
           "id": "stems-ft",
-          "label": "HTDemucs fine-tuned",
-          "note": "Separates songs into four finer stems.",
+          "label": "Finer stem splitter (HTDemucs fine-tuned)",
+          "note": "An optional four model package for finer stem separation.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -771,8 +666,8 @@
         },
         {
           "id": "stems-6s",
-          "label": "HTDemucs 6-stem",
-          "note": "Separates songs into six stems, including guitar and piano.",
+          "label": "Six-part stem splitter (guitar and piano)",
+          "note": "An optional model that separates guitar and piano too.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -791,8 +686,8 @@
         },
         {
           "id": "align",
-          "label": "MMS aligner",
-          "note": "Finds when each word of a song's lyrics is sung.",
+          "label": "Time song lyrics (MMS aligner)",
+          "note": "Finds when each word of a song's lyrics is sung, for the lyrics display. Optional, about 1.3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -811,8 +706,8 @@
         },
         {
           "id": "voice-convert",
-          "label": "SoulX-Singer",
-          "note": "Changes the singer in a vocal toward a reference voice.",
+          "label": "Change the singing voice (SoulX-Singer)",
+          "note": "Converts a vocal toward a reference voice. Optional, about 3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -833,10 +728,10 @@
         },
         {
           "id": "recorded-speech",
-          "label": "Fish Audio Drama 3",
-          "note": "Makes a finished speech recording with optional voice references and dialogue.",
+          "label": "Recorded speech (Fish Audio Drama 3)",
+          "note": "Makes a finished voice recording from typed words, including dialogue. Optional, about 24 GB; needs a 64 GB or larger computer.",
           "kind": "model",
-          "need": "recommended",
+          "need": "optional",
           "selectable": true,
           "download_bytes": 23781114058,
           "installed_bytes": 23781114058,
@@ -848,36 +743,6 @@
             "engine:recorded-speech",
             "engine:python"
           ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "ffmpeg",
-          "label": "FFmpeg",
-          "note": "Cuts, mixes and changes sound and video.",
-          "kind": "model",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 32902204,
-          "installed_bytes": 114388848,
-          "peak_temp_bytes": 32902204,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "shazam-signature",
-          "label": "Shazam signature",
-          "note": "Makes a small signature from a few seconds of music so Home can name the song.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 1700000,
-          "installed_bytes": 1700000,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [],
           "installed": false,
           "basis": "pins"
         },
@@ -942,36 +807,6 @@
           "basis": "measured"
         },
         {
-          "id": "engine:sound-effects",
-          "label": "Sound effects engine tools",
-          "note": "What making sound effects runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 165804267,
-          "installed_bytes": 606547968,
-          "peak_temp_bytes": 165804267,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "engine:score",
-          "label": "Score engine tools",
-          "note": "What turning audio into notes runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 180000000,
-          "installed_bytes": 350000000,
-          "peak_temp_bytes": 180000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
           "id": "engine:stems",
           "label": "Stem splitting tools",
           "note": "What separating song stems runs on.",
@@ -1033,25 +868,25 @@
         }
       ],
       "default": {
-        "download_bytes": 51296919879,
-        "installed_bytes": 54223254102,
-        "peak_temp_bytes": 4654804746,
-        "needed_bytes": 58878058848,
-        "required_free_bytes": 69722709669
+        "download_bytes": 25683842778,
+        "installed_bytes": 27728690357,
+        "peak_temp_bytes": 2921902542,
+        "needed_bytes": 30650592899,
+        "required_free_bytes": 36196330971
       },
       "minimum": {
-        "download_bytes": 22721360232,
-        "installed_bytes": 24317124762,
-        "peak_temp_bytes": 1867250663,
-        "needed_bytes": 26184375425,
-        "required_free_bytes": 31047800378
+        "download_bytes": 22688458028,
+        "installed_bytes": 24202735914,
+        "peak_temp_bytes": 1834348459,
+        "needed_bytes": 26037084373,
+        "required_free_bytes": 30877631556
       },
       "everything": {
-        "download_bytes": 64544624345,
-        "installed_bytes": 70146831613,
-        "peak_temp_bytes": 9450609013,
-        "needed_bytes": 79597440626,
-        "required_free_bytes": 93626806949
+        "download_bytes": 60573062695,
+        "installed_bytes": 65483039618,
+        "peak_temp_bytes": 9071902542,
+        "needed_bytes": 74554942160,
+        "required_free_bytes": 87651550084
       },
       "measured_on": "2026-10-17",
       "default_selected": [
@@ -1064,8 +899,6 @@
         "voice",
         "image-tools",
         "stems",
-        "recorded-speech",
-        "ffmpeg",
         "search"
       ]
     },
@@ -1092,8 +925,8 @@
         },
         {
           "id": "chat",
-          "label": "Chat AI (Muse Glimmer 30B Q4_K_XL)",
-          "note": "The AI you talk to. A small starter chat AI comes first so you can talk while the big one downloads.",
+          "label": "Chat AI (Muse Glimmer 30B)",
+          "note": "The AI you talk to. A small starter chat AI (Qwen3 1.7B) comes first so you can talk while the big one downloads.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -1110,8 +943,8 @@
         },
         {
           "id": "chat-mlx",
-          "label": "Muse Glimmer 30B MLX 4-bit",
-          "note": "Runs the chat model with the MLX engine on Apple silicon.",
+          "label": "Chat AI, Apple-chip build (Muse Glimmer 30B)",
+          "note": "The chat AI as an MLX build, about 20 percent faster to answer but less reliable with tools in our tests. Optional; llama.cpp stays the default.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1130,7 +963,7 @@
         },
         {
           "id": "reads-pictures",
-          "label": "Qwen3-VL 8B",
+          "label": "Reads pictures (projector)",
           "note": "Lets the chat AI look at a picture you send it.",
           "kind": "model",
           "need": "recommended",
@@ -1147,7 +980,7 @@
         },
         {
           "id": "judge",
-          "label": "Qwen3 4B",
+          "label": "Quick helper AI",
           "note": "A second, smaller AI that double-checks answers.",
           "kind": "model",
           "need": "required",
@@ -1164,8 +997,8 @@
         },
         {
           "id": "coding",
-          "label": "Qwen3.8 27B",
-          "note": "The model that writes code for the coding tools you connect.",
+          "label": "Coding AI (Qwen3.8 27B)",
+          "note": "Writes code for the coding tools you connect. It loads only while someone is coding. On a Mac with an M3 chip or newer it includes a 3.8 GB helper that makes it about four times faster. Skip it if your household does not want coding.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -1182,8 +1015,8 @@
         },
         {
           "id": "embed",
-          "label": "Memory and search model",
-          "note": "Lets Home find the right memory or page by meaning.",
+          "label": "Memory search model",
+          "note": "Finds what Home remembers when you ask.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -1199,8 +1032,8 @@
         },
         {
           "id": "stt",
-          "label": "Moonshine Tiny English",
-          "note": "Turns what you say into text.",
+          "label": "Speech to text",
+          "note": "Turns what you say into words, on this computer.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -1220,19 +1053,18 @@
         },
         {
           "id": "voice",
-          "label": "Pocket TTS",
-          "note": "The standard speaking voice.",
+          "label": "Voice (Pocket TTS)",
+          "note": "Home's spoken voice.",
           "kind": "model",
           "need": "required",
           "selectable": false,
-          "download_bytes": 335935587,
-          "installed_bytes": 335935587,
+          "download_bytes": 225282959,
+          "installed_bytes": 225282959,
           "peak_temp_bytes": 0,
           "model_ids": [
             "pocket-tts-english",
             "pocket-tts-english-tokenizer",
-            "pocket-tts-voice-alba",
-            "mossformer2-se-48k"
+            "pocket-tts-voice-alba"
           ],
           "engines": [
             "engine:voice",
@@ -1243,8 +1075,8 @@
         },
         {
           "id": "voice-better",
-          "label": "Chatterbox Turbo",
-          "note": "A more expressive speaking voice for larger computers.",
+          "label": "Voice (Chatterbox)",
+          "note": "A more expressive spoken voice. Pocket TTS stays as the fallback.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -1270,19 +1102,18 @@
         },
         {
           "id": "image-tools",
-          "label": "Image editor",
-          "note": "Remove a background, erase an object, upscale, resize or make a depth map for a picture.",
+          "label": "Edit pictures tools",
+          "note": "Remove a background, erase something, make a picture bigger.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
-          "download_bytes": 488126642,
-          "installed_bytes": 488126642,
+          "download_bytes": 389065803,
+          "installed_bytes": 389065803,
           "peak_temp_bytes": 0,
           "model_ids": [
             "image-tool-isnet-general",
             "image-tool-lama-big",
-            "image-tool-realesrgan-general-x4v3",
-            "image-tool-depth-anything-v2-small"
+            "image-tool-realesrgan-general-x4v3"
           ],
           "engines": [
             "engine:image-tools",
@@ -1293,8 +1124,8 @@
         },
         {
           "id": "tool-look",
-          "label": "Look",
-          "note": "Names household objects, wall colour and light in a picture.",
+          "label": "Look at pictures",
+          "note": "Name household objects, wall colour and light. Runs only when Home sends a picture.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1314,8 +1145,8 @@
         },
         {
           "id": "talking-pictures",
-          "label": "LivePortrait",
-          "note": "Makes the mouth and blink pictures a talking companion plays back while it speaks. MIT licence; about 0.6 GB of model files plus a 1.5 GB engine, built on this computer. Mac with Apple silicon only.",
+          "label": "Talking pictures (LivePortrait)",
+          "note": "Makes the mouth and blink pictures a talking companion plays while it speaks, and what Make needs to build a companion. MIT licence; about 0.6 GB of model files plus a 1.5 GB engine, built on this computer. Mac with Apple silicon only.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -1339,8 +1170,8 @@
         },
         {
           "id": "pictures",
-          "label": "FLUX.2 Klein 4B",
-          "note": "The everyday picture model.",
+          "label": "Change pictures (FLUX.2 Klein)",
+          "note": "Needed. Edits the pictures you already have, and makes new ones when ERNIE is not installed.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -1374,8 +1205,8 @@
         },
         {
           "id": "pictures-ernie",
-          "label": "ERNIE-Image-Turbo",
-          "note": "Draws words inside pictures correctly.",
+          "label": "Make pictures (ERNIE)",
+          "note": "Recommended. Draws words in pictures correctly. Makes new pictures from a sentence.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -1404,89 +1235,9 @@
           "basis": "pins"
         },
         {
-          "id": "pictures-h3",
-          "label": "MiniMax H3-Image",
-          "note": "Makes pictures and changes them, keeps words spelled right, and takes up to sixteen reference pictures.",
-          "kind": "model",
-          "need": "recommended",
-          "selectable": true,
-          "download_bytes": 49296196495,
-          "installed_bytes": 49296196495,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "minimax-h3-image",
-            "minimax-h3-image-text-encoder",
-            "minimax-h3-image-vae",
-            "minimax-h3-image-tokenizer",
-            "minimax-h3-image-vae-config"
-          ],
-          "engines": [
-            "engine:pictures-h3",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "pictures-klein3",
-          "label": "FLUX 3 Image Klein",
-          "note": "Makes and edits pictures from words, including legible lettering, with up to nine reference pictures.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 20320943472,
-          "installed_bytes": 20320943472,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "flux3-image-klein",
-            "flux3-image-klein-transformer-config",
-            "flux3-image-klein-transformer-diffusion-pytorch-model-00002-of-00002",
-            "flux3-image-klein-transformer-diffusion-pytorch-model-safetensors-index",
-            "flux3-image-klein-text-encoder-config",
-            "flux3-image-klein-text-encoder-generation-config",
-            "flux3-image-klein-text-encoder-model-00001-of-00002",
-            "flux3-image-klein-text-encoder-model-00002-of-00002",
-            "flux3-image-klein-text-encoder-model-safetensors-index",
-            "flux3-image-klein-text-encoder-tokenizer",
-            "flux3-image-klein-text-encoder-tokenizer-config",
-            "flux3-image-klein-text-encoder-chat-template",
-            "flux3-image-klein-text-encoder-merges",
-            "flux3-image-klein-text-encoder-vocab",
-            "flux3-image-klein-vae-config",
-            "flux3-image-klein-vae-diffusion-pytorch-model"
-          ],
-          "engines": [
-            "engine:pictures",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "pictures-clearer",
-          "label": "SeedVR2 3B",
-          "note": "The most careful repair for old, soft or damaged pictures, used by the Best level of Make clearer.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 7284343622,
-          "installed_bytes": 7284343622,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "seedvr2-3b",
-            "seedvr2-3b-ema-vae-fp16"
-          ],
-          "engines": [
-            "engine:pictures",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
           "id": "music",
-          "label": "ACE-Step 1.5",
-          "note": "Makes and changes songs in chat.",
+          "label": "Make music (ACE-Step 1.5)",
+          "note": "Makes and changes songs in chat. Optional.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1506,8 +1257,8 @@
         },
         {
           "id": "music-transcribe",
-          "label": "Whisper Large v3 Turbo",
-          "note": "Transcribes finished songs so Home can check the words.",
+          "label": "Check sung words (Whisper)",
+          "note": "Transcribes finished songs for Home to check. Optional, about 1.6 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1525,47 +1276,9 @@
           "basis": "pins"
         },
         {
-          "id": "sound-effects",
-          "label": "Stable Audio 3 Small-SFX",
-          "note": "Makes short sound effects and ambience from a sentence, up to 47 seconds.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 3492094340,
-          "installed_bytes": 3492094340,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "stable-audio-3-small-sfx"
-          ],
-          "engines": [
-            "engine:sound-effects",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "score-transcription",
-          "label": "Spotify Basic Pitch",
-          "note": "Turns audio into MIDI and a note list using the bundled model.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 0,
-          "installed_bytes": 0,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [
-            "engine:score",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
           "id": "stems",
-          "label": "HTDemucs",
-          "note": "Separates a song made here into vocals, drums, bass and other.",
+          "label": "Split songs into stems (HTDemucs)",
+          "note": "Separates songs made in Home into vocals, drums, bass and other. Recommended, about 0.3 GB.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -1584,8 +1297,8 @@
         },
         {
           "id": "stems-ft",
-          "label": "HTDemucs fine-tuned",
-          "note": "Separates songs into four finer stems.",
+          "label": "Finer stem splitter (HTDemucs fine-tuned)",
+          "note": "An optional four model package for finer stem separation.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1604,8 +1317,8 @@
         },
         {
           "id": "stems-6s",
-          "label": "HTDemucs 6-stem",
-          "note": "Separates songs into six stems, including guitar and piano.",
+          "label": "Six-part stem splitter (guitar and piano)",
+          "note": "An optional model that separates guitar and piano too.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1624,8 +1337,8 @@
         },
         {
           "id": "align",
-          "label": "MMS aligner",
-          "note": "Finds when each word of a song's lyrics is sung.",
+          "label": "Time song lyrics (MMS aligner)",
+          "note": "Finds when each word of a song's lyrics is sung, for the lyrics display. Optional, about 1.3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1644,8 +1357,8 @@
         },
         {
           "id": "voice-convert",
-          "label": "SoulX-Singer",
-          "note": "Changes the singer in a vocal toward a reference voice.",
+          "label": "Change the singing voice (SoulX-Singer)",
+          "note": "Converts a vocal toward a reference voice. Optional, about 3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -1666,10 +1379,10 @@
         },
         {
           "id": "recorded-speech",
-          "label": "Fish Audio Drama 3",
-          "note": "Makes a finished speech recording with optional voice references and dialogue.",
+          "label": "Recorded speech (Fish Audio Drama 3)",
+          "note": "Makes a finished voice recording from typed words, including dialogue. Optional, about 24 GB; needs a 64 GB or larger computer.",
           "kind": "model",
-          "need": "recommended",
+          "need": "optional",
           "selectable": true,
           "download_bytes": 23781114058,
           "installed_bytes": 23781114058,
@@ -1681,36 +1394,6 @@
             "engine:recorded-speech",
             "engine:python"
           ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "ffmpeg",
-          "label": "FFmpeg",
-          "note": "Cuts, mixes and changes sound and video.",
-          "kind": "model",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 32902204,
-          "installed_bytes": 114388848,
-          "peak_temp_bytes": 32902204,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "shazam-signature",
-          "label": "Shazam signature",
-          "note": "Makes a small signature from a few seconds of music so Home can name the song.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 1700000,
-          "installed_bytes": 1700000,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [],
           "installed": false,
           "basis": "pins"
         },
@@ -1805,21 +1488,6 @@
           "basis": "measured"
         },
         {
-          "id": "engine:pictures-h3",
-          "label": "Picture model engine tools",
-          "note": "What the picture model runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 80000000,
-          "installed_bytes": 250000000,
-          "peak_temp_bytes": 80000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
           "id": "engine:image-tools",
           "label": "Picture editing engine tools",
           "note": "What removing a background, erasing and enlarging run on.",
@@ -1836,7 +1504,7 @@
         },
         {
           "id": "engine:liveportrait",
-          "label": "Companion animation engine tools",
+          "label": "Talking pictures engine tools",
           "note": "What making a companion's mouth and blink pictures runs on (about 1.5 GB, built on first use from pinned sources).",
           "kind": "engine",
           "need": "required",
@@ -1859,36 +1527,6 @@
           "download_bytes": 800000000,
           "installed_bytes": 1200000000,
           "peak_temp_bytes": 800000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
-          "id": "engine:sound-effects",
-          "label": "Sound effects engine tools",
-          "note": "What making sound effects runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 165804267,
-          "installed_bytes": 606547968,
-          "peak_temp_bytes": 165804267,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "engine:score",
-          "label": "Score engine tools",
-          "note": "What turning audio into notes runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 180000000,
-          "installed_bytes": 350000000,
-          "peak_temp_bytes": 180000000,
           "model_ids": [],
           "engines": [],
           "installed": false,
@@ -1956,25 +1594,25 @@
         }
       ],
       "default": {
-        "download_bytes": 170569071854,
-        "installed_bytes": 174239088629,
-        "peak_temp_bytes": 6754328323,
-        "needed_bytes": 180993416952,
-        "required_free_bytes": 215841234678
+        "download_bytes": 95469145630,
+        "installed_bytes": 98087675761,
+        "peak_temp_bytes": 4941426119,
+        "needed_bytes": 103029101880,
+        "required_free_bytes": 122646637033
       },
       "minimum": {
-        "download_bytes": 42891978489,
-        "installed_bytes": 44908419548,
-        "peak_temp_bytes": 3049808551,
-        "needed_bytes": 47958228099,
-        "required_free_bytes": 56939912009
+        "download_bytes": 42748423657,
+        "installed_bytes": 44683378072,
+        "peak_temp_bytes": 3016906347,
+        "needed_bytes": 47700284419,
+        "required_free_bytes": 56636960034
       },
       "everything": {
-        "download_bytes": 245617830928,
-        "installed_bytes": 252759956155,
-        "peak_temp_bytes": 13223882463,
-        "needed_bytes": 265983838618,
-        "required_free_bytes": 316535829849
+        "download_bytes": 164554133061,
+        "installed_bytes": 170834027943,
+        "peak_temp_bytes": 12765175992,
+        "needed_bytes": 183599203935,
+        "required_free_bytes": 217766009524
       },
       "measured_on": "2026-10-17",
       "default_selected": [
@@ -1991,10 +1629,7 @@
         "talking-pictures",
         "pictures",
         "pictures-ernie",
-        "pictures-h3",
         "stems",
-        "recorded-speech",
-        "ffmpeg",
         "search"
       ]
     },
@@ -2021,8 +1656,8 @@
         },
         {
           "id": "chat",
-          "label": "Chat AI (Muse Glimmer 30B Q4_K_XL)",
-          "note": "The AI you talk to. A small starter chat AI comes first so you can talk while the big one downloads.",
+          "label": "Chat AI (Muse Glimmer 30B)",
+          "note": "The AI you talk to. A small starter chat AI (Qwen3 1.7B) comes first so you can talk while the big one downloads.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -2039,8 +1674,8 @@
         },
         {
           "id": "chat-mlx",
-          "label": "Muse Glimmer 30B MLX 4-bit",
-          "note": "Runs the chat model with the MLX engine on Apple silicon.",
+          "label": "Chat AI, Apple-chip build (Muse Glimmer 30B)",
+          "note": "The chat AI as an MLX build, about 20 percent faster to answer but less reliable with tools in our tests. Optional; llama.cpp stays the default.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2059,7 +1694,7 @@
         },
         {
           "id": "reads-pictures",
-          "label": "Qwen3-VL 8B",
+          "label": "Reads pictures (projector)",
           "note": "Lets the chat AI look at a picture you send it.",
           "kind": "model",
           "need": "recommended",
@@ -2076,8 +1711,8 @@
         },
         {
           "id": "vision",
-          "label": "Qwen3-VL 4B",
-          "note": "Describes pictures for the parts of Home that need to look at one.",
+          "label": "Picture reader (Qwen3-VL 4B)",
+          "note": "A small AI that describes what is in a picture. Home uses it to check finished clips and pictures for safety when the chat AI cannot read pictures.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2094,7 +1729,7 @@
         },
         {
           "id": "judge",
-          "label": "Qwen3 4B",
+          "label": "Quick helper AI",
           "note": "A second, smaller AI that double-checks answers.",
           "kind": "model",
           "need": "required",
@@ -2111,8 +1746,8 @@
         },
         {
           "id": "coding",
-          "label": "Qwen3.8 27B",
-          "note": "The model that writes code for the coding tools you connect.",
+          "label": "Coding AI (Qwen3.8 27B)",
+          "note": "Writes code for the coding tools you connect. It loads only while someone is coding. On a Mac with an M3 chip or newer it includes a 3.8 GB helper that makes it about four times faster. Skip it if your household does not want coding.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2129,8 +1764,8 @@
         },
         {
           "id": "embed",
-          "label": "Memory and search model",
-          "note": "Lets Home find the right memory or page by meaning.",
+          "label": "Memory search model",
+          "note": "Finds what Home remembers when you ask.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -2146,8 +1781,8 @@
         },
         {
           "id": "stt",
-          "label": "Moonshine Tiny English",
-          "note": "Turns what you say into text.",
+          "label": "Speech to text",
+          "note": "Turns what you say into words, on this computer.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -2167,19 +1802,18 @@
         },
         {
           "id": "voice",
-          "label": "Pocket TTS",
-          "note": "The standard speaking voice.",
+          "label": "Voice (Pocket TTS)",
+          "note": "Home's spoken voice.",
           "kind": "model",
           "need": "required",
           "selectable": false,
-          "download_bytes": 335935587,
-          "installed_bytes": 335935587,
+          "download_bytes": 225282959,
+          "installed_bytes": 225282959,
           "peak_temp_bytes": 0,
           "model_ids": [
             "pocket-tts-english",
             "pocket-tts-english-tokenizer",
-            "pocket-tts-voice-alba",
-            "mossformer2-se-48k"
+            "pocket-tts-voice-alba"
           ],
           "engines": [
             "engine:voice",
@@ -2190,8 +1824,8 @@
         },
         {
           "id": "voice-better",
-          "label": "Chatterbox Turbo",
-          "note": "A more expressive speaking voice for larger computers.",
+          "label": "Voice (Chatterbox)",
+          "note": "A more expressive spoken voice. Pocket TTS stays as the fallback.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2217,19 +1851,18 @@
         },
         {
           "id": "image-tools",
-          "label": "Image editor",
-          "note": "Remove a background, erase an object, upscale, resize or make a depth map for a picture.",
+          "label": "Edit pictures tools",
+          "note": "Remove a background, erase something, make a picture bigger.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
-          "download_bytes": 488126642,
-          "installed_bytes": 488126642,
+          "download_bytes": 389065803,
+          "installed_bytes": 389065803,
           "peak_temp_bytes": 0,
           "model_ids": [
             "image-tool-isnet-general",
             "image-tool-lama-big",
-            "image-tool-realesrgan-general-x4v3",
-            "image-tool-depth-anything-v2-small"
+            "image-tool-realesrgan-general-x4v3"
           ],
           "engines": [
             "engine:image-tools",
@@ -2240,8 +1873,8 @@
         },
         {
           "id": "tool-look",
-          "label": "Look",
-          "note": "Names household objects, wall colour and light in a picture.",
+          "label": "Look at pictures",
+          "note": "Name household objects, wall colour and light. Runs only when Home sends a picture.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2261,8 +1894,8 @@
         },
         {
           "id": "talking-pictures",
-          "label": "LivePortrait",
-          "note": "Makes the mouth and blink pictures a talking companion plays back while it speaks. MIT licence; about 0.6 GB of model files plus a 1.5 GB engine, built on this computer. Mac with Apple silicon only.",
+          "label": "Talking pictures (LivePortrait)",
+          "note": "Makes the mouth and blink pictures a talking companion plays while it speaks, and what Make needs to build a companion. MIT licence; about 0.6 GB of model files plus a 1.5 GB engine, built on this computer. Mac with Apple silicon only.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2286,8 +1919,8 @@
         },
         {
           "id": "pictures",
-          "label": "FLUX.2 Klein 4B",
-          "note": "The everyday picture model.",
+          "label": "Change pictures (FLUX.2 Klein)",
+          "note": "Needed. Edits the pictures you already have, and makes new ones when ERNIE is not installed.",
           "kind": "model",
           "need": "required",
           "selectable": false,
@@ -2321,8 +1954,8 @@
         },
         {
           "id": "pictures-ernie",
-          "label": "ERNIE-Image-Turbo",
-          "note": "Draws words inside pictures correctly.",
+          "label": "Make pictures (ERNIE)",
+          "note": "Recommended. Draws words in pictures correctly. Makes new pictures from a sentence.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2351,68 +1984,9 @@
           "basis": "pins"
         },
         {
-          "id": "pictures-h3",
-          "label": "MiniMax H3-Image",
-          "note": "Makes pictures and changes them, keeps words spelled right, and takes up to sixteen reference pictures.",
-          "kind": "model",
-          "need": "recommended",
-          "selectable": true,
-          "download_bytes": 49296196495,
-          "installed_bytes": 49296196495,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "minimax-h3-image",
-            "minimax-h3-image-text-encoder",
-            "minimax-h3-image-vae",
-            "minimax-h3-image-tokenizer",
-            "minimax-h3-image-vae-config"
-          ],
-          "engines": [
-            "engine:pictures-h3",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "pictures-klein3",
-          "label": "FLUX 3 Image Klein",
-          "note": "Makes and edits pictures from words, including legible lettering, with up to nine reference pictures.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 20320943472,
-          "installed_bytes": 20320943472,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "flux3-image-klein",
-            "flux3-image-klein-transformer-config",
-            "flux3-image-klein-transformer-diffusion-pytorch-model-00002-of-00002",
-            "flux3-image-klein-transformer-diffusion-pytorch-model-safetensors-index",
-            "flux3-image-klein-text-encoder-config",
-            "flux3-image-klein-text-encoder-generation-config",
-            "flux3-image-klein-text-encoder-model-00001-of-00002",
-            "flux3-image-klein-text-encoder-model-00002-of-00002",
-            "flux3-image-klein-text-encoder-model-safetensors-index",
-            "flux3-image-klein-text-encoder-tokenizer",
-            "flux3-image-klein-text-encoder-tokenizer-config",
-            "flux3-image-klein-text-encoder-chat-template",
-            "flux3-image-klein-text-encoder-merges",
-            "flux3-image-klein-text-encoder-vocab",
-            "flux3-image-klein-vae-config",
-            "flux3-image-klein-vae-diffusion-pytorch-model"
-          ],
-          "engines": [
-            "engine:pictures",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
           "id": "pictures-zimage",
-          "label": "Z-Image-Turbo",
-          "note": "A higher-detail picture model for the largest computers.",
+          "label": "More picture styles (Z-Image Turbo)",
+          "note": "A second picture maker with a different look. Optional.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2447,8 +2021,8 @@
         },
         {
           "id": "pictures-qwen",
-          "label": "Qwen-Image 20B",
-          "note": "The best picture model, used for Max pictures.",
+          "label": "Best pictures (Qwen-Image)",
+          "note": "The best picture maker, used for Max pictures. Clear words and fine detail. A large download. Optional.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2490,30 +2064,9 @@
           "basis": "pins"
         },
         {
-          "id": "pictures-clearer",
-          "label": "SeedVR2 3B",
-          "note": "The most careful repair for old, soft or damaged pictures, used by the Best level of Make clearer.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 7284343622,
-          "installed_bytes": 7284343622,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "seedvr2-3b",
-            "seedvr2-3b-ema-vae-fp16"
-          ],
-          "engines": [
-            "engine:pictures",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
           "id": "video",
-          "label": "Silent video",
-          "note": "Makes short silent clips.",
+          "label": "Make videos (Wan2.2)",
+          "note": "Recommended. Makes a short clip from a sentence or a picture.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2533,8 +2086,8 @@
         },
         {
           "id": "music",
-          "label": "ACE-Step 1.5",
-          "note": "Makes and changes songs in chat.",
+          "label": "Make music (ACE-Step 1.5)",
+          "note": "Makes and changes songs in chat. Optional.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2554,8 +2107,8 @@
         },
         {
           "id": "music-transcribe",
-          "label": "Whisper Large v3 Turbo",
-          "note": "Transcribes finished songs so Home can check the words.",
+          "label": "Check sung words (Whisper)",
+          "note": "Transcribes finished songs for Home to check. Optional, about 1.6 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2574,8 +2127,8 @@
         },
         {
           "id": "music-boost",
-          "label": "ACE-Step XL Turbo",
-          "note": "A larger song model with clearer voices, used for Boost songs.",
+          "label": "Clearer songs (ACE-Step XL Turbo)",
+          "note": "A larger song model for Boost quality, with clearer voices. Optional, about 10 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2595,8 +2148,8 @@
         },
         {
           "id": "music-max",
-          "label": "ACE-Step XL SFT",
-          "note": "The best song model, with its larger planning model, used for Max songs.",
+          "label": "Best songs (ACE-Step XL SFT)",
+          "note": "The best song model and its larger planning model, for Max quality. Optional, about 18 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2617,8 +2170,8 @@
         },
         {
           "id": "video-ltx25",
-          "label": "LTX-2.5 with sound",
-          "note": "Makes clips up to 10 seconds with a sound track and spoken words, from a sentence.",
+          "label": "Videos with sound (LTX-2.5)",
+          "note": "Clips with a sound track and spoken words, up to 10 seconds. Optional, about 38 GB; it needs the maker's licence accepted once during setup.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2637,8 +2190,8 @@
         },
         {
           "id": "video-ltx25-max",
-          "label": "LTX-2.5 Max with sound",
-          "note": "Makes 1024 by 576 clips up to 10 seconds with a sound track and spoken words, from a sentence.",
+          "label": "Best videos with sound (LTX-2.5 Max)",
+          "note": "Larger 1024 by 576 clips with a sound track and spoken words, up to 10 seconds. Optional, about 71 GB; it needs the maker's licence accepted once during setup.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2656,28 +2209,9 @@
           "basis": "pins"
         },
         {
-          "id": "video-minimax-h3",
-          "label": "MiniMax H3",
-          "note": "Makes five-second clips with stereo sound from a written description.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 0,
-          "installed_bytes": 0,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "minimax-h3"
-          ],
-          "engines": [
-            "engine:minimax-h3-video-gen"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
           "id": "video-mask",
-          "label": "SAM 2.1 subject masks",
-          "note": "Tracks a selected subject through a clip for cutouts and background removal, and makes still-picture masks.",
+          "label": "Subject masks on clips (SAM 2.1)",
+          "note": "Optional background removal and cutouts for clips. Apache-2.0; 4.9 GB measured running peak.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2695,47 +2229,9 @@
           "basis": "pins"
         },
         {
-          "id": "sound-effects",
-          "label": "Stable Audio 3 Small-SFX",
-          "note": "Makes short sound effects and ambience from a sentence, up to 47 seconds.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 3492094340,
-          "installed_bytes": 3492094340,
-          "peak_temp_bytes": 0,
-          "model_ids": [
-            "stable-audio-3-small-sfx"
-          ],
-          "engines": [
-            "engine:sound-effects",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "score-transcription",
-          "label": "Spotify Basic Pitch",
-          "note": "Turns audio into MIDI and a note list using the bundled model.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 0,
-          "installed_bytes": 0,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [
-            "engine:score",
-            "engine:python"
-          ],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
           "id": "stems",
-          "label": "HTDemucs",
-          "note": "Separates a song made here into vocals, drums, bass and other.",
+          "label": "Split songs into stems (HTDemucs)",
+          "note": "Separates songs made in Home into vocals, drums, bass and other. Recommended, about 0.3 GB.",
           "kind": "model",
           "need": "recommended",
           "selectable": true,
@@ -2754,8 +2250,8 @@
         },
         {
           "id": "stems-ft",
-          "label": "HTDemucs fine-tuned",
-          "note": "Separates songs into four finer stems.",
+          "label": "Finer stem splitter (HTDemucs fine-tuned)",
+          "note": "An optional four model package for finer stem separation.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2774,8 +2270,8 @@
         },
         {
           "id": "stems-6s",
-          "label": "HTDemucs 6-stem",
-          "note": "Separates songs into six stems, including guitar and piano.",
+          "label": "Six-part stem splitter (guitar and piano)",
+          "note": "An optional model that separates guitar and piano too.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2794,8 +2290,8 @@
         },
         {
           "id": "align",
-          "label": "MMS aligner",
-          "note": "Finds when each word of a song's lyrics is sung.",
+          "label": "Time song lyrics (MMS aligner)",
+          "note": "Finds when each word of a song's lyrics is sung, for the lyrics display. Optional, about 1.3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2814,8 +2310,8 @@
         },
         {
           "id": "voice-convert",
-          "label": "SoulX-Singer",
-          "note": "Changes the singer in a vocal toward a reference voice.",
+          "label": "Change the singing voice (SoulX-Singer)",
+          "note": "Converts a vocal toward a reference voice. Optional, about 3 GB.",
           "kind": "model",
           "need": "optional",
           "selectable": true,
@@ -2836,10 +2332,10 @@
         },
         {
           "id": "recorded-speech",
-          "label": "Fish Audio Drama 3",
-          "note": "Makes a finished speech recording with optional voice references and dialogue.",
+          "label": "Recorded speech (Fish Audio Drama 3)",
+          "note": "Makes a finished voice recording from typed words, including dialogue. Optional, about 24 GB; needs a 64 GB or larger computer.",
           "kind": "model",
-          "need": "recommended",
+          "need": "optional",
           "selectable": true,
           "download_bytes": 23781114058,
           "installed_bytes": 23781114058,
@@ -2851,36 +2347,6 @@
             "engine:recorded-speech",
             "engine:python"
           ],
-          "installed": false,
-          "basis": "pins"
-        },
-        {
-          "id": "ffmpeg",
-          "label": "FFmpeg",
-          "note": "Cuts, mixes and changes sound and video.",
-          "kind": "model",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 32902204,
-          "installed_bytes": 114388848,
-          "peak_temp_bytes": 32902204,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "shazam-signature",
-          "label": "Shazam signature",
-          "note": "Makes a small signature from a few seconds of music so Home can name the song.",
-          "kind": "model",
-          "need": "optional",
-          "selectable": true,
-          "download_bytes": 1700000,
-          "installed_bytes": 1700000,
-          "peak_temp_bytes": 0,
-          "model_ids": [],
-          "engines": [],
           "installed": false,
           "basis": "pins"
         },
@@ -2975,21 +2441,6 @@
           "basis": "measured"
         },
         {
-          "id": "engine:pictures-h3",
-          "label": "Picture model engine tools",
-          "note": "What the picture model runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 80000000,
-          "installed_bytes": 250000000,
-          "peak_temp_bytes": 80000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
           "id": "engine:image-tools",
           "label": "Picture editing engine tools",
           "note": "What removing a background, erasing and enlarging run on.",
@@ -3006,7 +2457,7 @@
         },
         {
           "id": "engine:liveportrait",
-          "label": "Companion animation engine tools",
+          "label": "Talking pictures engine tools",
           "note": "What making a companion's mouth and blink pictures runs on (about 1.5 GB, built on first use from pinned sources).",
           "kind": "engine",
           "need": "required",
@@ -3095,36 +2546,6 @@
           "basis": "estimate"
         },
         {
-          "id": "engine:sound-effects",
-          "label": "Sound effects engine tools",
-          "note": "What making sound effects runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 165804267,
-          "installed_bytes": 606547968,
-          "peak_temp_bytes": 165804267,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "measured"
-        },
-        {
-          "id": "engine:score",
-          "label": "Score engine tools",
-          "note": "What turning audio into notes runs on.",
-          "kind": "engine",
-          "need": "required",
-          "selectable": false,
-          "download_bytes": 180000000,
-          "installed_bytes": 350000000,
-          "peak_temp_bytes": 180000000,
-          "model_ids": [],
-          "engines": [],
-          "installed": false,
-          "basis": "estimate"
-        },
-        {
           "id": "engine:stems",
           "label": "Stem splitting tools",
           "note": "What separating song stems runs on.",
@@ -3186,25 +2607,25 @@
         }
       ],
       "default": {
-        "download_bytes": 198480811286,
-        "installed_bytes": 202495368534,
-        "peak_temp_bytes": 7513110986,
-        "needed_bytes": 210008479520,
-        "required_free_bytes": 250507553227
+        "download_bytes": 123380885062,
+        "installed_bytes": 126343955666,
+        "peak_temp_bytes": 5700208782,
+        "needed_bytes": 132044164448,
+        "required_free_bytes": 157312955582
       },
       "minimum": {
-        "download_bytes": 42891978489,
-        "installed_bytes": 44908419548,
-        "peak_temp_bytes": 3049808551,
-        "needed_bytes": 47958228099,
-        "required_free_bytes": 56939912009
+        "download_bytes": 42748423657,
+        "installed_bytes": 44683378072,
+        "peak_temp_bytes": 3016906347,
+        "needed_bytes": 47700284419,
+        "required_free_bytes": 56636960034
       },
       "everything": {
-        "download_bytes": 480547592255,
-        "installed_bytes": 489478612610,
-        "peak_temp_bytes": 14538310471,
-        "needed_bytes": 504016923081,
-        "required_free_bytes": 601912645603
+        "download_bytes": 399483894388,
+        "installed_bytes": 407552684398,
+        "peak_temp_bytes": 14079604000,
+        "needed_bytes": 421632288398,
+        "required_free_bytes": 503142825278
       },
       "measured_on": "2026-10-17",
       "default_selected": [
@@ -3222,11 +2643,8 @@
         "talking-pictures",
         "pictures",
         "pictures-ernie",
-        "pictures-h3",
         "video",
         "stems",
-        "recorded-speech",
-        "ffmpeg",
         "search"
       ]
     }
