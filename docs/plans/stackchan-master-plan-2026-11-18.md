@@ -1374,3 +1374,24 @@ The test is run on the virtual playground for steps 4 to 6 and by a real outside
 By the household test: recognition by name, several people, child and teen rules, live outside information, other rooms.
 
 Open for the owner: **a single adult's own memory** ("remember that I take my coffee black") is the benefit a solo user will miss most, and the household test as written keeps memory in Home. Recommendation: allow a small local memory package for one adult (explicit remember and forget, a plain file the owner can read and delete, no people, no recognition), with Home's memory taking over when paired. Queued as a decision.
+
+### 27.4 Local memory for several people, optional, from a free component (owner, 2026-11-18)
+
+Owner: "not just for one user, for multiple users. and ideally we use a free component to just handle this for us. but it's optional of course." This answers the open question in 27.3 and amends the household test:
+
+- **Household test, amended:** Home remains the only owner of household policy, child and teen rules, recognition by name across the household, outside services and other rooms. Personal memory for several adults may also run locally, without Home, as an optional package. When Home is paired, Home's memory is the one owner (test 4); the local store can be imported into Home or left untouched, never both active.
+
+Item M8, optional local memory package (M, host only):
+
+| Part | Design |
+|---|---|
+| Off by default | One switch on the local settings page; with it off nothing is stored |
+| The component | Use an existing free, self-hosted memory library instead of writing one. First candidate: **Mem0** (open source; keeps separate memories per user id; runs fully local with a local model, a local embedding model and an embedded vector store). Others to compare in a one-day spike: Letta (heavier, a whole agent server), Graphiti (needs a graph database), LangMem, Cognee, and the fallback of a plain SQLite file with a small vector extension. Licenses and local-only operation are to be verified in the spike before any is adopted [unverified] |
+| Selection test | Runs with no network; works with the owner's own model through the same OpenAI-compatible address; per-person separation; explicit remember and forget; a person can list, edit, export and delete their memories; small install; license compatible with AGPL-3.0; acceptable speed on a Raspberry Pi 5 |
+| Who is speaking | Without Home there is no recognition by name. Order of build: (1) the per-person profiles that already exist (name, eye color, caption size, wake phrase) gain "this is me" by voice ("it's Sam") or by a picker on the robot screen; (2) the per-person wake phrase, which is stored today but not matched; (3) optional voice matching with a free local speaker-embedding model, as a second optional package. Unknown speaker: nothing personal is read or written |
+| Privacy | Stored on the owner's host only, one store per person, readable and deletable from the settings page; never sent anywhere except to the model the owner chose; a cue-free feature but listed on the privacy page; "forget everything about me" is one action |
+| Limits | Adults only (a child's or teen's robot requires Home); no memories about other people unless they are also a profile; the model is told which person it is talking to, never the others' memories |
+| With Home | Home's memory replaces it; an import tool maps each local person to a Home person with their consent |
+| Packaging | An optional install extra and package, so the core stays small and the dependency is not forced on anyone |
+
+The friend test (27.2) gains a line: with the memory package on, two people in one home each get their own memories, and each can see and delete theirs.
