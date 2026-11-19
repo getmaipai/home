@@ -33,6 +33,14 @@ test("link delay is per send and controls are protected from loss", () => {
   expect(link.schedule("next", 1020, settings).deliverAt).toBe(1100);
 });
 
+test("periodic stall adds only its remaining wait and preserves send order", () => {
+  const link = new LinkModel(() => 0.5);
+  const settings = { delayMs: 80, jitterMs: 0, lossPercent: 0, burstEveryMs: 7000, burstStallMs: 800 };
+  expect(link.schedule("start", 0, settings).deliverAt).toBe(80);
+  expect(link.schedule("stall", 7100, settings).deliverAt).toBe(7880);
+  expect(link.schedule("after", 8000, settings).deliverAt).toBe(8080);
+});
+
 test("acknowledgement, interruption, and missing transcript stay distinct", () => {
   expect(decideBackchannel("Mm-hm!")).toBe("ack");
   expect(decideBackchannel("wait, stop")).toBe("interrupt");

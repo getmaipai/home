@@ -39,7 +39,7 @@ describe("cut-in", () => {
     const seen: string[] = [];
     for (let i = 0; i < 3; i++) seen.push(...types(step(true)));
     for (let i = 0; i < 12; i++) seen.push(...types(step(false)));
-    expect(seen).toEqual(["duck", "resume"]);
+    expect(seen).toEqual(["duck", "transcribe_cut_in", "resume"]);
     expect(m.state).toBe("speaking");
   });
   test("its own voice (echo) never stops the reply", () => {
@@ -72,5 +72,35 @@ describe("pause then decide", () => {
   test("long uninterrupted speech interrupts at the maximum", () => {
     const { m, step } = speaking(); const seen:string[]=[]; for (let i=0;i<60;i++) seen.push(...types(step(true)));
     expect(seen).toContain("interrupt");
+  });
+});
+
+describe("continue mode acknowledgements", () => {
+  test("lowers while a short acknowledgement is classified and never pauses", () => {
+    const { m, step } = speaking();
+    m.configure({ talkOverMode: "continue" });
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) seen.push(...types(step(true)));
+    expect(seen).toContain("duck");
+    expect(seen).not.toContain("pause");
+    expect(types(m.cutTranscript("mm-hm", "ack"))).toEqual(["backchannel"]);
+    expect(m.state).toBe("speaking");
+  });
+  test("unknown transcript stays lowered until the uninterrupted limit", () => {
+    const { m, step } = speaking(); m.configure({ talkOverMode: "continue" });
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) seen.push(...types(step(true)));
+    expect(m.cutTranscript("", "unknown")).toEqual([]);
+    expect(m.state).toBe("speaking");
+    for (let i = 0; i < 50; i++) seen.push(...types(step(true)));
+    expect(seen).toContain("interrupt");
+  });
+  test("unknown after a gap stays lowered until the decision limit", () => {
+    const { m, step } = speaking(); m.configure({ talkOverMode: "continue" });
+    for (let i = 0; i < 4; i++) step(true);
+    expect(types(step(false, 256))).toContain("transcribe_cut_in");
+    expect(m.cutTranscript("", "unknown")).toEqual([]);
+    expect(types(step(false, 900))).not.toContain("resume");
+    expect(types(step(false, 300))).toContain("interrupt");
   });
 });

@@ -367,3 +367,113 @@ test("16 hello voice is used for prewarm and an unprepared voice falls back befo
   expect(h.messages().some((message) => message.t === "notice" && message.code === "voice_not_ready")).toBe(true);
   h.session.close();
 });
+
+test("5 old playback and local duck reports cannot affect the current turn", () => {
+  const h = harness();
+  const before = (h.session as any).heardAudio;
+  h.session.message(JSON.stringify({ t: "played", turn: 0, chunk: 0, ms: 100 }));
+  h.session.message(JSON.stringify({ t: "played_end", turn: 0 }));
+  h.session.message(JSON.stringify({ t: "local_duck", turn: 0 }));
+  expect((h.session as any).heardAudio).toBe(before);
+  expect((h.session as any).metrics.t_local_duck).toBeUndefined();
+  h.session.close();
+});
+
+test("11 hub timestamps a current local duck in cut-in metrics", () => {
+  const records: any[] = [];
+  const h = harness({ appendMetrics: (_path: string, value: any) => records.push(value) });
+  h.session.message(JSON.stringify({ t: "local_duck", turn: (h.session as any).turn }));
+  (h.session as any).writeCutin(true);
+  expect(records.some((record) => record.backchannel === true && record.t_local_duck === 0)).toBe(true);
+  h.session.close();
+});
+
+test("10 inbound microphone frames use the session link delay before reaching turn detection", async () => {
+  const h = harness({ random: () => 0.5 });
+  h.session.message(JSON.stringify({ t: "config", values: { netSim: { delayMs: 200, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 } } }));
+  h.feed(true, 4);
+  expect((h.session as any).tm.state).toBe("idle");
+  await h.flush(200);
+  expect((h.session as any).tm.state).toBe("user_speaking");
+  h.session.close();
+});
+
+test("10 outbound control and audio use the same configured link delay", async () => {
+  const h = harness({ random: () => 0.5 });
+  h.session.message(JSON.stringify({ t: "config", values: { netSim: { delayMs: 200, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 } } }));
+  (h.session as any).send({ t: "notice", code: "test" });
+  (h.session as any).sendFrame(new Uint8Array([1, 2, 3]));
+  await h.flush(199);
+  expect(h.sent.some((value) => value instanceof Uint8Array)).toBe(false);
+  expect(h.messages().some((message) => message.code === "test")).toBe(false);
+  await h.flush(2);
+  expect(h.sent.some((value) => value instanceof Uint8Array)).toBe(true);
+  expect(h.messages().some((message) => message.code === "test")).toBe(true);
+  h.session.close();
+});
+
+test("9 a chat reply with no synthesized audio logs a failed no_audio turn", async () => {
+  const metrics: any[] = [];
+  const h = harness({ chat: async function* () {}, appendMetrics: (_path: string, value: any) => metrics.push(value) });
+  await (h.session as any).reply("question", true);
+  expect(metrics.some((record) => record.ok === false && record.failure === "no_audio")).toBe(true);
+  h.session.close();
+});
+
+function enterSpeakingState(session: VoiceSession, time: FakeTime) {
+  const tm = (session as any).tm as TurnManager;
+  tm.frame(true, time.now); time.advance(100); tm.frame(true, time.now);
+  time.advance(32); tm.frame(false, time.now); time.advance(200); tm.frame(false, time.now);
+  const revision = tm.checkRevision;
+  tm.transcriptReady("earlier question", time.now, revision);
+  tm.turnModel(0.9, true, revision);
+  tm.firstAudioPlayed();
+  return tm;
+}
+
+test("12 acknowledgement over a reply restores volume without pausing or starting another turn", async () => {
+  const h = harness({ transcribe: async () => "mm-hm" });
+  const tm = enterSpeakingState(h.session, h.time);
+  (h.session as any).generatedText = "Still speaking";
+  (h.session as any).cutInSamples = Array.from({ length: 512 * 5 }, () => 0.1);
+  for (let i = 0; i < 5; i++) { h.time.advance(32); for (const c of tm.frame(true, h.time.now)) (h.session as any).command(c); }
+  const turn = (h.session as any).turn;
+  (h.session as any).sendFrame(new Uint8Array([1, 2, 3])); await h.flush();
+  const audioFramesBeforeAck = h.sent.filter((value) => value instanceof Uint8Array).length;
+  await (h.session as any).finishCutIn();
+  await h.flush();
+  (h.session as any).sendFrame(new Uint8Array([4, 5, 6])); await h.flush();
+  expect(h.messages().some((message) => message.t === "resume" && message.turn === turn)).toBe(true);
+  expect(h.messages().some((message) => message.t === "pause" || message.t === "stop")).toBe(false);
+  expect(h.sent.filter((value) => value instanceof Uint8Array)).toHaveLength(audioFramesBeforeAck + 1);
+  expect((h.session as any).turn).toBe(turn);
+  h.session.close();
+});
+
+test("12 interruption phrase stops the reply and retains the whole phrase as the new turn audio", async () => {
+  const h = harness({ transcribe: async () => "yeah actually I meant Thursday" });
+  const tm = enterSpeakingState(h.session, h.time);
+  const phrase = Array.from({ length: 512 * 12 }, (_, i) => i / 10000);
+  (h.session as any).cutInSamples = phrase.slice();
+  for (let i = 0; i < 12; i++) { h.time.advance(32); for (const c of tm.frame(true, h.time.now)) (h.session as any).command(c); }
+  await (h.session as any).finishCutIn();
+  await h.flush();
+  expect(h.messages().some((message) => message.t === "stop")).toBe(true);
+  expect((h.session as any).samples).toHaveLength(phrase.length);
+  expect((h.session as any).samples[100]).toBeCloseTo(phrase[100]!);
+  expect(tm.state).toBe("user_speaking");
+  h.session.close();
+});
+
+test("12 empty interruption transcript remains lowered and undecided", async () => {
+  const h = harness({ transcribe: async () => "" });
+  const tm = enterSpeakingState(h.session, h.time);
+  (h.session as any).cutInSamples = Array.from({ length: 512 * 5 }, () => 0.1);
+  for (let i = 0; i < 5; i++) { h.time.advance(32); for (const c of tm.frame(true, h.time.now)) (h.session as any).command(c); }
+  await (h.session as any).finishCutIn();
+  await h.flush();
+  expect(h.messages().some((message) => message.t === "duck")).toBe(true);
+  expect(h.messages().some((message) => message.t === "pause" || message.t === "stop" || message.t === "resume")).toBe(false);
+  expect(tm.cutting).toBe(true);
+  h.session.close();
+});

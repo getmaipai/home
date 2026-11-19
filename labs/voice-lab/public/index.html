@@ -30,7 +30,7 @@
 
   <section id="timings">
     <h2>Speed</h2>
-    <div class="big"><span id="firstSound">-</span><small>seconds from the end of your sentence to the first sound</small></div>
+    <div class="big"><span id="firstSound">-</span><small>first sound at the hub, plus estimated output latency to your ear</small></div>
     <table>
       <tr><td>Warmed up before you spoke</td><td id="warm">-</td></tr>
       <tr><td>Typical so far</td><td id="median">-</td></tr>
@@ -53,7 +53,7 @@
   </section>
   <details id="settings">
     <summary>Settings</summary>
-    <label>Talk-over mode <select id="talkOver"><option value="pause_then_decide">Pause, then decide</option><option value="stop_fast">Stop fast</option></select></label>
+    <label>Talk-over mode <select id="talkOver"><option value="continue" selected>Lower while deciding</option><option value="pause_then_decide">Pause, then decide</option><option value="stop_fast">Stop fast</option></select></label>
     <label>Tool delay (ms) <input id="toolDelay" type="number" value="2500"></label>
     <label>Bad-link preset <select id="netSim"><option value="off">Home (off)</option><option value="phone">Phone on cellular</option><option value="hotel">Bad hotel Wi-Fi</option></select></label>
     <label>Jitter buffer (ms) <input id="jitter" type="number" value="60" readonly></label>

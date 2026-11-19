@@ -1,4 +1,5 @@
 import { TurnState } from "./turn-state.js";
+import { LocalDuckDetector } from "./local-duck.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -38,22 +39,24 @@ $('#start').onclick = async () => {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   const turnState = new TurnState();
+  const localDuckDetector = new LocalDuckDetector();
   const active = new Map();
   const chunkTexts = new Map();
   const playedTimes = [];
-  let thinkTimer = 0, failedTurns = 0;
+  let thinkTimer = 0, localRestoreTimer = 0, failedTurns = 0, turnCount = 0, localDuckSent = false;
   let currentTurn = 0, replyFinished = false, endSent = false, firstPlayedTurn = -1;
   const finishTurnIfReady = (turn) => {
-    if (replyFinished && active.size === 0 && !endSent && ws?.readyState === 1) {
+    if (replyFinished && active.size === 0 && !endSent && turnState.isCurrent(turn) && ws?.readyState === 1) {
       endSent = true;
       ws.send(JSON.stringify({ t: 'played_end', turn }));
     }
   };
-  ws.onopen = () => { let voice = 'builtin'; try { voice = localStorage.voiceLabVoice || 'builtin'; } catch {} ws.send(JSON.stringify({ t: 'hello', secret, proto: 2, voice })); ws.send(JSON.stringify({ t: 'config', values: { voice } })); };
-  const rtts = []; setInterval(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'ping', at: performance.now() })); }, 2000);
+  ws.onopen = () => { let voice = 'builtin'; try { voice = localStorage.voiceLabVoice || 'builtin'; } catch {} ws.send(JSON.stringify({ t: 'hello', secret, proto: 2, voice, turn: currentTurn })); ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values: { voice } })); };
+  const rtts = []; setInterval(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'ping', turn: currentTurn, at: performance.now() })); }, 2000);
   setInterval(() => {
     for (const playback of active.values()) {
-      if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'played', turn: playback.turn, chunk: playback.chunk, ms: Math.max(0, (ctx.currentTime - playback.start) * 1000) }));
+      if (!turnState.isCurrent(playback.turn)) continue;
+      if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'played', turn: playback.turn, chunk: playback.chunk, ms: Math.max(0, (window.__playedCursor() - playback.startSample) / 24) }));
     }
   }, 100);
   ws.onmessage = (event) => {
@@ -64,11 +67,16 @@ $('#start').onclick = async () => {
       if (!turnState.accepts(turn)) return;
       const pcm = new Int16Array(event.data, 8);
       const samples = Float32Array.from(pcm, (sample) => sample / 32768);
-      const scheduled = window.__playPcm(samples, 24000);
+      const scheduled = window.__playPcm(samples, 24000, turn);
       const key = `${turn}:${index}`;
       currentTurn = turn;
-      if (!active.has(key)) active.set(key, { turn, chunk: index, start: scheduled.at });
+      if (!active.has(key)) active.set(key, { turn, chunk: index, start: scheduled.at, startSample: scheduled.startSample });
       if (firstPlayedTurn !== turn) { firstPlayedTurn = turn; setTimeout(() => { if (turnState.isCurrent(turn) && ws?.readyState === 1) ws.send(JSON.stringify({ t: 'played', turn, chunk: index, ms: 1 })); }, Math.max(0, (scheduled.at - ctx.currentTime) * 1000)); }
+      if (!Number.isFinite(window.__firstScheduledTurn) || window.__firstScheduledTurn !== turn) {
+        window.__firstScheduledTurn = turn;
+        const latency = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+        if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'audio_scheduled', turn, contextTime: scheduled.at, contextNow: ctx.currentTime, output_latency_ms: latency * 1000 }));
+      }
       const chunk = chunkTexts.get(key);
       if (chunk && !chunk.emitted) {
         chunk.emitted = true;
@@ -96,7 +104,7 @@ $('#start').onclick = async () => {
       $('#light').textContent = labels[message.state] || 'Connected';
       $('#light').dataset.state = message.state;
       clearTimeout(thinkTimer);
-      if (message.state === 'thinking') thinkTimer = setTimeout(() => window.__startTick?.(), 900);
+      if (message.state === 'thinking') { const generation = currentTurn; thinkTimer = setTimeout(() => { if (turnState.isCurrent(generation)) window.__startTick?.(); }, 900); }
       else if (message.state !== 'speaking') window.__stopTick?.();
     }
     if (message.t === 'partial') $('#partial').textContent = message.text;
@@ -111,47 +119,63 @@ $('#start').onclick = async () => {
       replyFinished = true;
       finishTurnIfReady(message.turn);
     }
-    if (message.t === 'duck') window.__duck();
-    if (message.t === 'pause') window.__pause();
+    if (message.t === 'duck') { clearTimeout(localRestoreTimer); localDuckSent = false; window.__duck(); }
+    if (message.t === 'pause') { clearTimeout(localRestoreTimer); localDuckSent = false; window.__pause(); }
     if (message.t === 'tool_start') { $('#light').textContent = 'Looking that up'; window.__startTick(); }
     if (message.t === 'tool_end') { $('#toolWait').textContent = (message.ms / 1000).toFixed(2) + ' s'; }
     if (message.t === 'pong') { const rtt = performance.now() - message.at; rtts.push(rtt); if (rtts.length > 8) rtts.shift(); $('#link').textContent = `${rtt.toFixed(0)} ms`; }
-    if (message.t === 'pause') window.__pause();
     if (message.t === 'tool_start') { $('#light').textContent = 'Looking that up'; window.__startTick(); }
     if (message.t === 'tool_end') { $('#toolWait').textContent = (message.ms / 1000).toFixed(2) + ' s'; }
     if (message.t === 'pong') { const rtt = performance.now() - message.at; rtts.push(rtt); if (rtts.length > 8) rtts.shift(); $('#link').textContent = `${rtt.toFixed(0)} ms`; }
-    if (message.t === 'resume') { window.__stopTick(); window.__resume(); }
-    if (message.t === 'stop') { if (!turnState.stop(message.turn)) return; window.__stopPlayback(); active.clear(); window.__voiceLabListener?.({ type: 'stop' }); }
+    if (message.t === 'resume') { clearTimeout(localRestoreTimer); localDuckSent = false; window.__stopTick(); window.__resume?.(); }
+    if (message.t === 'stop') { if (!turnState.stop(message.turn)) return; clearTimeout(localRestoreTimer); localDuckSent = false; window.__stopPlayback(message.turn); active.clear(); window.__voiceLabListener?.({ type: 'stop', turn: message.turn }); }
     if (message.t === 'timing') {
-      if (Number.isFinite(message.t_first_audio_played)) {
-        playedTimes.push(message.t_first_audio_played);
+      turnCount++;
+      if (Number.isFinite(message.t_first_audio_scheduled)) {
+        playedTimes.push(message.t_first_audio_scheduled);
         if (playedTimes.length > 31) playedTimes.shift();
         const sorted = [...playedTimes].sort((a, b) => a - b);
         message.median_t_first_audio_played = sorted[Math.floor(sorted.length / 2)];
       }
       const sec = (v) => Number.isFinite(v) ? (v / 1000).toFixed(2) + ' s' : '-';
-      if (Number.isFinite(message.t_first_audio_played)) { $('#firstSound').textContent = (message.t_first_audio_played / 1000).toFixed(2); $('#median').textContent = sec(message.median_t_first_audio_played) + ' over ' + playedTimes.length + (playedTimes.length === 1 ? ' turn' : ' turns'); }
+      if (Number.isFinite(message.t_first_audio_scheduled)) { const latency = Number(message.output_latency_ms || 0); $('#firstSound').textContent = (message.t_first_audio_scheduled / 1000).toFixed(2) + ' s at hub + about ' + Math.round(latency) + ' ms to your ear'; $('#median').textContent = sec(message.median_t_first_audio_scheduled) + ' over ' + playedTimes.length + (playedTimes.length === 1 ? ' turn' : ' turns'); }
       $('#tCommit').textContent = sec(message.t_commit); $('#tToken').textContent = sec(message.t_llm_first_token); $('#tVoice').textContent = sec(message.t_voice_first_audio);
       if (Number.isFinite(message.t_tool_start) && Number.isFinite(message.t_tool_end)) $('#toolWait').textContent = ((message.t_tool_end - message.t_tool_start) / 1000).toFixed(2) + ' s';
       if (Number.isFinite(message.t_duck) || Number.isFinite(message.t_stop_sent)) $('#tCut').textContent = sec(message.t_duck) + ' / ' + sec(message.t_stop_sent);
-      if (message.ok === false) { failedTurns++; $('#failedTurns').textContent = String(failedTurns); }
+      if (message.ok === false) failedTurns++;
+      $('#failedTurns').textContent = `${failedTurns} of ${turnCount}`;
       $('#timings pre').textContent = JSON.stringify(message, null, 2);
     }
     if (message.t === 'warm') { const el = document.querySelector('#warm'); if (el) el.textContent = (el.textContent === '-' ? '' : el.textContent + ', ') + message.part + ' ' + (message.ms / 1000).toFixed(1) + ' s'; }
     if (message.t === 'error') status.textContent = 'The reply could not be completed.';
     if (message.t === 'notice' && message.code === 'voice_not_ready') status.textContent = 'That voice is not ready for this voice engine. Using the built-in voice.';
   };
-  node.port.onmessage = (event) => { if (ws?.readyState === 1) ws.send(event.data); };
+  node.port.onmessage = (event) => {
+    if (ws?.readyState !== 1) return;
+    const bytes = event.data;
+    if (bytes instanceof ArrayBuffer && bytes.byteLength >= 1036) {
+      const view = new DataView(bytes), pcm = new Float32Array(512);
+      for (let i = 0; i < pcm.length; i++) pcm[i] = view.getInt16(12 + i * 2, true) / 32768;
+      const playing = active.size > 0 && !replyFinished;
+      if (localDuckDetector.frame(pcm, { playing, enabled: $('#localDuck').checked }) && !localDuckSent) {
+        localDuckSent = true; window.__duck?.(); const turn = currentTurn;
+        ws.send(JSON.stringify({ t: 'local_duck', turn }));
+        clearTimeout(localRestoreTimer);
+        localRestoreTimer = setTimeout(() => { if (turnState.isCurrent(turn) && localDuckSent) { window.__restore?.(); localDuckSent = false; } }, 600);
+      }
+    }
+    ws.send(bytes);
+  };
   $('#start').disabled = true;
   $('#stop').disabled = false;
   $('#output').onchange = () => window.__configureOutput($('#output').value);
   window.__configureOutput($('#output').value);
 };
-$('#stop').onclick = () => ws?.send(JSON.stringify({ t: 'stop' }));
+$('#stop').onclick = () => ws?.send(JSON.stringify({ t: 'stop', turn: currentTurn }));
 for (const id of ['silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
   $('#' + id).onchange = () => {
     const sim = $('#netSim').value; const values = { talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
-    if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', values }));
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values }));
     if (id === 'output') window.__configureOutput($('#output').value);
     save({ talkOver: $('#talkOver').value, toolDelay: +$('#toolDelay').value, netSim: $('#netSim').value, localDuck: $('#localDuck').checked, output: $('#output').value, echoSetting: $('#echoSetting').value, silenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value });
   };
@@ -160,7 +184,7 @@ for (const id of ['silence', 'threshold', 'early', 'echoThreshold', 'output', 'e
 // Voice choice, voice engine and "record my voice".
 const labSecret = () => $('#secret').value || sessionStorage.labSecret || '';
 const api = (path, init = {}) => fetch(path, { ...init, headers: { ...(init.headers || {}), 'x-lab-secret': labSecret() } });
-const sendVoiceConfig = () => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', values: { voice: $('#voice').value, useStyles: $('#useStyles').checked } })); try { localStorage.voiceLabVoice = $('#voice').value; } catch {} };
+const sendVoiceConfig = () => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values: { voice: $('#voice').value, useStyles: $('#useStyles').checked } })); try { localStorage.voiceLabVoice = $('#voice').value; } catch {} };
 async function loadVoices() {
   if (!labSecret()) return;
   try {

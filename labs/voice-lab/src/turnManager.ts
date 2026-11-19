@@ -20,6 +20,7 @@ export class TurnManager {
   private ducked = false;
   private paused = false;
   private cutEnded = false;
+  private cutUnknown = false;
   private revision = 0;
   private clock: () => number;
   private opts: Options = { ...config, talkOverMode: "continue", backchannelGapMs: 250, backchannelMaxMs: 1400 };
@@ -78,6 +79,7 @@ export class TurnManager {
     const out: Command[] = [];
     if (speech) {
       if (this.cutAt < 0) { this.cutAt = now; this.cutSpeech = 0; this.ducked = false; this.paused = false; this.cutEnded = false; this.cutPrev = now - this.opts.frameMs; }
+      else if (this.opts.talkOverMode === "continue" && this.cutEnded) { this.cutEnded = false; this.cutSpeech = 0; }
       this.cutSpeech += Math.min(this.opts.frameMs * 1.5, Math.max(0, now - this.cutPrev));
       this.cutPrev = now;
       this.cutLast = now;
@@ -90,13 +92,17 @@ export class TurnManager {
     }
     if (this.cutAt >= 0) {
       this.cutPrev = now;
-      if (this.paused && !this.cutEnded && now - this.cutLast >= this.opts.backchannelGapMs) { this.cutEnded = true; out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech })); }
-      else if (!this.paused && now - this.cutLast >= this.opts.cutGapMs) { if (this.ducked) out.push(...this.emit("resume")); this.resetCut(); }
+      if (this.cutUnknown && now - this.cutAt >= this.opts.backchannelMaxMs) return this.interrupt();
+      if (!this.cutEnded && now - this.cutLast >= this.opts.backchannelGapMs) {
+        this.cutEnded = true;
+        out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech }));
+      }
+      else if (!this.paused && this.opts.talkOverMode !== "continue" && now - this.cutLast >= this.opts.cutGapMs) { if (this.ducked) out.push(...this.emit("resume")); this.resetCut(); }
     }
     return out;
   }
 
-  private resetCut() { this.cutAt = -1; this.cutSpeech = 0; this.ducked = false; this.paused = false; this.cutEnded = false; this.echo = false; }
+  private resetCut() { this.cutAt = -1; this.cutSpeech = 0; this.ducked = false; this.paused = false; this.cutEnded = false; this.cutUnknown = false; this.echo = false; }
   private interrupt(): Command[] {
     const start = this.cutAt;
     const duration = this.cutSpeech;
@@ -113,6 +119,7 @@ export class TurnManager {
     const verdict = typeof decision === "boolean" ? (decision ? "ack" : "interrupt") : decision;
     if (verdict === "ack" && this.cutSpeech < this.opts.backchannelMaxMs) { this.resetCut(); return this.emit("backchannel", { backchannel: true }); }
     if (verdict === "interrupt") return this.interrupt();
+    if (verdict === "unknown") this.cutUnknown = true;
     return [];
   }
 

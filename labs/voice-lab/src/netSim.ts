@@ -11,7 +11,6 @@ export type LinkMessage<T> = { value: T; deliverAt: number; dropped: boolean };
 export class LinkModel {
   private startedAt: number | null = null;
   private lastDeliveryAt = 0;
-  private index = 0;
 
   constructor(private random: () => number = Math.random) {}
 
@@ -19,11 +18,12 @@ export class LinkModel {
     this.startedAt ??= sendAt;
     const jitter = (this.random() * 2 - 1) * sim.jitterMs;
     const elapsed = sendAt - this.startedAt;
-    const inStall = sim.burstEveryMs > 0 && Math.floor(elapsed / sim.burstEveryMs) > 0 && elapsed % sim.burstEveryMs < sim.burstStallMs;
-    const deliverAt = Math.max(this.lastDeliveryAt, sendAt + Math.max(0, sim.delayMs + jitter) + (inStall ? sim.burstStallMs : 0));
+    const stallPosition = sim.burstEveryMs > 0 && elapsed > 0 ? elapsed % sim.burstEveryMs : -1;
+    const stallWait = stallPosition >= 0 && stallPosition < sim.burstStallMs ? sim.burstStallMs - stallPosition : 0;
+    const nominal = sendAt + sim.delayMs + jitter + stallWait;
+    const deliverAt = Math.max(this.lastDeliveryAt, Math.max(sendAt, nominal));
     this.lastDeliveryAt = deliverAt;
     const dropped = !control && (this.random() * 100 < (sim.lossPercent ?? 0));
-    this.index++;
     return { value, deliverAt, dropped };
   }
 }
