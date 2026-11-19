@@ -72,7 +72,7 @@ function loadRecognizer(): Recognizer {
 
 export async function transcribe(wav: Uint8Array, _signal?: AbortSignal): Promise<string> {
   const samples = wavSamples(wav); const rec = loadRecognizer();
-  const run = queue.then(async () => { const s = rec.createStream(); s.acceptWaveform({ samples, sampleRate: 16000 }); await rec.decodeAsync(s); return rec.getResult(s).text.trim(); });
+  const run = queue.then(async () => { if (_signal?.aborted) throw new DOMException("Aborted", "AbortError"); const s = rec.createStream(); s.acceptWaveform({ samples, sampleRate: 16000 }); await rec.decodeAsync(s); return rec.getResult(s).text.trim(); });
   queue = run.catch(() => {});
   return run;
 }

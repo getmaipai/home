@@ -5,6 +5,7 @@ import { TurnManager } from "../src/turnManager";
 function speaking() {
   let t = 0;
   const m = new TurnManager(() => t);
+  m.configure({ talkOverMode: "pause_then_decide" });
   const step = (speech: boolean, ms = 32) => { t += ms; return m.frame(speech, t); };
   step(true); step(true); step(true); step(true);            // 96 ms of speech starts the turn
   for (let i = 0; i < 6; i++) step(false);                   // 192 ms of silence: check_turn

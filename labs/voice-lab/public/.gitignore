@@ -1,4 +1,9 @@
 samples/
 samples_clone/
+samples_variants/
 voices.html
 voices-cloned.html
+voices-smaller.html
+phrasing/
+samples_round3/
+voices-round3.html

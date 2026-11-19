@@ -1,3 +1,4 @@
+import { TurnState } from "./turn-state.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -36,10 +37,11 @@ $('#start').onclick = async () => {
   source.connect(node);
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
+  const turnState = new TurnState();
   const active = new Map();
   const chunkTexts = new Map();
   const playedTimes = [];
-  let thinkTimer = 0;
+  let thinkTimer = 0, failedTurns = 0;
   let currentTurn = 0, replyFinished = false, endSent = false, firstPlayedTurn = -1;
   const finishTurnIfReady = (turn) => {
     if (replyFinished && active.size === 0 && !endSent && ws?.readyState === 1) {
@@ -59,13 +61,14 @@ $('#start').onclick = async () => {
       clearTimeout(thinkTimer); window.__stopTick?.();
       const view = new DataView(event.data);
       const turn = view.getUint32(0, true), index = view.getUint16(4, true), flags = view.getUint16(6, true);
+      if (!turnState.accepts(turn)) return;
       const pcm = new Int16Array(event.data, 8);
       const samples = Float32Array.from(pcm, (sample) => sample / 32768);
       const scheduled = window.__playPcm(samples, 24000);
       const key = `${turn}:${index}`;
       currentTurn = turn;
       if (!active.has(key)) active.set(key, { turn, chunk: index, start: scheduled.at });
-      if (firstPlayedTurn !== turn) { firstPlayedTurn = turn; setTimeout(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'played', turn, chunk: index, ms: 1 })); }, Math.max(0, (scheduled.at - ctx.currentTime) * 1000)); }
+      if (firstPlayedTurn !== turn) { firstPlayedTurn = turn; setTimeout(() => { if (turnState.isCurrent(turn) && ws?.readyState === 1) ws.send(JSON.stringify({ t: 'played', turn, chunk: index, ms: 1 })); }, Math.max(0, (scheduled.at - ctx.currentTime) * 1000)); }
       const chunk = chunkTexts.get(key);
       if (chunk && !chunk.emitted) {
         chunk.emitted = true;
@@ -73,7 +76,9 @@ $('#start').onclick = async () => {
       }
       window.__voiceLabListener?.({ type: 'audio', samples, rate: 24000, at: scheduled.at });
       if (flags & 1) {
+        const generation = turn;
         setTimeout(() => {
+          if (!turnState.isCurrent(generation)) return;
           active.delete(key);
           chunkTexts.delete(key);
           window.__voiceLabListener?.({ type: 'chunkEnd' });
@@ -83,6 +88,7 @@ $('#start').onclick = async () => {
       return;
     }
     const message = JSON.parse(event.data);
+    if (Number.isInteger(message.turn) && message.t !== "stop" && !turnState.accepts(message.turn)) return;
     if (message.t === 'state') {
       if (message.vad) vadMode = message.vad;
       const labels = { idle: 'Idle', user_speaking: 'Listening', maybe_done: 'Listening', thinking: 'Thinking', speaking: 'Speaking', paused: 'Listening', looking: 'Looking that up' };
@@ -115,7 +121,7 @@ $('#start').onclick = async () => {
     if (message.t === 'tool_end') { $('#toolWait').textContent = (message.ms / 1000).toFixed(2) + ' s'; }
     if (message.t === 'pong') { const rtt = performance.now() - message.at; rtts.push(rtt); if (rtts.length > 8) rtts.shift(); $('#link').textContent = `${rtt.toFixed(0)} ms`; }
     if (message.t === 'resume') { window.__stopTick(); window.__resume(); }
-    if (message.t === 'stop') { window.__stopPlayback(); active.clear(); window.__voiceLabListener?.({ type: 'stop' }); }
+    if (message.t === 'stop') { if (!turnState.stop(message.turn)) return; window.__stopPlayback(); active.clear(); window.__voiceLabListener?.({ type: 'stop' }); }
     if (message.t === 'timing') {
       if (Number.isFinite(message.t_first_audio_played)) {
         playedTimes.push(message.t_first_audio_played);
@@ -125,9 +131,10 @@ $('#start').onclick = async () => {
       }
       const sec = (v) => Number.isFinite(v) ? (v / 1000).toFixed(2) + ' s' : '-';
       if (Number.isFinite(message.t_first_audio_played)) { $('#firstSound').textContent = (message.t_first_audio_played / 1000).toFixed(2); $('#median').textContent = sec(message.median_t_first_audio_played) + ' over ' + playedTimes.length + (playedTimes.length === 1 ? ' turn' : ' turns'); }
-      $('#tCommit').textContent = sec(message.t_commit); $('#tToken').textContent = sec(message.t_llm_first_token); $('#tVoice').textContent = sec(message.t_tts_first_byte);
+      $('#tCommit').textContent = sec(message.t_commit); $('#tToken').textContent = sec(message.t_llm_first_token); $('#tVoice').textContent = sec(message.t_voice_first_audio);
       if (Number.isFinite(message.t_tool_start) && Number.isFinite(message.t_tool_end)) $('#toolWait').textContent = ((message.t_tool_end - message.t_tool_start) / 1000).toFixed(2) + ' s';
       if (Number.isFinite(message.t_duck) || Number.isFinite(message.t_stop_sent)) $('#tCut').textContent = sec(message.t_duck) + ' / ' + sec(message.t_stop_sent);
+      if (message.ok === false) { failedTurns++; $('#failedTurns').textContent = String(failedTurns); }
       $('#timings pre').textContent = JSON.stringify(message, null, 2);
     }
     if (message.t === 'warm') { const el = document.querySelector('#warm'); if (el) el.textContent = (el.textContent === '-' ? '' : el.textContent + ', ') + message.part + ' ' + (message.ms / 1000).toFixed(1) + ' s'; }
@@ -142,7 +149,7 @@ $('#start').onclick = async () => {
 $('#stop').onclick = () => ws?.send(JSON.stringify({ t: 'stop' }));
 for (const id of ['silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
   $('#' + id).onchange = () => {
-    const sim = $('#netSim').value; const values = { talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
+    const sim = $('#netSim').value; const values = { talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
     if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', values }));
     if (id === 'output') window.__configureOutput($('#output').value);
     save({ talkOver: $('#talkOver').value, toolDelay: +$('#toolDelay').value, netSim: $('#netSim').value, localDuck: $('#localDuck').checked, output: $('#output').value, echoSetting: $('#echoSetting').value, silenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value });

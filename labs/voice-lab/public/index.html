@@ -8,7 +8,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Voice lab</h1><span><a href="voices-cloned.html">Cloned voices</a> · <a href="voices.html">Voice samples</a> · <a href="echo.html">Echo test</a></span></header>
+  <header><h1>Voice lab</h1><span><a href="voices-smaller.html">Same voice, smaller</a> · <a href="voices-cloned.html">Cloned voices</a> · <a href="voices.html">Voice samples</a> · <a href="echo.html">Echo test</a></span></header>
   <p class="note">A test page. It talks to its own copy of the chat model and voice, not to Home.</p>
 
   <div id="signin">
@@ -34,6 +34,7 @@
     <table>
       <tr><td>Warmed up before you spoke</td><td id="warm">-</td></tr>
       <tr><td>Typical so far</td><td id="median">-</td></tr>
+      <tr><td>Turns that failed</td><td id="failedTurns">0</td></tr>
       <tr><td>Decided you were done</td><td id="tCommit">-</td></tr>
       <tr><td>Model's first word</td><td id="tToken">-</td></tr>
       <tr><td>Voice started</td><td id="tVoice">-</td></tr>
