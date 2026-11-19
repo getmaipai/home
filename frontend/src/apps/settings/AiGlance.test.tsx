@@ -79,6 +79,27 @@ describe("AI and models feature rows", () => {
     fireEvent.click(within(options[2]!).getByRole("button", { name: "Move Model c to the top" }));
     await waitFor(() => expect(view.calls.some((call) => call.url === "/api/ai/feature-models/pictures/order" && call.init?.method === "PUT" && String(call.init.body) === JSON.stringify({ order: ["c"] }))).toBe(true));
   });
+  test("the sheet's buttons stay off until the fresh list is back, so a second click cannot act on a stale sheet (CHOOSER-REFRESH-01)", async () => {
+    const view = render();
+    const inner = globalThis.fetch;
+    let held = false; let release: (() => void) | null = null;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (init?.method === "PUT" && url.includes("/api/ai/feature-models/")) held = true;
+      if (held && url.endsWith("/api/ai/feature-models") && !release) return new Promise<Response>((resolve) => { release = () => resolve(inner(input, init)); });
+      return inner(input, init);
+    }) as typeof fetch;
+    await view.findAllByTestId("ai-model-line");
+    fireEvent.click(view.getByRole("button", { name: "Change Pictures" }));
+    const sheet = await view.findByTestId("ai-model-chooser");
+    fireEvent.click(within(within(sheet).getAllByTestId("ai-chooser-option")[2]!).getByRole("button", { name: "Move Model c to the top" }));
+    await waitFor(() => expect(release).not.toBeNull());
+    const during = within(sheet).queryAllByRole("button", { name: /to the top$/ }) as HTMLButtonElement[];
+    expect(during.length).toBeGreaterThan(0);
+    for (const button of during) expect(button.disabled).toBe(true);
+    release!();
+    await waitFor(() => { for (const button of within(sheet).queryAllByRole("button", { name: /to the top$/ }) as HTMLButtonElement[]) expect(button.disabled).toBe(false); });
+  });
   test("a household order offers Use the default order, which writes an empty order", async () => {
     const view = render(base, "owner", modelsFor({}, "adult", ["c"]));
     await view.findAllByTestId("ai-model-line");
