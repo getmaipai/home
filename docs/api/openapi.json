@@ -22484,6 +22484,22 @@
                           "roleReason": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "update": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "newest": {
+                                "type": "string"
+                              },
+                              "since": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "newest",
+                              "since"
+                            ]
                           }
                         },
                         "required": [
