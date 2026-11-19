@@ -1,0 +1,26 @@
+{
+ "chatterbox-turbo": {
+  "whisper": "partly",
+  "shout": "did not carry",
+  "angry": "partly",
+  "excited": "carried"
+ },
+ "pocket": {
+  "whisper": "carried",
+  "shout": "did not carry",
+  "angry": "carried",
+  "excited": "did not carry"
+ },
+ "qwen3-base-1.7b": {
+  "whisper": "carried",
+  "shout": "partly",
+  "angry": "carried",
+  "excited": "carried"
+ },
+ "zonos3-mini": {
+  "whisper": "carried",
+  "shout": "did not carry",
+  "angry": "carried",
+  "excited": "partly"
+ }
+}

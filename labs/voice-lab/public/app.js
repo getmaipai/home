@@ -147,3 +147,44 @@ for (const id of ['silence', 'threshold', 'early', 'echoThreshold', 'output', 'e
     save({ talkOver: $('#talkOver').value, toolDelay: +$('#toolDelay').value, netSim: $('#netSim').value, localDuck: $('#localDuck').checked, output: $('#output').value, echoSetting: $('#echoSetting').value, silenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value });
   };
 }
+
+// Voice choice, voice engine and "record my voice".
+const labSecret = () => $('#secret').value || sessionStorage.labSecret || '';
+const api = (path, init = {}) => fetch(path, { ...init, headers: { ...(init.headers || {}), 'x-lab-secret': labSecret() } });
+const sendVoiceConfig = () => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', values: { voice: $('#voice').value, useStyles: $('#useStyles').checked } })); try { localStorage.voiceLabVoice = $('#voice').value; } catch {} };
+async function loadVoices() {
+  if (!labSecret()) return;
+  try {
+    const voices = (await (await api('/api/voices')).json()).voices || [];
+    const keep = $('#voice').value || (() => { try { return localStorage.voiceLabVoice; } catch { return ''; } })();
+    $('#voice').innerHTML = '<option value="builtin">Built-in</option>' + voices.map((v) => '<option value="' + v.id + '">' + (v.id === 'me' ? 'My voice' : v.id === 'ref_f' ? 'Sample voice (made up)' : v.id) + (v.styles?.length ? ' (has styled samples)' : '') + '</option>').join('');
+    if ([...$('#voice').options].some((o) => o.value === keep)) $('#voice').value = keep;
+    const models = await (await api('/api/voice-models')).json();
+    $('#voiceModel').innerHTML = Object.entries(models.models || {}).map(([key, m]) => '<option value="' + key + '"' + (m.loaded ? ' selected' : '') + '>' + key + (m.slow ? ' (slow)' : '') + '</option>').join('');
+  } catch { $('#recordStatus').textContent = 'The voice engine did not answer.'; }
+}
+$('#secret').addEventListener('change', loadVoices); $('#start').addEventListener('click', () => setTimeout(() => { loadVoices().then(sendVoiceConfig); }, 1500)); loadVoices();
+$('#voice').onchange = sendVoiceConfig; $('#useStyles').onchange = sendVoiceConfig;
+$('#voiceModel').onchange = async () => { $('#recordStatus').textContent = 'Switching voice engine. This takes a few seconds.'; try { const r = await api('/api/voice-model', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: $('#voiceModel').value }) }); $('#recordStatus').textContent = r.ok ? 'Voice engine ready.' : 'That voice engine could not load. Pick another one.'; } catch { $('#recordStatus').textContent = 'The voice engine did not answer.'; } loadVoices(); };
+$('#recordVoice').onclick = async () => {
+  if (!labSecret()) { $('#recordStatus').textContent = 'Enter the secret first.'; return; }
+  let micStream;
+  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); } catch { $('#recordStatus').textContent = 'The microphone was not allowed. Allow it in the browser and try again.'; return; }
+  const ctx = window.__voiceCtx; await ctx.resume();
+  const src = ctx.createMediaStreamSource(micStream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain(); mute.gain.value = 0;
+  const parts = []; let count = 0; const want = ctx.sampleRate * 10;
+  proc.onaudioprocess = (e) => { const d = e.inputBuffer.getChannelData(0); parts.push(new Float32Array(d)); count += d.length; $('#recordStatus').textContent = 'Recording. Keep talking: ' + Math.max(0, Math.ceil((want - count) / ctx.sampleRate)) + ' s left.'; if (count >= want) finish(); };
+  src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+  let done = false;
+  const finish = async () => {
+    if (done) return; done = true; proc.disconnect(); src.disconnect(); micStream.getTracks().forEach((t) => t.stop());
+    const all = new Float32Array(count); let o = 0; for (const p of parts) { all.set(p, o); o += p.length; }
+    const wav = new DataView(new ArrayBuffer(44 + all.length * 2)); const put = (at, s) => { for (let i = 0; i < s.length; i++) wav.setUint8(at + i, s.charCodeAt(i)); };
+    put(0, 'RIFF'); wav.setUint32(4, 36 + all.length * 2, true); put(8, 'WAVEfmt '); wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true); wav.setUint32(24, ctx.sampleRate, true); wav.setUint32(28, ctx.sampleRate * 2, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true); put(36, 'data'); wav.setUint32(40, all.length * 2, true);
+    for (let i = 0; i < all.length; i++) wav.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(all[i] * 32767))), true);
+    $('#recordStatus').textContent = 'Making your voice. This takes a few seconds.';
+    const form = new FormData(); form.append('file', new Blob([wav.buffer], { type: 'audio/wav' }), 'me.wav'); form.append('id', 'me');
+    try { const r = await api('/api/voices', { method: 'POST', body: form }); if (!r.ok) throw 0; await loadVoices(); $('#voice').value = 'me'; sendVoiceConfig(); $('#recordStatus').textContent = 'Your voice is ready and selected.'; }
+    catch { $('#recordStatus').textContent = 'Your voice could not be made. Record again somewhere quieter, speaking for the full 10 seconds.'; }
+  };
+};

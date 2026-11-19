@@ -8,7 +8,7 @@ import { encodeWav } from "./wav";
 import { smartTurnProbability, loadSmartTurn } from "./smartTurn";
 
 const LLM = (Bun.env.LAB_LLM_URL ?? "http://127.0.0.1:9921").replace(/\/$/, "");
-const TTS = (Bun.env.LAB_TTS_URL ?? "http://127.0.0.1:9922").replace(/\/$/, "");
+export const TTS = (Bun.env.LAB_TTS_URL ?? "http://127.0.0.1:9923").replace(/\/$/, "");
 const PARAKEET = Bun.env.LAB_PARAKEET ?? "/usr/local/maipai-home/stack/data/models/parakeet-tdt-0.6b-v2-int8/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8";
 const SMART_TURN = Bun.env.LAB_SMART_TURN ?? "/usr/local/maipai-home/stack/data/models/smart-turn-v3.2/smart-turn-v3.2-cpu.onnx";
 
@@ -86,8 +86,10 @@ export async function turnCheck(wav: Uint8Array, _signal?: AbortSignal): Promise
   return { probability, complete: true };
 }
 
-export async function speech(text: string, signal?: AbortSignal): Promise<Response> {
+export async function speech(text: string, signal?: AbortSignal, opts: { voice?: string; style?: string } = {}): Promise<Response> {
   const f = new FormData(); f.append("text", text);
+  if (opts.voice && opts.voice !== "builtin") f.append("voice", opts.voice);
+  if (opts.style) f.append("style", opts.style);
   const r = await fetch(`${TTS}/tts`, { method: "POST", body: f, signal });
   if (!r.ok || !r.body) throw new Error(`speech ${r.status}`);
   return r;

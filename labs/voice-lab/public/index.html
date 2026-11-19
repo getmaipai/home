@@ -8,7 +8,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Voice lab</h1><a href="echo.html">Echo test</a></header>
+  <header><h1>Voice lab</h1><span><a href="voices-cloned.html">Cloned voices</a> · <a href="voices.html">Voice samples</a> · <a href="echo.html">Echo test</a></span></header>
   <p class="note">A test page. It talks to its own copy of the chat model and voice, not to Home.</p>
 
   <div id="signin">
@@ -41,6 +41,14 @@
     <details><summary>All numbers</summary><pre></pre></details>
   </section>
 
+  <section class="talk" id="voiceBox">
+    <h2>Voice</h2>
+    <label>Voice <select id="voice"><option value="builtin">Built-in</option></select></label>
+    <label>Voice engine <select id="voiceModel"></select></label>
+    <label><input id="useStyles" type="checkbox" checked> Let the model whisper, shout, sound angry or excited (uses styled samples when the voice has them)</label>
+    <p><button id="recordVoice">Record my voice (10 seconds)</button> <span id="recordStatus" class="note"></span></p>
+    <p class="note">Recording makes a cloned voice called "me" that stays on this Mac in the lab's folder. Read anything aloud in your normal voice.</p>
+  </section>
   <details id="settings">
     <summary>Settings</summary>
     <label>Talk-over mode <select id="talkOver"><option value="pause_then_decide">Pause, then decide</option><option value="stop_fast">Stop fast</option></select></label>
