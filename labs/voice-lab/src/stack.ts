@@ -103,3 +103,20 @@ export async function warm(): Promise<string[]> {
   return notes;
 }
 export { encodeWav };
+
+/** Prewarm the chat model: makes it read the prompt so far (system prompt, tools, history) and keep that work,
+ * so the next real turn only has to read the new words. One token is generated and thrown away. */
+export async function prewarmChat(messages: unknown[], tools?: unknown[], signal?: AbortSignal): Promise<number> {
+  const t0 = performance.now();
+  const r = await fetch(`${LLM}/v1/chat/completions`, { method: "POST", signal, headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stream: false, cache_prompt: true, messages, max_tokens: 1, temperature: 0, ...(tools ? { tools, tool_choice: "auto" } : {}) }) });
+  await r.arrayBuffer();
+  return performance.now() - t0;
+}
+/** Prewarm the voice: one short line in the chosen voice, thrown away, so the voice and its clone are loaded and hot. */
+export async function prewarmVoice(voice: string, signal?: AbortSignal): Promise<number> {
+  const t0 = performance.now();
+  const r = await speech("Okay.", signal, { voice });
+  await r.arrayBuffer();
+  return performance.now() - t0;
+}

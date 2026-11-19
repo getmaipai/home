@@ -130,6 +130,7 @@ $('#start').onclick = async () => {
       if (Number.isFinite(message.t_duck) || Number.isFinite(message.t_stop_sent)) $('#tCut').textContent = sec(message.t_duck) + ' / ' + sec(message.t_stop_sent);
       $('#timings pre').textContent = JSON.stringify(message, null, 2);
     }
+    if (message.t === 'warm') { const el = document.querySelector('#warm'); if (el) el.textContent = (el.textContent === '-' ? '' : el.textContent + ', ') + message.part + ' ' + (message.ms / 1000).toFixed(1) + ' s'; }
     if (message.t === 'error') status.textContent = 'The reply could not be completed.';
   };
   node.port.onmessage = (event) => { if (ws?.readyState === 1) ws.send(event.data); };
