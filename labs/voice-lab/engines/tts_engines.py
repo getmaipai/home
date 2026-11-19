@@ -10,6 +10,7 @@ Loading and streaming code is taken from the round 1 and round 2 bench (bench_cl
 """
 import copy
 import gc
+import os
 import re
 
 import numpy as np
@@ -314,7 +315,7 @@ class VoxCPM2(Engine):
     guard = True
     min_ref_s = 3.0
     # Defaults picked by the word-accuracy experiments (data-scratch/voices/server_bench2.md).
-    cfg = dict(mode="cont", cfg_value=2.0, timesteps=10, noise=1.0, schedule=(1, 2, 4), sep=" ")
+    cfg = dict(mode="cont", cfg_value=2.0, timesteps=int(os.environ.get("LAB_VOX_STEPS", "6")), noise=1.0, schedule=(1, 2, 4), sep=" ")
     # 300 ms of silence after the reference clip and a space between its transcript and the new text: the model then starts
     # a fresh sentence instead of a hesitation ("um") that the casual reference voice teaches it. 39 of 40 exact, against 16 of 40.
     prep_tail_s = 0.3

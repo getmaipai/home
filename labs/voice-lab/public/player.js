@@ -6,7 +6,7 @@ const buffer = new PlaybackBuffer();
 let paths = {}, destination = ctx.destination, output = 'direct';
 let paused = false, ducked = false, next = ctx.currentTime, tickTimer = 0;
 let scheduled = [], playedCursor = 0, activeTurn = 0, sampleRate = 24000;
-let jitterMs = 60, underruns = 0;
+let jitterMs = 120, underruns = 0;
 const audio = document.querySelector('#audio');
 
 function pathNode(mode) {

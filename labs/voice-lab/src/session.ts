@@ -167,7 +167,7 @@ export class VoiceSession {
     try {
       while (rounds <= 2) {
         let toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
-        for await (const event of this.chatFn(requestMessages, signal, undefined, toolDefinitions)) {
+        for await (const event of this.chatFn(requestMessages, signal, undefined, toolDefinitions, rounds === 0 ? "auto" : "none")) {
           if (signal.aborted || this.closed) break;
           if (!this.metrics.t_llm_first_token) this.metrics.t_llm_first_token = this.metricNow();
           if (event.type === "text") await speakText(event.text); else toolCalls = event.calls;

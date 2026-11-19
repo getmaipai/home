@@ -13,7 +13,7 @@ export async function runTool(call: LabTool, toolDelayMs = 2500, now = new Date(
   }
   if (call.name === "web_search") {
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, toolDelayMs)));
-    return "No real search was run. Placeholder fact: Placeholder fact one. Placeholder fact: Placeholder fact two.";
+    return "Web search is not connected in this test page, so there are no results. Tell the person that in one short sentence, then say what you know from memory if that helps. Do not say you are looking anything up again.";
   }
   throw new Error("unknown tool");
 }
