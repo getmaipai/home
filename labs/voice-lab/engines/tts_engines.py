@@ -63,10 +63,14 @@ class Engine:
     needs_text = False        # prepare() wants the reference transcript
     native_tags = {}          # canonical tag -> model syntax (only tags checked to work)
     native_styles = {}        # style -> (prefix inserted before the text)
+    native_instruct = {}      # style -> delivery instruction (opts["instruct"]), for models that take one
     builtin_voice = True      # can speak with no reference clip
     min_ref_s = 3.0
     rate = SR
     note = ""
+    takes_opts = False        # stream() accepts opts={"seed": int, "context": [...]}
+    takes_context = False     # opts["context"] is used (earlier chat turns)
+    guard = False             # the server's runaway guard applies (see speech_guard.py)
 
     def __init__(self):
         self.model = None
@@ -298,5 +302,250 @@ class HiggsV3(Engine):
             yield self._f32(r.audio)
 
 
-ENGINES = {c.key: c for c in (ChatterboxTurbo, Pocket, Qwen3Base, Zonos3Mini, HiggsV3)}
+class VoxCPM2(Engine):
+    """VoxCPM2 (2B, bf16). Native 48 kHz, the server resamples to 24 kHz. The voice is the reference
+    clip, cached as its two latent encodings plus the transcript. Streams through voxcpm_stream."""
+    key = "voxcpm2"
+    repo = "mlx-community/VoxCPM2-bf16"
+    mem_gb = 6.5
+    needs_text = True
+    builtin_voice = False
+    takes_opts = True
+    guard = True
+    min_ref_s = 3.0
+    # Defaults picked by the word-accuracy experiments (data-scratch/voices/server_bench2.md).
+    cfg = dict(mode="cont", cfg_value=2.0, timesteps=10, noise=1.0, schedule=(1, 2, 4), sep=" ")
+    # 300 ms of silence after the reference clip and a space between its transcript and the new text: the model then starts
+    # a fresh sentence instead of a hesitation ("um") that the casual reference voice teaches it. 39 of 40 exact, against 16 of 40.
+    prep_tail_s = 0.3
+
+    def prepare(self, wav24, text):
+        import tempfile
+        from scipy.io import wavfile
+        from voxcpm_stream import encode_reference
+        if self.prep_tail_s:
+            wav24 = np.concatenate([wav24, np.zeros(int(self.prep_tail_s * SR), np.float32)])
+        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
+            wavfile.write(f.name, SR, (np.clip(wav24, -1, 1) * 32767).astype(np.int16))
+            prompt, ref = encode_reference(self.model, f.name)
+        return {"prompt_feat": prompt, "ref_feat": ref, "text": text}
+
+    def to_arrays(self, prep):
+        import mlx.core as mx
+        return {"prompt_feat": np.array(prep["prompt_feat"].astype(mx.float32)),
+                "ref_feat": np.array(prep["ref_feat"].astype(mx.float32)), "text": np.array(prep["text"])}
+
+    def from_arrays(self, arrs):
+        import mlx.core as mx
+        return {"prompt_feat": mx.array(arrs["prompt_feat"]), "ref_feat": mx.array(arrs["ref_feat"]),
+                "text": str(arrs["text"])}
+
+    def stream(self, text, prep, temperature=None, opts=None):
+        from voxcpm_stream import stream_patches
+        c = dict(self.cfg)
+        if temperature is not None:
+            c["noise"] = temperature
+        opts = opts or {}
+        yield from stream_patches(self.model, text, prep, seed=opts.get("seed"), **c)
+
+
+class CSM1B(Engine):
+    """Sesame CSM-1B (fp16), 24 kHz. The voice is the reference clip as Mimi codes plus its
+    transcript; the clip and its words lead the text (the model's voice-match mode), so the model
+    carries on in that voice. Optional earlier chat turns go in front as text-only context."""
+    key = "csm-1b"
+    repo = "mlx-community/csm-1b-fp16"
+    mem_gb = 4.7
+    needs_text = True
+    builtin_voice = False
+    takes_opts = True
+    takes_context = True
+    guard = True
+    min_ref_s = 3.0
+    cfg = dict(temperature=0.9, top_k=50, schedule=(2, 3, 4), context_chars=300, voice_match=False, sep=" ")
+    # voice_match=False: the clip is an earlier finished utterance and the new text is the next one. The package default
+    # (True) merges the clip words with the new text and dropped or changed the first words in 16 of 40 lines (24 of 40 exact);
+    # False was 40 of 40 exact and closer to the voice (similarity 0.59 against 0.49).
+    prep_tail_s = 0.0   # silence added after the reference clip before it is encoded
+    USER_SPEAKER, VOICE_SPEAKER = 1, 0
+
+    def prepare(self, wav24, text):
+        import mlx.core as mx
+        if self.prep_tail_s:
+            wav24 = np.concatenate([wav24, np.zeros(int(self.prep_tail_s * SR), np.float32)])
+        frames, _ = self.model._tokenize_audio(mx.array(wav24), add_eos=False)  # (n, 33): 32 codebooks + a text slot
+        mx.eval(frames)
+        return {"tokens": frames, "text": text}
+
+    def to_arrays(self, prep):
+        return {"tokens": np.array(prep["tokens"]), "text": np.array(prep["text"])}
+
+    def from_arrays(self, arrs):
+        import mlx.core as mx
+        return {"tokens": mx.array(arrs["tokens"]), "text": str(arrs["text"])}
+
+    def stream(self, text, prep, temperature=None, opts=None):
+        import time
+        import mlx.core as mx
+        from mlx_audio.lm.sample_utils import make_sampler
+        m, c, opts = self.model, self.cfg, opts or {}
+        if opts.get("seed") is not None:
+            mx.random.seed(opts["seed"])
+        # prompt: earlier turns (text only), then the reference words + the new text, then the reference audio
+        toks, masks = [], []
+        for turn in opts.get("context") or []:
+            t, mk = m._tokenize_text_segment(turn["text"][:c["context_chars"]],
+                                             self.USER_SPEAKER if turn["speaker"] == "user" else self.VOICE_SPEAKER)
+            toks.append(t), masks.append(mk)
+        frame = prep["tokens"].astype(mx.int32)
+        fmask = mx.zeros(frame.shape).astype(mx.bool_)
+        fmask[:, :-1] = True
+        if c["voice_match"]:
+            # the reference words and the new text come first, then the reference audio: the model carries on from it
+            t, mk = m._tokenize_text_segment((prep["text"] + c["sep"] + text).strip(), self.VOICE_SPEAKER)
+            toks.append(t), masks.append(mk)
+            toks.append(frame), masks.append(fmask)
+        else:
+            # a finished earlier utterance (words, audio, end frame), then the new text as the next utterance
+            t, mk = m._tokenize_text_segment(prep["text"], self.VOICE_SPEAKER)
+            toks.append(t), masks.append(mk)
+            toks.append(frame), masks.append(fmask)
+            toks.append(mx.zeros((1, m._frame_size)).astype(mx.int32)), masks.append(fmask[:1])  # end-of-utterance frame
+            t, mk = m._tokenize_text_segment(text, self.VOICE_SPEAKER)
+            toks.append(t), masks.append(mk)
+        curr = mx.expand_dims(mx.concat(toks, axis=0).astype(mx.int32), axis=0)
+        curr_mask = mx.expand_dims(mx.concat(masks, axis=0).astype(mx.bool_), axis=0)
+        pos = mx.expand_dims(mx.arange(0, curr.shape[1]), axis=0).astype(mx.int32)
+        from speech_guard import estimate_seconds
+        max_frames = int(12.5 * (estimate_seconds(text) * 4 + 2))
+        if curr.shape[1] + max_frames >= 2048:
+            raise ValueError("The text and the context are too long for this model. Send a shorter piece.")
+        sampler = make_sampler(temp=temperature if temperature is not None else c["temperature"], top_k=c["top_k"])
+        m.model.reset_caches()
+        m._streaming_decoder.reset()
+        samples, n, start, sched_i = [], 0, time.perf_counter(), 0
+        want = c["schedule"][0]
+        try:
+            for _ in range(max_frames):
+                sample = m.model.generate_frame(curr, curr_mask, pos, sampler)
+                if mx.all(sample == 0):
+                    break
+                samples.append(sample)
+                curr = mx.expand_dims(mx.concat([sample, mx.zeros((1, 1)).astype(mx.int32)], axis=1), axis=1)
+                curr_mask = mx.expand_dims(mx.concat([mx.ones_like(sample).astype(mx.bool_),
+                                                      mx.zeros((1, 1)).astype(mx.bool_)], axis=1), axis=1)
+                pos = pos[:, -1:] + 1
+                if len(samples) >= want:
+                    yield self._f32(m.generate_result(samples, start, stream=True).audio)
+                    samples, sched_i = [], sched_i + 1
+                    want = c["schedule"][min(sched_i, len(c["schedule"]) - 1)]
+            if samples:
+                yield self._f32(m.generate_result(samples, start, stream=True, is_final_chunk=True).audio)
+        finally:
+            mx.clear_cache()
+
+
+class Breeze2(Engine):
+    """Breeze TTS 2, 24 kHz. The voice is the reference clip's codec frames plus its transcript, cached as
+    the finished prompt embeddings. `instruct` (a delivery instruction) is the one style control; the server
+    maps `style` to it. The package streams in fixed pieces, so this repeats its loop with small first pieces."""
+    key = "breeze-tts-2"
+    repo = "mlx-community/Breeze-TTS-2-mlx"          # bf16; the 4-bit build is mlx-community/Breeze-TTS-2-mlx-4bit
+    mem_gb = 8.6
+    needs_text = True
+    builtin_voice = False
+    takes_opts = True
+    guard = True
+    min_ref_s = 3.0
+    native_instruct = {
+        "whisper": "Whisper softly, very quietly.",
+        "shout": "Shout loudly and urgently.",
+        "angry": "Speak in an angry tone.",
+        "excited": "Speak in a very excited, happy tone.",
+        "sad": "Speak in a sad, subdued tone.",
+    }
+    cfg = dict(temperature=0.9, top_p=1.0, top_k=50, cfg_scale=None, schedule=(2, 3, 4), speaker="S0")
+
+    def prepare(self, wav24, text):
+        import mlx.core as mx
+        m = self.model
+        sp = m._speaker(self.cfg["speaker"])
+        t = m.text_encoder_proj(m.text_encoder(m._text_ids(f"{sp}{text}")[None, :]))
+        a = m.backbone_model.embed_tokens(m._encode_reference(mx.array(wav24)))
+        eos = m.backbone_model.embed_tokens(mx.full((1, 1, m.num_codebooks), m.config.codebook_eos_token_id))
+        prefix = mx.concatenate([t, a, eos], axis=1)
+        mx.eval(prefix)
+        return {"prefix": prefix, "text": text}
+
+    def to_arrays(self, prep):
+        import mlx.core as mx
+        return {"prefix": np.array(prep["prefix"].astype(mx.float32)), "text": np.array(prep["text"])}
+
+    def from_arrays(self, arrs):
+        import mlx.core as mx
+        return {"prefix": mx.array(arrs["prefix"]).astype(mx.bfloat16), "text": str(arrs["text"])}
+
+    def _target(self, text, instruct):
+        sp = self.model._speaker(self.cfg["speaker"])
+        t = f"{sp}<ins_bos>{instruct}<ins_eos>{text}" if instruct else f"{sp}{text}"
+        m = self.model
+        return m.text_encoder_proj(m.text_encoder(m._text_ids(t)[None, :]))
+
+    def stream(self, text, prep, temperature=None, opts=None):
+        import mlx.core as mx
+        m, c, opts = self.model, self.cfg, opts or {}
+        if opts.get("seed") is not None:
+            mx.random.seed(opts["seed"])
+        instruct = opts.get("instruct")
+        temp = temperature if temperature is not None else c["temperature"]
+        cfg_scale = c["cfg_scale"]
+        use_cfg = bool(instruct) and cfg_scale not in (None, 1.0)
+        pre = prep["prefix"]
+        cond = mx.concatenate([pre, self._target(text, instruct).astype(pre.dtype)], axis=1)
+        cache = m.backbone_model.make_cache()
+        hidden = m.backbone_model(input_embeddings=cond, cache=cache)[:, -1, :]
+        if use_cfg:
+            ucond = mx.concatenate([pre, self._target(text, None).astype(pre.dtype)], axis=1)
+            ucache = m.backbone_model.make_cache()
+            uhidden = m.backbone_model(input_embeddings=ucond, cache=ucache)[:, -1, :]
+        from speech_guard import estimate_seconds
+        max_frames = int(12.5 * (estimate_seconds(text) * 4 + 2))
+        dec = m.audio_tokenizer.decoder
+        dec.reset_streaming_state()
+        pending, sched_i = [], 0
+        want = c["schedule"][0]
+
+        def decode(frames):
+            codes = mx.array(frames, dtype=mx.int32)[None, :, :]
+            return self._f32(m._audio_vector(dec.streaming_step(mx.transpose(codes, (0, 2, 1)))))
+        try:
+            for _ in range(max_frames):
+                logits = m.lm_head(hidden)
+                if use_cfg:
+                    ul = m.lm_head(uhidden)
+                    logits = ul + cfg_scale * (logits - ul)
+                logits = m._mask_reserved_codec_logits(logits)
+                first = m._sample(logits, temperature=temp, top_p=c["top_p"], top_k=c["top_k"], allow_eos=True)
+                if first == m.vocab_size:
+                    break
+                frame = m._depth_tokens(first, hidden, unconditional_hidden=uhidden if use_cfg else None,
+                                        cfg_scale=1.0 if cfg_scale is None else cfg_scale, temperature=temp,
+                                        top_p=c["top_p"], top_k=c["top_k"])
+                pending.append(frame)
+                if len(pending) >= want:
+                    yield decode(pending)
+                    pending, sched_i = [], sched_i + 1
+                    want = c["schedule"][min(sched_i, len(c["schedule"]) - 1)]
+                codes = mx.array(frame, dtype=mx.int32)[None, None, :]
+                hidden = m.backbone_model(input_ids=codes, cache=cache)[:, -1, :]
+                if use_cfg:
+                    uhidden = m.backbone_model(input_ids=codes, cache=ucache)[:, -1, :]
+            if pending:
+                yield decode(pending)
+        finally:
+            dec.reset_streaming_state()
+            mx.clear_cache()
+
+
+ENGINES = {c.key: c for c in (ChatterboxTurbo, Pocket, Qwen3Base, Zonos3Mini, HiggsV3, VoxCPM2, CSM1B, Breeze2)}
 DEFAULT_MODEL = "chatterbox-turbo"

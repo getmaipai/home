@@ -22,11 +22,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import style_refs
+import speech_guard
 import voice_store as vs
 from tts_engines import DEFAULT_MODEL, ENGINES, SR, apply_tags
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STYLES = ("neutral", "whisper", "shout", "angry", "excited")
+STYLES = ("neutral", "whisper", "shout", "angry", "excited", "sad")   # "sad" only where a model has an instruction for it
 STT_REPO = "mlx-community/parakeet-tdt-0.6b-v2"  # the recognizer wordcheck.py uses
 SIL = 10 ** (-45 / 20)  # replies: below this absolute level counts as silence
 
@@ -94,6 +95,8 @@ class Job:
         self.fn, self.kind = fn, kind
         self.out = queue.Queue()
         self.cancel = threading.Event()
+        self.runaway = False       # the runaway guard stopped this piece of speech
+        self.text_edited = False   # the text given to the model differs from the request (sound tags only)
 
 
 class Core:
@@ -209,7 +212,10 @@ class Core:
     def job_model(self, key):
         def run(job):
             self.maintenance = False
-            job.out.put(("result", self._switch(key)))
+            try:
+                job.out.put(("result", self._switch(key)))
+            finally:
+                self.task = None   # _switch reports "loading <model>"; without this /health stayed "loading" after a switch
         return self.submit(run, "model")
 
     def job_voice(self, vid, a24, text, src_s):
@@ -244,9 +250,10 @@ class Core:
             finally:
                 self._switch(prev)
                 self.maintenance = False
+                self.task = None
         return self.submit(run, "styles")
 
-    def job_tts(self, text, vid, style, temperature):
+    def job_tts(self, text, vid, style, temperature, opts=None):
         def run(job):
             eng = self.engine
             style_ref = None
@@ -256,22 +263,39 @@ class Core:
                     style_ref = style  # clone from the styled clip of this voice
                 elif style in eng.native_styles:
                     prefix = eng.native_styles[style]
+            run_opts = dict(opts or {})
+            if style != "neutral" and style in eng.native_instruct and style_ref is None:
+                run_opts["instruct"] = eng.native_instruct[style]
             prep = self._prep(vid, style_ref)
             txt = apply_tags(text, eng.native_tags)
             if not txt.strip():
                 raise vs.VoiceError("The text is empty once the unsupported sound tags are removed.")
-            gen = eng.stream(prefix + txt, prep, temperature)
+            # The words are never edited here: only sound tags are rewritten or removed (apply_tags).
+            job.text_edited = txt != text
+            if eng.takes_opts:
+                gen = eng.stream(prefix + txt, prep, temperature, run_opts)
+            else:
+                gen = eng.stream(prefix + txt, prep, temperature)
             from voice_store import Resampler, pcm16
             rs, sh = Resampler(eng.rate), Shaper()
+            # runaway guard: more audio than 2.2 times the text's length estimate ends the piece
+            room = int(speech_guard.runaway_limit_seconds(txt) * SR) if eng.guard else None
             try:
                 for piece in gen:
                     if job.cancel.is_set():
                         return
                     if not len(piece):
                         continue
-                    out = sh.feed(rs(piece))
+                    audio = rs(piece)
+                    if room is not None:
+                        if len(audio) > room:
+                            audio, job.runaway = audio[:max(room, 0)], True
+                        room -= len(audio)
+                    out = sh.feed(audio)
                     if out is not None and len(out):
                         job.out.put(("audio", pcm16(out)))
+                    if job.runaway:
+                        break
                 tail = sh.finish()
                 if tail is not None and len(tail):
                     job.out.put(("audio", pcm16(tail)))
@@ -306,6 +330,28 @@ def parse_body(handler):
         return fields, files
     from urllib.parse import parse_qs
     return {k: v[0] for k, v in parse_qs(body.decode("utf-8", "replace")).items()}, files
+
+
+def parse_context(raw):
+    """The optional `context` field: a JSON list (or JSON text of one) of up to 3 earlier chat turns,
+    each {"speaker": "user"|"assistant", "text": "..."}. Returns the cleaned list. Models that cannot
+    use context ignore it."""
+    if raw in (None, "", []):
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            raise vs.VoiceError("The 'context' field must be JSON: a list of {\"speaker\": \"user\" or \"assistant\", \"text\": \"...\"}.")
+    if not isinstance(raw, list) or len(raw) > 3:
+        raise vs.VoiceError("The 'context' field takes a list of at most 3 earlier turns. Send the last three.")
+    out = []
+    for t in raw:
+        if not isinstance(t, dict) or t.get("speaker") not in ("user", "assistant") or not isinstance(t.get("text"), str):
+            raise vs.VoiceError("Each context turn is {\"speaker\": \"user\" or \"assistant\", \"text\": \"...\"}.")
+        if t["text"].strip():
+            out.append({"speaker": t["speaker"], "text": t["text"].strip()})
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -410,11 +456,14 @@ class Handler(BaseHTTPRequestHandler):
         if style not in STYLES:
             raise vs.VoiceError(f"Unknown style '{style}'. Styles are: {', '.join(STYLES)}.")
         temp = float(f["temperature"]) if f.get("temperature") not in (None, "") else None
+        opts = {"context": parse_context(f.get("context"))}
+        if f.get("seed") not in (None, ""):
+            opts["seed"] = int(f["seed"])
         vid = f.get("voice") or None
         if c.maintenance:
             raise Busy("The server is busy building styled references. Try again in a minute.")
         model = c.engine.key if c.engine else "?"
-        job = c.job_tts(text, vid, style, temp)
+        job = c.job_tts(text, vid, style, temp, opts)
         sent = 0
         ttfa = None
         started = False
@@ -453,7 +502,8 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             total = (time.time() - t0) * 1000
             log(f"tts model={model} voice={vid or 'default'} style={style} chars={len(text)} "
-                f"ttfa_ms={ttfa if ttfa is None else round(ttfa)} total_ms={round(total)} audio_s={sent / 2 / SR:.2f}")
+                f"ttfa_ms={ttfa if ttfa is None else round(ttfa)} total_ms={round(total)} audio_s={sent / 2 / SR:.2f} "
+                f"runaway={int(job.runaway)} text_edited={int(job.text_edited)}")
 
     def chunk(self, b):
         self.wfile.write(f"{len(b):x}\r\n".encode() + b + b"\r\n")
@@ -468,9 +518,11 @@ def models_info(core):
     out = {}
     for k, E in ENGINES.items():
         out[k] = {"supports_clone": True, "streams": E.streams, "slow": E.slow,
-                  "tags": sorted(E.native_tags), "styles": sorted(E.native_styles),
+                  "tags": sorted(E.native_tags), "styles": sorted(set(E.native_styles) | set(E.native_instruct)),
+                  "instructions": E.native_instruct,
                   "styles_by_reference": verdicts.get(k, {}),
                   "approx_memory_gb": E.mem_gb, "needs_transcript": E.needs_text,
+                  "takes_context": E.takes_context, "runaway_guard": E.guard,
                   "has_builtin_voice": E.builtin_voice, "loaded": bool(core.engine and core.engine.key == k)}
     return {"default": DEFAULT_MODEL, "models": out}
 
