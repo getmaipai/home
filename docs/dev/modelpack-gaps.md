@@ -1,43 +1,47 @@
 # Model pack gaps: what Home cannot move yet
 
-Written by MODELPACK-HOME-05 (music), 2026-11-19. One section per slice. A gap here is a Stack or spec fact Home needs before it can stop naming a model; Home does not guess it (design note [model-packs-2026-11-17.md](../design/model-packs-2026-11-17.md), section 8).
+One section per slice. A gap here is a Stack or spec fact Home needs before it can stop naming a model; Home does not guess it (design note [model-packs-2026-11-17.md](../design/model-packs-2026-11-17.md), section 8). Answered gaps are deleted; only what is still true stays.
 
 ## MODELPACK-HOME-05: music (`backend/src/lib/music`)
 
-Status: stopped before any Home code change. The slice is blocked on the facts in 1 to 3. No Home source was edited.
+Status 2026-11-19, against `@maipai/spec` spec-v0.1.424 and Stack `f5a696b`: **stems are moved** (a song made here goes to the generic `stems` job; availability is read from the jobs catalog; no model id is sent). **Songs are not moved**: `song` and `song_edit` on the make door cannot yet carry what Home's songs need (1 to 3 below). A person's own audio file still splits on the stems route (4).
 
-What was checked on 2026-11-19, from this worktree and the local Stack:
+What moved, where:
 
-- `GET /stack/v1/jobs/catalog?audience=adult` answers and lists `song` (part `ace-step-1-5-turbo`, `limits.max_seconds.standard` 120, `limits.max_words` 4000), `song_edit` (same part, 120 s) and `stems` (part `htdemucs`, no limits). Home already has the read: `jobsCatalog` in `backend/src/lib/stack/client.ts`, typed by `jobsCatalogShape.ts`.
-- `POST /stack/v1/jobs/make` exists and refuses a call without Home's token (`home_token_required`). Home has no call to it yet: nothing in `backend/src` posts to `jobs/make`.
+- `submitStems` (`lib/music/stack.ts`) posts `{ job: "stems", audience: "adult", song: "data:audio/mp4;base64,...", stems: [vocals, drums, bass, other] }` to `POST /stack/v1/jobs/make` for a song made here, and reads the job id from the result's `id`. The `model` field is gone from every stems call (the stems route defaults it).
+- `stemsAvailable(audience)` replaces `stemsStatus` and reads the catalog's `stems` entry (`GET /stack/v1/jobs/catalog`). The music features run only for an adult (`musicViewDenial`), so the song-card and owned-file split ask the adult catalog. The voice-sample split has no person, so it asks the minor catalog: that list is the narrower one, so a yes there holds for anyone.
+- Tests: `tests/musicRoutes.test.ts` (the generic stems request, a refused make, the owned-file route, catalog availability); `tests/musicFixture.ts` answers the catalog and the make route.
 
-### 1. The `song`, `song_edit` and `stems` request and result shapes are not readable from Home
+### 1. The make door picks a song's part before it looks at the level
 
-The only copy of the spec in this tree is `@maipai/spec` spec-v0.1.422, which has no job shapes. `jobsCatalogShape.ts` says the catalog shape arrived in spec-v0.1.423, and the design note's section 3 lists eight jobs and none of the three music ones. The Stack source was not available to this session, and a trial `make` would start a real job on the live Stack.
+`planMake` (Stack `lib/makePlan.ts`) takes the first runnable part that has a `song` job, in the audience's order, and only then checks the level against that part's pack. The song parts split the levels (the standard part serves `standard`, the larger turbo part `boost`, the larger SFT part `max`), so a request for `boost` or `max` is refused `level_not_served` whenever the standard part is first and ready. Home cannot work around it: it would have to name a `part`, and it knows only ids and labels from the adult catalog's `alternatives`, never which level each serves (a minor's catalog has no `alternatives` at all). The same holds for `song_edit`.
 
-Needed from the Stack or spec side (a spec tag at or above the one that carries them, then `bash scripts/pin.sh commons <pkg>-vX.Y.Z`):
+Needed from the Stack: when a request names a `level`, plan among the parts whose pack serves it; and, for Home to drop `max_model` (`StackMusicStatus`, `ready.ts` `musicMaxInstalled`, `musicLength.test.ts`, `musicStackShape.test.ts`), a catalog `song` entry whose `limits.levels` covers every part's levels, with a Stack-worded way to say a level needs a part that is not installed yet (today Max runs as Boost when it is not).
 
-- The request fields of `song` and `song_edit`, and which of today's `MusicBody` tasks (`text2music`, `cover`, `repaint`, `extend`, `edit`, plus the trim, fade and loudness edits) map to which job. Home must not guess the field names (`field_map` is the pack's data).
-- How a source is sent for `song_edit` and `stems` (today `source` and `source_sha256`, with `origin: "owned_file"` for a person's own file).
-- The result: how the song's bytes, `lrc`, `bpm`, `key`, `seed` and `duration_s` come back, how each stem is listed (`vocals`, `drums`, `bass`, `other`) and fetched, and the poll, cancel and delete routes for a `make` job.
-- What `made_with` carries for a song, so `GenerationProvenance` can store the Stack's part id, label and pack version instead of looking a model id up in `lib/music/models.ts`.
+### 2. The `song` and `song_edit` requests lack fields Home's songs use
 
-### 2. Song quality levels have no catalog equivalent yet
+- `song` has no `bpm`, `key` or `language` (Home sends them from the tool, the Create form and the style card: `MusicRequest`, `routes/music.ts`). `style_words` is free text joined into the caption; turning a tempo or a key into words in Home would be Home writing a model prompt, so it is not done.
+- `song_edit` `cover` carries only `strength` and `style_words`; Home's cover also sends the new description and the lyrics. `repaint` and `extend` fit.
+- Trim, fade and loudness edits are not in the spec by design (no model runs); they stay on `POST /v1/audio/music` with `task: "edit"`, which names no model.
 
-Home offers Quick, Detailed and Max from `StackMusicStatus.quality`, with `max_model.installed` and `remaining_bytes` deciding whether Max runs as Max or as Boost (`ready.ts` `musicMaxInstalled`, `musicLength.test.ts`, `musicStackShape.test.ts`). The catalog lists `song` with `levels: ["standard"]` only, and `alternatives` names the larger parts without saying which level each serves, and it has no "needs a download" field. Needed: `song` levels (standard, boost, max) with limits per level, and a Stack-worded way to say a level needs a model that is not installed yet. Until then `musicStatus()` and `max_model` stay.
+### 3. A make call cannot return the job id at once
 
-### 3. Stems availability needs an audience answer
+Home queues a song, shows its position and progress, and lets the person cancel it, all keyed by the Stack's job id, which it gets with `timeout_ms: 1` from `/v1/audio/music`. The make request is strict and has no wait field, so the door waits the route's default (60 s for songs, 30 s for stems) before it answers 202 with the id. Stems moved anyway (a split is short, the wait is 30 s at most, and a cancel inside the wait is dropped when the id arrives); a queued song would sit with no id for up to a minute. The song result also carries no `lrc`, `bpm`, `key` or `seed`, which Home reads from the music job poll (`GET /v1/audio/music/<id>`, the id the make result returns). Needed: an optional wait (or an "answer at once" flag) on the make request, and either those fields on the result or a poll route for make jobs. Until then Home polls `/v1/audio/music/<id>` and `/v1/audio/stems/<id>`, which name no model.
 
-`stemsStatus()` could read `stems.available` from the catalog. Its callers (`prepareStemsJob`, the owned-file stems path in `lib/music/jobs.ts`, and `lib/voiceSamples.ts`) pass no audience. Needed: whether `stems` is in the minor catalog and which audience a voice-sample split should read. Home does not pick an audience for a person here by guess (rule E6).
+### 4. The generic `stems` job splits only songs this Stack made
+
+`dispatchStems` forwards no `origin`, so a person's own audio file (an upload, or a voice sample) is refused `source_not_made_here`. Both stay on `POST /v1/audio/stems` with `origin: "owned_file"` and no model id. Needed: `origin: "owned_file"` (or a spec field for a person's own file) on the `stems` request, carried through to the route.
+
+### 5. Provenance still reads Home's own model table
+
+`GenerationProvenance` for songs and stems is stamped from `lib/music/models.ts` (`modelStampFor`). The make result's `made_with` (part id, label, pack version) is the replacement, but a song cannot move until 1 to 3 close, and Home does not yet store `made_with` for the stems it now starts. Order once they close: store `made_with`, delete `KNOWN_MUSIC_MODELS`.
 
 ### What remains naming a model
 
-`lint:no-model-names` does not exist in this tree (no script, test or package entry; MODELPACK-HOME-01 has not landed here), so it could not be made repo-wide and there is nothing green to report. These are the places a music model name still sits in Home source, for the lint to cover once the gaps above close:
+`lint:no-model-names` does not exist in this tree (MODELPACK-HOME-01 has not landed, so there is no script, test or package entry), so it was not made repo-wide: it could not be green. After this change `htdemucs` is gone from `lib/music/stack.ts`. Still in Home source:
 
-- `backend/src/lib/music/stack.ts`: `model: "htdemucs"` in `submitStems`; the `max_model` field and its comment on `StackMusicStatus`.
-- `backend/src/lib/music/ready.ts`: `musicMaxInstalled` reads `max_model`; the sound-effects status builder holds a model id and licence text.
-- `backend/src/lib/music/models.ts`: `KNOWN_MUSIC_MODELS`, the licence and commercial-use table keyed by part id (ACE-Step, ACE-Step XL, the sound-effects model, the language model). This is pack data the Stack should send as `made_with`.
-- Comments naming ACE-Step or the sound-effects model in `types.ts`, `sections.ts`, `soundMaker.ts` and `routes/music.ts`.
+- `backend/src/lib/music/stack.ts`: the `max_model` field (1).
+- `backend/src/lib/music/ready.ts`: `musicMaxInstalled` reads `max_model`; the sound-effects status builder holds a model id and licence text (the sound-effects job, `sound_effect`, is not wired on the make door yet).
+- `backend/src/lib/music/models.ts`: `KNOWN_MUSIC_MODELS`, the licence and commercial-use table keyed by part id (5).
+- Comments naming ACE-Step, XL SFT or the sound-effects model in `types.ts`, `sections.ts`, `soundMaker.ts`, `tool.ts` and `ready.ts`.
 - Outside `lib/music`: `routes/aiChoices.ts` (the `htdemucs` alias), `shared/diskPlanMath.ts`, `shared/tierSlotOptions.ts`, `shared/licensedRows.ts`, `frontend/src/apps/settings/aiTierSlots.ts`, and the music pages (`WaveformSeek.tsx`, `MusicSongDetails.tsx`, `MusicLibrary.tsx`).
-
-Order once the facts exist: add a `make` call to the Stack client beside `jobsCatalog`, move `submitStems` and `submitMusic` onto it, read availability from the catalog, move the provenance table to `made_with`, then add the repo-wide lint.

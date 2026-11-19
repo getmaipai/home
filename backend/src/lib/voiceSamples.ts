@@ -8,7 +8,7 @@ import { clipToWav, decodeWavClip, encodeWavClip, type PcmClip } from "@/lib/voi
 import { createHash } from "node:crypto";
 import { findFfmpeg } from "@/lib/ffmpegPath";
 import { appendLogLine } from "@/lib/log";
-import { deleteStemsJob, enhanceSpeech, fetchStem, getStemsJob, stemsStatus, stemsStatusReady, submitStems, type StackStem } from "@/lib/music/stack";
+import { deleteStemsJob, enhanceSpeech, fetchStem, getStemsJob, stemsAvailable, submitStems, type StackStem } from "@/lib/music/stack";
 
 /** VOICE-CLEAN-01: what the person chose to clean from a recording before it is used as a voice sample. */
 export interface CleanOptions { noise?: boolean; echo?: boolean; isolate?: boolean }
@@ -30,7 +30,7 @@ const ISOLATE_POLL_MS = 1_500;
  * track is the clip. Null when the splitter is not installed or ready, or gives nothing; the caller says so. */
 export async function isolateVoice(wav: Uint8Array): Promise<Uint8Array | { reason: string }> {
   if (__isolateForTests.run) return (await __isolateForTests.run(wav)) ?? { reason: "the splitter gave nothing" };
-  if (!stemsStatusReady(await stemsStatus())) return { reason: "the splitter is not installed or not ready" };
+  if (!await stemsAvailable("minor")) return { reason: "the splitter is not installed or not ready" };
   let job: string | null = null;
   try {
     job = await submitStems(Buffer.from(wav).toString("base64"), createHash("sha256").update(wav).digest("hex"), "owned_file");

@@ -2,18 +2,18 @@
 import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
+import type { StackJobsCatalogRead } from "@/lib/stack/jobsCatalogShape";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
 /** What the Stack lists for a finished split: each stem by name, fetched at its url; every stem is as long as the song. */
 export interface StackStem { url: string; stem: "vocals" | "drums" | "bass" | "other" }
-export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
 export interface StackVoiceConvertStatus { available: boolean; state: string; ready?: boolean; install?: unknown }
 export interface StackVoiceConvertData { url: string; content_type: "audio/mp4"; bytes: number; sha256: string }
 export interface StackVoiceConvertJob { state: MusicState; stage?: string | null; stage_label?: string | null; progress_fraction?: number | null; eta_seconds?: number | null; position?: number | null; code?: string | null; data?: StackVoiceConvertData | null }
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };
   quality: string[]; default_quality?: "quick" | "detailed" | "max"; install?: unknown;
-  /** MUSIC-MAX-01: the Max maker (XL SFT). The Stack lists `max` in `quality` as soon as it offers it; without the models installed it runs the song as Boost. */
+  /** MUSIC-MAX-01: the Max maker. The Stack lists `max` in `quality` as soon as it offers it; without its parts installed it runs the song as Boost. Stays until the make door picks a song's part by level (docs/dev/modelpack-gaps.md). */
   max_model?: { id: string; installed: boolean; models?: unknown[]; remaining_bytes?: number | null } | null;
 }
 export interface MusicBody {
@@ -103,18 +103,42 @@ export async function fetchSound(job: string): Promise<Uint8Array> {
 export async function cancelOrDeleteSound(job: string): Promise<void> {
   try { await (await request(`/v1/audio/sound/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack expires its own copy */ }
 }
-export async function stemsStatus(): Promise<StackStemsStatus | null> {
+/** The four parts a split can hand back; the Stack keeps the ones asked for. They are Home's own names for a song's tracks, not a model's. */
+export const STEM_NAMES = ["vocals", "drums", "bass", "other"] as const;
+/**
+ * Whether the Stack can split a song now, read from the jobs catalog (`GET /stack/v1/jobs/catalog`): the `stems` job's `available`. The music
+ * features run only for an adult (`musicViewDenial`), so their callers ask the adult catalog. A caller with no person asks the minor's: that list is
+ * the narrower one, so a yes there holds for anyone. A catalog that does not answer reads as not available.
+ */
+export async function stemsAvailable(audience: "adult" | "minor"): Promise<boolean> {
   try {
-    const body = await (await checked(await request("/stack/v1/stems", {}, 5_000))).json() as { stems?: StackStemsStatus } & Partial<StackStemsStatus>;
-    return body.stems ?? (typeof body.available === "boolean" ? body as StackStemsStatus : null);
-  } catch { return null; }
+    const body = await (await checked(await request(`/stack/v1/jobs/catalog?audience=${audience}`, {}, 5_000))).json() as StackJobsCatalogRead;
+    return body.jobs?.find((entry) => entry.job === "stems")?.available === true;
+  } catch { return false; }
 }
-export function stemsStatusReady(status: StackStemsStatus | null): boolean { return !!status && status.available && !["unsupported", "off", "not-installed"].includes(status.state); }
+/** The plain one-line answers of the generic make door that mean "no part can do this now". */
+const MAKE_UNAVAILABLE = new Set(["not_available", "not_on_this_model"]);
+/**
+ * Starts a split. A song made here goes to the Stack's generic `stems` job (`POST /stack/v1/jobs/make`): the song travels as a data URL, the Stack
+ * picks the part and fills in its own settings, and the job id it hands back is the one `getStemsJob` polls. A person's own audio file (`origin:
+ * "owned_file"`) is split on the stems route itself, because the generic job takes only songs made here (docs/dev/modelpack-gaps.md); no part is named
+ * either way.
+ */
 export async function submitStems(source: string, source_sha256: string, origin?: "owned_file"): Promise<string> {
-  const res = await checked(await request("/v1/audio/stems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, model: "htdemucs", ...(origin ? { origin } : {}) }) }, 60_000));
-  const parsed = await res.json() as { job?: string };
-  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
-  return parsed.job;
+  if (origin === "owned_file") {
+    const res = await checked(await request("/v1/audio/stems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, origin }) }, 60_000));
+    const parsed = await res.json() as { job?: string };
+    if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+    return parsed.job;
+  }
+  const res = await request("/stack/v1/jobs/make", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: "stems", audience: "adult", song: `data:audio/mp4;base64,${source}`, stems: [...STEM_NAMES] }) }, 60_000);
+  if (res.status === 409) {
+    const code = (await res.json().catch(() => null) as { code?: unknown } | null)?.code;
+    throw new StackMusicError(503, typeof code === "string" && MAKE_UNAVAILABLE.has(code) ? "stems_unavailable" : typeof code === "string" ? code : "http_409");
+  }
+  const parsed = await (await checked(res)).json() as { id?: string };
+  if (!parsed.id) throw new StackMusicError(502, "bad_reply");
+  return parsed.id;
 }
 export async function getStemsJob(job: string): Promise<StackMusicJob> {
   return await (await checked(await request(`/v1/audio/stems/${encodeURIComponent(job)}`))).json() as StackMusicJob;
@@ -122,7 +146,7 @@ export async function getStemsJob(job: string): Promise<StackMusicJob> {
 export async function deleteStemsJob(job: string): Promise<void> {
   try { await (await request(`/v1/audio/stems/${encodeURIComponent(job)}`, { method: "DELETE" })).arrayBuffer(); } catch { /* Stack retention is the fallback */ }
 }
-/** Removes room echo and noise from a speech WAV with the Stack's speech enhancer (MossFormer2 SE). Null when the model is not installed or the call fails. */
+/** Removes room echo and noise from a speech WAV with the Stack's speech enhancer. Null when the model is not installed or the call fails. */
 export async function enhanceSpeech(wav: Uint8Array): Promise<Uint8Array | null> {
   try {
     const res = await request("/v1/audio/enhance", { method: "POST", headers: { "content-type": "audio/wav" }, body: wav as unknown as RequestInit["body"] }, 120_000);

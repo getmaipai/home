@@ -8,7 +8,7 @@ import { attachmentFilePath, createAttachment, readAttachment, readAttachmentFor
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, cancelOrDeleteSound, fetchSound, getSoundJob, submitSound, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
+import { cancelOrDeleteMusic, cancelOrDeleteSound, fetchSound, getSoundJob, submitSound, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsAvailable, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { partsDoneLine, prepareMusicEdit } from "./tool";
@@ -121,8 +121,7 @@ export interface StartMusicInput {
 }
 /** Shared bytes and Stack body for both the edit_music tool and the song card's stems action. */
 export async function prepareStemsJob(actor: PersonRow, source: MusicJob): Promise<{ ok: true; task: "stems"; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; status: 422 | 503; line: string }> {
-  const status = await stemsStatus();
-  if (!stemsStatusReady(status)) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  if (!await stemsAvailable("adult")) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
   if (source.task === "stems" || !source.fileId) return { ok: false, status: 422, line: "A stem cannot be split again. Choose a song instead." };
   const file = readMusicFile(actor, source, source.fileId);
   if (!file) return { ok: false, status: 422, line: plainMusicFailure("source_not_made_here") };
@@ -167,7 +166,7 @@ export async function prepareOwnedStemsJob(actor: PersonRow, fileId: string): Pr
     if (owned.reason === "large") return { ok: false, status: 413, line: "That file is too big to split. Try one under 40 MB." };
     return { ok: false, status: 404, line: "That file isn't available any more." };
   }
-  if (!stemsStatusReady(await stemsStatus())) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  if (!await stemsAvailable("adult")) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
   const name = (owned.row.name ?? "Audio file").replace(/\.[A-Za-z0-9]{1,5}$/, "").trim().slice(0, 80) || "Audio file";
   return { ok: true, name,
     request: { description: "", instrumental: false, seconds: owned.seconds, title: name, ownedFile: true },
