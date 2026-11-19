@@ -1,0 +1,23 @@
+export const config = {
+  host: "127.0.0.1",
+  port: Number(Bun.env.LAB_PORT ?? 9911),
+  stackUrl: (Bun.env.LAB_STACK_URL ?? "http://127.0.0.1:8770").replace(/\/$/, ""),
+  sileroPath: Bun.env.LAB_SILERO ?? "/usr/local/maipai-home/stack/data/models/silero-vad/silero_vad.onnx",
+  speechStartMs: 96,
+  prerollMs: 320,
+  checkSilenceMs: 160,
+  commitSilenceMs: 900,
+  turnThreshold: 0.6,
+  duckMs: 64,
+  interruptMs: 250,
+  cutGapMs: 280,
+  echoThreshold: 0.85,
+  frameMs: 32,
+  sampleRate: 16000,
+  replyRate: 24000,
+  temperature: Number(Bun.env.LAB_TEMPERATURE ?? 0.8),
+  earlyStart: true,
+  firstChunkMin: Number(Bun.env.LAB_FIRST_MIN ?? 14),
+  firstChunkMax: Number(Bun.env.LAB_FIRST_MAX ?? 42),
+};
+export type LiveConfig = Pick<typeof config, "checkSilenceMs" | "commitSilenceMs" | "turnThreshold" | "echoThreshold" | "earlyStart">;

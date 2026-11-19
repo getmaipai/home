@@ -1,0 +1,14 @@
+{
+  "name": "voice-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run server.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "sherpa-onnx-node": "1.13.8",
+    "sherpa-onnx-darwin-arm64": "1.13.8",
+    "onnxruntime-web": "1.29.0"
+  }
+}

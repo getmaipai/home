@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voice lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header><h1>Voice lab</h1><a href="echo.html">Echo test</a></header>
+  <p class="note">A test page. It talks to its own copy of the chat model and voice, not to Home.</p>
+
+  <div id="signin">
+    <label>Secret <input id="secret" type="password" autocomplete="current-password"></label>
+    <button id="start" class="primary">Start talking</button>
+    <button id="stop" disabled>Stop reply</button>
+  </div>
+  <p id="status">Enter the secret, then press Start talking and allow the microphone.</p>
+
+  <div id="light" data-state="off">Not started</div>
+
+  <section class="talk">
+    <h2>You said</h2>
+    <p id="final" class="line"></p>
+    <p id="partial" class="line faint"></p>
+    <h2>Reply</h2>
+    <p id="reply" class="line"></p>
+  </section>
+
+  <section id="timings">
+    <h2>Speed</h2>
+    <div class="big"><span id="firstSound">-</span><small>seconds from the end of your sentence to the first sound</small></div>
+    <table>
+      <tr><td>Typical so far</td><td id="median">-</td></tr>
+      <tr><td>Decided you were done</td><td id="tCommit">-</td></tr>
+      <tr><td>Model's first word</td><td id="tToken">-</td></tr>
+      <tr><td>Voice started</td><td id="tVoice">-</td></tr>
+      <tr><td>Cut-in: voice lowered / stopped</td><td id="tCut">-</td></tr>
+    </table>
+    <details><summary>All numbers</summary><pre></pre></details>
+  </section>
+
+  <details id="settings">
+    <summary>Settings</summary>
+    <label>Pause before checking you are done (ms) <input id="silence" type="number" value="160"></label>
+    <label>How sure the turn check must be (0 to 1) <input id="threshold" type="number" step=".05" value=".6"></label>
+    <label><input id="early" type="checkbox" checked> Start the answer early</label>
+    <label>Echo match needed to ignore its own voice (0 to 1) <input id="echoThreshold" type="number" step=".05" value=".85"></label>
+    <label>Sound output path <select id="output"><option>direct</option><option>element</option><option>loopback</option></select></label>
+    <label>Browser echo cancelling <select id="echoSetting"><option>true</option><option>all</option><option>remote-only</option><option>false</option></select></label>
+    <p class="note">Output path and echo cancelling take effect the next time you press Start talking (reload the page first).</p>
+  </details>
+  <audio id="audio" autoplay playsinline></audio>
+</main>
+<script type="module" src="player.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
