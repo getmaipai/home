@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { commitDelay } from "./commitDelay";
 
 export type State = "idle" | "user_speaking" | "maybe_done" | "thinking" | "speaking";
 export type Command = { type: string; [key: string]: unknown };
@@ -65,7 +66,7 @@ export class TurnManager {
         this.revision++;
         return this.emit("check_turn", { revision: this.revision });
       }
-      if (this.state === "maybe_done" && silence >= this.opts.commitSilenceMs && this.transcript) {
+      if (this.state === "maybe_done" && silence >= commitDelay(this.transcript, this.probability < 0 ? 1 : this.probability, this.opts.commitSilenceMs) && this.transcript) {
         this.state = "thinking";
         this.revision++;
         return this.emit("commit", { reason: "timeout", transcript: this.transcript, revision: this.revision });

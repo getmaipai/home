@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Record your voice</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px 16px;margin-top:14px}
+.card h2{font-size:18px;text-transform:none;letter-spacing:0;color:var(--fg);margin:12px 0 4px}
+.read{font-size:19px;line-height:1.5;margin:10px 0;padding:12px;border-radius:10px;border:1px dashed var(--line)}
+.state{font-weight:700;margin-left:10px} .ok{color:var(--listen)} .bad{color:#d33}
+audio{width:100%;height:36px;margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Record your voice</h1><a href="index.html">Lab</a></header>
+<p class="note">Use a quiet room. Hold the phone or sit at the Mac the way you normally would when talking. Speak the way you talk to a friend, not the way you read aloud. Each recording stays on the Studio in the lab's folder.</p>
+<label>Secret <input id="secret" type="password" autocomplete="current-password"></label>
+<div id="cards"></div>
+<p class="note">Only the first one is needed. The others let the voice whisper or sound excited or annoyed in your own voice. You can come back and do them later.</p>
+</main>
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const clips = [
+  { id: 'me', title: '1. Your normal voice (needed)', seconds: 25, text: "So I was thinking about what to do this weekend. Honestly, I just want to sleep in, make some coffee, and not look at my phone for a while. Maybe we could grill something on Saturday if the weather holds. What do you think? I'm fine either way, I just don't want to be stuck in traffic again." },
+  { id: 'me_soft', title: '2. Soft, almost a whisper', seconds: 10, text: "Okay, keep your voice down, everybody's asleep. Come over here, I want to show you something." },
+  { id: 'me_excited', title: '3. Excited', seconds: 10, text: "No way, are you serious? That's amazing! We have to tell everybody right now." },
+  { id: 'me_annoyed', title: '4. Annoyed', seconds: 10, text: "I've told you three times already. I'm not doing it again, so please just listen this time." },
+  { id: 'me_laugh', title: '5. Laughing while you talk', seconds: 10, text: "Oh man, that is the funniest thing I've heard all week. I can't believe he actually did that." },
+];
+const secret = () => $('#secret').value || sessionStorage.labSecret || '';
+if (sessionStorage.labSecret) $('#secret').value = sessionStorage.labSecret;
+$('#secret').onchange = () => { sessionStorage.labSecret = $('#secret').value; };
+let ctx;
+for (const c of clips) {
+  const card = document.createElement('section'); card.className = 'card';
+  card.innerHTML = `<h2>${c.title}</h2><p class="note">Press Record, then say this (about ${c.seconds} seconds). It stops by itself.</p><div class="read">${c.text}</div><button class="primary">Record</button><span class="state"></span><audio controls hidden></audio>`;
+  $('#cards').appendChild(card);
+  const btn = card.querySelector('button'), state = card.querySelector('.state'), player = card.querySelector('audio');
+  btn.onclick = async () => {
+    if (!secret()) { state.textContent = 'Enter the secret first.'; state.className = 'state bad'; return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch { state.textContent = 'The microphone was not allowed. Allow it in the browser, then press Record again.'; state.className = 'state bad'; return; }
+    ctx = ctx || new AudioContext(); await ctx.resume();
+    const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain(); mute.gain.value = 0;
+    const parts = []; let count = 0, peak = 0; const want = ctx.sampleRate * c.seconds; let done = false; btn.disabled = true;
+    proc.onaudioprocess = (e) => { if (done) return; const d = e.inputBuffer.getChannelData(0); parts.push(new Float32Array(d)); count += d.length; for (const v of d) { const a = Math.abs(v); if (a > peak) peak = a; }
+      state.className = 'state'; state.textContent = 'Recording: ' + Math.max(0, Math.ceil((want - count) / ctx.sampleRate)) + ' s left'; if (count >= want) finish(); };
+    src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+    const finish = async () => {
+      done = true; proc.disconnect(); src.disconnect(); stream.getTracks().forEach((t) => t.stop()); btn.disabled = false; btn.textContent = 'Record again';
+      const all = new Float32Array(count); let o = 0; for (const p of parts) { all.set(p, o); o += p.length; }
+      if (peak < 0.03) { state.textContent = 'That was almost silent. Check the microphone and record again.'; state.className = 'state bad'; return; }
+      const wav = new DataView(new ArrayBuffer(44 + all.length * 2)); const put = (at, s) => { for (let i = 0; i < s.length; i++) wav.setUint8(at + i, s.charCodeAt(i)); };
+      put(0, 'RIFF'); wav.setUint32(4, 36 + all.length * 2, true); put(8, 'WAVEfmt '); wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true); wav.setUint32(24, ctx.sampleRate, true); wav.setUint32(28, ctx.sampleRate * 2, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true); put(36, 'data'); wav.setUint32(40, all.length * 2, true);
+      for (let i = 0; i < all.length; i++) wav.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(all[i] * 32767))), true);
+      const blob = new Blob([wav.buffer], { type: 'audio/wav' }); player.src = URL.createObjectURL(blob); player.hidden = false;
+      state.textContent = 'Saving...'; state.className = 'state';
+      const form = new FormData(); form.append('file', blob, c.id + '.wav'); form.append('id', c.id); form.append('text', c.text);
+      try {
+        const r = await fetch('/api/voices', { method: 'POST', headers: { 'x-lab-secret': secret() }, body: form });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.detail || body.error || 'refused');
+        state.textContent = 'Saved. Play it back below to check it sounds like you' + (peak > 0.98 ? ' (it was very loud; move back a little and record again if it sounds harsh).' : '.'); state.className = 'state ok';
+      } catch (e) { state.textContent = 'It could not be saved (' + String(e.message).slice(0, 80) + '). Check the secret and record again.'; state.className = 'state bad'; }
+    };
+  };
+}
+</script>
+</body>
+</html>

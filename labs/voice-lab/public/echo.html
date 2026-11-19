@@ -1,1 +1,40 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Voice lab echo test</title><link rel="stylesheet" href="style.css"></head><body><main><h1>Echo test</h1><p>Stay quiet during each playback test.</p><label>Device label <input id="device"></label><label>Secret <input id="secret" type="password"></label><button id="run">Run combinations</button><p id="status"></p><table><thead><tr><th>Output</th><th>Echo setting</th><th>Leak dB</th><th>Correlation</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></main><script type="module" src="echo.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice lab echo test</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    #results-wrap { width: 100%; overflow-x: auto; }
+    #rows tr.best { background: #dff4e4; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .45rem; text-align: left; border-bottom: 1px solid #ccc; }
+    td small { display: block; font-weight: 400; overflow-wrap: anywhere; }
+    @media (max-width: 600px) { th, td { padding: .35rem .2rem; font-size: .78rem; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Echo test</h1>
+    <p>Stay quiet during playback combinations. The page first checks that each output can be heard by the microphone.</p>
+    <label>Device label <input id="device" autocomplete="off"></label>
+    <label>Secret <input id="secret" type="password" autocomplete="current-password"></label>
+    <button id="run">Run combinations</button>
+    <p id="status" aria-live="polite"></p>
+    <p id="setup"></p>
+    <div id="results-wrap"><table>
+      <thead><tr><th>Output</th><th>Echo setting</th><th>Return level</th><th>Match</th><th>Residual</th><th>Verdict</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <section>
+      <h2>Test while I talk</h2>
+      <p>First read the sentence in silence, then read it again while the clip plays.</p>
+      <label>Output <select id="talk-output"><option>direct</option><option>element</option><option>loopback</option></select></label>
+      <button id="talk">Test while I talk</button>
+      <p id="talk-status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script type="module" src="echo.js"></script>
+</body>
+</html>
