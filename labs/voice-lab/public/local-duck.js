@@ -18,7 +18,7 @@ export class LocalDuckDetector {
       this.hotFrames = 0;
       return false;
     }
-    const hot = enabled && rmsDb >= floorDb + 10 && rmsDb >= priorDb + 6;
+    const hot = enabled && rmsDb >= floorDb + 8 && rmsDb >= priorDb + 4;
     this.hotFrames = hot ? this.hotFrames + 1 : 0;
     this.history.push(rms);
     while (this.history.length > 7) this.history.shift();

@@ -23,7 +23,7 @@ export class TurnManager {
   private cutUnknown = false;
   private revision = 0;
   private clock: () => number;
-  private opts: Options = { ...config, talkOverMode: "continue", backchannelGapMs: 250, backchannelMaxMs: 1400 };
+  private opts: Options = { ...config, talkOverMode: "continue", backchannelGapMs: 200, backchannelMaxMs: 800 };
 
   constructor(clock: () => number = () => performance.now()) { this.clock = clock; }
   private emit(type: string, extra: Record<string, unknown> = {}): Command[] { return [{ type, ...extra }]; }
@@ -87,7 +87,7 @@ export class TurnManager {
       if (this.opts.talkOverMode === "pause_then_decide" && !this.paused && this.cutSpeech >= this.opts.interruptMs && !this.echo) { this.paused = true; out.push(...this.emit("pause")); }
       if (this.opts.talkOverMode === "stop_fast" && this.cutSpeech >= this.opts.interruptMs && !this.echo) return [...out, ...this.interrupt()];
       if (this.cutSpeech >= this.opts.backchannelMaxMs && !this.echo) return [...out, ...this.emit("transcribe_cut_in", { duration: this.cutSpeech, forced: true }), ...this.interrupt()];
-      if (this.cutSpeech > 0 && Math.floor(this.cutSpeech / 600) !== Math.floor((this.cutSpeech - this.opts.frameMs) / 600)) out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech }));
+      if (this.cutSpeech > 0 && Math.floor(this.cutSpeech / 350) !== Math.floor((this.cutSpeech - this.opts.frameMs) / 350)) out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech }));
       return out;
     }
     if (this.cutAt >= 0) {

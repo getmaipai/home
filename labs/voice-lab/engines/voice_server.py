@@ -527,7 +527,23 @@ def models_info(core):
     return {"default": DEFAULT_MODEL, "models": out}
 
 
+def limit_mlx_memory():
+    """Cap how much freed memory MLX keeps for reuse. Without a cap the server grew to 42 GB over a
+    day of model switches and voice preparations, which pushed the whole machine into swap and made
+    the job launcher pause the chat model. The cap costs a little speed after a model switch only."""
+    try:
+        import mlx.core as mx
+        cap = int(os.environ.get("LAB_MLX_CACHE_GB", "2")) * 1024 ** 3
+        setter = getattr(mx, "set_cache_limit", None) or getattr(getattr(mx, "metal", None), "set_cache_limit", None)
+        if setter:
+            setter(cap)
+        print(f"mlx cache limit set to {cap // 1024 ** 3} GB", flush=True)
+    except Exception as error:  # the server still works without the cap
+        print(f"mlx cache limit not set: {type(error).__name__}", flush=True)
+
+
 def main():
+    limit_mlx_memory()
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=DEFAULT_MODEL, choices=list(ENGINES))
     ap.add_argument("--port", type=int, default=9923)

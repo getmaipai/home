@@ -83,7 +83,7 @@ function stopPlayback(turn) {
     ramp(1); stopTick();
   }, 15);
 }
-function duck() { ducked = true; buffer.duck(); ramp(.6); }
+function duck() { ducked = true; buffer.duck(); ramp(.3); }
 function restore() { ducked = false; buffer.restore(); ramp(1); }
 function pause() {
   if (paused) return;

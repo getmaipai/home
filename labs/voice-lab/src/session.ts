@@ -45,7 +45,7 @@ export class VoiceSession {
   private runToolFn: typeof runTool;
   private metricsFn: typeof appendMetrics;
   private vadDetector: { detect(frame: Float32Array): boolean };
-  private voice = "builtin"; private useStyles = true; private replyStyle = "";
+  private voice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private useStyles = true; private replyStyle = "";
   private stylesFn: typeof supportedStyles;
   private voicePreparedFn: typeof voicePrepared;
   private voiceChecked = new Set<string>();

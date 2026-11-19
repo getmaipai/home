@@ -100,7 +100,7 @@ describe("continue mode acknowledgements", () => {
     for (let i = 0; i < 4; i++) step(true);
     expect(types(step(false, 256))).toContain("transcribe_cut_in");
     expect(m.cutTranscript("", "unknown")).toEqual([]);
-    expect(types(step(false, 900))).not.toContain("resume");
+    expect(types(step(false, 400))).not.toContain("resume");
     expect(types(step(false, 300))).toContain("interrupt");
   });
 });

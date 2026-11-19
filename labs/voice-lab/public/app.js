@@ -189,8 +189,8 @@ async function loadVoices() {
   if (!labSecret()) return;
   try {
     const voices = (await (await api('/api/voices')).json()).voices || [];
-    const keep = $('#voice').value || (() => { try { return localStorage.voiceLabVoice; } catch { return ''; } })();
-    $('#voice').innerHTML = '<option value="builtin">Built-in</option>' + voices.map((v) => '<option value="' + v.id + '">' + (v.id === 'me' ? 'My voice' : v.id === 'ref_f' ? 'Sample voice (made up)' : v.id) + (v.styles?.length ? ' (has styled samples)' : '') + '</option>').join('');
+    let keep = (() => { try { return localStorage.voiceLabVoice; } catch { return ''; } })() || $('#voice').value; if (!keep || keep === 'builtin') keep = 'casual';
+    $('#voice').innerHTML = '<option value="builtin">Built-in (slow with this engine)</option>' + voices.map((v) => '<option value="' + v.id + '">' + (v.id === 'me' ? 'My voice' : v.id === 'casual' ? 'Casual sample voice (recommended)' : v.id === 'ref_f' ? 'Sample voice (made up)' : v.id) + (v.styles?.length ? ' (has styled samples)' : '') + '</option>').join('');
     if ([...$('#voice').options].some((o) => o.value === keep)) $('#voice').value = keep;
     const models = await (await api('/api/voice-models')).json();
     $('#voiceModel').innerHTML = Object.entries(models.models || {}).map(([key, m]) => '<option value="' + key + '"' + (m.loaded ? ' selected' : '') + '>' + key + (m.slow ? ' (slow)' : '') + '</option>').join('');
