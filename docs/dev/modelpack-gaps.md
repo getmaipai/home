@@ -45,3 +45,48 @@ Home queues a song, shows its position and progress, and lets the person cancel 
 - `backend/src/lib/music/models.ts`: `KNOWN_MUSIC_MODELS`, the licence and commercial-use table keyed by part id (5).
 - Comments naming ACE-Step, XL SFT or the sound-effects model in `types.ts`, `sections.ts`, `soundMaker.ts`, `tool.ts` and `ready.ts`.
 - Outside `lib/music`: `routes/aiChoices.ts` (the `htdemucs` alias), `shared/diskPlanMath.ts`, `shared/tierSlotOptions.ts`, `shared/licensedRows.ts`, `frontend/src/apps/settings/aiTierSlots.ts`, and the music pages (`WaveformSeek.tsx`, `MusicSongDetails.tsx`, `MusicLibrary.tsx`).
+
+## MODELPACK-HOME-04: style bases (rechecked 2026-11-19 against Stack `f5a696b`, spec-v0.1.424)
+
+**No code changed.** `backend/src/lib/loras/baseFamilies.ts`, the `ltx-2.3` rule in `access.ts` and `sync.ts`, and the frontend base pills are still in place. Two earlier questions are answered; three gaps remain.
+
+### Answered (removed as gaps)
+
+- **What the wire shape is.** `@maipai/spec` spec-v0.1.424 has it: a pack's `style_bases` is `[{ id, label, browse: string[], retired?: { mark } }]` (`stack/ts/stack-model-pack.ts`), and each jobs catalog entry carries `styles: { bases: [{ id, label }], max }` (`stack/ts/stack-jobs-catalog.ts`). Home's hand copy `backend/src/lib/stack/jobsCatalogShape.ts` can be replaced by these types.
+- **Which route serves it.** Only `GET /stack/v1/jobs/catalog`, through `styles.bases` (from `lib/jobsCatalog.ts`: the serving pack's non-retired `style_bases`, as `{ id, label }`). The Stack has no route that serves packs or style bases on their own.
+
+### Gap 1: no pack has any style bases yet
+
+None of the nine packs under `backend/src/packs/` (`ace-step-*`, `flux3-image-klein`, `htdemucs`, `ltx-2-5-*`, `minimax-h3`, `minimax-h3-image`) has a `style_bases` entry, and `style_bases` appears in no Stack file except `lib/jobsCatalog.ts`. So every job in the catalog answers `styles: { bases: [], max: 0 }`. Reading it today would leave the Made for dropdown and the base pills empty. The Stack's `styles[]` field on the `picture` and `clip` make requests is accepted by the schema and read by no dispatch code (`makeDispatch*.ts`, `routes/jobsMake.ts`).
+
+### Gap 2: the spec shape is smaller than what `baseFamilies.ts` holds
+
+| Home holds today, per base | In spec-v0.1.424 |
+|---|---|
+| id | `id` |
+| plain label | `label` (one label; Home has `words` and `short`, which differ: "LTX 2.5" and "LTX-2.5", "Flux" and "Flux.2 Klein 4B") |
+| text patterns, Civitai `baseModels` labels, browse value | `browse: string[]` only; the spec does not say whether these are Civitai labels, text patterns or browse values |
+| media (video or picture) | not in `style_bases`; only implied by which job's catalog entry lists it |
+| family generic labels (`LTXV2`: a hit that names no version) | none |
+| `installable` | none (a base is listed when its serving part is on and ready, so "installable" may be answered by presence; the Stack should confirm) |
+| retired base with the base it was tested on | `retired: { mark }` only: one string, no "tested on" base id, and the catalog drops retired bases from `styles.bases` |
+
+### Gap 3: the retired-base bench mark lives on the LoRA files, not on the pack
+
+Home's `ltx-2.3` rule reads each file's `tested_on_25` mark (`tested`, `no_effect`, null) from the Stack's LoRA routes (`/stack/v1/video/loras`). The Stack's own source still names `ltx-2.3` and `tested_on_25` in those routes, and the pack's `retired.mark` is a single string. Home cannot tell which base a retired base is judged on, or what the marks mean, from the pack.
+
+### What unblocks it
+
+From the Stack session (pack data) and the spec owner (shape), in this order:
+
+1. Fill `style_bases` in the packs (LTX 2.5, the Flux, Z-Image and ERNIE picture parts), with the values `baseFamilies.ts` holds, so the catalog's `styles.bases` is not empty.
+2. Extend the spec shape to carry the missing fields per base: media, Civitai labels, text patterns (named apart from `browse`), the family's generic labels, plain words, short name, and for a retired base the id of the base it is tested on and the meaning of each bench mark. Tag the spec and say which Stack commit serves it.
+3. Or state in the design note which of these stay in Home as data about Civitai and Hugging Face (they are about the sources, not the models) and which move.
+
+### The plan once it is unblocked
+
+1. Replace `jobsCatalogShape.ts` with the spec types and add a `styleBases()` reader in `backend/src/lib/stack/client.ts`.
+2. Replace `baseFamilies.ts` with a reader that keeps the exports `source.ts`, `install.ts`, `sync.ts`, `readiness.ts`, `routes/lorasSources.ts` and `videos/stack.ts` use, fed from the Stack's answer, with the last good answer kept when the Stack is down (a Stack hiccup never makes the browser silently empty). Delete `baseFamilies.ts` and `setInstalledBasesProvider`.
+3. Move the retired-base rule in `access.ts` and `sync.ts` to the Stack's retired flag and bench mark, with no `ltx-2.3` string left in Home.
+4. Frontend: `stylesApi.ts` (`BaseModelId`, `BrowseQuery.base`, `baseWords`), `StyleBrowser.tsx` (`BASE_PILL`), `StyleConfirm.tsx` and `StyleEditor.tsx` (the two hard-coded base choices) take their ids and labels from the backend (`GET /api/loras/bases` exists already and returns `{ id, label }` per base for one media).
+5. Tests: `lorasBases`, `lorasHfBrowse`, `lorasPictureBrowse` and `lorasReadiness` keep their behavior checks against a scripted Stack answer; new tests cover the Stack-down fallback and a retired base.
