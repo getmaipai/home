@@ -25,6 +25,7 @@ audio{width:100%;height:36px;margin-top:8px}
 const $ = (s) => document.querySelector(s);
 const clips = [
   { id: 'me', title: '1. Your normal voice (needed)', seconds: 25, text: "So I was thinking about what to do this weekend. Honestly, I just want to sleep in, make some coffee, and not look at my phone for a while. Maybe we could grill something on Saturday if the weather holds. What do you think? I'm fine either way, I just don't want to be stuck in traffic again." },
+  { id: 'me_free', title: 'Just talk (best one to add)', seconds: 28, free: true, text: '', prompt: 'Do not read anything. Just talk for half a minute, the way you would on the phone with a friend. Ideas: what you had for dinner and whether it was any good, something that annoyed you this week, or what you are doing this weekend.' },
   { id: 'me_soft', title: '2. Soft, almost a whisper', seconds: 10, text: "Okay, keep your voice down, everybody's asleep. Come over here, I want to show you something." },
   { id: 'me_excited', title: '3. Excited', seconds: 10, text: "No way, are you serious? That's amazing! We have to tell everybody right now." },
   { id: 'me_annoyed', title: '4. Annoyed', seconds: 10, text: "I've told you three times already. I'm not doing it again, so please just listen this time." },
@@ -36,7 +37,7 @@ $('#secret').onchange = () => { sessionStorage.labSecret = $('#secret').value; }
 let ctx;
 for (const c of clips) {
   const card = document.createElement('section'); card.className = 'card';
-  card.innerHTML = `<h2>${c.title}</h2><p class="note">Press Record, then say this (about ${c.seconds} seconds). It stops by itself.</p><div class="read">${c.text}</div><button class="primary">Record</button><span class="state"></span><audio controls hidden></audio>`;
+  card.innerHTML = `<h2>${c.title}</h2><p class="note">${c.free ? 'Press Record and talk freely for about ' + c.seconds + ' seconds. It stops by itself.' : 'Press Record, then say this (about ' + c.seconds + ' seconds). It stops by itself.'}</p><div class="read">${c.free ? c.prompt : c.text}</div><button class="primary">Record</button><span class="state"></span><audio controls hidden></audio>`;
   $('#cards').appendChild(card);
   const btn = card.querySelector('button'), state = card.querySelector('.state'), player = card.querySelector('audio');
   btn.onclick = async () => {
@@ -59,7 +60,7 @@ for (const c of clips) {
       for (let i = 0; i < all.length; i++) wav.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(all[i] * 32767))), true);
       const blob = new Blob([wav.buffer], { type: 'audio/wav' }); player.src = URL.createObjectURL(blob); player.hidden = false;
       state.textContent = 'Saving...'; state.className = 'state';
-      const form = new FormData(); form.append('file', blob, c.id + '.wav'); form.append('id', c.id); form.append('text', c.text);
+      const form = new FormData(); form.append('file', blob, c.id + '.wav'); form.append('id', c.id); if (c.text) form.append('text', c.text);
       try {
         const r = await fetch('/api/voices', { method: 'POST', headers: { 'x-lab-secret': secret() }, body: form });
         const body = await r.json().catch(() => ({}));

@@ -1,41 +1,215 @@
 import { expect, test } from "bun:test";
 import { VoiceSession } from "../src/session";
 import { config } from "../src/config";
-import { commitDelay } from "../src/commitDelay";
+import { TurnManager } from "../src/turnManager";
+import { chatRequestBody } from "../src/stack";
+import { encodeWav } from "../src/wav";
 
-function frame(speech: boolean, marker: number, tone = false): Uint8Array {
-  const bytes = new Uint8Array(512 * 4);
-  const view = new DataView(bytes.buffer);
+type Timer = { at: number; fn: () => void; cancelled: boolean };
+class FakeTime {
+  now = 0;
+  readonly timers = new Set<Timer>();
+  setTimeout = ((fn: TimerHandler, delay = 0) => {
+    const timer = { at: this.now + Number(delay), fn: fn as () => void, cancelled: false };
+    this.timers.add(timer);
+    return timer as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    const timer = handle as unknown as Timer;
+    timer.cancelled = true;
+    this.timers.delete(timer);
+  }) as typeof clearTimeout;
+  advance(ms: number) {
+    this.now += ms;
+    let next: Timer | undefined;
+    while ((next = [...this.timers].filter((timer) => !timer.cancelled && timer.at <= this.now).sort((a, b) => a.at - b.at)[0])) {
+      this.timers.delete(next);
+      next.fn();
+    }
+  }
+}
+
+function audioFrame(voiced: boolean, marker = 0): Uint8Array {
+  const bytes = new Uint8Array(512 * 4), view = new DataView(bytes.buffer);
   for (let i = 0; i < 512; i++) {
-    const sample = speech && tone ? 0.1 * Math.sin(2 * Math.PI * 200 * i / config.sampleRate) : speech ? 0.1 : 0;
-    view.setFloat32(i * 4, sample + marker / 100000, true);
+    const tone = voiced ? 0.1 * Math.sin(2 * Math.PI * 200 * i / config.sampleRate) : 0;
+    view.setFloat32(i * 4, tone + marker, true);
   }
   return bytes;
 }
-function harness(transcriber: (wav: Uint8Array) => Promise<string> = async () => "ok") {
+function wavPcm(wav: Uint8Array): Float32Array {
+  const out = new Float32Array(Math.floor((wav.length - 44) / 2));
+  const view = new DataView(wav.buffer, wav.byteOffset + 44, out.length * 2);
+  for (let i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 32767;
+  return out;
+}
+async function drain() { for (let i = 0; i < 12; i++) await Promise.resolve(); }
+
+function harness(overrides: Record<string, unknown> = {}) {
+  const time = new FakeTime();
   const sent: Array<string | Uint8Array> = [];
-  let now = 0;
-  const session = new VoiceSession({ readyState: 1, send: (v) => sent.push(v) }, "", {
-    now: () => now,
-    vad: { detect: (samples) => samples.some((sample) => Math.abs(sample) > 0.05) },
-    transcribe: async (wav) => transcriber(wav),
-    turnCheck: async () => ({ probability: 0.8, complete: true }),
-    chat: async function* () {},
-    speech: async () => new Response(new Uint8Array(44)),
-    setTimeout: ((fn: TimerHandler, delay?: number) => { return setTimeout(fn, delay); }) as typeof setTimeout,
-  });
-  return { session, sent, tick: (ms: number) => { now += ms; }, feed: (talk: boolean, marker: number, tone = false) => { session.audio(frame(talk, marker, tone)); now += 32; } };
+  const signals: AbortSignal[] = [];
+  const deps = {
+    now: () => time.now,
+    setTimeout: time.setTimeout,
+    clearTimeout: time.clearTimeout,
+    vad: { detect: (samples: Float32Array) => samples.some((sample) => Math.abs(sample) > 0.03) },
+    transcribe: async (_wav: Uint8Array, signal?: AbortSignal) => { if (signal) signals.push(signal); return "heard words"; },
+    turnCheck: async (_wav: Uint8Array, signal?: AbortSignal) => { if (signal) signals.push(signal); return { probability: 0.8, complete: true }; },
+    chat: async function* (_messages: unknown[], signal: AbortSignal) { signals.push(signal); },
+    speech: async () => new Response(encodeWav(new Float32Array(512))),
+    prewarmChat: async (_messages: unknown[], _tools: unknown, signal: AbortSignal) => { signals.push(signal); return 0; },
+    prewarmVoice: async (_voice: string, signal: AbortSignal) => { signals.push(signal); return 0; },
+    appendMetrics: () => {},
+    ...overrides,
+  };
+  const session = new VoiceSession({ readyState: 1, send: (value) => sent.push(value) }, "", deps as never);
+  const feed = (voiced: boolean, frames = 1) => { for (let i = 0; i < frames; i++) { session.audio(audioFrame(voiced)); time.advance(32); } };
+  const flush = async (ms = 0) => { time.advance(ms); await drain(); time.advance(0); await drain(); };
+  const messages = () => sent.filter((value): value is string => typeof value === "string").map((value) => JSON.parse(value));
+  return { session, time, sent, signals, feed, flush, messages };
 }
 
-test("session seam accepts synthetic 32 ms speech and silence frames", () => {
-  const h = harness();
-  h.feed(true, 1, true); h.feed(false, 0);
-  h.session.close();
-  expect(h.sent).toEqual([]);
+test("1 recognizer gets 12 and 45 second utterances in order while turn check sees at most eight seconds", async () => {
+  for (const seconds of [12, 45]) {
+    const recognized: number[] = [];
+    const modelSamples: number[] = [];
+    const h = harness({
+      transcribe: async (wav: Uint8Array) => { const n = wavPcm(wav).length; recognized.push(n); return `segment-${recognized.length}`; },
+      turnCheck: async (wav: Uint8Array) => { modelSamples.push(wavPcm(wav).length); return { probability: 0.1, complete: true }; },
+    });
+    h.feed(true, seconds * 1000 / 32);
+    h.feed(false, 8);
+    await h.flush();
+    expect(recognized.length).toBeGreaterThan(0);
+    expect(recognized.reduce((sum, value) => sum + value, 0)).toBeGreaterThanOrEqual(seconds * config.sampleRate);
+    expect(recognized.reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual((seconds + 0.5) * config.sampleRate);
+    expect(recognized.length).toBe(seconds === 12 ? 1 : 2);
+    expect((h.session as any).tm.transcript).toBe(seconds === 12 ? "segment-1" : "segment-1 segment-2");
+    expect(modelSamples.every((n) => n <= 8 * config.sampleRate)).toBe(true);
+    h.session.close();
+  }
 });
 
-test("adaptive manager fallback uses 900 ms or 1800 ms as indicated", () => {
-  expect(commitDelay("unfinished and", 0.8)).toBe(1800);
-  expect(commitDelay("finished", 0.2)).toBe(1800);
-  expect(commitDelay("finished", 0.8)).toBe(900);
+test("2 forced cut-in keeps its opening frame and 300 ms pre-roll once", async () => {
+  const recognized: Float32Array[] = [];
+  const h = harness({
+    transcribe: async (wav: Uint8Array) => { recognized.push(wavPcm(wav)); return "the interruption"; },
+    chat: async function* () {},
+  });
+  h.feed(true, 4); h.feed(false, 8); await h.flush();
+  expect(h.messages().some((message) => message.t === "final")).toBe(true);
+  (h.session as any).heardAudio = true;
+  h.time.advance(1600);
+  h.feed(false, 10);
+  h.feed(true, 44);
+  expect((h.session as any).tm.state).toBe("user_speaking");
+  h.feed(true, 5); h.feed(false, 8); await h.flush();
+  expect(recognized.length).toBeGreaterThan(0);
+  const utterance = recognized.at(-1)!;
+  const preroll = config.sampleRate * config.prerollMs / 1000;
+  expect(utterance.length).toBeGreaterThan(preroll + 44 * 512);
+  expect(utterance.slice(0, preroll).every((sample) => Math.abs(sample) < 0.001)).toBe(true);
+  expect(utterance.slice(preroll + 1, preroll + 512).some((sample) => Math.abs(sample) > 0.04)).toBe(true);
+  expect(utterance.length).toBeLessThan(preroll + (44 + 5 + 20) * 512);
+  h.session.close();
+});
+
+test("3 second check waits for its own score and ignores the cancelled check", async () => {
+  let transcriptions = 0;
+  let resolveSecondModel!: (value: { probability: number; complete: boolean }) => void;
+  const h = harness({
+    transcribe: async () => `turn-${++transcriptions}`,
+    turnCheck: async (_wav: Uint8Array, signal?: AbortSignal) => {
+      if (signal) hSignals.push(signal);
+      if (modelCalls++ === 0) return { probability: 0.9, complete: true };
+      return new Promise((resolve) => { resolveSecondModel = resolve; });
+    },
+  });
+  const hSignals: AbortSignal[] = [];
+  let modelCalls = 0;
+  h.feed(true, 4); h.feed(false, 8); await h.flush();
+  expect(h.messages().filter((message) => message.t === "final").length).toBe(1);
+  h.session.message(JSON.stringify({ t: "played_end", turn: (h.session as any).turn }));
+  h.feed(true, 4); h.feed(false, 8); await h.flush();
+  expect((h.session as any).tm.transcript).toBe("turn-2");
+  expect(h.messages().filter((message) => message.t === "final").length).toBe(1);
+  h.feed(true, 4);
+  expect(hSignals[1]?.aborted).toBe(true);
+  resolveSecondModel({ probability: 0.99, complete: true }); await h.flush();
+  expect(h.messages().filter((message) => message.t === "final").length).toBe(1);
+  h.session.close();
+});
+
+test("4 speech before reply audio resumes the committed turn and replaces its transcript", async () => {
+  const seenAudio: number[] = [];
+  let transcriptions = 0;
+  let draftSignal: AbortSignal | undefined;
+  const h = harness({
+    transcribe: async (wav: Uint8Array) => { seenAudio.push(wavPcm(wav).length); return ++transcriptions === 1 ? "first part" : "whole utterance"; },
+    chat: async function* (_messages: unknown[], signal: AbortSignal) { draftSignal = signal; await new Promise<void>(() => {}); },
+  });
+  h.feed(true, 4); h.feed(false, 8); await h.flush();
+  const beforeUsers = (h.session as any).history.messages.filter((message: any) => message.role === "user").length;
+  expect(beforeUsers).toBe(1);
+  h.feed(true, 5);
+  expect(draftSignal?.aborted).toBe(true);
+  h.feed(false, 8); await h.flush();
+  expect(seenAudio[1]).toBeGreaterThan(seenAudio[0]!);
+  expect((h.session as any).history.messages.filter((message: any) => message.role === "user").length).toBe(1);
+  expect(h.messages().some((message) => message.t === "final" && message.text === "whole utterance")).toBe(true);
+  h.session.close();
+});
+
+test("5 turn manager applies the adaptive 900 to 1800 ms fallback", () => {
+  let now = 0;
+  const manager = new TurnManager(() => now);
+  const begin = () => { now = 0; manager.stop(); for (let i = 0; i < 4; i++) { now += 32; manager.frame(true, now); } for (let i = 0; i < 6; i++) { now += 32; manager.frame(false, now); } };
+  begin();
+  const revision = manager.checkRevision;
+  manager.transcriptReady("finished phrase", now, revision);
+  manager.turnModel(0.5, true, revision);
+  now += 739; expect(manager.frame(false, now)).toHaveLength(0);
+  now += 1; expect(manager.frame(false, now).some((command) => command.type === "commit")).toBe(true);
+  begin();
+  const unfinishedRevision = manager.checkRevision;
+  manager.transcriptReady("and", now, unfinishedRevision);
+  manager.turnModel(0.5, true, unfinishedRevision);
+  now += 1639; expect(manager.frame(false, now)).toHaveLength(0);
+  now += 1; expect(manager.frame(false, now).some((command) => command.type === "commit")).toBe(true);
+  begin();
+  const lowRevision = manager.checkRevision;
+  manager.transcriptReady("finished", now, lowRevision);
+  manager.turnModel(0.2, true, lowRevision);
+  now += 1639; expect(manager.frame(false, now)).toHaveLength(0);
+  now += 1; expect(manager.frame(false, now).some((command) => command.type === "commit")).toBe(true);
+});
+
+test("6 closing aborts work, clears timers, and prevents later sends", async () => {
+  let resolveChat!: () => void;
+  const warmSignals: AbortSignal[] = [];
+  const h = harness({
+    chat: async function* (_messages: unknown[], signal: AbortSignal) { hSignals.push(signal); await new Promise<void>((resolve) => { resolveChat = resolve; }); },
+    prewarmChat: async (_messages: unknown[], _tools: unknown, signal: AbortSignal) => { warmSignals.push(signal); return new Promise<number>(() => {}); },
+    prewarmVoice: async (_voice: string, signal: AbortSignal) => { warmSignals.push(signal); return new Promise<number>(() => {}); },
+  });
+  const hSignals: AbortSignal[] = [];
+  h.session.message(JSON.stringify({ t: "hello", proto: 1 }));
+  h.session.message(JSON.stringify({ t: "config", values: { netSim: { delayMs: 500 } } }));
+  h.feed(true, 4); h.feed(false, 8); await h.flush();
+  expect(h.time.timers.size).toBeGreaterThan(0);
+  h.session.close();
+  expect(h.time.timers.size).toBe(0);
+  expect(hSignals.every((signal) => signal.aborted)).toBe(true);
+  expect(warmSignals.length).toBe(2);
+  expect(warmSignals.every((signal) => signal.aborted)).toBe(true);
+  const sentAtClose = h.sent.length;
+  resolveChat?.(); await h.flush(5000);
+  expect(h.sent).toHaveLength(sentAtClose);
+  expect((h.session as any).history.messages.some((message: any) => message.role === "assistant")).toBe(false);
+  expect(h.time.timers.size).toBe(0);
+});
+
+test("7 chat request body pins id_slot zero", () => {
+  expect(chatRequestBody([{ role: "user", content: "hello" }]).id_slot).toBe(0);
 });

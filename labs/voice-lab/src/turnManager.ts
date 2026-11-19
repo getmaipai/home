@@ -141,6 +141,15 @@ export class TurnManager {
   }
 
   setEcho(echo: boolean) { this.echo = echo; }
+  resumeCommittedSpeech(): Command[] {
+    if (this.state !== "thinking" && this.state !== "speaking") return [];
+    this.state = "user_speaking";
+    this.resetTurn();
+    this.state = "user_speaking";
+    this.speechAt = this.clock();
+    this.resetCut();
+    return this.emit("resume_committed");
+  }
   firstAudioPlayed(): Command[] { if (this.state === "thinking") { this.state = "speaking"; return this.emit("state", { state: this.state }); } return []; }
   playbackEnded(): Command[] {
     if (this.state === "speaking" || this.state === "thinking") {

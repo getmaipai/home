@@ -13,9 +13,12 @@ const PARAKEET = Bun.env.LAB_PARAKEET ?? "/usr/local/maipai-home/stack/data/mode
 const SMART_TURN = Bun.env.LAB_SMART_TURN ?? "/usr/local/maipai-home/stack/data/models/smart-turn-v3.2/smart-turn-v3.2-cpu.onnx";
 
 export type ChatEvent = { type: "text"; text: string } | { type: "tool_calls"; calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> };
+export function chatRequestBody(messages: unknown[], temperature = config.temperature, tools?: unknown[]) {
+  return { stream: true, cache_prompt: true, id_slot: 0, messages, max_tokens: 220, temperature, ...(tools ? { tools, tool_choice: "auto" } : {}) };
+}
 export async function* chat(messages: unknown[], signal: AbortSignal, temperature = config.temperature, tools?: unknown[]): AsyncGenerator<ChatEvent> {
   const r = await fetch(`${LLM}/v1/chat/completions`, { method: "POST", signal, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ stream: true, cache_prompt: true, messages, max_tokens: 220, temperature, ...(tools ? { tools, tool_choice: "auto" } : {}) }) });
+    body: JSON.stringify(chatRequestBody(messages, temperature, tools)) });
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
   const reader = r.body.getReader(), decoder = new TextDecoder(); let buf = "";
   const calls = new Map<number, { id: string; name: string; arguments: string }>();
