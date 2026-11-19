@@ -4,6 +4,7 @@ import { config } from "../src/config";
 import { TurnManager } from "../src/turnManager";
 import { chatRequestBody } from "../src/stack";
 import { encodeWav } from "../src/wav";
+import { toolCapabilities } from "../src/tools";
 
 type Timer = { at: number; fn: () => void; cancelled: boolean };
 class FakeTime {
@@ -212,4 +213,157 @@ test("6 closing aborts work, clears timers, and prevents later sends", async () 
 
 test("7 chat request body pins id_slot zero", () => {
   expect(chatRequestBody([{ role: "user", content: "hello" }]).id_slot).toBe(0);
+  expect(toolCapabilities).toEqual({ web_search: { readOnly: true }, get_time: { readOnly: true } });
+});
+
+test("7 a held tool draft stays private until commit and binds repeated tool results by call id", async () => {
+  const seen: any[][] = [];
+  const h = harness({
+    chat: async function* (messages: any[]) {
+      seen.push(messages);
+      if (seen.length === 1) {
+        yield { type: "tool_calls", calls: [
+          { id: "call-tokyo", name: "get_time", arguments: { place: "Tokyo" } },
+          { id: "call-london", name: "get_time", arguments: { place: "London" } },
+        ] };
+      } else yield { type: "text", text: "Here are both times." };
+    },
+    runTool: async (call: { arguments: Record<string, unknown> }) => `time:${call.arguments.place}`,
+  });
+  (h.session as any).held = true;
+  const history = (h.session as any).history;
+  await (h.session as any).reply("what time?", false);
+  expect(history.messages).toHaveLength(1);
+  expect(seen[1].filter((m) => m.role === "tool").map((m) => [m.tool_call_id, m.content])).toEqual([
+    ["call-tokyo", "time:Tokyo"], ["call-london", "time:London"],
+  ]);
+  (h.session as any).command({ type: "commit", transcript: "what time?", reason: "model" });
+  expect(history.messages.filter((m: any) => m.role === "tool")).toHaveLength(2);
+  expect(history.messages.filter((m: any) => m.role === "assistant" && m.tool_calls)).toHaveLength(1);
+  h.session.close();
+});
+
+test("7 discarding a held draft leaves history unchanged", async () => {
+  const h = harness({ chat: async function* () { yield { type: "tool_calls", calls: [{ id: "call-1", name: "get_time", arguments: { place: "Tokyo" } }] }; } });
+  (h.session as any).held = true;
+  await (h.session as any).reply("time?", false);
+  const history = (h.session as any).history;
+  expect(history.messages).toHaveLength(1);
+  (h.session as any).command({ type: "cancel_held" });
+  expect(history.messages).toHaveLength(1);
+  h.session.close();
+});
+
+test("7 a cut-in while a draft tool waits keeps the completed exchange and spoken-status note", async () => {
+  let finishTool!: (value: string) => void;
+  let enteredTool!: () => void;
+  const prompts: any[][] = [];
+  const inTool = new Promise<void>((resolve) => { enteredTool = resolve; });
+  const h = harness({
+    chat: async function* (messages: any[]) { prompts.push(messages); if (prompts.length === 1) yield { type: "tool_calls", calls: [{ id: "weather-1", name: "web_search", arguments: { query: "weather" } }] }; else yield { type: "text", text: "Got it." }; },
+    runTool: async () => { enteredTool(); return new Promise<string>((resolve) => { finishTool = resolve; }); },
+  });
+  (h.session as any).held = true;
+  const reply = (h.session as any).reply("weather?", false);
+  await inTool;
+  (h.session as any).command({ type: "interrupt" });
+  finishTool("sunny");
+  await reply;
+  const history = (h.session as any).history;
+  expect(history.messages.some((m: any) => m.role === "tool" && m.tool_call_id === "weather-1" && m.content === "sunny")).toBe(true);
+  expect(history.messages.at(-1).content).toBe("[answer was not spoken]");
+  await (h.session as any).reply("what about now?", true);
+  expect(prompts[1].some((m) => m.role === "tool" && m.tool_call_id === "weather-1" && m.content === "sunny")).toBe(true);
+  expect(prompts[1].at(-1).content).toBe("[answer was not spoken]");
+  h.session.close();
+});
+
+test("7 repeated interruption does not duplicate the assistant message", () => {
+  const h = harness();
+  const history = (h.session as any).history;
+  history.commitUser("question");
+  (h.session as any).generatedText = "Heard answer";
+  (h.session as any).command({ type: "interrupt" });
+  (h.session as any).command({ type: "interrupt" });
+  expect(history.messages.filter((m: any) => m.role === "assistant")).toHaveLength(1);
+  expect(history.messages.at(-1).content).toContain("[cut off here by the person]");
+  h.session.close();
+});
+
+test("8 cutoff note is stored once and never included in speech text", async () => {
+  const speechText: string[] = [];
+  let speechStarted!: () => void;
+  let finishSpeech!: () => void;
+  const started = new Promise<void>((resolve) => { speechStarted = resolve; });
+  const response = new Promise<Response>((resolve) => { finishSpeech = () => resolve(new Response(encodeWav(new Int16Array(512)))); });
+  const h = harness({
+    speech: async (text: string) => { speechText.push(text); speechStarted(); return response; },
+    chat: async function* () { yield { type: "text", text: "The exact answer." }; },
+  });
+  const history = (h.session as any).history;
+  history.commitUser("question");
+  const reply = (h.session as any).reply("question", true);
+  await started;
+  (h.session as any).chunkDurations[0] = 1;
+  (h.session as any).playedMs[0] = 1;
+  (h.session as any).command({ type: "interrupt" });
+  finishSpeech();
+  await reply;
+  expect(history.messages.at(-1).content).toContain("[cut off here by the person]");
+  expect(history.messages.at(-1).content).toContain("The exact answer.");
+  expect(speechText).toEqual(["The exact answer."]);
+  expect(speechText.join(" ")).not.toContain("cut off here");
+  h.session.close();
+});
+
+test("6 style tags are sent only when the current voice supports them", async () => {
+  for (const [styles, expected] of [[new Set<string>(), ""], [new Set(["whisper"]), "whisper"]] as const) {
+    const sentStyles: string[] = [];
+    const h = harness({
+      supportedStyles: async () => new Set(styles),
+      speech: async (_text: string, _signal: AbortSignal, opts: { style?: string }) => { sentStyles.push(opts.style ?? ""); return new Response(encodeWav(new Int16Array(512))); },
+      chat: async function* () { yield { type: "text", text: "[whisper]Hello there." }; },
+    });
+    await (h.session as any).reply("question", true);
+    expect(sentStyles).toEqual([expected]);
+    h.session.close();
+  }
+});
+
+test("6 empty voice audio retries without style then reports voice_failed", async () => {
+  const styles: string[] = [];
+  const metrics: any[] = [];
+  let calls = 0;
+  const h = harness({
+    supportedStyles: async () => new Set(["whisper"]),
+    speech: async (_text: string, _signal: AbortSignal, opts: { style?: string }) => { styles.push(opts.style ?? ""); calls++; return new Response(encodeWav(new Int16Array(0))); },
+    chat: async function* () { yield { type: "text", text: "[whisper]Hello there." }; },
+    appendMetrics: (_path: string, value: any) => metrics.push(value),
+  });
+  await (h.session as any).reply("question", true);
+  await h.flush();
+  expect(calls).toBe(2);
+  expect(styles).toEqual(["whisper", ""]);
+  expect(h.messages().some((message) => message.t === "error" && message.code === "voice_failed")).toBe(true);
+  expect(metrics.some((value) => value.failure === "voice_failed" && value.ok === false)).toBe(true);
+  h.session.close();
+});
+
+test("16 hello voice is used for prewarm and an unprepared voice falls back before speech", async () => {
+  const warmed: string[] = [];
+  const spoken: Array<{ voice?: string; style?: string }> = [];
+  const h = harness({
+    prewarmVoice: async (voice: string) => { warmed.push(voice); return 0; },
+    voicePrepared: async () => false,
+    speech: async (_text: string, _signal: AbortSignal, options: { voice?: string; style?: string }) => { spoken.push(options); return new Response(encodeWav(new Int16Array(512))); },
+    chat: async function* () { yield { type: "text", text: "Hello there." }; },
+  });
+  h.session.message(JSON.stringify({ t: "hello", proto: 2, voice: "me" }));
+  await drain();
+  expect(warmed).toContain("me");
+  await (h.session as any).reply("question", true);
+  await h.flush();
+  expect(spoken[0]?.voice).toBe("builtin");
+  expect(h.messages().some((message) => message.t === "notice" && message.code === "voice_not_ready")).toBe(true);
+  h.session.close();
 });

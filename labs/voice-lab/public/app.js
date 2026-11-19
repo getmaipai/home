@@ -49,7 +49,7 @@ $('#start').onclick = async () => {
       ws.send(JSON.stringify({ t: 'played_end', turn }));
     }
   };
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', secret, proto: 2 }));
+  ws.onopen = () => { let voice = 'builtin'; try { voice = localStorage.voiceLabVoice || 'builtin'; } catch {} ws.send(JSON.stringify({ t: 'hello', secret, proto: 2, voice })); ws.send(JSON.stringify({ t: 'config', values: { voice } })); };
   const rtts = []; setInterval(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'ping', at: performance.now() })); }, 2000);
   setInterval(() => {
     for (const playback of active.values()) {
@@ -139,6 +139,7 @@ $('#start').onclick = async () => {
     }
     if (message.t === 'warm') { const el = document.querySelector('#warm'); if (el) el.textContent = (el.textContent === '-' ? '' : el.textContent + ', ') + message.part + ' ' + (message.ms / 1000).toFixed(1) + ' s'; }
     if (message.t === 'error') status.textContent = 'The reply could not be completed.';
+    if (message.t === 'notice' && message.code === 'voice_not_ready') status.textContent = 'That voice is not ready for this voice engine. Using the built-in voice.';
   };
   node.port.onmessage = (event) => { if (ws?.readyState === 1) ws.send(event.data); };
   $('#start').disabled = true;
@@ -192,7 +193,7 @@ $('#recordVoice').onclick = async () => {
     for (let i = 0; i < all.length; i++) wav.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(all[i] * 32767))), true);
     $('#recordStatus').textContent = 'Making your voice. This takes a few seconds.';
     const form = new FormData(); form.append('file', new Blob([wav.buffer], { type: 'audio/wav' }), 'me.wav'); form.append('id', 'me');
-    try { const r = await api('/api/voices', { method: 'POST', body: form }); if (!r.ok) throw 0; await loadVoices(); $('#voice').value = 'me'; sendVoiceConfig(); $('#recordStatus').textContent = 'Your voice is ready and selected.'; }
+    try { const r = await api('/api/voices', { method: 'POST', body: form }); const body = await r.json().catch(() => ({})); if (!r.ok || (body.prepared && body.prepared !== 'ok')) throw 0; await loadVoices(); $('#voice').value = 'me'; sendVoiceConfig(); $('#recordStatus').textContent = 'Your voice is ready and selected.'; }
     catch { $('#recordStatus').textContent = 'Your voice could not be made. Record again somewhere quieter, speaking for the full 10 seconds.'; }
   };
 };

@@ -4,7 +4,7 @@ import { TurnManager } from "./turnManager";
 import { History } from "./history";
 import { buildPrompt, datedUser } from "./prompt";
 import { encodeWav, StreamingWavReader } from "./wav";
-import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice } from "./stack";
+import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared } from "./stack";
 import { Chunker } from "./chunker";
 import { TagStream, forEngine } from "./tags";
 import { appendMetrics, type TurnMetrics } from "./metrics";
@@ -30,6 +30,9 @@ export class VoiceSession {
   private committedSamples: number[] = [];
   private committedSegments: string[] = [];
   private committedAt = -Infinity;
+  private draftMessages: any[] = [];
+  private toolInFlight = false;
+  private draftInterrupted = false;
   private resumingCommitted = false;
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private now: () => number;
@@ -41,6 +44,9 @@ export class VoiceSession {
   private metricsFn: typeof appendMetrics;
   private vadDetector: { detect(frame: Float32Array): boolean };
   private voice = "builtin"; private useStyles = true; private replyStyle = "";
+  private stylesFn: typeof supportedStyles;
+  private voicePreparedFn: typeof voicePrepared;
+  private voiceChecked = new Set<string>();
   private styleFor(piece: string): string { if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|sad)\]/i.exec(piece); if (m) this.replyStyle = m[1]!.toLowerCase(); return this.replyStyle; }
   private warming: AbortController | null = null; private lastWarmAt = 0;
   private prewarmChatFn: typeof prewarmChat;
@@ -57,11 +63,12 @@ export class VoiceSession {
   /** The engine keeps the conversation it just wrote, so no warm-up is needed right after a reply. Warm again only after a long quiet spell. */
   private rewarmIfStale() { if (this.now() - this.lastWarmAt > 10 * 60_000 && !this.warming) this.prewarm("all"); }
   private proto = 1; private seqExpected = 0; private netSim = { delayMs: 0, jitterMs: 0, burstEveryMs: 0, burstStallMs: 0 }; private outgoingAt = 0; private toolPendingAudio = false; private captureOffset = 0; private offsetInitialized = false; private toolDelayMs = 2500;
-  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean } }> = {}) {
+  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean } }> = {}) {
     this.now = deps.now ?? (() => performance.now()); this.tm = new TurnManager(this.now); this.speechOrigin = this.now(); this.lastVoiceAt = this.now();
     this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
     this.metricsFn = deps.appendMetrics ?? appendMetrics;
     this.prewarmChatFn = deps.prewarmChat ?? prewarmChat; this.prewarmVoiceFn = deps.prewarmVoice ?? prewarmVoice;
+    this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
     this.timerSet = deps.setTimeout ?? setTimeout; this.timerClear = deps.clearTimeout ?? clearTimeout;
     this.send({ t: "state", state: "idle", vad: this.vad.mode });
   }
@@ -91,7 +98,7 @@ export class VoiceSession {
           this.resumingCommitted = false;
         } else this.history.commitUser(datedUser(String(c.transcript)));
         this.committedSamples = this.samples.slice(); this.committedSegments = this.transcriptSegments.slice(); this.committedAt = this.now(); this.samples = [];
-        if (this.held) { this.send({ t: "final", text: String(c.transcript), turn: this.turn }); this.held = false; for (const event of this.heldChunkEvents) this.send(event); this.heldChunkEvents = []; for (const f of this.heldFrames) this.ws.send(f); this.heldFrames = []; if (this.generatedComplete && this.heldFinalText) { this.history.commitAssistant(this.heldFinalText); this.send({ t: "reply_final", text: this.heldFinalText, turn: this.turn }); this.heldFinalText = ""; } }
+        if (this.held) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.draftInterrupted = false; this.send({ t: "final", text: String(c.transcript), turn: this.turn }); this.held = false; for (const event of this.heldChunkEvents) this.send(event); this.heldChunkEvents = []; for (const f of this.heldFrames) this.ws.send(f); this.heldFrames = []; if (this.generatedComplete && this.heldFinalText) { this.history.commitAssistant(this.heldFinalText); this.send({ t: "reply_final", text: this.heldFinalText, turn: this.turn }); this.heldFinalText = ""; } }
         else { void this.reply(String(c.transcript), true); this.send({ t: "final", text: String(c.transcript), turn: this.turn }); }
         this.send({ t: "state", state: "thinking" }); break;
       case "cancel_held": this.metrics.early_start = "discarded"; for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = ""; this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
@@ -100,7 +107,7 @@ export class VoiceSession {
         this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = "";
         this.samples = this.committedSamples.slice(); this.transcriptSegments = this.committedSegments.slice(); this.resumingCommitted = true;
         this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
-      case "interrupt": this.abort?.abort(); if (!this.held && this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; this.metrics.t_stop_sent = this.metricNow(); } this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.heldFrames = []; this.held = false; this.send({ t: "state", state: c.tap ? "idle" : "user_speaking" }); break;
+      case "interrupt": this.abort?.abort(); if (this.held) { if (this.toolInFlight) this.draftInterrupted = true; else { this.history.messages.push(...this.draftMessages); this.draftMessages = []; if (this.generatedText) this.history.commitAssistant(`${this.generatedText} [answer was not spoken]`); } } else if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; this.metrics.t_stop_sent = this.metricNow(); } this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.heldFrames = []; this.held = false; this.send({ t: "state", state: c.tap ? "idle" : "user_speaking" }); break;
       case "duck": this.send({ t: "duck" }); break;
       case "resume": this.send({ t: "resume" }); break;
       case "discard": this.samples = []; break;
@@ -147,9 +154,10 @@ export class VoiceSession {
     if (!text.trim()) return;
     this.abort = new AbortController(); const signal = this.abort.signal; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
     const requestMessages: any[] = committed ? [...this.history.messages] : [...this.history.messages, { role: "user", content: datedUser(text) }];
+    this.draftMessages = []; this.draftInterrupted = false;
     this.replyStyle = ""; this.warming?.abort(); this.warming = null;
     const chunker = new Chunker(), tagger = new TagStream(); let full = "", rounds = 0, toolTextLength = 0, headerGate: Promise<void> = Promise.resolve(), sendQueue: Promise<void> = Promise.resolve();
-    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_chunk_text === undefined) this.metrics.t_first_chunk_text = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const response = headerGate.then(() => this.speechFn(forEngine(piece, supported), signal, { voice: this.voice, style: this.styleFor(piece) })); response.catch(() => {}); headerGate = response.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, response)).catch(() => {}); };
+    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_chunk_text === undefined) this.metrics.t_first_chunk_text = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
     const speakText = async (delta: string) => { full += delta; this.generatedText = full; const clean = tagger.push(delta); for (const piece of chunker.push(clean)) schedule(piece); };
     try {
       while (rounds <= 2) {
@@ -164,15 +172,26 @@ export class VoiceSession {
         for (const piece of chunker.push(tagger.flush())) schedule(piece); for (const piece of chunker.flush()) schedule(piece); // say the line before the tool runs
         rounds++; this.metrics.tool_rounds = rounds;
         const assistantWords = full.slice(toolTextLength); toolTextLength = full.length;
-        const call = toolCalls[0]; this.metrics.t_tool_start = this.metricNow(); this.send({ t: "tool_start", name: call.name });
-        let result: string; try { result = await this.runToolFn({ name: call.name, arguments: call.arguments }, this.toolDelayMs); } catch { result = "The tool failed."; }
+        const requested = toolCalls.slice(0, 3);
+        const messagesForCall = requested.map((x) => ({ id: x.id, type: "function", function: { name: x.name, arguments: JSON.stringify(x.arguments) } }));
+        this.metrics.t_tool_start = this.metricNow();
+        const toolResults: Array<{ id: string; content: string }> = [];
+        for (const call of requested) {
+          this.send({ t: "tool_start", name: call.name });
+          let result: string;
+          this.toolInFlight = true;
+          try { result = await this.runToolFn({ name: call.name, arguments: call.arguments }, this.toolDelayMs); }
+          catch { result = "The tool failed."; }
+          this.toolInFlight = false;
+          toolResults.push({ id: call.id, content: result });
+        }
+        this.metrics.t_tool_end = this.metricNow(); this.toolPendingAudio = true;
+        for (const call of requested) this.send({ t: "tool_end", name: call.name, ms: this.metrics.t_tool_end - this.metrics.t_tool_start });
+        const exchange = [{ role: "assistant", content: assistantWords || null, tool_calls: messagesForCall }, ...toolResults.map((tool) => ({ role: "tool", tool_call_id: tool.id, content: tool.content }))];
+        if (this.held || this.draftInterrupted) this.draftMessages.push(...exchange); else this.history.messages.push(...exchange);
+        requestMessages.push(...exchange);
+        if (this.draftInterrupted) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.history.commitAssistant("[answer was not spoken]"); this.draftInterrupted = false; return; }
         if (signal.aborted || this.closed) return;
-        this.metrics.t_tool_end = this.metricNow(); this.toolPendingAudio = true; this.send({ t: "tool_end", name: call.name, ms: this.metrics.t_tool_end - this.metrics.t_tool_start });
-        const messagesForCall = toolCalls.map((x) => ({ id: x.id, type: "function", function: { name: x.name, arguments: JSON.stringify(x.arguments) } }));
-        const toolResults = toolCalls.map((x) => ({ id: x.id, content: x.name === call.name ? result : "Tool not run." }));
-        this.history.commitToolExchange(assistantWords, messagesForCall, toolResults);
-        requestMessages.push({ role: "assistant", content: assistantWords || null, tool_calls: messagesForCall });
-        for (const tool of toolResults) requestMessages.push({ role: "tool", tool_call_id: tool.id, content: tool.content });
       }
       for (const piece of chunker.push(tagger.flush())) schedule(piece); for (const piece of chunker.flush()) schedule(piece); await sendQueue;
       if (signal.aborted || this.closed) return;
@@ -181,7 +200,32 @@ export class VoiceSession {
       if (full && !this.held) this.history.commitAssistant(full);
     } catch (error) { if (!signal.aborted) { console.log(`reply error: ${(error as Error)?.name}: ${String((error as Error)?.message).slice(0, 200)}`); this.send({ t: "error", code: "reply_failed" }); this.finishMetrics(); } }
   }
-  private async say(text: string, index: number, signal: AbortSignal, responsePromise: Promise<Response>) { const response = await responsePromise; const reader = response.body!.getReader(), wavReader = new StreamingWavReader(); let pending = false; while (true) { const x = await reader.read(); if (x.done) break; const pcm = wavReader.push(x.value); if (!pcm.length) continue; this.chunkDurations[index] += pcm.length * 1000 / config.replyRate; for (const value of pcm) { const win = this.chunkRefWindows[index]; win.push(value / 32768); if (win.length === 240) { this.chunkRefEnvelopes[index].push(Math.sqrt(win.reduce((sum, sample) => sum + sample * sample, 0) / 240)); win.length = 0; } } const frame = new Uint8Array(8 + pcm.length * 2), v = new DataView(frame.buffer); v.setUint32(0, this.turn, true); v.setUint16(4, index, true); for (let i = 0; i < pcm.length; i++) v.setInt16(8 + i * 2, pcm[i], true); this.sendFrame(frame); pending = true; } if (pending) { const tail = new Uint8Array(488), tv = new DataView(tail.buffer); tv.setUint32(0, this.turn, true); tv.setUint16(4, index, true); tv.setUint16(6, 1, true); this.sendFrame(tail); } }
+  private async say(text: string, index: number, signal: AbortSignal, voiceAndStyle: Promise<{ voice: string; style: string }>) {
+    const choice = await voiceAndStyle;
+    const synth = async (style: string) => {
+      const response = await this.speechFn(forEngine(text, supported), signal, { voice: choice.voice, style });
+      if (!response.body) throw new Error("empty voice response");
+      const reader = response.body.getReader(), wavReader = new StreamingWavReader();
+      const pieces: Int16Array[] = []; let count = 0;
+      while (true) { const part = await reader.read(); if (part.done) break; const pcm = wavReader.push(part.value); if (pcm.length) { pieces.push(pcm); count += pcm.length; } }
+      if (!count) throw new Error("voice response contained no audio");
+      return pieces;
+    };
+    let pieces: Int16Array[];
+    try { pieces = await synth(choice.style); }
+    catch {
+      if (signal.aborted || this.closed) return;
+      try { pieces = await synth(""); }
+      catch { if (signal.aborted || this.closed) return; this.metrics.ok = false; this.metrics.failure = "voice_failed"; this.send({ t: "error", code: "voice_failed" }); this.abort?.abort(); this.finishMetrics(); return; }
+    }
+    if (signal.aborted || this.closed) return;
+    for (const pcm of pieces) {
+      this.chunkDurations[index] += pcm.length * 1000 / config.replyRate;
+      for (const value of pcm) { const win = this.chunkRefWindows[index]; win.push(value / 32768); if (win.length === 240) { this.chunkRefEnvelopes[index].push(Math.sqrt(win.reduce((sum, sample) => sum + sample * sample, 0) / 240)); win.length = 0; } }
+      const frame = new Uint8Array(8 + pcm.length * 2), v = new DataView(frame.buffer); v.setUint32(0, this.turn, true); v.setUint16(4, index, true); for (let i = 0; i < pcm.length; i++) v.setInt16(8 + i * 2, pcm[i], true); this.sendFrame(frame);
+    }
+    const tail = new Uint8Array(488), tv = new DataView(tail.buffer); tv.setUint32(0, this.turn, true); tv.setUint16(4, index, true); tv.setUint16(6, 1, true); this.sendFrame(tail);
+  }
   audio(bytes: Uint8Array) {
     let frame: Float32Array, capture = this.now();
     if (this.proto === 2) { if (bytes.length < 12) return; const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); const seq = dv.getUint32(0, true); capture = dv.getFloat64(4, true); const payload = bytes.subarray(12); frame = new Float32Array(payload.length / 2); const pv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength); for (let i = 0; i < frame.length; i++) frame[i] = pv.getInt16(i * 2, true) / 32768; if (seq < this.seqExpected) return; if (seq > this.seqExpected) { const missing = Math.min(20, seq - this.seqExpected); for (let i = 0; i < missing; i++) this.processAudio(new Float32Array(512), capture - (missing - i) * 32); } this.seqExpected = seq + 1; const arrival = this.now(); const sampleOffset = arrival - capture; if (!this.offsetInitialized || sampleOffset < this.captureOffset) { this.captureOffset = sampleOffset; this.offsetInitialized = true; } const mapped = capture + this.captureOffset; if (arrival - mapped > 3000) { this.metrics.dropped_late_frames = Number(this.metrics.dropped_late_frames ?? 0) + 1; return; } this.processAudio(frame, mapped); return; }
@@ -224,5 +268,5 @@ export class VoiceSession {
     if (this.preRoll.length > maxPreRoll) this.preRoll.splice(0, this.preRoll.length - maxPreRoll);
   }
   close() { if (this.closed) return; this.closed = true; for (const timer of this.timers) this.timerClear(timer); this.timers.clear(); this.abort?.abort(); this.warming?.abort(); for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort = null; this.warming = null; this.samples = []; this.preRoll = []; this.cutInSamples = []; this.transcriptSegments = []; this.committedSamples = []; this.committedSegments = []; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.chunks = []; this.playedMs = []; this.chunkDurations = []; }
-  message(data: string) { try { const j = JSON.parse(data); if (j.t === "hello") { this.proto = j.proto === 2 ? 2 : 1; this.seqExpected = 0; this.prewarm("all"); } if (j.t === "config") { this.tm.configure(j.values ?? {}); if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold; if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart; if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.prewarm("voice"); } if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles; if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs; if (j.values?.netSim) this.netSim = j.values.netSim; } if (j.t === "ping") this.send({ t: "pong", at: j.at }); if (j.t === "stop") for (const c of this.tm.stop()) this.command(c); if (j.t === "played_end" && j.turn === this.turn) { for (let i = 0; i < this.chunkDurations.length; i++) this.playedMs[i] = this.chunkDurations[i]; this.updatePlayedReference(); for (const c of this.tm.playbackEnded()) this.command(c); this.finishMetrics(); } if (j.t === "played" && j.turn === this.turn && Number.isInteger(j.chunk) && Number.isFinite(j.ms)) { this.playedMs[j.chunk] = Math.min(this.chunkDurations[j.chunk] ?? j.ms, j.ms); this.updatePlayedReference(); if (!this.heardAudio) { this.heardAudio = true; this.metrics.t_first_audio_played = this.metricNow(); if (this.toolPendingAudio) { this.metrics.t_first_audio_after_tool = this.metricNow(); this.toolPendingAudio = false; } for (const c of this.tm.firstAudioPlayed()) this.command(c); } } } catch {} }
+  message(data: string) { try { const j = JSON.parse(data); if (j.t === "hello") { this.proto = j.proto === 2 ? 2 : 1; this.seqExpected = 0; if (typeof j.voice === "string") this.voice = j.voice.slice(0, 64) || "builtin"; this.prewarm("all"); } if (j.t === "config") { this.tm.configure(j.values ?? {}); if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold; if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart; if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.prewarm("voice"); } if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles; if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs; if (j.values?.netSim) this.netSim = j.values.netSim; } if (j.t === "ping") this.send({ t: "pong", at: j.at }); if (j.t === "stop") for (const c of this.tm.stop()) this.command(c); if (j.t === "played_end" && j.turn === this.turn) { for (let i = 0; i < this.chunkDurations.length; i++) this.playedMs[i] = this.chunkDurations[i]; this.updatePlayedReference(); for (const c of this.tm.playbackEnded()) this.command(c); this.finishMetrics(); } if (j.t === "played" && j.turn === this.turn && Number.isInteger(j.chunk) && Number.isFinite(j.ms)) { this.playedMs[j.chunk] = Math.min(this.chunkDurations[j.chunk] ?? j.ms, j.ms); this.updatePlayedReference(); if (!this.heardAudio) { this.heardAudio = true; this.metrics.t_first_audio_played = this.metricNow(); if (this.toolPendingAudio) { this.metrics.t_first_audio_after_tool = this.metricNow(); this.toolPendingAudio = false; } for (const c of this.tm.firstAudioPlayed()) this.command(c); } } } catch {} }
 }

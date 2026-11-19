@@ -9,6 +9,34 @@ import { smartTurnProbability, loadSmartTurn } from "./smartTurn";
 
 const LLM = (Bun.env.LAB_LLM_URL ?? "http://127.0.0.1:9921").replace(/\/$/, "");
 export const TTS = (Bun.env.LAB_TTS_URL ?? "http://127.0.0.1:9923").replace(/\/$/, "");
+const styleCache = new Map<string, { expires: number; styles: Set<string> }>();
+export async function supportedStyles(voice: string, now = Date.now()): Promise<Set<string>> {
+  const cached = styleCache.get(voice);
+  if (cached && cached.expires > now) return new Set(cached.styles);
+  try {
+    const [voiceResponse, modelResponse] = await Promise.all([fetch(`${TTS}/voices`), fetch(`${TTS}/models`)]);
+    if (!voiceResponse.ok || !modelResponse.ok) throw new Error("voice metadata unavailable");
+    const voiceData = await voiceResponse.json() as { voices?: Array<{ id: string; styles?: string[] }> };
+    const modelData = await modelResponse.json() as { models?: Record<string, { loaded?: boolean; styles?: string[]; styles_by_reference?: Record<string, Record<string, boolean>> }> };
+    const model = Object.values(modelData.models ?? {}).find((entry) => entry.loaded);
+    const listed = voice === "builtin" ? model?.styles ?? [] : voiceData.voices?.find((entry) => entry.id === voice)?.styles ?? [];
+    const byReference = model?.styles_by_reference?.[voice] ?? {};
+    const allowed = new Set(listed.filter((style) => (model?.styles ?? []).includes(style) || byReference[style] === true));
+    styleCache.set(voice, { expires: now + 60_000, styles: allowed });
+    return new Set(allowed);
+  } catch { return new Set(); }
+}
+export async function voicePrepared(voice: string): Promise<boolean> {
+  if (voice === "builtin") return true;
+  try {
+    const [voiceResponse, modelResponse] = await Promise.all([fetch(`${TTS}/voices`), fetch(`${TTS}/models`)]);
+    if (!voiceResponse.ok || !modelResponse.ok) return false;
+    const voiceData = await voiceResponse.json() as { voices?: Array<{ id: string; prepared_for?: Record<string, string[]> }> };
+    const modelData = await modelResponse.json() as { models?: Record<string, { loaded?: boolean }> };
+    const modelName = Object.entries(modelData.models ?? {}).find(([, entry]) => entry.loaded)?.[0];
+    return !!modelName && (voiceData.voices?.find((entry) => entry.id === voice)?.prepared_for?.[modelName] ?? []).includes("plain");
+  } catch { return false; }
+}
 const PARAKEET = Bun.env.LAB_PARAKEET ?? "/usr/local/maipai-home/stack/data/models/parakeet-tdt-0.6b-v2-int8/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8";
 const SMART_TURN = Bun.env.LAB_SMART_TURN ?? "/usr/local/maipai-home/stack/data/models/smart-turn-v3.2/smart-turn-v3.2-cpu.onnx";
 

@@ -3,6 +3,7 @@ export const toolDefinitions = [
   { type: "function", function: { name: "web_search", description: "Search the web", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } } },
   { type: "function", function: { name: "get_time", description: "Get the current time in a city", parameters: { type: "object", properties: { place: { type: "string" } }, required: ["place"] } } },
 ];
+export const toolCapabilities = { web_search: { readOnly: true }, get_time: { readOnly: true } } as const;
 export async function runTool(call: LabTool, toolDelayMs = 2500, now = new Date()): Promise<string> {
   if (call.name === "get_time") {
     const zones: Record<string, string> = { tokyo: "Asia/Tokyo", "new york": "America/New_York", london: "Europe/London", paris: "Europe/Paris", sydney: "Australia/Sydney", "los angeles": "America/Los_Angeles" };
