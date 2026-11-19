@@ -17822,6 +17822,11 @@ msgid "New version progress"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/EnginesPage.tsx:78
+msgid "Newer release {newest} found"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:131
 msgid "Newest"
 msgstr ""
