@@ -36,13 +36,18 @@
       <tr><td>Decided you were done</td><td id="tCommit">-</td></tr>
       <tr><td>Model's first word</td><td id="tToken">-</td></tr>
       <tr><td>Voice started</td><td id="tVoice">-</td></tr>
-      <tr><td>Cut-in: voice lowered / stopped</td><td id="tCut">-</td></tr>
+      <tr><td>Cut-in: voice lowered / stopped</td><td id="tCut">-</td></tr><tr><td>Link round trip</td><td id="link">-</td></tr><tr><td>Tool wait</td><td id="toolWait">-</td></tr>
     </table>
     <details><summary>All numbers</summary><pre></pre></details>
   </section>
 
   <details id="settings">
     <summary>Settings</summary>
+    <label>Talk-over mode <select id="talkOver"><option value="pause_then_decide">Pause, then decide</option><option value="stop_fast">Stop fast</option></select></label>
+    <label>Tool delay (ms) <input id="toolDelay" type="number" value="2500"></label>
+    <label>Bad-link preset <select id="netSim"><option value="off">Home (off)</option><option value="phone">Phone on cellular</option><option value="hotel">Bad hotel Wi-Fi</option></select></label>
+    <label>Jitter buffer (ms) <input id="jitter" type="number" value="60" readonly></label>
+    <label><input id="localDuck" type="checkbox" checked> Local duck</label>
     <label>Pause before checking you are done (ms) <input id="silence" type="number" value="160"></label>
     <label>How sure the turn check must be (0 to 1) <input id="threshold" type="number" step=".05" value=".6"></label>
     <label><input id="early" type="checkbox" checked> Start the answer early</label>
@@ -51,6 +56,7 @@
     <label>Browser echo cancelling <select id="echoSetting"><option>true</option><option>all</option><option>remote-only</option><option>false</option></select></label>
     <p class="note">Output path and echo cancelling take effect the next time you press Start talking (reload the page first).</p>
   </details>
+  <section><h2>Try these</h2><ul><li>What time is it in Tokyo?</li><li>Search for the latest news about a made-up subject.</li><li>Say “mm-hm” while it talks.</li><li>Interrupt with “wait, stop.”</li></ul><p class="note">Search results in the lab are placeholders.</p></section>
   <audio id="audio" autoplay playsinline></audio>
 </main>
 <script type="module" src="player.js"></script>

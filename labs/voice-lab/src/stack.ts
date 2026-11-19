@@ -12,19 +12,31 @@ const TTS = (Bun.env.LAB_TTS_URL ?? "http://127.0.0.1:9922").replace(/\/$/, "");
 const PARAKEET = Bun.env.LAB_PARAKEET ?? "/usr/local/maipai-home/stack/data/models/parakeet-tdt-0.6b-v2-int8/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8";
 const SMART_TURN = Bun.env.LAB_SMART_TURN ?? "/usr/local/maipai-home/stack/data/models/smart-turn-v3.2/smart-turn-v3.2-cpu.onnx";
 
-export async function* chat(messages: unknown[], signal: AbortSignal, temperature = config.temperature): AsyncGenerator<string> {
+export type ChatEvent = { type: "text"; text: string } | { type: "tool_calls"; calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> };
+export async function* chat(messages: unknown[], signal: AbortSignal, temperature = config.temperature, tools?: unknown[]): AsyncGenerator<ChatEvent> {
   const r = await fetch(`${LLM}/v1/chat/completions`, { method: "POST", signal, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ stream: true, cache_prompt: true, messages, max_tokens: 220, temperature }) });
+    body: JSON.stringify({ stream: true, cache_prompt: true, messages, max_tokens: 220, temperature, ...(tools ? { tools, tool_choice: "auto" } : {}) }) });
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
   const reader = r.body.getReader(), decoder = new TextDecoder(); let buf = "";
+  const calls = new Map<number, { id: string; name: string; arguments: string }>();
   while (true) {
     const x = await reader.read(); if (x.done) break;
     buf += decoder.decode(x.value, { stream: true }); let i;
     while ((i = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
       if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim(); if (data === "[DONE]") return;
-      try { const s = JSON.parse(data).choices?.[0]?.delta?.content; if (typeof s === "string" && s) yield s; } catch {}
+      const data = line.slice(5).trim(); if (data === "[DONE]") {
+        if (calls.size) yield { type: "tool_calls", calls: [...calls.values()].map((call) => ({ id: call.id, name: call.name, arguments: JSON.parse(call.arguments || "{}") })) };
+        return;
+      }
+      try {
+        const delta = JSON.parse(data).choices?.[0]?.delta;
+        if (typeof delta?.content === "string" && delta.content) yield { type: "text", text: delta.content };
+        for (const part of delta?.tool_calls ?? []) {
+          const old = calls.get(part.index) ?? { id: "", name: "", arguments: "" };
+          old.id += part.id ?? ""; old.name += part.function?.name ?? ""; old.arguments += part.function?.arguments ?? ""; calls.set(part.index, old);
+        }
+      } catch {}
     }
   }
 }
