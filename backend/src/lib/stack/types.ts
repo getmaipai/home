@@ -262,6 +262,8 @@ export interface EngineInfo {
   directory: string;
   roleState: string;
   roleReason: string | null;
+  /** A newer upstream release than the installed build (ENGINE-UPDATE-01), with the date the Stack first noticed it. */
+  update?: { newest: string; since: string } | null;
 }
 
 export interface EnginesListResponse {

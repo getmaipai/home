@@ -78,6 +78,7 @@ const EngineInfoSchema = z.object({
   directory: z.string(),
   roleState: z.string(),
   roleReason: z.string().nullable(),
+  update: z.object({ newest: z.string(), since: z.string() }).nullable().optional(),
 });
 
 const BudgetSchema = z.object({

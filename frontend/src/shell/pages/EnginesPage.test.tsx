@@ -111,6 +111,17 @@ describe("EnginesConsole (the engines section of Home settings, ENGINES-AI-01)",
     }
   });
 
+  test("a newer upstream release shows on the engine row, and no line when none is known (ENGINE-UPDATE-01)", async () => {
+    const { restore } = mockEnginesFetch(
+      { configured: true, roles: [], engines: [makeEngine({ label: "llama.cpp server", currentTag: "b10797", state: "current", update: { newest: "b10900", since: "2026-11-19T00:00:00Z" } })], budget: null },
+      { configured: true, health: [] },
+    );
+    try {
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Newer release b10900 found"));
+      expect(document.body.textContent).not.toContain("Current");
+    } finally { restore(); }
+  });
   test("a configured Stack: real roles, engines and health rows", async () => {
     const { restore } = mockEnginesFetch(
       {

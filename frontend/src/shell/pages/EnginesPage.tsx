@@ -75,7 +75,7 @@ function toEngineRow(engine: StackEngineInfo): EngineRow {
   const row = {
     engine: engine.label,
     version: engine.currentTag ?? "-",
-    status: engine.needsRestart ? i18n._({ id: "Needs restart", message: "Needs restart" }) : engine.state === "current" ? i18n._({ id: "Current", message: "Current" }) : i18n._({ id: "Update available", message: "Update available" }),
+    status: engine.needsRestart ? i18n._({ id: "Needs restart", message: "Needs restart" }) : engine.state === "current" ? (engine.update ? i18n._({ id: "Newer release {newest} found", message: "Newer release {newest} found", values: { newest: engine.update.newest } }) : i18n._({ id: "Current", message: "Current" })) : i18n._({ id: "Update available", message: "Update available" }),
   };
   Object.defineProperty(row, "name", { value: engine.name });
   return row as EngineRow;

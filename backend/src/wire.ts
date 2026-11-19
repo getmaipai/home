@@ -1092,6 +1092,7 @@ export interface StackEngineInfo {
   directory: string;
   roleState: string;
   roleReason: string | null;
+  update?: { newest: string; since: string } | null;
 }
 
 export interface StackBudget {
