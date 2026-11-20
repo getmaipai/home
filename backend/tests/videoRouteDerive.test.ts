@@ -23,7 +23,7 @@ const clipOk = () => json({ id: "clip-1", job: "clip", state: "running", percent
 const answer = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
   const path = new URL(String(input), "http://stack.test").pathname;
   calls.push({ path, body: typeof init?.body === "string" ? JSON.parse(init.body) : null });
-  if (path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, part: { id: "part-a", label: "A" } }] });
+  if (path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, request_fields: ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of"], part: { id: "part-a", label: "A" } }] });
   if (path === "/stack/v1/jobs/make") {
     const job = JSON.parse(String(init?.body)).job;
     if (job === "picture") return json({ id: "pic-1", job: "picture", state: "running", percent: 0, status: "Making", files: [], poster: null, made_with: { part: "part-p", label: "P", pack_version: "1", shape: "landscape", seconds: null, sound: false, notes: [] } }, 202);

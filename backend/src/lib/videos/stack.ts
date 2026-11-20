@@ -251,16 +251,25 @@ export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; 
   return failure(res);
 }
 
-/** VF-DOOR-01: whether the adult list's catalog shows a part serving the clip job now; null when the catalog cannot be read (that decides nothing). Read through this module's own connection. */
-export async function clipJobAvailable(): Promise<boolean | null> {
+/**
+ * VF-DOOR-01 and VF-TAKES-01: what the adult list's catalog says about the clip job: whether a part serves it now (null when the catalog cannot be read: that
+ * decides nothing) and the request keys its strict make door accepts (`request_fields`, spec-v0.1.450; absent on a Stack built before it, which is that
+ * Stack's old contract). Read through this module's own connection.
+ */
+export async function clipCatalog(): Promise<{ available: boolean | null; fields: ReadonlySet<string> | null }> {
   try {
     const res = await request("/stack/v1/jobs/catalog?audience=adult", { method: "GET", timeoutMs: 5_000 });
-    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
-    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean }> };
-    if (!catalog || !Array.isArray(catalog.jobs)) return null;
-    return catalog.jobs.find((item) => item.job === "clip")?.available === true;
-  } catch { return null; }
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return { available: null, fields: null }; }
+    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean; request_fields?: unknown }> };
+    if (!catalog || !Array.isArray(catalog.jobs)) return { available: null, fields: null };
+    const clip = catalog.jobs.find((item) => item.job === "clip");
+    const fields = clip && Array.isArray(clip.request_fields) ? new Set(clip.request_fields.filter((key): key is string => typeof key === "string")) : null;
+    return { available: clip?.available === true, fields };
+  } catch { return { available: null, fields: null }; }
 }
+
+/** VF-DOOR-01: whether the adult list's catalog shows a part serving the clip job now; null when the catalog cannot be read (that decides nothing). */
+export async function clipJobAvailable(): Promise<boolean | null> { return (await clipCatalog()).available; }
 
 /** VF-RECEIPT-01: the receipt the Stack wrote for a finished clip (the job owner's record; never logged), or null when there is none or it cannot be read. */
 export async function fetchClipReceipt(job: string, view?: FullView): Promise<Record<string, unknown> | null> {

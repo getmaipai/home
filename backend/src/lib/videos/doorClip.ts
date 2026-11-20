@@ -8,14 +8,35 @@
 // generic one cannot take the clip: the catalog says no part serves it, the planner refuses it, or the Stack is older than the door.
 import type { StackMakeClipRequest } from "@/lib/stack/makeShape";
 import type { PersonRow } from "@/types";
-import { clipJobAvailable, makeClip, StackVideoError, type StackClip, type StackLoraWarning, type VideoBody } from "./stack";
+import { clipCatalog, makeClip, StackVideoError, type StackClip, type StackLoraWarning, type VideoBody } from "./stack";
 import { deriveStartPicture, isNeedsStartPicture, START_PICTURE_FAILED_LINE } from "./deriveStart";
 
 /** The way back to the old door for every clip: set MAIPAI_VIDEO_LEGACY_DOOR=1 (a Stack or a part misbehaving on the generic door). */
 export const legacyDoorForced = (): boolean => process.env.MAIPAI_VIDEO_LEGACY_DOOR === "1";
 
 /** The generic clip request for a body, or null when the body is not a plain clip (it then stays on the old door). */
-export function clipRequestFor(body: VideoBody): StackMakeClipRequest | null {
+/** The keys a Stack built before the catalog listed its request fields (spec before 0.1.450) is known to take on a clip: nothing newer is sent to it. */
+export const OLD_CLIP_FIELDS: ReadonlySet<string> = new Set(["job", "audience", "part", "description", "shape", "level", "seconds", "start_picture", "end_picture", "styles", "seed"]);
+
+/**
+ * The generic clip request for a body, or null when the body is not a plain clip (it then stays on the old door). `fields` is the Stack's own list of the keys
+ * its strict door accepts (undefined: not asked, every key is built; null: the Stack lists none, so it keeps its old contract). A key the clip needs to mean
+ * what it says (the identity input, the derived-start intent, the quiet window) that the Stack does not list sends the clip to the old door instead of
+ * dropping it; `wait` is only a convenience and is left out.
+ */
+export function clipRequestFor(body: VideoBody, fields?: ReadonlySet<string> | null): StackMakeClipRequest | null {
+  const request = buildClipRequest(body);
+  if (!request || fields === undefined) return request;
+  const known = fields ?? OLD_CLIP_FIELDS;
+  const sent: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(request)) {
+    if (known.has(key)) sent[key] = value;
+    else if (key !== "wait") return null;
+  }
+  return sent as unknown as StackMakeClipRequest;
+}
+
+function buildClipRequest(body: VideoBody): StackMakeClipRequest | null {
   if (body.audience !== "adult") return null;
   if (body.negative_prompt || (body.loras && body.loras.length > 0)) return null;
   // Max stays on the old door for now: its memory holds and the Stack's Max stop are classed by Home's own retry policy (`holdMaxAfterMemoryRefusal`) and were not part of the first proof.
@@ -50,10 +71,13 @@ export const doorWanted = (body: VideoBody): boolean => !legacyDoorForced() && c
  */
 export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void, isStopped?: () => boolean): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; derivedImage?: string } | null> {
   if (legacyDoorForced()) return null;
-  const request = clipRequestFor(body);
+  if (!clipRequestFor(body)) return null;
+  // The catalog is asked first so a clip that no part serves does not cost a call (a catalog that cannot be read decides nothing: the door is tried), and
+  // so only the keys this Stack lists are sent (a Stack that lists none keeps its old contract).
+  const catalog = await clipCatalog();
+  if (catalog.available === false) return null;
+  const request = clipRequestFor(body, catalog.available === null ? undefined : catalog.fields);
   if (!request) return null;
-  // The catalog is asked first so a clip that no part serves does not cost a call (a catalog that cannot be read decides nothing: the door is tried).
-  if ((await clipJobAvailable()) === false) return null;
   try {
     const made = await makeClip(request);
     if (!made.ok) {
@@ -61,7 +85,7 @@ export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onD
       if (isNeedsStartPicture(made.refusal) && actor && body.identity_image && !body.derived_start) {
         const derived = await deriveStartPicture(actor, body, made.refusal, isStopped);
         onDerived?.(derived);   // kept on the job at once: a hold after this resend never derives a second picture
-        const resend = clipRequestFor({ ...body, image: derived, derived_start: true });
+        const resend = clipRequestFor({ ...body, image: derived, derived_start: true }, catalog.available === null ? undefined : catalog.fields);
         // A queue or memory answer is thrown as the old door throws it (the job holds, and the derived picture is already kept); any other failure here ends the request: the picture is never swapped for the old door's start.
         const again = resend ? await makeClip(resend).catch((error: unknown) => { if (error instanceof StackVideoError && ["queue_full", "no_memory", "out_of_memory", "memory_cancelled"].includes(String(error.code))) throw error; throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE); }) : null;
         if (!again || !again.ok) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);

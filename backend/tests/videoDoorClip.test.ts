@@ -1,23 +1,25 @@
 // VF-DOOR-01: a plain clip goes through the Stack's generic make door; everything else stays on the old one, and the old one is the way back.
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __setVideosFetchForTests, fetchClipReceipt, type VideoBody } from "@/lib/videos/stack";
-import { clipRequestFor, doorWanted, submitVideoViaDoor } from "@/lib/videos/doorClip";
+import { OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitVideoViaDoor } from "@/lib/videos/doorClip";
 
 const base = (over: Partial<VideoBody> = {}): VideoBody => ({ prompt: "a dog barks", audience: "adult", size: "864x480", seconds: 5, seed: 7, timeout_ms: 1, ...over });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 let calls: Array<{ path: string; body: Record<string, unknown> | null }> = [];
 let clipAvailable = true;
+const ALL_FIELDS = ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of"];
+let catalogFields: string[] | "none" = ALL_FIELDS;
 let makeAnswer: () => Response = () => json({ id: "job-1", job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
 const answer = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
   const path = new URL(String(input), "http://stack.test").pathname;
   calls.push({ path, body: typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : null });
-  if (path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: clipAvailable, part: { id: "part-a", label: "A" } }] });
+  if (path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: clipAvailable, ...(catalogFields === "none" ? {} : { request_fields: catalogFields }), part: { id: "part-a", label: "A" } }] });
   if (path === "/stack/v1/jobs/make") return makeAnswer();
   if (path.endsWith("/receipt.json")) return json({ version: 1, job_id: "job-1" });
   return json({ error: "no", code: "not_found" }, 404);
 };
-beforeEach(() => { calls = []; clipAvailable = true; delete process.env.MAIPAI_VIDEO_LEGACY_DOOR; __setVideosFetchForTests(answer as unknown as typeof fetch); });
+beforeEach(() => { calls = []; clipAvailable = true; catalogFields = ALL_FIELDS; delete process.env.MAIPAI_VIDEO_LEGACY_DOOR; __setVideosFetchForTests(answer as unknown as typeof fetch); });
 afterEach(() => { __setVideosFetchForTests(null); delete process.env.MAIPAI_VIDEO_LEGACY_DOOR; });
 
 test("a plain adult clip becomes a generic clip request with the level, the shape, the seconds, the seed and no wait", () => {
@@ -107,4 +109,27 @@ test("the engine's raw validation words never reach a person's toast on any vide
   const line = plainVideoFailure(new StackVideoError(400, "http_400", 'Unrecognized key: "wait"'));
   expect(line).not.toContain("Unrecognized");
   expect(line).toContain("Try again");
+});
+
+test("the Stack's own list of request keys decides what is sent: a Stack that lists none keeps its old contract and gets no wait or quiet window; a list that lacks a key the clip needs sends it to the old door", async () => {
+  catalogFields = "none";
+  makeAnswer = () => json({ id: "job-1", job: "clip", state: "running", percent: 0, status: "Making", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
+  expect(await submitVideoViaDoor(base())).toMatchObject({ job: "job-1" });
+  const sent = calls.find((c) => c.path === "/stack/v1/jobs/make")!.body!;
+  expect(sent).not.toHaveProperty("wait");
+  expect(Object.keys(sent).every((key) => OLD_CLIP_FIELDS.has(key))).toBe(true);
+  // A quiet window the Stack does not list would be lost: the old door takes the clip.
+  calls = [];
+  expect(await submitVideoViaDoor(base({ quiet_seconds: 60 }))).toBeNull();
+  expect(calls.filter((c) => c.path === "/stack/v1/jobs/make")).toHaveLength(0);
+  // A list with `wait` missing but everything else: the clip is sent without it.
+  catalogFields = ALL_FIELDS.filter((key) => key !== "wait");
+  calls = [];
+  expect(await submitVideoViaDoor(base({ quiet_seconds: 60 }))).toMatchObject({ job: "job-1" });
+  expect(calls.find((c) => c.path === "/stack/v1/jobs/make")!.body).not.toHaveProperty("wait");
+  // A list with `inputs` missing: an identity clip goes to the old door, nothing is derived.
+  catalogFields = ALL_FIELDS.filter((key) => key !== "inputs");
+  calls = [];
+  expect(await submitVideoViaDoor(base({ identity_image: "aWRlbnRpdHk=" }))).toBeNull();
+  expect(calls.filter((c) => c.path === "/stack/v1/jobs/make")).toHaveLength(0);
 });
