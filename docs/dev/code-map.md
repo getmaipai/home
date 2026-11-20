@@ -1247,7 +1247,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/statusChannel.ts` | StatusChannel |
 | `backend/src/lib/statusHistory.ts` | buildStatusHistory, componentStatesFrom, chatPauseSummary, __setStatusHistoryHealthForTests, recordStatusSample, recordBootGap |
 | `backend/src/lib/statusPhrases.ts` | pickStatusPhrase |
-| `backend/src/lib/storage.ts` | walkFiles, diskUsage, storageSummary, storageImpact, checkPersonQuota, diskIsLow |
+| `backend/src/lib/storage.ts` | walkFiles, diskUsage, storageSummary, storageImpact, checkPersonQuota, levelOfDisk |
 | `backend/src/lib/storage/personFiles.ts` | personFilesFate, releaseFilesOfDeletedPerson, exportPersonFiles |
 | `backend/src/lib/storage/usage.ts` | kindForMediaType, personUsageBytes, householdUsageBytes, householdInheritedUsage, personUsageByKind, storageUsageOverview |
 | `backend/src/lib/store.ts` | fetchVerifiedIndex, install, rollback, uninstall, setChannel |
