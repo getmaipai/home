@@ -36,6 +36,7 @@ Open **Video**, then **Create**. Create is for adults. Its prompt input follows 
 In the maker:
 
 - **Describe a video.** Write what you want to see. Put each person's line in quotes. As you type, Home may show up to two small style suggestions under the box. Leave one on to use it, or press its **x** to drop it.
+- **Cast.** Press **Cast** to bring in your characters, places and props from [Elements](elements.md). Pick up to three. Home keeps them looking the same in the clip.
 - **Start frame.** Use the picture attachment control in the composer toolbar to pick a picture from your Library or add a new one as the video’s first frame.
 - **Length.** 5 seconds, or the longest the level you picked can make.
 - **Style.** A compact control opens the **Look** choices. The same menu includes **Camera** moves. Your **Look** is natural, classic cartoon, anime, 3D animated or film. Camera moves include dolly in, slow orbit, handheld, slow motion, time-lapse, aerial and close-up. **Auto** is the first choice in each, and it is what you get if you pick nothing: Home keeps the look natural and lets the words decide the camera. If an admin has added styles you may use, the same window also has **Styles**, **Characters** and **Strength** (**Less**, **Normal** or **More**). A style works at some levels only, and the window says which.
@@ -49,7 +50,11 @@ On a phone, the maker stacks into the page above the idea row. **Your clips** ar
 
 A new clip is the top card. It shows where it is in line, then how far along it is, and it turns into the video by itself. You do not need to reload. Press **Stop** to cancel it.
 
-On a finished clip:
+On a finished clip, the **...** menu holds the less common choices. The first six are the ones you reach for most: **Lock**, **Another take**, **Edit and make again**, **Open in Studio**, **How it was made** and **Save as a template**. Everything that changes the clip itself sits under **Change this clip**: make it Max, change its shape, sharpen it, add spatial sound, continue it with a next shot or an extension, colorize it, or hide it.
+
+**Save as a template** saves the clip's words, look, camera and length as a template only you can see. It is named after the first words of the clip, and you can rename it on the [Templates](videos-templates.md) page. A cast member's name in the words becomes a blank, so the template can be used with someone else.
+
+The buttons on the card:
 
 - **Download** saves it.
 - **Another take** makes the same words again with a new result.
@@ -58,7 +63,7 @@ On a finished clip:
 - **Open in Studio** opens it in the [Studio](videos-studio.md).
 - The **star** marks a favorite.
 
-If a clip did not finish, press **Try again**.
+If a clip did not finish, press **Try again**. A clip you stopped shows as one short line, "Stopped. Nothing was kept."
 
 If Home cannot make videos right now, **Generate** and the buttons that start a clip are switched off, and a line next to them says why and what to do. Your clips still play.
 
