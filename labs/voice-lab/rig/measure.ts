@@ -2,10 +2,14 @@
 // time to first sound, voice speed vs real time while the reply is being written, audio underruns
 // (simulated page player: starts after JITTER ms buffered, gaps when the buffer runs dry), plus median/worst.
 // Usage: bun rig/measure.ts <secret-file> [--n 30] [--jitter 120] [--voice id] [--json out.json]
+import { JitterGate, replay } from "../public/jitter.js";
+const gate = new JitterGate();
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1]! : d; };
 const secretFile = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1]?.startsWith("--") !== true) ?? "";
 const N = Number(opt("n", "30")), JITTER = Number(opt("jitter", "120")), VOICE = opt("voice", ""), OUT = opt("json", "");
+// --ab key=a,b[;key2=c,d] alternates live config values per turn (arm A, arm B, A, B...) so slow drift of the busy machine hits both equally.
+const AB = opt("ab", "").split(";").filter(Boolean).map((x) => { const [k, v] = x.split("="); return { k: k!, vals: v!.split(",").map((y) => (Number.isNaN(Number(y)) ? (y === "true" ? true : y === "false" ? false : y) : Number(y))) }; });
 const LAB = opt("lab", "127.0.0.1:9931"), TTS = "http://127.0.0.1:9923";
 const secret = (await Bun.file(secretFile).text()).trim();
 const QUESTIONS = [
@@ -57,6 +61,7 @@ if (!args.includes("--cold")) { const t0 = performance.now(); while (performance
 const rows: any[] = []; const allFrames: any[] = [];
 for (let i = 0; i < clips.length; i++) {
   pump = false; await Bun.sleep(40); await stream(null, 900);
+  const arm = AB.length ? i % AB[0]!.vals.length : 0; if (AB.length) { ws.send(JSON.stringify({ t: "config", values: Object.fromEntries(AB.map((a) => [a.k, a.vals[arm]])) })); await Bun.sleep(30); }
   frames = []; replyFinalAt = 0; finalText = ""; lastFrameAt = 0; curTurn = 0;
   await stream(clips[i]!, 0); speechEnd = performance.now(); pump = true; (async () => { while (pump) await stream(null, 32); })();
   const t0 = performance.now();
@@ -69,22 +74,24 @@ for (let i = 0; i < clips.length; i++) {
     for (const fr of f) { if (!playing) { avail += fr.sec; if (avail * 1000 >= jit) { playing = true; playEnd = fr.at + avail * 1000; } continue; }
       if (fr.at > playEnd + 1) { gaps++; gapMs += fr.at - playEnd; playEnd = fr.at + fr.sec * 1000; } else playEnd += fr.sec * 1000; }
     return { gaps, gapMs }; };
-  const { gaps, gapMs } = simGaps(JITTER); const g0 = simGaps(0);
+  const before = gate.underruns; const rp = replay(f.map((x) => ({ at: x.at - f[0]!.at, sec: x.sec })), gate); if (gate.underruns === before && rp.gaps === 0) gate.cleanTurn();
+  const gaps = rp.gaps, gapMs = rp.gapMs, startDelay = rp.startAt ?? 0; const g0 = simGaps(0);
   allFrames.push({ i: i + 1, speechEnd, frames: f.map((x) => ({ at: +(x.at - speechEnd).toFixed(1), sec: +x.sec.toFixed(4), chunk: x.chunk })), replyFinal: +(replyFinalAt - speechEnd).toFixed(1) });
   // voice speed vs real time while the reply was still being written (frames before reply_final)
   const during = f.filter((x) => x.at <= replyFinalAt); const dSec = during.reduce((s, x) => s + x.sec, 0);
   const dWall = during.length > 1 ? (during.at(-1)!.at - during[0]!.at) / 1000 : 0;
   const speed = dWall > 0.3 ? dSec / dWall : NaN;
   const total = f.reduce((s, x) => s + x.sec, 0);
-  const row = { i: i + 1, q: QUESTIONS[i], ttfs: Math.round(ttfs), audioSec: +total.toFixed(2), speedWhileWriting: Number.isNaN(speed) ? null : +speed.toFixed(2), gaps, gapMs: Math.round(gapMs), gapsNoBuffer: g0.gaps, gapMsNoBuffer: Math.round(g0.gapMs), words: finalText.split(/\s+/).length };
+  const row = { arm, i: i + 1, q: QUESTIONS[i], ttfs: Math.round(ttfs), startDelay: Math.round(startDelay), ttfsPlayed: Math.round(ttfs + startDelay), audioSec: +total.toFixed(2), speedWhileWriting: Number.isNaN(speed) ? null : +speed.toFixed(2), gaps, gapMs: Math.round(gapMs), gapsNoBuffer: g0.gaps, gapMsNoBuffer: Math.round(g0.gapMs), words: finalText.split(/\s+/).length };
   rows.push(row); console.log(`${String(i + 1).padStart(2)} first=${row.ttfs}ms audio=${row.audioSec}s speed=${row.speedWhileWriting ?? "-"}x gaps=${gaps} (${row.gapMs}ms) nobuf=${g0.gaps} words=${row.words}`);
   ws.send(JSON.stringify({ t: "played_end", turn: f[0]!.turn })); await Bun.sleep(300);
 }
 pump = false; ws.close();
 const ok = rows.filter((r) => r.ttfs != null);
 const sp = ok.map((r) => r.speedWhileWriting).filter((x) => x != null) as number[];
-const summary = { turns: ok.length, jitterMs: JITTER, firstSoundMedianMs: med(ok.map((r) => r.ttfs)), firstSoundWorstMs: Math.max(...ok.map((r) => r.ttfs)), firstSoundP90Ms: [...ok.map((r) => r.ttfs)].sort((a, b) => a - b)[Math.floor(ok.length * 0.9)],
+const summary = { turns: ok.length, jitterMs: JITTER, firstSoundMedianMs: med(ok.map((r) => r.ttfs)), firstSoundPlayedMedianMs: med(ok.map((r) => r.ttfsPlayed)), firstSoundWorstMs: Math.max(...ok.map((r) => r.ttfs)), firstSoundP90Ms: [...ok.map((r) => r.ttfs)].sort((a, b) => a - b)[Math.floor(ok.length * 0.9)],
   speedMedian: med(sp), speedWorst: sp.length ? Math.min(...sp) : null, turnsWithGaps: ok.filter((r) => r.gaps > 0).length, totalGaps: ok.reduce((s, r) => s + r.gaps, 0), totalGapMs: ok.reduce((s, r) => s + r.gapMs, 0), noBufferTotalGaps: ok.reduce((s, r) => s + r.gapsNoBuffer, 0), noBufferTurnsWithGaps: ok.filter((r) => r.gapsNoBuffer > 0).length };
 console.log("SUMMARY", JSON.stringify(summary));
+if (AB.length) for (let a = 0; a < AB[0]!.vals.length; a++) { const r = ok.filter((x) => x.arm === a); console.log(`ARM ${AB.map((q) => q.k + "=" + q.vals[a]).join(",")} turns=${r.length} firstSound median=${med(r.map((x) => x.ttfs))} mean=${Math.round(r.reduce((s, x) => s + x.ttfs, 0) / r.length)} worst=${Math.max(...r.map((x) => x.ttfs))} gaps=${r.reduce((s, x) => s + x.gaps, 0)} playedMedian=${med(r.map((x) => x.ttfsPlayed))}`); }
 if (OUT) await Bun.write(OUT, JSON.stringify({ summary, rows, frames: allFrames }));
 process.exit(0);

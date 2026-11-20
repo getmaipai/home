@@ -1,5 +1,6 @@
 import { PlaybackBuffer } from './playback-buffer.js';
 import { wordEnd } from './word-end.js';
+import { JitterGate } from './jitter.js';
 
 const ctx = new AudioContext();
 const gain = ctx.createGain();
@@ -7,7 +8,8 @@ const buffer = new PlaybackBuffer();
 let paths = {}, destination = ctx.destination, output = 'direct';
 let paused = false, ducked = false, next = ctx.currentTime, tickTimer = 0;
 let scheduled = [], playedCursor = 0, activeTurn = 0, sampleRate = 24000;
-let jitterMs = 120, underruns = 0;
+const gate = new JitterGate(); let turnUnderrunsAtStart = 0;
+const queuedMs = () => Math.max(0, buffer.length - buffer.cursor) / sampleRate * 1000 + Math.max(0, next - ctx.currentTime) * 1000;
 const audio = document.querySelector('#audio');
 
 function pathNode(mode) {
@@ -60,15 +62,17 @@ function playedPosition() {
 }
 function pump() {
   if (paused) return;
+  if (!gate.update(queuedMs(), performance.now())) return;
   while (next < ctx.currentTime + .1 && buffer.cursor < buffer.length) scheduleSlice();
   const done = scheduled.filter((item) => item.end <= ctx.currentTime);
   if (done.length) playedCursor = Math.max(playedCursor, done.at(-1).endCursor);
   scheduled = scheduled.filter((item) => item.end > ctx.currentTime);
 }
 function playPcm(samples, rate = 24000, turn = activeTurn) {
-  if (turn !== activeTurn) { buffer.stop(); scheduled = []; activeTurn = turn; next = ctx.currentTime + .01; playedCursor = 0; ducked = false; ramp(1); }
+  if (turn !== activeTurn) { if (gate.underruns === turnUnderrunsAtStart) gate.cleanTurn(); turnUnderrunsAtStart = gate.underruns; gate.reset(performance.now()); buffer.stop(); scheduled = []; activeTurn = turn; next = ctx.currentTime + .01; playedCursor = 0; ducked = false; ramp(1); }
   if (!buffer.length) sampleRate = rate;
   const startSample = buffer.length;
+  gate.noteArrival(performance.now());
   buffer.append(samples);
   pump();
   return { at: scheduled.find((item) => item.startCursor === startSample)?.at ?? Math.max(ctx.currentTime, next), duration: samples.length / rate, startSample };
@@ -87,7 +91,7 @@ function stopPlayback(turn) {
     if (activeTurn !== stoppedTurn) return;
     for (const item of scheduled) try { item.source.stop(); } catch {}
     scheduled = []; buffer.stop(); paused = false; ducked = false; next = ctx.currentTime; playedCursor = 0; activeTurn = stoppedTurn;
-    ramp(1); stopTick();
+    ramp(1); stopTick(); gate.reset(performance.now());
   }, Math.round(wait * 1000) + 30);
 }
 // People do not turn their voice down when someone says "mm-hm", so the reply keeps its volume while the lab decides
@@ -115,7 +119,7 @@ function resume() {
   if (paused) {
     const atChunk = null;
     buffer.resume(sampleRate, atChunk);
-    paused = false; ducked = false; buffer.restore(); next = ctx.currentTime + .015; ramp(1);
+    gate.state = 'playing'; paused = false; ducked = false; buffer.restore(); next = ctx.currentTime + .015; ramp(1);
     pump();
   } else restore();
 }
@@ -132,6 +136,7 @@ setInterval(pump, 20);
 window.voiceLab = { onSpeech(listener) { window.__voiceLabListener = listener; } };
 window.__voiceCtx = ctx;
 window.__playPcm = playPcm;
+window.__jitter = gate;
 window.__stopPlayback = stopPlayback;
 window.__duck = duck;
 window.__restore = restore;
