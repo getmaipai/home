@@ -7,7 +7,7 @@ import { StackRoughCutRequest } from "@maipai/spec/stack/ts/stack-rough-cut.js";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { createMediaProduction, setShotPicture, updateMediaProduction } from "@/lib/mediaProductions";
 import { storeFile } from "@/lib/attachments";
-import { ANIMATIC_FAILED_LINE, ANIMATIC_MISSING_LINE, ANIMATIC_OLD_STACK_LINE, ANIMATIC_TIMEOUT_LINE, animaticRequest, assumedMinor, latestVoicedPreview, makeRoughCut, roughCutRequest, runRoughCutJob, voicedScript, VOICED_NOT_AVAILABLE_LINE, type RoughCutJobDeps } from "../src/lib/films/roughCut";
+import { ANIMATIC_FAILED_LINE, ANIMATIC_MISSING_LINE, ANIMATIC_OLD_STACK_LINE, ANIMATIC_TIMEOUT_LINE, animaticRequest, assumedMinor, latestVoicedPreview, makeRoughCut, roughCutRequest, runRoughCutJob, voicedScript, droppedLinesNote, VOICED_NOT_AVAILABLE_LINE, type RoughCutJobDeps } from "../src/lib/films/roughCut";
 import { __setStackHttpFetchForTests } from "../src/lib/films/roughCut";
 import type { FilmPlan } from "../src/lib/films/plan";
 import type { PersonRow } from "@/types";
@@ -168,5 +168,43 @@ describe("makeRoughCut (voiced)", () => {
       expect(await makeRoughCut({ actor: kid, productionId: "x", plan, voiced: true, deps: deps(sent), seams: pass })).toEqual({ ok: false, line: "That film is not available to you." });
       expect(sent).toEqual([]);
     }
+  });
+});
+
+describe("FILM-LINES-01 slice 2: an exchange in one shot, one voice per speaker", () => {
+  const two = [{ name: "Willow", kind: "character", locked: "Blue coat." }, { name: "Marlow", kind: "character", locked: "Green scarf." }];
+  const exchange = (extra: Record<string, unknown> = {}) => sixShots.map((s) => (s.id === "shot-2" ? { ...Object.fromEntries(Object.entries(s).filter(([key]) => key !== "line")), lines: [{ speaker: "Willow", text: "Is that mine?" }, { speaker: "Marlow", text: "It was never yours." }, { speaker: "Narration", text: "They both laughed." }], ...extra } : Object.fromEntries(Object.entries(s).filter(([key]) => key !== "line"))));
+  test("every line of the shot is sent in order under the one shot id, with one voice entry per speaker", async () => {
+    const { script, dropped } = await voicedScript(sage, planOf(exchange(), two));
+    expect(dropped).toBe(0);
+    expect(script.lines).toEqual([
+      { shot_id: "shot-2", line: { speaker: "Willow", text: "Is that mine?" } },
+      { shot_id: "shot-2", line: { speaker: "Marlow", text: "It was never yours." } },
+      { shot_id: "shot-2", line: { speaker: "Narration", text: "They both laughed." } },
+    ]);
+    expect(script.voices.map((voice) => voice.speaker)).toEqual(["Willow", "Marlow", "Narration"]);
+    const request = roughCutRequest(planOf(exchange(), two), sixShots.map((_, i) => `/m/${i}.png`), script);
+    expect(StackRoughCutRequest.safeParse(request).success).toBe(true);
+    expect(request.shots.find((entry) => entry.id === "shot-2")!.caption).toBeUndefined();
+  });
+  test("the minor flag follows each line's own speaker: a real subject with no person is a minor, the other speaker is not", async () => {
+    const real = createMediaSubject(sage, { name: "Marlow", kind: "character", look: "A woman.", real: true });
+    const cast = [two[0]!, { ...two[1]!, subject_id: real.id }];
+    const { script } = await voicedScript(sage, planOf(exchange(), cast));
+    expect(script.voices.find((voice) => voice.speaker === "Marlow")).toEqual({ speaker: "Marlow", minor: true });
+    expect(script.voices.find((voice) => voice.speaker === "Willow")).toEqual({ speaker: "Willow" });
+    expect(script.voices.every((voice) => !("voice_reference" in voice))).toBe(true);
+  });
+  test("one line the text gate refuses drops ALL of that shot's lines, counted, and the other shots stay", async () => {
+    const plan = planOf(exchange({ lines: [{ speaker: "Willow", text: "Fine." }, { speaker: "Marlow", text: MINOR_SEXUAL }] }), two);
+    const { script, dropped, droppedByShot } = await voicedScript(sage, plan);
+    expect(dropped).toBe(2);
+    expect(droppedByShot).toEqual([{ shot: 2, lines: 2 }]);
+    expect(script.lines).toEqual([]);
+    expect(script.withheld).toEqual(["shot-2"]);
+  });
+  test("the note counts lines and names the shot, never a speaker, an age or a filter", () => {
+    expect(droppedLinesNote([{ shot: 3, lines: 1 }])).toBe("One line in shot 3 was left out of the voiced preview because it could not be used. Change that line to include it. The rest are spoken.");
+    expect(droppedLinesNote([{ shot: 3, lines: 2 }, { shot: 5, lines: 1 }])).toBe("2 lines in shot 3 and 1 line in shot 5 were left out of the voiced preview because they could not be used. Change those lines to include them. The rest are spoken.");
   });
 });

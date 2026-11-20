@@ -116,7 +116,6 @@ export async function runRoughCutJob(request: AnimaticRequest, signal: AbortSign
 // ---- voices and the script (voiced only) ----
 
 export const VOICED_NOT_AVAILABLE_LINE = "The voiced preview is not available yet. The AI engine does not have the storyboard step.";
-const DROPPED_LINES_NOTE = (n: number) => `${n === 1 ? "One line was" : `${n} lines were`} left out of the voiced preview because ${n === 1 ? "it" : "they"} could not be used. The rest are spoken.`;
 
 /** The storyboard step is offered only when the Stack says it has it: `media.rough_cut` in the media kinds it lists. An old, remote or silent Stack reads as not available. */
 export async function roughCutAvailable(): Promise<boolean> {
@@ -158,29 +157,54 @@ import { shotLines, shotText } from "./lines";
 
 const asAddress = (voice: string | null | undefined): string | undefined => (voice && voice !== VOICE_ENGINE_DEFAULT && isPresetVoice(voice) ? voicePresetName(voice) ?? voice : undefined);
 
-/** The script and voices of a plan: each kept shot's line passes the maker's text gate (a failing line is dropped), and the speaker's voice is its own choice if it has one, else the household default. A minor or unknown-age speaker is sent with NO address. */
-export async function voicedScript(actor: PersonRow, plan: FilmPlan): Promise<{ script: VoicedScript; dropped: number }> {
-  const { name, member } = speakerOfPlan(plan);
-  const withheld: string[] = [];
+/** The note after a voiced preview left lines out: it counts lines and names the shot, never a speaker, an age or a filter (FILM-LINES-01 slice 2, C11). */
+export function droppedLinesNote(dropped: ReadonlyArray<{ shot: number; lines: number }>): string {
+  const total = dropped.reduce((sum, entry) => sum + entry.lines, 0);
+  const parts = dropped.map((entry, index) => `${entry.lines === 1 ? (index === 0 ? "One line" : "1 line") : `${entry.lines} lines`} in shot ${entry.shot}`);
+  const named = parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `${named} ${total === 1 ? "was" : "were"} left out of the voiced preview because ${total === 1 ? "it" : "they"} could not be used. Change ${total === 1 ? "that line" : "those lines"} to include ${total === 1 ? "it" : "them"}. The rest are spoken.`;
+}
+
+/** The script and voices of a plan (FILM-LINES-01 slice 2): every line of every kept shot goes through the maker's text gate with ITS OWN speaker's minor fact, then the shot's lines are screened
+ *  together; if either fails, ALL of that shot's lines are dropped and counted (never part of an exchange). One voice entry per speaker: its own choice if it has one, else the household default;
+ *  a minor or unknown-age speaker is sent with NO address (never a voice reference). Narration has no cast entry and is not a minor. */
+export async function voicedScript(actor: PersonRow, plan: FilmPlan): Promise<{ script: VoicedScript; dropped: number; droppedByShot: Array<{ shot: number; lines: number }> }> {
+  const kept = plan.shots.filter((entry) => (entry as { kept?: boolean }).kept !== false);
+  const facts = new Map<string, { minor: boolean; own: string | undefined }>();
+  const factsOf = async (speaker: string) => {
+    const known = facts.get(speaker);
+    if (known) return known;
+    const member = plan.cast.find((entry) => entry.kind === "character" && entry.name.trim().toLocaleLowerCase() === speaker.trim().toLocaleLowerCase());
+    let minor = false, own: string | undefined;
+    if (member?.subject_id) {
+      const entry = (await resolveCast(actor, [member.subject_id])).members[0];
+      // A subject Home cannot resolve is treated like one whose age it cannot tell.
+      if (!entry) minor = true; else { minor = assumedMinor(entry); own = asAddress(entry.voice); }
+    }
+    const made = { minor, own };
+    facts.set(speaker, made);
+    return made;
+  };
+  const withheld: string[] = [], droppedByShot: Array<{ shot: number; lines: number }> = [];
   const lines: VoicedScript["lines"] = [];
-  for (const shot of plan.shots.filter((entry) => (entry as { kept?: boolean }).kept !== false)) {
-    // FILM-LINES-01 slice 1: the voiced preview speaks a shot with ONE line by the film's one speaker (as before); an exchange or another speaker waits for the Stack's several-lines-per-shot half and is shown as words.
+  const spoken = new Set<string>();
+  for (const [index, shot] of kept.entries()) {
     const said = shotLines(plan, shot);
-    if (said.length !== 1 || said[0]!.speaker !== name) continue;
-    const text = said[0]!.text;
-    if (refuseVideoPrompt(text, { lane: "adult" })) { withheld.push(shot.id); continue; }
-    lines.push({ shot_id: shot.id, line: { speaker: name, text: text.slice(0, 300) } });
+    if (said.length === 0) continue;
+    const speakers = await Promise.all(said.map((entry) => factsOf(entry.speaker)));
+    const laneOf = (minor: boolean): "child" | "adult" => (minor ? "child" : "adult");
+    const eachFails = said.some((entry, i) => refuseVideoPrompt(entry.text, { lane: laneOf(speakers[i]!.minor) }));
+    const together = speakers.some((entry) => entry.minor) ? "child" : "adult";
+    if (eachFails || refuseVideoPrompt(said.map((entry) => entry.text).join(" "), { lane: together })) { withheld.push(shot.id); droppedByShot.push({ shot: index + 1, lines: said.length }); continue; }
+    for (const entry of said) { lines.push({ shot_id: shot.id, line: { speaker: entry.speaker, text: entry.text.slice(0, 300) } }); spoken.add(entry.speaker); }
   }
-  let minor = false, own: string | undefined;
-  if (member?.subject_id) {
-    const cast = await resolveCast(actor, [member.subject_id]);
-    const entry = cast.members[0];
-    // A subject Home cannot resolve is treated like one whose age it cannot tell.
-    if (!entry) minor = true;
-    else { minor = assumedMinor(entry); own = asAddress(entry.voice); }
+  const voices: VoicedScript["voices"] = [];
+  for (const speaker of spoken) {
+    const { minor, own } = await factsOf(speaker);
+    const address = minor ? undefined : own ?? asAddress(voiceForSpeech({ actor }));
+    voices.push({ speaker, ...(address ? { voice_address: address } : {}), ...(minor ? { minor: true } : {}) });
   }
-  const address = minor ? undefined : own ?? asAddress(voiceForSpeech({ actor }));
-  return { script: { lines, voices: lines.length ? [{ speaker: name, ...(address ? { voice_address: address } : {}), ...(minor ? { minor: true } : {}) }] : [], withheld }, dropped: withheld.length };
+  return { script: { lines, voices, withheld }, dropped: droppedByShot.reduce((sum, entry) => sum + entry.lines, 0), droppedByShot };
 }
 
 // ---- the pipeline ----
@@ -206,11 +230,11 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   const stored = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
   if (plan.shots.length === 0) return { ok: false, line: "This film has no shots yet." };
   const kind = voiced ? "voiced preview" : "animatic";
-  let script: VoicedScript | undefined, dropped = 0;
+  let script: VoicedScript | undefined, dropped = 0, droppedByShot: Array<{ shot: number; lines: number }> = [];
   if (voiced) {
     if (!(await roughCutAvailable())) return { ok: false, line: VOICED_NOT_AVAILABLE_LINE };
     // The script is gated BEFORE anything is sent to the Stack (rules 0 and 10).
-    ({ script, dropped } = await voicedScript(actor, plan));
+    ({ script, dropped, droppedByShot } = await voicedScript(actor, plan));
     if (script.lines.length === 0) return { ok: false, line: dropped > 0 ? "None of the lines could be used in the voiced preview. Change the lines, then try again." : "There are no lines to speak yet. Add a line to a shot, then make the voiced preview." };
   }
   const files: Array<{ bytes: Uint8Array; ext: string }> = [];
@@ -233,7 +257,9 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   // Voiced: each line heard once, at its time, or the file is not shown. Not checked counts as a failure here.
   if (voiced) {
     const lines = result.lines ?? [];
-    const lineByShot = new Map((script?.lines ?? []).map((entry) => [entry.shot_id, entry.line.text]));
+    // The finished-film check expects only the lines actually sent, per shot, in the order they were sent.
+    const lineByShot = new Map<string, string>();
+    for (const entry of script?.lines ?? []) lineByShot.set(entry.shot_id, [lineByShot.get(entry.shot_id), entry.line.text].filter(Boolean).join(" "));
     const verdict = await (input.seams?.verify ?? verifyRoughCutBytes)(made.bytes, {
       total_s: result.total_s, has_audio: lines.length > 0, signal,
       // Every shot is a still with a camera move (a slow pan moves a few pixels): the frozen-picture check does not apply, so each is a held still. Black and sound checks do.
@@ -265,7 +291,7 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   const record = { v: 1, kind: voiced ? "film-rough-cut" : "film-animatic", production: productionId, shots: plan.shots.length, seconds: made.seconds, ...(voiced ? { plan: planFingerprint(plan) } : {}), ...(voiced ? { result: { total_s: result.total_s, shots: result.shots, lines: keptLines } } : {}) };
   const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: made.bytes, provenance: `video-edit:${JSON.stringify(record)}`, retention: "kept", name: voiced ? "Film voiced preview" : "Film animatic", deduplicate: false });
   if (!saved.ok) return { ok: false, line: saved.error };
-  return { ok: true, fileId: saved.value.id, seconds: made.seconds ?? 0, shots: plan.shots.length, lines: keptLines.length, note: dropped > 0 ? DROPPED_LINES_NOTE(dropped) : null };
+  return { ok: true, fileId: saved.value.id, seconds: made.seconds ?? 0, shots: plan.shots.length, lines: keptLines.length, note: dropped > 0 ? droppedLinesNote(droppedByShot) : null };
 }
 
 /** A short fingerprint of what a voiced preview was made from (each kept shot's id, length, motion and line): a preview made from other words is stale. */
