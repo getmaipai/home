@@ -25,6 +25,7 @@ export function elementFacts(person: PersonRow, id: string) {
   const sheet = entry.look.sheet_file_id ? (entry.look.sheet_stale ? "Made, but its pictures have changed since" : "Made") : "Not made yet";
   const linked = entry.kind === "synth" ? "A companion" : entry.kind === "member" ? "A household member" : "Saved by you";
   return [
+    { id: "name", label: "Name", value: entry.name },
     { id: "kind", label: "Kind", value: `${entry.subject_kind === "character" ? "Character" : entry.subject_kind === "place" ? "Place" : "Prop"}. ${linked}.` },
     { id: "look", label: "Look", value: entry.look.description.trim() || EMPTY },
     { id: "locked", label: "Locked description", value: entry.locked_description?.trim() || EMPTY },

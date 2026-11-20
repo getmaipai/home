@@ -86,7 +86,8 @@
           }
         }
       ],
-      "item_media_field": "thumbnail"
+      "item_media_field": "thumbnail",
+      "hide_when_empty": true
     },
     {
       "type": "media_shelf",
@@ -119,7 +120,8 @@
             }
           }
         }
-      ]
+      ],
+      "hide_when_empty": true
     },
     {
       "type": "action_bar",
