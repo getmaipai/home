@@ -8,7 +8,7 @@ const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = q
 const FIRST_SOUND_TARGET_MS = 1350; // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
 const secret = (await Bun.file(SECRET_FILE).text()).trim(), LAB = "127.0.0.1:9931";
 const results: Array<[boolean, string]> = []; const line = (ok: boolean, text: string) => { results.push([ok, text]); console.log(`${ok ? "PASS" : "FAIL"}  ${text}`); };
-const run = async (cmd: string[]) => { const p = Bun.spawn(cmd, { cwd: import.meta.dir + "/..", stdout: "pipe", stderr: "pipe" }); const out = await new Response(p.stdout).text(); await p.exited; return out; };
+const run = async (cmd: string[]) => { const p = Bun.spawn(cmd, { cwd: import.meta.dir + "/..", stdout: "pipe", stderr: "pipe" }); const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]); await p.exited; return out + "\n" + err; };
 const up = async (url: string, headers: Record<string, string> = {}) => { try { return (await fetch(url, { headers, signal: AbortSignal.timeout(4000) })).status < 500; } catch { return false; } };
 
 // 1 engines answer and are prewarmed
