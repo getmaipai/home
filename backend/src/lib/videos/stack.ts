@@ -261,16 +261,25 @@ export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; 
  * decides nothing) and the request keys its strict make door accepts (`request_fields`, spec-v0.1.450; absent on a Stack built before it, which is that
  * Stack's old contract). Read through this module's own connection.
  */
-export async function clipCatalog(): Promise<{ available: boolean | null; fields: ReadonlySet<string> | null }> {
+export async function clipCatalog(): Promise<{ available: boolean | null; fields: ReadonlySet<string> | null; sizes: Record<string, Record<string, { width: number; height: number }>> }> {
   try {
     const res = await request("/stack/v1/jobs/catalog?audience=adult", { method: "GET", timeoutMs: 5_000 });
-    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return { available: null, fields: null }; }
-    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean; request_fields?: unknown }> };
-    if (!catalog || !Array.isArray(catalog.jobs)) return { available: null, fields: null };
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return { available: null, fields: null, sizes: {} }; }
+    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean; request_fields?: unknown; limits?: { shapes?: unknown } }> };
+    if (!catalog || !Array.isArray(catalog.jobs)) return { available: null, fields: null, sizes: {} };
     const clip = catalog.jobs.find((item) => item.job === "clip");
     const fields = clip && Array.isArray(clip.request_fields) ? new Set(clip.request_fields.filter((key): key is string => typeof key === "string")) : null;
-    return { available: clip?.available === true, fields };
-  } catch { return { available: null, fields: null }; }
+    const sizes: Record<string, Record<string, { width: number; height: number }>> = {};
+    const shapes = clip?.limits?.shapes;
+    if (shapes && typeof shapes === "object") for (const [shape, levels] of Object.entries(shapes as Record<string, unknown>)) {
+      if (!levels || typeof levels !== "object") continue;
+      for (const [level, size] of Object.entries(levels as Record<string, unknown>)) {
+        const { width, height } = (size ?? {}) as { width?: unknown; height?: unknown };
+        if (typeof width === "number" && typeof height === "number" && width > 0 && height > 0) (sizes[shape] ??= {})[level] = { width, height };
+      }
+    }
+    return { available: clip?.available === true, fields, sizes };
+  } catch { return { available: null, fields: null, sizes: {} }; }
 }
 
 /** VF-DOOR-01: whether the adult list's catalog shows a part serving the clip job now; null when the catalog cannot be read (that decides nothing). */

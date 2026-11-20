@@ -16,6 +16,7 @@ import { resolveCompanionClip, stackVideoModel, promptHash, reportedVideoModelMa
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { makingStateOf } from "@/lib/pictures/plainLine";
 import { takeClipSize } from "@/lib/companionClipSize";
+import { planCompanionDoor } from "@/lib/companionDoor";
 import { bandOfFrame, frameForImage, frameInBand, type Dims, type PackFrame } from "@/lib/companionPackFrame";
 import { activeLookJob } from "@/lib/companionLookJobs";
 import type { CompanionTake } from "@/lib/companionStates";
@@ -96,6 +97,9 @@ export const PACK_MOTIONS: Record<string, string[]> = {
   speaking: ["head makes small natural talking movements with tiny nods and tilts, lips stay gently closed, eyes open and bright"],
 };
 
+/** The state's action in plain words for a pack take, exactly the text the pack prompt carries after "Action:" (the Stack's companion recipe wraps it). */
+export function packTakeDescription(state: string, variant = 0): string { const motions = PACK_MOTIONS[state] ?? PACK_MOTIONS.idle!; return motions[variant % motions.length]!; }
+export function packGestureDescription(id: string): string { return PACK_GESTURES.find((item) => item.id === id)!.motion; }
 export type PackGesture = { id: string; state: "speaking" | "idle"; kind: "nod" | "tilt" | "glance" | "settle"; amp: 1 | 2 | 3; motion: string };
 const gesture = (id: string, state: PackGesture["state"], kind: PackGesture["kind"], amp: PackGesture["amp"], size: string, action: string): PackGesture => ({ id, state, kind, amp, motion: `Eyes open, gaze at the camera, face evenly lit, camera locked. The person makes ${size} ${action}, then looks directly at the camera. the final frame matches the first frame` });
 export const PACK_GESTURES: readonly PackGesture[] = [
@@ -185,6 +189,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
       for (let index = 1; index <= count; index++) {
         if (run.cancelled) break;
         const prompt = run.pack ? (run.packGesture ? packGesturePrompt(PACK_GESTURES.find((item) => item.id === run.packGesture)!, keyName) : packTakePrompt(sheet.card, state, keyName, index - 1)) : takePrompt(sheet.card, chosenMotion(state, stored?.motion), keyName);
+        // The state's action in plain words, as the Stack's companion recipe expects it (the same text the pack prompt carries after "Action:" today).
+        const doorDescription = run.packGesture ? packGestureDescription(run.packGesture) : packTakeDescription(state, index - 1);
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
         const makingLabel = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
@@ -198,19 +204,35 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           const lane = personLane === "adult" ? "detailed" : "quick";
           // A pack clip is made on the Max model when the engine has it (the demo's clips were, and it moves more naturally); the standard one otherwise.
           // The take is made in the lane of the person who will see it: a teen's or child's take is never made on the sound maker (AGE-ROUTING-REMOVE-01).
-          const art = run.pack && lane === "detailed" && process.env.MAIPAI_PACK_MAX !== "0" ? await resolveCompanionClip(lane, true, personLane).catch(() => resolveCompanionClip(lane, false, personLane)) : await resolveCompanionClip(lane, false, personLane);
+          // VF-COMPANION-RECIPE-01: an adult viewer's pack take asks the Stack's generic door first (operation companion_take: the pack recipe holds the wording, the Stack picks the part and the size);
+          // where it does not serve it, the take is made on the old door below exactly as before.
+          const doorPlan = run.pack && personLane === "adult" ? await planCompanionDoor().catch(() => null) : null;
+          let art = null as Awaited<ReturnType<typeof resolveCompanionClip>> | null;
           const shape = await sharp(readFileSync(keyframePath(run.companionId, state))).metadata();
-          const engineNow = await videoEngineStatus().catch(() => null);
-          const clipSize = takeClipSize(art.model, art.quality, run.pack ? false : (shape.height ?? 0) > (shape.width ?? 0), engineNow), pictureB64 = await pictureFor(clipSize);
-          // A pack clip is a loop of one picture: the same picture is its last frame too (LTX-2.5 guides frame 0 and the last frame), which stops the face drifting away from the rest picture. Only when the engine says it can.
-          const endPicture = run.pack && art.model.startsWith("ltx25") && ltx25EndPictureReady(engineNow, art.model === "ltx25-max");
-          const seconds = Math.min(run.pack ? PACK_TAKE_SECONDS : media.generate.seconds, maxSecondsFor(art.quality));
-          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt), ...(run.packJob ? { pack_job: run.packJob } : {}) });
+          let clipSize: { width: number; height: number };
+          let pictureB64: string | null = null;
+          let endPicture = false;
+          let seconds = PACK_TAKE_SECONDS;
+          const legacyInputs = async () => {
+            art = run.pack && lane === "detailed" && process.env.MAIPAI_PACK_MAX !== "0" ? await resolveCompanionClip(lane, true, personLane).catch(() => resolveCompanionClip(lane, false, personLane)) : await resolveCompanionClip(lane, false, personLane);
+            const engineNow = await videoEngineStatus().catch(() => null);
+            clipSize = takeClipSize(art.model, art.quality, run.pack ? false : (shape.height ?? 0) > (shape.width ?? 0), engineNow); pictureB64 = await pictureFor(clipSize);
+            // A pack clip is a loop of one picture: the same picture is its last frame too (LTX-2.5 guides frame 0 and the last frame), which stops the face drifting away from the rest picture. Only when the engine says it can.
+            endPicture = !!(run.pack && art.model.startsWith("ltx25") && ltx25EndPictureReady(engineNow, art.model === "ltx25-max"));
+            seconds = Math.min(run.pack ? PACK_TAKE_SECONDS : media.generate.seconds, maxSecondsFor(art.quality));
+          };
+          clipSize = doorPlan ? (doorPlan.sizeFor("max") ?? doorPlan.sizeFor("standard")!) : { width: 0, height: 0 };
+          if (!doorPlan) await legacyInputs();
+          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art ? art.model : null, quality: art ? art.quality : "detailed", prompt_hash: promptHash(prompt), ...(run.packJob ? { pack_job: run.packJob } : {}) });
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
           const maxAttempts = run.pack ? PACK_MEMORY_ATTEMPTS : 2;
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
-              const submitted = await submitVideo({ prompt, negative_prompt: run.pack ? PACK_TAKE_NEGATIVE_PROMPT : TAKE_NEGATIVE_PROMPT, size: `${clipSize.width}x${clipSize.height}`, seconds, ...(run.pack ? PACK_QUIET : {}), ...(endPicture ? { end_image: pictureB64 } : {}), model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
+              const legacySubmit = () => submitVideo({ prompt, negative_prompt: run.pack ? PACK_TAKE_NEGATIVE_PROMPT : TAKE_NEGATIVE_PROMPT, size: `${clipSize.width}x${clipSize.height}`, seconds, ...(run.pack ? PACK_QUIET : {}), ...(endPicture ? { end_image: pictureB64! } : {}), model: stackVideoModel(art!), seed, image: pictureB64!, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
+              let submitted: Awaited<ReturnType<typeof submitVideo>> | { job: string; done: null };
+              const viaDoor = doorPlan ? await doorPlan.submit({ description: doorDescription, picture: pictureFor, keyColour: keyName, frame: run.packGesture ? "gesture" : "state", seconds, seed, quiet: { ...PACK_QUIET } }) : null;
+              if (viaDoor) { submitted = { job: viaDoor.job, done: null }; clipSize = doorPlan!.sizeFor(viaDoor.level) ?? clipSize; }
+              else { if (!art) await legacyInputs(); submitted = await legacySubmit(); }
               stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
               const deadline = Date.now() + 15 * 60_000;
               while (!done) {
@@ -240,7 +262,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           if (run.cancelled) break;
           const reported = done?.find((clip) => typeof clip.model === "string")?.model ?? null;
           const reportedQuality = done?.find((clip) => clip.quality)?.quality ?? null;
-          if ((reportedQuality && !reportedVideoQualityMatches(reportedQuality, art)) || (reported && !reportedVideoModelMatches(reported, art, take.model ?? ""))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
+          if (art && ((reportedQuality && !reportedVideoQualityMatches(reportedQuality, art)) || (reported && !reportedVideoModelMatches(reported, art, take.model ?? "")))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
           recordTakeModelReported(run.companionId, state, take.id, reported);
           run.phase = "finishing"; run.label = `Finishing the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`; run.percent = Math.min(99, run.percent + 1);
           const completedStackJob = stackJob!;
