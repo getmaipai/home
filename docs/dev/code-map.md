@@ -630,7 +630,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fillerEvents.ts` | reportFillerEvent |
 | `backend/src/lib/films/animatic.ts` | makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
-| `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
+| `backend/src/lib/films/engines.ts` | stillSeed, backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm |
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
 | `backend/src/lib/films/filmProgress.ts` | shotProgressRow, pageShotRow, filmProgressPageRows, filmProgressRows |
 | `backend/src/lib/films/junkCleanup.ts` | JUNK, deriveJunkRegion, JUNK_PROMPT, cleanJunk |
