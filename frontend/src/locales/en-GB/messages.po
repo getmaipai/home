@@ -1051,11 +1051,6 @@ msgid "{name} restarted."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:286
-msgid "{name} sections"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:90
 msgid "{name} settings"
 msgstr ""
@@ -1224,17 +1219,17 @@ msgid "{pictures} and {videos}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:310
+#: src/shell/pages/PackageAppPage.tsx:308
 msgid "{place} is already in your list."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:321
+#: src/shell/pages/PackageAppPage.tsx:319
 msgid "{place} is your home place. Change it in Settings, Weather."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:328
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "{place} removed from your list."
 msgstr ""
 
@@ -3390,11 +3385,6 @@ msgid "setting.coding.person.api_keys.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:286
-msgid "App"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/AllAppsPage.tsx:111
 msgid "App categories"
 msgstr ""
@@ -3527,7 +3517,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
-#: src/shell/pages/PackageAppPage.tsx:200
+#: src/shell/pages/PackageAppPage.tsx:199
 #: src/shell/pages/status/StatusApps.tsx:114
 #: src/shell/phoneMenuLinks.tsx:31
 msgid "Apps"
@@ -3896,8 +3886,7 @@ msgstr ""
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:199
 #: src/shell/pages/packageAppHeaderBar.tsx:94
-#: src/shell/pages/PackageAppPage.tsx:285
-#: src/shell/pages/PackageAppPage.tsx:286
+#: src/shell/pages/PackageAppPage.tsx:284
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
 #: src/shell/pages/SignInPage.tsx:188
@@ -7619,7 +7608,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:293
+#: src/shell/pages/PackageAppPage.tsx:291
 msgid "Could not open this app. Check your connection and try again."
 msgstr ""
 
@@ -7678,7 +7667,7 @@ msgid "Could not remove this piece."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:329
+#: src/shell/pages/PackageAppPage.tsx:327
 msgid "Could not remove this place."
 msgstr ""
 
@@ -15619,7 +15608,7 @@ msgid "Loading voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:303
+#: src/shell/pages/PackageAppPage.tsx:301
 msgid "Loading weather"
 msgstr ""
 
@@ -19999,7 +19988,7 @@ msgid "OpenCode · same key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:294
+#: src/shell/pages/PackageAppPage.tsx:292
 msgid "Opening the app"
 msgstr ""
 
@@ -21049,7 +21038,7 @@ msgid "Pitch {value}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:328
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "Place"
 msgstr ""
 
@@ -23753,7 +23742,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/packageAppHeaderBar.tsx:107
-#: src/shell/pages/PackageAppPage.tsx:285
+#: src/shell/pages/PackageAppPage.tsx:284
 msgid "Search {name}"
 msgstr ""
 
@@ -24022,9 +24011,9 @@ msgid "seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:369
-#: src/shell/pages/PackageAppPage.tsx:387
-#: src/shell/pages/PackageAppPage.tsx:402
+#: src/shell/pages/PackageAppPage.tsx:367
+#: src/shell/pages/PackageAppPage.tsx:385
+#: src/shell/pages/PackageAppPage.tsx:400
 msgid "Sections"
 msgstr ""
 
@@ -27176,7 +27165,7 @@ msgstr ""
 #: src/shell/pages/MusicStudioView.tsx:155
 #: src/shell/pages/MusicStudioView.tsx:156
 #: src/shell/pages/MusicStudioView.tsx:159
-#: src/shell/pages/PackageAppPage.tsx:302
+#: src/shell/pages/PackageAppPage.tsx:300
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:265
@@ -28777,7 +28766,7 @@ msgid "This app is also on the Never close list, so it stays open."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:121
+#: src/shell/pages/PackageAppPage.tsx:120
 msgid "This app's page is not valid."
 msgstr ""
 
@@ -29043,7 +29032,7 @@ msgid "This picture becomes the character. Use the name with @ in chat or on Cre
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:321
+#: src/shell/pages/PackageAppPage.tsx:319
 msgid "This place"
 msgstr ""
 
