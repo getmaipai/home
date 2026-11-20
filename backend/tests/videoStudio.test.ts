@@ -441,7 +441,7 @@ describe("the audience floor and the Adult lock", () => {
     expect(rows[0]).toMatchObject({ locked: true });
     expect(JSON.stringify(rows)).not.toContain(refOf(spicy));
     expect(JSON.stringify(rows)).not.toContain("nightclub");
-    expect(studioHeaderRows(owner, refOf(spicy))).toEqual([{ title: "Make it yours", locked: true }]);
+    expect(studioHeaderRows(owner, refOf(spicy))).toEqual([{ title: "Edit a clip", locked: true }]);
     expect(await studioAdd(owner, { kind: "clip", ref: refOf(spicy) })).toMatchObject({ ok: false, status: 403, line: STUDIO_LOCKED_LINE });
     const plan = planOf([vp(refOf(clean), { out_s: seconds(clean) }), vp(refOf(spicy), { out_s: seconds(spicy) })]);
     expect(await startStudioExport(owner, { plan })).toMatchObject({ ok: false, status: 403, code: "locked" });
@@ -518,7 +518,7 @@ describe("the page's rows", () => {
     expect(studioRows(owner, undefined)).toEqual([]);
     expect(studioRows(owner, "$state.clip")).toEqual([]);
     expect(studioRows(owner, refOf(theirs))).toEqual([]);
-    expect(studioHeaderRows(owner, refOf(theirs))).toEqual([{ title: "Make it yours", locked: false }]);
+    expect(studioHeaderRows(owner, refOf(theirs))).toEqual([{ title: "Edit a clip", locked: false }]);
   });
 
   test("an open clip is one video piece the clip's own length with its poster and address; the header carries its words", async () => {

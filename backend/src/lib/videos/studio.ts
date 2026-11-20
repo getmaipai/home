@@ -22,7 +22,7 @@ import type { PersonRow } from "@/types";
 
 type Row = Record<string, unknown>;
 
-export const STUDIO_TITLE = "Make it yours";
+export const STUDIO_TITLE = "Edit a clip";
 export const STUDIO_NO_CLIP_LINE = "That clip isn't available any more. Pick another one from My clips.";
 export const STUDIO_LOCKED_LINE = "That is locked. Unlock it with your passcode first, then try again.";
 export const STUDIO_NO_SONG_LINE = "I can't find that song. Pick one of your own songs.";

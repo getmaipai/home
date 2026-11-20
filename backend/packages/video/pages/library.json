@@ -6,7 +6,13 @@
     {
       "type": "media_shelf",
       "heading": "Making now",
-      "bind": { "source": "package", "path": "recipes", "params": { "scope": "making-films" } },
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "making-films"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
@@ -14,7 +20,11 @@
       "layout": "rail",
       "card_radius": "soft",
       "hide_when_empty": true,
-      "on_select": { "navigate": { "to": "/apps/video/film-maker" } }
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/film-maker"
+        }
+      }
     },
     {
       "type": "media_shelf",
@@ -67,7 +77,6 @@
       "item_meta_field": "duration_s",
       "aspect": "wide",
       "variant": "plain",
-      "orientation": "vertical",
       "on_select": {
         "play": {
           "media_id": "{id}"
@@ -75,7 +84,8 @@
       },
       "hide_when_empty": true,
       "card_radius": "soft",
-      "look": "backdrop"
+      "look": "backdrop",
+      "layout": "rail"
     },
     {
       "type": "picker",
