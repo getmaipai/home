@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 import { config } from "./config";
 import { FrameVad } from "./vad";
 import { TurnManager } from "./turnManager";
@@ -23,6 +24,7 @@ import { runTool, toolDefinitions } from "./tools";
 import { fileURLToPath } from "node:url";
 import { commitDelay } from "./commitDelay";
 const supported = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"];
+const stopsPath = fileURLToPath(new URL("../results/stops.jsonl", import.meta.url));
 const metricsPath = fileURLToPath(new URL("../results/turns.jsonl", import.meta.url));
 const cutinsPath = fileURLToPath(new URL("../results/cutins.jsonl", import.meta.url));
 /** Sessions in a conversation turn right now: from the start of the person's speech until the reply is fully synthesized. A heavy background job on the same GPU can look at this and pause between its steps (cooperative yielding: Metal has no queue priority). Entries expire after 25 s in case a clear is missed. */
@@ -144,7 +146,7 @@ export class VoiceSession {
           const had = this.streamDraft; this.command({ type: "cancel_held" }); this.metrics.stream_draft = "replaced"; void had;
         }
         this.held = true; this.draftStartedAt = this.now(); this.metrics.early_start = "used"; this.metrics.draft = "used"; void this.reply(String(c.transcript), false); break;
-      case "transcribe_cut_in": if (c.forced) { this.writeCutin(false); this.samples = this.cutInSamples.slice(); this.cutInSamples = []; this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); } else void this.finishCutIn(); break;
+      case "transcribe_cut_in": if (c.forced) { this.logStop("forced-cut-in", { samples: this.cutInSamples.length }); this.writeCutin(false); this.samples = this.cutInSamples.slice(); this.cutInSamples = []; this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); } else void this.finishCutIn(); break;
       case "backchannel": this.send({ t: "resume" }); this.writeCutin(true); this.cutInSamples = []; this.samples = []; break;
       case "pause": this.send({ t: "pause" }); break;
       case "commit":
@@ -166,7 +168,7 @@ export class VoiceSession {
       case "resume_committed":
         for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear();
         this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = "";
-        this.samples = this.committedSamples.slice(); this.transcriptSegments = this.committedSegments.slice(); this.resumingCommitted = true;
+        this.logStop("resume-committed"); this.samples = this.committedSamples.slice(); this.transcriptSegments = this.committedSegments.slice(); this.resumingCommitted = true;
         this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
       case "interrupt": this.abort?.abort(); this.metrics.ok = false; this.metrics.failure = "cancelled"; if (this.held) { if (this.toolInFlight) this.draftInterrupted = true; else { this.history.messages.push(...this.draftMessages); this.draftMessages = []; if (this.generatedText) this.history.commitAssistant(`${this.generatedText} [answer was not spoken]`); } } else if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; this.metrics.t_stop_sent = this.metricNow(); } this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.heldFrames = []; this.held = false; this.send({ t: "state", state: c.tap ? "idle" : "user_speaking" }); break;
       case "duck": this.metrics.t_duck = this.metricNow(); this.send({ t: "duck" }); break;
@@ -180,6 +182,7 @@ export class VoiceSession {
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
   private echoRms = 0;
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
+  private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
   private playingNowText() { let last = -1; for (let i = 0; i < this.chunks.length; i++) if ((this.playedMs[i] ?? 0) > 0) last = i; if (last < 0) last = 0; return this.chunks.slice(Math.max(0, last - 1), last + 2).join(" "); }
   private recentSpoken() { return this.chunks.join(" "); }
@@ -190,6 +193,7 @@ export class VoiceSession {
     const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
     if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
     for (const command of this.tm.cutTranscript(text, decision)) this.command(command);
+    this.logStop(`cut-in-${decision}`, { heard: text, seconds: +(audio.length / 16000).toFixed(2), louder: this.cutInLouder(audio), overlapMs: this.overlapMs, refMode: !!this.echoRef, spoken: this.playingNowText().slice(0, 80) });
     if (decision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
   }
   private async check(revision: number) {
