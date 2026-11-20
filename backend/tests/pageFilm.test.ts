@@ -206,4 +206,33 @@ describe("refusals and access", () => {
     const item = activityForViewer(row).items.find((entry) => entry.id === `film:${id}`);
     expect(item).toMatchObject({ state: "attention", href: "/apps/video/film-maker", title: "Crossing" });
   });
+  test("the storyboard rows and the render bar for a planned film: the silent animatic, one row per kept shot, no picture yet, a plain reason, and none for a teen (VF-UI-09)", async () => {
+    const { adult, teen, row } = await household();
+    const owner = adult.client;
+    const id = await planned(owner, row("Marlow"));
+    const shots = await rows(owner, "storyboard");
+    const run = getFilmRun(row("Marlow"), id)!;
+    expect(shots.map((r) => r.shot_id)).toEqual(run.plan!.shots.map((shot) => shot.id));
+    for (const shot of shots) {
+      expect(shot).toMatchObject({ status: "no_picture", still: null, clip: null, line_audio: null, line_wave: null });
+      expect(shot.duration_sec).toBeGreaterThan(0);
+      expect(String(shot.caption).length).toBeGreaterThan(0);
+      expect(JSON.stringify(shot)).not.toMatch(/ltx|wan|h3|minimax|\d{3,4}\s*[x×]\s*\d{3,4}/i);
+    }
+    const bar = await rows(owner, "render-plan");
+    expect(bar).toEqual([{ run_id: id, ready: false, reason: expect.stringMatching(/no picture yet\. Draft all makes them\.$/) }]);
+    expect((await teen.client.post(`${T}/data/recipes`, { scope: "storyboard" })).status).toBe(404);
+    expect((await teen.client.post(`${T}/data/recipes`, { scope: "render-plan" })).status).toBe(404);
+  });
+
+  test("the rough-cut op's result becomes the same rows the page reads (the Stack's committed fixture), and the page's item_fields name exactly those keys", async () => {
+    const { roughCutShotRows } = await import("@maipai/spec/stack/ts/stack-rough-cut.js");
+    const fixture = JSON.parse((await import("node:fs")).readFileSync("node_modules/@maipai/spec/fixtures/stack-rough-cut-result/valid-six-shots-three-lines.json", "utf8"));
+    const out = roughCutShotRows(fixture, { captions: { "shot-1": "1 · Kitchen" }, stills: { "shot-1": "/api/files/f1/thumb?w=640" }, lineTexts: {} });
+    expect(out).toHaveLength(6);
+    const page = JSON.parse((await import("node:fs")).readFileSync("packages/video/pages/film-maker.json", "utf8")) as { body: Array<Record<string, any>> };
+    const player = page.body.find((node) => node.type === "storyboard_player")!;
+    expect(Object.values(player.item_fields as Record<string, string>).sort()).toEqual(Object.keys(out[0]!).sort());
+    expect(page.body.find((node) => node.type === "action_bar")!.primary.label).toBe("Render film");
+  });
 });

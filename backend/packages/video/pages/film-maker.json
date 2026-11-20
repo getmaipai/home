@@ -257,6 +257,70 @@
       "item_loop_field": "loop"
     },
     {
+      "type": "storyboard_player",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "storyboard"
+        }
+      },
+      "item_fields": {
+        "shot_id": "shot_id",
+        "caption": "caption",
+        "duration_sec": "duration_sec",
+        "still": "still",
+        "clip": "clip",
+        "status": "status",
+        "line_speaker": "line_speaker",
+        "line_text": "line_text",
+        "line_start_sec": "line_start_sec",
+        "line_audio": "line_audio",
+        "line_wave": "line_wave"
+      },
+      "selected": "shot",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/film-maker",
+          "state": {
+            "shot": "{shot_id}"
+          }
+        }
+      },
+      "loading_text": "Getting your storyboard ready",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "clapperboard",
+        "text": "No shots yet. Describe a film above and press Plan the film."
+      }
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "render-plan"
+        }
+      },
+      "primary": {
+        "label": "Render film",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-finish",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        },
+        "busy_state": "rendering",
+        "busy_label": "Rendering"
+      },
+      "reason": "reason",
+      "sticky": true
+    },
+    {
       "type": "media_shelf",
       "heading": "Your film",
       "bind": {
