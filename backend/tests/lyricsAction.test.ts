@@ -220,13 +220,27 @@ test("an instrumental record is a miss with a receipt and nothing stored", async
   expect(storedLyrics(id)).toBeNull();
 });
 
-test("lyrics an adult's lookup stored are served to the adult, and withheld from a teen when their words fail the floor", async () => {
+test("lyrics an adult's lookup stores re-rate the item at store time: a floor-tripping text makes it adult, so a teen is never served it", async () => {
   const { adultId, teenId } = await setup();
   const id = trackId("Morning Light");
-  db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "lrclib", text: "She danced naked in the rain" }) }).where(eq(mediaItems.id, id)).run();
-  const view = (personId: string) => mediaAppDataRaw(person(personId), "audio", "item", { id }) as unknown as { lyrics?: string };
-  expect(view(adultId).lyrics).toBe("She danced naked in the rain");
-  expect(view(teenId).lyrics).toBeUndefined();
-  db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "lrclib", text: "She danced in the rain" }) }).where(eq(mediaItems.id, id)).run();
-  expect(view(teenId).lyrics).toBe("She danced in the rain");
+  withArtist(id, "The Marlows");
+  const fake = fakeFetch(200, { plainLyrics: "She danced naked in the rain" });
+  const res = await lookupLyricsFor(person(adultId), id, { fetch: fake.fetch, nowMs: () => 1000 });
+  expect(res).toMatchObject({ ok: true, value: { lookup: "found" } });
+  expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()?.bandOk).toBe("adult");
+  const view = (personId: string) => mediaAppDataRaw(person(personId), "audio", "item", { id }) as unknown as { lyrics?: string } | unknown[];
+  expect((view(adultId) as { lyrics?: string }).lyrics).toBe("She danced naked in the rain");
+  const seen = view(teenId);
+  expect(Array.isArray(seen) ? seen : [(seen as { lyrics?: string }).lyrics]).toEqual(Array.isArray(seen) ? [] : [undefined]);
+});
+
+test("clean lyrics an adult's lookup stores leave the item's band alone", async () => {
+  const { adultId, teenId } = await setup();
+  const id = trackId("Morning Light");
+  withArtist(id, "The Marlows");
+  const before = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()?.bandOk;
+  const fake = fakeFetch(200, { plainLyrics: "She danced in the rain" });
+  await lookupLyricsFor(person(adultId), id, { fetch: fake.fetch, nowMs: () => 1000 });
+  expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()?.bandOk).toBe(before);
+  expect((mediaAppDataRaw(person(teenId), "audio", "item", { id }) as unknown as { lyrics?: string }).lyrics).toBe("She danced in the rain");
 });

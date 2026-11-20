@@ -13,7 +13,8 @@ import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { tryConsume } from "@/lib/rateLimiter";
 import { readableIn } from "./appHost";
-import { bandAllows, mediaBandOf, wordsAllowFor } from "./band";
+import { bandAllows, bandOkAtIngest, mediaBandOf, wordsAllowFor } from "./band";
+import { stampMediaById } from "@/lib/filter/ratingsSweep";
 import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { lookupLyrics } from "./lyricsLookup";
 import { hasReceipt, isPaused, recordReceipt, recordRefusal, recordSuccess } from "./lyricsReceipts";
@@ -81,7 +82,11 @@ export async function lookupLyricsFor(
   const newLyrics = { source: "lrclib", text: outcome.text, ...(outcome.timed ? { timed: outcome.timed } : {}) };
   // RULES.md C9: fetched lyrics have no stamp yet, so the words are checked as they arrive (`bandAllows` reads only the stored stamp since FILTER-MEDIA-01).
   if (!bandAllows(person, item) || !wordsAllowFor(person, newLyrics.text)) return { ok: true, value: { lookup: "none" } };
-  db.update(mediaItems).set({ lyrics: JSON.stringify(newLyrics) }).where(eq(mediaItems.id, item.id)).run();
+  // RULES.md C9: stored content is rated when it arrives and the rating is stored. The item's band is computed at ingest from its words INCLUDING its lyrics (`bandOkAtIngest`), so the new lyrics
+  // re-rate it here: lyrics that trip the floor make the item adult (unless an adult already marked it), and the stamp is rewritten from the stored row. A minor is never served them: the item is adult.
+  const band = item.verified_by_person_id ? item.band_ok : bandOkAtIngest({ explicit: item.advisory.explicit, title: item.title, description: item.description, lyrics: newLyrics.text, also: [item.subtitle, item.artist, item.album, item.series, item.author] }).band === "adult" ? "adult" : item.band_ok;
+  db.update(mediaItems).set({ lyrics: JSON.stringify(newLyrics), bandOk: band }).where(eq(mediaItems.id, item.id)).run();
+  stampMediaById(item.id);
   // MUSIC-GEN-20c: word timing for the new synced lyrics runs in the background; the answer below does not wait for it.
   void startLibraryAlign(person, { ...item, lyrics: newLyrics }, { lrclibDurationS: outcome.durationS });
   return {
