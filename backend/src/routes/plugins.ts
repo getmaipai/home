@@ -4,7 +4,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { roleHealth } from "@/lib/roleHealth";
-import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID } from "@/lib/voiceTools";
+import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID } from "@/lib/voiceTools";
 import { mayUseClipVoices } from "@/lib/access";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { resolveTurnBudgetWithStack, toolOfferLabel, withTurnToolGates } from "@/lib/turnMachine/budget";
@@ -114,8 +114,11 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     if (houseOk) houseContext = { visible, areas: registry.areas };
   } else if (houseEligible) warmHouseRegistries();
   const uptimeOk = uptimeAllowed({ actor, band, surfaceClass: "written", spoken: false, bare: false });
+  const resolved = await resolveTurnBudgetWithStack(undefined, band);
+  // SCENE-01c: the same gate a real turn applies (toolGates.ts): a person who is not a guest, on a turn that has tool rounds.
+  const sceneOk = actor.role !== "guest" && resolved.rounds > 0;
   const budget = withTurnToolGates(
-    await resolveTurnBudgetWithStack(undefined, band),
+    resolved,
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
     false, false, false, false, false, false, false, null,
     // WRITING-FORMATS-03: the same gate a real written turn applies, so the list matches what the chat sends.
@@ -123,8 +126,10 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
     false, voiceoverOk, false, houseOk,
     uptimeOk,
     inspiredVoiceOk,
+    false,
+    sceneOk,
   );
-  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : id === "uptime" ? uptimeOk : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID ? voiceoverOk : id === MAKE_INSPIRED_VOICE_TOOL_ID ? inspiredVoiceOk : toolSpecFor(id) !== null)));
+  return new Set(budget.tools_offered.filter((id) => id === "house" ? Boolean(houseOk && houseContext && houseToolSpec(houseContext)) : id === "uptime" ? uptimeOk : (id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID || id === MAKE_SPEECH_TOOL_ID ? voiceoverOk : id === MAKE_INSPIRED_VOICE_TOOL_ID ? inspiredVoiceOk : toolSpecFor(id) !== null)));
 }
 
 pluginsRoutes.openapi(skillsRoute, async (c) => {
