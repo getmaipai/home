@@ -12,6 +12,11 @@
       "reason": "same: the memory episodes prompt block"
     },
     {
+      "file": "nodes/outputGate.ts",
+      "word": "episode",
+      "reason": "name of a context fence block the output gate strips from replies (LEAK-FIX-01), not a research topic"
+    },
+    {
       "file": "contract.ts",
       "word": "episode",
       "reason": "the context item source kind 'episode' (a recalled conversation), unrelated to a subject of research"
