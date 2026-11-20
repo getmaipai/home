@@ -16,6 +16,7 @@ import { cancelVideoJob, getVideoJobFor, type VideoJob } from "@/lib/videos/jobs
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { planFirstFrameClip } from "@/lib/videos/referenceVideo";
+import { LTX25_DEFAULTS } from "@/lib/videos/quality";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { readCapabilities } from "@/lib/memoryRoom";
@@ -271,15 +272,17 @@ describe("the happy path: a person, a place and an object", () => {
     expect(job.request.quality).toBe("detailed");
     expect(job.request.tier).toBe("max");
   });
-  test("with no Max picture start the best allowed level is used (a Quick clip from the first picture)", async () => {
-    __setVideoStatusForTests(readyVideoStatusForTests());
+  test("with no Max picture start the best allowed level for an adult is Boost (a clip from the first picture at the Boost size)", async () => {
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
     const job = await finished(actor, await run(await chatWith(actor, [PERSON_A, PLACE]), { request: "she waves at the camera" }));
     expect(job.state).toBe("done");
-    expect(fake.submitted[0]!.model).toBeUndefined();
-    expect(fake.submitted[0]!.size).toBe("832x480");
-    expect(Number(fake.submitted[0]!.seconds)).toBeLessThanOrEqual(5);
+    // The level and size come from the code's own table, not from a part id: the route planner may change the maker, not the level it plans.
+    expect(job.request.quality).toBe("detailed");
+    expect(fake.submitted[0]!.size).toBe(LTX25_DEFAULTS.boost.landscape);
+    expect(Number(fake.submitted[0]!.seconds)).toBeLessThanOrEqual(LTX25_DEFAULTS.boost.max_seconds);
+    const [width, height] = LTX25_DEFAULTS.boost.landscape.split("x").map(Number) as [number, number];
     const sent = await sharp(Buffer.from(String(fake.submitted[0]!.image), "base64")).metadata();
-    expect([sent.width, sent.height]).toEqual([832, 480]);
+    expect([sent.width, sent.height]).toEqual([width, height]);
   });
   test("one picture of people and nothing else: the photo itself is the first picture, no edit model, no cut-out", async () => {
     answersFor(READ_PERSON);
