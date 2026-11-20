@@ -139,6 +139,30 @@ describe("edit_video restyle", () => {
     expect(getVideoJobFor(owner, job.id)?.state).toBe("done");
   });
 
+  for (const [code, status] of [["no_memory", 503], ["queue_full", 429]] as const) {
+    test(`a ${code} answer ends the restyle with the same line, the same state and the original kept, on the door and on the old route`, async () => {
+      const ownerOld = person("owner");
+      const old = await makeClip(ownerOld);
+      restyleRefusal = { status, code, error: "not right now" };
+      const oldJob = await finished(ownerOld, await edit(old.state, { clip: old.job.id, change: "restyle", restyle: "colorize" }));
+      restyleRefusal = null;
+      expect(restyles.length).toBe(1);   // the old route was asked once and refused
+      expect(oldJob.state).toBe("failed");
+      resetDb(); fake.restore();
+      fake = installFakeVideoStack(); fake.ltx25max = "ready"; fake.ltx25 = "ready"; fake.loras.push({ ...COLORIZER });
+      __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
+      fake.door = true;
+      const ownerNew = person("owner");
+      const made = await makeClip(ownerNew);
+      fake.refuseSubmit = { status, code, error: "not right now" };
+      const newJob = await finished(ownerNew, await edit(made.state, { clip: made.job.id, change: "restyle", restyle: "colorize" }));
+      fake.refuseSubmit = null;
+      expect(newJob.state).toBe(oldJob.state);
+      expect(newJob.error).toBe(oldJob.error);
+      expect(getVideoJobFor(ownerNew, made.job.id)?.state).toBe("done");
+    });
+  }
+
   test("a catalog that does not list the restyle keys sends it on the old route exactly as before", async () => {
     fake.door = true;
     fake.catalogFields = ["job", "audience", "part", "description", "shape", "level", "seconds", "start_picture", "end_picture", "styles", "seed"];
