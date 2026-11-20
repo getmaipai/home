@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { videoShape } from "./videoCreateApp";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { filmRuns, people } from "@/db/schema";
 import { filmShelfRows } from "./videoCreateApp";
@@ -77,4 +78,18 @@ test("Film maker inspiration uses showcase rows to fill its prompt", () => {
   const shelf = page.body.find((node) => node.heading === "Inspiration");
   expect(shelf?.bind.params.scope).toBe("showcase");
   expect(shelf?.on_select.navigate.state.prompt).toBe("{prompt}");
+});
+
+test("a finished film offers Titles and credits and Edit and export on its own file; an unfinished one does not", async () => {
+  const { filmRows } = await import("@/lib/films/pageFilm");
+  const adult = addPerson("finisher", "owner");
+  addRun(adult.id, "film-open", "waiting_for_go", "A short story");
+  expect(filmRows(adult, "film-open")[0]).toMatchObject({ can_title: false, film_file_id: "" });
+  addRun(adult.id, "film-done", "done", "A finished story");
+  db.update(filmRuns).set({ filmFileId: "file-film-1" }).where(eq(filmRuns.id, "film-done")).run();
+  expect(filmRows(adult, "film-done")[0]).toMatchObject({ can_title: true, film_file_id: "file-film-1" });
+  const page = JSON.parse(readFileSync(new URL("../../../packages/video/pages/film-maker.json", import.meta.url), "utf8")) as { body: Array<Record<string, any>> };
+  const shelf = page.body.find((node) => node.heading === "Your film");
+  const labels = (shelf?.row_actions as Array<{ label: string; show_when_field?: string }>).filter((a) => a.show_when_field === "can_title").map((a) => a.label);
+  expect(labels).toEqual(["Titles and credits", "Edit and export"]);
 });

@@ -324,6 +324,18 @@
               }
             }
           }
+        },
+        {
+          "icon": "captions",
+          "label": "Titles and credits",
+          "show_when_field": "can_title",
+          "action": { "navigate": { "to": "/apps/video/captions", "state": { "clip": "{film_file_id}" } } }
+        },
+        {
+          "icon": "scissors",
+          "label": "Edit and export",
+          "show_when_field": "can_title",
+          "action": { "navigate": { "to": "/apps/video/studio", "state": { "clip": "{film_file_id}" } } }
         }
       ]
     },

@@ -137,6 +137,9 @@ export function filmRows(person: PersonRow, id?: string): Array<Record<string, u
     can_draft: run.state === "waiting_for_go" && !!run.plan && drafted.size < run.plan.shots.length,
     can_finish: run.state === "waiting_for_go" && kept.length >= 2 && kept.every((shot) => drafted.has(shot.id)),
     can_beat: run.state === "done" && !!run.film_file_id,
+    // VF-UI-12: the finished film's file id, so Titles and credits and Edit and export open it in the existing pages.
+    film_file_id: run.film_file_id ?? "",
+    can_title: run.state === "done" && !!run.film_file_id,
   }];
 }
 
