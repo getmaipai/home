@@ -9,12 +9,12 @@ const MOMENTS = [
   { you: "Tell me something funny.", text: "Ha [laugh] okay, that one is actually pretty funny to me.", tag: "laugh" },
   { you: "How was your day?", text: "Oh [sigh] I am so tired today, you have no idea.", tag: "sigh" },
   { you: "You got me with that one.", text: "[chuckle] Okay, okay, you got me there.", tag: "chuckle" },
-  { you: "What should we do about dinner?", text: "Hmm, [clear throat] let me think about that for a second.", tag: "clear throat" },
+  { you: "Tell me another one.", text: "Ha [laugh] oh, that one is so bad, okay, here is another one, and this one is even worse.", tag: "laugh" },
   { you: "I have something serious to tell you.", text: "[breath] Okay. Go ahead, I am listening.", tag: "breath" },
   { you: "Guess who just walked in.", text: "Oh [gasp] I did not see that coming at all.", tag: "gasp" },
 ];
-async function say(text: string): Promise<Int16Array> {
-  const f = new FormData(); f.set("text", text); f.set("voice", "casual");
+async function say(text: string, voice = "casual"): Promise<Int16Array> {
+  const f = new FormData(); f.set("text", text); f.set("voice", voice);
   const b = new Uint8Array(await (await fetch(TTS + "/tts", { method: "POST", body: f })).arrayBuffer());
   return new Int16Array(b.buffer.slice(44, 44 + ((b.length - 44) & ~1)));
 }
@@ -25,10 +25,10 @@ const cat = (parts: Int16Array[]) => { const o = new Int16Array(parts.reduce((n,
 let seed = 7; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 const key: Record<string, string> = {}; let html = "";
 for (let m = 0; m < MOMENTS.length; m++) {
-  const { you, text, tag } = MOMENTS[m]!; const withParts: Int16Array[] = []; let speechRms = 0.06;
+  const { you, text, tag } = MOMENTS[m]!; const withParts: Int16Array[] = []; let speechRms = 0.06; let smile = false;
   for (const seg of splitTags(text)) {
-    if (seg.type === "tag") { const s = pickSound("casual", seg.value, speechRms, undefined, rnd); if (s) withParts.push(s); continue; }
-    if (!/[a-z]/i.test(seg.value)) continue; const pcm = await say(seg.value); speechRms = rmsOf(pcm) || speechRms; withParts.push(pcm);
+    if (seg.type === "tag") { const s = pickSound("casual", seg.value, speechRms, undefined, rnd); if (s) { withParts.push(s); if (seg.value === "laugh" || seg.value === "chuckle") smile = true; } continue; }
+    if (!/[a-z]/i.test(seg.value)) continue; const pcm = await say(seg.value, smile ? "casual_mild_happy" : "casual"); speechRms = rmsOf(pcm) || speechRms; withParts.push(pcm);
   }
   const without = await say(text.replace(/\[[^\]]*\]\s*/g, "").trim());
   const order = rnd() < 0.5 ? ["with", "without"] : ["without", "with"];
