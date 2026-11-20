@@ -1,3 +1,4 @@
+import { recordShotFailure, recordShotJob, recordShotNote } from "./progressStore";
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import type { PersonRow } from "@/types";
@@ -170,9 +171,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         console.error(`[film] clip ${shot.id} refused: ${why}`);
         // The engine being unavailable (a restarting Stack answers "no video model is installed") is a wait, not an end: the step runner retries it.
         const unavailable = (result as { failureKind?: string; errorCode?: string }).failureKind === "unavailable" || (result as { errorCode?: string }).errorCode === "no_engine";
+        // VF-FILMPROGRESS-01: plain words for the render page; the raw reason above stays in the log only.
+        if (unavailable) recordShotNote(productionId, shot.id, { held_reason: "Waiting for the video maker" }); else recordShotFailure(productionId, shot.id, "The video could not be started.");
         throw Object.assign(new Error(`The video could not be started: ${why}`), unavailable ? { code: "unavailable" } : {});
       }
-      const job = await poll(() => getVideoJobFor(actor, jobId), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The video did not finish." : null);
+      recordShotJob(productionId, shot.id, jobId);
+      const job = await poll(() => getVideoJobFor(actor, jobId), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The video did not finish." : null).catch((error) => { recordShotFailure(productionId, shot.id, error instanceof Error && error.message ? error.message : "This shot did not finish."); throw error; });
       const id = job.files[0]?.id;
       if (!id) throw new Error("The finished video is unavailable.");
       return id;

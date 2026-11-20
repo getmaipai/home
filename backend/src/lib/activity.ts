@@ -20,7 +20,7 @@ import { getMusicJobFor } from "@/lib/music/store";
 import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import { listFilmRunsInStates } from "@/lib/films/store";
-import { filmShotJobIds } from "@/lib/films/filmProgress";
+import { filmShotJobIds } from "@/lib/films/progressStore";
 
 /** The five states of the one status card (section 20): WAITING, MAKING NOW, DONE, NEEDS A LOOK, COULD NOT FINISH. */
 export type ActivityState = "waiting" | "making" | "done" | "attention" | "failed";
