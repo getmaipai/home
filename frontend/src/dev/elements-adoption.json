@@ -1,7 +1,15 @@
 {
-  "generatedAt": "2026-11-17T15:07:40.440Z",
-  "kitTag": "ui-v0.5.690",
+  "generatedAt": "2026-11-20T09:59:00.185Z",
+  "kitTag": "ui-v0.5.695",
   "items": [
+    {
+      "file": "ActionBarShowcase.tsx",
+      "name": "ActionBarShowcase",
+      "group": "ActionBarShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
     {
       "file": "ActivityCardsShowcase.tsx",
       "name": "ActivityCardsShowcase",
@@ -24,6 +32,22 @@
       "group": "character",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for the companion character parts (COMPANIONS-DOTS-01), covered by the Commons tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "CompanionsShowcase.tsx",
+      "name": "CompanionsShowcase",
+      "group": "CompanionsShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
+      "file": "CompareShowcase.tsx",
+      "name": "CompareShowcase",
+      "group": "CompareShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -68,6 +92,14 @@
       "implemented": false
     },
     {
+      "file": "JobProgressShotsShowcase.tsx",
+      "name": "JobProgressShotsShowcase",
+      "group": "JobProgressShotsShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "K02bShowcase.tsx",
       "name": "K02bShowcase",
       "group": "thread/showcase",
@@ -81,6 +113,14 @@
       "group": "KitGalleryShowcase",
       "verdict": "support",
       "verdictReason": "Developer-only kit gallery (PRO-LOOK-01); not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "MediaStageShowcase.tsx",
+      "name": "MediaStageShowcase",
+      "group": "MediaStageShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -101,6 +141,14 @@
       "implemented": false
     },
     {
+      "file": "ProposalCardShowcase.tsx",
+      "name": "ProposalCardShowcase",
+      "group": "ProposalCardShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "ShareDialogShowcase.tsx",
       "name": "ShareDialogShowcase",
       "group": "ShareDialogShowcase",
@@ -108,6 +156,14 @@
       "verdictReason": "Developer-only story fixture for ShareDialog (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
       "implemented": false,
       "reading": "Developer-only story fixture for ShareDialog (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
+      "file": "StoryboardPlayerShowcase.tsx",
+      "name": "StoryboardPlayerShowcase",
+      "group": "StoryboardPlayerShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
     },
     {
       "file": "StudioLayoutShowcase.tsx",
@@ -150,6 +206,14 @@
       "implemented": false
     },
     {
+      "file": "TierTimeShowcase.tsx",
+      "name": "TierTimeShowcase",
+      "group": "TierTimeShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "TraceWaterfallShowcase.tsx",
       "name": "TraceWaterfallShowcase",
       "group": "trace/showcase",
@@ -158,11 +222,35 @@
       "implemented": false
     },
     {
+      "file": "VideoOverlayShowcase.tsx",
+      "name": "VideoOverlayShowcase",
+      "group": "VideoOverlayShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "VideoPlayerShowcase.tsx",
       "name": "VideoPlayerShowcase",
       "group": "VideoPlayerShowcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for the VideoPlayer states; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "VideoRetakeShowcase.tsx",
+      "name": "VideoRetakeShowcase",
+      "group": "VideoRetakeShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
+      "file": "VoiceLineRowShowcase.tsx",
+      "name": "VoiceLineRowShowcase",
+      "group": "VoiceLineRowShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -195,6 +283,14 @@
       "group": "tests/support",
       "verdict": "no-fit",
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
+      "implemented": false
+    },
+    {
+      "file": "action-bar.tsx",
+      "name": "action-bar",
+      "group": "action",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -382,6 +478,14 @@
       "group": "climate-tile",
       "verdict": "later",
       "verdictReason": "Smart-home tile; no Home surface uses it until the Home Control package is built.",
+      "implemented": false
+    },
+    {
+      "file": "clip-compare.tsx",
+      "name": "clip-compare",
+      "group": "clip",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -962,6 +1066,14 @@
       "implemented": true
     },
     {
+      "file": "facts-line.tsx",
+      "name": "facts-line",
+      "group": "facts",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "fan-tile.tsx",
       "name": "fan-tile",
       "group": "fan-tile",
@@ -1260,6 +1372,14 @@
       "implemented": false
     },
     {
+      "file": "media-stage.tsx",
+      "name": "media-stage",
+      "group": "media",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
+    },
+    {
       "file": "media-viewer-logic.ts",
       "name": "media-viewer-logic",
       "group": "media",
@@ -1488,6 +1608,14 @@
       "group": "composer",
       "verdict": "later",
       "verdictReason": "Deferred until saved-prompts store.",
+      "implemented": false
+    },
+    {
+      "file": "proposal-card.tsx",
+      "name": "proposal-card",
+      "group": "proposal",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -1780,6 +1908,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "storyboard-player.tsx",
+      "name": "storyboard-player",
+      "group": "storyboard",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
     },
     {
       "file": "streaming-text.tsx",
@@ -2246,6 +2382,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "voice-line-row.tsx",
+      "name": "voice-line-row",
+      "group": "voice",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.695; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
+      "implemented": false
     },
     {
       "file": "voice.tsx",
