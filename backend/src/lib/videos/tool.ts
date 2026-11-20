@@ -25,6 +25,7 @@ import { stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, t
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { promptCheck } from "@/lib/pictures/promptDoor";
 import { rewriteForChild } from "@/lib/pictures/childRewrite";
+import { legacyDoorForced } from "./doorClip";
 import { NO_PICTURE_START_LINE, videoEngineStatus, videoNotReadyReason, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
@@ -226,6 +227,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     image = ref.base64; imageSource = "generated"; sourceFileId = ref.id;
     if (ref.width && ref.height) portrait = ref.height > ref.width;
   }
+  let identityCandidate: string | undefined;   // the cast reference taken as the picture (VF-ROUTE-01: it may travel as an identity input instead)
   if (!image && resolvedSubjects.length) {
     const reference = resolvedSubjects.find(({ subject }) => subject.kind === "character") ?? resolvedSubjects.find(({ subject }) => subject.kind === "place") ?? resolvedSubjects.find(({ subject }) => subject.kind === "prop");
     const ref = reference?.references[0];
@@ -234,6 +236,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       const screened = await screenInputImage(ref.bytes, subjectPrompt, viewerOf(actor, audience.band));
       if (!screened.ok) return refuseWith(screened.line);
       image = Buffer.from(ref.bytes).toString("base64"); imageSource = "uploaded"; sourceFileId = ref.id;
+      identityCandidate = image;
     }
   }
   let endImage: string | undefined;
@@ -274,6 +277,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const asksMax = tierAsked.tier === "max" && maxReady;
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
+  // VF-ROUTE-01: the cast's picture goes to the Stack as an `identity` input and the Stack's planner chooses the route, so Home no longer takes it as the start picture before the model is known. Only a plain adult clip with no style and no ending can ride it; everything else keeps the picture as the start, as before.
+  const identityRoute = identityCandidate !== undefined && image === identityCandidate && lane === "adult" && !asksMax && !legacyDoorForced() && adapters.length === 0 && !ending && !loop;
+  const identityImage = identityRoute ? identityCandidate : undefined;
+  if (identityRoute) image = undefined;
   const pickFor = (hasPicture: boolean) => chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
   const choice = pickFor(image !== undefined);
   if (!choice) {
@@ -358,6 +365,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         audience: endAudience === "adult-only" || castAdult || resolvedSubjects.some(({ references }) => references.some((ref) => ref.audience === "adult-only")) ? "adult" : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource } : {}),
+        ...(identityImage ? { identity_image: identityImage, image_source: imageSource, identity_legacy_start: pickFor(true) !== null } : {}),
         ...(endImage ? { end_image: endImage } : {}),
         ...(adapters.length > 0 ? { loras: plan.loras } : {}),
         ...(plan.negative ? { negative_prompt: plan.negative } : {}),

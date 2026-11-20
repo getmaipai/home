@@ -150,6 +150,12 @@ export interface StackLoraWarning { id: string; code: string; message: string }
 
 export interface VideoBody {
   prompt: string;
+  /** VF-ROUTE-01: the cast's own picture as the clip's `identity` input (base64 png). Sent only to the generic make door; the old door never sees it (releaseVideo). */
+  identity_image?: string;
+  /** Whether the old door may start from the identity picture as a plain start picture (the Stack reported it can), for a clip the generic door cannot take. */
+  identity_legacy_start?: boolean;
+  /** VF-ROUTE-DERIVE-01: `image` is the first picture Home derived after the Stack's `needs_start_picture`; the resend says so (intent `derived_start`). */
+  derived_start?: boolean;
   negative_prompt?: string;
   size?: string;
   seconds?: number;

@@ -7,7 +7,9 @@
 // the Stack's prompt writer and style ids (docs/design/video-film-pipeline-2026-11-20.md, VF-DOOR-01). The old door is also the fallback when the
 // generic one cannot take the clip: the catalog says no part serves it, the planner refuses it, or the Stack is older than the door.
 import type { StackMakeClipRequest } from "@/lib/stack/makeShape";
+import type { PersonRow } from "@/types";
 import { clipJobAvailable, makeClip, StackVideoError, type StackClip, type StackLoraWarning, type VideoBody } from "./stack";
+import { deriveStartPicture, isNeedsStartPicture, START_PICTURE_FAILED_LINE } from "./deriveStart";
 
 /** The way back to the old door for every clip: set MAIPAI_VIDEO_LEGACY_DOOR=1 (a Stack or a part misbehaving on the generic door). */
 export const legacyDoorForced = (): boolean => process.env.MAIPAI_VIDEO_LEGACY_DOOR === "1";
@@ -30,6 +32,8 @@ export function clipRequestFor(body: VideoBody): StackMakeClipRequest | null {
     job: "clip", audience: "adult", description: body.prompt, shape, level, seconds: body.seconds,
     ...(body.seed !== undefined ? { seed: body.seed } : {}),
     ...(body.image ? { start_picture: picture(body.image) } : {}),
+    ...(body.identity_image ? { inputs: [{ role: "identity" as const, file: picture(body.identity_image) }] } : {}),
+    ...(body.derived_start ? { intent: "derived_start" as const } : {}),
     ...(body.end_image ? { end_picture: picture(body.end_image) } : {}),
     ...(body.quiet_seconds !== undefined ? { quiet_seconds: body.quiet_seconds } : {}),
     ...(body.quiet_max_wait_seconds !== undefined ? { quiet_max_wait_seconds: body.quiet_max_wait_seconds } : {}),
@@ -44,7 +48,7 @@ export const doorWanted = (body: VideoBody): boolean => !legacyDoorForced() && c
  * Starts the clip on the generic door, or answers null when it must go on the old one. A Stack failure that is not a refusal (queue full, no memory,
  * memory cancelled) is thrown exactly as the old door throws it, so the queue and the holds in the job runner behave as before.
  */
-export async function submitVideoViaDoor(body: VideoBody): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[] } | null> {
+export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; derivedImage?: string } | null> {
   if (legacyDoorForced()) return null;
   const request = clipRequestFor(body);
   if (!request) return null;
@@ -52,11 +56,22 @@ export async function submitVideoViaDoor(body: VideoBody): Promise<{ job: string
   if ((await clipJobAvailable()) === false) return null;
   try {
     const made = await makeClip(request);
-    if (!made.ok) return null;   // shape_not_served, level_not_served, too_long, not_on_this_model, not_available ...: the old door decides
+    if (!made.ok) {
+      // VF-ROUTE-DERIVE-01: only the Stack's typed answer starts a derivation, once. Home makes the first picture, gates it and resends; it never decides this itself.
+      if (isNeedsStartPicture(made.refusal) && actor && body.identity_image && !body.derived_start) {
+        const derived = await deriveStartPicture(actor, body, made.refusal);
+        onDerived?.(derived);   // kept on the job at once: a hold after this resend never derives a second picture
+        const resend = clipRequestFor({ ...body, image: derived, identity_image: undefined, derived_start: true });
+        const again = resend ? await makeClip(resend) : null;
+        if (!again || !again.ok) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);
+        return { job: again.job, done: null, warnings: [], derivedImage: derived };
+      }
+      return null;   // shape_not_served, level_not_served, too_long, not_on_this_model, not_available ...: the old door decides
+    }
     return { job: made.job, done: null, warnings: [] };
   } catch (error) {
     // A Stack older than the door (no such route) or one whose strict request schema does not know a key we send (the live build rejects `wait` with 400 and a raw validation line): the old door decides, and the person never sees the engine's words.
-    if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status)) return null;
+    if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status) && !String(error.code).startsWith("start_picture_")) return null;
     throw error;
   }
 }

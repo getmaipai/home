@@ -43,6 +43,46 @@ describe("generate_video saved subjects", () => {
     expect(JSON.parse(job.request).stackBody.prompt).toContain("A tiny blue fox. Pip waves hello");
     expect(request.source_file_id).not.toBeNull();
   });
+  test("VF-ROUTE-01: the cast picture travels as an identity input to the generic door, not as the start picture", async () => {
+    fake.door = true;
+    const saved = await subject();
+    // The input screen is independently exercised by the existing age-check tests; stub only its vision verdict here.
+    const conversation = resolveOrCreateConversation(owner, "chat");
+    if (!conversation.ok) throw new Error("conversation");
+    const turnId = newConversationTurnId();
+    db.insert(conversationTurns).values({ id: turnId, personId: owner.id, surface: "chat", conversationId: conversation.value.id, userText: "hi", replyText: "ok", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: "1:0:test" }).run();
+    const result = await runGenerateVideo({ state: { actor: owner, temporary: false, conversationId: conversation.value.id, turnId }, args: { prompt: "Pip waves hello", subjects: [saved.name] }, callId: "c", spoken: false, audience: { actor: owner, band: "adult", surface: "chat", surfaceClass: "written", spoken: false } as never });
+    expect(result.status).toBe("succeeded");
+    const stored = JSON.parse(db.select().from((await import("@/db/schema")).videoJobs).all()[0]!.request).stackBody;
+    expect(stored.identity_image).toBeTruthy(); expect(stored.image).toBeUndefined();
+    const { until } = await import("./pictureFixture");
+    await until(() => fake.makeRequests.length > 0);
+    expect((fake.makeRequests[0] as { inputs?: Array<{ role: string }>; start_picture?: string }).inputs?.[0]?.role).toBe("identity");
+    expect(fake.makeRequests[0]).not.toHaveProperty("start_picture");
+    const job = db.select().from((await import("@/db/schema")).videoJobs).all()[0]!;
+    const request = JSON.parse(job.request);
+    expect(JSON.parse(job.request).stackBody.prompt).toContain("A tiny blue fox. Pip waves hello");
+    expect(request.source_file_id).not.toBeNull();
+  });
+  test("VF-ROUTE-01: when the generic door cannot take the clip the old door starts from the cast picture as before, and never sees the identity keys", async () => {
+    const saved = await subject();
+    // The input screen is independently exercised by the existing age-check tests; stub only its vision verdict here.
+    const conversation = resolveOrCreateConversation(owner, "chat");
+    if (!conversation.ok) throw new Error("conversation");
+    const turnId = newConversationTurnId();
+    db.insert(conversationTurns).values({ id: turnId, personId: owner.id, surface: "chat", conversationId: conversation.value.id, userText: "hi", replyText: "ok", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: "1:0:test" }).run();
+    const result = await runGenerateVideo({ state: { actor: owner, temporary: false, conversationId: conversation.value.id, turnId }, args: { prompt: "Pip waves hello", subjects: [saved.name] }, callId: "c", spoken: false, audience: { actor: owner, band: "adult", surface: "chat", surfaceClass: "written", spoken: false } as never });
+    expect(result.status).toBe("succeeded");
+    const { until } = await import("./pictureFixture");
+    await until(() => fake.submitted.length > 0);
+    expect(fake.submitted[0]!.image).toBeTruthy();
+    expect(fake.submitted[0]).not.toHaveProperty("identity_image");
+    expect(fake.submitted[0]).not.toHaveProperty("identity_legacy_start");
+    const job = db.select().from((await import("@/db/schema")).videoJobs).all()[0]!;
+    const request = JSON.parse(job.request);
+    expect(JSON.parse(job.request).stackBody.prompt).toContain("A tiny blue fox. Pip waves hello");
+    expect(request.source_file_id).not.toBeNull();
+  });
   test("unknown names refuse without contacting Stack", async () => {
     const result = await call(owner, { subjects: ["Missing"] });
     expect(result.status).toBe("succeeded");

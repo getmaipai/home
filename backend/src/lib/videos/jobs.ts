@@ -27,7 +27,7 @@ import { videoModelForLane } from "@/lib/pictures/lane";
 import { passForPerson } from "@/lib/filter/pass";
 import { videoBodyForSlot } from "./slotBody";
 import { LTX25_DEFAULTS, LTX25_MAX_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
-import { videoEngineStatus } from "./ready";
+import { NO_PICTURE_START_LINE, videoEngineStatus } from "./ready";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { doorWanted, submitVideoViaDoor } from "./doorClip";
@@ -208,6 +208,7 @@ export function plainVideoFailure(error: unknown): string {
       case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} Videos are not ready yet. Try again in a few minutes.`;
       case "lora_not_allowed": case "unknown_lora": case "wrong_base_model": case "lora_changed": case "lora_missing": return `${VIDEO_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "reference_not_generated": case "reference_source_required": case "reference_image_refused": case "bad_image": return `${VIDEO_FAILED_PREFIX} I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.`;
+      case "start_picture_withheld": case "start_picture_failed": case "no_picture_start": return error.message;
       case "timeout": return `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`;
       // A request the Stack's validator rejected has no code, only the engine's raw words (`Unrecognized key: "wait"`): never shown to a person.
       case "http_400": case "http_422": return `${VIDEO_FAILED_PREFIX} Something in the request did not work on this computer. Try again, or ask for something simpler.`;
@@ -285,6 +286,17 @@ registerQueueProvider(() => {
   });
 });
 
+/** The old door never sees the identity or derived-start keys. A clip the generic door could not take starts from the cast's picture only when the Stack reported the old door can (`identity_legacy_start`); otherwise it ends with the plain no-picture-start line. */
+function legacyBodyFor(body: VideoBody & { timeout_ms: number }): VideoBody & { timeout_ms: number } {
+  const { identity_image, identity_legacy_start, derived_start, ...rest } = body;
+  void derived_start;
+  if (identity_image && !rest.image) {
+    if (!identity_legacy_start) throw new StackVideoError(422, "no_picture_start", NO_PICTURE_START_LINE);
+    return { ...rest, image: identity_image };
+  }
+  return rest;
+}
+
 async function releaseVideo(job: VideoJob): Promise<void> {
   if (explicitlyStopped.has(job.id) || job.state !== "queued" || job.stackJob || job.kind === "edit") return;
   try {
@@ -296,7 +308,8 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
-    const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody) : null) ?? (await submitVideo(sendBody));
+    const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); delete (storedBody as { identity_image?: string }).identity_image; persistVideoJob(job); } };
+    const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept) : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job;
     // LTXD-18B: the Stack's own words about an old-base style ride the clip's existing muted line (`create.note`, read by the card, the feed and the make reply); no new status surface.

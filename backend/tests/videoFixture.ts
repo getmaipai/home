@@ -48,6 +48,8 @@ export interface FakeVideoStack {
   receipt: Record<string, unknown> | "fail" | null;
   /** VF-DOOR-01: the Stack answers the generic make door (clip) and its catalog, so a plain adult clip goes through it; off by default, so every other test stays on the old door. */
   door: boolean;
+  /** The requests the generic make door received (VF-ROUTE-01: what Home sent as inputs). */
+  makeRequests: Record<string, unknown>[];
   /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
   handler: typeof fetch;
   restore(): void;
@@ -85,7 +87,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], receipt: null, door: false, converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], receipt: null, door: false, makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -99,6 +101,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, part: { id: "part-a", label: "A" } }] });
     if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      fake.makeRequests.push(request);
       const legacy: Record<string, unknown> = { prompt: request.description, seconds: request.seconds, seed: request.seed, audience: request.audience === "adult" ? "adult" : "all-ages", ...(request.level === "boost" || request.level === "max" ? { tier: request.level } : {}), via: "door" };
       fake.submitted.push(legacy);
       const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body: legacy, polls: 0, state: "queued", deleted: false };
