@@ -2,6 +2,8 @@ import { decideBackchannel, type BackchannelDecision } from "./backchannel";
 // A person's interruption is judged on the words that are NOT the assistant's own: when the page's microphone hears her voice
 // from the speakers, the recognizer writes her own words down, and those must never stop her.
 const STOPPERS = new Set(["stop", "wait", "hold", "shut", "nope", "hang", "enough", "quiet", "pause", "hey", "sorry", "excuse"]);
+// Words that are common openers in her own replies ("Hey!", "I am so sorry", "excuse me"): they stop her only when they are NOT words she is saying right now.
+const SOFT = new Set(["hey", "sorry", "excuse"]);
 const FUNCTION = new Set("the a an of to and in on at as is was were be been are am it its that this these those there then than so but while with for from by or if not we you i he she they me him her them us my your his their our what who which when where how just very really about into over out up down too also can could would should will did does do had has have get got let lets said say says one".split(" "));
 const words = (t: string) => t.toLowerCase().replace(/[^a-z'\s-]/g, " ").replace(/-/g, "").split(/\s+/).filter(Boolean);
 function near(a: string, b: string) {
@@ -23,7 +25,9 @@ export function judgeCutIn(heard: string, spoken: string, echoLikely = true, pla
   const strong = hw.some((w) => STOPPERS.has(w)) || hw.filter((w) => w === "no").length >= 2;
   if (hw.length <= 3 && strong) {
     const nowWords = [...new Set(words(playingNow))];
-    if (!personLouder && hw.every((w) => nowWords.some((n) => near(w, n)))) return "echo"; // unless the sound is clearly louder than her echo has been: then it is a person
+    const ownWords = hw.every((w) => nowWords.some((n) => near(w, n)));
+    // Her own "Hey!" or "so sorry" coming back is echo even when the microphone level looks louder than her (early in a reply her echo level is not yet known); a hard command word still needs the loudness test.
+    if (ownWords && (!personLouder || hw.every((w) => SOFT.has(w) || !STOPPERS.has(w)))) return "echo"; // unless the sound is clearly louder than her echo has been: then it is a person
     return decideBackchannel(heard) === "ack" ? "ack" : "interrupt";
   }
   const resid = hw.filter((w) => !spokenWords.some((s) => near(w, s)));

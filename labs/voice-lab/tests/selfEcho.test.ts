@@ -62,3 +62,13 @@ test("the same stop word from a clearly louder source than her echo is a person 
   expect(judgeCutIn("Wait.", said + " " + now, true, now, true)).toBe("interrupt");
   expect(judgeCutIn("Wait.", said + " " + now, true, now, false)).toBe("echo");
 });
+import { judgeCutIn as jc } from "../src/selfEcho";
+test("her own soft openers coming back are echo even when the mic looks louder (recorded self-stops of attempt 2: 'Hey,', 'Oh, hey.', 'So sorry.')", () => {
+  expect(jc("Hey,", "Hey! I'm doing pretty well, thanks for asking.", false, "Hey! I'm doing pretty well, thanks for asking.", true)).toBe("echo");
+  expect(jc("Oh, hey.", "Oh, hey! I'm doing pretty well, thanks for asking.", false, "Oh, hey! I'm doing pretty well, thanks for asking.", true)).toBe("echo");
+  expect(jc("So sorry.", "Oh, I’m so sorry. That is just, really heavy.", false, "Oh, I’m so sorry. That is just, really heavy.", true)).toBe("echo");
+});
+test("a person saying wait or stop louder than her still stops her, even if she said the word too", () => {
+  expect(jc("Wait.", "Wait, let me think about that for a second.", false, "Wait, let me think about that for a second.", true)).toBe("interrupt");
+  expect(jc("Wait, stop.", "You got it. There was a dragon named", false, "You got it. There was a dragon named", true)).toBe("interrupt");
+});
