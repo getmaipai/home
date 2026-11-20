@@ -123,7 +123,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/clips-feed.json` | video | Clips |
 | `backend/packages/video/pages/clips.json` | video | My clips |
 | `backend/packages/video/pages/create.json` | video | Create |
-| `backend/packages/video/pages/drafts.json` | video | Drafts |
+| `backend/packages/video/pages/drafts.json` | video | Unfinished |
 | `backend/packages/video/pages/family-picks.json` | video | Family Picks |
 | `backend/packages/video/pages/film-maker.json` | video | Film maker |
 | `backend/packages/video/pages/from-picture.json` | video | From a picture |
