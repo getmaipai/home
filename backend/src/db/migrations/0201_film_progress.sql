@@ -1,0 +1,1 @@
+ALTER TABLE `film_runs` ADD `progress_json` text;

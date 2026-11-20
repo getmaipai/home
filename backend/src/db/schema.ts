@@ -2514,6 +2514,8 @@ export const filmRuns = sqliteTable("film_runs", {
   errorLine: text("error_line"), goAhead: integer("go_ahead", { mode: "boolean" }).notNull(),
   /** LONGFORM-01: a scene run belongs to a long-form production's parent run, and a scene may be several runs that share a scene key. */
   parentId: text("parent_id"), sceneKey: text("scene_key"),
+  /** VF-FILMPROGRESS-01: what exists nowhere else about a film's shots (the shot-to-job link, a held reason, the failure words, later the repair note), as JSON; null for a run made before it. Per-shot state and percent are read from the clips' own video jobs, never stored here. */
+  progressJson: text("progress_json"),
   createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
 }, (table) => [index("film_runs_person_idx").on(table.personId), index("film_runs_state_idx").on(table.state), index("film_runs_parent_idx").on(table.parentId)]);
 

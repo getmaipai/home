@@ -1,0 +1,7 @@
+[
+  { "id": "shot-1", "label": "1 · Kitchen, wide", "state": "done", "progress": 100, "thumb": "/api/files/pic-1/thumb?w=320", "note": "Fixed on its own: a small noise at the start was trimmed." },
+  { "id": "shot-2", "label": "2 · Kitchen, close", "state": "running", "progress": 45, "thumb": "/api/files/pic-2/thumb?w=320" },
+  { "id": "shot-3", "label": "3 · Living room", "state": "queued", "thumb": "/api/files/pic-3/thumb?w=320" },
+  { "id": "shot-4", "label": "4 · Living room, close", "state": "held", "heldReason": "Waiting for another job", "thumb": "/api/files/pic-4/thumb?w=320" },
+  { "id": "shot-5", "label": "5 · Porch at dusk", "state": "failed", "thumb": "/api/files/pic-5/thumb?w=320", "failure": { "message": "The face did not match, twice.", "actions": [{ "label": "Try again", "action": "film-again" }] } }
+]

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
-import { InstallDock, buildDock } from "./InstallDock";
+import { InstallDock, buildDock, filmDockItems } from "./InstallDock";
 import type { ActivityItemView, HomeJobView, InstallStatusView } from "@/lib/api";
 
 afterEach(cleanup);
@@ -142,6 +142,14 @@ describe("InstallDock making jobs", () => {
     expect(model.primary?.label).toBe("Making a video");
     expect(model.percent).toBe(40);
     expect(model.primary?.href).toBe("/apps/video");
+  });
+  test("a running film is one dock row from the Activity list, with its percent and link; a waiting or finished film is not a making row (VF-FILMDOCK-01)", () => {
+    const film = (state: ActivityItemView["state"], id = "film:f1"): ActivityItemView => ({ id, source: "job", state, title: "Crossing", line: "Step 3 of 6", percent: 50, typicalMinutes: null, href: "/apps/video/film-maker", at: "2026-11-20T10:00:00.000Z" });
+    const rows = filmDockItems([film("making"), film("attention", "film:f2"), film("done", "film:f3"), { ...film("making", "video:v1") }]);
+    expect(rows.map((row) => row.key)).toEqual(["make:film:f1"]);
+    const model = buildDock(null, [], rows);
+    expect(model.primary).toMatchObject({ label: "Making a film", percent: 50, href: "/apps/video/film-maker" });
+    expect(buildDock(null, [making], rows).active).toHaveLength(2);
   });
   test("another person's job row and a finished job are not shown", () => {
     expect(buildDock(null, [{ id: "x", kind: "video", forPersonName: "Nova" }, { ...making, state: "done" }]).primary).toBeNull();

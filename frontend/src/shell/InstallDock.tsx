@@ -6,7 +6,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { getIcon } from "@maipai/ui/src/icons";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
-import { api, ApiError, type ActivityListView, type HomeJobView, type InstallStatusView } from "@/lib/api";
+import { api, ApiError, type ActivityItemView, type ActivityListView, type HomeJobView, type InstallStatusView } from "@/lib/api";
 import { ACTIVITY_PATH, useActivity } from "@/shell/activity";
 import { InstallDockRow } from "@/shell/InstallDockRow";
 import { installActive, useInstallStatus, useJobs } from "@/lib/useInstallStatus";
@@ -63,6 +63,14 @@ function makingItem(row: HomeJobView): DockItem {
   return { key: `make:${row.id}`, words: { verb: "Making", what, benefit: row.title && row.title !== what ? row.title : "It shows up in its app when it is done." }, label, state: row.state === "queued" ? "queued" : "running", completedBytes: 0, totalBytes: 0, bytesPerSecond: null, percent, href: makingHref(row) };
 }
 
+/** VF-FILMDOCK-01: a running film is one dock row, taken from the same Activity list the bell and the Activity page read (its `film:<run id>` item), never from the job table. */
+export function filmDockItems(items: readonly ActivityItemView[] = []): DockItem[] {
+  return items.filter((item) => item.id.startsWith("film:") && item.state === "making").map((item) => ({
+    key: `make:${item.id}`, words: { verb: "Making", what: "a film", benefit: item.line ?? "It shows up in Video when it is done." }, label: i18n._({ id: "Making a film", message: "Making a film" }),
+    state: "running" as const, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, percent: item.percent, href: item.href,
+  }));
+}
+
 const ACTIVE = new Set(["queued", "running", "paused", "stalled", "verifying", "waiting_for_you"]);
 
 function dockState(state: string): DockState {
@@ -71,8 +79,8 @@ function dockState(state: string): DockState {
 
 /** One list of what is installing, from the install status (what and how much) and, for admins, the
  * job rows (speed, files, Cancel). The same download is one entry, never two. */
-export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJobView[] = []): DockModel {
-  const making = makingJobs(jobs).map(makingItem);
+export function buildDock(status: InstallStatusView | null, jobs: readonly HomeJobView[] = [], films: readonly DockItem[] = []): DockModel {
+  const making = [...makingJobs(jobs).map(makingItem), ...films];
   const empty: DockModel = { active: [], failed: [], primary: null, percent: null, line: null, problem: null };
   if (!status || status.state === "none" || status.state === "ready") {
     if (making.length === 0) return empty;
@@ -117,6 +125,7 @@ export function finishedLine(made: string | null): string {
   if (made === "a picture") return i18n._({ id: "Your picture is ready.", message: "Your picture is ready." });
   if (made === "a video") return i18n._({ id: "Your video is ready.", message: "Your video is ready." });
   if (made === "a song") return i18n._({ id: "Your song is ready.", message: "Your song is ready." });
+  if (made === "a film") return i18n._({ id: "Your film is ready.", message: "Your film is ready." });
   return i18n._({ id: "The install finished.", message: "The install finished." });
 }
 
@@ -197,7 +206,7 @@ export function InstallDock({ admin, read: readProp, readJobs: readJobsProp, rea
   }, []);
 
 
-  const model = buildDock(status, jobs);
+  const model = buildDock(status, jobs, filmDockItems(activity?.items));
   const showing = model.primary !== null;
   useEffect(() => { for (const entry of model.active) if (entry.key.startsWith("make:")) seenMaking.current.add(entry.key.slice(5)); });
   const ended = activity?.items.find((entry) => seenMaking.current.has(entry.id) && (entry.state === "done" || entry.state === "failed") && !dismissed.has(entry.id) && !model.active.some((live) => live.key === `make:${entry.id}`)) ?? null;

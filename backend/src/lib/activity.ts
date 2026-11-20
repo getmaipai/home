@@ -20,6 +20,7 @@ import { getMusicJobFor } from "@/lib/music/store";
 import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import { listFilmRunsInStates } from "@/lib/films/store";
+import { filmShotJobIds } from "@/lib/films/filmProgress";
 
 /** The five states of the one status card (section 20): WAITING, MAKING NOW, DONE, NEEDS A LOOK, COULD NOT FINISH. */
 export type ActivityState = "waiting" | "making" | "done" | "attention" | "failed";
@@ -124,7 +125,10 @@ function videoItems(actor: PersonRow): ActivityItem[] {
   const audience = audienceOf(actor);
   const ids = db.select({ id: videoJobs.id }).from(videoJobs).where(eq(videoJobs.personId, actor.id)).orderBy(desc(videoJobs.updatedAt)).limit(PER_SOURCE_LIMIT).all();
   const out: ActivityItem[] = [];
+  // VF-FILMDOCK-01: while a film runs, its shot clips are part of the film's own row (`filmItems`), not separate "Making a video" rows.
+  const foldedIntoFilm = new Set(listFilmRunsInStates(["planning", "running"]).filter((run) => run.person_id === actor.id && !run.parent_id).flatMap((run) => filmShotJobIds(run.id)));
   for (const { id } of ids) {
+    if (foldedIntoFilm.has(id)) continue;
     const job = getVideoJobFor(actor, id);
     if (!job || job.state === "cancelled" || !recent(job.updatedAt)) continue;
     if (videoJobLockState(actor, job) !== "open") continue;

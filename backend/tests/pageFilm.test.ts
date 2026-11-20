@@ -9,7 +9,7 @@ import { getFilmRun } from "@/lib/films/store";
 import { activityForViewer } from "@/lib/activity";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { filmRuns } from "@/db/schema";
+import { filmRuns, videoJobs } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { household } from "./fixtures/adultLock";
 import { owner as signedInOwner } from "./support/testAuth";
@@ -239,6 +239,20 @@ describe("refusals and access", () => {
     const player = page.body.find((node) => node.type === "storyboard_player")!;
     expect(Object.values(player.item_fields as Record<string, string>).sort()).toEqual(Object.keys(out[0]!).sort());
     expect(page.body.find((node) => node.type === "action_bar")!.primary.label).toBe("Render film");
+  test("a running film is one Activity row: its shot clips are folded into it, other clips stay their own rows (VF-FILMDOCK-01)", async () => {
+    const { client: owner, row } = await signedInOwner();
+    const id = await planned(owner, row);
+    const sage = row;
+    const stamp = new Date().toISOString();
+    const job = (jobId: string) => db.insert(videoJobs).values({ id: jobId, personId: sage.id, kind: "generate", state: "running", percent: 40, phase: "generating", position: 0, prompt: "A woman crosses a pier", request: JSON.stringify({ size: "832x480", seconds: 5, audience: "all-ages" }), files: "[]", createdAt: stamp, updatedAt: stamp, hlc: "h" }).run();
+    job("shot-job-1"); job("other-job");
+    db.update(filmRuns).set({ state: "running", progressJson: JSON.stringify({ shots: { s1: { job_id: "shot-job-1" } } }) }).where(eq(filmRuns.id, id)).run();
+    const ids = activityForViewer(sage).items.map((entry) => entry.id);
+    expect(ids).toContain(`film:${id}`);
+    expect(ids).not.toContain("video:shot-job-1");
+    expect(ids).toContain("video:other-job");
+    db.update(filmRuns).set({ state: "done" }).where(eq(filmRuns.id, id)).run();
+    expect(activityForViewer(sage).items.map((entry) => entry.id)).toContain("video:shot-job-1");
   });
 
   test("VOICED-ROUGH-CUT-HOME-01: the voiced preview action runs in the background; a failure is a plain line on the film's own card, a pass clears it, an adult's other film is never touched", async () => {

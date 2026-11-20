@@ -1508,7 +1508,7 @@ msgid "+ Add voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:277
+#: src/shell/InstallDock.tsx:286
 msgid "+{count} more"
 msgstr ""
 
@@ -1814,7 +1814,7 @@ msgid "A household member"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:248
+#: src/shell/InstallDock.tsx:257
 msgid "A job just ended"
 msgstr ""
 
@@ -2161,7 +2161,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:19
-#: src/shell/InstallDock.tsx:256
+#: src/shell/InstallDock.tsx:265
 #: src/shell/NotificationBell.tsx:273
 #: src/shell/pages/ActivityPage.tsx:74
 #: src/shell/pages/CompanionsPage.tsx:329
@@ -7179,7 +7179,7 @@ msgid "Could not export those memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:252
+#: src/shell/InstallDock.tsx:261
 #: src/shell/pages/ActivityPage.tsx:29
 #: src/shell/pages/ActivityPage.tsx:111
 #: src/shell/pages/musicSongStatus.tsx:30
@@ -9078,7 +9078,7 @@ msgstr ""
 #: src/apps/setup/AwayFromHome.tsx:185
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/AlarmRinger.tsx:60
-#: src/shell/InstallDock.tsx:252
+#: src/shell/InstallDock.tsx:261
 #: src/shell/pages/ActivityPage.tsx:27
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
@@ -13653,7 +13653,7 @@ msgid "Installing, this can take a minute or two"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:289
+#: src/shell/InstallDock.tsx:298
 msgid "Installs in progress"
 msgstr ""
 
@@ -16410,6 +16410,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:62
 msgid "Making {what}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:69
+msgid "Making a film"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19789,7 +19794,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:108
 #: src/shell/AmbientCompanionPane.tsx:332
-#: src/shell/InstallDock.tsx:255
+#: src/shell/InstallDock.tsx:264
 #: src/shell/library/LibraryItems.tsx:35
 #: src/shell/library/useSaveAsCharacter.tsx:53
 #: src/shell/NotificationBell.tsx:252
@@ -22377,7 +22382,7 @@ msgid "Repair issues"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:308
+#: src/shell/InstallDock.tsx:317
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
@@ -24044,7 +24049,7 @@ msgid "See all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:272
+#: src/shell/InstallDock.tsx:281
 msgid "See all activity"
 msgstr ""
 
@@ -24483,7 +24488,7 @@ msgid "Setting up the AI engine stopped."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:87
+#: src/shell/InstallDock.tsx:95
 msgid "Setting up your AI"
 msgstr ""
 
@@ -27137,7 +27142,7 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:181
 #: src/shell/AmbientCompanionPane.tsx:268
 #: src/shell/AmbientCompanionPane.tsx:336
-#: src/shell/InstallDock.tsx:312
+#: src/shell/InstallDock.tsx:321
 #: src/shell/library/LibraryViewer.tsx:128
 #: src/shell/library/LibraryViewer.tsx:134
 #: src/shell/library/LibraryViewer.tsx:141
@@ -27879,7 +27884,7 @@ msgid "The install could not be cancelled. Check the connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:120
+#: src/shell/InstallDock.tsx:129
 msgid "The install finished."
 msgstr ""
 
@@ -29607,8 +29612,8 @@ msgstr ""
 #: src/apps/setup/StorageStep.tsx:35
 #: src/apps/setup/WebSearchStep.tsx:74
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/InstallDock.tsx:255
-#: src/shell/InstallDock.tsx:307
+#: src/shell/InstallDock.tsx:264
+#: src/shell/InstallDock.tsx:316
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/pages/ActivityPage.tsx:37
@@ -32706,6 +32711,11 @@ msgid "Your family's private AI, in your own home."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/InstallDock.tsx:128
+msgid "Your film is ready."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:47
 msgid "Your Home"
 msgstr ""
@@ -32817,7 +32827,7 @@ msgid "your pick"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:117
+#: src/shell/InstallDock.tsx:125
 msgid "Your picture is ready."
 msgstr ""
 
@@ -32879,7 +32889,7 @@ msgid "Your song is being started."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:119
+#: src/shell/InstallDock.tsx:127
 msgid "Your song is ready."
 msgstr ""
 
@@ -32986,7 +32996,7 @@ msgid "Your upload"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/InstallDock.tsx:118
+#: src/shell/InstallDock.tsx:126
 msgid "Your video is ready."
 msgstr ""
 
