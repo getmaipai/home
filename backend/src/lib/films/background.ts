@@ -57,7 +57,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       }
       if(mode==="redo" && shotId) await redoFilmShot({...input,shotId});
       else if(mode==="music") await changeFilmMusic(input);
-      else if(mode==="run" && engineFactory===realFilmEngines) await resumeFilm({actor,productionId:current.production_id,plan,faceless:current.faceless,signal:controller.signal,onProgress:engines.onProgress});
+      else if(mode==="run" && engineFactory===realFilmEngines) await resumeFilm({actor,productionId:current.production_id,plan,faceless:current.faceless,signal:controller.signal,onProgress:engines.onProgress,engines});
       else await runFilm(input);
       if(controller.signal.aborted) return;
       const latest=getFilmRun(actor,run.id)!;

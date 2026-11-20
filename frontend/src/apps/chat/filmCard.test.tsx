@@ -71,6 +71,15 @@ describe("film chat part", () => {
     Object.assign(filmsApi, old);
   });
 
+  test("a finished film shows the check's lines on its own card (found on the real run: a done film's note was never shown)", async () => {
+    const old = { ...filmsApi };
+    const line = "Shot 2: no speech is heard where a line is expected. Render that shot again.";
+    filmsApi.get = mock(async () => progress({ state: "done", stage: null, film_file_id: "file-1", note: line }));
+    const view = renderWithQueryClient(<FilmPlayerToolRender {...props} />);
+    await waitFor(() => expect(view.container.textContent).toContain(line));
+    Object.assign(filmsApi, old);
+  });
+
   test("done progress part is null and unknown run uses JobProgress", async () => {
     const old = { ...filmsApi };
     filmsApi.get = mock(async () => progress({ state: "done", film_file_id: "file-1" }));

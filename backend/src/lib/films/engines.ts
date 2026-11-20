@@ -323,8 +323,8 @@ export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: 
   return { productionId: production.id, plan: planned.plan, filmFileId, ...(engines.note ? { note: engines.note } : {}) };
 }
 
-export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {
-  const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId, faceless: input.faceless }); engines.onProgress = input.onProgress;
+export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"]; /** The engines whose `note` the caller will read afterwards (the film's card note); made here when absent. */ engines?: FilmEngines }) {
+  const engines = input.engines ?? realFilmEngines({ actor: input.actor, signal: input.signal, productionId: input.productionId, faceless: input.faceless }); engines.onProgress = input.onProgress;
   return runFilm({ ...input, engines });
 }
 export async function redoFilmShot(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; shotId: string; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }) {

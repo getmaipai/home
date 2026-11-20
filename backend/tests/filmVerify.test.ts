@@ -4,6 +4,7 @@ import { people } from "@/db/schema";
 import { createMediaProduction } from "@/lib/mediaProductions";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { runFilm, type FilmEngines } from "@/lib/films/run";
+import { resumeFilm } from "@/lib/films/engines";
 import type { FilmPlan } from "@/lib/films/plan";
 import { filmShotList, verdictLines, verifyFinishedFilm, type VerifyDeps, type VerifyReply } from "@/lib/films/verifyFinished";
 import { CLIP_RULES } from "@/lib/videos/frameCheck";
@@ -41,6 +42,10 @@ describe("film shot list", () => {
 
 describe("verdict lines", () => {
   const ids = ["a", "b", "c"];
+  test("shots that share sound are one line, not one per pair", () => {
+    const pairs = [["a", "b"], ["b", "c"], ["a", "c"]].map(([x, y]) => ({ check: "sound.copied", status: "fail", shot_id: x, other_shot_id: y }));
+    expect(verdictLines(reply(pairs, total), ids)).toEqual(["Shots 1, 2 and 3 carry the same sound. Render them again."]);
+  });
   test("plain lines say what is wrong and what to do, by shot number", () => {
     const lines = verdictLines(reply([
       { check: "speech.line", status: "fail", shot_id: "b", value: 0 },
@@ -50,9 +55,9 @@ describe("verdict lines", () => {
       { check: "sound.silent", status: "pass", shot_id: "a" },
     ], total), ids);
     expect(lines).toEqual([
+      "Shots 1 and 2 carry the same sound. Render them again.",
       "Shot 2: no speech is heard where a line is expected. Render that shot again.",
       "Shot 3: its line is heard in shot 2 instead. Render shot 3 again.",
-      "Shots 1 and 2 carry the same sound. Render them again.",
       "Shot 3: the picture stops moving. Render that shot again.",
     ]);
     for (const line of lines) expect(line).not.toMatch(/—|LUFS|lag|ffmpeg|Stack|correlat/i);
@@ -103,5 +108,11 @@ describe("the film runner reports the verdict on the film's own card", () => {
     const e = engines(actor, async () => { throw new Error("stack down"); });
     expect((await runFilm({ actor, productionId: production.id, plan, engines: e, signal: new AbortController().signal })).finished_cut_file_ids).toEqual(["cut-1"]);
     expect(e.note).toBeUndefined();
+  });
+  test("resumeFilm uses the engines it is given, so the note the card saves is the one the run wrote (found on the real run: a resumed film's notes were lost)", async () => {
+    const actor = person("film-owner"); const production = createMediaProduction(actor, { title: "Draft" });
+    const e = engines(actor, async () => ({ checked: true, lines: ["Shot 1: the picture goes black. Render that shot again."] }));
+    await resumeFilm({ actor, productionId: production.id, plan, signal: new AbortController().signal, engines: e });
+    expect(e.note).toBe("Shot 1: the picture goes black. Render that shot again.");
   });
 });

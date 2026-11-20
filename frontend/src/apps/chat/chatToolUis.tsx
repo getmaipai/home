@@ -402,7 +402,7 @@ export const FilmPlayerToolRender: ToolCallMessagePartComponent<Record<string, n
   const query = useFilmCard(result?.id);
   const film = query.data;
   if (!result || film?.state !== "done" || !film.film_file_id) return null;
-  return <VideoPlayer status="ready" prompt={film.plan?.title ?? "Film"} src={`/api/files/${encodeURIComponent(film.film_file_id)}/content`} actionItems={film.plan ? [...film.plan.shots.slice(0, 6).map((shot, i) => ({ key: shot.id, label: `Redo a shot ${i + 1}`, when: ["ready" as const], onSelect: () => { void filmsApi.redoShot(film.id, shot.id).then(() => query.refetch()).catch(() => query.refetch()); } })), { key: "music", label: "Change the music", when: ["ready" as const], onSelect: () => { void filmsApi.music(film.id).then(() => query.refetch()).catch(() => query.refetch()); } }] : undefined} />;
+  return <VideoPlayer status="ready" prompt={film.plan?.title ?? "Film"} src={`/api/files/${encodeURIComponent(film.film_file_id)}/content`} {...(film.note ? { notice: film.note } : {})} actionItems={film.plan ? [...film.plan.shots.slice(0, 6).map((shot, i) => ({ key: shot.id, label: `Redo a shot ${i + 1}`, when: ["ready" as const], onSelect: () => { void filmsApi.redoShot(film.id, shot.id).then(() => query.refetch()).catch(() => query.refetch()); } })), { key: "music", label: "Change the music", when: ["ready" as const], onSelect: () => { void filmsApi.music(film.id).then(() => query.refetch()).catch(() => query.refetch()); } }] : undefined} />;
 };
 
 

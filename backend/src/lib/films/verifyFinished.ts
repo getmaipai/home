@@ -39,15 +39,22 @@ const AGAIN = "Render that shot again.";
 export function verdictLines(reply: VerifyReply, shotIds: string[]): string[] {
   const n = (id?: string): number => shotIds.indexOf(id ?? "") + 1;
   const out: string[] = [];
-  for (const c of reply.checks.filter((item) => item.status === "fail")) {
+  // Shots that share sound form groups (3 and 4, 4 and 5 make one group of 3, 4 and 5): one line per group, not one per pair.
+  const group = new Map<number, number>(); const find = (x: number): number => group.get(x) === undefined || group.get(x) === x ? x : find(group.get(x)!);
+  for (const c of reply.checks) if (c.status === "fail" && c.check === "sound.copied") { const a = n(c.shot_id), b = n(c.other_shot_id); if (a && b) { if (!group.has(a)) group.set(a, a); if (!group.has(b)) group.set(b, b); group.set(find(a), find(b)); } }
+  const members = new Map<number, number[]>(); for (const x of group.keys()) { const r = find(x); members.set(r, [...(members.get(r) ?? []), x]); }
+  for (const list of [...members.values()].map((m) => m.sort((p, q) => p - q)).sort((p, q) => p[0]! - q[0]!)) {
+    const names = list.length === 2 ? `${list[0]} and ${list[1]}` : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
+    out.push(`Shots ${names} carry the same sound. Render them again.`);
+  }
+  for (const c of reply.checks.filter((item) => item.status === "fail" && item.check !== "sound.copied")) {
     const a = n(c.shot_id), b = n(c.other_shot_id);
     if (c.check === "speech.line") {
       if (b) out.push(`Shot ${a}: its line is heard in shot ${b} instead. Render shot ${a} again.`);
       else if (typeof c.value === "number" && c.value >= 2) out.push(`Shot ${a}: its line is heard twice. ${AGAIN}`);
       else if (c.value === 0) out.push(`Shot ${a}: no speech is heard where a line is expected. ${AGAIN}`);
       else out.push(`Shot ${a}: the words heard are not the line. ${AGAIN}`);
-    } else if (c.check === "sound.copied") out.push(`Shots ${a} and ${b} carry the same sound. Render them again.`);
-    else if (c.check === "sound.silent") out.push(`Shot ${a}: there is no sound where sound is expected. ${AGAIN}`);
+    } else if (c.check === "sound.silent") out.push(`Shot ${a}: there is no sound where sound is expected. ${AGAIN}`);
     else if (c.check === "sound.quiet") out.push(`Shot ${a} is much quieter than the others. ${AGAIN}`);
     else if (c.check === "picture.black") out.push(a ? `Shot ${a}: the picture goes black. ${AGAIN}` : "Part of the film is black. Render the film again.");
     else if (c.check === "picture.frozen") out.push(a ? `Shot ${a}: the picture stops moving. ${AGAIN}` : "Part of the film stops moving. Render the film again.");
