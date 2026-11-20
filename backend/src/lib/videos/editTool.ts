@@ -29,7 +29,7 @@ import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
-import { submitEditViaDoor } from "./doorClip";
+import { submitEditViaDoor, submitRestyleViaDoor } from "./doorClip";
 import { storedFilmCredits } from "@/lib/creations/credits";
 import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, quickClearerOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
@@ -542,7 +542,10 @@ async function restyleClip(input: RunEditVideoInput, value: EditArgs, actor: Per
     const staged = await stageClipForStack(sourceVideo);
     if (!staged) return { ok: false, line: failedLine(MAX_EDIT_NOT_READY_LINE) };
     try {
-      const submitted = await submitVideoRestyle(restyleBody({ source: staged.path, restyle: style.id, lora: installed.id, ...(value.words ? { words: value.words } : {}) }));
+      const body = restyleBody({ source: staged.path, restyle: style.id, lora: installed.id, ...(value.words ? { words: value.words } : {}) });
+      // VF-RESTYLE-OP-01: the generic door first (no model name, no add-on file: the Stack resolves the style id); the old restyle route takes it where the Stack does not list the keys or refuses.
+      const viaDoor = await submitRestyleViaDoor({ sourcePath: staged.path, styleId: installed.id, strength: body.strength, conditioning: body.conditioning, description: body.prompt, seconds: Math.max(1, Math.round(clipSeconds ?? source.request.seconds ?? 5)) });
+      const submitted: { job: string; done: Array<{ url?: string; seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }> | null } = viaDoor ? { job: viaDoor.job, done: null } : await submitVideoRestyle(body);
       const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0, note: RESTYLE_NOTE } });
       if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
       for (;;) {

@@ -103,7 +103,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
-    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, ...(fake.catalogFields === null ? {} : { request_fields: fake.catalogFields ?? ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look"] }), part: { id: "part-a", label: "A" } }] });
+    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, ...(fake.catalogFields === null ? {} : { request_fields: fake.catalogFields ?? ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look","style_strength","conditioning","loop"] }), part: { id: "part-a", label: "A" } }] });
     if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.makeRequests.push(request);

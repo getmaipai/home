@@ -121,6 +121,38 @@ describe("edit_video restyle", () => {
     expect(getVideoJobFor(owner, job.id)?.state).toBe("done");
   });
 
+  test("VF-RESTYLE-OP-01: on a Stack whose catalog lists the keys the restyle goes through the generic door with the style by its Stack id and no model or add-on file; the old route is not used", async () => {
+    fake.door = true;
+    const owner = person("owner");
+    const { job, state } = await makeClip(owner);
+    const before = fake.makeRequests.length;
+    const out = await edit(state, { clip: job.id, change: "restyle", restyle: "colorize", words: "warm autumn leaves" });
+    expect(out.status).toBe("succeeded");
+    const next = await finished(owner, out);
+    expect(next.state).toBe("done");
+    expect(restyles).toHaveLength(0);
+    const sent = fake.makeRequests[before]!;
+    expect(sent).toMatchObject({ job: "clip", operation: "restyle", level: "max", styles: [COLORIZER_ID], style_strength: 1, conditioning: "source", inputs: [{ role: "edit_source", file: expect.stringContaining("video-edit") }] });
+    expect(sent).not.toHaveProperty("model");
+    expect(sent).not.toHaveProperty("lora");
+    expect(next.request.edit).toMatchObject({ from: job.id, change: "restyle", note: RESTYLE_NOTE });
+    expect(getVideoJobFor(owner, job.id)?.state).toBe("done");
+  });
+
+  test("a catalog that does not list the restyle keys sends it on the old route exactly as before", async () => {
+    fake.door = true;
+    fake.catalogFields = ["job", "audience", "part", "description", "shape", "level", "seconds", "start_picture", "end_picture", "styles", "seed"];
+    const owner = person("owner");
+    const { job, state } = await makeClip(owner);
+    const before = fake.makeRequests.length;
+    const out = await edit(state, { clip: job.id, change: "restyle", restyle: "colorize" });
+    const next = await finished(owner, out);
+    expect(next.state).toBe("done");
+    expect(restyles).toHaveLength(1);
+    expect(restyles[0]).toMatchObject({ model: "ltx25-max", lora: COLORIZER_ID });
+    expect(fake.makeRequests.slice(before).some((r) => (r as { operation?: string }).operation === "restyle")).toBe(false);
+  });
+
   test("a person without the Max grant gets the Max line and nothing is sent", async () => {
     const adult = person("adult");
     const { job, state } = await makeClip(adult);

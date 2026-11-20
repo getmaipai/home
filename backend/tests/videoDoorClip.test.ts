@@ -1,14 +1,14 @@
 // VF-DOOR-01: a plain clip goes through the Stack's generic make door; everything else stays on the old one, and the old one is the way back.
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __setVideosFetchForTests, fetchClipReceipt, type VideoBody } from "@/lib/videos/stack";
-import { OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitEditViaDoor, submitVideoViaDoor } from "@/lib/videos/doorClip";
+import { OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitEditViaDoor, submitRestyleViaDoor, submitVideoViaDoor } from "@/lib/videos/doorClip";
 
 const base = (over: Partial<VideoBody> = {}): VideoBody => ({ prompt: "a dog barks", audience: "adult", size: "864x480", seconds: 5, seed: 7, timeout_ms: 1, ...over });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 let calls: Array<{ path: string; body: Record<string, unknown> | null }> = [];
 let clipAvailable = true;
-const ALL_FIELDS = ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of"];
+const ALL_FIELDS = ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","style_strength","conditioning","loop"];
 let catalogFields: string[] | "none" = ALL_FIELDS;
 let makeAnswer: () => Response = () => json({ id: "job-1", job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
 const answer = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -170,26 +170,44 @@ test("a film shot is sent as operation clip_film_shot with its look, its line, t
 test("a retry of a film shot carries take_of; a body that is not a film shot never carries the film keys", () => {
   expect(clipRequestFor(shotBody({ film_shot: { look: "x", take_of: "stack-job-1" } }))).toMatchObject({ operation: "clip_film_shot", take_of: "stack-job-1" });
   const plain = clipRequestFor(base()) as Record<string, unknown>;
-  for (const key of ["operation", "look", "dialogue", "take_of"]) expect(key in plain).toBe(false);
+  for (const key of ["operation", "look", "dialogue", "take_of","style_strength","conditioning","loop"]) expect(key in plain).toBe(false);
 });
 
 test("a Stack whose catalog does not list the film-shot keys gets the old door: the clip is not sent at all as a film shot", () => {
   expect(clipRequestFor(shotBody(), new Set(OLD_CLIP_FIELDS))).toBeNull();
-  expect(clipRequestFor(shotBody(), new Set([...ALL_FIELDS, "operation", "look", "take_of"]))).not.toBeNull();
+  expect(clipRequestFor(shotBody(), new Set([...ALL_FIELDS, "operation", "look", "take_of","style_strength","conditioning","loop"]))).not.toBeNull();
 });
 
 test("a typed refusal of the film shot answers null, so the old door makes the shot exactly as before", async () => {
-  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of"];
+  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of","style_strength","conditioning","loop"];
   makeAnswer = () => json({ error: "A film shot is not served at this level.", code: "level_not_served" }, 422);
   expect(await submitVideoViaDoor(shotBody())).toBeNull();
   expect(calls.some((c) => c.path === "/stack/v1/jobs/make" && c.body?.operation === "clip_film_shot")).toBe(true);
 });
 
 test("the Stack's route line for a film shot comes back with the job, so the film that asked can say when a shot is not full HD", async () => {
-  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of"];
+  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of","style_strength","conditioning","loop"];
   makeAnswer = () => json({ id: "job-9", job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 8, sound: true, notes: [], route_reason: "A film shot, made at the standard Max size because the shot is longer than 5 seconds." } }, 202);
   const made = await submitVideoViaDoor(shotBody({ seconds: 8 }));
   expect(made).toMatchObject({ job: "job-9", routeReason: "A film shot, made at the standard Max size because the shot is longer than 5 seconds." });
   makeAnswer = () => json({ id: "job-10", job: "clip", state: "running", percent: 0, status: "x", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
   expect((await submitVideoViaDoor(shotBody()))?.routeReason ?? null).toBeNull();
+});
+
+test("a restyle goes to the old route unless the Stack lists every key it needs; a planner refusal sends it back; the request names no model or add-on file", async () => {
+  const restyle = { sourcePath: "/tmp/video-edit/x.mp4", styleId: "lora-aaaaaaaaaaaaaaaa", strength: 1, conditioning: "source" as const, description: "warm leaves", seconds: 5 };
+  catalogFields = "none";
+  expect(await submitRestyleViaDoor(restyle)).toBeNull();
+  catalogFields = ALL_FIELDS.filter((key) => key !== "style_strength");
+  expect(await submitRestyleViaDoor(restyle)).toBeNull();
+  expect(calls.filter((c) => c.path === "/stack/v1/jobs/make")).toHaveLength(0);
+  catalogFields = ALL_FIELDS;
+  makeAnswer = () => json({ code: "not_available", line: "That style is not available. Choose an installed LTX-2.5 style." }, 409);
+  expect(await submitRestyleViaDoor(restyle)).toBeNull();
+  makeAnswer = () => json({ id: "job-r", job: "clip", state: "running", percent: 0, status: "Restyling", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
+  expect(await submitRestyleViaDoor(restyle)).toEqual({ job: "job-r" });
+  const sent = calls.filter((c) => c.path === "/stack/v1/jobs/make").at(-1)!.body!;
+  expect(sent).toMatchObject({ operation: "restyle", level: "max", styles: ["lora-aaaaaaaaaaaaaaaa"], style_strength: 1, conditioning: "source", inputs: [{ role: "edit_source", file: "/tmp/video-edit/x.mp4" }] });
+  expect(sent).not.toHaveProperty("model");
+  expect(sent).not.toHaveProperty("lora");
 });

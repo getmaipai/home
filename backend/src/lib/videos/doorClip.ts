@@ -129,3 +129,30 @@ export async function submitEditViaDoor(edit: { mode: "extend" | "retake"; promp
     throw error;
   }
 }
+
+/**
+ * VF-RESTYLE-OP-01 (Home half): a restyle of a finished Max clip through the generic door (`operation: restyle`, the clip as the `edit_source` input, the style by
+ * its Stack id, the strength and the conditioning), or null when the catalog does not list every key it needs (an older Stack) or the planner refuses it
+ * (no row, an unknown or unusable style, an unreadable source): the caller then sends it on the old restyle route exactly as before. The door request names no model
+ * and no add-on file: the pack resolves the style id.
+ */
+export async function submitRestyleViaDoor(edit: { sourcePath: string; styleId: string; strength: number; conditioning: "source" | "edges"; description: string; seconds: number; seed?: number }): Promise<{ job: string } | null> {
+  if (legacyDoorForced()) return null;
+  const catalog = await clipCatalog();
+  if (catalog.available !== true || !catalog.fields) return null;
+  const request: Record<string, unknown> = {
+    job: "clip", audience: "adult", description: edit.description, shape: "landscape", level: "max", seconds: edit.seconds, operation: "restyle",
+    styles: [edit.styleId], style_strength: edit.strength, conditioning: edit.conditioning, inputs: [{ role: "edit_source", file: edit.sourcePath }],
+    ...(edit.seed !== undefined ? { seed: edit.seed } : {}), wait: 0,
+  };
+  for (const key of Object.keys(request)) {
+    if (!catalog.fields.has(key)) { if (key === "wait") delete request[key]; else return null; }
+  }
+  try {
+    const made = await makeClip(request as unknown as StackMakeClipRequest);
+    return made.ok ? { job: made.job } : null;
+  } catch (error) {
+    if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status)) return null;
+    throw error;
+  }
+}
