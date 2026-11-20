@@ -159,3 +159,16 @@ test("ELEMENTS-HOME-05: the Looks page lists one stored sheet per element and ne
   createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl" });
   expect(elementLooks(row).filter((item) => MADE.has(item.title))).toEqual([]);
 });
+
+test("ELEMENTS-HOME-02: rename changes the owner's own element, refuses an empty name, and refuses a companion in plain words", async () => {
+  const { client, row } = await owner();
+  const own = createMediaSubject(row, { name: "Mug", kind: "prop", look: "a blue mug" });
+  expect((await client.post("/api/plugins/elements/actions/rename", { id: own.id, name: "  Blue Cup " })).status).toBe(200);
+  expect(elementRows(row, { kind: "prop" }).map((item) => item.title)).toContain("Blue Cup");
+  const empty = await client.post("/api/plugins/elements/actions/rename", { id: own.id, name: "   " });
+  expect(empty.status).toBe(422);
+  const companion = elementRows(row, { kind: "character" }).find((item) => !MADE.has(item.title))!;
+  const refused = await client.post("/api/plugins/elements/actions/rename", { id: companion.id, name: "X" });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: string }).error).toContain("edited where that record lives");
+});

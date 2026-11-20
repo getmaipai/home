@@ -8,11 +8,11 @@ import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeElementFromWords } from "@/lib/elementsMake";
 import { canEditElement, entryFor } from "@/lib/elementsDetail";
 import { captureLook } from "@/lib/castLook";
-import { deleteMediaSubject, setSubjectVoice } from "@/lib/mediaSubjects";
+import { deleteMediaSubject, setSubjectVoice, updateMediaSubject } from "@/lib/mediaSubjects";
 import { elementVoices } from "@/lib/elementsDetail";
 
 export const elementsAppRoutes = apiRouter();
-gateMediaApp(elementsAppRoutes, "elements", ["/actions/make", "/actions/capture-look", "/actions/delete", "/actions/voice"]);
+gateMediaApp(elementsAppRoutes, "elements", ["/actions/make", "/actions/capture-look", "/actions/delete", "/actions/voice", "/actions/rename"]);
 elementsAppRoutes.post("/actions/make", requireAuth, async (c, next) => {
   const person = c.get("person");
   if (!appRouteAllowed(person, "elements", "actions", "make")) return next();
@@ -52,4 +52,16 @@ elementsAppRoutes.post("/actions/voice", requireAuth, async (c, next) => {
   const entry = entryFor(person, id);
   if (!entry?.subject_id || !offered) return c.json({ error: "That voice is not available for this element. Pick one from the list and try again.", code: "not_allowed" }, 403);
   return setSubjectVoice(person, entry.subject_id, offered.id) ? c.json({ ok: true as const, line: "Voice saved." }, 200) : c.json({ error: "The voice could not be saved. Try again.", code: "failed" }, 400);
+});
+
+// ELEMENTS-HOME-02: Rename, for the owner's own saved elements only (a companion or household member is renamed where that record lives).
+elementsAppRoutes.post("/actions/rename", requireAuth, async (c, next) => {
+  const person = c.get("person");
+  if (!appRouteAllowed(person, "elements", "actions", "rename")) return next();
+  const body = await jsonBody(c);
+  const entry = typeof body.id === "string" ? entryFor(person, body.id) : null;
+  if (!entry?.subject_id || !canEditElement(person, entry.id)) return c.json({ error: "That element cannot be renamed here. A companion or household member is edited where that record lives.", code: "not_allowed" }, 403);
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (name.length < 1 || name.length > 80) return c.json({ error: "Give it a name of 1 to 80 letters, then try again.", code: "bad_arguments" }, 422);
+  return updateMediaSubject(person, entry.subject_id, { name }) ? c.json({ ok: true as const, line: "Renamed." }, 200) : c.json({ error: "The name could not be saved. Try again.", code: "failed" }, 400);
 });

@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "elements-rename",
+  "title": "Rename",
+  "body": [
+    {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "New name",
+      "placeholder": "Type the new name.",
+      "prompt_state": "prompt",
+      "max_length": 80,
+      "submit_label": "Rename",
+      "submit": {
+        "call": {
+          "target": "/api/plugins/elements/actions/rename",
+          "method": "POST",
+          "args": {
+            "id": "{id}",
+            "name": "{prompt}"
+          },
+          "success_label": "Renamed"
+        }
+      }
+    },
+    {
+      "type": "empty_state",
+      "icon": "square-pen",
+      "text": "Type a new name (1 to 80 letters). Pictures and films that used the old name keep working."
+    }
+  ]
+}

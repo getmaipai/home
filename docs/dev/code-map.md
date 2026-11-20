@@ -61,6 +61,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/elements/pages/make.json` | elements | Make an element |
 | `backend/packages/elements/pages/places.json` | elements | Places |
 | `backend/packages/elements/pages/props.json` | elements | Props |
+| `backend/packages/elements/pages/rename.json` | elements | Rename |
 | `backend/packages/elements/pages/search.json` | elements | Search |
 | `backend/packages/image/pages/collections.json` | image | Collections |
 | `backend/packages/image/pages/combine.json` | image | Combine pictures |

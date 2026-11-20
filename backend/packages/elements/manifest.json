@@ -134,6 +134,14 @@
         "nav": false,
         "kind": "schema",
         "module": "element"
+      },
+      {
+        "id": "rename",
+        "label": "Rename",
+        "icon": "square-pen",
+        "nav": false,
+        "kind": "schema",
+        "module": "rename"
       }
     ],
     "data": [

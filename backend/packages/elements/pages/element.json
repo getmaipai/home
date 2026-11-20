@@ -67,6 +67,18 @@
       "aspect": "wide",
       "row_actions": [
         {
+          "icon": "square-pen",
+          "label": "Rename",
+          "action": {
+            "navigate": {
+              "to": "/apps/elements/rename",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          }
+        },
+        {
           "icon": "trash",
           "label": "Delete",
           "action": {
