@@ -29,6 +29,10 @@ if (engines.chat && engines.voice && engines.page) {
 }
 line(engines.chat && engines.voice && engines.page, `chat model, voice server and page ${engines.chat && engines.voice && engines.page ? "answer and are prewarmed" : "do not all answer or prewarm"}${warm}`);
 
+// 1b the chosen voice speaks one phrase right now and sounds like the reference (catches a cold or wrong voice before a person hears it)
+{ const { readWav } = await import("./listen/audio"); const { embed, cosine } = await import("./listen/speaker"); try {
+    const f = new FormData(); f.append("text", "Hey, I'm doing pretty well. Thanks for asking."); f.append("voice", "casual"); const r = await fetch("http://127.0.0.1:9923/tts", { method: "POST", body: f }); const b = new Uint8Array(await r.arrayBuffer()); const dv = new DataView(b.buffer); const n = Math.floor((b.length - 44) / 2); const x = new Float32Array(n); for (let i = 0; i < n; i++) x[i] = dv.getInt16(44 + i * 2, true) / 32768;
+    const ref = readWav(import.meta.dir + "/../../../data-scratch/voices/voices_store/casual/ref.wav"); const sim = cosine(embed(x, 24000), embed(ref.samples.subarray(0, 24000 * 12), 24000)); line(sim >= 0.4, `the chosen voice, spoken now, sounds like its reference: similarity ${sim.toFixed(2)} (needs 0.40)`); } catch (e) { line(false, `the chosen voice could not speak a phrase now: ${String(e).slice(0, 120)}`); } }
 // 2 no other lab load, no real page
 const others = (await run(["pgrep", "-f", "rig/(measure|echotest)\\.ts"])).trim().split("\n").filter((p) => p && Number(p) !== process.pid);
 let live = -1, connected = -1; try { const j = (await (await fetch(`http://${LAB}/api/live`, { headers: { "x-lab-secret": secret } })).json()) as { live: number; connected?: number }; live = j.live; connected = j.connected ?? j.live; } catch {}
@@ -87,6 +91,9 @@ if (!quick) {
 { const { readFileSync } = await import("node:fs"); const rows = readFileSync(import.meta.dir + "/../results/turns.jsonl", "utf8").trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((m) => m && m.at && m.at >= RUN_START && typeof m.prompt_tokens_reused === "number" && typeof m.prompt_tokens_read === "number");
   const sh = rows.map((m: any) => m.prompt_tokens_reused / Math.max(1, m.prompt_tokens_reused + m.prompt_tokens_read)).sort((a: number, b: number) => a - b); const med = sh.length ? sh[sh.length >> 1] : 0;
   line(sh.length >= 3 && med >= 0.9, `chat prompt prefix reuse: median ${(med * 100).toFixed(0)}% of prompt tokens from the cache over ${sh.length} turns (needs 90%; lowest ${sh.length ? (sh[0] * 100).toFixed(0) : "-"}%)`); }
+// 12 no phrase was spoken in a voice other than the requested one during this run
+{ const { existsSync, readFileSync } = await import("node:fs"); const f = import.meta.dir + "/../results/voice-fallbacks.jsonl"; const bad = existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((x) => x && x.at >= RUN_START) : [];
+  line(bad.length === 0, `every phrase was spoken in the requested voice${bad.length ? `; ${bad.length} WERE NOT (first: chunk ${bad[0].chunk} in "${bad[0].used}" instead of "${bad[0].requested}", "${bad[0].text}")` : ""}`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");

@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { commitDelay } from "./commitDelay";
 const supported = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"];
 const commitsPath = fileURLToPath(new URL("../results/commits.jsonl", import.meta.url));
+const fallbackPath = fileURLToPath(new URL("../results/voice-fallbacks.jsonl", import.meta.url));
 const stopsPath = fileURLToPath(new URL("../results/stops.jsonl", import.meta.url));
 const metricsPath = fileURLToPath(new URL("../results/turns.jsonl", import.meta.url));
 const cutinsPath = fileURLToPath(new URL("../results/cutins.jsonl", import.meta.url));
@@ -203,7 +204,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private contMode = Bun.env.LAB_CONT === "1"; private sessionTag = Math.random().toString(36).slice(2, 8); private levelMatch = Bun.env.LAB_LEVEL_MATCH === "1"; /* measured (rig/joincheck2.ts, 42 joins): it made the dB jumps worse, so it is OFF */ private levelMatcher = new LevelMatcher(); private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
+  private requestedVoice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private contMode = Bun.env.LAB_CONT === "1"; private sessionTag = Math.random().toString(36).slice(2, 8); private levelMatch = Bun.env.LAB_LEVEL_MATCH === "1"; /* measured (rig/joincheck2.ts, 42 joins): it made the dB jumps worse, so it is OFF */ private levelMatcher = new LevelMatcher(); private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -310,6 +311,8 @@ export class VoiceSession {
   }
   private async say(text: string, index: number, signal: AbortSignal, voiceAndStyle: Promise<{ voice: string; style: string }>) {
     const choice = await voiceAndStyle;
+    { const asked = this.requestedVoice.split("_")[0]!, used = choice.voice.split("_")[0]!;
+      if (asked !== "builtin" && used !== asked) { const line = { at: new Date().toISOString(), requested: this.requestedVoice, used: choice.voice, chunk: index, text: text.slice(0, 60) }; console.error(`VOICE FALLBACK: chunk ${index} is spoken in "${choice.voice}" instead of the requested "${this.requestedVoice}"`); try { appendFileSync(fallbackPath, JSON.stringify(line) + "\n"); } catch {} this.send({ t: "notice", code: "voice_other", requested: this.requestedVoice, used: choice.voice }); } }
     // Audio is forwarded the moment each piece arrives. Holding a whole phrase to check it first cost about half a second of first sound.
     const emit = (pcm: Int16Array) => {
       this.chunkDurations[index] += pcm.length * 1000 / config.replyRate;
@@ -420,7 +423,7 @@ export class VoiceSession {
       const j = JSON.parse(data);
       if (j.t === "hello") {
         this.proto = j.proto === 2 ? 2 : 1; this.seqExpected = 0;
-        if (typeof j.voice === "string") this.voice = j.voice.slice(0, 64) || "builtin";
+        if (typeof j.voice === "string") { this.voice = j.voice.slice(0, 64) || "builtin"; this.requestedVoice = this.voice; }
         this.prewarm("all");
       }
       if (j.t === "config") {
@@ -432,7 +435,7 @@ export class VoiceSession {
         if (typeof j.values?.prefill === "boolean") this.prefill = j.values.prefill;
         if (typeof j.values?.stamp === "boolean") this.stamp = j.values.stamp;
         if (Number.isFinite(j.values?.firstWords)) this.firstWords = Math.max(0, Math.min(8, Math.floor(j.values.firstWords)));
-        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
+        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.requestedVoice = this.voice; this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
         if (typeof j.values?.echoReference === "boolean") this.echoRef = j.values.echoReference;
         if (typeof j.values?.streamingDraft === "boolean") this.streamEnabled = j.values.streamingDraft;
         if (typeof j.values?.backchannel === "boolean") { this.nodEnabled = j.values.backchannel; if (this.nodEnabled) void this.makeNod(); }

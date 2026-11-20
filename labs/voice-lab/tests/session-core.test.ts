@@ -367,6 +367,7 @@ test("16 hello voice is used for prewarm and an unprepared voice falls back befo
   await h.flush();
   expect(spoken[0]?.voice).toBe("builtin");
   expect(h.messages().some((message) => message.t === "notice" && message.code === "voice_not_ready")).toBe(true);
+  expect(h.messages().some((message) => message.t === "notice" && message.code === "voice_other" && message.requested === "me" && message.used === "builtin")).toBe(true);   // a chunk spoken in another voice is announced, never silent
   h.session.close();
 });
 
