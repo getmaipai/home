@@ -173,7 +173,8 @@ describe("media home", () => {
     expect((mediaAppDataRaw(person, "shows", "item", { id: noTranscript }) as { captions: unknown[] }).captions).toEqual([]);
     expect((await adult.client.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(200);
     expect((await teen.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(200);
-    expect((await child.client.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(403);
+    // UNSEEN-01 (RULES.md C10): a child's transcript is absent, not locked.
+    expect((await child.client.get(`/api/transcripts/${saved.id}/export?format=vtt`)).status).toBe(404);
   });
 
   test("the Pick up route still answers with its rows", async () => {
