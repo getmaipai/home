@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaSources } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { mediaBandOf, bandAllows } from "./band";
+import { mediaBandOf, bandAllows, wordsAllowFor } from "./band";
 import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { registerItemView } from "./appHost";
 import { registerAppPageFill } from "@/lib/apps";
@@ -14,7 +14,8 @@ registerAppPageFill("audio", "library", fillLibraryPage);
 
 registerItemView("audio", (person, item, view) => {
   const allowed = bandAllows(person, item);
-  const lyrics = allowed ? item.lyrics : null;
+  // RULES.md C9: lyrics a lookup stored for an adult carry no stamp of their own, so a minor is served them only if the words pass the floor as they are read.
+  const lyrics = allowed && (!item.lyrics || wordsAllowFor(person, item.lyrics.text)) ? item.lyrics : null;
   // MUSIC-GEN-20c: a track whose lyrics have line timing but no words is lined up in the background, once per version of its lyrics.
   if (lyrics && item.kind === "track") void startLibraryAlign(person, item);
   const scanned = item.provenance !== "music:generated-library" && item.source_id && !item.source_id.startsWith("msrc-made")

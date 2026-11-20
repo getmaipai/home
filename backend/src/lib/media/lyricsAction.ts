@@ -13,7 +13,7 @@ import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { tryConsume } from "@/lib/rateLimiter";
 import { readableIn } from "./appHost";
-import { bandAllows, mediaBandOf } from "./band";
+import { bandAllows, mediaBandOf, wordsAllowFor } from "./band";
 import { startLibraryAlign } from "@/lib/music/libraryAlign";
 import { lookupLyrics } from "./lyricsLookup";
 import { hasReceipt, isPaused, recordReceipt, recordRefusal, recordSuccess } from "./lyricsReceipts";
@@ -79,7 +79,8 @@ export async function lookupLyricsFor(
   recordSuccess();
   recordReceipt(item.id, "hit", now);
   const newLyrics = { source: "lrclib", text: outcome.text, ...(outcome.timed ? { timed: outcome.timed } : {}) };
-  if (!bandAllows(person, { ...item, lyrics: newLyrics })) return { ok: true, value: { lookup: "none" } };
+  // RULES.md C9: fetched lyrics have no stamp yet, so the words are checked as they arrive (`bandAllows` reads only the stored stamp since FILTER-MEDIA-01).
+  if (!bandAllows(person, item) || !wordsAllowFor(person, newLyrics.text)) return { ok: true, value: { lookup: "none" } };
   db.update(mediaItems).set({ lyrics: JSON.stringify(newLyrics) }).where(eq(mediaItems.id, item.id)).run();
   // MUSIC-GEN-20c: word timing for the new synced lyrics runs in the background; the answer below does not wait for it.
   void startLibraryAlign(person, { ...item, lyrics: newLyrics }, { lrclibDurationS: outcome.durationS });

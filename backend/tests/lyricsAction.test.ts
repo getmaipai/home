@@ -9,6 +9,7 @@ import { buildMediaTree } from "./support/mediaTree";
 import { scanRoot } from "@/lib/media/scan";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
+import { mediaAppDataRaw } from "@/lib/media/appHost";
 import { hasReceipt } from "@/lib/media/lyricsReceipts";
 
 // These two tables land in a migration this change does not write, so the
@@ -217,4 +218,15 @@ test("an instrumental record is a miss with a receipt and nothing stored", async
   expect(res).toEqual({ ok: true, value: { lookup: "none" } });
   expect(hasReceipt(id)).toBe(true);
   expect(storedLyrics(id)).toBeNull();
+});
+
+test("lyrics an adult's lookup stored are served to the adult, and withheld from a teen when their words fail the floor", async () => {
+  const { adultId, teenId } = await setup();
+  const id = trackId("Morning Light");
+  db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "lrclib", text: "She danced naked in the rain" }) }).where(eq(mediaItems.id, id)).run();
+  const view = (personId: string) => mediaAppDataRaw(person(personId), "audio", "item", { id }) as unknown as { lyrics?: string };
+  expect(view(adultId).lyrics).toBe("She danced naked in the rain");
+  expect(view(teenId).lyrics).toBeUndefined();
+  db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "lrclib", text: "She danced in the rain" }) }).where(eq(mediaItems.id, id)).run();
+  expect(view(teenId).lyrics).toBe("She danced in the rain");
 });
