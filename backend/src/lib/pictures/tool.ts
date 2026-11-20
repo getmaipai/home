@@ -368,7 +368,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       temporary: extra || input.scene?.detached ? false : temporary,
       kind: "generate",
       prompt: subjectPrompt,
-      tier: jobTier("image", tierAsked.tier, choice.quality),
+      tier: jobTier("image", tierAsked.tier, tierAsked.tier && ["boost", "max"].includes(tierAsked.tier) && !kid ? "detailed" : choice.quality),
       body: {
         prompt: kid ? forceCartoon(subjectPrompt) : subjectPrompt,
         size,
