@@ -65,7 +65,8 @@ describe("the served Film maker page", () => {
     const { teen, child } = await household();
     for (const who of [teen.client, child.client]) {
       expect((await who.post(`${T}/data/recipes`, { scope: "film" })).status).toBe(404);
-      for (const name of ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat"]) expect((await who.post(`${T}/actions/${name}`, { prompt: "A boat crosses a lake", run: "x", shot: "y" })).status).toBe(404);
+      expect((await who.post(`${T}/data/recipes`, { scope: "storyboard-voiced" })).status).toBe(404);
+      for (const name of ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview"]) expect((await who.post(`${T}/actions/${name}`, { prompt: "A boat crosses a lake", run: "x", shot: "y" })).status).toBe(404);
     }
   });
 });
@@ -234,5 +235,20 @@ describe("refusals and access", () => {
     const player = page.body.find((node) => node.type === "storyboard_player")!;
     expect(Object.values(player.item_fields as Record<string, string>).sort()).toEqual(Object.keys(out[0]!).sort());
     expect(page.body.find((node) => node.type === "action_bar")!.primary.label).toBe("Render film");
+  });
+
+  test("VOICED-ROUGH-CUT-HOME-01: the voiced preview action runs in the background; a failure is a plain line on the film's own card, a pass clears it, an adult's other film is never touched", async () => {
+    const { owner, row } = await household();
+    const id = await planned(owner, row("Sage"));
+    const { __setVoicedMakerForTests } = await import("@/lib/films/voicedPreview");
+    __setVoicedMakerForTests((async () => ({ ok: false, line: "The voiced preview did not pass its check. Shot 2: its line is heard twice. Render that shot again." })) as never);
+    const res = await owner.post(`${T}/actions/film-voiced-preview`, { run: id });
+    expect(res.status).toBe(200);
+    await until(() => (getFilmRun(row("Sage"), id)?.note ?? "").includes("did not pass its check"));
+    __setVoicedMakerForTests((async () => ({ ok: true, fileId: "f", seconds: 30, shots: 3, lines: 1, note: null })) as never);
+    expect((await owner.post(`${T}/actions/film-voiced-preview`, { run: id })).status).toBe(200);
+    await until(() => getFilmRun(row("Sage"), id)?.note === null);
+    expect((await owner.post(`${T}/actions/film-voiced-preview`, { run: "film-nope" })).status).toBe(404);
+    __setVoicedMakerForTests(null);
   });
 });

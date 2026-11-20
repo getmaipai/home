@@ -77,15 +77,14 @@ const realDeps = (): VerifyDeps => ({
 });
 const DEADLINE_MS = 10 * 60_000, POLL_MS = 1000, DURATION_SLACK_S = 2;
 
-/** Asks the Stack to verify a finished film file at `path` (a path the Stack may read). Never throws. */
-export async function verifyFinishedFilm(input: { path: string; plan: Parameters<typeof filmShotList>[0]; signal?: AbortSignal }, deps: VerifyDeps = realDeps()): Promise<FilmVerdict> {
+/** The one verify call: submit, poll with a deadline, read the reply, and turn it into plain lines. `total_s` is where the shot windows say the file ends; a file of another length is "not checked". Never throws. */
+async function verifyAtPath(input: { path: string; shots: Array<{ id: string; start_s: number; end_s: number; kind: "moving" | "held_still"; line?: string }>; total_s: number; has_audio: boolean; signal?: AbortSignal }, deps: VerifyDeps): Promise<FilmVerdict> {
   const unchecked: FilmVerdict = { checked: false, lines: [] };
   try {
     if (deps.remote()) return unchecked;
-    const list = filmShotList(input.plan);
-    const expectShots = list.shots.map(({ id, start_s, end_s, kind, line }) => ({ id, start_s, end_s, kind, ...(line ? { line } : {}) }));
+    const expectShots = input.shots.map(({ id, start_s, end_s, kind, line }) => ({ id, start_s, end_s, kind, ...(line ? { line } : {}) }));
     const rules = { blackLuma: CLIP_RULES.blackLuma, blackSeconds: CLIP_RULES.blackSeconds, frozenDiff: CLIP_RULES.frozenDiff, frozenSeconds: CLIP_RULES.frozenSeconds };
-    let job = await deps.submit({ path: input.path, expect: { shots: expectShots, has_audio: true }, rules });
+    let job = await deps.submit({ path: input.path, expect: { shots: expectShots, has_audio: input.has_audio }, rules });
     const deadline = Date.now() + DEADLINE_MS;
     while (["queued", "running", "paused", "stalled"].includes(job.state)) {
       if (Date.now() > deadline || input.signal?.aborted) return unchecked;
@@ -97,21 +96,41 @@ export async function verifyFinishedFilm(input: { path: string; plan: Parameters
     // The shot windows come from the plan. If the finished file's length is not what the plan adds up to, the windows are not trustworthy
     // and a per-shot finding could be wrong, so the film is reported as not checked rather than wrongly failed.
     const actual = reply.file?.duration_s;
-    if (typeof actual !== "number" || Math.abs(actual - list.total_s) > DURATION_SLACK_S) return unchecked;
-    return { checked: true, lines: verdictLines(reply, list.shots.map((s) => s.id)) };
+    if (typeof actual !== "number" || Math.abs(actual - input.total_s) > DURATION_SLACK_S) return unchecked;
+    return { checked: true, lines: verdictLines(reply, input.shots.map((s) => s.id)) };
   } catch {
     return unchecked;
   }
 }
 
-/** Stages the finished film's bytes where the Stack can read them, verifies, cleans up. */
-export async function verifyFinishedFilmBytes(bytes: Uint8Array, plan: Parameters<typeof filmShotList>[0], signal?: AbortSignal, deps?: VerifyDeps): Promise<FilmVerdict> {
+/** Asks the Stack to verify a finished film file at `path` (a path the Stack may read). Never throws. */
+export async function verifyFinishedFilm(input: { path: string; plan: Parameters<typeof filmShotList>[0]; signal?: AbortSignal }, deps: VerifyDeps = realDeps()): Promise<FilmVerdict> {
+  const list = filmShotList(input.plan);
+  return verifyAtPath({ path: input.path, shots: list.shots, total_s: list.total_s, has_audio: true, signal: input.signal }, deps);
+}
+
+/** A rough cut's own check (the voiced storyboard): its shot windows and lines come from the Stack's result, not the plan. A shot with no motion holds still, so it is exempt from the frozen check. */
+export async function verifyRoughCutFile(input: { path: string; shots: Array<{ id: string; start_s: number; end_s: number; held_still: boolean; line?: string }>; total_s: number; has_audio: boolean; signal?: AbortSignal }, deps: VerifyDeps = realDeps()): Promise<FilmVerdict> {
+  return verifyAtPath({ ...input, shots: input.shots.map(({ held_still, ...rest }) => ({ ...rest, kind: held_still ? "held_still" as const : "moving" as const })) }, deps);
+}
+
+/** Stages a rough cut's bytes where the Stack can read them, verifies, cleans up. */
+export async function verifyRoughCutBytes(bytes: Uint8Array, input: Omit<Parameters<typeof verifyRoughCutFile>[0], "path">, deps?: VerifyDeps): Promise<FilmVerdict> {
+  return withStagedFile(bytes, (path) => verifyRoughCutFile({ ...input, path }, deps));
+}
+
+async function withStagedFile(bytes: Uint8Array, use: (path: string) => Promise<FilmVerdict>): Promise<FilmVerdict> {
   const tmp = join(dataDir, "tmp", "film-verify"); const file = join(tmp, `${newFileId()}.mp4`);
   try {
     mkdirSync(tmp, { recursive: true, mode: 0o700 });
     writeFileSync(file, bytes, { mode: 0o600 });
     const staged = await stageClipForStack(file);
     if (!staged) return { checked: false, lines: [] };
-    try { return await verifyFinishedFilm({ path: staged.path, plan, signal }, deps); } finally { staged.cleanup(); }
+    try { return await use(staged.path); } finally { staged.cleanup(); }
   } catch { return { checked: false, lines: [] }; } finally { rmSync(file, { force: true }); }
+}
+
+/** Stages the finished film's bytes where the Stack can read them, verifies, cleans up. */
+export async function verifyFinishedFilmBytes(bytes: Uint8Array, plan: Parameters<typeof filmShotList>[0], signal?: AbortSignal, deps?: VerifyDeps): Promise<FilmVerdict> {
+  return withStagedFile(bytes, (path) => verifyFinishedFilm({ path, plan, signal }, deps));
 }

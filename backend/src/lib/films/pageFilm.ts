@@ -2,6 +2,7 @@
 // one sentence plans the shot list (`startFilm`, waiting for Go), "Draft all" makes only the pictures, each draft is kept or skipped, "Finish kept" renders the
 // kept shots and joins them (the same run a full Go makes), and "Music video to the beat" is the chat tool's `cut_to_beat` edit over the finished film's clips.
 // The page's rows are `recipes` scopes `film` (the person's newest film) and `film-shots` (its shots); the actions are `film-*` under /api/plugins/video/actions.
+import { startVoicedPreview } from "./voicedPreview";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { castForTool } from "@/lib/cast";
@@ -16,7 +17,7 @@ import { getFilmRun, listFilmRunsInStates, type FilmRun, type FilmRunState } fro
 
 export type FilmPageResult = { ok: true; id: string; state: string } | { ok: false; status: 403 | 404 | 422 | 423; error: string; code: string };
 const fail = (status: 403 | 404 | 422 | 423, error: string, code: string): FilmPageResult => ({ ok: false, status, error, code });
-export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat"] as const;
+export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview"] as const;
 export type FilmPageAction = (typeof FILM_PAGE_ACTIONS)[number];
 
 const GONE_LINE = "That film isn't available any more. Describe a new one and press Plan the film.";
@@ -92,6 +93,8 @@ async function beatFromPage(person: PersonRow, runId: string, body: Record<strin
 /** One `film-*` action of the page. `body` is what the page posted (strings, as a form sends them). */
 export async function filmPageAction(person: PersonRow, action: FilmPageAction, body: Record<string, unknown>): Promise<FilmPageResult> {
   if (action === "film-plan") return planFromPage(person, body);
+  // C10: a teen, a child or anyone else gets the answer of a film that does not exist (404), not a refusal that says the feature is there.
+  if (action === "film-voiced-preview") { const started = startVoicedPreview(person, pageFilmRun(person, given(body.run) || undefined)); return started.ok ? { ok: true, id: started.id, state: started.state } : fail(started.status, started.line, started.code); }
   if (!allowed(person)) return fail(403, NOT_ADULT_LINE, "denied");
   const runId = given(body.run), shotId = given(body.shot);
   if (action === "film-beat") return beatFromPage(person, runId, body);
