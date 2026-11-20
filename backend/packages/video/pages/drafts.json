@@ -6,25 +6,34 @@
     {
       "type": "media_shelf",
       "heading": "Your unfinished films",
-      "bind": { "source": "package", "path": "recipes", "params": { "scope": "unfinished-films" } },
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "unfinished-films"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
       "layout": "rail",
-      "hide_when_empty": true,
-      "on_select": { "navigate": { "to": "/apps/video/film-maker" } }
-    },
-    {
-      "type": "empty_state",
-      "icon": "bookmark",
-      "text": "Videos you started and have not finished will show up here.",
-      "action": {
+      "on_select": {
         "navigate": {
-          "to": "/apps/video/create"
+          "to": "/apps/video/film-maker"
         }
       },
-      "action_label": "Make a video"
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "bookmark",
+        "text": "Videos you started and have not finished will show up here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/video/create"
+          }
+        },
+        "action_label": "Make a video"
+      }
     }
   ]
 }

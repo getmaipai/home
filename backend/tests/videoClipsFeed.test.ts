@@ -152,6 +152,12 @@ describe("scope short: the clips feed rows", () => {
     for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
     // The Clips shelf and page ask for the short scope: open to both.
     for (const who of [teen, child]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "short" })).status).toBe(200);
+    // VF-UI-02: the Library's film shelves are served to every role, and a teen or child gets no rows (films are adult-only), so the shelves are absent, never a load error.
+    for (const who of [teen, child]) for (const scope of ["making-films", "unfinished-films"]) {
+      const res = await who.client.post("/api/plugins/video/data/recipes", { scope });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    }
   });
 
   test.skipIf(!specAllowsClipFeed)("with the Clips page registered, a child and a teen open the short scope and nothing else", async () => {

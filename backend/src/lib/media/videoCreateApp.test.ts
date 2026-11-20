@@ -51,7 +51,7 @@ describe("film library shelves", () => {
     const unfinished = filmShelfRows(viewer, ["waiting_for_go", "failed", "cancelled"]);
     expect(making.map((row) => row.id)).toEqual(["vf-planning", "vf-running"]);
     expect(unfinished.map((row) => row.id).sort()).toEqual(["vf-cancelled", "vf-failed", "vf-waiting"]);
-    expect(making[0]).toEqual({ id: "vf-planning", title: "A quiet moonlit train crosses the", subtitle: "Planning the film" });
+    expect(making[0]).toEqual({ id: "vf-planning", title: "A quiet moonlit train crosses the…", subtitle: "Planning the film" });
     expect(making[1]?.subtitle).toBe("Making the shots");
     expect(unfinished.map((row) => row.subtitle).sort()).toEqual(["Did not finish", "Stopped", "Waiting for your go"]);
     for (const row of [...making, ...unfinished]) {

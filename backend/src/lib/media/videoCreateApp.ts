@@ -414,7 +414,8 @@ export function filmShelfRows(person: PersonRow, states: FilmRunState[]): Array<
   return listFilmRunsInStates(states).filter((run) => run.person_id === person.id && !run.parent_id).map((run) => {
     const production = run.production_id ? getMediaProduction(person, run.production_id) : null;
     const still = production?.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots)).find((shot) => shot.picture_file_id)?.picture_file_id;
-    const title = run.plan?.title || run.idea.trim().split(/\s+/).slice(0, 6).join(" ") || "Your film";
+    const words = run.idea.trim().split(/\s+/).filter(Boolean);
+    const title = run.plan?.title || (words.length > 6 ? `${words.slice(0, 6).join(" ")}…` : words.join(" ")) || "Your film";
     const subtitles: Record<string, string> = { planning: "Planning the film", running: "Making the shots", waiting_for_go: "Waiting for your go", failed: "Did not finish", cancelled: "Stopped" };
     return { id: run.id, title, subtitle: subtitles[run.state], ...(still ? { thumbnail: `/api/files/${encodeURIComponent(still)}/thumb?w=320` } : {}) };
   });
@@ -438,7 +439,7 @@ registerMediaAppData("video", (person, dataId, params) => {
   if (dataId !== "recipes") return null;
   // CLIPS-FEED-01: the Clips page is open to every role, and it binds `recipes`, so the page-level gate no longer keeps a child or teen out of the other scopes
   // (the Create pages' feed, jobs, Studio): they answer nothing unless the person holds the Create pages' adult floor.
-  if (params.scope !== "short" && !meetsMinRole(person.role, "adult")) return null;
+  if (!["short", "making-films", "unfinished-films"].includes(String(params.scope)) && !meetsMinRole(person.role, "adult")) return null; // the film shelves answer no rows below an adult (filmShelfRows)
   switch (params.scope) {
     case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);

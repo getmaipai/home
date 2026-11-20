@@ -171,9 +171,10 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
       }
     }
+    // VF-UI-02: the film shelves of the Library bind `recipes` on a page every role opens; their scopes return no rows below an adult, so they are served to every role like `short`.
     // CLIPS-FEED-01: the Clips page is open to every role and binds `recipes`; a null from the hook would fall through to the package runner (a 502), so a person below
     // the Create floor asking for any scope but `short` is answered 404 here.
-    if (appId === "video" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && (await jsonBody(c)).scope !== "short") return c.json({ error: "no such data" }, 404);
+    if (appId === "video" && c.req.param("dataId") === "recipes" && !meetsMinRole(person.role, "adult") && !["short", "making-films", "unfinished-films"].includes(String((await jsonBody(c)).scope))) return c.json({ error: "no such data" }, 404);
     const value = mediaAppData(person, appId, c.req.param("dataId"), { ...paramsOf(await jsonBody(c)), ...(appId === "audio" ? { device: deviceKeyOf(c) } : {}) });
     if (value === null) return next();
     return c.json(value as never, 200);
