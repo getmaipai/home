@@ -2,12 +2,14 @@
 // GPU job appears mid-run, then goes back to waiting. Logs every busy stretch and which jobs caused it to data-scratch/gpu-log.jsonl, so we can say how rare free windows are.
 // Usage: bun rig/when-free.ts [--full] ; exits 0 when a clean run finished (its output is in data-scratch/ready-clean.txt), 1 if that run failed a check.
 import { appendFileSync } from "node:fs";
+import { stopOwnMatching } from "../src/ownProcs";
 import { ensureChat } from "../src/engineGuard";
-import { sampleGpu, gpuClass, FreeWindow } from "../src/gpuLoad";
+import { sampleGpu, gpuClass, restingBaseline, FreeWindow } from "../src/gpuLoad";
 const W = "/Users/jessetorres/Developer/github.com/getmaipai/wt/home-brisk-panda-voice-lab/data-scratch"; const full = process.argv.includes("--full");
 const log = (o: object) => appendFileSync(`${W}/gpu-log.jsonl`, JSON.stringify({ at: new Date().toISOString(), ...o }) + "\n");
 const ownNice = async () => Number((await new Response(Bun.spawn(["ps", "-o", "nice=", "-p", String(process.pid)], { stdout: "pipe" }).stdout).text()).trim());
 if (await ownNice() !== 0) { log({ event: "bad-priority", nice: await ownNice() }); console.error("REFUSING TO START: this process runs at nice " + await ownNice() + " (started as a zsh background job?). Start it with: bash -c 'nohup bun rig/when-free.ts &'"); process.exit(2); }
+const utils: number[] = [];
 const win = new FreeWindow(60_000); const t0 = Date.now(); let busySince: number | null = null, busyJobs = new Set<string>(); let child: ReturnType<typeof Bun.spawn> | null = null, aborted = false, attempts = 0;
 const ROOT = W.replace(/\/data-scratch$/, "");
 const chatDeps = { health: async () => { try { return (await fetch("http://127.0.0.1:9921/health", { signal: AbortSignal.timeout(3000) })).ok; } catch { return false; } },
@@ -29,10 +31,10 @@ async function startRun() {
   });
 }
 while (true) {
-  const g = await sampleGpu(); const free = gpuClass(g, win.running) === "free"; const now = Date.now();
+  const g = await sampleGpu(); if (!win.running) { utils.push(g.util); if (utils.length > 12) utils.shift(); } const free = gpuClass(g, win.running, restingBaseline(utils)) === "free"; const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
-  if (s.abort && child) { aborted = true; child.kill(); try { Bun.spawnSync(["pkill", "-f", "rig/(measure|echotest|listen|round1)\\.ts"]); } catch {} log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
+  if (s.abort && child) { aborted = true; child.kill(); void stopOwnMatching(/rig\/(measure|echotest|listen|round1)\.ts/).then((r) => log({ event: "stopped-own", ...r })); log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
   if (s.start) { { const r = await ensureChat(chatDeps); if (r === "ready") await startRun(); else { win.finish(); if (r === "bad-priority") { console.error("bad priority: exiting"); process.exit(2); } } } }
   await Bun.sleep(5000);
   if (Math.floor((now - t0) / 60000) !== Math.floor((Date.now() - t0) / 60000)) log({ event: "tick", util: g.util, free, freeMs: s.freeMs, jobs: g.jobs });

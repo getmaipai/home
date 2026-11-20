@@ -44,3 +44,11 @@ test("free means the chip is idle: a resident idle engine or a CPU-only python i
   expect(gpuClass({ util: 90, jobs: "" }, true)).toBe("free");     // during a run our own engines raise it
   expect(gpuClass({ util: 90, jobs: "pid=5 60% llama-server" }, true)).toBe("shared");
 });
+import { restingBaseline } from "../src/gpuLoad";
+test("the resting level (remote-desktop streaming about 30%) is the baseline; busy is clearly above it, and a long job cannot become the baseline", () => {
+  expect(restingBaseline([30, 31, 29, 33, 30, 32, 31, 30, 29, 31, 30, 32])).toBe(30);
+  expect(gpuClass({ util: 35, jobs: "" }, false, 30)).toBe("free");
+  expect(gpuClass({ util: 95, jobs: "" }, false, 30)).toBe("shared");
+  expect(restingBaseline([90, 91, 92, 90, 93, 91])).toBe(40);       // capped: a sustained job never raises the baseline
+  expect(gpuClass({ util: 90, jobs: "" }, false, 40)).toBe("shared");
+});

@@ -33,10 +33,11 @@ export async function sampleGpu(): Promise<{ util: number; jobs: string }> {
 }
 
 /** "free" when no other GPU engine (hub video job, other MLX or llama process) is running; the utilization is recorded next to it but is not the class, because remote-desktop streaming alone keeps the GPU busy. */
-/** Remote-desktop streaming alone holds the chip near 30% (measured), so "idle" is not 0. */
-export const UTIL_BUSY = 70;
-/** At rest (our own engines idle) "free" means the chip itself is idle: median utilization under UTIL_BUSY, whoever causes it; process names only label. During a run our own engines raise utilization, so only another named GPU engine (by pid) counts: pass running=true. */
-export const gpuClass = (g: { util: number; jobs: string }, running = false) => ((running || g.util < 0 ? g.jobs === "" : g.util <= UTIL_BUSY) ? "free" : "shared");
+/** Resting level of the machine (remote-desktop streaming alone holds about 30%, and it is not ours to stop): the low quartile of the last minute of samples, never above 40. Busy means clearly above that level. */
+export const BUSY_MARGIN = 40;
+export function restingBaseline(samples: number[]): number { const v = samples.filter((x) => x >= 0).sort((a, b) => a - b); return v.length === 0 ? 0 : Math.min(40, v[Math.floor((v.length - 1) / 4)]); }
+/** At rest (our own engines idle) "free" means the chip is clearly not above its resting level, whoever causes the load; process names only label. During a run our own engines raise utilization, so only another named GPU engine (by pid) counts: pass running=true. */
+export const gpuClass = (g: { util: number; jobs: string }, running = false, baseline = 30) => ((running || g.util < 0 ? g.jobs === "" : g.util <= baseline + BUSY_MARGIN) ? "free" : "shared");
 export async function waitForGpuFree(maxMs = 20 * 60_000, quietSamples = 3): Promise<boolean> { const t0 = performance.now(); let ok = 0; while (performance.now() - t0 < maxMs) { ok = gpuClass(await sampleGpu()) === "free" ? ok + 1 : 0; if (ok >= quietSamples) return true; await Bun.sleep(5000); } return false; }
 
 /** Tracks how long the GPU has been continuously free. A run may START only after `needMs` of continuous freedom, and is ABORTED (not failed) the moment another GPU job shows up. */
