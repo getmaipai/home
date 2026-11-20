@@ -112,6 +112,17 @@ describe("the film runner reports the verdict on the film's own card", () => {
     await runFilm({ actor, productionId: createMediaProduction(actor, { title: "Two" }).id, plan, engines: unread, signal: new AbortController().signal });
     expect(unread.note).toBe("This film could not be checked, so play it through before you share it.");
   });
+  test("a missing saved song is made again before the join (FILM-KEEP-01)", async () => {
+    const actor = person("film-owner"); const production = createMediaProduction(actor, { title: "Draft" });
+    const { updateMediaProduction } = await import("@/lib/mediaProductions");
+    updateMediaProduction(actor, production.id, { music_line_ids: ["gone-song"] });
+    let made = 0; const said: string[] = [];
+    const e = { ...engines(actor), songExists: (id: string) => id !== "gone-song", async makeMusic() { made++; return "music-2"; }, say: (line: string) => { said.push(line); } } as FilmEngines;
+    const result = await runFilm({ actor, productionId: production.id, plan, engines: e, signal: new AbortController().signal });
+    expect(made).toBe(1);
+    expect(said.some((l) => l.includes("song was removed"))).toBe(true);
+    expect(result.music_line_ids).toEqual(["music-2"]);
+  });
   test("resumeFilm uses the engines it is given, so the note the card saves is the one the run wrote (found on the real run: a resumed film's notes were lost)", async () => {
     const actor = person("film-owner"); const production = createMediaProduction(actor, { title: "Draft" });
     const e = engines(actor, async () => ({ checked: true, lines: ["Shot 1: the picture goes black. Render that shot again."] }));

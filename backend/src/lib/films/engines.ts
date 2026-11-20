@@ -2,7 +2,8 @@ import { recordRunJob, recordShotFailure, recordShotJob, recordShotNote } from "
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import type { PersonRow } from "@/types";
-import { readAttachment, storeFile } from "@/lib/attachments";
+import { getAttachment, readAttachment, storeFile } from "@/lib/attachments";
+import { pinFilmSong } from "@/lib/films/pinSong";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished } from "@/lib/pictures/laneGate";
 import { submitGeneration, submitEdit, getGenerationJob, fetchPicture, cancelOrDelete } from "@/lib/pictures/stack";
@@ -247,6 +248,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const job = await poll(() => getMusicJobFor(actor, jobId), signal, 15 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? value.errorLine ?? "The song did not finish." : null);
       if (musicJobLockState(job, actor) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
       if (!job.fileId) throw new Error("The finished song is unavailable.");
+      pinFilmSong(actor.id, job.fileId, "Film song");
       return job.fileId;
     },
     async assemble({ plan, clipFileIds, musicFileId }) {
@@ -334,6 +336,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       return verifyShotClipBytes(clip.value.bytes, { id: shot.id, seconds: shot.seconds, ...(text ? { text } : {}) }, options.signal);
     },
     /** VF-CHECK-01: the Stack checks the finished file against the plan's shot list and lines. Advisory; never throws. */
+    songExists: (fileId) => getAttachment(actor, fileId).ok,
     async verifyCut({ plan, cutFileId }, options) {
       const cut = readAttachment(actor, cutFileId);
       if (!cut.ok) return { checked: false, lines: [] };

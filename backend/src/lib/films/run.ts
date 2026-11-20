@@ -21,6 +21,8 @@ export interface FilmEngines {
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; /** Null when the song could not be made: a film still ends with its picture and sound. */ musicFileId: string | null }, options: { signal: AbortSignal }): Promise<string>;
   /** VF-CHECK-01: check the finished file against the plan (shots, lines, sound, picture). Lines are plain sentences for the film's card; `checked: false` means it could not be checked. */
+  /** FILM-KEEP-01: false when the film's saved song is gone (so Resume makes it again instead of failing at the join). Absent means present. */
+  songExists?(fileId: string): boolean;
   verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[]; entries?: import("./verifyFinished").VerdictEntry[]; faults?: import("./verifyFinished").FilmFault[] }>;
   /** VF-REPAIR-01 slice 1: one shot's stored clip checked alone (told apart from a fault in the cut). */
   verifyClip?(input: { shot: FilmPlan["shots"][number]; clipFileId: string; /** What the shot says, as one passage. */ text: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; faults?: import("./verifyFinished").FilmFault[] }>;
@@ -149,6 +151,12 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
   }
   current = getMediaProduction(actor, productionId)!;
   let musicFileId: string | null | undefined = current.music_line_ids[0];
+  if (musicFileId && engines.songExists && !engines.songExists(musicFileId)) {
+    // FILM-KEEP-01: the saved song is gone; make it again and say so.
+    current = updateMediaProduction(actor, productionId, { music_line_ids: current.music_line_ids.slice(1) })!;
+    musicFileId = null;
+    engines.say?.("The film's song was removed, so I am making it again.");
+  }
   if (!musicFileId) {
     try {
       musicFileId = await callEngine("music", undefined, engines, signal, () => engines.makeMusic({ brief: faceless ? `${plan.music}, soft and underscoring a narrator` : plan.music, seconds: plan.shots.reduce((sum, shot) => sum + shot.seconds, 0), faceless }, { signal }));
