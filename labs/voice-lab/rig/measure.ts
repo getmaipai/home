@@ -2,6 +2,7 @@
 // time to first sound, voice speed vs real time while the reply is being written, audio underruns
 // (simulated page player: starts after JITTER ms buffered, gaps when the buffer runs dry), plus median/worst.
 // Usage: bun rig/measure.ts <secret-file> [--n 30] [--jitter 120] [--voice id] [--json out.json]
+import { waitForNoLivePage } from "./guard";
 import { JitterGate, replay } from "../public/jitter.js";
 const gate = new JitterGate();
 const args = process.argv.slice(2);
@@ -34,8 +35,9 @@ async function say(text: string): Promise<Float32Array> {
   return out.subarray(0, Math.min(m, end + 320));
 }
 const clips: Float32Array[] = []; for (const q of QUESTIONS) clips.push(await say(q));
+if (!(await waitForNoLivePage(secret, LAB))) { console.log("not running: a real page stayed connected (or the lab is down)"); process.exit(2); }
 const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer";
-await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret }));
+await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true }));
 if (VOICE) setTimeout(() => ws.send(JSON.stringify({ t: "config", values: { voice: VOICE } })), 200);
 const warm: Record<string, number> = {}; const openedAt = performance.now();
 type Frame = { at: number; sec: number; chunk: number; turn: number };

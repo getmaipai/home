@@ -3,6 +3,7 @@
 // Scenarios: silent (must not interrupt itself), mmhm (must keep talking), stop ("wait, stop": must stop, finishing the word),
 // briefly (a short "yeah, right, okay" talk-over: must keep talking).
 // Usage: bun rig/echotest.ts <secret-file> --scenario silent|mmhm|stop|briefly --runs 20 [--gain 0.35] [--delay 120] [--aec 1]
+import { waitForNoLivePage } from "./guard";
 import { LocalDuckDetector } from "../public/local-duck.js";
 import { wordEnd } from "../public/word-end.js";
 const args = process.argv.slice(2);
@@ -16,6 +17,7 @@ async function say(text: string): Promise<Float32Array> {
   for (let i = 0; i < m; i++) { const x = i * 1.5, a = Math.floor(x), c = Math.min(n - 1, a + 1), fr = x - a; out[i] = (dv.getInt16(a * 2, true) * (1 - fr) + dv.getInt16(c * 2, true) * fr) / 32768; }
   let end = m; while (end > 0 && Math.abs(out[end - 1]!) < 0.01) end--; return out.subarray(0, Math.min(m, end + 320));
 }
+if (!(await waitForNoLivePage(secret, LAB))) { console.log("not running: a real page stayed connected (or the lab is down)"); process.exit(2); }
 const Q = await say("Tell me a long story about a dragon who learns to bake bread.");
 const INTERJECT: Record<string, Float32Array | null> = { silent: null, mmhm: await say("Mm-hm."), stop: await say("Wait, stop."), briefly: await say("Yeah, right, okay.") };
 const user = INTERJECT[SCEN] ?? null;
@@ -28,7 +30,7 @@ for (let run = 0; run < RUNS; run++) {
   results.push(await one(run, gain, delayMs));
 }
 async function one(run: number, gain: number, delayMs: number) {
-  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret }));
+  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true }));
   const ev: Array<{ t: string; at: number; extra?: any }> = []; const T0 = performance.now(); const rel = () => performance.now() - T0;
   // virtual speaker
   let queue: Float32Array[] = [], qLen = 0, playhead = 0, playing = false, stopAt = -1, stopped = false, paused = false, firstAudioAt = 0, turn = 0, replyFinished = false;

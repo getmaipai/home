@@ -103,7 +103,7 @@ test("2 forced cut-in keeps its opening frame and 300 ms pre-roll once", async (
   (h.session as any).heardAudio = true;
   h.time.advance(1600);
   h.feed(false, 10);
-  h.feed(true, 44);
+  h.feed(true, 44); await h.flush();
   expect((h.session as any).tm.state).toBe("user_speaking");
   h.feed(true, 5); h.feed(false, 8); await h.flush();
   expect(recognized.length).toBeGreaterThan(0);

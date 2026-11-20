@@ -69,9 +69,10 @@ describe("pause then decide", () => {
     expect(types(m.cutTranscript("wait, stop", false))).toEqual(["interrupt"]);
     expect(m.state).toBe("user_speaking");
   });
-  test("long uninterrupted speech interrupts at the maximum", () => {
+  test("long uninterrupted voice-like sound never interrupts by itself: only recognised words decide", () => {
     const { m, step } = speaking(); const seen:string[]=[]; for (let i=0;i<60;i++) seen.push(...types(step(true)));
-    expect(seen).toContain("interrupt");
+    expect(seen).not.toContain("interrupt");
+    expect(seen).toContain("transcribe_cut_in");
   });
 });
 
@@ -86,21 +87,22 @@ describe("continue mode acknowledgements", () => {
     expect(types(m.cutTranscript("mm-hm", "ack"))).toEqual(["backchannel"]);
     expect(m.state).toBe("speaking");
   });
-  test("unknown transcript stays lowered until the uninterrupted limit", () => {
+  test("unknown transcript never interrupts, however long the sound lasts", () => {
     const { m, step } = speaking(); m.configure({ talkOverMode: "continue" });
     const seen: string[] = [];
     for (let i = 0; i < 5; i++) seen.push(...types(step(true)));
     expect(m.cutTranscript("", "unknown")).toEqual([]);
     expect(m.state).toBe("speaking");
     for (let i = 0; i < 50; i++) seen.push(...types(step(true)));
-    expect(seen).toContain("interrupt");
+    expect(seen).not.toContain("interrupt");
   });
-  test("unknown after a gap stays lowered until the decision limit", () => {
+  test("unknown after a gap ends quietly: no stop", () => {
     const { m, step } = speaking(); m.configure({ talkOverMode: "continue" });
     for (let i = 0; i < 4; i++) step(true);
     expect(types(step(false, 256))).toContain("transcribe_cut_in");
     expect(m.cutTranscript("", "unknown")).toEqual([]);
-    expect(types(step(false, 400))).not.toContain("resume");
-    expect(types(step(false, 300))).toContain("interrupt");
+    const after = [...types(step(false, 400)), ...types(step(false, 300))];
+    expect(after).not.toContain("interrupt");
+    expect(m.cutting).toBe(false);
   });
 });

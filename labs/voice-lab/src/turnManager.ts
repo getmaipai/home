@@ -86,13 +86,13 @@ export class TurnManager {
       if (!this.ducked && this.cutSpeech >= this.opts.duckMs) { this.ducked = true; out.push(...this.emit("duck")); }
       if (this.opts.talkOverMode === "pause_then_decide" && !this.paused && this.cutSpeech >= this.opts.interruptMs && !this.echo) { this.paused = true; out.push(...this.emit("pause")); }
       if (this.opts.talkOverMode === "stop_fast" && this.cutSpeech >= this.opts.interruptMs && !this.echo) return [...out, ...this.interrupt()];
-      if (this.cutSpeech >= this.opts.backchannelMaxMs && !this.echo) return [...out, ...this.emit("transcribe_cut_in", { duration: this.cutSpeech, forced: true }), ...this.interrupt()];
       if (this.cutSpeech > 0 && Math.floor(this.cutSpeech / 350) !== Math.floor((this.cutSpeech - this.opts.frameMs) / 350)) out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech }));
       return out;
     }
     if (this.cutAt >= 0) {
       this.cutPrev = now;
-      if (this.cutUnknown && now - this.cutAt >= this.opts.backchannelMaxMs) return this.interrupt();
+      // nothing was recognised and the sound has stopped: it was noise or her own voice, never an interruption
+      if (this.cutUnknown && now - this.cutLast >= 600) { const r = this.ducked ? this.emit("resume") : []; this.resetCut(); return r; }
       if (!this.cutEnded && now - this.cutLast >= this.opts.backchannelGapMs) {
         this.cutEnded = true;
         out.push(...this.emit("transcribe_cut_in", { duration: this.cutSpeech }));
@@ -114,13 +114,14 @@ export class TurnManager {
     return this.emit("interrupt", { duration, revision: this.revision });
   }
 
-  cutTranscript(text: string, decision: "ack" | "interrupt" | "unknown" | boolean): Command[] {
+  /** The words heard during a cut-in decide it: "ack" (mm-hm) and "echo" (her own voice) resume the reply, "interrupt" stops it, "unknown"
+   * (nothing recognised: noise, or her own voice too blurred to read) never stops it. A lone duck or a long run of voice-like sound is not enough. */
+  cutTranscript(text: string, decision: "ack" | "interrupt" | "unknown" | "echo" | boolean): Command[] {
     if (this.cutAt < 0) return [];
     const verdict = typeof decision === "boolean" ? (decision ? "ack" : "interrupt") : decision;
-    if (verdict === "ack" && this.cutSpeech < this.opts.backchannelMaxMs) { this.resetCut(); return this.emit("backchannel", { backchannel: true }); }
-    if (verdict === "interrupt") return this.interrupt();
-    if (verdict === "unknown") this.cutUnknown = true;
-    return [];
+    if (verdict === "ack" || verdict === "echo") { this.resetCut(); return this.emit("backchannel", { backchannel: true, verdict }); }
+    if (verdict === "unknown") { this.cutUnknown = true; return []; }
+    return this.interrupt();
   }
 
   transcriptReady(text: string, now = this.clock(), revision = this.revision): Command[] {
