@@ -107,7 +107,8 @@ describe("VoiceManagerSection", () => {
     fireEvent.change(within(dialog).getByLabelText("Liveliness (optional)"), { target: { value: "1.05" } });
     fireEvent.change(within(dialog).getByLabelText("Pitch (optional)"), { target: { value: "-1" } });
     fireEvent.submit(document.getElementById("add-voice-form")!);
-    await waitFor(() => expect(make).toHaveBeenCalledWith({ name: "Fresh", clip, temperature: 1.05, pitchSemitones: -1 }));
+    // The payload now also carries the cleaning options (VOICE-ISOLATE-01, VOICE-CLEAN-01, VOICE-ECHO-01): noise removal starts on, isolating and echo removal start off; the numbers still go as numbers.
+    await waitFor(() => expect(make).toHaveBeenCalledWith(expect.objectContaining({ name: "Fresh", clip, temperature: 1.05, pitchSemitones: -1, isolateVoice: false, reduceNoise: true, reduceEcho: false })));
     await view.findByText("Fresh is ready. Test it here, then pick it for a person or a robot.");
     await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
   });
@@ -131,13 +132,16 @@ describe("VoiceManagerSection", () => {
     expect(document.body.textContent).not.toMatch(/clone/i);
   });
 
-  test("the dialog states the responsibility sentence without a checkbox", async () => {
+  test("the dialog states the responsibility sentence without a consent checkbox (the only checkboxes are the three sound-cleaning options)", async () => {
     const view = render([builtIn]);
     fireEvent.click(await view.findByRole("button", { name: "+ Add voice" }));
     const dialog = await view.findByRole("dialog");
     openCloneTab(dialog);
     within(dialog).getByText("You are responsible for having the right to use this voice.");
-    expect(within(dialog).queryAllByRole("checkbox")).toHaveLength(0);
+    // VOICE-ISOLATE-01, VOICE-CLEAN-01 and VOICE-ECHO-01 added three cleaning options to the Clone form. They are not a rights confirmation: the sentence above stays the only statement.
+    const names = within(dialog).queryAllByRole("checkbox").map((box) => box.closest("label")?.textContent ?? "");
+    expect(names).toEqual(["Isolate the voice (remove music and other sounds)", "Remove background noise", "Remove echo and room sound (uses the echo remover model)"]);
+    expect(names.join(" ")).not.toMatch(/right|permission|consent|agree|allowed/i);
   });
 
   test("a parent or admin sees a minor's voice with who made it, can test it and can delete it (AUDIO-PARITY-01 V4)", async () => {
