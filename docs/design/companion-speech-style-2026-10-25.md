@@ -1,5 +1,7 @@
 # Companion speech style: how often each companion hesitates, and with which words (2026-10-25)
 
+Talk before I finish and its pre-recorded acknowledgement clips were retired on 2026-11-20.
+
 Owner's request (Jesse, 2026-10-25): control the rate and the types of disfluency per companion. An English professor probably has none; a
 valley girl has a lot, mostly "like", "no way" and "get out"; a kid might say "um". Design only; nothing here is built.
 
@@ -168,7 +170,7 @@ Evidence is thin and mostly from blog analyses and abstracts, so the table in se
 3. **SPEECH-STYLE-03 (S):** the per-companion rate control in Settings and in the Companions app (kit parts only), and the author form that picks sounds from the master list and adds custom ones with the save-time floor check.
 4. **SPEECH-STYLE-04 (M, by ear):** author the bundled companions' styles, render every preset sample through each shipped voice, and
    listen; a voice that says an inline filler badly turns inline off. Jesse judges the valley girl and the kid.
-5. **SPEECH-STYLE-05 (S):** DUPLEX-07's continuers and acknowledgement clips come from the companion's own filler list when it has one
+5. **SPEECH-STYLE-05 (S):** DUPLEX-07's continuers come from the companion's own filler list when it has one
    ("mm-hm" for the professor's tutor, "oh my gosh" for the valley girl), rendered once per voice, same rules.
 Order: 01, 02, 03, then 04 and 05.
 

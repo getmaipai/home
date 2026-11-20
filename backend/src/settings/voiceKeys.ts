@@ -138,42 +138,6 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
-  // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 2 item 8): the end-of-turn acknowledgement and its protected overlap
-  // window. Household, admin, advanced; adults only whatever it says (lib/talkOver.ts grants nothing to a minor or a robot, rule 0).
-  // Default off (owner decision 2026-11-20; it was gentle from 2026-11-12), the same default the shared spec carries since spec-v0.1.472.
-  SettingsKey.parse({
-    key: "voice.talk_over",
-    scope: "household",
-    selector: "select",
-    range: { options: ["off", "gentle", "natural"] },
-    default: "off",
-    label: "Talk before I finish",
-    copy: {
-      does: "Home gives a short spoken cue the moment your sentence sounds finished, then answers.",
-      options: {
-        off: "Home waits until you have clearly stopped before it makes a sound.",
-        gentle: "A short spoken cue when a sentence clearly ends, such as a question.",
-        natural: "Also on plain statements, so it happens more often and is wrong more often.",
-      },
-      option_labels: { off: "Off", gentle: "Gentle", natural: "Natural" },
-    },
-    help: "Home gives a short spoken cue the moment your sentence sounds finished, then answers. If you keep talking, Home goes quiet and answers everything you said. Adults only; it needs Start answering early to be on.",
-    level: "advanced",
-    lives_in: "household.ai_advanced",
-    honoured_by: ["home"],
-  }),
-  SettingsKey.parse({
-    key: "voice.talk_over_window_ms",
-    scope: "household",
-    selector: "number",
-    range: { min: 500, max: 1200 },
-    default: 800,
-    label: "Overlap time (ms)",
-    help: "How long Home keeps going while you both talk at once before it decides whether you are done. Shorter cuts in less; longer lets more of your sentence through. 500 to 1200 milliseconds, usually 800.",
-    level: "advanced",
-    lives_in: "household.ai_advanced",
-    honoured_by: ["home"],
-  }),
   // REG-02: composer-owned spoken hesitations and nonverbal cues. One
   // household setting an admin sets; a child or teen never gets a cue
   // whatever it says (chat rule 0, lib/voiceCues.ts), and the key is not

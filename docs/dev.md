@@ -1,5 +1,7 @@
 # MaiPai Home: design record
 
+Talk before I finish and its pre-recorded acknowledgement clips were retired on 2026-11-20.
+
 ## Companion animation takes: a finished clip is usable (owner ruling 2026-10-29)
 
 On screen 2 of the companion creator every generated clip was made but none played: the engine's quality report (`loop_gap`,

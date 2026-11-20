@@ -51,7 +51,7 @@ function fixWavHeaderSize(bytes: Uint8Array): void {
   view.setUint32(40, bytes.length - 44, true);
 }
 
-/** TALK-OVER-01: the anti-click ramp of a hard stop, in milliseconds. 10 to 20 ms is below what a listener hears as a fade; the
+/** BARGE-IN stop: the anti-click ramp of a hard stop, in milliseconds. 10 to 20 ms is below what a listener hears as a fade; the
  * stop tests hold it at 20 or under. */
 export const ANTI_CLICK_RAMP_MS = 15;
 
@@ -499,7 +499,7 @@ export class SentenceSpeechScheduler implements SpeechSource {
       this.audioContext.close().catch(() => {});
       return;
     }
-    // TALK-OVER-01 (Jesse, 2026-11-12: people do not fade when talking): a hard stop, mid-word if that is where it is. The bus ramps to
+    // BARGE-IN stop (Jesse, 2026-11-12: people do not fade when talking): a hard stop, mid-word if that is where it is. The bus ramps to
     // zero over ANTI_CLICK_RAMP_MS, too short to hear and just long enough that the cut does not pop, and the sources stop at its end.
     const sources = [...this.sources];
     this.sources.clear();

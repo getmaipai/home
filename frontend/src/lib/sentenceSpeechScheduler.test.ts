@@ -367,7 +367,7 @@ describe("sentence speech scheduler", () => {
   });
 });
 
-describe("TALK-OVER-01: a hard stop", () => {
+describe("BARGE-IN stop", () => {
   test("stop ramps the bus to zero in at most 20 ms and cuts the sources within 250 ms, with no audible fade", async () => {
     const { ANTI_CLICK_RAMP_MS } = await import("@/lib/sentenceSpeechScheduler");
     expect(ANTI_CLICK_RAMP_MS).toBeLessThanOrEqual(20);

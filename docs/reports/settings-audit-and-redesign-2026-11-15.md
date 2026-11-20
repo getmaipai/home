@@ -237,7 +237,9 @@ Today's place is the area, section and tab from `areas.json` v0.1.406; "n/p" mea
 | `household.news` (12) | household | search (card) | H7 Apps › News |
 | `household.reference` (3) | household | apps › integrations | H6 Offline books |
 | `household.chat_pause` (2), `household.ai_models` (6), `household.ai_chat`, `household.ai_coding`, `household.ai_music`, `household.ai_pictures` (4), `household.ai_videos` (2), `household.ai_vision`, `household.ai_voice`, `household.ai_wakeword`, `household.ai_runtime`, `household.ai_tiers` (20), `household.coding` (8), `household.coding_people`, `household.coding_limits` (7) | household | ai | H3 unchanged (the AI and models redesign) |
-| `household.ai_advanced` (14) | household | ai › advanced | `voice.hesitations`, `voice.hf_token`, `voice.speculative_start`, `voice.talk_over`, `voice.talk_over_window_ms` H5 How Home speaks · the rest H3 |
+| `household.ai_advanced` (12) | household | ai › advanced | `voice.hesitations`, `voice.hf_token`, `voice.speculative_start` H5 How Home speaks · the rest H3 |
+
+Talk before I finish was retired on 2026-11-20; its settings keys were removed from the shared spec and Home.
 | `household.resources` (27) | household | n/p (H3 Performance) | `host.guard.*` (4) H9 Checks · the rest H3 Performance |
 | `household.ai_developer` (2, expert), `media.budget` (1, expert) | household | advanced › developer (never drawn) | H9 Developer |
 | `household.ai_retired` (4), `household.media_retired` (1), `household.media_styles_old` (2) | household | n/p | stay unplaced |

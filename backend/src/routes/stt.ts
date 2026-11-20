@@ -19,7 +19,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { countLiveVoicePrintsForPerson } from "@/lib/biometricPrints";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
-import { scoreEdgePartial, talkOverDecision } from "@/lib/talkOver";
+import { scoreEdgePartial } from "@/lib/turnEnd";
 import { noteListeningActivity } from "@/lib/turnActivity";
 import { computeVoiceVerdict } from "@/lib/voiceMatch";
 import { setVoiceMatchVerdict, voiceMatchSessionKey } from "@/lib/voiceMatchVerdict";
@@ -56,15 +56,9 @@ sttRoutes.get(
           robotSttSockets.add(trackedRobotSocket);
           if (!robotsEnabled()) trackedRobotSocket.close(4403, "robots_off");
         }
-        // TALK-OVER-01: the grant is decided once per session from the signed-in person (an adult, not a robot device, the settings on);
-        // a session with no grant gets no `talk_over` field and its edge partials carry no score, so an older or ungranted client has
-        // nothing to act on.
-        const decision = talkOverDecision({ actor: c.get("person"), isRobot });
-        const grant = decision.grant;
         void getEndpointer().then((endpointer) => {
           if (ended) return;
-          // Every session's edge partial carries the end-of-turn score (the client starts no held run on an unfinished fragment); the
-          // acknowledgement clip itself needs the grant.
+          // Edge partials carry the unfinished marker used by speculative start.
           const base = { ...SESSION_CONFIG, turnEnd: scoreEdgePartial };
           const config = endpointer
             ? { ...base, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
@@ -83,7 +77,7 @@ sttRoutes.get(
           });
           for (const frame of pendingPcm) session.pushPcm(frame);
           pendingPcm.length = 0;
-          ws.send(JSON.stringify(grant ? { t: "ready", talk_over: grant } : { t: "ready", talk_over_reason: decision.reason }));
+          ws.send(JSON.stringify({ t: "ready" }));
         });
       },
       onMessage(evt, ws) {
@@ -111,8 +105,8 @@ sttRoutes.get(
                 if (value.first_playback_ms !== undefined) setVoiceTiming(record, "first_playback_ms", value.first_playback_ms);
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
-                // STT-SMARTTURN-01 and TALK-OVER-01: the client's labels and counts for the speculative start and the acknowledgement clip.
-                setVoiceOutcome(record, { speculative: value.speculative, talk_over_level: value.talk_over_level, early_release_ms: value.early_release_ms, overlap_ms: value.overlap_ms, decision: value.decision, yield_ms: value.yield_ms, edge_partials: value.edge_partials, clip_started_ms: value.clip_started_ms, clip_ended_ms: value.clip_ended_ms, clip_completed: value.clip_completed, echo_drops: value.echo_drops, talk_over_reason: value.talk_over_reason, pool_size: value.pool_size, filler_group: value.filler_group, filler_source: value.filler_source, filler_choose_ms: value.filler_choose_ms, filler_pool_ready: value.filler_pool_ready });
+                // STT-SMARTTURN-01: client labels and counts for speculative start.
+                setVoiceOutcome(record, { speculative: value.speculative, early_release_ms: value.early_release_ms, edge_partials: value.edge_partials, echo_drops: value.echo_drops });
               }
             }
           } catch {

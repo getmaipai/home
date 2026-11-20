@@ -1,5 +1,7 @@
 # Full duplex for Home: current code, the planned rows, and Bobby (2026-11-11, consulting design)
 
+Talk before I finish and its pre-recorded acknowledgement clips were retired on 2026-11-20.
+
 Read for this: `RULES.md`, the 2026-10-24 design, the DUPLEX, STT-SMARTTURN-01 and CHAT-TYPEAHEAD-01 rows, `sttSession.ts`,
 `routes/stt.ts`, `routes/tts.ts`, `routes/turn.ts`, `sentenceSpeechScheduler.ts`, `liveVoiceSession.tsx`,
 `tier-evaluations-2026-10-30.md`, and the VOICE-LATENCY-01 commit (`voiceTiming.ts`: `stt_ms`, `turn_start_ms`, `first_token_ms`,

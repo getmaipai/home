@@ -2016,7 +2016,6 @@ export const api = {
   reactTurn: (said: string) => request<{ text: string | null }>("/api/turn/react", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ said }), timeoutMs: 2500 }),
   /** The voice spoken replies and fillers use right now (the synth or companion in this chat, else the persons own). */
   activeChatVoice: () => request<{ voice: string }>("/api/tts/voice", { timeoutMs: 3000 }),
-  fillerGroup: (said: string, signal?: AbortSignal) => request<{ group: import("@/lib/voice/ackClip").AckGroupId | null; source: "model" | "rule"; ms: number }>("/api/turn/filler", { method: "POST", body: JSON.stringify({ said: said.slice(0, 160) }), ...(signal ? { signal } : {}), timeoutMs: 450 }),
   // STT-SMARTTURN-01: begin a spoken turn on the edge partial, held privately on the server; the final transcript's send confirms it
   // (streamTurn with resumeToken, turnId, resumeFrom 0 and confirm) or discardTurn drops it unstored. A 400 means the server refused it.
   speculateTurn: (text: string, conversationId: string, signal?: AbortSignal) =>

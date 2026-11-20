@@ -555,27 +555,15 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     session.close();
   });
 
-  test("TALK-OVER-01: with a scorer, the edge partial carries the end-of-turn score; voice that comes back after the edge and lasts 0.2 s is reported once as resumed", async () => {
+  test("edge partial carries the unfinished marker", async () => {
     scriptTranscript("what is a good name for a small grey cat?");
     const events: SttTestEvent[] = [];
-    const session = new SttSession({ ...config({ silenceTimeoutS: 0.6 }), turnEnd: (text) => ({ score: text.endsWith("?") ? 0.9 : 0.1, level: text.endsWith("?") ? "gentle" : "none", unfinished: !text.endsWith("?") }) }, (e) => events.push(e));
+    const session = new SttSession({ ...config({ silenceTimeoutS: 0.6 }), turnEnd: (text) => ({ unfinished: !text.endsWith("?") }) }, (e) => events.push(e));
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
     await flush();
     await pushPause(session, 250);
     const edge = events.filter((e) => e.t === "partial" && "edge" in e);
-    expect(edge).toEqual([{ t: "partial", v: "what is a good name for a small grey cat?", edge: true, end: { score: 0.9, level: "gentle", unfinished: false } }]);
-    // 150 ms of sound after the edge: not yet the person (a breath, a cough); 250 ms: reported once.
-    for (let i = 0; i < 15; i++) session.pushPcm(loudFrame());
-    await flush();
-    expect(events.some((e) => e.t === "vad" && "resumed" in e)).toBe(false);
-    for (let i = 0; i < 10; i++) session.pushPcm(loudFrame());
-    await flush();
-    const resumed = events.filter((e) => e.t === "vad" && "resumed" in e);
-    expect(resumed).toHaveLength(1);
-    expect((resumed[0] as { voiced_ms: number }).voiced_ms).toBeGreaterThanOrEqual(200);
-    for (let i = 0; i < 20; i++) session.pushPcm(loudFrame());
-    await flush();
-    expect(events.filter((e) => e.t === "vad" && "resumed" in e)).toHaveLength(1);
+    expect(edge).toEqual([{ t: "partial", v: "what is a good name for a small grey cat?", edge: true, end: { unfinished: false } }]);
     session.close();
   });
 

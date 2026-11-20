@@ -21,18 +21,10 @@
 // contract and the server has never read it.
 // STT-SMARTTURN-01: the hub marks the partial it transcribed at the first silent frame with `edge: true` (additive; absent on
 // cadence partials and from older hubs), so the client can begin a speculative turn on it before the final lands.
-// TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 4): three more additive fields. `ready.talk_over` names the "Talk before I
-// finish" level the hub granted this session (absent for a minor, a robot device or when the setting is off), the window and the
-// acknowledgement clips to render; the edge partial carries the hub's end-of-turn score; a `vad` event with `resumed: true` says
-// the person's voice came back after the edge partial and lasted 200 ms.
-export type TalkOverLevel = "gentle" | "natural";
-export type TurnEndLevel = "none" | "gentle" | "natural";
-export interface TalkOverGrant { level: TalkOverLevel; window_ms: number; clips: readonly string[] }
 export type SttServerMessage =
   | import("@maipai/spec/voice/ts/sttTypes.js").SttWireEvent
-  | { t: "ready"; talk_over?: TalkOverGrant; talk_over_reason?: "setting_off" | "speculative_off" | "robot" | "not_adult" }
-  | { t: "partial"; v: string; edge: true; end?: { score: number; level: TurnEndLevel; unfinished: boolean } }
-  | { t: "vad"; speaking: true; rms: number; resumed: true; voiced_ms: number }
+  | { t: "ready" }
+  | { t: "partial"; v: string; edge: true; end?: { unfinished: boolean } }
   | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 export type SttServerMessageWithTiming = SttServerMessage;
 import { z } from "zod";
@@ -51,15 +43,10 @@ export type TalkOverDecision = "none" | "confirmed" | "continued";
 export interface SttTimingExtras {
   head_ms?: number; offer_ms?: number; emit_ms?: number; ctx_enqueue?: string; ctx_emit?: string;
   speculative?: SpeculativeOutcome;
-  talk_over_level?: "off" | TalkOverLevel; early_release_ms?: number; overlap_ms?: number; decision?: TalkOverDecision; yield_ms?: number;
-  filler_group?: import("./ackClip").AckGroupId | null; filler_source?: "model" | "rule" | "late" | "none"; filler_choose_ms?: number; filler_pool_ready?: number;
-  /** How many edge partials the hub marked in the utterance; the clip's start and end against the end of speech (negative is
-   * before the person finished: a wrong start in a pause), and whether it played to its natural end (false only when the call closed). */
-  edge_partials?: number; clip_started_ms?: number; clip_ended_ms?: number; clip_completed?: boolean;
+  early_release_ms?: number;
+  edge_partials?: number;
   /** ECHO-GUARD-01: final transcripts that were Home's own voice and were dropped before this turn. */
   echo_drops?: number;
-  /** Why the session got no talk-over grant (or `granted`), and how many clips were ready. */
-  talk_over_reason?: "granted" | "setting_off" | "speculative_off" | "robot" | "not_adult" | "unknown"; pool_size?: number;
 }
 
 /** Additive client timing report; all playback fields remain optional for older clients. */
@@ -70,9 +57,5 @@ export const SttTimingReportSchema = z.object({
   head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(),
   ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(),
-  talk_over_level: z.enum(["off", "gentle", "natural"]).optional(), early_release_ms: z.number().finite().optional(), overlap_ms: z.number().finite().nonnegative().optional(),
-  decision: z.enum(["none", "confirmed", "continued"]).optional(), yield_ms: z.number().finite().nonnegative().optional(),
-  edge_partials: z.number().int().nonnegative().optional(), clip_started_ms: z.number().finite().optional(), clip_ended_ms: z.number().finite().optional(), clip_completed: z.boolean().optional(), echo_drops: z.number().int().nonnegative().optional(),
-  talk_over_reason: z.enum(["granted", "setting_off", "speculative_off", "robot", "not_adult", "unknown"]).optional(), pool_size: z.number().int().nonnegative().optional(),
-  filler_group: z.enum(["backchannel", "thinking", "request", "question", "good_news", "bad_news"]).nullable().optional(), filler_source: z.enum(["model", "rule", "late", "none"]).optional(), filler_choose_ms: z.number().finite().nonnegative().optional(), filler_pool_ready: z.number().int().nonnegative().optional(),
+  early_release_ms: z.number().finite().optional(), edge_partials: z.number().int().nonnegative().optional(), echo_drops: z.number().int().nonnegative().optional(),
 }).strict();

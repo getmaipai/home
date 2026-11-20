@@ -20,26 +20,21 @@ import { getStackClient } from "@/lib/stackEngine";
 import { voiceFailureLine } from "@/lib/failureCopy";
 import { getSileroStream, type SileroVadStream } from "@/lib/sileroVad";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
-import { isFinishedSentence, SENTENCE_END_COMMIT_S } from "@/lib/turnEnd";
+import { isFinishedSentence, SENTENCE_END_COMMIT_S, type TurnEndScore } from "@/lib/turnEnd";
 
 export interface SttSessionConfig {
   sampleRate: number;
   silenceTimeoutS: number;
   partialIntervalS: number;
   endpointing?: { endpointer: Endpointer; holdS: number };
-  /** TALK-OVER-01: scores the edge partial's text for completeness (lib/talkOver.ts); when set, the edge partial carries `end`. */
-  turnEnd?: (text: string) => TurnEndMark;
+  /** Crisis checked unfinished marker for the speculative start path. */
+  turnEnd?: (text: string) => TurnEndScore;
   /** Optional private voice-match input. Called once at finalization with a copy of voiced audio only. */
   onSpeechClip?: (clip: Float32Array, sampleRate: number) => void;
   /** Fresh eligibility gate, checked before any audio buffer is flattened or copied. */
   shouldCaptureClip?: () => boolean;
 }
 
-export type TurnEndLevel = "none" | "gentle" | "natural";
-/** The score, the lowest level it fires at, and whether the fragment is plainly mid-sentence (no held run is started on one). */
-export interface TurnEndMark { score: number; level: TurnEndLevel; unfinished: boolean }
-/** TALK-OVER-01 (design section 2 item 5): voice after an edge partial counts as the person speaking again only once it has lasted this long. */
-export const RESUME_CONFIRM_S = 0.2;
 /** STT-SMARTTURN-01 (2026-11-12, seen in a real browser on the dev hub): the recognizer's voice detector goes silent between words and phrases,
  * so a partial transcribed at the first silent frame was marked `edge` ten times in a two-second question and each started a held run on
  * a fragment. The transcription still starts at the first silent frame (so the text is ready early), but the partial is marked `edge`
@@ -120,9 +115,7 @@ export function isLikelySpeech(text: string): boolean {
 
 export type SttSessionEvent =
   | SttWireEvent
-  | { t: "partial"; v: string; edge: true; end?: TurnEndMark }
-  /** TALK-OVER-01: the voice came back after the edge partial and has lasted RESUME_CONFIRM_S (additive; sent once per resume). */
-  | { t: "vad"; speaking: true; rms: number; resumed: true; voiced_ms: number }
+  | { t: "partial"; v: string; edge: true; end?: TurnEndScore }
   | { t: "timing"; speech_end_to_final_ms: number; silence_wait_ms: number };
 
 export class SttSession {
@@ -168,10 +161,6 @@ export class SttSession {
   // server stopped managing (voice confirmed) still resumes if the utterance turns out to hold no speech.
   private replyPaused = false;
   private unconfirmedPauses: number[] = [];
-  // TALK-OVER-01: voiced frames after a silence inside the utterance (the person went on after the edge partial).
-  private resuming = false;
-  private resumeVoicedSamples = 0;
-  private resumedSent = false;
   // An edge transcript whose silence has not yet lasted EDGE_SILENCE_S: sent as the edge partial when it does, as a plain partial if the voice comes back first.
   private pendingEdge: string | null = null;
 
@@ -235,15 +224,7 @@ export class SttSession {
         this.startReplyPause();
       }
       if (this.silenceSamples > 0) {
-        this.resuming = true; this.resumeVoicedSamples = 0; this.resumedSent = false;
         if (this.pendingEdge !== null) { const text = this.pendingEdge; this.pendingEdge = null; this.send({ t: "partial", v: text }); }
-      }
-      if (this.resuming) {
-        this.resumeVoicedSamples += samples.length;
-        if (!this.resumedSent && this.resumeVoicedSamples >= RESUME_CONFIRM_S * this.cfg.sampleRate) {
-          this.resumedSent = true;
-          this.send({ t: "vad", speaking: true, rms, resumed: true, voiced_ms: Math.round(this.resumeVoicedSamples / this.cfg.sampleRate * 1000) });
-        }
       }
       this.silenceSamples = 0;
       this.endpointCheckScheduled = false;
@@ -268,7 +249,7 @@ export class SttSession {
       this.checkReplyPause();
       if (this.speaking) {
       const firstSilenceFrame = this.silenceSamples === 0;
-      if (firstSilenceFrame) { this.silenceStartedAtMs = this.now(); this.resuming = false; this.resumeVoicedSamples = 0; this.resumedSent = false; }
+      if (firstSilenceFrame) { this.silenceStartedAtMs = this.now(); }
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
       this.silenceSamples += samples.length;
@@ -578,9 +559,6 @@ export class SttSession {
     this.finalizeStartedAtMs = 0;
     this.reusablePartial = null;
     this.redecodeAtEdge = false;
-    this.resuming = false;
-    this.resumeVoicedSamples = 0;
-    this.resumedSent = false;
     this.pendingEdge = null;
     this.endpointAsked = false;
     this.endpointPending = false;

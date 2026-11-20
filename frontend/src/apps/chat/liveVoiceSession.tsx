@@ -35,9 +35,7 @@ import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
 import type { SpeculationIds } from "@/apps/chat/useChatVoiceTurnState";
-import type { SpeculativeOutcome, SttTimingExtras } from "@/lib/voice/sttContract";
-import { TalkOverController, type Overlap } from "@/lib/voice/talkOver";
-import { renderAckClips, type AckClipHandle, type AckClipPool, type AckGroupId } from "@/lib/voice/ackClip";
+import type { SpeculativeOutcome } from "@/lib/voice/sttContract";
 import { createVoiceTrace, type VoiceTrace } from "@/lib/voice/voiceTrace";
 import { browserFamily, createEchoGate, type EchoGate } from "@/lib/voice/echoGate";
 import { isOwnEcho, isOwnEchoTurn, normalizeOwnEchoTranscript } from "@/lib/voice/ownEcho";
@@ -57,12 +55,6 @@ export interface LiveVoiceSessionProps {
   /** STT-SMARTTURN-01: when set, a turn may begin privately on the edge partial (the first partial after the voice stops) for the
    * conversation `getConversationId` names; the final transcript confirms it on an exact match through `pendingRef`, else it is discarded. */
   speculation?: { getConversationId: () => string | undefined; pendingRef: { current: SpeculationIds | null };
-    /** TALK-OVER-01: set when the acknowledgement clip played for the turn being confirmed, so the adapter skips the run's own cue. */
-    ackClipPlayedRef?: { current: boolean };
-    /** The voice the reply will use (the scheduler's `voice`), so the clips are rendered in it (rule 14). */
-    getVoice?: () => string | undefined;
-    /** Test seam: the clip renderer. */
-    renderClips?: typeof renderAckClips;
   };
   cancelRun: () => void;
   voiceBargeIn?: boolean;
@@ -93,7 +85,7 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
-  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; talkOver?: Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "edge_partials" | "clip_started_ms" | "clip_ended_ms" | "clip_completed" | "echo_drops" | "talk_over_reason" | "pool_size" | "filler_group" | "filler_source" | "filler_choose_ms" | "filler_pool_ready"> }) => void;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; edgePartials?: number; echoDrops?: number }) => void;
   voiceTimingSocketRef?: { current: SttSocket | null };
   /** VOICE-TRACE-01: an owner's live trace for the next N utterances of this call (event names and numbers only; off when 0). */
   traceUtterances?: number;
@@ -188,6 +180,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
   const speculationRef = useRef<(SpeculationIds & { text: string }) | null>(null);
   const edgePartialPendingRef = useRef(false);
+  const edgeCountRef = useRef(0);
   const discardSpeculation = () => {
     const held = speculationRef.current;
     speculationRef.current = null;
@@ -205,78 +198,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const speculationInFlightRef = useRef<string | null>(null);
   const latestEdgeTextRef = useRef<string | null>(null);
   const refusedThisUtteranceRef = useRef(false);
-  // TALK-OVER-01 (docs/design/talk-over-2026-11-12.md section 2): the acknowledgement clip and its protected overlap window. The hub
-  // grants the level per session (`ready.talk_over`, adults only); the clips are rendered once in the reply's voice; one clip plays
-  // per utterance, on the edge partial that starts a held run when the hub's end-of-turn score fires at the level in force.
-  const talkOverRef = useRef<TalkOverController | null>(null);
-  const ackPoolRef = useRef<AckClipPool | null>(null);
-  const fillerAnswerRef = useRef<{ text: string; group: AckGroupId | null; source: "model" | "rule"; ms: number } | null>(null);
-  const fillerInFlightRef = useRef(false);
-  const fillerLastRequestRef = useRef(0);
-  const fillerStableRef = useRef("");
-  const fillerStableAtRef = useRef(0);
-  const fillerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fillerTimingRef = useRef<Pick<SttTimingExtras, "filler_group" | "filler_source" | "filler_choose_ms" | "filler_pool_ready"> | undefined>(undefined);
-  const ackRenderRef = useRef<AbortController | null>(null);
-  const overlapRef = useRef<(Overlap & { conversationId: string; text: string; clip: AckClipHandle; level: "gentle" | "natural" }) | null>(null);
-  const overlapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTalkOverRef = useRef<Pick<SttTimingExtras, "talk_over_level" | "early_release_ms" | "overlap_ms" | "decision" | "edge_partials" | "clip_started_ms" | "clip_ended_ms" | "clip_completed"> | undefined>(undefined);
-  // How many edge partials the hub marked in the utterance in progress (a real voice pauses more than a clean recording).
-  const edgeCountRef = useRef(0);
-  // One clip per utterance (Jesse's rule, 2026-11-12), reset when a new utterance begins.
-  const clipPlayedThisUtteranceRef = useRef(false);
-  const clearOverlapTimer = () => { if (overlapTimerRef.current) clearTimeout(overlapTimerRef.current); overlapTimerRef.current = null; };
-  /** The one decision at the window's end (design item 4): the person went on, so the held ANSWER is dropped, silently. The clip is
-   * never touched (Jesse's rule, 2026-11-12: once started it always plays to its end); only the held run's release is decided here. */
-  const decideOverlap = () => {
-    const overlap = overlapRef.current; const control = talkOverRef.current;
-    if (!overlap || !control) return;
-    const decision = control.decide(overlap.conversationId, overlap, performance.now());
-    trace("window_decide", { decision, resumed: overlap.resumedAt !== null, more_words: overlap.moreWords });
-    if (decision !== "continued") return;
-    const held = speculationRef.current;
-    if (held && held.text === overlap.text) { speculationRef.current = null; void api.discardTurn(held.turnId).catch(() => undefined); speculativeOutcomeRef.current = "discarded"; }
-  };
-  const playAckClip = async (conversationId: string, text: string, end: { level: "none" | "gentle" | "natural" } | undefined) => {
-    const control = talkOverRef.current; const pool = ackPoolRef.current;
-    if (!control || !pool || overlapRef.current || clipPlayedThisUtteranceRef.current || !end || !control.shouldPlay(conversationId, end.level)) return;
-    // No acknowledgement while the reply is paused or was just cut in on: the person is already talking over her, not finishing a question.
-    if (overlapPausedRef.current || Date.now() - lastInterruptAtRef.current < 1000) return;
-    // The edge is stable by the hub's rule (0.2 s of silence with no voice in between before it is marked), so this is the one clip.
-    let answer = fillerAnswerRef.current?.text === text ? fillerAnswerRef.current : null;
-    if (!answer && typeof (pool as Partial<AckClipPool>).playGroup === "function") {
-      await new Promise<void>((resolve) => setTimeout(resolve, 150));
-      answer = fillerAnswerRef.current?.text === text ? fillerAnswerRef.current : null;
-    }
-    if (clipPlayedThisUtteranceRef.current || overlapRef.current || ackPoolRef.current !== pool) return;
-    const groupedPlay = (pool as Partial<AckClipPool>).playGroup;
-    const clip = groupedPlay ? groupedPlay.call(pool, answer?.group ?? "backchannel", performance.now()) : pool.play(performance.now());
-    if (!clip) return;
-    fillerTimingRef.current = { filler_group: answer?.group ?? "backchannel", filler_source: answer ? answer.source : "late", ...(answer ? { filler_choose_ms: answer.ms } : {}), filler_pool_ready: pool.size };
-    clipPlayedThisUtteranceRef.current = true;
-    clipPlayedAtRef.current = Date.now();
-    const overlap = control.open(conversationId, clip.startedAt, clip.durationMs);
-    overlapRef.current = { ...overlap, conversationId, text, clip, level: control.state(conversationId).level as "gentle" | "natural" };
-    clearOverlapTimer();
-    overlapTimerRef.current = setTimeout(() => { overlapTimerRef.current = null; decideOverlap(); }, Math.max(0, overlap.windowEndsAt - performance.now()));
-  };
-  const closeOverlap = (finalText: string | null, finalAt: number, sttMs: number | null) => {
-    const overlap = overlapRef.current; const control = talkOverRef.current;
-    overlapRef.current = null; clearOverlapTimer();
-    if (!overlap || !control) { lastTalkOverRef.current = undefined; return; }
-    if (finalText !== null && finalText === overlap.text) control.confirm(overlap);
-    // A final with other words after a clip was a wrong start; the clip itself is never touched (it plays to its end whatever happens).
-    else if (finalText !== null) control.continuedAtFinal(overlap.conversationId, overlap);
-    // The clip's start and end relative to the end of speech: the hub's timing message says how long after the last voiced sample the
-    // final came. A correct start is always positive (the hub marks the edge after 0.2 s of silence plus the transcription); a large
-    // negative value is a wrong start in a mid-sentence pause that long before the person finished.
-    const speechEndAt = sttMs !== null ? finalAt - sttMs : null;
-    const clip = overlap.clip;
-    const endedAt = clip.endedAt ?? (clip.ended ? null : clip.startedAt + clip.durationMs);
-    lastTalkOverRef.current = { talk_over_level: overlap.level, overlap_ms: overlap.windowMs, decision: overlap.decision, ...(speechEndAt !== null ? { early_release_ms: Math.round(clip.startedAt - speechEndAt), clip_started_ms: Math.round(clip.startedAt - speechEndAt), ...(endedAt !== null ? { clip_ended_ms: Math.round(endedAt - speechEndAt) } : {}) } : {}), clip_completed: clip.ended ? clip.completed : true };
-    if (overlap.decision === "confirmed" && speculation?.ackClipPlayedRef) speculation.ackClipPlayedRef.current = true;
-  };
-  const startSpeculation = (text: string, unfinished = false, end?: { level: "none" | "gentle" | "natural" }) => {
+  const startSpeculation = (text: string, unfinished = false) => {
     if (!speculation || !text) return;
     if (speculationOffRef.current) { speculativeOutcomeRef.current = "off"; return; }
     if (refusedThisUtteranceRef.current) return;
@@ -291,10 +213,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     const held = speculationRef.current;
     if (held && held.text === text) return;
     if (held) { speculationRef.current = null; void api.discardTurn(held.turnId).catch(() => undefined); }
-    if (overlapRef.current && overlapRef.current.text !== text) talkOverRef.current?.noteMoreWords(overlapRef.current);
     if (speculationInFlightRef.current !== null) return; // reconciled against latestEdgeTextRef when it lands
     speculationInFlightRef.current = text;
-    void playAckClip(conversationId, text, end);
     const epoch = reactionEpochRef.current;
     trace("speculate", { words: text.split(/\s+/).length });
     void api.speculateTurn(text, conversationId).then((ids) => {
@@ -367,8 +287,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const traceRef = useRef<VoiceTrace | null>(null);
   const trace = (event: Parameters<VoiceTrace["note"]>[0], extra?: Record<string, unknown>) => traceRef.current?.note(event, extra);
   // The grant's reason and the pool size, reported on the next timing message so the record itself says why no clip could play.
-  const talkOverReasonRef = useRef<SttTimingExtras["talk_over_reason"]>("unknown");
-  const poolSizeRef = useRef(0);
   // ECHO-GATE-01 (Jesse uses laptop speakers): while Home plays, only microphone frames clearly louder than her own echo reach the hub.
   const echoGateRef = useRef<EchoGate | null>(null);
   if (!echoGateRef.current) echoGateRef.current = createGate();
@@ -393,18 +311,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const lastAcceptedCutInAtRef = useRef(-1);
   const speechStartedAtRef = useRef(-1);
   const ECHO_TAIL_MS = 1500;
-  // The acknowledgement clip's own words, heard back: part of Home's voice for a few seconds after it played.
-  const clipWordsRef = useRef<string[]>([]);
-  // The clips as whole normalized phrases ("mm hm", "okay"), for the trailing-echo strip below.
-  const clipPhrasesRef = useRef<string[]>([]);
-  const clipPlayedAtRef = useRef(0);
-  const CLIP_ECHO_MS = 4000;
   const homeVoiceWords = () => {
     const scheduler = turnSchedulerRef.current;
     const replyWords = scheduler && typeof scheduler.recentlySpokenWords === "function" && (isReplySpeaking() || Date.now() - lastSpeakingEndedAtRef.current <= ECHO_TAIL_MS) ? scheduler.recentlySpokenWords() : [];
     if (replyWords.length) lastHomeSpokeAtRef.current = Date.now();
-    const clipWords = Date.now() - clipPlayedAtRef.current <= CLIP_ECHO_MS ? clipWordsRef.current : [];
-    return [...replyWords, ...clipWords];
+    return replyWords;
   };
   const isOwnVoice = (text: string) => { const spoken = homeVoiceWords(); return spoken.length > 0 && isOwnEcho(text, spoken); };
   const traceSessionStart = (handle: MicCaptureHandle | null) => {
@@ -426,21 +337,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
         }).catch(() => undefined);
       }
     } catch { /* diagnostics only */ }
-  };
-  /** The clip's echo can land inside the person's own utterance (speakers, no headset): the final then ends with the clip's words. Those
-   * trailing words are Home's, not the person's: dropped before the held run is matched and before the words are sent. */
-  const withoutTrailingClipEcho = (text: string) => {
-    if (Date.now() - clipPlayedAtRef.current > CLIP_ECHO_MS || clipPhrasesRef.current.length === 0) return text;
-    let out = text.trim();
-    for (let round = 0; round < 3; round++) {
-      const tokens = out.split(/\s+/);
-      // A phrase may span one token ("Okay.") or more ("Mm-hm." is "mm hm" once normalized, but "mm hm" could also arrive as two tokens).
-      const phrase = clipPhrasesRef.current.find((candidate) => { const n = candidate.split(" ").length; for (let k = 1; k <= Math.min(n, tokens.length - 1); k++) { if (normalizedTranscript(tokens.slice(-k).join(" ")) === candidate) return true; } return false; });
-      if (!phrase) break;
-      let k = 1; while (k < tokens.length && normalizedTranscript(tokens.slice(-k).join(" ")) !== phrase) k++;
-      out = tokens.slice(0, -k).join(" ").replace(/[,;:]+$/, "").trim();
-    }
-    return out;
   };
   const interrupt = (_reason: "voice" | "tap") => {
     clearPauseDeadline();
@@ -535,21 +431,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
         switch (message.t) {
           case "ready":
             retryCountRef.current = 0;
-            // TALK-OVER-01: the hub's grant for this session (absent for a minor, a robot device or when the setting is off).
-            if (traceUtterances && traceUtterances > 0 && !traceRef.current) traceRef.current = createVoiceTrace(traceUtterances);
-            trace("ready", { granted: Boolean("talk_over" in message && message.talk_over), reason: ("talk_over_reason" in message && message.talk_over_reason) || (speculation ? "granted" : "no_speculation") });
-            if ("talk_over" in message && message.talk_over && speculation) {
-              const grant = message.talk_over;
-              talkOverReasonRef.current = "granted";
-              trace("grant", { level: grant.level, window_ms: grant.window_ms, clips: grant.clips.length });
-              talkOverRef.current = new TalkOverController(grant);
-              ackRenderRef.current?.abort();
-              const render = new AbortController(); ackRenderRef.current = render;
-              clipWordsRef.current = grant.clips.flatMap((clip) => normalizedTranscript(clip).split(" ").filter(Boolean));
-              clipPhrasesRef.current = grant.clips.map((clip) => normalizedTranscript(clip)).filter(Boolean);
-              // The clips are rendered in the voice this chat speaks in (a synth or companion voice, else the persons own), so the filler and the reply match.
-              void Promise.resolve(speculation.getVoice?.() ?? api.activeChatVoice().then((found) => found.voice, () => undefined)).then((voice) => (speculation.renderClips ?? renderAckClips)(grant.clips, voice, { signal: render.signal, onTrace: (event, extra) => trace(event, extra) })).then((pool) => { if (!render.signal.aborted) { ackPoolRef.current = pool; poolSizeRef.current = pool.size; trace("pool", { size: pool.size }); } }).catch(() => { trace("pool", { size: 0, failed: true }); });
-            } else { talkOverRef.current = null; ackPoolRef.current = null; talkOverReasonRef.current = "talk_over_reason" in message && message.talk_over_reason ? message.talk_over_reason : "unknown"; }
+            if (traceUtterances > 0 && !traceRef.current) traceRef.current = createVoiceTrace(traceUtterances);
             if (voiceBargeIn && !playedTimer) {
               playedTimer = setInterval(() => {
                 const scheduler = turnSchedulerRef.current;
@@ -627,35 +509,15 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // STT-SMARTTURN-01: the edge partial (the hub marks the one it transcribed at its first silent frame with `edge: true`; the
             // `vad speaking: false` event only comes at finalize, after it) may begin a held run. The armed flag stays for a partial
             // that follows a vad-false from an older hub.
-            trace("edge" in message && message.edge === true ? "edge" : "partial", { words: message.v.trim().split(/\s+/).filter(Boolean).length, mode: modeRef.current, speaking: isReplySpeaking(), ...("end" in message && message.end ? { level: message.end.level, score: message.end.score, unfinished: message.end.unfinished } : {}) });
+            trace("edge" in message && message.edge === true ? "edge" : "partial", { words: message.v.trim().split(/\s+/).filter(Boolean).length, mode: modeRef.current, speaking: isReplySpeaking(), ...("end" in message && message.end ? { unfinished: message.end.unfinished } : {}) });
             if ("edge" in message && message.edge === true) { edgeSeenRef.current = true; edgeCountRef.current += 1; }
             if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) {
-              // The clip's own echo at the end of the words is Home's, not the person's (see withoutTrailingClipEcho): the held run keeps matching.
-              const edgeText = withoutTrailingClipEcho(message.v.trim());
+              const edgeText = message.v.trim();
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
-              else if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, "end" in message ? message.end : undefined);
+              else if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true);
               // The session was not listening (the last reply still thinking or speaking, or the mic muted): labelled, so a live record names it.
               else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
             }
-            if (!("edge" in message && message.edge === true) && talkOverRef.current && ackPoolRef.current?.size && !activeTurnRef.current && modeRef.current === "listening") {
-              const stableText = message.v.trim(); const words = stableText.split(/\s+/).filter(Boolean).length;
-              if (words >= 3) {
-                if (fillerStableRef.current !== stableText) {
-                  fillerStableAtRef.current = Date.now();
-                  if (fillerTimerRef.current) clearTimeout(fillerTimerRef.current);
-                  fillerTimerRef.current = setTimeout(() => {
-                    fillerTimerRef.current = null;
-                    if (fillerStableRef.current !== stableText || Date.now() - fillerLastRequestRef.current < 600 || fillerInFlightRef.current || activeTurnRef.current || !ackPoolRef.current?.size) return;
-                    fillerInFlightRef.current = true; fillerLastRequestRef.current = Date.now(); const began = performance.now();
-                    void api.fillerGroup(stableText.slice(0, 160)).then((answer) => {
-                      if (fillerStableRef.current === stableText && !activeTurnRef.current) fillerAnswerRef.current = { text: stableText, group: answer.group, source: answer.source, ms: Math.max(answer.ms, performance.now() - began) };
-                    }).catch(() => undefined).finally(() => { fillerInFlightRef.current = false; });
-                  }, 200);
-                }
-                fillerStableRef.current = stableText;
-              }
-            }
-            else if (overlapRef.current && message.v.trim().split(/\s+/).length > overlapRef.current.text.split(/\s+/).length) talkOverRef.current?.noteMoreWords(overlapRef.current);
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
             lastPartialRef.current = message.v;
@@ -682,17 +544,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // hearing you" signal while this is live.
             break;
           case "vad":
-            trace(message.speaking ? ("resumed" in message && message.resumed === true ? "vad_resumed" : "vad_on") : "vad_off", { mode: modeRef.current, speaking: isReplySpeaking() });
-            if (message.speaking && "resumed" in message && message.resumed === true) {
-              // TALK-OVER-01: the person's voice came back inside the same utterance (after an edge partial). It is not a new utterance, so
-              // it must not cancel the in-flight reaction or held run (doing so bumped the epoch and dropped the speculative start): it only
-              // tells the overlap window the person went on. The next edge partial, or the final, settles the held run.
-              if (overlapRef.current) talkOverRef.current?.noteResumed(overlapRef.current, performance.now());
-              break;
-            }
+            trace(message.speaking ? "vad_on" : "vad_off", { mode: modeRef.current, speaking: isReplySpeaking() });
             if (message.speaking) {
               if (!activeSpeechRef.current) speechStartedAtRef.current = Date.now();
-              refusedThisUtteranceRef.current = false; latestEdgeTextRef.current = null; clipPlayedThisUtteranceRef.current = false;
+              refusedThisUtteranceRef.current = false; latestEdgeTextRef.current = null;
               cancelReaction();
               discardSpeculation(); // STT-SMARTTURN-01: a new utterance means the held run's words were not the final ones
               activeSpeechRef.current = true;
@@ -742,7 +597,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             lastPartialRef.current = "";
             activeSpeechRef.current = false;
             setIdleActivity((value) => value + 1);
-            const text = withoutTrailingClipEcho(message.v.trim());
+            const text = message.v.trim();
             const normalized = normalizedTranscript(text);
             const nowMs = Date.now();
             const spokenWords = homeVoiceWords();
@@ -759,7 +614,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               trace("echo_final", { words: normalized.split(" ").length });
               if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_echo" });
               traceRef.current?.endUtterance();
-              closeOverlap(null, performance.now(), null);
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
               overlapPauseTimerRef.current = null;
               if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
@@ -812,8 +666,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             setCurrentMode("thinking");
             const sttMs = sttMsForNextTurn;
             sttMsForNextTurn = null;
-            // TALK-OVER-01: the final settles the overlap (a match confirms the clip; anything else was a wrong start).
-            closeOverlap(text, performance.now(), sttMs);
             // STT-SMARTTURN-01: an exact trimmed match confirms the held run through this one send; anything else discards it first.
             let speculative: SpeculativeOutcome = speculativeOutcomeRef.current;
             if (speculation) {
@@ -834,9 +686,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
             trace("turn_send", { words: text.split(/\s+/).filter(Boolean).length, speculative, edges: edgePartials, echo_drops: echoDrops });
             traceRef.current?.endUtterance();
-            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), talkOver: { ...lastTalkOverRef.current, ...fillerTimingRef.current, edge_partials: edgePartials, ...(echoDrops > 0 ? { echo_drops: echoDrops } : {}), talk_over_reason: talkOverReasonRef.current, pool_size: poolSizeRef.current } });
-            fillerTimingRef.current = undefined; fillerAnswerRef.current = null; fillerStableRef.current = "";
-            lastTalkOverRef.current = undefined;
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops });
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());
@@ -954,11 +804,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // guarantee VOICE-01's future barge-in will build on.
   useEffect(() => {
     liveVoiceActiveRef.current = open;
-    if (!open) { clearPauseDeadline(); turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); closeOverlap(null, performance.now(), null); ackPoolRef.current?.stopAll(); ackRenderRef.current?.abort(); traceRef.current?.close(); traceRef.current = null; }
+    if (!open) { clearPauseDeadline(); turnSchedulerRef.current?.stop(); cancelReaction(); discardSpeculation(); traceRef.current?.close(); traceRef.current = null; }
     return () => {
       liveVoiceActiveRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cancelReaction/discardSpeculation/closeOverlap close over stable refs; `open` is the real trigger.
   }, [open, liveVoiceActiveRef, turnSchedulerRef]);
 
   return {

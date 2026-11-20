@@ -11,8 +11,6 @@ export function useChatVoiceTurnState() {
   const liveVoiceActiveRef = useRef(false);
   const pendingSpeechRef = useRef(false);
   const pendingSpeculationRef = useRef<SpeculationIds | null>(null);
-  // TALK-OVER-01: the acknowledgement clip already played for the turn being confirmed, so the run's own quick cue is skipped (one sound).
-  const ackClipPlayedRef = useRef(false);
   const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(null);
   const askAnswerRef = useRef<AskAnswerArm | undefined>(undefined);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -23,5 +21,5 @@ export function useChatVoiceTurnState() {
     if (!speaking) setSpeakingEndedAt((n) => n + 1);
   }, []);
   const onSpeechError = useCallback(() => setSpeechFailed((n) => n + 1), []);
-  return { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, pendingSpeculationRef, ackClipPlayedRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, onSpeakingChange, onSpeechError };
+  return { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, pendingSpeculationRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, onSpeakingChange, onSpeechError };
 }
