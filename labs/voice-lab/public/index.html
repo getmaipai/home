@@ -62,6 +62,7 @@
     <label>How sure the turn check must be (0 to 1) <input id="threshold" type="number" step=".05" value=".6"></label>
     <label><input id="early" type="checkbox" checked> Start the answer early</label>
     <label>Echo match needed to ignore its own voice (0 to 1) <input id="echoThreshold" type="number" step=".05" value=".85"></label>
+    <label><input type="checkbox" id="finishWord" checked> When you interrupt, it finishes the word it is on</label>
     <label>Volume while it works out if you are interrupting <select id="duckLevel"><option value="1">Unchanged (like a person)</option><option value="0.6">A little lower</option><option value="0.3">Much lower</option></select></label>
     <label>Sound output path <select id="output"><option>direct</option><option>element</option><option>loopback</option></select></label>
     <label>Browser echo cancelling <select id="echoSetting"><option>true</option><option>all</option><option>remote-only</option><option>false</option></select></label>

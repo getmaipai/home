@@ -1,4 +1,5 @@
 import { PlaybackBuffer } from './playback-buffer.js';
+import { wordEnd } from './word-end.js';
 
 const ctx = new AudioContext();
 const gain = ctx.createGain();
@@ -74,19 +75,27 @@ function playPcm(samples, rate = 24000, turn = activeTurn) {
 }
 function stopPlayback(turn) {
   if (Number.isInteger(turn) && turn < activeTurn) return;
-  ramp(0);
+  // When interrupted, a person finishes the word they are on. So does the voice: it plays on to the next gap between
+  // words (at most 450 ms away), then fades out.
+  let wait = 0;
+  if (finishWord && !paused && buffer.length) { const from = playedPosition(); wait = Math.max(0, (wordEnd(buffer.samples, from, sampleRate) - from) / sampleRate); }
+  const now = ctx.currentTime;
+  gain.gain.cancelScheduledValues(now); gain.gain.setValueAtTime(gain.gain.value, now); gain.gain.setValueAtTime(gain.gain.value, now + wait); gain.gain.linearRampToValueAtTime(0, now + wait + .025);
+  window.__lastStopWaitMs = Math.round(wait * 1000);
   const stoppedTurn = Number.isInteger(turn) ? turn : activeTurn;
   setTimeout(() => {
     if (activeTurn !== stoppedTurn) return;
     for (const item of scheduled) try { item.source.stop(); } catch {}
     scheduled = []; buffer.stop(); paused = false; ducked = false; next = ctx.currentTime; playedCursor = 0; activeTurn = stoppedTurn;
     ramp(1); stopTick();
-  }, 15);
+  }, Math.round(wait * 1000) + 30);
 }
 // People do not turn their voice down when someone says "mm-hm", so the reply keeps its volume while the lab decides
 // whether the person is interrupting. The level is kept as a setting (1 = no change) in case a device needs help hearing.
 let duckLevel = 1; try { const v = parseFloat(localStorage.voiceLabDuckLevel); if (v > 0 && v <= 1) duckLevel = v; } catch {}
 window.__setDuckLevel = (v) => { duckLevel = Math.min(1, Math.max(0.1, v)); try { localStorage.voiceLabDuckLevel = String(duckLevel); } catch {} };
+let finishWord = true; try { finishWord = localStorage.voiceLabFinishWord !== '0'; } catch {}
+window.__setFinishWord = (on) => { finishWord = !!on; try { localStorage.voiceLabFinishWord = on ? '1' : '0'; } catch {} };
 function duck() { ducked = true; buffer.duck(); if (duckLevel < 1) ramp(duckLevel); }
 function restore() { ducked = false; buffer.restore(); ramp(1); }
 function pause() {
