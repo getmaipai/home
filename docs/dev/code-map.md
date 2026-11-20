@@ -653,7 +653,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
 | `backend/src/lib/films/verifyFinished.ts` | filmShotList, faultsOf, verdictEntries, verdictLines, verifyFinishedFilm, verifyRoughCutFile |
 | `backend/src/lib/films/voicedPreview.ts` | VOICED_WORKING_NOTE, __setVoicedMakerForTests, startVoicedPreview |
-| `backend/src/lib/films/voicedRows.ts` | voicedRows, voicedStoryboardRows, voicedAvailable, voicedOfferRows |
+| `backend/src/lib/films/voicedRows.ts` | voicedRows, voicedStoryboardRows, voicedAvailable, VOICED_OFFER_LINE, VOICED_BLOCKED_LINE, voicedOfferRows |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, releaseSync |
 | `backend/src/lib/filter/nothingSuitable.ts` | NOTHING_SUITABLE_HINT |
