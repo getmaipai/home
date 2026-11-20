@@ -450,7 +450,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     for (let n = 0; n < 40; n++) { after = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json() as typeof after; if (after[0]?.stage_state === "error") break; await new Promise((r) => setTimeout(r, 50)); }
     expect(after).toHaveLength(1);
     expect(after[0]).toMatchObject({ id, stage_state: "error", eyebrow: "Did not finish", prompt: BOAT, seconds: 10, tier: "boost" });
-    expect(String(after[0]!.error_message)).toContain("Try again to carry on, or change the words.");
+    expect(String(after[0]!.error_message)).toMatch(/^(Part 1 of 2 did not finish|This long take was stopped after 0 of 2 parts)\. Try again to carry on, or change the words\.$/); // our own words, never the engine's line
     expect((await adult.client.post("/api/plugins/video/actions/another", { id })).status).toBe(200); // resumed, so it is running again
     await adult.client.post(`/api/videos/long/${id}/cancel`, {}); // a take left running would refuse the next test's long take
   });

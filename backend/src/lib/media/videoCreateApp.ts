@@ -452,7 +452,7 @@ function longTakeStage(person: PersonRow, newestClipIso: string): Array<Record<s
     eyebrow: running ? `Part ${part} of ${progress.parts_total}` : "Did not finish",
     title, subtitle: `${params.parts * params.per_part} seconds, made in ${params.parts} parts`,
     progress: running ? Math.round((progress.parts_done / progress.parts_total) * 100) : null,
-    error_message: running ? null : progress.state === "stopped" ? `This long take was stopped after ${progress.parts_done} of ${progress.parts_total} parts. Try again to carry on, or change the words.` : `${progress.error_line ?? "A part of the long take did not finish."} Try again to carry on, or change the words.`,
+    error_message: running ? null : progress.state === "stopped" ? `This long take was stopped after ${progress.parts_done} of ${progress.parts_total} parts. Try again to carry on, or change the words.` : `Part ${Math.min(progress.parts_done + 1, progress.parts_total)} of ${progress.parts_total} did not finish. Try again to carry on, or change the words.`,
   }];
 }
 
