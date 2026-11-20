@@ -33,12 +33,14 @@ const clips: Float32Array[] = []; for (const q of QUESTIONS) clips.push(await sa
 const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer";
 await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret }));
 if (VOICE) setTimeout(() => ws.send(JSON.stringify({ t: "config", values: { voice: VOICE } })), 200);
+const warm: Record<string, number> = {}; const openedAt = performance.now();
 type Frame = { at: number; sec: number; chunk: number; turn: number };
 let speechEnd = 0, frames: Frame[] = [], replyFinalAt = 0, finalText = "", replyDone: (() => void) | null = null, lastFrameAt = 0, curTurn = 0;
 ws.onmessage = (e) => {
   const now = performance.now();
   if (typeof e.data === "string") { const j = JSON.parse(e.data);
     if (j.t === "reply_final") { replyFinalAt = now; finalText = j.text ?? ""; }
+    if (j.t === "warm") { warm[j.part] = j.ms; console.log(`  warm ${j.part} ${j.ms}ms after open +${Math.round(now - openedAt)}ms`); }
     if (j.t === "error") console.log("  ERROR", JSON.stringify(j));
   } else { const buf = e.data as ArrayBuffer, dv = new DataView(buf);
     const turn = dv.getUint32(0, true); if (turn < curTurn) return;
@@ -51,7 +53,8 @@ async function stream(samples: Float32Array | null, ms: number) { const n = samp
     if (ws.readyState === 1) ws.send(f.buffer); const w = t0 + (i + 1) * tick - performance.now(); if (w > 0) await Bun.sleep(w); } }
 let pump = true; (async () => { while (pump) await stream(null, 32); })();
 const med = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)]! : NaN; };
-const rows: any[] = [];
+if (!args.includes("--cold")) { const t0 = performance.now(); while (performance.now() - t0 < 20000 && !(warm.chat != null && warm.voice != null)) await Bun.sleep(100); }
+const rows: any[] = []; const allFrames: any[] = [];
 for (let i = 0; i < clips.length; i++) {
   pump = false; await Bun.sleep(40); await stream(null, 900);
   frames = []; replyFinalAt = 0; finalText = ""; lastFrameAt = 0; curTurn = 0;
@@ -62,26 +65,26 @@ for (let i = 0; i < clips.length; i++) {
   const f = frames;
   if (!f.length) { rows.push({ i: i + 1, q: QUESTIONS[i], ttfs: null }); console.log(`${String(i + 1).padStart(2)} NO AUDIO`); ws.send(JSON.stringify({ t: "played_end", turn: curTurn })); await Bun.sleep(300); continue; }
   const ttfs = f[0]!.at - speechEnd;
-  // simulate the player: starts after JITTER ms of audio is queued; counts a gap whenever its queue runs dry
-  let queued = 0, playhead = 0, playing = false, startAt = 0, gaps = 0, gapMs = 0, avail = 0, dryAt = 0; let playEnd = 0;
-  for (const fr of f) {
-    if (!playing) { avail += fr.sec; if (avail * 1000 >= JITTER) { playing = true; startAt = fr.at; playEnd = fr.at + avail * 1000; } continue; }
-    if (fr.at > playEnd + 1) { gaps++; gapMs += fr.at - playEnd; playEnd = fr.at + fr.sec * 1000; } else playEnd += fr.sec * 1000;
-  }
+  const simGaps = (jit: number) => { let playing = false, avail = 0, gaps = 0, gapMs = 0, playEnd = 0;
+    for (const fr of f) { if (!playing) { avail += fr.sec; if (avail * 1000 >= jit) { playing = true; playEnd = fr.at + avail * 1000; } continue; }
+      if (fr.at > playEnd + 1) { gaps++; gapMs += fr.at - playEnd; playEnd = fr.at + fr.sec * 1000; } else playEnd += fr.sec * 1000; }
+    return { gaps, gapMs }; };
+  const { gaps, gapMs } = simGaps(JITTER); const g0 = simGaps(0);
+  allFrames.push({ i: i + 1, speechEnd, frames: f.map((x) => ({ at: +(x.at - speechEnd).toFixed(1), sec: +x.sec.toFixed(4), chunk: x.chunk })), replyFinal: +(replyFinalAt - speechEnd).toFixed(1) });
   // voice speed vs real time while the reply was still being written (frames before reply_final)
   const during = f.filter((x) => x.at <= replyFinalAt); const dSec = during.reduce((s, x) => s + x.sec, 0);
   const dWall = during.length > 1 ? (during.at(-1)!.at - during[0]!.at) / 1000 : 0;
   const speed = dWall > 0.3 ? dSec / dWall : NaN;
   const total = f.reduce((s, x) => s + x.sec, 0);
-  const row = { i: i + 1, q: QUESTIONS[i], ttfs: Math.round(ttfs), audioSec: +total.toFixed(2), speedWhileWriting: Number.isNaN(speed) ? null : +speed.toFixed(2), gaps, gapMs: Math.round(gapMs), words: finalText.split(/\s+/).length };
-  rows.push(row); console.log(`${String(i + 1).padStart(2)} first=${row.ttfs}ms audio=${row.audioSec}s speed=${row.speedWhileWriting ?? "-"}x gaps=${gaps} (${row.gapMs}ms) words=${row.words}`);
+  const row = { i: i + 1, q: QUESTIONS[i], ttfs: Math.round(ttfs), audioSec: +total.toFixed(2), speedWhileWriting: Number.isNaN(speed) ? null : +speed.toFixed(2), gaps, gapMs: Math.round(gapMs), gapsNoBuffer: g0.gaps, gapMsNoBuffer: Math.round(g0.gapMs), words: finalText.split(/\s+/).length };
+  rows.push(row); console.log(`${String(i + 1).padStart(2)} first=${row.ttfs}ms audio=${row.audioSec}s speed=${row.speedWhileWriting ?? "-"}x gaps=${gaps} (${row.gapMs}ms) nobuf=${g0.gaps} words=${row.words}`);
   ws.send(JSON.stringify({ t: "played_end", turn: f[0]!.turn })); await Bun.sleep(300);
 }
 pump = false; ws.close();
 const ok = rows.filter((r) => r.ttfs != null);
 const sp = ok.map((r) => r.speedWhileWriting).filter((x) => x != null) as number[];
 const summary = { turns: ok.length, jitterMs: JITTER, firstSoundMedianMs: med(ok.map((r) => r.ttfs)), firstSoundWorstMs: Math.max(...ok.map((r) => r.ttfs)), firstSoundP90Ms: [...ok.map((r) => r.ttfs)].sort((a, b) => a - b)[Math.floor(ok.length * 0.9)],
-  speedMedian: med(sp), speedWorst: sp.length ? Math.min(...sp) : null, turnsWithGaps: ok.filter((r) => r.gaps > 0).length, totalGaps: ok.reduce((s, r) => s + r.gaps, 0), totalGapMs: ok.reduce((s, r) => s + r.gapMs, 0) };
+  speedMedian: med(sp), speedWorst: sp.length ? Math.min(...sp) : null, turnsWithGaps: ok.filter((r) => r.gaps > 0).length, totalGaps: ok.reduce((s, r) => s + r.gaps, 0), totalGapMs: ok.reduce((s, r) => s + r.gapMs, 0), noBufferTotalGaps: ok.reduce((s, r) => s + r.gapsNoBuffer, 0), noBufferTurnsWithGaps: ok.filter((r) => r.gapsNoBuffer > 0).length };
 console.log("SUMMARY", JSON.stringify(summary));
-if (OUT) await Bun.write(OUT, JSON.stringify({ summary, rows }, null, 1));
+if (OUT) await Bun.write(OUT, JSON.stringify({ summary, rows, frames: allFrames }));
 process.exit(0);
