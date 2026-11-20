@@ -346,7 +346,7 @@ export class VoiceSession {
       // A piece with no words has nothing for this voice to say; the engine refuses it, which used to fail the whole reply.
       if (!/[\p{L}\p{N}]/u.test(seg.value)) continue;
       const before = sent;
-      const segVoice = smile ? await this.moodVoiceFn(this.voice, "happy", voiceSettings(this.voice).moodStrength === "off" ? "mild" : voiceSettings(this.voice).moodStrength) : choice.voice;
+      const segVoice = smile && voiceSettings(this.voice).moodStrength !== "off" ? await this.moodVoiceFn(this.voice, "happy", voiceSettings(this.voice).moodStrength) : choice.voice;
       try { await synth(choice.style, seg.value, segVoice); }
       catch {
         if (signal.aborted || this.closed) return;

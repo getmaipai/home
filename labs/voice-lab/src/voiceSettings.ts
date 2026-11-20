@@ -5,7 +5,7 @@ import { join } from "node:path";
 export const VOICE_STORE = Bun.env.LAB_VOICE_STORE ?? join(import.meta.dir, "..", "..", "..", "data-scratch", "voices", "voices_store");
 export const STUMBLE_LEVELS = ["none", "light", "natural", "lively", "fits", "heavy"] as const, MOOD_STRENGTHS = ["off", "mild", "medium", "full"] as const;
 export type VoiceSettings = { stumble: string; moodStrength: string };
-export const defaultSettings = (): VoiceSettings => ({ stumble: Bun.env.LAB_STUMBLE ?? "natural", moodStrength: Bun.env.LAB_MOOD_STRENGTH ?? "mild" });
+export const defaultSettings = (): VoiceSettings => ({ stumble: Bun.env.LAB_STUMBLE ?? "natural", moodStrength: Bun.env.LAB_MOOD_STRENGTH ?? "off" }); // OFF by default (owner's blind test: switching the reference sample for a mood made the voice "crazy" and "awful"); sound tags stay
 const safeId = (v: string) => /^[A-Za-z0-9_-]{1,64}$/.test(v);
 /** The base voice of a mood variant: "casual_mild_happy" uses the settings of "casual". */
 const baseOf = (voice: string, store: string) => (safeId(voice) && existsSync(join(store, voice, "meta.json")) ? voice : voice.split("_")[0]!);

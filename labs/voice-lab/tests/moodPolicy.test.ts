@@ -23,3 +23,5 @@ test("later tags in the same reply follow the first decision, and a suppressed r
   const p = new MoodPolicy(); p.beginReply("hi"); expect(p.check("excited").ok).toBe(false); expect(p.check("sad").ok).toBe(false); p.finishReply();
   p.beginReply("I won a prize!"); expect(p.check("excited").ok).toBe(true); expect(p.check("sad").ok).toBe(true);
 });
+import { defaultSettings } from "../src/voiceSettings";
+test("mood sample switching is off by default (owner's blind verdict: mild happy and blend 'crazy emotion, awful')", () => { expect(Bun.env.LAB_MOOD_STRENGTH ?? "off").toBe(defaultSettings().moodStrength); });

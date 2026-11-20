@@ -579,6 +579,8 @@ test("reference mode: the page may stop her locally once a person is clearly tal
 });
 
 test("after a laugh the words that follow (and the next phrase) are spoken from the happy sample, then back to the normal voice", async () => {
+  const prevMood = Bun.env.LAB_MOOD_STRENGTH; Bun.env.LAB_MOOD_STRENGTH = "mild";   // mood samples are off by default now (owner's blind test); this test covers the switch when it is enabled
+  try {
   const used: Array<[string, string]> = [];
   const h = harness({
     speech: async (text: string, _s: AbortSignal, o: { voice?: string }) => { used.push([text.trim(), o.voice ?? ""]); return new Response(encodeWav(new Int16Array(2400).fill(2000))); },
@@ -593,6 +595,7 @@ test("after a laugh the words that follow (and the next phrase) are spoken from 
   expect(v["And then it got better."]).toContain("happy");
   expect(v["Anyway, enough of that."]).not.toContain("happy");
   h.session.close();
+  } finally { if (prevMood === undefined) delete Bun.env.LAB_MOOD_STRENGTH; else Bun.env.LAB_MOOD_STRENGTH = prevMood; }
 });
 
 test("every live turn records prompt tokens read and reused, the wait that was not prompt reading, the voice wait and the machine load", () => {
