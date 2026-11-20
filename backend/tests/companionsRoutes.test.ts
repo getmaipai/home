@@ -498,7 +498,7 @@ describe("household companion routes", () => {
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${withheldHouse.value.id}/look/jobs/${deniedJob}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress.state).toBe("failed"); expect(progress.error).toBeTruthy(); expect(existsSync(keyframePath(withheldHouse.value.id, "listening"))).toBe(false);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
-    __setVideoStatusForTests(readyVideoStatusForTests());
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     const started = await request(`companions/${id}/states/thinking/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202);
     expect(existsSync(keyframePath(id, "thinking"))).toBe(true); /* an animation with no picture of its own starts from the starting picture */
     expect(await sharp(readFileSync(keyframePath(id, "thinking"))).metadata()).toMatchObject({ width: 1024, height: 1024, hasAlpha: true });
@@ -790,7 +790,7 @@ describe("household companion routes", () => {
     const adult = addPerson("person-state-generate", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generated character" }, { display_name: "Author", person_id: "person-state-generate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const stackOriginal = await transparentPng();
     const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, stackOriginal); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox with white paws", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
-    __setVideoStatusForTests(readyVideoStatusForTests());
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     const submitted: Array<Record<string, unknown>> = [], deleted: string[] = [], fetched: string[] = [];
     __setVideosFetchForTests((async (input, init) => {
       const url = new URL(String(input)), method = init?.method ?? "GET";
@@ -818,7 +818,7 @@ describe("household companion routes", () => {
 
   test("retries one memory cancellation once with a fresh seed, and Stop during the wait wins", async () => {
     const adult = addPerson("person-state-retry", "adult"), submitted: Array<Record<string, unknown>> = [];
-    __setVideoStatusForTests(readyVideoStatusForTests()); __setTakeRetryWaitMsForTests(0);
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); __setTakeRetryWaitMsForTests(0);
     const prepare = async (name: string) => {
       const created = createHouseholdCompanion({ ...fixture(), display_name: name }, { display_name: "Author", person_id: "person-state-retry" }); if (!created.ok) throw new Error(created.error);
       const id = created.value.id, original = await transparentPng();
@@ -865,14 +865,14 @@ describe("household companion routes", () => {
 
   test("refuses minor, unapproved sheet and unavailable video engine before submitting", async () => {
     const adult = addPerson("person-state-gate", "adult"), child = addPerson("person-state-gate-child", "child"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generation gates" }, { display_name: "Author", person_id: "person-state-gate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
-    __setVideoStatusForTests(readyVideoStatusForTests()); let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);
     expect((await request(`companions/${id}/states/idle/generate`, child, "POST", { count: 1 })).status).toBe(403);
     expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(409);
     __setVideoStatusForTests(null);
     const restBytes = await transparentPng();
     const rest = addVersion(id, restBytes, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, restBytes); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(503); expect(calls).toBe(0);
-    __setVideoStatusForTests(readyVideoStatusForTests()); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "a naked child character", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "a naked child character", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
     const refused = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(refused.status).toBe(422); expect((await refused.json() as { error: string }).error).toContain("never allowed"); expect(calls).toBe(0);
     updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
     __setVideoStatusForTests(readyVideoStatusForTests({ quickMissing: true }));
@@ -892,7 +892,7 @@ describe("household companion routes", () => {
     const adult = addPerson("person-state-cancel", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Cancelable character" }, { display_name: "Author", person_id: "person-state-cancel" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const restBytes = await transparentPng();
     const rest = addVersion(id, restBytes, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, restBytes); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
-    __setVideoStatusForTests(readyVideoStatusForTests()); let sawPoll!: () => void; const pollStarted = new Promise<void>((resolve) => { sawPoll = resolve; }); let cancelled = 0;
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); let sawPoll!: () => void; const pollStarted = new Promise<void>((resolve) => { sawPoll = resolve; }); let cancelled = 0;
     __setVideosFetchForTests((async (input: string | URL | Request, init?: RequestInit) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") return Response.json({ job: "video-live" }, { status: 202 }); if (url.pathname.endsWith("/video-live") && method === "GET") { sawPoll(); return Response.json({ job: "video-live", state: "running", progress: 20, data: [] }); } if (url.pathname.endsWith("/video-live") && method === "DELETE") { cancelled++; return new Response(null, { status: 204 }); } return new Response("Not found", { status: 404 }); }) as unknown as typeof fetch);
     const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string }; await pollStarted;
     expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(409);
@@ -923,7 +923,7 @@ describe("household companion routes", () => {
     const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK)); const events: string[] = [];
     __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") events.push("keyframe"); return Response.json({ job: "never" }, { status: 202 }); }) as typeof fetch);
-    __setVideoStatusForTests(readyVideoStatusForTests()); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") events.push("clip"); return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") events.push("clip"); return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
     const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"], count: 1 }); expect(response.status).toBe(202);
     expect(existsSync(keyframePath(id, "listening"))).toBe(true); expect(existsSync(keyframePath(id, "thinking"))).toBe(true); expect(events).not.toContain("keyframe");
   });
