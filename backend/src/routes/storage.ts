@@ -13,6 +13,10 @@ import { generateDiagnostics } from "@/lib/diagnostics";
 import { clearPackageCache, getCacheSourceStats, getCacheStats, OTHER_CACHE_SOURCE } from "@/lib/packageCache";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { loadManifestOnly } from "@/lib/plugins";
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { repoRoot } from "@/lib/paths";
 // Renamed from the bare `File` export, same reason attachments.ts's own
 // toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
 // zod object under that name would shadow it.
@@ -20,7 +24,25 @@ import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 
 export const storageRoutes = apiRouter();
 
-const CleanupItemSchema = z.object({ id: z.string(), kind: z.enum(["superseded", "orphan_folder", "partial_download", "package_cache", "previews"]), label: z.string(), bytes: z.number().nonnegative(), reversible: z.boolean(), how: z.string(), blocked: z.string().nullable() });
+const CleanupItemSchema = z.object({ id: z.string(), kind: z.enum(["superseded", "orphan_folder", "partial_download", "package_cache", "previews", "rollback_copies"]), label: z.string(), bytes: z.number().nonnegative(), reversible: z.boolean(), how: z.string(), blocked: z.string().nullable() });
+const rollbackHelper = () => process.env.MAIPAI_ROLLBACK_HELPER ?? "/usr/local/libexec/maipai-prune-rollbacks";
+function runRollbackHelper(args: string[], timeout: number) {
+  const helper = rollbackHelper();
+  const installRoot = resolve(process.env.MAIPAI_INSTALL_ROOT ?? repoRoot);
+  return process.env.MAIPAI_ROLLBACK_HELPER
+    ? spawnSync(helper, args, { encoding: "utf8", timeout, env: { ...process.env, MAIPAI_INSTALL_ROOT: installRoot } })
+    : spawnSync("sudo", ["-n", helper, ...args], { encoding: "utf8", timeout, env: { ...process.env, MAIPAI_INSTALL_ROOT: installRoot } });
+}
+function rollbackCopies(): Array<{ name: string; bytes: number }> {
+  if (!existsSync(rollbackHelper())) return [];
+  const result = runRollbackHelper(["list"], 8_000);
+  if (result.status !== 0) return [];
+  return result.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => {
+    const [name, bytesText, extra] = line.split("\t");
+    const bytes = Number(bytesText);
+    return name && /^data\.rolled-back-[0-9-]+$/.test(name) && extra === undefined && Number.isSafeInteger(bytes) && bytes >= 0 ? [{ name, bytes }] : [];
+  });
+}
 async function cleanupItems() {
   const rows: Array<z.infer<typeof CleanupItemSchema>> = [];
   if (isStackConfigured()) try {
@@ -31,6 +53,8 @@ async function cleanupItems() {
   if (cacheBytes) rows.push({ id: "package_cache", kind: "package_cache", label: "Package cache", bytes: cacheBytes, reversible: true, how: "Saved copies fetched by packages; they can be fetched again.", blocked: null });
   const previews = previewStats();
   if (previews.bytes) rows.push({ id: "previews", kind: "previews", label: "Previews", bytes: previews.bytes, reversible: true, how: "Previews rebuild when viewed again.", blocked: null });
+  const rollbacks = rollbackCopies();
+  if (rollbacks.length > 2) rows.push({ id: "rollback-copies", kind: "rollback_copies", label: "Old update backups", bytes: rollbacks.slice(0, -2).reduce((sum, item) => sum + item.bytes, 0), reversible: true, how: `${rollbacks.length - 2} old update backups can be removed.`, blocked: null });
   return rows;
 }
 const cleanupListRoute = createRoute({ method: "get", path: "/cleanup", tags: ["Storage"], summary: "List safely clearable product files", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.array(CleanupItemSchema) } }, description: "Product-owned cleanup candidates; blocked candidates remain listed." }, ...errorResponses({ 403: "Not owner/admin" }) } });
@@ -38,7 +62,7 @@ storageRoutes.openapi(cleanupListRoute, async (c) => c.json(await cleanupItems()
 const cleanupRunRoute = createRoute({
   method: "post", path: "/cleanup", tags: ["Storage"], summary: "Clear selected safe product files", middleware: [requireRole("owner", "admin")] as const,
   request: { body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1).max(100) }) } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ bytes_freed: z.number().nonnegative() }) } }, description: "Bytes freed." }, ...errorResponses({ 400: "Unknown or blocked item" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ bytes_freed: z.number().nonnegative() }) } }, description: "Bytes freed." }, ...errorResponses({ 400: "Unknown or blocked item", 500: "Cleanup helper failed" }) },
 });
 storageRoutes.openapi(cleanupRunRoute, async (c) => {
   const { ids } = c.req.valid("json");
@@ -56,6 +80,15 @@ storageRoutes.openapi(cleanupRunRoute, async (c) => {
   }
   if (chosen.some((item) => item.id === "package_cache")) freed += clearPackageCache().bytes;
   if (chosen.some((item) => item.id === "previews")) freed += clearPreviews().bytes;
+  if (chosen.some((item) => item.id === "rollback-copies")) {
+    const copies = rollbackCopies();
+    const clearable = copies.slice(0, -2);
+    if (clearable.length) {
+      const result = runRollbackHelper(["prune", ...clearable.map((item) => item.name)], 30_000);
+      if (result.status !== 0) return c.json({ error: "Could not clear old update backups." }, 500);
+      freed += clearable.reduce((sum, item) => sum + item.bytes, 0);
+    }
+  }
   return c.json({ bytes_freed: freed }, 200);
 });
 

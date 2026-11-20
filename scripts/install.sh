@@ -711,6 +711,27 @@ prune_snapshots() {
   done
 }
 
+# Keep only the newest rollback data copies. Names are installer timestamps,
+# so lexical order is chronological; only real directories are eligible.
+prune_rolled_back_copies() {
+  local root="$1" keep="${2:-2}" entry name count i
+  [[ "$keep" =~ ^[0-9]+$ ]] || keep=2
+  local entries=() sorted=()
+  for entry in "$root"/data.rolled-back-*; do
+    [ -d "$entry" ] && [ ! -L "$entry" ] || continue
+    name=${entry##*/}
+    [[ "$name" =~ ^data\.rolled-back-[0-9-]+$ ]] || continue
+    entries+=("$name")
+  done
+  [ "${#entries[@]}" -gt 0 ] || return 0
+  while IFS= read -r name; do sorted+=("$name"); done < <(printf '%s\n' "${entries[@]}" | sort)
+  count=${#sorted[@]}; i=0
+  while [ $((count - i)) -gt "$keep" ]; do
+    if ! rm -rf -- "${root:?}/${sorted[$i]}"; then log "Could not remove old rollback copy ${root}/${sorted[$i]}"; fi
+    i=$((i + 1))
+  done
+}
+
 # The newest snapshot taken while upgrading away from <tag>.
 find_snapshot() {
   local root="$1" tag="$2"
@@ -747,6 +768,7 @@ restore_snapshot() {
       mkdir -p "$(dirname "${root}/${rel}")" && mv "${root}/data.rolled-back-${ts}/${rel#data/}" "${root}/${rel}"
     done < "${root}/upgrade-backups/${snap}/excluded.txt"
   fi
+  prune_rolled_back_copies "$root" || log "Could not prune old rollback copies in ${root}"
   log "Restored your data from ${snap}"
 }
 
@@ -2757,6 +2779,7 @@ main() {
     printf '%s\n' "$tag" > "${install_root}/.installed-tag"
   fi
   INSTALL_STAGE="done"
+  prune_rolled_back_copies "$install_root" || log "Could not prune old rollback copies in ${install_root}"
   trap - EXIT
   phase "done"
 

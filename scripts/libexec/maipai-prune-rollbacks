@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="${MAIPAI_INSTALL_ROOT:-/usr/local/maipai-home}"
+fail() { echo "maipai-prune-rollbacks: $1" >&2; exit "${2:-1}"; }
+[[ "$(id -u)" == 0 ]] || fail "run it with sudo." 77
+[[ $# -ge 1 ]] || fail "usage: maipai-prune-rollbacks list | prune <name>..." 64
+verb="$1"; shift
+case "$verb" in
+  list)
+    [[ $# == 0 ]] || fail "list takes no arguments." 64
+    shopt -s nullglob
+    for path in "$ROOT"/data.rolled-back-*; do
+      [[ -d "$path" && ! -L "$path" ]] || continue
+      name="${path##*/}"
+      [[ "$name" =~ ^data\.rolled-back-[0-9-]+$ ]] || continue
+      bytes=$(du -sk "$path" | awk '{print $1 * 1024}')
+      printf '%s\t%s\n' "$name" "$bytes"
+    done | sort
+    ;;
+  prune)
+    [[ $# -ge 1 ]] || fail "prune needs one or more copy names." 64
+    for name in "$@"; do
+      [[ "$name" =~ ^data\.rolled-back-[0-9-]+$ && "$name" != *..* && "$name" != */* ]] || fail "invalid rollback copy name: $name" 64
+      path="$ROOT/$name"
+      [[ ! -L "$path" ]] || fail "refusing symlink: $name" 64
+      [[ -d "$path" ]] || fail "not a rollback copy directory: $name" 64
+    done
+    for name in "$@"; do rm -rf -- "$ROOT/$name" || fail "could not remove $name"; done
+    ;;
+  *) fail "usage: maipai-prune-rollbacks list | prune <name>..." 64 ;;
+esac

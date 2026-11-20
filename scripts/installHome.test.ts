@@ -137,6 +137,17 @@ describe("upgrade data copy and rollback", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  test("rollback pruning leaves the newest two real directories", () => {
+    const root = fixture();
+    try {
+      for (const name of ["20261117-000000", "20261118-000000", "20261119-000000"]) mkdirSync(join(root, `data.rolled-back-${name}`));
+      mkdirSync(join(root, "data.rolled-back-20261116-000000"));
+      const result = bash(`prune_rolled_back_copies "${root}"`);
+      expect(result.exitCode).toBe(0);
+      expect(readdirSync(root).filter((name) => name.startsWith("data.rolled-back-")).sort()).toEqual(["data.rolled-back-20261118-000000", "data.rolled-back-20261119-000000"]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("restore_snapshot puts the old data back and keeps the newer data aside", () => {
     const root = fixture();
     try {
