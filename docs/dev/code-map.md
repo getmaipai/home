@@ -115,7 +115,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/shows.json` | shows | Shows |
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
-| `backend/packages/video/pages/animate.json` | video | Animate a picture |
 | `backend/packages/video/pages/captions.json` | video | Captions |
 | `backend/packages/video/pages/categories.json` | video | Categories |
 | `backend/packages/video/pages/channel.json` | video | Channel |
@@ -127,7 +126,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/family-picks.json` | video | Family Picks |
 | `backend/packages/video/pages/film-maker.json` | video | Film maker |
 | `backend/packages/video/pages/film-render.json` | video | Making your film |
-| `backend/packages/video/pages/from-picture.json` | video | From a picture |
 | `backend/packages/video/pages/history.json` | video | History |
 | `backend/packages/video/pages/how-made.json` | video | How it was made |
 | `backend/packages/video/pages/index.json` | video | Video |
