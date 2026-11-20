@@ -3,6 +3,7 @@
 import { availableTags, pickSound, refusedSounds } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";
+import { machineBusy } from "./loadcheck";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
 const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = quick ? 4 : 10;
 const FIRST_SOUND_TARGET_MS = 1350, P90_LIMIT_MS = 2300, WORST_LIMIT_MS = 3500; // median 1.17 s, p90 1.93 s, worst about 2.6 s measured, plus 15 percent where the sample is stable // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
@@ -28,6 +29,7 @@ let live = -1; try { live = ((await (await fetch(`http://${LAB}/api/live`, { hea
 line(others.length === 0 && live === 0, `no other rig run is going (${others.length}) and no real page is connected (${live < 0 ? "unknown" : live}); rigs wait while a page is connected`);
 if (others.length || live !== 0) { console.log("Stopping here: running the checks now would disturb a live test."); process.exit(1); }
 
+{ const m = await machineBusy(); line(!m.busy, `machine is quiet enough to measure (load average ${m.load1.toFixed(1)}, limit 4)${m.busy ? "; BUSY: " + m.top : ""}`); if (m.busy) { console.log("NOT MEASURED: the machine is busy; nothing below would be valid."); process.exit(3); } }
 // 7 tags (cheap, before the slow runs)
 const offered = [...new Set((buildPrompt().match(/\[([a-z ]+)\]/g) ?? []).map((t) => t.slice(1, -1)))].filter((t) => (TAGS as readonly string[]).includes(t) && !["whisper", "shout", "excited", "happy", "angry", "sad", "sarcastic"].includes(t));
 const silent = offered.filter((t) => { const p = pickSound("casual", t, 0.08); return !p || p.length < 3600; });

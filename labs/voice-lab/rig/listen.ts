@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { waitForNoLivePage } from "./guard";
+import { requireQuiet } from "./loadcheck";
 import { JitterGate } from "../public/jitter.js";
 import { wordEnd, stopPlan } from "../public/word-end.js";
 import { LocalDuckDetector } from "../public/local-duck.js";
@@ -16,6 +17,7 @@ import { holes, clicks, joinJump, joinFails, firstAudible, wer, stumbleReport, L
 const args = process.argv.slice(2); const opt = (k: string, d: string) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1]! : d; };
 const secret = (await Bun.file(args[0]!).text()).trim(); const RUNS = Number(opt("runs", "1")), QUICK = args.includes("--quick"), LOAD = args.includes("--load"), GAIN = Number(opt("gain", "0.2")), LAB = "127.0.0.1:9931", TTS = "http://127.0.0.1:9923";
 const W = "/Users/jessetorres/Developer/github.com/getmaipai/wt/home-brisk-panda-voice-lab";
+if (!LOAD && !args.includes("--allow-busy")) await requireQuiet("a quiet-machine listener run");
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19); const OUT = opt("out", join(W, "data-scratch", "listen", STAMP)); mkdirSync(OUT, { recursive: true });
 if (!(await waitForNoLivePage(secret, LAB))) { console.log("not running: a real page stayed connected (or the lab is down)"); process.exit(2); }
 
