@@ -4,6 +4,8 @@ import "./lockguard";
 import { speech } from "../src/stack";
 import { Chunker } from "../src/chunker";
 import { joinJump } from "./listen/judge";
+import { LevelMatcher } from "../src/levelMatch";
+const MATCH = Bun.env.MATCH === "1";
 const SEED = Bun.env.SEED ? Number(Bun.env.SEED) : undefined;
 const TEXTS = [
   "Hey, I'm doing pretty well. Thanks for asking. Just keeping things calm and steady over here. How are you doing today?",
@@ -22,6 +24,7 @@ const chunk = (t: string) => { const c = new Chunker(); const out = c.push(t); r
 const chunked: { st: number[]; db: number[] } = { st: [], db: [] }, whole: { st: number[]; db: number[] } = { st: [], db: [] };
 for (const t of TEXTS) {
   const parts = chunk(t); const sy = [] as Array<{ x: Float32Array; rate: number }>; for (const p of parts) sy.push(await synth(p, SEED));
+  if (MATCH) { const lm = new LevelMatcher(); for (let k = 0; k < sy.length; k++) { const pcm = Int16Array.from(sy[k]!.x, (v) => Math.round(v * 32767)); lm.startChunk(); const outs: Int16Array[] = []; for (let i = 0; i < pcm.length; i += 2400) outs.push(...lm.push(pcm.subarray(i, i + 2400))); outs.push(...lm.endChunk()); const all = new Int16Array(outs.reduce((a, b) => a + b.length, 0)); let o = 0; for (const b of outs) { all.set(b, o); o += b.length; } sy[k] = { x: Float32Array.from(all, (v) => v / 32768), rate: sy[k]!.rate }; } }
   const rate = sy[0]!.rate; const total = sy.reduce((a, s) => a + s.x.length, 0); const all = new Float32Array(total); let o = 0; const at: number[] = []; for (const s of sy) { all.set(s.x, o); o += s.x.length; at.push(o / rate); } at.pop();
   const one = await synth(t, SEED); const frac = parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join(" ").length / t.length);
   for (const a of at) { const j = joinJump(all, rate, a); if (j.semitones !== null) { chunked.st.push(j.semitones); chunked.db.push(j.db); } }
