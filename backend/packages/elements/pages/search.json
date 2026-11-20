@@ -1,0 +1,58 @@
+{
+  "type": "page",
+  "id": "elements-search",
+  "title": "Search",
+  "body": [
+    {
+      "type": "search",
+      "state": "q",
+      "label": "Search Elements",
+      "placeholder": "Search Elements",
+      "type_chips": {
+        "state": "kind",
+        "label": "Kind",
+        "options": [
+          {
+            "value": "all",
+            "label": "All"
+          },
+          {
+            "value": "character",
+            "label": "Characters"
+          },
+          {
+            "value": "place",
+            "label": "Places"
+          },
+          {
+            "value": "prop",
+            "label": "Props"
+          }
+        ]
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Results",
+      "bind": {
+        "source": "package",
+        "path": "elements",
+        "params": {
+          "query": "$state.q",
+          "kind": "$state.kind"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "search",
+        "text": "Nothing matches. Try other words."
+      }
+    }
+  ]
+}

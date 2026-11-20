@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "id": "elements-places",
+  "title": "Places",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Places",
+      "bind": {
+        "source": "package",
+        "path": "elements",
+        "params": {
+          "kind": "place"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "map-pin",
+        "text": "No places yet. A place you save, like your kitchen or a beach, can be reused in any picture, clip or film."
+      }
+    }
+  ]
+}

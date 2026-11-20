@@ -1,0 +1,124 @@
+{
+  "id": "elements",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Media",
+  "display": "Elements",
+  "description": "Characters, places and props you reuse in pictures, clips and films, all in one place.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "open Elements",
+      "show my characters",
+      "show my places and props",
+      "find the character I saved",
+      "where are my reusable props"
+    ],
+    "patterns": []
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "degraded",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "sidebar": {
+      "search": {
+        "type": "search",
+        "state": "q",
+        "label": "Search Elements",
+        "placeholder": "Search Elements",
+        "submit": {
+          "navigate": {
+            "to": "/apps/elements/search",
+            "state": {
+              "q": "{q}"
+            }
+          }
+        }
+      },
+      "groups": [
+        {
+          "id": "browse-elements",
+          "pages": [
+            "index",
+            "characters",
+            "places",
+            "props"
+          ]
+        }
+      ]
+    },
+    "pages": [
+      {
+        "id": "index",
+        "label": "All",
+        "icon": "layers",
+        "nav": true,
+        "kind": "schema",
+        "module": "index"
+      },
+      {
+        "id": "characters",
+        "label": "Characters",
+        "icon": "user-round",
+        "nav": true,
+        "kind": "schema",
+        "module": "characters"
+      },
+      {
+        "id": "places",
+        "label": "Places",
+        "icon": "map-pin",
+        "nav": true,
+        "kind": "schema",
+        "module": "places"
+      },
+      {
+        "id": "props",
+        "label": "Props",
+        "icon": "box",
+        "nav": true,
+        "kind": "schema",
+        "module": "props"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "icon": "search",
+        "nav": false,
+        "kind": "schema",
+        "module": "search"
+      }
+    ],
+    "data": [
+      {
+        "id": "elements",
+        "rows": "list"
+      }
+    ],
+    "header": {
+      "search": {
+        "label": "Search Elements"
+      }
+    }
+  },
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected",
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

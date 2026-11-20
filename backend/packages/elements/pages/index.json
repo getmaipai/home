@@ -1,0 +1,27 @@
+{
+  "type": "page",
+  "id": "elements-index",
+  "title": "Everything",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Everything",
+      "bind": {
+        "source": "package",
+        "path": "elements",
+        "params": {}
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "layers",
+        "text": "Nothing saved yet. Characters, places and props you save will show here."
+      }
+    }
+  ]
+}

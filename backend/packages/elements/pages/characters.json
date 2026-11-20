@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "id": "elements-characters",
+  "title": "Characters",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Characters",
+      "bind": {
+        "source": "package",
+        "path": "elements",
+        "params": {
+          "kind": "character"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "user-round",
+        "text": "No characters yet. A character you save can appear in any picture, clip or film."
+      }
+    }
+  ]
+}

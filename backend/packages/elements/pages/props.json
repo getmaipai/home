@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "id": "elements-props",
+  "title": "Props",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Props",
+      "bind": {
+        "source": "package",
+        "path": "elements",
+        "params": {
+          "kind": "prop"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "box",
+        "text": "No props yet. A prop you save can be reused in any picture, clip or film."
+      }
+    }
+  ]
+}

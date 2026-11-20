@@ -32,6 +32,7 @@ import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { mayUse } from "@/lib/filter/pass";
 import "@/lib/imageApp";
+import "@/lib/elementsApp";
 
 export const pluginsRoutes = apiRouter();
 
