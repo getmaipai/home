@@ -1829,6 +1829,7 @@ commons_archive_sha256() {
     spec-v0.1.447) printf '%s\n' "0a0bae96da2957cd201d6d0b3ebf6d93fa7cc9533ab1560e54d10de31e3dffb9" ;;
     spec-v0.1.448) printf '%s\n' "c1a9e2bc6ab6d36dfc55972082b192a0bd80b5a563fb552c4508e4d641ed8c04" ;;
     ui-v0.5.702) printf '%s\n' "fa1828b5074f162644b1f6e9a037047427621aeb9687ee7e517406d96f460cf5" ;;
+    spec-v0.1.450) printf '%s\n' "54cfc5588f6f8243ea5e38df5a639391d6912a757d2234ccb089ee78b0c1f835" ;;
     *) return 1 ;;
   esac
 }
