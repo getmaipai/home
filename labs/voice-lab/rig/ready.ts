@@ -52,6 +52,13 @@ for (const [scenario, label, need] of [["silent", "her own voice fed back into t
   const ok = !!m && Number(m[1]) === Number(m[2]) && (scenario === "stop" ? true : m[3] === "0");
   line(ok, `${label}: ${m ? `${m[1]} of ${m[2]} runs, self-interruptions ${m[3]}` : "no result"}`);
 }
+// 9 the listener: three full conversations (two on a quiet machine, one with background load); the worst case decides
+if (!quick) {
+  for (const [label, extra] of [["quiet machine, run 1 and 2", ["--runs", "2"]], ["with background load", ["--runs", "1", "--load"]]] as const) {
+    const out = await run(["bun", "rig/listen.ts", SECRET_FILE, ...extra]); const ok = /ALL RUNS: PASS/.test(out);
+    const files = out.match(/LISTEN FILES[^\n]*/)?.[0] ?? ""; line(ok, `listener, three-minute conversation (${label}; room is SIMULATED, not real speakers): ${ok ? "same person, right words, smooth, joins, timing and stumble pattern all pass" : out.split("\n").filter((l) => /^(RUN|  )/.test(l)).slice(0, 4).join(" / ").slice(0, 400)} ${ok ? "" : files}`);
+  }
+} else line(true, "listener skipped in quick mode (not valid for telling the owner to test)");
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
