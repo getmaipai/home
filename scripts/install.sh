@@ -1840,6 +1840,7 @@ commons_archive_sha256() {
     ui-v0.5.707) printf '%s\n' "fa79aaaa2b0a79f6b5e7d23c7e69db88036047a52f2c603b9c2fdbf661601ef7" ;;
     ui-v0.5.708) printf '%s\n' "0a818a7f79c1123343ce04b9e6c71dd9d2cbaa9e484d9f7926a9eb457afd17b4" ;;
     spec-v0.1.454) printf '%s\n' "bb7c2039a93a801b9879748d61208416212bcd61e19db19a92988fb2d59f7398" ;;
+    ui-v0.5.709) printf '%s\n' "822780f138e3c49597fdc952425d540213183f64d428967ded8d156a085ff725" ;;
     *) return 1 ;;
   esac
 }
