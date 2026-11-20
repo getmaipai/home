@@ -18717,8 +18717,8 @@ msgstr "Not for this computer"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:160
-msgid "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads."
-msgstr "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads."
+msgid "Not for you? Turn Videos off above and nothing of it downloads."
+msgstr "Not for you? Turn Videos off above and nothing of it downloads."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/ChatSkillsSection.tsx:41

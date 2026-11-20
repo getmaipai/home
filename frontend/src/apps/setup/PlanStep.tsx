@@ -157,7 +157,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
               <ul className="list-disc space-y-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
               <span className="block break-all">{i18n._({ id: "The full licence: {url}", message: "The full licence: {url}", values: { url: licence.url } })}</span>
               <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>{i18n._({ id: "I have read it and I accept it", message: "I have read it and I accept it" })}</FieldLabel></FieldContent></Field>
-              <span className="block text-muted-foreground">{i18n._({ id: "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads.", message: "Not for you? Choose the Standard level, or turn Videos off, above and nothing of it downloads." })}</span>
+              <span className="block text-muted-foreground">{i18n._({ id: "Not for you? Turn Videos off above and nothing of it downloads.", message: "Not for you? Turn Videos off above and nothing of it downloads." })}</span>
             </AlertDescription>
           </Alert>
         ))}
