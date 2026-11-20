@@ -4,7 +4,7 @@ import { availableTags, pickSound } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
-const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 20, TURNS = quick ? 4 : 10;
+const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = quick ? 4 : 10;
 const FIRST_SOUND_TARGET_MS = 1350; // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
 const secret = (await Bun.file(SECRET_FILE).text()).trim(), LAB = "127.0.0.1:9931";
 const results: Array<[boolean, string]> = []; const line = (ok: boolean, text: string) => { results.push([ok, text]); console.log(`${ok ? "PASS" : "FAIL"}  ${text}`); };

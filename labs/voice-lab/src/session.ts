@@ -47,7 +47,7 @@ export class VoiceSession {
   private turnCheckFn: typeof turnCheck;
   private chatFn: typeof chat;
   private speechFn: typeof speech;
-  private streamAsr: StreamingAsr | null = null; private streamEnabled = Bun.env.LAB_STREAM_DRAFT !== "0"; private streamDraft = ""; private streamDraftEarlyMs = 64;
+  private streamAsr: StreamingAsr | null = null; private streamEnabled = Bun.env.LAB_STREAM_DRAFT === "1"; private streamDraft = ""; private streamDraftEarlyMs = 64;
   private nodEnabled = false; private nodClip: Int16Array | null = null; private lastNodAt = -1e9; private nodsThisTurn = 0; private nodSuppressUntil = 0; private nodRoll: () => number = Math.random;
   private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
