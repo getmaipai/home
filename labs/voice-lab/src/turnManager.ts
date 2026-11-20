@@ -27,6 +27,7 @@ export class TurnManager {
 
   constructor(clock: () => number = () => performance.now()) { this.clock = clock; }
   private emit(type: string, extra: Record<string, unknown> = {}): Command[] { return [{ type, ...extra }]; }
+  get echoLikely() { return this.echo; }
   get cutDuration() { return this.cutSpeech; }
   get checkRevision() { return this.revision; }
 

@@ -14,16 +14,20 @@ function near(a: string, b: string) {
 export type EchoVerdict = BackchannelDecision | "echo";
 /** Only these, or three or more unrecognised words, count as a person asking her to stop. One or two stray words (a half-heard name, a
  * blur of her own voice) never do: a person who really wants her to stop says "wait" or "stop", or goes on talking, and the next check hears more. */
-export function judgeCutIn(heard: string, spoken: string): EchoVerdict {
+export function judgeCutIn(heard: string, spoken: string, echoLikely = true): EchoVerdict {
   const hw = words(heard); if (!hw.length) return "unknown";
   const spokenWords = [...new Set(words(spoken))];
+  // A short utterance with a stop word in it is a command ("wait, stop", "stop here"), even if her story happens to contain the same words.
+  if (hw.length <= 3 && hw.some((w) => STOPPERS.has(w))) return decideBackchannel(heard) === "ack" ? "ack" : "interrupt";
   const resid = hw.filter((w) => !spokenWords.some((s) => near(w, s)));
   if (!resid.length) return "echo";
   if (decideBackchannel(resid.join(" ")) === "ack") return "ack";
   // A spoken "wait" or "stop" comes first (or right after one word like "okay" or "please") and has little else after it. The
   // recognizer's blur of her own voice sometimes writes "hold" or "no" in the middle of a sentence; that is not a command.
   const content = resid.filter((w) => w.length > 2 && !FUNCTION.has(w) && !STOPPERS.has(w));
-  const stopAt = resid.findIndex((w) => STOPPERS.has(w));
-  if (stopAt >= 0 && stopAt <= 1 && content.length <= 1) return "interrupt";
+  const stopAt = hw.findIndex((w) => STOPPERS.has(w) && resid.includes(w)), stoppers = resid.filter((w) => STOPPERS.has(w)).length;
+  // At the start of a short utterance, or two stop words together ("wait, stop"), it is a command. A single stop word later in the text
+  // counts only when the microphone does not look like her own voice (the envelope check); her blurred voice often writes "hold" or "no".
+  if (stopAt >= 0 && ((stopAt <= 1 && content.length <= 1) || stoppers >= 2 || (!echoLikely && content.length <= 2))) return "interrupt";
   return content.length >= 3 ? "interrupt" : "echo";
 }

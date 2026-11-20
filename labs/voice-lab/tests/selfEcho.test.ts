@@ -36,3 +36,16 @@ test("a stop word in the middle of her own blurred sentence is not a command, on
   expect(judgeCutIn("please stop", said)).toBe("interrupt");
   expect(judgeCutIn("hold on a second", said)).toBe("interrupt");
 });
+
+test("a lone late stop word counts only when the microphone does not look like her own voice", () => {
+  expect(judgeCutIn("you want to hold", said, true)).toBe("echo");
+  expect(judgeCutIn("the dragon was nervous wait", said, false)).toBe("interrupt");
+  expect(judgeCutIn("the dragon was nervous wait", said, true)).toBe("echo");
+  expect(judgeCutIn("the dragon was nervous wait stop", said, true)).toBe("interrupt");
+});
+
+test("a short utterance with a stop word is a command even when her own story used the same words", () => {
+  const story = said + " Wait, stop, said the baker.";
+  expect(judgeCutIn("Wait, stop.", story)).toBe("interrupt");
+  expect(judgeCutIn("Stop.", story, true)).toBe("interrupt");
+});
