@@ -32139,6 +32139,12 @@
                                 "install_block": {
                                   "type": "string",
                                   "nullable": true
+                                },
+                                "for_minors": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
                                 }
                               },
                               "required": [
