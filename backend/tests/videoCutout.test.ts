@@ -39,9 +39,10 @@ beforeEach(() => {
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
 });
 afterEach(() => { __setStackEditTimingForTests(null); __setStackClientForTests(null); __resetVideoJobsForTests(); });
-function person(role: string): PersonRow {
-  const now = new Date().toISOString(), id = `person-${role.replace(/[^a-z0-9]/gi, "").toLowerCase().padEnd(6, "x")}`;
-  db.insert(people).values({ id, displayName: role, role, avatarSeed: role, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
+// `key` makes a second person with the same role: the role itself must stay one of the six (since AUDIENCE-01, 338aa18ef, a role the audience function does not know is the child band, the safe answer).
+function person(role: string, key = role): PersonRow {
+  const now = new Date().toISOString(), id = `person-${key.replace(/[^a-z0-9]/gi, "").toLowerCase().padEnd(6, "x")}`;
+  db.insert(people).values({ id, displayName: key, role, avatarSeed: role, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
   return db.select().from(people).where(eq(people.id, id)).get() as PersonRow;
 }
 function stateFor(actor: PersonRow): TurnState {
@@ -81,7 +82,7 @@ describe("remove_background", () => {
   });
   test("passes all background kinds as the cutout op", async () => {
     for (const background of ["black", "white", "green", "blur", "transparent", "#1a2b3c"]) {
-      const actor = person(`owner-${background.replace("#", "hex")}`), source = await sourceClip(actor);
+      const actor = person("owner", `owner-${background.replace("#", "hex")}`), source = await sourceClip(actor);
       const out = await run(source.state, source.id, background);
       expect(edits.jobs.at(-1)!.input.ops).toEqual([{ op: "cutout", background }]);
       const id = (out.result?.data as { videoJobId: string }).videoJobId;
@@ -92,7 +93,7 @@ describe("remove_background", () => {
   });
   test("refuses length, width and invalid background before a Stack job", async () => {
     for (const [seconds, width, background, line] of [[90, 832, undefined, "up to a minute"], [8, 2048, undefined, "too large"], [8, 832, "purple", "six-digit hex"]] as const) {
-      const actor = person(`limits-${seconds}-${width}-${background ?? "default"}`), source = await sourceClip(actor, seconds, width), before = edits.jobs.length;
+      const actor = person("owner", `limits-${seconds}-${width}-${background ?? "default"}`), source = await sourceClip(actor, seconds, width), before = edits.jobs.length;
       const out = await run(source.state, source.id, background);
       expect(out.result?.reply?.text).toContain(line);
       expect(edits.jobs).toHaveLength(before);

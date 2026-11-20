@@ -10,12 +10,13 @@ import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { resetDb } from "./reset-db";
 import { installFakeVideoStack } from "./videoFixture";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 
 describe("generate_video saved subjects", () => {
   let owner: ReturnType<typeof createBenchPeople>["owner"];
   let fake: ReturnType<typeof installFakeVideoStack>;
-  beforeEach(() => { resetDb(); owner = createBenchPeople().owner; fake = installFakeVideoStack(); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); });
+  beforeEach(() => { resetDb(); owner = createBenchPeople().owner; fake = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); });
 
   afterEach(async () => { await new Promise((r) => setTimeout(r, 50)); fake.restore(); });
 

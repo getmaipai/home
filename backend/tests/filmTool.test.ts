@@ -60,6 +60,7 @@ describe("FILM-04 make_film", () => {
     expect(result.output.entries[0]?.decision).toMatchObject({ allow: false });
   });
   test("offer gate excludes children, teens, guests, spoken, overlay and TV turns", async () => {
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); // an adult's video is ready only when the sound maker is (534d4c229, VIDEO-WAN-HIDE-01); setup only
     const base = { budget: resolveTurnBudgetBase(undefined, "adult"), actor, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false, temporary: false, bare: false, ephemeral: false, text: "make a film", musicEditAvailable: () => false };
     expect((await budgetWithTurnToolGates(base)).budget.tools_offered).toContain(MAKE_FILM_TOOL_ID);
     // FILM-ROUTING-02: several pictures attached means the film tool is the video tool; one picture keeps both.
