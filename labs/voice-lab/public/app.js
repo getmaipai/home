@@ -1,3 +1,4 @@
+import { WarmGate } from './warmup.js';
 import { TurnState } from "./turn-state.js";
 import { LocalDuckDetector } from "./local-duck.js";
 import { watchSocket } from "./reconnect.js";
@@ -57,7 +58,8 @@ $('#start').onclick = async () => {
       ws.send(JSON.stringify({ t: 'played_end', turn }));
     }
   };
-  ws.onopen = () => { let voice = 'builtin'; try { voice = localStorage.voiceLabVoice || 'builtin'; } catch {} ws.send(JSON.stringify({ t: 'hello', secret, proto: 2, voice, turn: currentTurn })); ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values: { voice } })); };
+  const warmGate = new WarmGate(performance.now()); setInterval(() => { if (!warmGate.open && ws?.readyState === 1) status.textContent = warmGate.line(performance.now()); }, 500);
+  ws.onopen = () => { warmGate.reset(performance.now()); status.textContent = warmGate.line(performance.now()); let voice = 'builtin'; try { voice = localStorage.voiceLabVoice || 'builtin'; } catch {} ws.send(JSON.stringify({ t: 'hello', secret, proto: 2, voice, turn: currentTurn })); ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values: { voice } })); };
   const rtts = []; setInterval(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'ping', turn: currentTurn, at: performance.now() })); }, 2000);
   setInterval(() => {
     for (const playback of active.values()) {
@@ -154,6 +156,7 @@ $('#start').onclick = async () => {
       $('#failedTurns').textContent = `${failedTurns} of ${turnCount}`;
       $('#timings pre').textContent = JSON.stringify(message, null, 2);
     }
+    if (warmGate.onMessage(message)) status.textContent = 'Ready. Start talking.';
     if (message.t === 'warm') { const el = document.querySelector('#warm'); if (el) el.textContent = (el.textContent === '-' ? '' : el.textContent + ', ') + message.part + ' ' + (message.ms / 1000).toFixed(1) + ' s'; }
     if (message.t === 'error') status.textContent = 'The reply could not be completed.';
     if (message.t === 'notice' && message.code === 'voice_not_ready') status.textContent = 'That voice is not ready for this voice engine. Using the built-in voice.';
@@ -178,6 +181,7 @@ $('#start').onclick = async () => {
         localRestoreTimer = setTimeout(() => { if (turnState.isCurrent(turn) && localDuckSent) { window.__restore?.(); localDuckSent = false; } }, 600);
       }
     }
+    if (!warmGate.open) return;   // no conversation until the voice is loaded
     ws.send(bytes);
   };
   watchSocket(ws, { make: () => { const n = new WebSocket(ws.url); n.binaryType = 'arraybuffer'; return n; }, status: (t) => { status.textContent = t; }, onSwap: (n) => { ws = n; } });

@@ -42,3 +42,10 @@ test("local duck ignores steady noise and triggers within two burst frames only 
   expect(active.frame(new Float32Array(512).fill(0.1), { playing: true })).toBe(false);
   expect(active.frame(new Float32Array(512).fill(0.1), { playing: true })).toBe(true);
 });
+import { WarmGate } from "../public/warmup.js";
+test("warm-up gate: the microphone stays closed until the server reports the voice loaded; the page says so in plain words and never starts silently", () => {
+  const g = new WarmGate(1000); expect(g.open).toBe(false); expect(g.line(2000)).toContain("Warming up"); expect(g.line(25000)).toContain("taking longer");
+  expect(g.onMessage({ t: "warm", part: "chat", ms: 300 })).toBe(false); expect(g.open).toBe(false);   // the chat model alone is not enough
+  expect(g.onMessage({ t: "warm", part: "voice", ms: 400 })).toBe(true); expect(g.open).toBe(true);
+  g.reset(5000); expect(g.open).toBe(false);                                                           // a reconnect warms up again
+});
