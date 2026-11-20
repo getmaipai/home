@@ -135,7 +135,7 @@ beforeEach(() => {
   setBudgetReader(async () => ({ freeMemoryBytes: 100_000_000_000, loaded: [] }));
   fake = installFakeVideoStack();
   fake.ltx25max = "ready"; fake.ltx25maxPicture = true;
-  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25max: "ready", ltx25maxPicture: true }));
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true, ltx25max: "ready", ltx25maxPicture: true }));
   composeCalls = []; cutCalls = 0; pairNames = new Set(); ingredientsCalls = 0; clipFrameColor = PERSON_A;
   composeResult = async () => solid(PERSON_A, 1024, 576);
   // Frames: the finished-clip age check asks for three; the face measurement asks for six (solid frames of the colour a test picks).
@@ -165,7 +165,7 @@ describe("the route is decided in code before any work", () => {
     __setStackClientForTests({ capabilities: async () => ({ machine_class: "test", total_bytes: 0, rows: [{ category: "video", tier: "max", fits_ever: false, needs_bytes: null, cap_bytes: 0, model: null }] }) } as never);
     try {
       expect((await readCapabilities()).rows.find((row) => row.category === "video")?.cells.find((cell) => cell.tier === "max")?.fits).toBe(false);
-      const plan = await planFirstFrameClip(actor, readyVideoStatusForTests({ ltx25max: "ready", ltx25maxPicture: true }), 5);
+      const plan = await planFirstFrameClip(actor, readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true, ltx25max: "ready", ltx25maxPicture: true }), 5);
       expect(plan?.tier).toBe("boost");
       expect(plan?.line).toBe("Max is not available on this computer yet, so this one is made at Boost.");
     } finally { __resetStackEngineForTests(); }
