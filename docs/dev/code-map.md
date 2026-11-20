@@ -142,6 +142,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/studio.json` | video | Studio |
 | `backend/packages/video/pages/swap.json` | video | Swap character |
 | `backend/packages/video/pages/talking-avatar.json` | video | Talking avatar |
+| `backend/packages/video/pages/template-rename.json` | video | Rename template |
 | `backend/packages/video/pages/templates.json` | video | Templates |
 | `backend/packages/video/pages/voiceover.json` | video | Voiceover |
 | `backend/packages/video/pages/watch-later.json` | video | Watch later |
