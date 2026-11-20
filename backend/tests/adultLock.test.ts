@@ -10,7 +10,7 @@ import { attachments, people as peopleTable, personCredentials, sessions } from 
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
-import { __setVideoStatusForTests } from "@/lib/videos/ready";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
@@ -25,6 +25,8 @@ let fake: FakeVideoStack;
 beforeEach(() => {
   resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
+  // AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker (the adult lane), so the Stack reports it ready; without this an adult's video is not ready and no clip is ever made.
+  fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { adult: false } as never })));
 });
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); __setAdultLockClockForTests(null); });
