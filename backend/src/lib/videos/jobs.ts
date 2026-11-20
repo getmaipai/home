@@ -309,7 +309,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
     const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); delete (storedBody as { identity_image?: string }).identity_image; persistVideoJob(job); } };
-    const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept) : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
+    const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept, () => explicitlyStopped.has(job.id) || (job.state as string) === "cancelled") : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job;
     // LTXD-18B: the Stack's own words about an old-base style ride the clip's existing muted line (`create.note`, read by the card, the feed and the make reply); no new status surface.
@@ -322,7 +322,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
   } catch (error) {
     // A Stop can land while submitVideo is in flight. Do not let a late
     // refusal overwrite the cancelled state or schedule another queue pass.
-    if (explicitlyStopped.has(job.id)) return;
+    if (explicitlyStopped.has(job.id) || (job.state as string) === "cancelled") return;
     if (error instanceof StackVideoError && error.code === "queue_full") {
       const request = job.request as VideoRequest & { submitQueueFullHolds?: number };
       request.submitQueueFullHolds = (request.submitQueueFullHolds ?? 0) + 1;

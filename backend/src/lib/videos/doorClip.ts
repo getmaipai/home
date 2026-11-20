@@ -48,7 +48,7 @@ export const doorWanted = (body: VideoBody): boolean => !legacyDoorForced() && c
  * Starts the clip on the generic door, or answers null when it must go on the old one. A Stack failure that is not a refusal (queue full, no memory,
  * memory cancelled) is thrown exactly as the old door throws it, so the queue and the holds in the job runner behave as before.
  */
-export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; derivedImage?: string } | null> {
+export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void, isStopped?: () => boolean): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; derivedImage?: string } | null> {
   if (legacyDoorForced()) return null;
   const request = clipRequestFor(body);
   if (!request) return null;
@@ -59,10 +59,11 @@ export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onD
     if (!made.ok) {
       // VF-ROUTE-DERIVE-01: only the Stack's typed answer starts a derivation, once. Home makes the first picture, gates it and resends; it never decides this itself.
       if (isNeedsStartPicture(made.refusal) && actor && body.identity_image && !body.derived_start) {
-        const derived = await deriveStartPicture(actor, body, made.refusal);
+        const derived = await deriveStartPicture(actor, body, made.refusal, isStopped);
         onDerived?.(derived);   // kept on the job at once: a hold after this resend never derives a second picture
         const resend = clipRequestFor({ ...body, image: derived, identity_image: undefined, derived_start: true });
-        const again = resend ? await makeClip(resend) : null;
+        // A queue or memory answer is thrown as the old door throws it (the job holds, and the derived picture is already kept); any other failure here ends the request: the picture is never swapped for the old door's start.
+        const again = resend ? await makeClip(resend).catch((error: unknown) => { if (error instanceof StackVideoError && ["queue_full", "no_memory", "out_of_memory", "memory_cancelled"].includes(String(error.code))) throw error; throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE); }) : null;
         if (!again || !again.ok) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);
         return { job: again.job, done: null, warnings: [], derivedImage: derived };
       }

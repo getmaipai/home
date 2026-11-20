@@ -104,4 +104,23 @@ describe("needs_start_picture", () => {
     await expect(submitVideoViaDoor(body(), actor)).rejects.toMatchObject({ code: "start_picture_failed" });
     expect(pictureMakes()).toHaveLength(0);
   });
+  test("a Stop while the first picture is made ends it: no gate, no resend", async () => {
+    clipAnswers = [needs, clipOk];
+    let stopped = false;
+    const run = submitVideoViaDoor(body(), actor, undefined, () => stopped);
+    stopped = true;
+    await expect(run).rejects.toMatchObject({ code: "cancelled" });
+    expect(clipMakes()).toHaveLength(1);
+  });
+  test("a failure of the resend ends the request with the plain line, never the old door's start in its place", async () => {
+    clipAnswers = [needs, () => json({ error: 'Unrecognized key: "intent"' }, 400)];
+    await expect(submitVideoViaDoor(body(), actor)).rejects.toMatchObject({ code: "start_picture_failed" });
+  });
+  test("a full line on the resend is thrown as the old door throws it, after the derived picture was kept", async () => {
+    clipAnswers = [needs, () => json({ error: "The video queue is full.", code: "queue_full" }, 429)];
+    const kept: string[] = [];
+    await expect(submitVideoViaDoor(body(), actor, (image) => kept.push(image))).rejects.toMatchObject({ code: "queue_full" });
+    expect(kept).toEqual([png]);
+    expect(pictureMakes()).toHaveLength(1);
+  });
 });
