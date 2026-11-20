@@ -12,3 +12,8 @@ export class OverlapDetector {
     return this.hotMs;
   }
 }
+
+export const LOCAL_STOP_MS = 650, BRIEF_OVERLAP_MS = 250;
+/** Once a person has clearly been talking over her for LOCAL_STOP_MS the page stops her itself, without waiting for the hub. Shorter overlap (a brief "mm-hm", "right", a half-second of both talking) never stops her on the device: the hub judges the words. */
+export function shouldStopLocally(overlapMs, { playing, alreadySent }) { return !!playing && !alreadySent && overlapMs >= LOCAL_STOP_MS; }
+export const isBriefOverlap = (overlapMs) => overlapMs >= BRIEF_OVERLAP_MS && overlapMs < LOCAL_STOP_MS;

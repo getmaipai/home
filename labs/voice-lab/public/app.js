@@ -1,7 +1,7 @@
 import { TurnState } from "./turn-state.js";
 import { LocalDuckDetector } from "./local-duck.js";
 import { watchSocket } from "./reconnect.js";
-import { OverlapDetector } from "./overlap.js";
+import { OverlapDetector, shouldStopLocally } from "./overlap.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -165,7 +165,7 @@ $('#start').onclick = async () => {
       if ($('#echoRef').checked) {
         const ms = overlapDetector.frame(pcm, { playing });
         if (ms >= 250 && performance.now() - lastOverlapSent > 90) { lastOverlapSent = performance.now(); ws.send(JSON.stringify({ t: 'overlap', ms, turn: currentTurn })); }
-        if (ms >= 650 && playing && !localStopSent2) { localStopSent2 = true; turnState.stop(currentTurn); window.__stopPlayback?.(currentTurn); ws.send(JSON.stringify({ t: 'local_stop', turn: currentTurn })); }
+        if (shouldStopLocally(ms, { playing, alreadySent: localStopSent2 })) { localStopSent2 = true; turnState.stop(currentTurn); window.__stopPlayback?.(currentTurn); ws.send(JSON.stringify({ t: 'local_stop', turn: currentTurn })); }
         if (ms === 0) localStopSent2 = false;
       }
       if (localDuckDetector.frame(pcm, { playing, enabled: $('#localDuck').checked }) && !localDuckSent) {
