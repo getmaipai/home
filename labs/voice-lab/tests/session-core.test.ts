@@ -487,6 +487,6 @@ test("a piece that is only a sound tag is skipped and does not fail the reply", 
   (h.session as any).history.commitUser("question");
   await (h.session as any).reply("question", true);
   expect((h.session as any).metrics.failure).not.toBe("voice_failed");
-  expect(spoken.every((t) => /[a-z]/i.test(t))).toBe(true);
+  expect(spoken.every((t) => /[a-z]/i.test(t.replace(/\[[^\]]*\]/g, "")))).toBe(true);
   h.session.close();
 });
