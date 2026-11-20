@@ -21064,6 +21064,7 @@ msgstr "Pitch {value}"
 
 #. js-lingui-explicit-id
 #: src/shell/library/useSaveAsCharacter.tsx:49
+#: src/shell/MediaPickerDialog.tsx:76
 #: src/shell/pages/PackageAppPage.tsx:326
 msgid "Place"
 msgstr "Place"
@@ -21520,6 +21521,7 @@ msgstr "Pronouns: {pronouns}"
 
 #. js-lingui-explicit-id
 #: src/shell/library/useSaveAsCharacter.tsx:50
+#: src/shell/MediaPickerDialog.tsx:76
 msgid "Prop"
 msgstr "Prop"
 

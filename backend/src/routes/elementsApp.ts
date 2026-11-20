@@ -8,10 +8,11 @@ import { getPictureJob } from "@/lib/pictures/jobs";
 import { makeElementFromWords } from "@/lib/elementsMake";
 import { canEditElement, entryFor } from "@/lib/elementsDetail";
 import { captureLook } from "@/lib/castLook";
-import { deleteMediaSubject } from "@/lib/mediaSubjects";
+import { deleteMediaSubject, setSubjectVoice } from "@/lib/mediaSubjects";
+import { elementVoices } from "@/lib/elementsDetail";
 
 export const elementsAppRoutes = apiRouter();
-gateMediaApp(elementsAppRoutes, "elements", ["/actions/make", "/actions/capture-look", "/actions/delete"]);
+gateMediaApp(elementsAppRoutes, "elements", ["/actions/make", "/actions/capture-look", "/actions/delete", "/actions/voice"]);
 elementsAppRoutes.post("/actions/make", requireAuth, async (c, next) => {
   const person = c.get("person");
   if (!appRouteAllowed(person, "elements", "actions", "make")) return next();
@@ -39,4 +40,16 @@ elementsAppRoutes.post("/actions/delete", requireAuth, async (c, next) => {
   const entry = typeof body.id === "string" ? entryFor(person, body.id) : null;
   if (!entry?.subject_id || !canEditElement(person, entry.id)) return c.json({ error: "That element cannot be deleted here. A companion or household member is edited where that record lives.", code: "not_allowed" }, 403);
   return deleteMediaSubject(person, entry.subject_id) ? c.json({ ok: true as const, line: "Deleted." }, 200) : c.json({ error: "That element could not be deleted. Try again.", code: "failed" }, 400);
+});
+
+// ELEMENTS-HOME-05: pick the voice an element speaks in, from the voices the engine in use offers for it (never a recording or a clone).
+elementsAppRoutes.post("/actions/voice", requireAuth, async (c, next) => {
+  const person = c.get("person");
+  if (!appRouteAllowed(person, "elements", "actions", "voice")) return next();
+  const body = await jsonBody(c);
+  const id = typeof body.element_id === "string" ? body.element_id : "";
+  const offered = elementVoices(person, id).find((voice) => voice.id === body.id);
+  const entry = entryFor(person, id);
+  if (!entry?.subject_id || !offered) return c.json({ error: "That voice is not available for this element. Pick one from the list and try again.", code: "not_allowed" }, 403);
+  return setSubjectVoice(person, entry.subject_id, offered.id) ? c.json({ ok: true as const, line: "Voice saved." }, 200) : c.json({ error: "The voice could not be saved. Try again.", code: "failed" }, 400);
 });

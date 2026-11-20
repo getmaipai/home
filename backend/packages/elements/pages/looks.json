@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "elements-looks",
+  "title": "Looks",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Looks",
+      "bind": {
+        "source": "package",
+        "path": "looks"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/elements/element",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "palette",
+        "text": "No look sheets yet. Open a character and choose Capture the look."
+      }
+    }
+  ]
+}

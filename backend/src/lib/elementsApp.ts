@@ -7,7 +7,7 @@ import { attachments } from "@/db/schema";
 import { registerAppData } from "@/lib/apps";
 import { listCast, type CastEntry } from "@/lib/cast";
 import { getMediaSubject, isSheetReference, type SubjectKind } from "@/lib/mediaSubjects";
-import { elementActions, elementEditRows, elementFacts, elementFilms, elementPictures } from "@/lib/elementsDetail";
+import { elementLooks, elementVoices, elementActions, elementEditRows, elementFacts, elementFilms, elementPictures } from "@/lib/elementsDetail";
 import type { PersonRow } from "@/types";
 
 const KIND_LABEL: Record<SubjectKind, string> = { character: "Character", place: "Place", prop: "Prop" };
@@ -45,6 +45,8 @@ export function elementsAppData(person: PersonRow, dataId: string, body: unknown
   if (dataId === "element-films") return elementFilms(person, id);
   if (dataId === "element-actions") return elementActions(person, id);
   if (dataId === "element-edit") return elementEditRows(person, id);
+  if (dataId === "element-voices") return elementVoices(person, id);
+  if (dataId === "looks") return elementLooks(person);
   if (dataId !== "elements") return null;
   return elementRows(person, { kind: pick(input.kind), query: pick(input.query) });
 }

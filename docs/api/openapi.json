@@ -71459,6 +71459,14 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 60
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "character",
+                      "prop",
+                      "place"
+                    ]
                   }
                 },
                 "required": [

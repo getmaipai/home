@@ -94,6 +94,20 @@ describe("MediaHost.pickMedia", () => {
     expect(await picked).toEqual({ id: "cast-ada", thumb: "/ada.png" });
   });
 
+  test("ELEMENTS-HOME-04: a place and a prop are listed with their kind shown, a character without one", async () => {
+    const entry = (id: string, subject_kind: string, name: string) => ({ id, kind: "subject", subject_kind, name, real: false, minor: false, audience: "all-ages", look: { description: "", sheet_file_id: "s", sheet_stale: false, medium: null }, avatar: { url: null, seed: id } });
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes("/api/cast")) return Response.json({ cast: [entry("c1", "character", "Ada"), entry("p1", "place", "Kitchen"), entry("r1", "prop", "Mug")] });
+      return Response.json({ items: [], next_cursor: null });
+    }) as unknown as typeof fetch;
+    const view = mount("person-1");
+    act(() => { void host!.pickMedia!("character"); });
+    const kitchen = await view.findByRole("button", { name: "Choose Kitchen" });
+    expect(kitchen.textContent).toContain("Place");
+    expect(view.getByRole("button", { name: "Choose Mug" }).textContent).toContain("Prop");
+    expect(view.getByRole("button", { name: "Choose Ada" }).textContent).toBe("Ada");
+  });
+
   test("a cast member without a sheet can be selected and capture look refreshes cast", async () => {
     let listCalls = 0;
     const requests: string[] = [];

@@ -89,6 +89,39 @@
       "item_media_field": "thumbnail"
     },
     {
+      "type": "media_shelf",
+      "heading": "Voice",
+      "bind": {
+        "source": "package",
+        "path": "element-voices",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "row_actions": [
+        {
+          "icon": "mic",
+          "label": "Use this voice",
+          "action": {
+            "call": {
+              "target": "/api/plugins/elements/actions/voice",
+              "method": "POST",
+              "args": {
+                "id": "{id}",
+                "element_id": "{element_id}"
+              },
+              "success_label": "Voice saved"
+            }
+          }
+        }
+      ]
+    },
+    {
       "type": "action_bar",
       "bind": {
         "source": "package",

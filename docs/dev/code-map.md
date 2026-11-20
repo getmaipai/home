@@ -55,7 +55,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/books/pages/series-detail.json` | books | Series |
 | `backend/packages/books/pages/series.json` | books | Series |
 | `backend/packages/elements/pages/characters.json` | elements | Characters |
-| `backend/packages/elements/pages/index.json` | elements | Everything |
+| `backend/packages/elements/pages/element.json` | elements | Element |
+| `backend/packages/elements/pages/index.json` | elements | Elements |
+| `backend/packages/elements/pages/looks.json` | elements | Looks |
 | `backend/packages/elements/pages/make.json` | elements | Make an element |
 | `backend/packages/elements/pages/places.json` | elements | Places |
 | `backend/packages/elements/pages/props.json` | elements | Props |
@@ -604,6 +606,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/documentMediaTypes.ts` | DOCUMENT_MEDIA_TYPES, isDocumentMediaType |
 | `backend/src/lib/echo.ts` | ECHO_WINDOW_MS, subjectOf, fingerprintOf, repeatNotes, resetEchoRecords |
 | `backend/src/lib/elementsApp.ts` | elementRows, elementsAppData |
+| `backend/src/lib/elementsDetail.ts` | entryFor, elementFacts, elementPictures, elementFilms, elementActions, elementEditRows |
 | `backend/src/lib/elementsMake.ts` | ELEMENT_WORDS_MAX, elementPrompt, makeElementFromWords |
 | `backend/src/lib/emergencyKit.ts` | generateEmergencyKit |
 | `backend/src/lib/engineAutotune.ts` | autotuneContextSize, resolveLaunchFlags, launchFlagsToArgs |

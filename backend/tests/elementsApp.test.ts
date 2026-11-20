@@ -31,7 +31,7 @@ test("Elements is a valid bundled app: its pages exist, validate against the pag
   expect(appPackageProblems(loaded.value, join(PACKAGES_DIR, "elements"))).toEqual([]);
   expect((loaded.value.routing?.examples ?? []).length).toBeGreaterThanOrEqual(5);
   expect(loaded.value.min_role).toBe("child");
-  expect(contributes.data.map((item) => item.id)).toEqual(["elements", "element", "element-pictures", "element-films", "element-actions", "element-edit"]);
+  expect(contributes.data.map((item) => item.id)).toEqual(["elements", "element", "element-pictures", "element-films", "element-actions", "element-edit", "element-voices", "looks"]);
   const ajv = new Ajv2020({ strict: false });
   for (const page of contributes.pages) expect(ajv.validate(UI_SCHEMA as object, JSON.parse(readFileSync(join(PACKAGES_DIR, "elements", "pages", `${page.module}.json`), "utf8")))).toBe(true);
 });
@@ -132,4 +132,30 @@ test("ELEMENTS-HOME-02: the delete action removes the owner's own element, and r
   expect(((await refused.json()) as { error: string }).error).toContain("edited where that record lives");
   const missing = await client.post("/api/plugins/elements/actions/capture-look", { id: "nope" });
   expect(missing.status).toBe(404);
+});
+
+test("ELEMENTS-HOME-05: the voice is stored on the owner's own element, only from the offered voices, and resolveCast returns it", async () => {
+  const { client, row } = await owner();
+  const { __setOfferedVoicesForTests } = await import("@/lib/voiceResolve");
+  const { resolveCast } = await import("@/lib/cast");
+  const voice = (id: string, source: "preset" | "cloned") => ({ id, name: id, description: "A calm voice", language: "en-US", country: "US", gender: "neutral" as const, source, onDisk: true, licence: null, revision: "1" });
+  __setOfferedVoicesForTests([voice("pocket-alba", "preset"), voice("my-clone", "cloned")]);
+  try {
+    const subject = createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl" });
+    expect((await import("@/lib/elementsDetail")).elementVoices(row, subject.id).map((item) => item.id)).toEqual(["pocket-alba"]);
+    const set = await client.post("/api/plugins/elements/actions/voice", { id: "pocket-alba", element_id: subject.id });
+    expect(set.status).toBe(200);
+    expect((await resolveCast(row, [subject.id])).members[0]!.voice).toBe("pocket-alba");
+    const clone = await client.post("/api/plugins/elements/actions/voice", { id: "my-clone", element_id: subject.id });
+    expect(clone.status).toBe(403);
+    expect(((await clone.json()) as { error: string }).error).toContain("not available for this element");
+  } finally { __setOfferedVoicesForTests(undefined); }
+});
+
+test("ELEMENTS-HOME-05: the Looks page lists one stored sheet per element and never a real person's", async () => {
+  const { row } = await owner();
+  const { elementLooks } = await import("@/lib/elementsDetail");
+  expect(elementLooks(row).filter((item) => MADE.has(item.title))).toEqual([]);
+  createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl" });
+  expect(elementLooks(row).filter((item) => MADE.has(item.title))).toEqual([]);
 });

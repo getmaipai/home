@@ -1,11 +1,11 @@
 {
   "type": "page",
   "id": "elements-index",
-  "title": "Everything",
+  "title": "Elements",
   "body": [
     {
       "type": "media_shelf",
-      "heading": "Everything",
+      "heading": "Characters, places and props",
       "bind": {
         "source": "package",
         "path": "elements",

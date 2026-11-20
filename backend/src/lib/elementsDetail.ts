@@ -7,6 +7,7 @@ import { listCast, type CastEntry } from "@/lib/cast";
 import { getMediaSubject, isSheetReference } from "@/lib/mediaSubjects";
 import { attachments } from "@/db/schema";
 import { and, isNull } from "drizzle-orm";
+import { peekOfferedVoices, voicePresetName } from "@/lib/voiceResolve";
 import type { PersonRow } from "@/types";
 
 const EMPTY = "Not set yet";
@@ -71,3 +72,20 @@ export function elementEditRows(person: PersonRow, id: string) {
   return entry && editable(person, entry) ? [{ id, title: entry.name, thumbnail: "", subtitle: "Delete this element. Pictures and films that used it keep working." }] : [];
 }
 export const canEditElement = (person: PersonRow, id: string): boolean => { const entry = entryFor(person, id); return !!entry && editable(person, entry); };
+
+/** ELEMENTS-HOME-05: the voices the engine in use offers, for the owner's own saved element. Only offered preset voices are listed: a voice that is a recording or a clone is never picked here, and a child's voice is never cloned. */
+export function elementVoices(person: PersonRow, id: string) {
+  const entry = entryFor(person, id);
+  if (!entry || !editable(person, entry)) return [];
+  return (peekOfferedVoices() ?? []).filter((voice) => voice.source === "preset" || voice.source === "community").map((voice) => {
+    const name = voicePresetName(voice.id) ?? voice.name;
+    return { id: voice.id, element_id: id, title: voice.name || name, thumbnail: "", subtitle: entry.voice && (voice.id === entry.voice || voice.id.endsWith(`-${entry.voice}`)) ? "Its voice now" : voice.description };
+  });
+}
+
+/** ELEMENTS-HOME-05: the Looks page: the one stored sheet per element, for elements that are not a real person's likeness (real-person views wait for VF-CAST-01 and VF-UI-07). */
+export function elementLooks(person: PersonRow) {
+  return listCast(person).filter((entry) => entry.look.sheet_file_id && !entry.real && entry.kind !== "member").map((entry) => ({
+    id: entry.id, title: entry.name, thumbnail: `/api/files/${entry.look.sheet_file_id}/thumb?w=480`, subtitle: entry.look.sheet_stale ? "Out of date: its pictures changed" : "Look sheet", kind: entry.subject_kind,
+  }));
+}

@@ -73,7 +73,7 @@ export function MediaPickerBody({ kind, personId, onDone }: { kind: PickKind; pe
             {rows.map((member) => <li key={member.id} className="flex min-w-0 flex-col gap-1">
               <button type="button" className="flex min-h-20 w-full items-center gap-2 rounded-md border border-border p-2 text-left focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Choose ${member.name}`} onClick={() => onDone({ id: member.id, ...(member.avatar.url ? { thumb: member.avatar.url } : {}) })}>
                 {member.avatar.url ? <SafeImage src={member.avatar.url} alt="" draggable={false} className="size-12 shrink-0 rounded-full object-cover" /> : <SeededAvatar name={member.name} seed={member.avatar.seed ?? member.id} />}
-                <span className="truncate text-supporting">{member.name}</span>
+                <span className="flex min-w-0 flex-col"><span className="truncate text-supporting">{member.name}</span>{member.subject_kind === "place" ? <span className="truncate text-supporting text-muted-foreground">{i18n._({ id: "Place", message: "Place" })}</span> : member.subject_kind === "prop" ? <span className="truncate text-supporting text-muted-foreground">{i18n._({ id: "Prop", message: "Prop" })}</span> : null}</span>
               </button>
               {!member.look.sheet_file_id ? <><p className="text-supporting text-muted-foreground">{i18n._({ id: "No look sheet yet", message: "No look sheet yet" })}</p><Button type="button" size="sm" variant="secondary" disabled={lookBusy !== null} onClick={() => void captureLook(member.id)}>{lookBusy === member.id ? "Capturing look" : "Capture look"}</Button></> : null}
             </li>)}

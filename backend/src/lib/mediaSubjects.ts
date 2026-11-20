@@ -77,6 +77,12 @@ export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<
   db.update(mediaSubjects).set({ name, kind: updated.kind, look, referenceIds: JSON.stringify(ids), real: updated.real ?? false, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();
   return getMediaSubject(actor, id);
 }
+/** ELEMENTS-HOME-05: the voice an element speaks in, stored on the subject and returned by `resolveCast`. Owner's own saved element only (a companion's or a member's voice is theirs). Null clears it. */
+export function setSubjectVoice(actor: PersonRow, id: string, voice: string | null): MediaSubject | null {
+  const existing = rowById(id); if (!existing || existing.personId || existing.synthId || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
+  db.update(mediaSubjects).set({ voice, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();
+  return getMediaSubject(actor, id);
+}
 export function deleteMediaSubject(actor: PersonRow, id: string): boolean {
   const row = rowById(id); if (!row || row.personId || row.ownerPersonId !== actor.id) return false;
   const names = db.select().from(mediaProductions).all().filter((p) => p.ownerPersonId === actor.id).filter((p) => {
