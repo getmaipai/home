@@ -12,7 +12,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { listPending } from "@/lib/notifications";
 import {
   AGE_CHECK_SYSTEM_PROMPT, __resetAgeCheckEventsForTests, __setAgeCheckRunnerForTests, __setAgeDeadlineForTests, __setAgeVisionForTests, checkImages, decideAgeCheck,
-  downscaleForCheck, effectiveLabel, isAdultOnlyJob, minorRefusalLine, parseVerdict, pictureReader, promptHash, uncheckedRefusalLine, type AgeLabel, type AgeVerdict, type ImageCheck,
+  __setReaderWaitForTests, downscaleForCheck, effectiveLabel, isAdultOnlyJob, minorRefusalLine, parseVerdict, pictureReader, promptHash, uncheckedRefusalLine, type AgeLabel, type AgeVerdict, type ImageCheck,
 } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests, keyframeCount } from "@/lib/pictures/keyframes";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
@@ -373,3 +373,25 @@ describe("a video job", () => {
     expect((await run("a paper boat")).state).toBe("done");
   });
 });
+
+describe("checkImages with a reader that never starts", () => {
+  test("COLD-CHECK-01: every image is unchecked, nothing is sent to the reader, and the person's line is today's (never a pass)", async () => {
+    __setAgeCheckRunnerForTests(null); // the real path, with a scripted Stack; the suite preload restores the default after the test
+    let asked = 0;
+    __setReaderWaitForTests({ boundMs: 300, pollMs: 50 });
+    __setStackClientForTests({
+      roles: async () => ({ roles: [{ id: "vision", state: { state: "installed" }, model: { id: "vision-model", imageInput: true } }] }),
+      budget: async () => ({ pressure: "normal" }),
+      modelAction: async () => { asked++; return {}; },
+      request: async () => { throw new Error("the reader must not be asked a question it has not started for"); },
+    } as never);
+    const checks = await checkImages([new Uint8Array([1]), new Uint8Array([2])], "video");
+    expect(checks.every((check) => !check.ok)).toBe(true);
+    expect(asked).toBe(1);
+    const decision = decideAgeCheck(checks, true, "video");
+    expect(decision).toMatchObject({ action: "withhold", reason: "unchecked", line: uncheckedRefusalLine("video") });
+    expect(decideAgeCheck(checks, false, "video", "teen").action).toBe("withhold");
+    __setReaderWaitForTests(null); __setStackClientForTests(null);
+  });
+});
+

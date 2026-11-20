@@ -1,7 +1,7 @@
 // The finished-picture and clip check reads pictures on the chat role when chat declares picture input, else on the Stack's separate
 // vision role (so Splash chat, which loads no projector, keeps its speed). With neither, the check fails closed (no_vision).
 import { afterEach, describe, expect, test } from "bun:test";
-import { pictureReader, checkImages, __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
+import { pictureReader, checkImages, __setAgeCheckRunnerForTests, __setReaderWaitForTests } from "@/lib/pictures/ageCheck";
 import { checkChildSafety, __setChildSafetyRunnerForTests } from "@/lib/pictures/laneGate";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 
@@ -40,9 +40,11 @@ describe("pictureReader", () => {
   });
   test("an offline vision role that cannot answer still fails closed through both checks", async () => {
     __setAgeCheckRunnerForTests(null); __setChildSafetyRunnerForTests(null);
+    __setReaderWaitForTests({ boundMs: 200, pollMs: 20 }); // COLD-CHECK-01: the check waits for the reader to start; this one never does, so the wait is short here
     __setStackClientForTests({ roles: async () => ({ roles: [row("chat", "ready", false), row("vision", "offline", true, MEMORY_PAUSE)] }), budget: async () => ({ pressure: "normal" }) } as never);
     const age = await checkImages([new Uint8Array([1])], "video"), child = await checkChildSafety([new Uint8Array([1])]);
     expect(age.every((c) => !c.ok)).toBe(true); expect(child.every((c) => !c.ok)).toBe(true);
+    __setReaderWaitForTests(null);
   });
   test("an unreadable Stack is no reader", async () => {
     __setStackClientForTests({ roles: async () => { throw new Error("down"); } } as never);

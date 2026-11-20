@@ -289,6 +289,45 @@ export async function pictureReader(): Promise<PictureReader | null> {
   }
 }
 
+// COLD-CHECK-01 (measured 2026-11-20): the first picture check after the reader was unloaded spent its engine start (about 24 s once) inside the check's own 20 s deadline and failed
+// closed. The 20 s bounds the question, not the engine's start: before the per-image timers, the check waits for the reader to be ready. Never a pass without a verdict: a reader that does
+// not start within the bound gives the same unchecked result as a timeout, and the person sees the same line.
+export interface ReaderWaitDeps {
+  roles(): Promise<{ roles: Array<{ id: string; state: { state: string }; model?: { id?: string } | null }> }>;
+  /** Asks the Stack to start the reader's model (once). */
+  ask(modelId: string): Promise<unknown>;
+  sleep(ms: number): Promise<void>;
+  now(): number;
+}
+let READER_WAIT_MS = 60_000;
+let READER_POLL_MS = 1_000;
+/** Test seam: a shorter bound and poll (null restores). */
+export function __setReaderWaitForTests(options: { boundMs: number; pollMs: number } | null): void { READER_WAIT_MS = options?.boundMs ?? 60_000; READER_POLL_MS = options?.pollMs ?? 1_000; }
+const realReaderDeps = (): ReaderWaitDeps => ({
+  roles: () => getStackClient().roles({ signal: AbortSignal.timeout(5_000) }),
+  ask: async (modelId) => getStackClient().modelAction(modelId, "load", { signal: AbortSignal.timeout(READER_WAIT_MS) }),
+  sleep,
+  now: () => Date.now(),
+});
+const READY_STATES = new Set(["ready", "busy", "loaded"]);
+
+/** True when the reader is ready (at once for a warm one); false when it did not become ready within the bound. A Stack that cannot be read is not waited on: the check runs and decides as before. */
+export async function waitForPictureReader(reader: PictureReader, deps: ReaderWaitDeps = realReaderDeps()): Promise<boolean> {
+  const until = deps.now() + READER_WAIT_MS;
+  let asked = false;
+  for (;;) {
+    let row: { state: { state: string }; model?: { id?: string } | null } | undefined;
+    try { row = (await deps.roles()).roles.find((entry) => entry.id === reader); } catch { return true; }
+    const state = row?.state.state ?? "";
+    if (READY_STATES.has(state)) return true;
+    if (!row) return true;
+    // Asked once, and only when nothing is already starting it.
+    if (!asked && state !== "loading" && row.model?.id) { asked = true; try { void deps.ask(row.model.id).catch(() => undefined); } catch { /* a Stack that cannot be asked is only waited on */ } }
+    if (deps.now() >= until) return false;
+    await deps.sleep(READER_POLL_MS);
+  }
+}
+
 /** True when the Stack says memory is critical, after waiting a few seconds for it to ease. A budget the Stack cannot read counts as fine. */
 async function memoryIsCritical(): Promise<boolean> {
   const until = Date.now() + MEMORY_WAIT_MS;
@@ -412,6 +451,8 @@ export async function checkImages(images: readonly Uint8Array[], kind: CheckedKi
       if (!found) return images.map((): ImageCheck => ({ ok: false, why: "no_vision" }));
       reader = found;
       if (await memoryIsCritical()) return images.map((): ImageCheck => ({ ok: false, why: "memory" }));
+      // COLD-CHECK-01: the per-image timers start only once the reader is ready; a reader that does not start in time is an unchecked result, the same as a timeout.
+      if (!(await waitForPictureReader(reader))) return images.map((): ImageCheck => ({ ok: false, why: "timeout" }));
     }
     const checks: ImageCheck[] = [];
     for (const image of images) {
