@@ -147,40 +147,6 @@
         "crossfade"
       ],
       "export_label": "Save as a new clip"
-    },
-    {
-      "type": "section",
-      "heading": "Split into two clips",
-      "condition": "clip",
-      "children": [
-        {
-          "type": "prompt_bar",
-          "placement": "inline",
-          "layout": "chat",
-          "chat_distribution": "start_end",
-          "label": "Split at",
-          "placeholder": "Type the time to split at, in seconds, for example 4.5.",
-          "prompt_state": "split_at",
-          "max_length": 12,
-          "submit_label": "Split",
-          "starts": "video",
-          "submit": {
-            "call": {
-              "target": "/api/plugins/video/actions/split",
-              "method": "POST",
-              "args": {
-                "id": "{clip}",
-                "at": "{split_at}"
-              },
-              "then": {
-                "navigate": {
-                  "to": "/apps/video/clips"
-                }
-              }
-            }
-          }
-        }
-      ]
     }
   ]
 }

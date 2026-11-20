@@ -70,7 +70,8 @@ describe("the page", () => {
     expect(PageNodeSchema.safeParse(page).success).toBe(true);
     const text = JSON.stringify(page);
     expect(text).not.toContain("coming soon");
-    expect(text).toContain("/api/plugins/video/actions/split");
+    expect(text).not.toContain("/api/plugins/video/actions/split"); // VF-IA-02 (a): Split into two clips moved into the Studio page
+    expect((await (await owner.get("/api/plugins/video/pages/studio")).text())).toContain("/api/plugins/video/actions/split");
     expect(text).toContain("/api/plugins/video/actions/export");
     expect(text).toContain("/api/plugins/video/actions/add");
     for (const minor of [teen.client, child.client]) expect([403, 404]).toContain((await minor.get("/api/plugins/video/pages/trim")).status);
