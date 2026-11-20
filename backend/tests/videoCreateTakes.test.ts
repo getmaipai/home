@@ -138,7 +138,7 @@ describe("Takes chip", () => {
 describe("the time and engine line under Generate", () => {
   test("falls back to the fixed words with no history, and says the engine's state in plain words", async () => {
     const { client } = await adultClient();
-    __setVideoStatusForTests(readyVideoStatusForTests({}));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     const line = videoTimeLine("standard", 5);
     expect(line.startsWith(VIDEO_TIME_WORDS.standard)).toBe(true);
     expect(videoEngineLine()).toBe("Ready");
@@ -165,7 +165,7 @@ describe("the time and engine line under Generate", () => {
   test("a busy home says how many are ahead", async () => {
     const { client } = await adultClient();
     await client.post("/api/plugins/video/actions/make", { prompt: BOAT, takes: 2 });
-    __setVideoStatusForTests(readyVideoStatusForTests({}));
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
     expect(videoEngineLine()).toMatch(/^Busy: [12] ahead of you$/);
   });
 
