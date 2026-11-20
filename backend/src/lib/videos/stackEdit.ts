@@ -121,6 +121,27 @@ export async function stageClipForStack(sourcePath: string): Promise<{ path: str
   }
 }
 
+/** Private copies of several files (pictures, sounds) in one folder the Stack may read, for a Stack job other than `media.edit`. Call `cleanup` when the job is over. Null when the Stack is remote or the copy fails. */
+export async function stageFilesForStack(files: EditFile[]): Promise<{ paths: string[]; cleanup: () => void } | null> {
+  if (isRemoteStackSelected()) return null;
+  const root = resolve(dataDir, "video-edit");
+  const dir = join(root, newFileId());
+  try {
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    await openEditRoot(root);
+    const paths = files.map((file, index) => {
+      const path = join(dir, `in-${index + 1}.${file.ext.replace(/[^a-z0-9]/gi, "").toLowerCase() || "bin"}`);
+      writeFileSync(path, file.bytes, { mode: 0o644 });
+      return path;
+    });
+    return { paths, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  } catch {
+    rmSync(dir, { recursive: true, force: true });
+    return null;
+  }
+}
+
 /** Submits one `media.edit` job with these files and steps, waits for it and returns the finished file's bytes. */
 export async function runStackEdit(request: StackEditRequest): Promise<StackEditResult> {
   if (!isStackConfigured()) return { ok: false, code: "unavailable", line: EDIT_UNAVAILABLE_LINE };
