@@ -259,6 +259,7 @@ PY
     case "$watch_result" in
       green) echo "main: green at ${watch_sha:0:7}" ;;
       flaky) echo "main: flaky at ${watch_sha:0:7}: ${watch_files:-unknown}" ;;
+      unverified) echo "main: unverified at ${watch_sha:0:7}: ${watch_files//stopped:/} stopped before finishing (not a pass, not red)" ;;
       red)
         echo "main: red at ${watch_sha:0:7}: ${watch_files:-unknown} (culprit ${watch_culprit:0:7})"
         changed_files="$(git diff --name-only "$base"...HEAD 2>/dev/null || true)"

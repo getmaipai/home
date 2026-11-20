@@ -122,18 +122,21 @@ atomic_value() {
 watch_unverified_age() {
   python3 - "$data" "${1:-$(date +%s)}" <<'PY'
 import datetime,json,os,sys
-d,now=sys.argv[1],int(sys.argv[2]); newest=0; stamp='never'
+d,now=sys.argv[1],int(sys.argv[2]); newest=0; earliest=0; stamp='never'
 try:
  for line in open(os.path.join(d,'runs.jsonl')):
   try: r=json.loads(line)
   except Exception: continue
-  if r.get('result') not in ('green','flaky','red'): continue
   ts=r.get('ts','')
   try: n=int(datetime.datetime.fromisoformat(ts.replace('Z','+00:00')).timestamp())
   except Exception: continue
-  if n>newest: newest=n; stamp=ts
+  if earliest==0 or n<earliest: earliest=n
+  if r.get('result') in ('green','flaky','red') and n>newest: newest=n; stamp=ts
 except OSError: pass
-print(max(0,now-newest) if newest else now, stamp)
+# No finished run yet: the gap runs from the first record of any kind (a fresh data folder is not 490,000 hours unverified); no record at all is no gap.
+if newest: print(max(0,now-newest), stamp)
+elif earliest: print(max(0,now-earliest), 'no finished run yet')
+else: print(0, 'never')
 PY
 }
 
@@ -266,7 +269,7 @@ run_suite() {
         if [[ "$requested" == "$leg" ]]; then legs+=("$leg"); break; fi
       done
     done
-    : > "$output"
+    : > "$output"; rm -f "$output.stopped"
     for leg in "${legs[@]}"; do
       leg_output="$output.$leg"
       leg_status="$output.$leg.status"
@@ -287,12 +290,12 @@ run_suite() {
       if (( leg_limit > 0 )); then
         ( sleep "$leg_limit"; if kill -0 "$leg_pid" 2>/dev/null; then : > "$leg_status.timeout"; kill -TERM -"$leg_pid" 2>/dev/null || true; sleep 10; kill -KILL -"$leg_pid" 2>/dev/null || true; fi ) &
         watchdog_pid=$!
-        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; rc=1; fi
+        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; fi
         pkill -P "$watchdog_pid" 2>/dev/null || true
         kill "$watchdog_pid" 2>/dev/null || true
         wait "$watchdog_pid" 2>/dev/null || true
       else
-        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; rc=1; fi
+        if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; fi
       fi
       if [[ -e "$leg_status.timeout" ]]; then
         printf '124 %s timed_out\n' "$(( $(date +%s) - local_started ))" > "$leg_status"
@@ -312,6 +315,14 @@ run_suite() {
         printf 'shard: failing files: unknown\n' >> "$output"
       fi
       cat "$leg_output" >> "$output"
+      # WATCHER-STARVED-01: a leg job.sh stopped ("STOPPED: ... This is not a pass", memory pressure or any other stop) did not run to the end. It is neither a failure nor a pass:
+      # it is listed in "$output.stopped", and the pass says which legs did not run.
+      if (( leg_rc != 0 )) && grep -q '^job\.sh: STOPPED:' "$leg_output" 2>/dev/null; then
+        printf '%s\n' "$leg" >> "$output.stopped"
+        printf 'shard: leg %s was stopped before it finished; it is not counted as a failure or a pass\n' "$leg" >> "$output"
+        rm -f "$leg_output" "$leg_status" "$leg_status.timeout"
+        continue
+      fi
       rm -f "$leg_output" "$leg_status" "$leg_status.timeout"
       (( leg_rc == 0 )) || rc=1
     done
@@ -661,7 +672,7 @@ run_once() {
 }
 
 run_once_body() {
-  local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
+  local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0 stopped_legs=""
   local bisect_started bisect_budget bisect_spent has_t2=0
   mkdir -p "$data/t2-wanted" "$data/t2-green"
   [[ -z "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]] || has_t2=1
@@ -753,6 +764,7 @@ run_once_body() {
   set -e
   if (( watcher_lock_held )); then bash "$gate_lock" release "watcher-$$" || true; watcher_lock_held=0; fi
   seconds=$(( $(date +%s) - started ))
+  stopped_legs="$(tr '\n' ' ' < "$output.stopped" 2>/dev/null | sed 's/ *$//')"
   # A leg the sharder deferred for memory pressure (exit 75) is neither green nor red: nothing is recorded and the next tick retries.
   if grep -qE '^== leg: [a-z]+ \(exit 75,' "$output"; then
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) deferred (memory) at $head: $(grep -E '^shard: deferred' "$output" | tail -n 1 | sed 's/^shard: deferred (memory): //')" >> "$data/watcher.log"
@@ -768,6 +780,18 @@ run_once_body() {
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) stalled at $head: leg $timed_leg timed out after $timed_seconds s" >> "$data/watcher.log"
     rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
     echo "stalled at ${head:0:7}: leg $timed_leg timed out"
+    return 0
+  fi
+  if (( rc == 0 )) && [[ -n "$stopped_legs" ]]; then
+    # WATCHER-STARVED-01: every leg that ran passed, but at least one was stopped: neither green nor red. No green marker, no red issue, no culprit; the 24 hour alert still counts it as unverified.
+    local tokens="" leg
+    for leg in $stopped_legs; do tokens="${tokens:+$tokens }stopped:$leg"; done
+    append_run "$head" unverified "$seconds" "$tokens" ""
+    atomic_value "$data/last-run" "$head"
+    watch_unverified_alert
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) unverified at $head: legs stopped before they finished (not a pass): $stopped_legs" >> "$data/watcher.log"
+    rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts" "$output.stopped"
+    echo "unverified at ${head:0:7}: $stopped_legs stopped (not a pass)"
     return 0
   fi
   if (( rc == 0 )); then
@@ -813,6 +837,7 @@ run_once_body() {
     if (( budget_spent )); then printf -- '- Main SHA: `%s`\n- Culprit: unknown (bisect budget spent)\n- Failing files: %s\n\n' "$head" "${files:-unknown}"
     elif [[ "$culprit" == flaky ]]; then printf -- '- Main SHA: `%s`\n- Culprit: none (flaky under load: the failing files pass alone at the commit the bisect named, so no commit is blamed)\n- Failing files: %s\n\n' "$head" "${files:-unknown}"
     else printf -- '- Main SHA: `%s`\n- Culprit: `%s` (%s)\n- Failing files: %s\n\n' "$head" "$culprit" "$subject" "${files:-unknown}"; fi
+    if [[ -n "$stopped_legs" ]]; then printf -- '- Legs that did not run (stopped before they finished, not a pass): %s\n\n' "$stopped_legs"; fi
     printf '## Last 60 lines of suite output\n\n```text\n'
     tail -n 60 "$output"
     printf '\n```\n\n## Failure messages (every leg, WATCH-RED-KEEP-01)\n\n```text\n'
@@ -827,7 +852,7 @@ run_once_body() {
   atomic_value "$data/last-run" "$head"
   file="${files%% *}"; title="Watcher: main red at ${head:0:7}: ${file:-unknown}"
   file_issue "$title" "${file:-unknown}" "$note"
-  rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
+  rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts" "$output.stopped"
   echo "red at ${head:0:7}: ${files:-unknown}; culprit ${culprit:0:7}"
 }
 

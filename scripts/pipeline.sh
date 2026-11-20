@@ -177,6 +177,9 @@ elif record.get("result")=="red":
     print("main: red at %s: %s (culprit %s)" % (last_run[:7], files, culprit[:7]))
 elif record.get("result")=="flaky":
     print("main: flaky at %s: %s" % (last_run[:7], ", ".join(record.get("failing",[])) or "unknown"))
+elif record.get("result")=="unverified":
+    legs=", ".join(item.split(":",1)[-1] for item in record.get("failing",[])) or "a leg"
+    print("main: unverified at %s: %s stopped before finishing (not a pass, not red)" % (last_run[:7], legs))
 elif record.get("result")=="stalled":
     print("main: stalled at %s: %s" % (last_run[:7], ", ".join(record.get("failing",[])) or "a test leg timed out"))
 elif last_run==last_green:
@@ -197,18 +200,19 @@ PY
 watch_unverified_status() {
   python3 - "$watch_data" "$(date +%s)" "${MAIPAI_WATCH_UNVERIFIED_SECONDS:-21600}" <<'PY'
 import datetime,json,os,sys
-d,now,threshold=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]); newest=0; stamp='never'
+d,now,threshold=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]); newest=0; earliest=0; stamp='never'
 try:
  for line in open(os.path.join(d,'runs.jsonl')):
   try:r=json.loads(line)
   except Exception:continue
-  if r.get('result') not in ('green','flaky','red'):continue
   try:n=int(datetime.datetime.fromisoformat(r['ts'].replace('Z','+00:00')).timestamp())
   except Exception:continue
-  if n>newest:newest=n;stamp=r['ts']
+  if earliest==0 or n<earliest:earliest=n
+  if r.get('result') in ('green','flaky','red') and n>newest:newest=n;stamp=r['ts']
 except OSError: pass
-age=now-newest if newest else now
-if age>threshold: print('main unverified for %d h (last finished run %s)' % (age//3600,stamp))
+base=newest or earliest
+age=now-base if base else 0
+if age>threshold: print('main unverified for %d h (last finished run %s)' % (age//3600,stamp if newest else 'none yet'))
 PY
 }
 

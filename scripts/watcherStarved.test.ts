@@ -132,6 +132,45 @@ describe("watcher starvation protection", () => {
     expect(readFileSync(join(f.data, "reds", `${sha}.md`), "utf8")).toContain("flaky under load");
   }, 60_000);
 
+  // WATCHER-STARVED-01: a leg job.sh stopped ("STOPPED: ... This is not a pass") is neither red nor green. A fake `bun` plays each leg by its --dir.
+  const legsEnv = (f: F, behave: Record<string, "pass" | "stopped" | "red">) => {
+    const bin = join(f.scratch, "leg-bin"); mkdirSync(bin, { recursive: true });
+    const cases = Object.entries(behave).map(([dir, how]) => how === "stopped"
+      ? `${dir}) echo 'job.sh: STOPPED: memory pressure and this job is the largest and still growing (3256 MB). This is not a pass.'; exit 143 ;;`
+      : how === "red" ? `${dir}) echo '(fail) boom > it breaks'; echo 'shard: failing files: broken.test.ts'; exit 1 ;;` : `${dir}) echo 'all green'; exit 0 ;;`).join("\n");
+    writeFileSync(join(bin, "bun"), `#!/usr/bin/env bash\ndir=''; while (($#)); do case "$1" in --dir) dir="$2"; shift 2 ;; *) shift ;; esac; done\ncase "$dir" in\n${cases}\n*) exit 0 ;; esac\n`); chmodSync(join(bin, "bun"), 0o755);
+    return { ...f.env, PATH: `${bin}:${process.env.PATH}`, MAIPAI_WATCH_SUITE_CMD: "", MAIPAI_WATCH_LEGS: "scripts backend frontend", MAIPAI_WATCH_RERUN_CMD: "false" };
+  };
+  for (const stoppedLeg of ["backend", "frontend"]) {
+    test(`a stopped ${stoppedLeg} leg with the others passing is unverified: no green marker, no red note, no issue, no culprit, and status says so`, () => {
+      const f = fixture();
+      const env = legsEnv(f, { scripts: "pass", backend: stoppedLeg === "backend" ? "stopped" : "pass", frontend: stoppedLeg === "frontend" ? "stopped" : "pass" });
+      const out = run(f, "watcher.sh", ["run-once"], env);
+      expect(out.status).toBe(0);
+      const head = git(f.warm, "rev-parse", "origin/main");
+      const last = records(f).at(-1);
+      expect(last.result).toBe("unverified");
+      expect(last.failing).toEqual([`stopped:${stoppedLeg}`]);
+      expect(last.culprit ?? "").toBe("");
+      expect(existsSync(join(f.data, "green", head))).toBe(false);
+      expect(existsSync(join(f.data, "reds", `${head}.md`))).toBe(false);
+      expect(existsSync(join(f.scratch, "issue.calls"))).toBe(false);
+      expect(out.stdout).toContain(`unverified at ${head.slice(0, 7)}`);
+      expect(run(f, "pipeline.sh", ["status"], { ...env, MAIPAI_WATCH_DATA: f.data }).stdout).toContain(`unverified at ${head.slice(0, 7)}`);
+    }, 60_000);
+  }
+  test("a real red in one leg with another stopped is red for the legs that ran, and the note says which leg did not run", () => {
+    const f = fixture();
+    const out = run(f, "watcher.sh", ["run-once"], legsEnv(f, { scripts: "red", backend: "stopped", frontend: "pass" }));
+    expect(out.status).toBe(0);
+    const head = git(f.warm, "rev-parse", "origin/main");
+    expect(records(f).at(-1).result).toBe("red");
+    const note = readFileSync(join(f.data, "reds", `${head}.md`), "utf8");
+    expect(note).toContain("Legs that did not run");
+    expect(note).toContain("backend");
+    expect(existsSync(join(f.scratch, "issue.calls"))).toBe(true);
+  }, 60_000);
+
   test("the log rotates over 5 MB (the duplicate-start quieting has no automated test: it needs a live second watcher process)", () => {
     const f = fixture();
     mkdirSync(f.data, { recursive: true });
