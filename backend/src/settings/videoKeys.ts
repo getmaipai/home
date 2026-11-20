@@ -47,12 +47,12 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
     range: {"options": ["standard", "boost"]},
     default: "standard",
     label: "Level when nobody says",
-    help: "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video.",
+    help: "Fast has sound and takes less time. Full HD has a sharper picture and takes longer. Anyone can pick a quality for one video.",
     copy: {
       does: "Picks how chat makes a video if no level is named.",
       options: {
         standard: "Fast, with sound.",
-        boost: "A sharper picture, a little slower.",
+        boost: "Full HD: a sharper picture, a little slower.",
       },
     },
     level: "basic",

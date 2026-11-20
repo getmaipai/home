@@ -459,7 +459,9 @@
           "label": "Video",
           "sections": [
             "speed",
-            "storage"
+            "storage",
+            "models",
+            "limits"
           ]
         }
       ],
@@ -489,6 +491,37 @@
             "folders",
             "saved copies",
             "trash"
+          ]
+        },
+        {
+          "id": "models",
+          "label": "Video makers and quality",
+          "icon": "cpu",
+          "kind": "link",
+          "href": "/settings/ai",
+          "min_role": "admin",
+          "keywords": [
+            "install",
+            "maker",
+            "model",
+            "quality",
+            "fast",
+            "full hd"
+          ]
+        },
+        {
+          "id": "limits",
+          "label": "Family limits for making videos",
+          "icon": "shield",
+          "kind": "link",
+          "href": "/settings/media?tab=pictures",
+          "min_role": "admin",
+          "keywords": [
+            "limits",
+            "children",
+            "teens",
+            "daily",
+            "family"
           ]
         }
       ]
