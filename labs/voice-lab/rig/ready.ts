@@ -31,8 +31,8 @@ line(engines.chat && engines.voice && engines.page, `chat model, voice server an
 
 // 2 no other lab load, no real page
 const others = (await run(["pgrep", "-f", "rig/(measure|echotest)\\.ts"])).trim().split("\n").filter((p) => p && Number(p) !== process.pid);
-let live = -1; try { live = ((await (await fetch(`http://${LAB}/api/live`, { headers: { "x-lab-secret": secret } })).json()) as { live: number }).live; } catch {}
-line(others.length === 0 && live === 0, `no other rig run is going (${others.length}) and no real page is connected (${live < 0 ? "unknown" : live}); rigs wait while a page is connected`);
+let live = -1, connected = -1; try { const j = (await (await fetch(`http://${LAB}/api/live`, { headers: { "x-lab-secret": secret } })).json()) as { live: number; connected?: number }; live = j.live; connected = j.connected ?? j.live; } catch {}
+line(others.length === 0 && live === 0, `no other rig run is going (${others.length}) and no real page is active (${live < 0 ? "unknown" : live} active, ${connected < 0 ? "unknown" : connected} open; a page counts as active for 120 s after any message either way)`);
 if (others.length || live !== 0) { console.log("Stopping here: running the checks now would disturb a live test."); process.exit(1); }
 
 { const pr = await labPriorities(); const bad = pr.filter((x) => x.nice !== 0 || x.stat.includes("N")); line(bad.length === 0, `lab processes run at normal priority: ${pr.map((x) => `${x.name} pid ${x.pid} nice ${x.nice} state ${x.stat}`).join("; ")}${bad.length ? "; LOW PRIORITY: " + bad.map((x) => x.name).join(", ") + " (never start an engine from a zsh background job)" : ""}`); const m = await machineBusy(); console.log(`      load average ${m.load1.toFixed(1)}${m.busy ? "; busiest: " + m.top : ""} (recorded, never a reason to skip)`); const g = await sampleGpu(); console.log(`      GPU utilization ${g.util}%${g.jobs ? "; other GPU jobs: " + g.jobs : ""} (a video job on the same GPU stretches chat and voice)`); }
