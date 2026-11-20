@@ -1,6 +1,6 @@
 # Video and film pipeline: one clip pipeline for LTX and H3, characters, films, swap, speed (2026-11-20)
 
-Status: proposed, for the architect; no product code in this note's commit. Saves the design from the video proof of concept (POC) of
+Status: proposed, architect APPROVED 2026-11-20; no product code in this note's commit. Saves the design from the video proof of concept (POC) of
 2026-11-19 and 2026-11-20 and several rounds of outside review. Owner ask (Jesse, 2026-11-20): "ok save the design and its details".
 Where an earlier note in the repo and this one disagree, this one wins for the points listed in Supersedes.
 
@@ -40,7 +40,7 @@ Searched 2026-11-20 in Home and Stack (names tried: receipt, profile, capability
 Extended, not duplicated: the model pack record and generic jobs (MODELPACK-SPEC-01, -STACK-01, -JOBS-01, -SWAP-01, -SHEET-01, -HOME-01 to -03, rows listed in section 11 of the model packs note); the Stack's job queue, heavy gate and admission (`lib/jobs.ts`, `lib/heavyGate.ts`) and disk admission (DISK-GUARD-02);
 `video/videoGen.ts` (`VIDEO_SPECS`), `video/ltx25.ts` (size table), `video/h3.ts` (`H3_VIDEO_CAPABILITIES`), `video/jobs.ts` (finish step), `video/ltx25Edit.ts` (extend, retake), `clip_from_sheet`; Home `lib/videos/tool.ts`, `lib/films/plan.ts`, `films/sheetMaker.ts`, `films/referenceFirstFrame.ts`, `castLook.ts`, `resolveCast`;
 the existing rows FILM-ANIMATIC-01 (animatic), FILM-GRADE-01, VIDEO-TAKES-01 and CREATOR-10 (take scoring and face match), CREATOR-25 (shot card and takes), CREATOR-01 (locked sentence), H3-REFS-01, H3-ONE-RUNTIME-01, H3-SHEET-STACK-01 / -HOME-01 / -BENCH-01, H3-SWAP-STACK-01, CREATOR-57-LIVE-01, FILM-UPSCALE-01 (done), VIDEO-MASK-01 (done).
-ffmpeg's built-in filters (`blackdetect`, `freezedetect`, `silencedetect`, `ebur128`) for the checker, and the spec and catalog records of MODELPACK-SPEC-01 (`clip`, `character_sheet`, `clip_from_sheet`, `swap`), MODELPACK-JOBS-01 (`limits`, `capabilities`, `available`, `alternatives[]`), `made_with`, `generation-provenance` and the `creation-record` (CREATOR-01).
+Home's one clip rule table `CLIP_RULES` (`backend/src/lib/videos/frameCheck.ts`, IVY-QC-01: `blackLuma 12`, `frozenDiff 0.35`), ffmpeg's built-in filters (`blackdetect`, `freezedetect`, `silencedetect`, `ebur128`) for the checker, and the spec and catalog records of MODELPACK-SPEC-01 (`clip`, `character_sheet`, `clip_from_sheet`, `swap`), MODELPACK-JOBS-01 (`limits`, `capabilities`, `available`, `alternatives[]`), `made_with`, `generation-provenance` and the `creation-record` (CREATOR-01).
 New: the typed clip request, capability rows, the job receipt, the planner, the finished-file checker, the voiced storyboard, the reference-set approval and the repaired swap check. Nothing here adds a second queue, store or model table.
 
 ## 1. Evidence (POC, 2026-11-19 and 2026-11-20)
@@ -88,11 +88,11 @@ Reading: close-ups hold on every recipe (0.6 and up). In medium shots every firs
 
 | Failure | Cause (confirmed unless marked) | Where it goes |
 |---|---|---|
-| Film A (all LTX) had no speech, repeated footsteps, looked like different camera crews, teeth problems (owner) | One `loudnorm` over six audio inputs in a single ffmpeg graph made every shot carry the first shot's audio (correlation 0.999 between shots). Only the parts were checked; the speech-to-text returned empty on the final file and was blamed on length. Silent shots had a -53 to -71 dB floor that loudness leveling raised to speech level. Crews and footsteps: independent stills and independent voices per shot (inference, not tested) | Finished-file checks (7.7); one room tone bed per location (7.5) |
+| Film A (all LTX) had no speech, repeated footsteps, looked like different camera crews, teeth problems (owner) | One `loudnorm` over six audio inputs in a single ffmpeg graph made every shot carry the first shot's audio (correlation 0.999 between shots). Only the parts were checked; the speech-to-text returned empty on the final file and was blamed on length. This was the proof of concept's own manual ffmpeg cut, not product code: neither Home nor the Stack does it (code audit of `origin/main`, 2026-11-20); the finished-file check stays as the guard. Silent shots had a -53 to -71 dB floor that loudness leveling raised to speech level. Crews and footsteps: independent stills and independent voices per shot (inference, not tested) | Finished-file checks (7.7); one room tone bed per location (7.5) |
 | H3 opens every clip with a noise burst and a small mouth movement in the first 130 ms | Found by the owner ("her lips move with that odd sound"); in every engine; no official fix. Our start picture had parted lips and our prompt did not follow H3's official format | Start pictures with closed lips for speaking shots; trim or cover the first four frames at 24 fps; H3 prompt grammar (6.3) |
 | Teeth merge on wide-open mouths | At every LTX size and on H3 at 1088x608 in a medium shot; close-ups with calm delivery are clean on every recipe. The detail pass neither fixes nor causes it. All three seeds of the original prompt had a wide-open stretch; "speaks quietly, lips parting only slightly" cut it to one small stretch in one take (one take: not proof). Refine Details could not be run (the adapter's repo is gated behind accepting its model terms) | Close-ups for speech; the wording above; a mouth check per take (7.6); no automatic mouth repair |
 | Identity in medium shots | Face under 120 px; first-frame routes score 0.27 to 0.35 | Reference route on a capable pack (6); close-ups for faces |
-| The live Stack cancelled LTX Max three times | Memory governor, "too busy", at 9 percent, 9 percent and 12 percent (2026-11-19). Max needs 49 to 74 GB peak, above what the governor left free. Not proven whether another job was running | Open (section 13); the hub must be able to admit Max HD (VF-PROFILE-01) |
+| The live Stack cancelled LTX Max three times | Memory governor, "too busy", at 9 percent, 9 percent and 12 percent (2026-11-19). Max needs 49 to 74 GB peak, above what the governor left free. Not proven whether another job was running | Open (section 13); the hub must be able to admit Max HD (VF-PROFILE-01) In code: a clip is capped at 64 GB (`ltx25.ts:173`), Max is admitted at 51.0 or 61.5 GB, and the memory watchdog fails a Max job as "stopped: memory" (`lib/jobs.ts:493`, `lib/memoryWatchdog.ts:619`). The HD profile needs a measured row, the cap and tier row and admission, or it cancels itself. |
 | The old swap compositor fails its own check | Its mask covers about 48 percent of a two-person dialogue clip (a color rule tuned to one clip) and the check grades the mask against itself. Repaired independent check: 41,694 persistent changed pixels (largest blob 15,877) outside the true face region; 51,723 as written; 10.6 percent of pixels changed outside the region on the dialogue clip | Section 8 |
 | Face-only swap fails likeness | Passes every preservation check and swaps the right person, but the swapper rewrites only the inner-face template (brows to chin); hair, hairline, beard and head shape stay the actor's, so it reads as a third person. Owner: "faceswap is awful" (2026-11-20). Models, boost sizes and face restore changed nothing | Section 8 |
 | Head-swap adapter reverts within 5 frames | The LTX head-swap adapter fed a good anchor still: frame 0 carries the anchor, frame 5 scores -0.07, then about 0 to the end; the guide video's own head wins. The paste-back worked (0 pixels outside the region); the result is nearly the original again | Section 8; V3 mode not yet run |
@@ -133,7 +133,7 @@ Additive optional fields on MODELPACK-SPEC-01's `clip` shape, spec first (`commo
 | `dialogue` | Structured lines: speaker, text, optional timing; never free text inside the words |
 | `inputs[]` | New typed inputs with a role: `identity`, `wardrobe`, `voice_reference`, `edit_source` |
 | `intent` | "open exactly on this picture" or "this person, new shot" |
-| `profile` | `preview` or `quality`, the clip-job name for the existing tier `level` of the jobs catalog; the spec defines the mapping once (Standard is preview; Boost and Max are quality) and adds no second field for it |
+| `level` (existing) | The only quality key on the wire. `profile` (`preview`, `quality`) is a spec-defined name for groups of levels (Standard is preview; Boost and Max are quality) and is never a request field |
 | `operation` | `new`, plus `retake_from`, `extend`, `enhance` added spec first by VF-TAKES-01 and VF-ENHANCE-01 (retake and extend exist in the Stack today) |
 
 Home names no model, step count, size, limit or fallback (E7). It owns cast access, age and audience rules and face checks (rules 0 and C8), asks the Stack for the route, and names a part only from the household order or the catalog's `alternatives[]`. Home derives a start picture only when the Stack's answer says the chosen route needs one.
@@ -176,7 +176,7 @@ One record per job, the same for every run, written by the Stack: revisions, mod
 4. One prompt per engine from the same shot; never copy H3 speaker tags, steps or the turbo adapter into LTX.
 5. The native file is kept; a failed finish leaves the original.
 6. Existing ids, polling, permissions, cancel and queue keep working; a retry or cancel cannot overwrite a first take.
-7. Home never writes "no X" for H3; a negation sent to an engine without one is rejected, not dropped.
+7. No prompt the pack's writer sends to H3 carries a negation; a negation sent to an engine without one is rejected, not dropped.
 
 ## 4. Today's clip path, traced (`origin/main`; the live hub may differ)
 
@@ -185,13 +185,37 @@ One record per job, the same for every run, written by the Stack: revisions, mod
 | H3 checkpoint, steps | FL2VA through the yshenaw port; 7 steps when the turbo adapter file exists, else 12 | Profiles (3.2, VF-PROFILE-01) |
 | H3 size | 864x480 or 480x864 only | Pack numbers |
 | H3 reference pictures for clips | not possible (`reference_pictures: false`); `VIDEO_SPECS.h3` says no image input while `H3_KEYFRAMES` says first and last work | One capability row (VF-CAPS-01) |
-| Saved character into a clip | its first raw reference photo as the start picture, plus look words; the sheet is stored last, so never the one sent | Reference set and roles (section 5) |
+| Saved character into a clip | its first raw reference photo as the start picture, plus look words; `loadSubjectReferences` filters the sheet out of `references` and returns it separately (Home `lib/mediaSubjects.ts:120`); only the adult-only check reads it, so the first photo is what the clip gets | Reference set and roles (section 5) |
 | Pack notes | the H3 pack says 24 steps, 1.5x lanczos, an audio chain; the code does 7 or 12, Real-ESRGAN 2x, no chain | Implement or delete (VF-PROFILE-01) |
 | Runtimes | clips on the yshenaw port; swap and sheets on the mere.run fork with different weights | H3-ONE-RUNTIME-01 |
 | Negative prompt | accepted and silently dropped | Rule 7 |
 | LTX | two-stage 8 + 3 steps matches the maker; sizes Standard 512x256 (10 s), Boost 768x448 (5 s), Max 1024x576 (10 s); LoRAs fused on Max only; extend and retake Max only; sheet adapter Max only | Add native HD Max profile, detail pass profile |
 | Finish | H3: Real-ESRGAN 2x then lanczos to 1728x960; LTX: file rewritten in place | One cheap finisher per pack and operation (VF-FINISH-01) |
 | Shot to shot | each still and clip made on its own | Section 7 |
+
+**Where Home is today (code audit of `origin/main`, 2026-11-20).** Home's video and film path does not go through the Stack's pack, plan and catalog layer. Home calls the legacy `POST /v1/videos/generations` (and `/restyle`, `/ingredients`, `/swap`); the generic `jobs/make` `clip` door has no Home caller. So every Stack-side piece here (planner, roles, receipt, profiles) reaches a film only after MODELPACK-HOME-03 moves Home onto the generic door, or after a thin interim change passes the new fields through the legacy door (VF-DOOR-01 decides). MODELPACK status: SPEC-01 to 03, STACK-01 (9 packs), JOBS-01 and SWAP-01 have landed code; SHEET-01 has its dispatch; HOME-02 is done; HOME-01, 03 and 04 are not; `lint:no-model-names` does not exist (MODELPACK-HOME-05 owns it); none of these rows are in `docs/BACKLOG.md`.
+
+**Defects the audit found, to fix inside the named rows.**
+
+| Defect | Row |
+|---|---|
+| H3 finish failure invisible (status overwritten by `ready`); reply is constants (`audio: true` unverified); poster cut before the finish and never re-cut | VF-RECEIPT-01 |
+| H3 silently lengthens clips under 4 s; a fixed LoRA file is a hidden H3 default; the 34 GB peak is the 4-bit build while the generic door starts the 8-bit build (42.1 GB); `planMake` refuses 6 to 10 s H3 clips the legacy route runs | VF-PROFILE-01 |
+| The H3 video engine has no pin or weight hashes and runs from an environment variable (rule 11) | VF-PROFILE-01, H3-REFS-01 |
+| Result retention (24 newest or 24 hours) can delete early film shots before the cut | VF-CHECK-01 |
+| A cast of two, or a character plus a place, yields one start picture and drops the rest silently | VF-ROUTE-01 |
+| A film character named like a saved subject takes that subject's look; a failed look capture is swallowed; dialogue is `Say "line"` with no speaker and no check the words came out; two copies of the film assembly; the music bed is not ducked | VF-STORYBOARD-01, VF-CAST-01 |
+| Drift is measured then only logged; a redo clears the approved still too; face check exists only in the reference route | VF-REPAIR-01 |
+| Render-time words hard-coded per model in Home (E4) | VF-STORYBOARD-01 |
+
+**Gate gaps that exist today, closed with this work and not after.**
+
+| Gap | Closed by |
+|---|---|
+| Drawn views and composed first pictures skip `gateFinished` (`films/sheetViews.ts`, `videos/referenceFirstFrame.ts`, `firstPictureHarmony.ts`) | VF-ROUTE-01 and VF-CAST-01 |
+| No known-minor fact reaches the finished-item gate; an adult can cast an under-18 household member | VF-CHECK-01 (the cast's minor fact is passed to every per-clip and finished-file check) |
+| The clip gate checks keyframes only, never the sound (VIDEO-LTX-06); faceless narration audio is never checked | VF-CHECK-01 |
+| Two owner rulings conflict on clip voices for minors: `voiceForSpeech.ts` (a voice made from a clip is spoken in every band) against the talent note (a minor never hears one) | Open owner ruling (section 13); one voice per character stays adult-only and Films stay adult-only meanwhile |
 
 ## 5. Characters and locations
 
@@ -222,7 +246,7 @@ Four sheet makers exist; only Home's `films/sheetMaker.ts` is wired, and it foll
 | The sheet never reaches video | Clip job takes the approved reference set with roles (VF-CAST-01, VF-ROUTE-01) |
 | One small composite | Store separate full-size views; keep the composite for display |
 | Stale sheet never rebuilt; film capture failure swallowed | Rebuild when photos change and ask again; show the failure on the film card |
-| Locked sentence is typed words | Vision model writes it from the approved views |
+| Locked sentence: for a saved cast it does reach video (`castForTool` swaps in `locked_description`, `lib/cast.ts:172`) but it is the first 400 typed characters, cut mid-word; the `subjects:[names]` path sends the raw look | Vision model writes it from the approved views |
 | No check after the clip | Face check against the set, one retake, plain note if it still fails (CREATOR-10 scores the take) |
 | Locations: none | Section 7.3 |
 
@@ -236,8 +260,8 @@ Hand-written prompts in each official grammar first, as golden fixtures; the loc
 
 | Profile | LTX | H3 |
 |---|---|---|
-| Preview | Boost 768x448, 1.2 min | turbo adapter at its own schedule; a "fast H3" profile only if a test shows 120 s or less and within half a star of the 24-step clip on face, mouth and speech |
-| Quality | Max bf16 1920x1088, 6.5 to 8.1 min, 74 GB; DFR detail pass for detail-sensitive shots | FL2VA 24 steps 864x480 (13.0 min); Ref2VA only for identity in medium shots. A 768p 8-step profile (13.7 min) is open: it was measured only on an outside Metal engine and counts only as a Stack-installed, pinned, tested part with a part row (rule 11) |
+| Preview | Standard 512x256 (Boost 768x448, 1.2 min, is the fast default and a quality-group level: a kept Boost clip is a final, D4) | turbo adapter at its own schedule; a "fast H3" profile only if a test shows 120 s or less and within half a star of the 24-step clip on face, mouth and speech |
+| Quality | Boost 768x448 (fast default); Max bf16 1920x1088, 6.5 to 8.1 min, 74 GB; DFR detail pass for detail-sensitive shots | FL2VA 24 steps 864x480 (13.0 min); Ref2VA only for identity in medium shots. A 768p 8-step profile (13.7 min) is open: it was measured only on an outside Metal engine and counts only as a Stack-installed, pinned, tested part with a part row (rule 11) |
 
 ### 6.3 Finish and sound
 
@@ -299,7 +323,7 @@ Each shot has one observable beat: the wide for geography, the medium for postur
 
 ### 7.7 Finished-file checks
 
-The checker is a Stack media op (E3: Home never runs an engine or model itself). It takes the exported file, the approved shot list and the dialogue timings, uses ffmpeg's `blackdetect`, `freezedetect`, `silencedetect` and `ebur128` for the picture and sound facts and the Stack's speech-to-text for the words; any mouth or teeth check that needs a model is a Stack job too. A failed export shows on that film's own card (S6). Before a film is called done, on the exported file, not the parts: every scripted line is heard once, at its time (speech-to-text shot by shot, never skipped because the file is "too long"; an empty result is a failure); no shot shares another shot's audio (waveform correlation between shots); the picture is not frozen or black; size, length and frame rate are what was asked; a nonempty audio stream alone is not a pass.
+The checker is a Stack media op (E3: Home never runs an engine or model itself). It takes the exported file, the approved shot list and the dialogue timings, uses the one black and frozen rule table `CLIP_RULES` (extended with the held-still exemption, never a second table) and ffmpeg's `blackdetect`, `freezedetect`, `silencedetect` and `ebur128` for the picture and sound facts and the Stack's speech-to-text for the words; any mouth or teeth check that needs a model is a Stack job too. A failed export shows on that film's own card (S6). Before a film is called done, on the exported file, not the parts: every scripted line is heard once, at its time (speech-to-text shot by shot, never skipped because the file is "too long"; an empty result is a failure); no shot shares another shot's audio (waveform correlation between shots); the picture is not frozen or black; size, length and frame rate are what was asked; a nonempty audio stream alone is not a pass.
 
 Three deliberate-break tests of the checker: mute one line; copy another shot's audio into its place; freeze a shot that calls for motion. It must catch all three, and it must PASS an intentionally held still (a porch lamp that comes on and holds). That is why the exporter needs the approved shot list and dialogue timings as its reference, not just the file. Normalize each shot's audio in its own call, then join; never one shared filter graph.
 
@@ -404,20 +428,31 @@ Acceptance cases kept as release evidence: replay a legacy start and end job on 
 
 ## 12. Build order and work packages
 
-Order (from the outside review, adopted): (1) typed roles, receipts and capability tests around the current runners, no behavior change; (2) route ordinary Home clips and film shots through one planner, exercising LTX with H3 absent; (3) H3 reference conditioning and explicit H3 profiles; (4) compare quality and promote a default per task and per tier, separately. For films: voiced storyboard, finished-export checks, approved character and location references through Films, bounded repairs. Swap: repair the preservation check, then the face-only decisive test. First milestone in the person's words: "I give MaiPai a sentence and a photo, watch a 30 second version with voices, change one thing, and approve what it is about to spend time rendering."
+Order (from the outside review, adopted): spec first, then Stack, then Home; each commons change needs a spec tag, a Stack pin and the installer hash. Waves, by which packages share files (code audit, 2026-11-20):
+
+| Wave | Packages | Notes |
+|---|---|---|
+| 0 (now, parallel, disjoint files) | VF-RECEIPT-01, VF-ROLES-01 (spec), VF-CHECK-01 (Stack ffmpeg part), VF-SWAPCHECK-01, VF-EVAL-01, VF-SPEED-01, VF-DOOR-01 (decision) | VF-RECEIPT-01 and VF-SWAPCHECK-01 both touch `video/` but different files |
+| 1 | VF-CAPS-01 (needs ROLES for operation names; one commons session with it) | |
+| 2 | VF-PROFILE-01, the LTX Max HD row, VF-PROMPT-01 | `h3Video.test.ts` breaks here |
+| 3 | VF-ROUTE-01 (= MODELPACK-HOME-03), VF-CAST-01, VF-FINISH-01 | VF-ROUTE-01 and VF-CAST-01 both edit `videos/referenceVideo.ts` and the `videoSubjects` and `castLook` tests: sequence or split |
+| 4 | VF-STORYBOARD-01, VF-LOOK-01, the Films part of VF-CHECK-01 | all edit `films/engines.ts`, `run.ts`, `background.ts`: one session or strict file ownership |
+| 5 | VF-REPAIR-01, VF-TAKES-01, the H3 reference route (H3-REFS-01) | |
+
+Until Home reaches the generic door (wave 3), waves 1 and 2 cannot be exercised by a real film unless VF-DOOR-01 adds a thin pass-through on the legacy door. For films: voiced storyboard, finished-export checks, approved references through Films, bounded repairs. Swap: repair the preservation check, then the face-only decisive test. First milestone in the person's words: "I give MaiPai a sentence and a photo, watch a 30 second version with voices, change one thing, and approve what it is about to spend time rendering."
 
 Shared shapes go spec first (`commons/spec`), then Stack, then Home. Packages touching child or audience gates take the full gate and a review. Each is sized for one session.
 
 | Row | Package | Repo | Depends on | Note section |
 |---|---|---|---|---|
 | VF-RECEIPT-01 | Receipt and native-file retention for every video job; delivered file probed; extends `made_with` and `generation-provenance` / `creation-record` (CREATOR-01), spec first; the LTX in-place rewrite and H3 overwrite fixed; extra-copy cleanup follows DISK-GUARD-04 | commons spec, then Stack | none | 3.4 |
-| VF-ROLES-01 | Additive fields on the MODELPACK-SPEC-01 `clip` shape: `dialogue`, typed `inputs[]` (identity, wardrobe, voice_reference, edit_source), `intent`, `profile` mapped to the catalog `level`; `start_picture` and `end_picture` unchanged | commons spec, then Stack | MODELPACK-SPEC-01 | 3.1 |
+| VF-ROLES-01 | Additive fields on the MODELPACK-SPEC-01 `clip` shape: `dialogue`, typed `inputs[]` (identity, wardrobe, voice_reference, edit_source), `intent`; `profile` is a spec-defined name for groups of `level`, not a request field and not a second quality key; `start_picture` and `end_picture` unchanged | commons spec, then Stack | MODELPACK-SPEC-01 | 3.1 |
 | VF-CAPS-01 | Capability rows added to the jobs catalog's `limits` and `capabilities` per operation and profile (no second read); Home filters inputs only, the Stack's `available` answers fit | Stack, spec | VF-ROLES-01, MODELPACK-JOBS-01 | 3.3 |
 | VF-PROFILE-01 | Typed profiles (preview, quality) for H3 and LTX, including LTX Max native HD and its admission and its `roleHealth` refusal; a file on disk never selects quality; pack notes implemented or removed | Stack | VF-CAPS-01 | 3.2, 4, 6.2 |
 | VF-ROUTE-01 | Merged into MODELPACK-HOME-03: the Stack plans the route; Home sends roles and intent, derives a start picture only when asked, honors an attached picture, shows plain refusals (redirects for the ceiling, C10); `videos/tool.ts` model branches deleted | Stack, then Home (risky surface: full gate and review) | VF-ROLES-01, VF-CAPS-01, MODELPACK-HOME-03 | 3.3 |
 | VF-CAST-01 | Approved cast views stored once by Home, versioned and role-tagged; derivatives come from the generic `character_sheet` and `clip_from_sheet` jobs; stale and failed capture shown on the job's card; locked sentence by a vision model; the gates of section 5.1 | Home | VF-ROLES-01, MODELPACK-SHEET-01, MODELPACK-HOME-01 | 5 |
 | VF-PROMPT-01 | Per-engine prompt rendering with golden fixtures (H3 base and reference grammars, LTX paragraph) in the pack | Stack | VF-ROLES-01, VF-PROFILE-01 | 6.1 |
-| VF-EVAL-01 | Evaluation harness: three scenes, arms A to E and L-A to L-E, sheet-maker bake-off, blind scorecard, receipts attached (bench, no product code); decides per-shot routing and mixing | bench | VF-RECEIPT-01 | 11 |
+| VF-EVAL-01 | Evaluation harness: three scenes, arms A to E and L-A to L-E, sheet-maker bake-off, blind scorecard (bench, no product code); the harness and scorecard may be built now, the scored runs wait for the receipt; decides per-shot routing and mixing | bench | VF-RECEIPT-01 (scored runs only) | 11 |
 | VF-FINISH-01 | Finish and sound: paired comparison, then one finisher per pack and operation; the H3 start trim | Stack | VF-RECEIPT-01 | 6.3, 7.5 |
 | VF-TAKES-01 | Another take, retake, extend and chaining: `retake_from` and `extend` added to the spec first, then Stack, then surfaced in Films (amends CREATOR-25, cites VIDEO-TAKES-01) | commons spec, Stack, Home | VF-ROUTE-01 | 3.3 |
 | VF-CHECK-01 | Finished-file checker as a Stack media op taking the shot list and dialogue timings; ffmpeg filters plus the Stack's speech-to-text; any model check is a Stack job | Stack, then Home card | VF-ROLES-01 | 7.7 |
@@ -431,7 +466,30 @@ Shared shapes go spec first (`commons/spec`), then Stack, then Home. Packages to
 | VF-SPEED-01 | Matched H3 speed tests and the fast-H3 verdict | bench | none | 10 |
 | (amended) H3-REFS-01 | The H3 reference route is H3-REFS-01 with H3-ONE-RUNTIME-01, behind a capability that stays off until a full job passes; no new row | Stack | VF-CAPS-01, VF-PROFILE-01 | 3.2 |
 
-Fine to start once this note is approved: VF-SWAPCHECK-01, VF-SPEED-01 and VF-EVAL-01. Everything else waits for the spec rows (VF-ROLES-01 first) and for MODELPACK-SPEC-01 and MODELPACK-JOBS-01. Existing rows to cite rather than duplicate: MODELPACK-* (rows in section 11 of the model packs note, not in BACKLOG.md; the pack record and generic jobs these rows ride on), H3-ONE-RUNTIME-01, H3-REFS-01, H3-SHEET-*, FILM-ANIMATIC-01, FILM-GRADE-01, VIDEO-TAKES-01, CREATOR-10, CREATOR-25, DISK-GUARD-02.
+Dispatch list (architect, 2026-11-20), row by row:
+
+| Row | When |
+|---|---|
+| VF-RECEIPT-01 | Now |
+| VF-SWAPCHECK-01 | Now (full gate and review) |
+| VF-SPEED-01 | Now (bench; the verdict needs the owner's ratings) |
+| VF-ROLES-01 | Now, with the `profile` wording of section 3.1 |
+| VF-EVAL-01 | Harness and scorecard now; scored runs after VF-RECEIPT-01 |
+| VF-DOOR-01 | Now (decision) |
+| VF-CAPS-01 | After VF-ROLES-01 |
+| VF-PROFILE-01 | After VF-CAPS-01; Max HD admission stays inside chat rule 4's one exception (the Stack may restart chat once at a smaller context, never below 32768 tokens); any other way of displacing chat is a rule change |
+| VF-ROUTE-01 | After VF-ROLES-01 and VF-CAPS-01, as the video-create slice of MODELPACK-HOME-03 in one brief (full gate and review) |
+| VF-PROMPT-01 | After VF-ROLES-01 and VF-PROFILE-01, carrying that no prompt the pack's writer sends to H3 has a negation |
+| VF-FINISH-01, VF-ENHANCE-01 | After VF-RECEIPT-01 (the Refine Details model terms are accepted) |
+| VF-CHECK-01 | After VF-ROLES-01, using the one `CLIP_RULES` table |
+| VF-TAKES-01 | After VF-ROUTE-01 |
+| VF-REPAIR-01 | After VF-CHECK-01, VF-TAKES-01 and CREATOR-10, in CREATOR-10's one rule table |
+| VF-CAST-01 | Needs its own ruling first (2026-11-05 child conditions against rule 0's family clause), then MODELPACK-HOME-01; full gate |
+| VF-LOOK-01 | After VF-CAST-01 |
+| VF-STORYBOARD-01 | After VF-CHECK-01, VF-CAST-01 and FILM-ANIMATIC-01 closing |
+| VF-SWAPBENCH-01 | After VF-SWAPCHECK-01 |
+| VF-SWAP-01 | After VF-SWAPBENCH-01 passes and CREATOR-57-LIVE-01 closes; its Home half after MODELPACK-HOME-01 |
+| H3-REFS-01 | After VF-CAPS-01, VF-PROFILE-01 and H3-ONE-RUNTIME-01 |
 
 ## 13. Open questions and what is not verified
 
@@ -439,12 +497,19 @@ Results still coming (a follow-up updates this note):
 
 - The H3 speed test's blind ratings and words checks: vpipe 8 and 4 step at 768p, h3.c exact mode, FastH3-Omni with one reference, Pika's real schedule, the preview and fast decoders, Regenerate-2K as the finish, and whether the 24-step clip is worth its minutes over turbo.
 - The swap test's whole-head V3 mode, tight margin and r128 runs, and the decisive two-actor test with a hand over the face.
-- The video test's Refine Details compatibility check (needs the maintainer's model terms accepted), the Union Control test, and medium and wide shots at native 1920x1088 (only a close-up was tested at that size).
+- The video test's Refine Details compatibility check (model terms accepted by the owner 2026-11-20, so the test can run), the Union Control test, and medium and wide shots at native 1920x1088 (only a close-up was tested at that size).
 
 Open decisions and unknowns:
 
 | Item | State |
 |---|---|
+| Interim door: pass the new fields through the legacy `POST /v1/videos/generations`, or wait for MODELPACK-HOME-03 | Open (VF-DOOR-01) |
+| Which voice ruling wins for minors (`voiceForSpeech.ts` against the talent note) | Open owner ruling; Films are adult-only, so nothing is blocked |
+| Whether the 2026-11-05 per-child, off-by-default conditions apply to a stored reference set used for clips, against rule 0's family clause of 2026-11-13 | Needs its own architect ruling (VF-CAST-01); may be a rule change, which is the owner's |
+| Whether the POC's 1920x1088 runtime equals the pinned `ltx25-max-gen` commit | Not established; compare commit and requirements |
+| Whether the recorded-speech worker renders several speakers or one reference | Not established; one two-speaker request settles it |
+| Whether `alternatives[]` exists in the jobs catalog | Not found by the audit; confirm before VF-ROUTE-01 |
+| Whether the live Stack matches `origin/main` for the audited files | Not checked |
 | Whether the 24-step H3 clip beats turbo on a good start picture | One clip, sound not rated; the owner's earlier ratings say it does |
 | Why LTX Max took 161 s once and 95 s another time | Likely another job on the GPU; not proven |
 | Whether the memory governor should admit LTX Max HD (74 GB) on a hub that also holds a chat engine | The live Stack cancelled it three times; threshold and admission rule undecided |
