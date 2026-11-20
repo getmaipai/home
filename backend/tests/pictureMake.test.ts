@@ -11,6 +11,7 @@ import { __setImageToolsForTests } from "@/lib/imageEdit";
 import { __setPicturePollMsForTests, __resetPictureJobsForTests, getPictureJob } from "@/lib/pictures/jobs";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { __setCarouselCompleterForTests } from "@/lib/pictures/carouselPlan";
+import { __setWordsQuestionCompleterForTests, PICTURE_WORDS_UNAVAILABLE_LINE } from "@/lib/pictures/wordsQuestion";
 import { readPictureMakeBody, makePictureFor, wordsFromPrompt } from "@/lib/pictures/make";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
@@ -37,6 +38,7 @@ function file(actor: PersonRow, bytes: Uint8Array, provenance = 'picture-gen:{"v
 
 beforeEach(async () => {
   resetDb(); __resetPictureJobsForTests(); __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: {}, limits: { max_n: 4 }, operations: [], reason: null }, true);
+  __setWordsQuestionCompleterForTests(async () => ({ ok: true, text: JSON.stringify({ words: [] }) }));
   __setRoleHealthForTests({ image: { availability: "ready", reason: null } });
   fake = installFakeImageStack({ pollsToFinish: 1 });
   client = new TestClient();
@@ -53,7 +55,7 @@ describe("wordsFromPrompt", () => {
     expect(readPictureMakeBody({ prompt: 'Poster says "Summer Fair"' })).toMatchObject({ ok: true, body: { words: ["Summer Fair"] } });
   });
 });
-afterEach(() => { __setCarouselCompleterForTests(null); fake.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __setPicturePollMsForTests(null); __resetPictureJobsForTests(); });
+afterEach(() => { __setCarouselCompleterForTests(null); __setWordsQuestionCompleterForTests(null); fake.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); __setImageToolsForTests(undefined); __setRoleHealthForTests({}); __setPicturePollMsForTests(null); __resetPictureJobsForTests(); });
 
 describe("Images Create make", () => {
   test("reads placeholders as empty and validates shape, count, presets, cast and reference limits", () => {
@@ -101,6 +103,14 @@ describe("Images Create make", () => {
     await until(() => !!db.select().from(attachments).where(eq(attachments.ownerPersonId, owner.id)).all().find((item) => item.provenance.startsWith("picture-gen:")));
     const row = db.select().from(attachments).where(eq(attachments.ownerPersonId, owner.id)).all().find((item) => item.provenance.startsWith("picture-gen:"));
     expect(row).toMatchObject({ conversationId: null, retention: "kept" });
+  });
+
+  test("shows the unavailable line when checking picture words is unavailable", async () => {
+    __setWordsQuestionCompleterForTests(async () => ({ ok: false, unavailable: true }));
+    const read = readPictureMakeBody({ prompt: "a blue boat" });
+    if (!read.ok) throw new Error(read.error);
+    const made = await makePictureFor(owner, read.body);
+    expect(made).toMatchObject({ ok: true, notice: PICTURE_WORDS_UNAVAILABLE_LINE });
   });
 
   test("CREATOR-16: set reads 2 to 8, treats 0 and a blank chip as none, and refuses the rest", () => {
