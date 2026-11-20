@@ -49,3 +49,10 @@ test("a short utterance with a stop word is a command even when her own story us
   expect(judgeCutIn("Wait, stop.", story)).toBe("interrupt");
   expect(judgeCutIn("Stop.", story, true)).toBe("interrupt");
 });
+
+test("her own \"hold on\" from the phrase playing right now is echo; the same words from a person are a command", () => {
+  const now = "Oh, hold on, wait, the dragon had one more idea.";
+  expect(judgeCutIn("Hold on.", said + " " + now, true, now)).toBe("echo");
+  expect(judgeCutIn("Wait.", said + " " + now, true, now)).toBe("echo");
+  expect(judgeCutIn("Hold on.", said, true, said)).toBe("interrupt");
+});
