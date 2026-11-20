@@ -869,13 +869,15 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radioName.ts` | STATION_NAME_MAX, cleanStationName |
 | `backend/src/lib/media/radioRecordings.ts` | startRadioRecording, isRadioRecording, stopRadioRecording, radioRecordingRows, radioRecordingItem, __resetRadioRecordingsForTests |
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, __resetRadioStreamsForTests |
+| `backend/src/lib/media/savedTemplateActions.ts` | SAVED_NOT_FOUND_LINE, SAVED_CHILD_SHARE_LINE, SAVED_LOCKED_SHARE_LINE, saveTemplate, renameSavedTemplate, deleteSavedTemplate |
+| `backend/src/lib/media/savedTemplates.ts` | recordOf, visibleRows, listSavedTemplates, getSavedTemplate, savedTemplateSettings |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, startMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | lightArt, parseRange, resolveUnderRoot, serveBytes, serveItemBytes, serveItemArtwork |
 | `backend/src/lib/media/shotCard.ts` | validatePalette, composeShotPrompt, sameShotFourLights |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
-| `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, declaredTemplateStamp, bundledTemplates, listTemplates, getTemplate |
+| `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, declaredTemplateStamp, bundledTemplates, listTemplates, resolveTemplate |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, createLengthOptions, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, videoEngineLine, videoTimeLine |
