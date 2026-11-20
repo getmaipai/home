@@ -14,7 +14,7 @@ import { mkdirSync } from "node:fs";
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1]! : d; };
 const secret = (await Bun.file(args[0]!).text()).trim();
-const R1 = args.includes("--round1"), OUT = opt("out", ""); if (OUT) mkdirSync(OUT, { recursive: true });
+const traceLines: string[] = []; const R1 = args.includes("--round1"), OUT = opt("out", ""); if (OUT) mkdirSync(OUT, { recursive: true });
 const SCEN = opt("scenario", "silent"), RUNS = Number(opt("runs", "20")), GAIN_FIXED = opt("gain", ""), DELAY_FIXED = opt("delay", ""), LAB = "127.0.0.1:9931", TTS = "http://127.0.0.1:9923";
 async function say(text: string): Promise<Float32Array> {
   const f = new FormData(); f.set("text", text); f.set("voice", "lj");
@@ -86,7 +86,7 @@ async function one(run: number, gain: number, delayMs: number) {
     // the page's instant local lowering
     const playingNow = speakerOn && !replyFinished;
     if (phase !== "ask" && duck.frame(mic, { playing: playingNow, enabled: true }) && !localDuckSent) { localDuckSent = true; ws.send(JSON.stringify({ t: "local_duck", turn })); ev.push({ t: "local_duck", at: rel() }); setTimeout(() => (localDuckSent = false), 600); }
-    if (R1 && phase !== "ask") { const ms = ovl.frame(mic, { playing: playingNow }); if (ms >= 250 && rel() - lastOvl > 90) { lastOvl = rel(); ws.send(JSON.stringify({ t: "overlap", ms, turn })); }
+    if (R1 && phase !== "ask") { const ms = ovl.frame(mic, { playing: playingNow }); if (Bun.env.ECHO_TRACE && userStartAt >= 0) { let q = 0; for (const v of mic) q += v * v; traceLines.push(`${Math.round(rel() - userStartAt)}\t${Math.sqrt(q / mic.length).toFixed(4)}\t${(ovl as any).floor.toFixed(4)}\t${ms}`); } if (ms >= 250 && rel() - lastOvl > 90) { lastOvl = rel(); ws.send(JSON.stringify({ t: "overlap", ms, turn })); }
       if (shouldStopLocally(ms, { playing: playingNow, alreadySent: localStopSent })) { localStopSent = true; const a2 = flat(); const target = wordEnd(a2, playhead, 24000); if (!(stopWordAt >= 0)) stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopped = true; ev.push({ t: "local_stop_dev", at: rel() }); ws.send(JSON.stringify({ t: "local_stop", turn })); } }
     // timeline
     if (phase === "ask") { const f = new Float32Array(frame); f.set(Q.subarray(askPos, askPos + frame)); mic.set(f.map((x, i) => x + mic[i]!)); askPos += frame; if (askPos >= Q.length) { phase = "wait"; askEndAt = rel(); ev.push({ t: "ask_end", at: askEndAt }); } }
@@ -98,6 +98,7 @@ async function one(run: number, gain: number, delayMs: number) {
     // played reports like the page (every 100 ms)
     if (rel() - lastPlayedReport >= 100 && firstAudioAt && queue.length && !stopped) { lastPlayedReport = rel(); for (const [idx, s0] of chunkStarts) { const ms = Math.max(0, (playhead - s0) / 24); if (ms >= 0) ws.send(JSON.stringify({ t: "played", turn, chunk: idx, ms })); } }
   }
+  if (Bun.env.ECHO_TRACE) { Bun.write(`/private/tmp/echo-trace-${run + 1}-g${gain}.tsv`, "ms_since_user\tmic_rms\tfloor\toverlap_ms\n" + traceLines.join("\n")); traceLines.length = 0; }
   ws.close(); await Bun.sleep(200);
   if (OUT) writeWav(`${OUT}/${SCEN}-${run + 1}.wav`, outAll.subarray(0, outLen), 24000);
   const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final" && x.at > firstAudioAt);
