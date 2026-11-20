@@ -5,6 +5,7 @@
 // Round 1 (--round1 --out <dir>): echo-reference cut-in, local stop, overlap messages and her rare "mm-hm" are ON, the simulated browser echo canceller leaves 8% residue, each run saves her
 // speaker output as <out>/<scenario>-<run>.wav and prints measurements for rig/round1.ts to judge. Extra scenarios: repeat, cough, yeah, sentence, overlap, nodmid. THE ROOM IS SIMULATED.
 // Usage: bun rig/echotest.ts <secret-file> --scenario silent|mmhm|stop|briefly --runs 20 [--gain 0.35] [--delay 120] [--aec 1]
+import "./lockguard"; // refuses while a clean run holds the lab (src/runLock.ts)
 import { waitForNoLivePage } from "./guard";
 import { LocalDuckDetector } from "../public/local-duck.js";
 import { wordEnd } from "../public/word-end.js";

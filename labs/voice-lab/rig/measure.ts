@@ -2,6 +2,7 @@
 // time to first sound, voice speed vs real time while the reply is being written, audio underruns
 // (simulated page player: starts after JITTER ms buffered, gaps when the buffer runs dry), plus median/worst.
 // Usage: bun rig/measure.ts <secret-file> [--n 30] [--jitter 120] [--voice id] [--json out.json]
+import "./lockguard"; // refuses while a clean run holds the lab (src/runLock.ts)
 import { waitForNoLivePage } from "./guard";
 import { JitterGate, replay } from "../public/jitter.js";
 const gate = new JitterGate();

@@ -2,6 +2,7 @@
 // (with its start gate and its stop plan), puts it through a SIMULATED room (delay, gain, reflections, noise: a real Studio-speakers-and-microphone run
 // needs a real browser with audio devices, which this rig cannot drive), and judges every reply from the RECORDING: same person, right words, smooth,
 // joins, timing, stumble pattern. Usage: bun rig/listen.ts <secret-file> [--runs 1] [--load] [--quick] [--out dir] [--gain 0.2]
+import "./lockguard"; // refuses while a clean run holds the lab (src/runLock.ts)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { waitForNoLivePage } from "./guard";

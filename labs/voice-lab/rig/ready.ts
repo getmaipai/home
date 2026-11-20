@@ -1,5 +1,7 @@
 // "Ready to test" gate. Run `bun rig/ready.ts` in labs/voice-lab. It must pass before anyone tells the owner to test the lab.
 // One plain line per check. Options: --quick (4 runs instead of 20 / 10 turns, for development only; not valid for "ready").
+import { guardOrExit, readLock, pidAlive, acquireLock, releaseLock } from "../src/runLock";
+guardOrExit("ready"); { const l = readLock(); if (!l || !pidAlive(l.pid)) { acquireLock("ready"); process.on("exit", () => releaseLock()); } } // a standalone ready holds the lab; one started by when-free runs under its lock
 import { availableTags, pickSound, refusedSounds } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";

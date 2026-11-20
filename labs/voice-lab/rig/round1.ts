@@ -2,6 +2,7 @@
 // Each case runs RUNS times through rig/echotest.ts --round1; every run is judged from the RECORDING of her speaker output (rig/round1/judge.ts).
 // THE ROOM IS SIMULATED: her voice is played into a virtual microphone with delay, reflections and an echo-canceller residue of 8 percent. A real speaker and microphone are not tested here.
 // Usage: bun rig/round1.ts [--runs 5] ; exit 0 only if every case passes every run.
+import "./lockguard"; // refuses while a clean run holds the lab (src/runLock.ts)
 import { readWav } from "./listen/audio";
 import { judgeRun, type R1Run } from "./round1/judge";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";

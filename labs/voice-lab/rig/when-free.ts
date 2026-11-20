@@ -2,6 +2,9 @@
 // GPU job appears mid-run, then goes back to waiting. Logs every busy stretch and which jobs caused it to data-scratch/gpu-log.jsonl, so we can say how rare free windows are.
 // Usage: bun rig/when-free.ts [--full] ; exits 0 when a clean run finished (its output is in data-scratch/ready-clean.txt), 1 if that run failed a check.
 import { appendFileSync } from "node:fs";
+import { acquireLock, releaseLock, setStep } from "../src/runLock";
+import { labOwn } from "../src/ownProcs";
+import { readProcs } from "../src/gpuLoad";
 import { BurstFilter } from "../src/burstFilter";
 import { stopOwnMatching } from "../src/ownProcs";
 import { ensureChat } from "../src/engineGuard";
@@ -11,8 +14,10 @@ const log = (o: object) => appendFileSync(`${W}/gpu-log.jsonl`, JSON.stringify({
 const ownNice = async () => Number((await new Response(Bun.spawn(["ps", "-o", "nice=", "-p", String(process.pid)], { stdout: "pipe" }).stdout).text()).trim());
 if (await ownNice() !== 0) { log({ event: "bad-priority", nice: await ownNice() }); console.error("REFUSING TO START: this process runs at nice " + await ownNice() + " (started as a zsh background job?). Start it with: bash -c 'nohup bun rig/when-free.ts &'"); process.exit(2); }
 const utils: number[] = [];
+/** Stops the rigs this run started (never the lab engines or their job.sh wrappers): killing the parent must not leave a child running. */
+async function stopRigChildren() { try { const { rows } = await readProcs(); const mine = labOwn(rows, new Map()); const rigs = rows.filter((r) => mine.has(r.pid) && /rig\/(ready|round1|round2|measure|echotest|listen|flaky)|flaky\.sh|bun test/.test(r.cmd)).map((r) => r.pid); for (const p of rigs) { try { process.kill(p, "SIGTERM"); } catch {} } log({ event: "stopped-children", pids: rigs }); } catch {} }
 const burst = new BurstFilter();
-process.on("SIGTERM", () => { log({ event: "exit", why: "SIGTERM (stopped by another process)" }); console.log("when-free: stopped by SIGTERM"); process.exit(143); }); process.on("SIGINT", () => { log({ event: "exit", why: "SIGINT" }); process.exit(130); });
+process.on("SIGTERM", async () => { log({ event: "exit", why: "SIGTERM (stopped by another process)" }); console.log("when-free: stopped by SIGTERM"); await stopRigChildren(); releaseLock(); process.exit(143); }); process.on("SIGINT", async () => { log({ event: "exit", why: "SIGINT" }); await stopRigChildren(); releaseLock(); process.exit(130); }); process.on("exit", () => releaseLock());
 process.on("uncaughtException", (e) => { log({ event: "exit", why: "uncaught " + String(e).slice(0, 200) }); console.error(e); process.exit(1); });
 const win = new FreeWindow(60_000); const t0 = Date.now(); let busySince: number | null = null, busyJobs = new Set<string>(); let child: ReturnType<typeof Bun.spawn> | null = null, aborted = false, attempts = 0;
 const ROOT = W.replace(/\/data-scratch$/, "");
@@ -28,18 +33,19 @@ async function ensureFlaky() {
   if (check().ok) return; log({ event: "flaky-stale", why: check().why }); const p = Bun.spawn(["bash", "rig/flaky.sh", "10"], { cwd: import.meta.dir + "/..", stdout: "ignore", stderr: "ignore" }); await p.exited; log({ event: "flaky-ran", verdict: check() });
 }
 async function startRun() {
-  await ensureFlaky();
+  { const a = acquireLock("flaky check, then ready --quick"); if (!a.ok) { log({ event: "lock-refused", why: a.message }); console.log(a.message); win.finish(); return; } }
+  await ensureFlaky(); setStep("ready --quick");
   attempts++; aborted = false; log({ event: "start", attempt: attempts });
   const spawnStep = (cmd: string[], file: string) => Bun.spawn(["bun", ...cmd], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/${file}`), stderr: "ignore" });
-  const finish = (code: number, step: string) => { burst.finish(Date.now()); const bs = burst.summary(); log({ event: "finished", step, code, attempt: attempts, hubSpeechBursts: bs }); console.log(`hub speech bursts: ${bs.count}, total ${(bs.totalMs / 1000).toFixed(1)} s ${JSON.stringify(bs.intervals)}`); console.log(`CLEAN RUN FINISHED (${step}, attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt${step === "round1" ? " and round1-clean.txt" : ""}`); process.exit(code === 0 ? 0 : 1); };
-  const engineDied = async (code: number) => { if (code !== 0 && !(await chatDeps.health())) { log({ event: "waiting: memory", why: "chat engine died mid-run", attempt: attempts }); console.log("chat engine died mid-run; waiting, not a failure"); child = null; win.finish(); return true; } return false; };
+  const finish = (code: number, step: string) => { releaseLock(); burst.finish(Date.now()); const bs = burst.summary(); log({ event: "finished", step, code, attempt: attempts, hubSpeechBursts: bs }); console.log(`hub speech bursts: ${bs.count}, total ${(bs.totalMs / 1000).toFixed(1)} s ${JSON.stringify(bs.intervals)}`); console.log(`CLEAN RUN FINISHED (${step}, attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt${step === "round1" ? " and round1-clean.txt" : ""}`); process.exit(code === 0 ? 0 : 1); };
+  const engineDied = async (code: number) => { if (code !== 0 && !(await chatDeps.health())) { log({ event: "waiting: memory", why: "chat engine died mid-run", attempt: attempts }); releaseLock(); console.log("chat engine died mid-run; waiting, not a failure"); child = null; win.finish(); return true; } return false; };
   try { (await import("node:fs")).rmSync(`${W}/ready-clean.txt`, { force: true }); (await import("node:fs")).rmSync(`${W}/round1-clean.txt`, { force: true }); } catch {} // Bun.file stdout does not truncate: old lines used to stay below the new ones
   child = spawnStep(["rig/ready.ts", ...(full ? [] : ["--quick"])], "ready-clean.txt");
   void child.exited.then(async (code) => {
     if (aborted) return; if (await engineDied(code)) return;
     if (code !== 0) return finish(code, "baseline"); // a baseline fail skips round 1
     log({ event: "baseline-passed", attempt: attempts }); if (aborted) return;
-    child = spawnStep(["rig/round1.ts"], "round1-clean.txt");   // round 1 runs in the same free window
+    setStep("round1"); child = spawnStep(["rig/round1.ts"], "round1-clean.txt");   // round 1 runs in the same free window
     void child.exited.then(async (c2) => { if (aborted) return; if (await engineDied(c2)) return; finish(c2, "round1"); });
   });
 }
@@ -47,7 +53,7 @@ while (true) {
   const g = await sampleGpu(); const bf = burst.push(Date.now(), g.jobs.split(" | ").filter(Boolean)); const free = bf.free; const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
-  if (s.abort && child) { aborted = true; child.kill(); void stopOwnMatching(/rig\/(measure|echotest|listen|round1)\.ts/).then((r) => log({ event: "stopped-own", ...r })); log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
+  if (s.abort && child) { aborted = true; child.kill(); void stopOwnMatching(/rig\/(measure|echotest|listen|round1)\.ts/).then((r) => log({ event: "stopped-own", ...r })); log({ event: "aborted", why: g.jobs, attempt: attempts }); releaseLock(); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
   if (s.start) { { const r = await ensureChat(chatDeps); if (r === "ready") await startRun(); else { win.finish(); if (r === "bad-priority") { console.error("bad priority: exiting"); process.exit(2); } } } }
   await Bun.sleep(5000);
   if (Math.floor((now - t0) / 60000) !== Math.floor((Date.now() - t0) / 60000)) log({ event: "tick", util: g.util, free, freeMs: s.freeMs, jobs: g.jobs });

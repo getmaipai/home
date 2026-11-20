@@ -4,6 +4,7 @@
 // Reports per conversation: first-sound median / p90 / worst, gaps and problems; and for the loads, steps per second and how long they paused (the slowdown yielding costs the job).
 // RUN ONLY IN A FREE-GPU WINDOW (it is its own GPU load): `bun rig/when-free.ts`-style waiting is not built in here; call after the GPU is free, never with another job running. THE ROOM IS SIMULATED.
 // Usage: bun rig/round2.ts [--secs 200] ; exits 0 when all three conversations pass the listener, 1 otherwise.
+import "./lockguard"; // refuses while a clean run holds the lab (src/runLock.ts)
 import { readFileSync, mkdirSync } from "node:fs";
 import { sampleGpu, gpuClass } from "../src/gpuLoad";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
