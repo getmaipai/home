@@ -3,8 +3,7 @@
 // same, with each line spoken in a voice Home already has) both come through `makeRoughCut`; the Stack does the work (E3), Home builds the
 // request from the plan, waits for the job, checks the file and keeps it. Adults only, and only their own films (C10).
 //   Voiced rules (architect ruling VOICED-ROUGH-CUT-HOME-01): the script passes the maker's text gate BEFORE anything is sent, a failing line is
-//   dropped with a plain note; a speaker the cast flags minor, or whose age Home cannot tell, gets NO voice address (the Stack uses a starter
-//   voice); then `media.verify` on the file (each line heard once, at its time) and `gateFinished` for the pictures, and a failure or an
+//   dropped with a plain note; every speaker is treated alike, a child included (FILM-NO-CHILD-DISTINCTION-01, owner 2026-11-20); then `media.verify` on the file (each line heard once, at its time) and `gateFinished` for the pictures, and a failure or an
 //   unchecked result means the file is not shown. Logs carry counts and timings only.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import type { PersonRow } from "@/types";
@@ -18,9 +17,8 @@ import { createStackHttp } from "@/lib/stack/http";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 import { getMediaProduction } from "@/lib/mediaProductions";
 import { db } from "@/db";
-import { people, attachments } from "@/db/schema";
+import { attachments } from "@/db/schema";
 import { and, desc, eq, like, isNull } from "drizzle-orm";
-import { speakerAgeBand } from "@/lib/ageBand";
 import { resolveCast, type CastEntry } from "@/lib/cast";
 import { refuseVideoPrompt } from "@/lib/videos/policy";
 import { voiceForSpeech, isPresetVoice } from "@/lib/voiceForSpeech";
@@ -143,14 +141,6 @@ export function roughCutAvailableNow(): boolean {
 /** Test seam: forget the last answer. */
 export function __resetRoughCutAvailabilityForTests(): void { availability = { value: false, at: 0 }; refreshing = null; }
 
-const bandOf = (personId: string) => { const person = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get(); return person ? speakerAgeBand(person, new Date()) : null; };
-/** The minor flag for a voice: the cast's own `minor` (`subjectFacts`), and, when Home cannot tell, assumed minor: a real subject with no person to read an age from, or a person whose age band is unknown. */
-export function assumedMinor(entry: Pick<CastEntry, "minor" | "real" | "person_id">): boolean {
-  if (entry.minor) return true;
-  if (!entry.real) return false;
-  return !entry.person_id || bandOf(entry.person_id) === null;
-}
-
 export { speakerOfPlan } from "./speaker";
 import { speakerOfPlan } from "./speaker";
 import { shotLines, shotText } from "./lines";
@@ -170,18 +160,17 @@ export function droppedLinesNote(dropped: ReadonlyArray<{ shot: number; lines: n
  *  a minor or unknown-age speaker is sent with NO address (never a voice reference). Narration has no cast entry and is not a minor. */
 export async function voicedScript(actor: PersonRow, plan: FilmPlan): Promise<{ script: VoicedScript; dropped: number; droppedByShot: Array<{ shot: number; lines: number }> }> {
   const kept = plan.shots.filter((entry) => (entry as { kept?: boolean }).kept !== false);
-  const facts = new Map<string, { minor: boolean; own: string | undefined }>();
+  const facts = new Map<string, { own: string | undefined }>();
   const factsOf = async (speaker: string) => {
     const known = facts.get(speaker);
     if (known) return known;
     const member = plan.cast.find((entry) => entry.kind === "character" && entry.name.trim().toLocaleLowerCase() === speaker.trim().toLocaleLowerCase());
-    let minor = false, own: string | undefined;
+    let own: string | undefined;
     if (member?.subject_id) {
       const entry = (await resolveCast(actor, [member.subject_id])).members[0];
-      // A subject Home cannot resolve is treated like one whose age it cannot tell.
-      if (!entry) minor = true; else { minor = assumedMinor(entry); own = asAddress(entry.voice); }
+      if (entry) own = asAddress(entry.voice);
     }
-    const made = { minor, own };
+    const made = { own };
     facts.set(speaker, made);
     return made;
   };
@@ -191,18 +180,16 @@ export async function voicedScript(actor: PersonRow, plan: FilmPlan): Promise<{ 
   for (const [index, shot] of kept.entries()) {
     const said = shotLines(plan, shot);
     if (said.length === 0) continue;
-    const speakers = await Promise.all(said.map((entry) => factsOf(entry.speaker)));
-    const laneOf = (minor: boolean): "child" | "adult" => (minor ? "child" : "adult");
-    const eachFails = said.some((entry, i) => refuseVideoPrompt(entry.text, { lane: laneOf(speakers[i]!.minor) }));
-    const together = speakers.some((entry) => entry.minor) ? "child" : "adult";
-    if (eachFails || refuseVideoPrompt(said.map((entry) => entry.text).join(" "), { lane: together })) { withheld.push(shot.id); droppedByShot.push({ shot: index + 1, lines: said.length }); continue; }
+    // FILM-NO-CHILD-DISTINCTION-01: a film is an adult's work and every line is gated the same way whoever speaks it; no speaker is treated differently for being a child.
+    const eachFails = said.some((entry) => refuseVideoPrompt(entry.text, { lane: "adult" }));
+    if (eachFails || refuseVideoPrompt(said.map((entry) => entry.text).join(" "), { lane: "adult" })) { withheld.push(shot.id); droppedByShot.push({ shot: index + 1, lines: said.length }); continue; }
     for (const entry of said) { lines.push({ shot_id: shot.id, line: { speaker: entry.speaker, text: entry.text.slice(0, 300) } }); spoken.add(entry.speaker); }
   }
   const voices: VoicedScript["voices"] = [];
   for (const speaker of spoken) {
-    const { minor, own } = await factsOf(speaker);
-    const address = minor ? undefined : own ?? asAddress(voiceForSpeech({ actor }));
-    voices.push({ speaker, ...(address ? { voice_address: address } : {}), ...(minor ? { minor: true } : {}) });
+    const { own } = await factsOf(speaker);
+    const address = own ?? asAddress(voiceForSpeech({ actor }));
+    voices.push({ speaker, ...(address ? { voice_address: address } : {}) });
   }
   return { script: { lines, voices, withheld }, dropped: droppedByShot.reduce((sum, entry) => sum + entry.lines, 0), droppedByShot };
 }

@@ -39,6 +39,8 @@ export interface CaptureOptions {
   photoFileIds?: string[];
   /** Rebuild even when the sheet's source pictures are unchanged. */
   force?: boolean;
+  /** FILM-NO-CHILD-DISTINCTION-01 (owner, 2026-11-20): a film casts a household child like anyone else, so the film path asks for the capture with no minor refusal. Every other caller keeps the refusal. */
+  filmCast?: boolean;
   onStep?: (step: { phase: "cut" | "draw"; done: number; total: number }) => void;
   /** Test seams: the sheet builder and the portrait maker. The real ones are `films/sheetMaker.ts` and the picture engine. */
   sheetMaker?: LookSheetMaker;
@@ -99,7 +101,7 @@ async function doCapture(actor: PersonRow, ref: string, options: CaptureOptions)
   const resolved = await resolveCast(actor, [ref]);
   const member = resolved.members[0];
   if (!member) return { ok: false, line: resolved.refused[0]?.line ?? `"${ref}" is not in your cast list. Pick someone from the list and try again.` };
-  if (member.real && member.minor) return { ok: false, line: LOOK_MINOR_LINE };
+  if (member.real && member.minor && !options.filmCast) return { ok: false, line: LOOK_MINOR_LINE };
   const row = db.select().from(mediaSubjects).where(eq(mediaSubjects.id, member.subject_id)).get();
   if (!row) return { ok: false, line: `${member.name} could not be set up as cast. Try again in a moment.` };
   // Who may write: a synth and a saved subject only for the person who made it (the maker stores the sheet); a household member by any adult who may cast them (the cast gate already applied).

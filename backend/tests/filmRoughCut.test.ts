@@ -7,7 +7,7 @@ import { StackRoughCutRequest } from "@maipai/spec/stack/ts/stack-rough-cut.js";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { createMediaProduction, setShotPicture, updateMediaProduction } from "@/lib/mediaProductions";
 import { storeFile } from "@/lib/attachments";
-import { ANIMATIC_FAILED_LINE, ANIMATIC_MISSING_LINE, ANIMATIC_OLD_STACK_LINE, ANIMATIC_TIMEOUT_LINE, animaticRequest, assumedMinor, latestVoicedPreview, makeRoughCut, roughCutRequest, runRoughCutJob, voicedScript, droppedLinesNote, VOICED_NOT_AVAILABLE_LINE, type RoughCutJobDeps } from "../src/lib/films/roughCut";
+import { ANIMATIC_FAILED_LINE, ANIMATIC_MISSING_LINE, ANIMATIC_OLD_STACK_LINE, ANIMATIC_TIMEOUT_LINE, animaticRequest, latestVoicedPreview, makeRoughCut, roughCutRequest, runRoughCutJob, voicedScript, droppedLinesNote, VOICED_NOT_AVAILABLE_LINE, type RoughCutJobDeps } from "../src/lib/films/roughCut";
 import { __setStackHttpFetchForTests } from "../src/lib/films/roughCut";
 import type { FilmPlan } from "../src/lib/films/plan";
 import type { PersonRow } from "@/types";
@@ -94,80 +94,13 @@ describe("voicedScript: the text gate and the minor rule", () => {
     const { script } = await voicedScript(sage, planOf(sixShots));
     expect(script.voices).toEqual([{ speaker: "Willow" }]);
   });
-  test("a real subject from photos with no linked person is assumed minor: the voice entry is sent with no address and minor true", async () => {
+  test("FILM-NO-CHILD-DISTINCTION-01: a real subject (a photo of a person, a household child included) is voiced like any other speaker: no minor flag, the household's address", async () => {
     const subject = createMediaSubject(sage, { name: "Willow", kind: "character", look: "A woman in a blue coat.", real: true });
     const plan = planOf(sixShots, [{ name: "Willow", kind: "character", locked: "Blue coat.", subject_id: subject.id }]);
-    const { script } = await voicedScript(sage, plan);
-    expect(script.voices).toEqual([{ speaker: "Willow", minor: true }]);
-  });
-  test("assumedMinor: the cast's own minor flag, a real subject with no person, and a person with no readable age band", () => {
-    expect(assumedMinor({ minor: true, real: false, person_id: null })).toBe(true);
-    expect(assumedMinor({ minor: false, real: false, person_id: null })).toBe(false);
-    expect(assumedMinor({ minor: false, real: true, person_id: null })).toBe(true);
-    expect(assumedMinor({ minor: false, real: true, person_id: "person-gone" })).toBe(true);
-    expect(assumedMinor({ minor: false, real: true, person_id: sage.id })).toBe(false);
-  });
-});
-
-describe("makeRoughCut (voiced)", () => {
-  function productionFor(plan: FilmPlan) {
-    const production = createMediaProduction(sage, { title: plan.title, summary: plan.summary }, "film");
-    updateMediaProduction(sage, production.id, { episodes: [{ id: "e", title: "t", scenes: [{ id: "s", title: "t", shots: plan.shots.map(({ id }) => ({ id, subject_ids: [] })) }] }] as never, cast: [] });
-    for (const entry of plan.shots) {
-      const saved = storeFile(sage, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array([137, 80, 78, 71]), provenance: "test", retention: "kept", name: "still", deduplicate: false });
-      if (!saved.ok) throw new Error(saved.error);
-      setShotPicture(sage.id, production.id, entry.id, saved.value.id);
-    }
-    return production.id;
-  }
-  const result = { total_s: 30, shots: sixShots.map((s, i) => ({ id: s.id, start_s: i * 5, end_s: i * 5 + 5 })), lines: [{ shot_id: "shot-2", speaker: "Willow", start_s: 5.2, length_s: 1.5, audio: "/stack/l1.wav", wave: [0.5, 1] }, { shot_id: "shot-3", speaker: "Willow", start_s: 10.2, length_s: 1.5, audio: "/stack/l2.wav" }, { shot_id: "shot-5", speaker: "Willow", start_s: 20.2, length_s: 1.5, audio: "/stack/l3.wav" }] };
-  const deps = (sent: unknown[]): RoughCutJobDeps => ({
-    submit: async (input) => { sent.push(input); return { id: "j1", state: "done", result: { file: "/stack/out.mp4", ...result } }; },
-    job: async () => ({ id: "j1", state: "done" }), cancel: async () => undefined, sleep: async () => {}, now: () => 0, readFile: () => new Uint8Array([1, 2, 3]),
-  });
-  const available = () => __setStackHttpFetchForTests((async () => new Response(JSON.stringify({ media: { kinds: ["media.edit", "media.rough_cut"] } }), { status: 200 })) as unknown as typeof fetch);
-  const pass = { verify: async () => ({ checked: true, lines: [] as string[] }), gate: async () => ({ ok: true as const }) };
-
-  test("the Stack must list media.rough_cut: otherwise a plain line and nothing is sent", async () => {
-    const plan = planOf(sixShots); const sent: unknown[] = [];
-    __setStackHttpFetchForTests((async () => new Response(JSON.stringify({ media: { kinds: ["media.edit"] } }), { status: 200 })) as unknown as typeof fetch);
-    expect(await makeRoughCut({ actor: sage, productionId: productionFor(plan), plan, voiced: true, deps: deps(sent), seams: pass })).toEqual({ ok: false, line: VOICED_NOT_AVAILABLE_LINE });
-    expect(sent).toEqual([]);
-    __setStackHttpFetchForTests(null);
-  });
-  test("a passing preview is kept with each line's own audio file and is found again; the request sent has the script and no failing line", async () => {
-    const plan = planOf(sixShots.map((s) => (s.id === "shot-3" ? { ...s, line: MINOR_SEXUAL } : s))); const sent: Array<Record<string, any>> = [];
-    available();
-    const productionId = productionFor(plan);
-    const made = await makeRoughCut({ actor: sage, productionId, plan, voiced: true, deps: deps(sent), seams: pass });
-    expect(made.ok && made.note).toContain("left out");
-    expect(sent[0]!.lines.map((l: any) => l.shot_id)).toEqual(["shot-2", "shot-5"]);
-    expect(JSON.stringify(sent[0])).not.toContain("12 year old");
-    const found = latestVoicedPreview(sage, productionId, plan);
-    expect(latestVoicedPreview(sage, productionId, { shots: plan.shots.map((s) => ({ ...s, seconds: 9 })) } as never)).toBeNull(); // made from other lengths: stale
-    expect(found?.fileId).toBe(made.ok ? made.fileId : "");
-    expect(found?.result.lines[0]!.audio).toMatch(/^\/api\/files\/.+\/content$/);
-    __setStackHttpFetchForTests(null);
-  });
-  test("a failed verify, an unchecked verify and a gate that withholds each hide the file: nothing is kept", async () => {
-    const plan = planOf(sixShots); available();
-    const productionId = productionFor(plan);
-    const failedVerify = await makeRoughCut({ actor: sage, productionId, plan, voiced: true, deps: deps([]), seams: { ...pass, verify: async () => ({ checked: true, lines: ["Shot 2: its line is heard twice. Render that shot again."] }) } });
-    expect(failedVerify.ok).toBe(false); expect(!failedVerify.ok && failedVerify.line).toContain("did not pass its check");
-    const unchecked = await makeRoughCut({ actor: sage, productionId, plan, voiced: true, deps: deps([]), seams: { ...pass, verify: async () => ({ checked: false, lines: [] }) } });
-    expect(!unchecked.ok && unchecked.line).toContain("could not be checked");
-    const withheld = await makeRoughCut({ actor: sage, productionId, plan, voiced: true, deps: deps([]), seams: { ...pass, gate: async () => ({ ok: false, line: "I couldn't check that video, so I can't show it. Try again in a minute." }) } });
-    expect(!withheld.ok && withheld.line).toContain("can't show it");
-    expect(latestVoicedPreview(sage, productionId)).toBeNull();
-    __setStackHttpFetchForTests(null);
-  });
-  test("a teen and a child are refused (the film is adults only) and nothing is sent", async () => {
-    const plan = planOf(sixShots);
-    for (const role of ["teen", "child"] as const) {
-      const kid = { ...sage, role } as PersonRow; const sent: unknown[] = [];
-      expect(await makeRoughCut({ actor: kid, productionId: "x", plan, voiced: true, deps: deps(sent), seams: pass })).toEqual({ ok: false, line: "That film is not available to you." });
-      expect(sent).toEqual([]);
-    }
+    const { script, dropped } = await voicedScript(sage, plan);
+    expect(dropped).toBe(0);
+    expect(script.voices).toEqual([{ speaker: "Willow" }]);
+    expect(script.voices.every((voice) => !("minor" in voice))).toBe(true);
   });
 });
 
@@ -187,13 +120,12 @@ describe("FILM-LINES-01 slice 2: an exchange in one shot, one voice per speaker"
     expect(StackRoughCutRequest.safeParse(request).success).toBe(true);
     expect(request.shots.find((entry) => entry.id === "shot-2")!.caption).toBeUndefined();
   });
-  test("the minor flag follows each line's own speaker: a real subject with no person is a minor, the other speaker is not", async () => {
+  test("FILM-NO-CHILD-DISTINCTION-01: no speaker in an exchange carries a minor flag, whoever they are", async () => {
     const real = createMediaSubject(sage, { name: "Marlow", kind: "character", look: "A woman.", real: true });
     const cast = [two[0]!, { ...two[1]!, subject_id: real.id }];
     const { script } = await voicedScript(sage, planOf(exchange(), cast));
-    expect(script.voices.find((voice) => voice.speaker === "Marlow")).toEqual({ speaker: "Marlow", minor: true });
-    expect(script.voices.find((voice) => voice.speaker === "Willow")).toEqual({ speaker: "Willow" });
-    expect(script.voices.every((voice) => !("voice_reference" in voice))).toBe(true);
+    expect(script.voices.find((voice) => voice.speaker === "Marlow")).toEqual({ speaker: "Marlow" });
+    expect(script.voices.every((voice) => !("minor" in voice) && !("voice_reference" in voice))).toBe(true);
   });
   test("one line the text gate refuses drops ALL of that shot's lines, counted, and the other shots stay", async () => {
     const plan = planOf(exchange({ lines: [{ speaker: "Willow", text: "Fine." }, { speaker: "Marlow", text: MINOR_SEXUAL }] }), two);

@@ -168,6 +168,15 @@ describe("gates per band, exactly as the cast resolver applies them", () => {
     expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.personId, kid.id)).get()?.referenceIds ?? "[]").toBe("[]"); // the child's photos were never stored on the subject
   });
 
+  test("FILM-NO-CHILD-DISTINCTION-01: a film's capture (filmCast) treats a household child's photo like an adult's: a sheet is built, with the same one builder", async () => {
+    const { sage, kid } = await world();
+    const made = await captureLook(sage, kid.id, { sheetMaker: maker, photoFileIds: [await photo(sage, 40)], filmCast: true });
+    expect(made.ok).toBe(true);
+    expect(calls.at(-1)!.roles).toEqual(["actor"]);
+    // Only the film path asks for this: the same call without it keeps today's answer.
+    expect(await captureLook(sage, kid.id, { sheetMaker: maker, photoFileIds: [await photo(sage, 41)] })).toMatchObject({ ok: false });
+  });
+
   test("a legacy household likeness value does not block an adult capturing another member", async () => {
     const { sage, adult2 } = await world();
     if (!adult2) return;
