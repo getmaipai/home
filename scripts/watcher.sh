@@ -832,7 +832,7 @@ serve() {
   (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
-    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then if [[ ! -f "$data/.duplicate-logged" ]] || [[ -n "$(find "$data/.duplicate-logged" -mmin +60 2>/dev/null)" ]]; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; : > "$data/.duplicate-logged"; fi; return 0; fi
+    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then if [[ ! -f "$data/.duplicate-logged" ]] || [[ -n "$(find "$data/.duplicate-logged" -mmin +60 2>/dev/null)" ]]; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; : > "$data/.duplicate-logged"; fi; sleep "${MAIPAI_WATCH_DUPLICATE_SLEEP:-300}"; return 0; fi
   fi
   echo "$$" > "$pidfile"
   local stop_requested=0 sleep_pid=""

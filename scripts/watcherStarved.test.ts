@@ -98,7 +98,7 @@ describe("watcher starvation protection", () => {
     expect(lines(closes).some((line) => line.includes("unverified"))).toBe(true);
   });
 
-  test("a duplicate watcher exits 0 and logs at most once an hour; the log rotates over 5 MB", () => {
+  test("the log rotates over 5 MB (the duplicate-start quieting has no automated test: it needs a live second watcher process)", () => {
     const f = fixture();
     mkdirSync(f.data, { recursive: true });
     writeFileSync(join(f.data, "watcher.log"), "x".repeat(5 * 1024 * 1024 + 10));
