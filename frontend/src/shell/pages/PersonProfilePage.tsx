@@ -127,7 +127,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                       <CardHeader><CardTitle>{i18n._({ id: "What {name} can see", message: "What {name} can see", values: { name: profile.display_name } })}</CardTitle></CardHeader>
                       <CardContent>
                         <p className="text-supporting text-muted-foreground">{i18n._({ id: "Role: {role}", message: "Role: {role}", values: { role: ROLE_LABELS[access.role as keyof typeof ROLE_LABELS] ?? access.role } })}</p>
-                        <ul className="mt-2 flex flex-col gap-1 text-supporting">{ACCESS_KINDS.map((kind) => <li key={kind} className="flex flex-wrap justify-between gap-2"><span>{accessKindName(kind)}</span><span className="text-muted-foreground">{access.ceiling[kind]}: {accessSource(access, kind)}{access.unrated.includes(kind) ? `, ${i18n._({ id: "shows unrated items", message: "shows unrated items" })}` : ""}</span></li>)}</ul>
+                        <ul className="mt-2 flex flex-col gap-1 text-supporting">{ACCESS_KINDS.map((kind) => <li key={kind} className="flex flex-wrap justify-between gap-2"><span>{accessKindName(kind)}</span><span className="text-muted-foreground">{accessSource(access, kind)}{access.unrated.includes(kind) ? `, ${i18n._({ id: "shows unrated items", message: "shows unrated items" })}` : ""}</span></li>)}</ul>
                       </CardContent>
                     </Card> : null}
                     <CreationsSection profile={profile} />
