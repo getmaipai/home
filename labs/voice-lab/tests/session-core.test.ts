@@ -549,3 +549,29 @@ test("the reply draft starts from the streaming text during the first moments of
     h.session.close();
   }
 });
+
+test("reference mode: a repeated word with a person overlapping makes her yield; the same text with no overlap on the cleaned microphone does not", async () => {
+  for (const [overlapMs, expectStop] of [[450, true], [0, false]] as const) {
+    const h = harness({ transcribe: async () => "Thursday?" });
+    const s = h.session as any; s.message(JSON.stringify({ t: "config", values: { echoReference: true } }));
+    const tm = enterSpeakingState(h.session, h.time);
+    s.chunks = ["It is on Thursday."]; s.playedMs = [500]; s.chunkDurations = [1500];
+    s.cutInSamples = Array.from({ length: 512 * 5 }, () => 0.1);
+    for (let i = 0; i < 5; i++) { h.time.advance(32); for (const c of tm.frame(true, h.time.now)) s.command(c); }
+    if (overlapMs) s.message(JSON.stringify({ t: "overlap", ms: overlapMs, turn: s.turn }));
+    await s.finishCutIn(); await h.flush();
+    expect(h.messages().some((m) => m.t === "stop")).toBe(expectStop);
+    h.session.close();
+  }
+});
+
+test("reference mode: the page may stop her locally once a person is clearly talking over her, and the hub keeps what was heard", async () => {
+  const h = harness({}); const s = h.session as any; s.message(JSON.stringify({ t: "config", values: { echoReference: true } }));
+  const tm = enterSpeakingState(h.session, h.time);
+  s.cutInSamples = Array.from({ length: 512 * 5 }, () => 0.1);
+  for (let i = 0; i < 5; i++) { h.time.advance(32); for (const c of tm.frame(true, h.time.now)) s.command(c); }
+  s.message(JSON.stringify({ t: "local_stop", turn: s.turn })); await h.flush();
+  expect(h.messages().some((m) => m.t === "stop")).toBe(true);
+  expect(s.samples.length).toBeGreaterThan(0);          // the first words of the interruption are kept as the start of the next turn
+  h.session.close();
+});

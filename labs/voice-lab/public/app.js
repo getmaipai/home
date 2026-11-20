@@ -1,6 +1,7 @@
 import { TurnState } from "./turn-state.js";
 import { LocalDuckDetector } from "./local-duck.js";
 import { watchSocket } from "./reconnect.js";
+import { OverlapDetector } from "./overlap.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -40,7 +41,7 @@ $('#start').onclick = async () => {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   const turnState = new TurnState();
-  const localDuckDetector = new LocalDuckDetector();
+  const localDuckDetector = new LocalDuckDetector(); const overlapDetector = new OverlapDetector(); let lastOverlapSent = 0, localStopSent2 = false;
   const active = new Map();
   const chunkTexts = new Map();
   const playedTimes = [];
@@ -159,6 +160,12 @@ $('#start').onclick = async () => {
       const view = new DataView(bytes), pcm = new Float32Array(512);
       for (let i = 0; i < pcm.length; i++) pcm[i] = view.getInt16(12 + i * 2, true) / 32768;
       const playing = active.size > 0 && !replyFinished;
+      if ($('#echoRef').checked) {
+        const ms = overlapDetector.frame(pcm, { playing });
+        if (ms >= 250 && performance.now() - lastOverlapSent > 90) { lastOverlapSent = performance.now(); ws.send(JSON.stringify({ t: 'overlap', ms, turn: currentTurn })); }
+        if (ms >= 650 && playing && !localStopSent2) { localStopSent2 = true; turnState.stop(currentTurn); window.__stopPlayback?.(currentTurn); ws.send(JSON.stringify({ t: 'local_stop', turn: currentTurn })); }
+        if (ms === 0) localStopSent2 = false;
+      }
       if (localDuckDetector.frame(pcm, { playing, enabled: $('#localDuck').checked }) && !localDuckSent) {
         localDuckSent = true; window.__duck?.(); const turn = currentTurn;
         ws.send(JSON.stringify({ t: 'local_duck', turn }));
@@ -175,10 +182,11 @@ $('#start').onclick = async () => {
   window.__configureOutput($('#output').value);
 };
 $('#stop').onclick = () => ws?.send(JSON.stringify({ t: 'stop', turn: currentTurn }));
-for (const id of ['backchannel', 'silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
+for (const id of ['echoRef', 'backchannel', 'silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
   $('#' + id).onchange = () => {
-    const sim = $('#netSim').value; const values = { backchannel: $('#backchannel').checked, talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
+    const sim = $('#netSim').value; const values = { echoReference: $('#echoRef').checked, backchannel: $('#backchannel').checked, talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
     if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values }));
+    if (id === 'echoRef' && $('#echoRef').checked) { $('#output').value = 'loopback'; $('#echoSetting').value = 'true'; window.__configureOutput('loopback'); status.textContent = 'Echo-reference mode: her voice now plays through the browser echo-cancelled path. Press Start again for the microphone setting to apply.'; }
     if (id === 'output') window.__configureOutput($('#output').value);
     save({ talkOver: $('#talkOver').value, toolDelay: +$('#toolDelay').value, netSim: $('#netSim').value, localDuck: $('#localDuck').checked, output: $('#output').value, echoSetting: $('#echoSetting').value, silenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value });
   };

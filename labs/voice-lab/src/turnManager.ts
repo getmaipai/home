@@ -27,6 +27,8 @@ export class TurnManager {
 
   constructor(clock: () => number = () => performance.now()) { this.clock = clock; }
   private emit(type: string, extra: Record<string, unknown> = {}): Command[] { return [{ type, ...extra }]; }
+  /** The device says a person is clearly talking over her: stop now, keep what was heard so far as the start of their turn. */
+  forceInterrupt(): Command[] { if (this.cutAt < 0) return []; const duration = this.cutSpeech; return [...this.emit("transcribe_cut_in", { duration, forced: true }), ...this.interrupt()]; }
   silenceMs(now = this.clock()) { return this.silenceAt < 0 ? 0 : now - this.silenceAt; }
   get turnProbability() { return this.probability; }
   get echoLikely() { return this.echo; }

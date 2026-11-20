@@ -17,3 +17,10 @@ test("bad values and unknown voices are refused; the stumble level reaches the p
   const d = store(); expect(() => setVoiceSettings("casual", { stumble: "wild" }, d)).toThrow(); expect(() => setVoiceSettings("../x", { stumble: "none" }, d)).toThrow();
   expect(buildPrompt([], "none")).toContain("clean, fluent sentences"); expect(buildPrompt([], "heavy")).toContain("stumbles a lot");
 });
+
+test("the when-it-fits stumble level exists, has no quota, and the default is unchanged", () => {
+  const d = store(); setVoiceSettings("casual", { stumble: "fits" }, d);
+  expect(voiceSettings("casual", d).stumble).toBe("fits");
+  expect(buildPrompt([], "fits")).toContain("There is no quota");
+  expect(defaultSettings().stumble).toBe("natural");
+});

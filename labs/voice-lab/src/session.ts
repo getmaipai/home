@@ -12,6 +12,7 @@ import { shouldNod } from "./listenerNod";
 import { StreamingAsr, norm } from "./streamingAsr";
 import { voiceSettings } from "./voiceSettings";
 import { judgeCutIn } from "./selfEcho";
+import { decideYield } from "./yieldDecision";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
 import { decideBackchannel } from "./backchannel";
@@ -48,6 +49,7 @@ export class VoiceSession {
   private chatFn: typeof chat;
   private speechFn: typeof speech;
   private streamAsr: StreamingAsr | null = null; private streamEnabled = Bun.env.LAB_STREAM_DRAFT === "1"; private streamDraft = ""; private streamDraftEarlyMs = 64;
+  private echoRef = false; private overlapMs = 0; private lastOverlapAt = -1e9;
   private nodEnabled = false; private nodClip: Int16Array | null = null; private lastNodAt = -1e9; private nodsThisTurn = 0; private nodSuppressUntil = 0; private nodRoll: () => number = Math.random;
   private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
@@ -170,7 +172,8 @@ export class VoiceSession {
   private async finishCutIn() {
     const audio = Float32Array.from(this.cutInSamples);
     let text = ""; try { text = await this.transcribeFn(encodeWav(audio), this.abort?.signal); } catch {}
-    const decision = judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
+    // Reference-based mode: the device says whether a person overlaps her; words only help. Otherwise the text-only judgement against her own words.
+    const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
     if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
     for (const command of this.tm.cutTranscript(text, decision)) this.command(command);
     if (decision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
@@ -373,12 +376,15 @@ export class VoiceSession {
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
         if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
+        if (typeof j.values?.echoReference === "boolean") this.echoRef = j.values.echoReference;
         if (typeof j.values?.streamingDraft === "boolean") this.streamEnabled = j.values.streamingDraft;
         if (typeof j.values?.backchannel === "boolean") { this.nodEnabled = j.values.backchannel; if (this.nodEnabled) void this.makeNod(); }
         if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles;
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
         if (j.values?.netSim) this.netSim = j.values.netSim;
       }
+      if (j.t === "overlap" && Number.isFinite(j.ms)) { this.overlapMs = Math.max(0, Math.min(60000, j.ms)); this.lastOverlapAt = this.now(); }
+      if (j.t === "local_stop" && this.echoRef && j.turn === this.turn) { this.metrics.t_local_stop = this.metricNow(); for (const c of this.tm.forceInterrupt()) this.command(c); }
       if (j.t === "ping") this.send({ t: "pong", at: j.at });
       if (["stop", "local_duck", "audio_scheduled", "played_end", "played"].includes(j.t) && j.turn !== this.turn) return;
       if (j.t === "stop") for (const c of this.tm.stop()) this.command(c);

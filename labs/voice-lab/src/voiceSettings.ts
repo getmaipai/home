@@ -3,7 +3,7 @@ import { join } from "node:path";
 // Per-voice settings kept in the voice's own folder of the lab voice store (meta.json, key "settings"), so each voice (and later each companion)
 // carries its own stumbling level and mood strength. Missing values fall back to the lab defaults.
 export const VOICE_STORE = Bun.env.LAB_VOICE_STORE ?? join(import.meta.dir, "..", "..", "..", "data-scratch", "voices", "voices_store");
-export const STUMBLE_LEVELS = ["none", "light", "natural", "lively", "heavy"] as const, MOOD_STRENGTHS = ["off", "mild", "medium", "full"] as const;
+export const STUMBLE_LEVELS = ["none", "light", "natural", "lively", "fits", "heavy"] as const, MOOD_STRENGTHS = ["off", "mild", "medium", "full"] as const;
 export type VoiceSettings = { stumble: string; moodStrength: string };
 export const defaultSettings = (): VoiceSettings => ({ stumble: Bun.env.LAB_STUMBLE ?? "natural", moodStrength: Bun.env.LAB_MOOD_STRENGTH ?? "mild" });
 const safeId = (v: string) => /^[A-Za-z0-9_-]{1,64}$/.test(v);
