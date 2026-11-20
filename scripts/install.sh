@@ -768,7 +768,6 @@ restore_snapshot() {
       mkdir -p "$(dirname "${root}/${rel}")" && mv "${root}/data.rolled-back-${ts}/${rel#data/}" "${root}/${rel}"
     done < "${root}/upgrade-backups/${snap}/excluded.txt"
   fi
-  prune_rolled_back_copies "$root" || log "Could not prune old rollback copies in ${root}"
   log "Restored your data from ${snap}"
 }
 

@@ -2,7 +2,7 @@ import { describe, test, expect, setDefaultTimeout, afterAll } from "bun:test";
 setDefaultTimeout(30_000);
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHmac } from "node:crypto";
 import * as installFixtures from "./installFixtures";
@@ -135,6 +135,30 @@ describe("upgrade data copy and rollback", () => {
       bash(`prune_snapshots "${root}/upgrade-backups"`);
       expect(readdirSync(join(root, "upgrade-backups")).sort()).toEqual(["20260103-000000-from-v3", "20260104-000000-from-v4"]);
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a rollback after a failed update removes no old rollback copy", () => {
+    const root = fixture();
+    try {
+      mkdirSync(join(root, "data"), { recursive: true });
+      writeFileSync(join(root, "data", "a.txt"), "a");
+      expect(bash(`snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
+      for (const name of ["20261101-000000", "20261102-000000", "20261103-000000"]) mkdirSync(join(root, `data.rolled-back-${name}`));
+      expect(bash(`restore_snapshot "${root}" v0.0.9`).exitCode).toBe(0);
+      expect(readdirSync(root).filter((name) => name.startsWith("data.rolled-back-")).length).toBe(4);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("rollback pruning never follows a symlink out of the install folder", () => {
+    const root = fixture();
+    const outside = mkdtempSync(join(tmpdir(), "maipai-outside-"));
+    try {
+      writeFileSync(join(outside, "keep.txt"), "keep");
+      symlinkSync(outside, join(root, "data.rolled-back-20261101-000000"));
+      for (const name of ["20261102-000000", "20261103-000000", "20261104-000000"]) mkdirSync(join(root, `data.rolled-back-${name}`));
+      expect(bash(`prune_rolled_back_copies "${root}"`).exitCode).toBe(0);
+      expect(readFileSync(join(outside, "keep.txt"), "utf8")).toBe("keep");
+    } finally { rmSync(root, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
   });
 
   test("rollback pruning leaves the newest two real directories", () => {

@@ -25,6 +25,22 @@ case "$verb" in
       [[ ! -L "$path" ]] || fail "refusing symlink: $name" 64
       [[ -d "$path" ]] || fail "not a rollback copy directory: $name" 64
     done
+    # The newest two copies are never removed, whatever the caller asks for.
+    shopt -s nullglob
+    keep=()
+    for path in "$ROOT"/data.rolled-back-*; do
+      [[ -d "$path" && ! -L "$path" ]] || continue
+      [[ "${path##*/}" =~ ^data\.rolled-back-[0-9-]+$ ]] || continue
+      keep+=("${path##*/}")
+    done
+    if ((${#keep[@]} > 0)); then
+      sorted=()
+      while IFS= read -r line; do sorted+=("$line"); done < <(printf '%s\n' "${keep[@]}" | sort | tail -n 2)
+      keep=("${sorted[@]}")
+    fi
+    for name in "$@"; do
+      for k in "${keep[@]}"; do [[ "$name" != "$k" ]] || fail "refusing to remove one of the newest two copies: $name" 64; done
+    done
     for name in "$@"; do rm -rf -- "$ROOT/$name" || fail "could not remove $name"; done
     ;;
   *) fail "usage: maipai-prune-rollbacks list | prune <name>..." 64 ;;
