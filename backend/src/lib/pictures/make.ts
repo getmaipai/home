@@ -1,7 +1,7 @@
 // CREATOR-15 slice A: Create enters the same generate_image definition as chat, on the person's own written screen.
 import type { PersonRow } from "@/types";
 import { runGenerateImage, type RunGenerateImageInput } from "./tool";
-import { getTemplate } from "@/lib/media/templates";
+import { resolveTemplate } from "@/lib/media/templates";
 import { PICTURE_WORD_BLANKS } from "./quality";
 import { askPictureWords, picturePromptNeedsWordsQuestion } from "./wordsQuestion";
 
@@ -113,7 +113,7 @@ export async function makePictureFor(actor: PersonRow, body: PictureMakeBody): P
   }
   let submitted: PictureMakeBody = body;
   if (body.template) {
-    const template = getTemplate(body.template);
+    const template = resolveTemplate(actor, body.template);
     if (template?.kind === "picture") {
       const blankSpecs = [...template.prompt.matchAll(/\{\{([a-z][a-z0-9_]*)\|([^|}]+)\|([^}]*)\}\}/g)].map((match) => ({ name: match[1]!, example: match[3]!.trim() }));
       if (blankSpecs.length) {

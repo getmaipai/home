@@ -7,6 +7,7 @@ import { passForPerson } from "@/lib/filter/pass";
 import { stampAllowed } from "@/lib/filter/stampCompare";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
+import { getSavedTemplate, listSavedTemplates, savedTemplateSettings } from "./savedTemplates";
 
 const ROOT = join(import.meta.dir, "../../../packages/generate_image/images/templates");
 const VIDEO_ROOT = join(import.meta.dir, "../../../packages/generate_video/video/templates");
@@ -61,8 +62,18 @@ const visibleTo = (actor: PersonRow, row: MediaTemplateRecord): boolean => {
 };
 export function bundledTemplates(kind?: "picture" | "video"): PickableTemplate[] { return all().templates.filter((row) => !kind || row.kind === kind); }
 export function listTemplates(input: { actor: PersonRow; kind?: "picture" | "video" }): PickableTemplate[] {
-  return all().templates.filter((row) => (!input.kind || row.kind === input.kind) && visibleTo(input.actor, row));
+  const bundled = all().templates.filter((row) => (!input.kind || row.kind === input.kind) && visibleTo(input.actor, row));
+  // TEMPLATE-02: the viewer's own saved templates and the household-shared ones, filtered in savedTemplates.ts by the same ceiling and the same household check.
+  return [...bundled, ...(listSavedTemplates(input.actor, input.kind) as PickableTemplate[])];
 }
+/** A template this person may use, by id: a bundled one they may see, or a saved one (their own or shared with the home) their ceiling allows. Null otherwise: absent, never "locked" (C10). */
+export function resolveTemplate(actor: PersonRow, id: string): PickableTemplate | null {
+  const bundled = getTemplate(id);
+  if (bundled) return visibleTo(actor, bundled) ? bundled : null;
+  return getSavedTemplate(actor, id) as PickableTemplate | null;
+}
+/** The video sidecar of a template: the bundled settings file, else the saved template's own. */
+export function templateSettingsFor(id: string): VideoTemplateSettings | undefined { return videoTemplateSettings()[id] ?? savedTemplateSettings(id) ?? undefined; }
 export function getTemplate(id: string): PickableTemplate | null { return all().templates.find((row) => row.id === id) ?? null; }
 /** The preset records this person may use, in file order. An adult-only record is hidden by the same rule as an adult-only template. */
 export function listFragments(input: { actor: PersonRow; group?: FragmentRecord["group"] }): FragmentRecord[] {

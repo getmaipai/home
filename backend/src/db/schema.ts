@@ -2767,6 +2767,29 @@ export const scheduledTasks = sqliteTable("scheduled_tasks", {
   deletedAt: text("deleted_at"),
 }, (table) => [index("scheduled_tasks_person_idx").on(table.person), index("scheduled_tasks_external_ref_idx").on(table.externalRef)]);
 
+// TEMPLATE-02: a template a person saved, in the spec's `media-template` shape (spec 0.1.458): the owner's key is `owner_person_id`, `shared_with` is "household" or absent
+// (private), the rating is the stamp in `content_ratings` under the `template` kind (the record's `content_rating` is built from it), a saved template stores no Library
+// files and no styles, and its cast is `cast_*` blanks in `prompt`. `settings` is the video sidecar of a bundled template (seconds, look, camera, orientation, level).
+// `lock` is the source's own lock carried over ("on"), never made by being unchecked (C11).
+export const savedTemplates = sqliteTable("saved_templates", {
+  id: text("id").primaryKey(),
+  ownerPersonId: text("owner_person_id").notNull().references(() => people.id),
+  kind: text("kind").notNull(), // picture | video
+  title: text("title").notNull(),
+  summary: text("summary").notNull().default(""),
+  category: text("category").notNull(),
+  audience: text("audience").notNull(), // all-ages | adult-only, set from the stamp (X is adult-only)
+  prompt: text("prompt").notNull(),
+  settings: text("settings"), // JSON, video only
+  aspect: text("aspect"),
+  sharedWith: text("shared_with"), // null = private | "household"
+  lock: text("lock"), // null | "on"
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+}, (table) => [index("saved_templates_owner_idx").on(table.ownerPersonId), index("saved_templates_shared_idx").on(table.sharedWith)]);
+
 // RATE-INGEST-01 (RULES.md C9): the stored content rating of one item, written when the item arrives or by the ratings sweep.
 // A reconstructible derived cache: lists read it, nothing rates on a request. `fingerprint` is what the rating was computed from.
 export const contentRatings = sqliteTable("content_ratings", {

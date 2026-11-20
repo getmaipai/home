@@ -314,6 +314,9 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM creations WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM creation_cast WHERE subject_id IN (SELECT id FROM media_subjects WHERE owner_person_id = ?)").run(personId);
   sqlite.query("DELETE FROM media_subjects WHERE owner_person_id = ?").run(personId);
+  // TEMPLATE-02: the templates a person saved go with them, with their stamps.
+  sqlite.query("DELETE FROM content_ratings WHERE subject_kind = 'template' AND subject_id IN (SELECT id FROM saved_templates WHERE owner_person_id = ?)").run(personId);
+  sqlite.query("DELETE FROM saved_templates WHERE owner_person_id = ?").run(personId);
   const subjectShares = sqlite.query("SELECT id, shared_with FROM media_subjects WHERE EXISTS (SELECT 1 FROM json_each(media_subjects.shared_with) WHERE value = ?)").all(personId) as Array<{ id: string; shared_with: string }>;
   for (const subject of subjectShares) {
     const remaining = (JSON.parse(subject.shared_with) as string[]).filter((id) => id !== personId);

@@ -15,7 +15,7 @@ import { resolveStyles, strengthWord } from "./styleChoice";
 import type { StyleStrength } from "@/lib/loras/promptPlan";
 import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import sharp from "sharp";
-import { fillTemplateBlanks, getTemplate, templateBlanks, videoTemplateSettings } from "@/lib/media/templates";
+import { fillTemplateBlanks, resolveTemplate, templateBlanks, templateSettingsFor } from "@/lib/media/templates";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
 
 /** The most takes one press of Generate makes (the Takes chip offers 1 to 4; a level may cap lower, `MAX_TAKES_BY_TIER`). */
@@ -136,9 +136,9 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
   if (denial) return { ok: false, status: 403, error: VIDEO_DENIAL_LINE[denial], code: denial };
   let templateStyles: string[] = [];
   if (body.template) {
-    const template = getTemplate(body.template);
+    const template = resolveTemplate(actor, body.template);
     if (!template || template.kind !== "video" || (template.audience !== "all-ages" && audience.band !== "adult")) return { ok: false, status: 422, error: "That video template is not available. Choose another template or make a video without one.", code: "template_unavailable" };
-    const settings = videoTemplateSettings()[template.id];
+    const settings = templateSettingsFor(template.id);
     if (!settings) return { ok: false, status: 422, error: "That video template is not available. Choose another template or make a video without one.", code: "template_unavailable" };
     templateStyles = template.styles;
     const blanks = templateBlanks(template.prompt);

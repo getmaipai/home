@@ -1,6 +1,6 @@
 import { __resetMusicJobsForTests } from "@/lib/music/store";
 import { __resetLoraSyncForTests } from "@/lib/loras/sync";
-import { musicJobs } from "@/db/schema";
+import { savedTemplates, musicJobs } from "@/db/schema";
 import { tmpdir } from "node:os";
 import { db } from "@/db";
 import { dataDir } from "@/lib/paths";
@@ -352,6 +352,7 @@ export function resetDb(): void {
   db.delete(productionDocuments).run();
   db.delete(filmRuns).run();
   db.delete(mediaSubjects).run(); // IMG-SUBJECT-01: owner_person_id references people
+  db.delete(savedTemplates).run(); // TEMPLATE-02: owner_person_id references people
   db.delete(activityDismissals).run(); // ACTIVITY-CLEAR-01: person_id references people
   db.delete(people).run();
 }

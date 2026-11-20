@@ -23,7 +23,7 @@ import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, REMOVED_MODEL_LINE, type QualityChoice } from "./quality";
 import { listOfAudience, makePicture, pictureJobFor, StackPicturesError } from "./stack";
 import { needsNoTextLine, wordsCanStart } from "./catalog";
-import { getTemplate } from "@/lib/media/templates";
+import { resolveTemplate } from "@/lib/media/templates";
 import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
 import { runMediaOp } from "@/lib/mediaOps/registry";
 import { subjectsForNames } from "@/lib/mediaSubjects";
@@ -161,10 +161,10 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const normalized = { ...args };
   // USE-AS-REFERENCE: references kept per call = the engine's own count (1 to 6); read only when the call carries references.
   const refLimit = Array.isArray(args.references) ? pictureReferenceLimit(await pictureEngineStatusPatient()) : 1;
-  let template: ReturnType<typeof getTemplate> = null;
+  let template: ReturnType<typeof resolveTemplate> = null;
   let promptOverride: string | null = null;
   if (typeof args.template === "string" && args.template) {
-    template = getTemplate(args.template);
+    template = resolveTemplate(state.actor as PersonRow, args.template);
     if (!template || template.kind !== "picture" || (template.audience === "adult-only" && (audience.band !== "adult" || !adultStylesAllowed()))) {
       return failed(callId, args, "bad_template", "bad_arguments");
     }
