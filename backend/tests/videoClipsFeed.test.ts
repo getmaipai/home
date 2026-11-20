@@ -182,9 +182,9 @@ describe("scope short: the clips feed rows", () => {
     for (const r of teens) { expect(r.prompt).toBeUndefined(); expect("autoplay" in r).toBe(false); }
   });
 
-  test("a child and a teen reach no other scope of recipes (feed, job, clips, showcase, studio)", async () => {
+  test("a child and a teen reach no other scope of recipes (feed, job, clips, templates, studio)", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header", "stage"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "templates", "studio", "studio-picker", "header", "stage"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
     // The Clips shelf and page ask for the short scope: open to both.
     for (const who of [teen, child]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "short" })).status).toBe(200);
     // VF-UI-02: the Library's film shelves are served to every role, and a teen or child gets no rows (films are adult-only), so the shelves are absent, never a load error.

@@ -15,7 +15,8 @@ describe("shot card data", () => {
       for (const row of rows) expect(MediaTemplate.safeParse(row).success).toBe(true);
     }
     const starters = listTemplates({ actor, kind: "video" });
-    expect(starters).toHaveLength(6);
+    expect(starters.filter((row) => !row.id.startsWith("mtpl-inspiration"))).toHaveLength(17); // plus the eight Inspiration ideas (TEMPLATE-01)
+    expect(starters.filter((row) => row.id.startsWith("mtpl-inspiration"))).toHaveLength(8);
     for (const row of starters) expect(MediaTemplate.safeParse(row).success).toBe(true);
     expect(listTemplates({ actor, kind: "picture" }).every((row) => row.kind === "picture")).toBe(true);
     expect(listFragments({ actor, group: "picture_look" })).toHaveLength(56);

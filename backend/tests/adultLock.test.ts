@@ -50,7 +50,7 @@ function surfaces(clip: { jobId: string; fileId: string; posterId: string }): Ar
     ["job scope", (c, h) => data(c, { scope: "job", id: jobId }, h)],
     ["clips scope", (c, h) => data(c, { scope: "clips" }, h)],
     ["clips favorites", (c, h) => data(c, { scope: "clips", view: "favorites" }, h)],
-    ["showcase scope", (c, h) => data(c, { scope: "showcase" }, h)],
+    ["inspiration templates", (c, h) => data(c, { scope: "templates", filter: "inspiration" }, h)],
     ["made at home shelf", (c, h) => c.post("/api/plugins/video/data/made-at-home", {}, h)],
     ["creation header", (c, h) => c.post("/api/plugins/video/data/creation", { id: fileId }, h)],
     ["library list", (c, h) => c.get("/api/library", h)],

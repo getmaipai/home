@@ -18,7 +18,9 @@ test("video templates have valid settings and covers", async () => {
   expect(templates.length).toBeGreaterThanOrEqual(12);
   expect(validVideoTemplateSettings()).toBe(true);
   expect(Object.keys(videoTemplateSettings()).length).toBe(templates.length);
-  for (const row of templates) expect(templateCoverUrl(row.id)).toBe(`/template-covers/${row.id}.jpg`);
+  // TEMPLATE-01: the eight Inspiration ideas are templates too (their picture is their own clip in the package, checked in videoShowcase.test.ts); the starters have covers.
+  for (const row of templates.filter((row) => !row.id.startsWith("mtpl-inspiration"))) expect(templateCoverUrl(row.id)).toBe(`/template-covers/${row.id}.jpg`);
+  expect(templates.filter((row) => row.id.startsWith("mtpl-inspiration"))).toHaveLength(8);
 });
 test("video template data scope lists covers", async () => {
   const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -57,7 +59,7 @@ test("explicit settings beat template defaults and unknown template starts no jo
 
 test("every video template is a recipe with one labelled blank and an example that reads as a whole sentence", () => {
   const person = {} as PersonRow;
-  for (const row of listTemplates({ actor: person, kind: "video" })) {
+  for (const row of listTemplates({ actor: person, kind: "video" }).filter((row) => !row.id.startsWith("mtpl-inspiration"))) { // the Inspiration ideas are plain words with no blank
     const blanks = templateBlanks(row.prompt);
     expect(blanks.length).toBeGreaterThan(0);
     for (const blank of blanks) { expect(blank.label.length).toBeGreaterThan(0); expect(blank.example.length).toBeGreaterThan(2); }

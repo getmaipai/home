@@ -117,5 +117,61 @@
     "camera": "close-up",
     "orientation": "portrait",
     "tier": "standard"
+  },
+  "mtpl-inspirationpaperboatanime": {
+    "seconds": 5,
+    "look": "anime",
+    "camera": "dolly-in",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationvalleyaerial": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "aerial",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationcabinorbit": {
+    "seconds": 5,
+    "look": "3d-animated",
+    "camera": "slow-orbit",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationmorningcartoon": {
+    "seconds": 5,
+    "look": "classic-cartoon",
+    "camera": "none",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationlighthousefilm": {
+    "seconds": 5,
+    "look": "film",
+    "camera": "handheld",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationcitytimelapse": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "time-lapse",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationsplashslow": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "slow-motion",
+    "orientation": "landscape",
+    "tier": "standard"
+  },
+  "mtpl-inspirationraindropclose": {
+    "seconds": 5,
+    "look": "natural",
+    "camera": "close-up",
+    "orientation": "landscape",
+    "tier": "standard"
   }
 }

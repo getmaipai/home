@@ -238,8 +238,9 @@
         "source": "package",
         "path": "recipes",
         "params": {
-          "scope": "showcase",
-          "limit": 3
+          "scope": "templates",
+          "limit": 3,
+          "filter": "inspiration"
         }
       },
       "item_key_field": "id",

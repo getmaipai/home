@@ -1,33 +1,33 @@
 {
- "paper-boat-anime": {
+ "mtpl-inspirationpaperboatanime": {
   "prompt": "7a03e1c6bfa7a7cf07ee6f33fff168671715b6130c3e811f4f1c39a0cabc4904",
   "file": "2682a98cc2d84fae97215af6efe0fedc57cf98099b3359e85f93498a17cc1aeb"
  },
- "valley-aerial": {
+ "mtpl-inspirationvalleyaerial": {
   "prompt": "9d01bb15a19bfbba1deb786bd0929e3c342587e451e62118c91d5cf510a3b804",
   "file": "78831cd0d8085ca993a297e88ba3ab20f219ee4fca7d3c343a2c3c8bc52e3f41"
  },
- "cabin-orbit": {
+ "mtpl-inspirationcabinorbit": {
   "prompt": "53e62c67ad35857605d29eaa662d346e00615f9ecd0f155416fdb5c56cfd80af",
   "file": "12d690e1ea39227409bdd36a427a58f892acc04e42ef420f71ddcbac54f6c87f"
  },
- "morning-cartoon": {
+ "mtpl-inspirationmorningcartoon": {
   "prompt": "bfe508c0c9d6dc8c343a84191bfd4433908f1ec00e81bf53810318dc2f60cbc6",
   "file": "b5792056e087968773b7381a844b9d7b6f0c1aa3d3ba758838e9f33fae945bfa"
  },
- "lighthouse-film": {
+ "mtpl-inspirationlighthousefilm": {
   "prompt": "cf5a88e51960c4b11ea93f573b3a964581a2532479792cea21efeac12763d5f8",
   "file": "846bebba5208a37bd24e959474c0e93b4faba29b83c53491f5623f7b185a8e01"
  },
- "city-time-lapse": {
+ "mtpl-inspirationcitytimelapse": {
   "prompt": "2ccad63cdef0878f82e9c5d57721519f33892a39b54055fc12baaa2c4d9a8fde",
   "file": "e02b77bfeb4c1e63b9424b715ea44dee9aca7ea0a359ab0f89ac14e3925867bd"
  },
- "splash-slow": {
+ "mtpl-inspirationsplashslow": {
   "prompt": "980c836853d20f603bd67b7b52c266fdd78e489f6bbd83bb27ca5a2e626a88c5",
   "file": "fb2e9da8c688c1fecd3ceef9fb43d59f4eabc7bc1bee3938b8f8aadb323b7b80"
  },
- "raindrop-close": {
+ "mtpl-inspirationraindropclose": {
   "prompt": "4df608690372dcca85d85dda025fbb50a68f70bd836e368d5a03d4c065af5b0a",
   "file": "80065c4696cd86f3c7df066ebe24f26c7826fbbd7896508721bb02cb1f02bafd"
  }

@@ -1,5 +1,5 @@
 // VIDEO-CREATE-01, VIDEO-UI-06: the Video package's Create data, added to the shared media host. The manifest's `contributes.data` is at the spec's
-// cap of 16 ids, so one id, `recipes`, answers by `scope`: none = the recipe list (lib/videos/recipes.ts), "showcase" = the Try this rail (VIDEO-UI-11), "feed" = the person's own Create clips
+// cap of 16 ids, so one id, `recipes`, answers by `scope`: none = the recipe list (lib/videos/recipes.ts), "templates" = the video templates (with `filter: "inspiration"` the Inspiration rail, TEMPLATE-01), "feed" = the person's own Create clips
 // as result_feed rows (newest first, with the Favorites only and Type filters), "job" = one of those rows by id (what the feed's `poll_while`
 // re-reads while a clip is made), "clips" = My clips (Library files made at home, own and shared, or the person's uploaded pictures, by `view`).
 // Only the two Create pages bind it and both have an adult floor, so appRouteAllowed refuses the rest.
@@ -12,7 +12,7 @@ import { listLibrary } from "@/lib/library";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { requestProof } from "@/lib/adultLock";
 import { adultStateOf } from "@/lib/adultMarks";
-import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_SHOWCASE, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
+import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
 import { syncLoras } from "@/lib/loras/sync";
@@ -28,7 +28,7 @@ import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
 import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { getLoraRecord } from "@/lib/loras/store";
-import { listFragments, listTemplates, templateBlanks } from "@/lib/media/templates";
+import { listFragments, listTemplates, templateBlanks, videoTemplateSettings } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
@@ -169,7 +169,8 @@ registerAppPageFill("video", "create", (person, page) => {
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
-  const templates = listTemplates({ actor: person, kind: "video" });
+  // The Template chip lists the starters; the Inspiration ideas (TEMPLATE-01) are their own rail, and the chip holds at most 24 options.
+  const templates = listTemplates({ actor: person, kind: "video" }).filter((row) => !row.id.startsWith(INSPIRATION_PREFIX));
   const templateChip = { state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "No template" }, ...templates.map((row) => ({ value: row.id, label: row.title }))] };
   const selectedTemplate = templates.find((row) => row.id === (page.state as Record<string, unknown> | undefined)?.template);
   if (selectedTemplate) {
@@ -513,15 +514,17 @@ export function stageRows(person: PersonRow, filter: { from?: string } = {}): Ar
 
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];
 
-/** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
- * (a camera of "none" is the Auto card). Never a clip of the person's, so the rows are the same for everyone who may open the page (adults; appRouteAllowed refuses the rest). */
-function showcaseRows(limit = VIDEO_SHOWCASE.length): Array<Record<string, unknown>> {
-  return VIDEO_SHOWCASE.slice(0, Math.min(Math.max(limit, 1), VIDEO_SHOWCASE.length)).flatMap((tile) => {
-    const poster = tile.poster.replace(/\.mp4$/, ".jpg");
-    if (!packageAssetFile("video", poster)) return [];
-    const look = videoLookFor(tile.look)!;
-    const camera = videoRecipeFor(tile.camera);
-    return [{ id: tile.id, title: tile.title, subtitle: [look.id === "natural" ? null : look.label, camera?.label ?? null].filter(Boolean).join(", ") || "Auto", thumbnail: `/api/plugins/video/assets/${poster}`, loop: `/api/plugins/video/assets/${tile.poster}`, prompt: tile.prompt, look: look.id, camera: camera?.id ?? "none" }];
+/** TEMPLATE-01: the video templates as rows. The Inspiration ideas are video templates too (id `mtpl-inspiration<name>`, a clip and poster at `showcase/<id>` in the package); the Templates
+ * shelf leaves them out and the Inspiration rail shows only them. A tile whose poster is not in the package is left out of the rail, never a broken picture. */
+const INSPIRATION_PREFIX = "mtpl-inspiration";
+function templateRows(person: PersonRow, inspiration: boolean, limit = 100): Array<Record<string, unknown>> {
+  const rows = listTemplates({ actor: person, kind: "video" }).filter((row) => row.id.startsWith(INSPIRATION_PREFIX) === inspiration);
+  return rows.slice(0, Math.min(Math.max(limit, 1), 100)).flatMap((row) => {
+    if (!inspiration) return [{ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }];
+    if (!packageAssetFile("video", `showcase/${row.id}.jpg`)) return [];
+    const settings = videoTemplateSettings()[row.id];
+    const look = videoLookFor(settings?.look)!, camera = videoRecipeFor(settings?.camera);
+    return [{ id: row.id, title: row.title, subtitle: row.summary, thumbnail: `/api/plugins/video/assets/showcase/${row.id}.jpg`, loop: `/api/plugins/video/assets/showcase/${row.id}.mp4`, prompt: row.prompt, look: look.id, camera: camera?.id ?? "none" }];
   });
 }
 
@@ -531,7 +534,9 @@ registerMediaAppData("video", (person, dataId, params) => {
   // (the Create pages' feed, jobs, Studio): they answer nothing unless the person holds the Create pages' adult floor.
   if (!["short", "making-films", "unfinished-films"].includes(String(params.scope)) && !meetsMinRole(person.role, "adult")) return null; // the film shelves answer no rows below an adult (filmShelfRows)
   switch (params.scope) {
-    case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
+    // TEMPLATE-01: one list. The Templates shelf and page read it as it is; the Inspiration rails ask for `filter: "inspiration"` (the ideas that have their own clip) and each row then also
+    // carries its words, look and camera for the press, and its clip and poster from the package.
+    case "templates": return templateRows(person, params.filter === "inspiration", params.limit);
     case "short": return shortClipRows(person);
     case "stage": return stageRows(person, { ...(typeof params.id === "string" && params.id ? { from: params.id } : {}) });
     // VOICED-ROUGH-CUT-HOME-01: the page binds one storyboard. A fresh voiced preview's rows (timed lines with their audio and waves) replace the silent animatic's; with none, or once the plan has changed, the silent rows stay.
@@ -546,7 +551,6 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "making-films": return filmShelfRows(person, ["planning", "running"]);
     case "unfinished-films": return filmShelfRows(person, ["waiting_for_go", "failed", "cancelled"]);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
-    case "showcase": return showcaseRows(params.limit);
     // VIDEO-STUDIO-08: shared header data for the Studio surface. The same for everyone who may open the page.
     case "header": return [{ title: "Make any video" }];
     // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).

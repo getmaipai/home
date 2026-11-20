@@ -75,10 +75,11 @@ test("Video empty message is not attached to a filtered index shelf", () => {
   expect(page.body.some((node) => node.empty_state?.text?.includes("No videos yet"))).toBe(false);
 });
 
-test("Film maker inspiration uses showcase rows to fill its prompt", () => {
+test("Film maker inspiration uses the inspiration templates to fill its prompt", () => {
   const page = JSON.parse(readFileSync(new URL("../../../packages/video/pages/film-maker.json", import.meta.url), "utf8")) as { body: Array<Record<string, any>> };
   const shelf = page.body.find((node) => node.heading === "Inspiration");
-  expect(shelf?.bind.params.scope).toBe("showcase");
+  expect(shelf?.bind.params.scope).toBe("templates");
+  expect(shelf?.bind.params.filter).toBe("inspiration");
   expect(shelf?.on_select.navigate.state.prompt).toBe("{prompt}");
 });
 
