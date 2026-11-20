@@ -62,7 +62,12 @@ describe("the plan step's job cards", () => {
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB)} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
     expect(within(jobs(view)).getByTestId("plan-job-videos")).toBeTruthy();
-    expect(within(view.getByTestId("plan-job-videos")).getByText(sizeGb(cardsFor(plan).cards.find((card) => card.id === "videos")!.choices.find((choice) => choice.id === "videos.quick")!.installedBytes))).toBeTruthy();
+    // WAN-DEFAULT-01: an adult-only home's Videos job is the licensed LTX model alone, off until it is switched on; the card then shows that model's size.
+    const ltxBytes = cardsFor(plan).cards.find((card) => card.id === "videos")!.choices.find((choice) => choice.id === "videos.detailed")!.installedBytes;
+    expect(within(view.getByTestId("plan-job-videos")).queryByText(sizeGb(ltxBytes))).toBeNull();
+    fireEvent.click(sw(view, "Videos"));
+    expect(within(view.getByTestId("plan-job-videos")).getByText(sizeGb(ltxBytes))).toBeTruthy();
+    fireEvent.click(sw(view, "Videos"));
     expect(view.queryByRole("checkbox", { name: /Make videos/ })).toBeNull();
     expect(view.getByText("Total on disk")).toBeTruthy();
     expect(view.getByText(sizeGb(selectionTotals(plan, plan.default_selected).installed_bytes))).toBeTruthy();
@@ -76,7 +81,8 @@ describe("the plan step's job cards", () => {
     await view.findByRole("group", { name: "What gets installed" });
     expect((sw(view, "Job chat") as HTMLButtonElement).disabled).toBe(true);
     expect(sw(view, "Job music").getAttribute("aria-checked")).toBe("false");
-    expect(sw(view, "Videos").getAttribute("aria-checked")).toBe("true");
+    // WAN-DEFAULT-01: an adult-only home has no minors-only clip model, and the licensed LTX model starts off.
+    expect(sw(view, "Videos").getAttribute("aria-checked")).toBe("false");
     expect(sw(view, "More picture styles").getAttribute("aria-checked")).toBe("false");
   });
 
@@ -133,9 +139,10 @@ describe("the plan step's job cards", () => {
   });
 
   const licence = { row_id: "video-ltx25", component: "ltx-2-5-distilled-mlx", id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
-  const pickDetailed = (view: ReturnType<typeof render>) => fireEvent.click(view.getByRole("radio", { name: /Detailed videos/ }));
+  // An adult-only home has one video choice (the licensed LTX model), so turning Videos on picks it.
+  const pickDetailed = (view: ReturnType<typeof render>) => fireEvent.click(sw(view, "Videos"));
 
-  test("choosing Detailed videos shows the licence plainly and Install waits for the accept", async () => {
+  test("turning Videos on (the licensed model) shows the licence plainly and Install waits for the accept", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [licence] })} start={start} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
@@ -188,15 +195,12 @@ describe("the plan step's job cards", () => {
     expect((start.mock.calls[0] as unknown[])[2]).toEqual([]);
   });
 
-  test("going back to Quick videos, or turning Videos off, drops the licence and sends no accept", async () => {
+  test("turning Videos off again drops the licence and sends no accept", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [licence] })} start={start} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
     pickDetailed(view);
     expect(view.queryByTestId("plan-licence")).not.toBeNull();
-    fireEvent.click(view.getByRole("radio", { name: /Quick videos/ }));
-    expect(view.queryByTestId("plan-licence")).toBeNull();
-    pickDetailed(view);
     fireEvent.click(sw(view, "Videos"));
     expect(view.queryByTestId("plan-licence")).toBeNull();
     fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
