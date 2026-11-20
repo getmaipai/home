@@ -7,6 +7,9 @@ import { __setFilmPlanCompleterForTests } from "@/lib/films/plan";
 import { __setFilmEnginesForTests } from "@/lib/films/background";
 import { getFilmRun } from "@/lib/films/store";
 import { activityForViewer } from "@/lib/activity";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { filmRuns } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { household } from "./fixtures/adultLock";
 import { owner as signedInOwner } from "./support/testAuth";
@@ -271,5 +274,25 @@ describe("refusals and access", () => {
     const offered = await rows(owner, "film-voiced", id);
     expect(offered).toEqual([{ run_id: id, reason: "Hear the lines in the voices of your cast." }]);
     __setStackHttpFetchForTests(null); __resetRoughCutAvailabilityForTests();
+  });
+
+  test("the page's one storyboard shows the voiced preview's rows once a fresh one exists, and the silent rows again when the plan changes", async () => {
+    const { client: owner, row } = await signedInOwner();
+    const id = await planned(owner, row);
+    const run = getFilmRun(row, id)!;
+    const silent = await rows(owner, "storyboard");
+    expect(silent.every((r) => r.line_audio === null)).toBe(true);
+    const { storeFile } = await import("@/lib/attachments");
+    const { planFingerprint } = await import("@/lib/films/roughCut");
+    const fixture = JSON.parse((await import("node:fs")).readFileSync("node_modules/@maipai/spec/fixtures/stack-rough-cut-result/valid-six-shots-three-lines.json", "utf8"));
+    const saved = storeFile(row, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([1, 2, 3]), retention: "kept", name: "preview.mp4", deduplicate: false, provenance: `video-edit:${JSON.stringify({ v: 1, kind: "film-rough-cut", production: run.production_id, shots: 3, seconds: 15, plan: planFingerprint(run.plan!), result: { total_s: fixture.total_s, shots: fixture.shots, lines: fixture.lines.map((line: { audio: string }, n: number) => ({ ...line, audio: `/api/files/line-${n}/content` })) } })}` });
+    expect(saved.ok).toBe(true);
+    const voiced = await rows(owner, "storyboard");
+    expect(voiced.some((r) => typeof r.line_audio === "string" && r.line_audio.startsWith("/api/files/"))).toBe(true);
+    expect(voiced).toEqual(await rows(owner, "storyboard-voiced"));
+    // the plan changes (a shot's length): the preview is stale, the silent rows come back
+    const changed = { ...run.plan!, shots: run.plan!.shots.map((shot, index) => (index === 0 ? { ...shot, seconds: shot.seconds + 1 } : shot)) };
+    db.update(filmRuns).set({ planJson: JSON.stringify({ plan: changed }) }).where(eq(filmRuns.id, id)).run();
+    expect((await rows(owner, "storyboard")).every((r) => r.line_audio === null)).toBe(true);
   });
 });

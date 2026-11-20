@@ -508,7 +508,8 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);
     case "stage": return stageRows(person);
-    case "storyboard": return storyboardRows(person, params.id);
+    // VOICED-ROUGH-CUT-HOME-01: the page binds one storyboard. A fresh voiced preview's rows (timed lines with their audio and waves) replace the silent animatic's; with none, or once the plan has changed, the silent rows stay.
+    case "storyboard": { const voiced = voicedRows(person, params.id); return voiced.length ? voiced : storyboardRows(person, params.id); }
     case "storyboard-voiced": return voicedRows(person, params.id);
     case "film-voiced": return voicedOfferRows(person, params.id);
     case "render-plan": return renderPlanRows(person, params.id);
