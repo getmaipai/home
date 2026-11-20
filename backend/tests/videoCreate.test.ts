@@ -262,8 +262,11 @@ describe("the Create page and the make action", () => {
     const feedNode = section.children[0] as Record<string, any>;
     expect(feedNode.type).toBe("result_feed");
     expect(feedNode.heading_style).toBeUndefined(); // sentence-case headings, no all-caps eyebrow (pro look)
-    expect((page.body[2] as Record<string, any>)).toMatchObject({ type: "media_shelf", heading: "Inspiration", aspect: "wide", bind: { params: { limit: 4 } } });
-    expect((page.body[1] as Record<string, any>).heading_style).toBeUndefined();
+    // The composer still leads; the newest take's stage (VF-UI-03b) sits right under it, then Templates, then Inspiration (found by heading, not by index).
+    expect((page.body[0] as Record<string, any>).type).toBe("prompt_bar");
+    expect((page.body[1] as Record<string, any>).type).toBe("media_stage");
+    expect(page.body.find((node) => node.heading === "Inspiration")).toMatchObject({ type: "media_shelf", heading: "Inspiration", aspect: "wide", bind: { params: { limit: 4 } } });
+    expect((page.body.find((node) => node.heading === "Templates") as Record<string, any>).heading_style).toBeUndefined();
     expect(feedNode).toMatchObject({ look: "media", filters_presentation: "popover" });
     expect(feedNode.poll_while).toEqual({ statuses: ["queued", "generating"], record: { path: "recipes", params: { scope: "job", id: "{id}" } } });
     expect(feedNode.bind.params.scope).toBe("feed");
