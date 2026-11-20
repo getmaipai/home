@@ -2,13 +2,14 @@ import { beforeEach, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { installFakeVideoStack } from "./videoFixture";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { fillTemplateBlanks, getTemplate, listTemplates, templateBlanks, validVideoTemplateSettings, videoTemplateSettings } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); __setVideoStatusForTests(undefined); });
 test("video templates have valid settings and covers", async () => {
   const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   const person = db.select().from(people).get()! as PersonRow;
@@ -25,6 +26,8 @@ test("video template data scope lists covers", async () => {
 });
 test("template request reaches the submitted video job with prompt and sidecar values", async () => {
   const fake = installFakeVideoStack();
+  // AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker, so the Stack reports it ready.
+  fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const template = listTemplates({ actor: db.select().from(people).get()! as PersonRow, kind: "video" })[0]!;
@@ -39,6 +42,8 @@ test("template request reaches the submitted video job with prompt and sidecar v
 });
 test("explicit settings beat template defaults and unknown template starts no job", async () => {
   const fake = installFakeVideoStack();
+  // AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker, so the Stack reports it ready.
+  fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const person = db.select().from(people).get()! as PersonRow; const template = listTemplates({ actor: person, kind: "video" })[0]!;
@@ -60,6 +65,8 @@ test("every video template is a recipe with one labelled blank and an example th
 });
 test("the typed words fill the template's blank; a blank left empty uses its example", async () => {
   const fake = installFakeVideoStack();
+  // AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker, so the Stack reports it ready.
+  fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const template = getTemplate("mtpl-vtpetmoment")!;
@@ -71,6 +78,8 @@ test("the typed words fill the template's blank; a blank left empty uses its exa
 });
 test("a blank left empty uses its example, and a malformed blanks value is refused", async () => {
   const fake = installFakeVideoStack();
+  // AGE-ROUTING-REMOVE-01: an adult's clips are made by the sound maker, so the Stack reports it ready.
+  fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   try {
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const template = getTemplate("mtpl-vtpetmoment")!;
