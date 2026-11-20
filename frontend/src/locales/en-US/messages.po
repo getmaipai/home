@@ -1958,6 +1958,11 @@ msgid "setting.search.web_sources.option.ddgs"
 msgstr "A second source that is not available yet."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:819
+msgid "setting.generation.video_tier.option.boost"
+msgstr "A sharper picture, a little slower."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1850
 msgid "setting.voice.talk_over.option.gentle"
 msgstr "A short spoken cue when a sentence clearly ends, such as a question. If you keep talking, Home goes quiet and answers all of it."
@@ -10206,11 +10211,6 @@ msgid "Fast"
 msgstr "Fast"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:816
-msgid "setting.generation.video_tier.help"
-msgstr "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:785
 msgid "setting.generation.picture_quick_model.option.klein"
 msgstr "Fast, and it can also change a picture."
@@ -10924,11 +10924,6 @@ msgstr "Full"
 #: src/lib/settingCopy.generated.ts:905
 msgid "setting.music.dj.option_label.full"
 msgstr "Full"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:819
-msgid "setting.generation.video_tier.option.boost"
-msgstr "A sharper picture, a little slower."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1260
@@ -25953,6 +25948,11 @@ msgstr "Standard"
 #: src/lib/settingCopy.generated.ts:820
 msgid "setting.generation.video_tier.option_label.standard"
 msgstr "Standard"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:816
+msgid "setting.generation.video_tier.help"
+msgstr "Standard is fast and has sound. Boost has a sharper picture and takes a little longer. Anyone can pick a level for one video."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:789

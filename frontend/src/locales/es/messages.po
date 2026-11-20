@@ -2255,6 +2255,12 @@ msgid "setting.search.web_sources.option.ddgs"
 msgstr "Una segunda fuente que aún no está disponible."
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:819
+#, needs-review
+msgid "setting.generation.video_tier.option.boost"
+msgstr "Una imagen más nítida, un poco más lenta."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1850
 msgid "setting.voice.talk_over.option.gentle"
 msgstr ""
@@ -11624,12 +11630,6 @@ msgid "Fast"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:816
-#, needs-review
-msgid "setting.generation.video_tier.help"
-msgstr "Estándar es rápido y tiene sonido. Boost tiene una imagen más nítida y toma un poco más de tiempo. Cualquiera puede elegir un nivel para un vídeo."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:785
 #, needs-review
 msgid "setting.generation.picture_quick_model.option.klein"
@@ -12436,12 +12436,6 @@ msgstr "Completo"
 #, needs-review
 msgid "setting.music.dj.option_label.full"
 msgstr "Completo"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:819
-#, needs-review
-msgid "setting.generation.video_tier.option.boost"
-msgstr "Una imagen más nítida, un poco más lenta."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1260
@@ -29480,6 +29474,12 @@ msgstr "Estándar"
 #, needs-review
 msgid "setting.generation.video_tier.option_label.standard"
 msgstr "Estándar"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:816
+#, needs-review
+msgid "setting.generation.video_tier.help"
+msgstr "Estándar es rápido y tiene sonido. Boost tiene una imagen más nítida y toma un poco más de tiempo. Cualquiera puede elegir un nivel para un vídeo."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:789
