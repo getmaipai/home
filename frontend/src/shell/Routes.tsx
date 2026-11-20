@@ -192,6 +192,12 @@ function LegacyCreateRedirect() {
   return <Navigate to={{ pathname: "/apps/video/create", search: location.search, hash: location.hash }} replace />;
 }
 
+/** VF-IA-02 (a): Trim and join is the Studio (it already rendered the same timeline); its old route opens the Studio with the clip kept. */
+function LegacyStudioRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/apps/video/studio", search: location.search, hash: location.hash }} replace />;
+}
+
 /** ELEMENTS-HOME-01: the Image app's cast pages moved to the Elements app (the package `elements`; not a kit Element). Productions and Character sheet had no new home: they go to Image's own front page. */
 const ELEMENTS_MOVED: Readonly<Record<string, string>> = { characters: "/apps/elements/characters", places: "/apps/elements/places", props: "/apps/elements/props", productions: "/apps/image", "character-sheet": "/apps/image" };
 function LegacyImageCastRedirect({ page }: { page: string }) {
@@ -554,6 +560,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route path="apps/videos/*" element={<LegacyVideoRedirect />} />
           <Route path="apps/video/from-picture" element={<LegacyCreateRedirect />} />
           <Route path="apps/video/animate" element={<LegacyCreateRedirect />} />
+          <Route path="apps/video/trim" element={<LegacyStudioRedirect />} />
           <Route path="apps/image/characters" element={<LegacyImageCastRedirect page="characters" />} />
           <Route path="apps/image/places" element={<LegacyImageCastRedirect page="places" />} />
           <Route path="apps/image/props" element={<LegacyImageCastRedirect page="props" />} />

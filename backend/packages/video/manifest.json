@@ -110,7 +110,6 @@
           "title": "Edit",
           "pages": [
             "studio",
-            "trim",
             "captions",
             "voiceover",
             "swap"
@@ -322,15 +321,6 @@
         "nav": false,
         "kind": "schema",
         "module": "templates",
-        "min_role": "adult"
-      },
-      {
-        "id": "trim",
-        "label": "Trim and join",
-        "icon": "scissors",
-        "nav": false,
-        "kind": "schema",
-        "module": "trim",
         "min_role": "adult"
       },
       {

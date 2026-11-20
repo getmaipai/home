@@ -124,7 +124,8 @@ describe("Routes appearance", () => {
     ["/apps/video/from-picture?start_frame=file-1&prompt=wave", "/apps/video/create?start_frame=file-1&prompt=wave"],
     ["/apps/video/animate", "/apps/video/create"],
     ["/apps/video/animate?start_frame=file-2", "/apps/video/create?start_frame=file-2"],
-  ])("the removed Video route %s opens Create with its query kept", async (from, to) => {
+    ["/apps/video/trim?clip=file-3", "/apps/video/studio?clip=file-3"],
+  ])("the removed Video route %s opens Create or the Studio with its query kept", async (from, to) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();

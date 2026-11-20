@@ -62,26 +62,16 @@ const plan = (pieces: ReturnType<typeof piece>[], transitions: Array<{ kind: "cu
   ({ version: 1, film_s: pieces.reduce((sum, p) => sum + p.out_s - p.in_s, 0), video: { level_db: 0, muted: false, pieces, transitions }, voice: lane, music: lane });
 
 describe("the page", () => {
-  test("it is a real page, not the coming-soon stub, valid for an adult, and a teen and a child never get it", async () => {
+  test("VF-IA-02 (a): Trim and join is gone as a page (the Studio does it), and the Studio carries the split, export and add actions for an adult and nothing for a teen or a child", async () => {
     const { owner, teen, child } = await household();
-    const res = await owner.get("/api/plugins/video/pages/trim");
+    expect([403, 404]).toContain((await owner.get("/api/plugins/video/pages/trim")).status);
+    const res = await owner.get("/api/plugins/video/pages/studio");
     expect(res.status).toBe(200);
     const page = await res.json();
     expect(PageNodeSchema.safeParse(page).success).toBe(true);
     const text = JSON.stringify(page);
-    expect(text).not.toContain("coming soon");
-    expect(text).not.toContain("/api/plugins/video/actions/split"); // VF-IA-02 (a): Split into two clips moved into the Studio page
-    expect((await (await owner.get("/api/plugins/video/pages/studio")).text())).toContain("/api/plugins/video/actions/split");
-    expect(text).toContain("/api/plugins/video/actions/export");
-    expect(text).toContain("/api/plugins/video/actions/add");
-    for (const minor of [teen.client, child.client]) expect([403, 404]).toContain((await minor.get("/api/plugins/video/pages/trim")).status);
-  });
-
-  test("it asks for no more than the Studio element offers, and keeps its own tools to cut, delete and add a clip", () => {
-    const page = JSON.parse(readFileSync(new URL("../packages/video/pages/trim.json", import.meta.url), "utf8")) as { body: Array<Record<string, unknown>> };
-    const studio = page.body.find((node) => node.type === "studio")!;
-    expect(studio.tools).toEqual(["split", "delete", "add_clip"]);
-    expect(studio.panels).toEqual(["crossfade"]);
+    for (const action of ["split", "export", "add"]) expect(text).toContain(`/api/plugins/video/actions/${action}`);
+    for (const minor of [teen.client, child.client]) expect([403, 404]).toContain((await minor.get("/api/plugins/video/pages/studio")).status);
   });
 });
 
