@@ -25,3 +25,12 @@ test("brief overlap (both talking for a moment) never stops her on the device; a
   expect(shouldStopLocally(900, { playing: true, alreadySent: true })).toBe(false);   // only once
   expect(shouldStopLocally(900, { playing: false, alreadySent: false })).toBe(false); // nothing is playing
 });
+import { OverlapDetector as OD } from "../public/overlap.js";
+test("a person talking in a gap between her phrases does not teach the detector their voice as the floor", () => {
+  const d = new OD(); const quiet = new Float32Array(512).fill(0.0025), loud = new Float32Array(512).fill(0.08);
+  for (let i = 0; i < 40; i++) d.frame(quiet, { playing: true });
+  const floorBefore = d.floor; for (let i = 0; i < 8; i++) d.frame(loud, { playing: false });   // she paused between chunks, the person starts
+  expect(d.floor).toBeLessThan(floorBefore * 1.5);
+  let ms = 0; for (let i = 0; i < 12; i++) ms = d.frame(loud, { playing: true });                // she resumes, the person is still talking
+  expect(ms).toBeGreaterThanOrEqual(250);
+});
