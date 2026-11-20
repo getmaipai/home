@@ -6,14 +6,14 @@ import { db } from "@/db";
 import { creations, people as peopleTable } from "@/db/schema";
 import { getVideoJobFor } from "@/lib/videos/jobs";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
-import { __setVideoStatusForTests } from "@/lib/videos/ready";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import type { PersonRow } from "@/types";
 import { until } from "./pictureFixture";
 import { installFakeEditStack, type FakeEditStack } from "./videoEditStackFixture";
 
 let fake: FakeVideoStack;
 let editFake: FakeEditStack;
-beforeEach(() => { resetDb(); fake = installFakeVideoStack(); editFake = installFakeEditStack(); });
+beforeEach(() => { resetDb(); fake = installFakeVideoStack(); fake.ltx25 = "ready"; fake.ltx25Picture = true; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); editFake = installFakeEditStack(); });
 afterEach(() => { editFake.restore(); fake.restore(); __setVideoStatusForTests(undefined); });
 async function household() {
   const owner = new TestClient(); await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
