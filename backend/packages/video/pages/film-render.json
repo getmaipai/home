@@ -62,7 +62,7 @@
         }
       },
       "sticky": false,
-      "estimate": "reason"
+      "note": "reason"
     }
   ]
 }

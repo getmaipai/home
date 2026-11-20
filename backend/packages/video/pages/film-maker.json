@@ -349,7 +349,7 @@
         }
       },
       "sticky": false,
-      "estimate": "reason"
+      "note": "reason"
     },
     {
       "type": "action_bar",
@@ -373,7 +373,7 @@
         }
       },
       "sticky": false,
-      "estimate": "reason"
+      "note": "reason"
     },
     {
       "type": "action_bar",
@@ -397,7 +397,7 @@
         }
       },
       "sticky": false,
-      "estimate": "reason"
+      "note": "reason"
     },
     {
       "type": "media_shelf",
