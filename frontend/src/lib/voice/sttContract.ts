@@ -36,7 +36,7 @@ import { z } from "zod";
 export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
 /** `unfinished`: every edge partial read as a mid-sentence fragment, so no run was started; `late_start`: the start request was still in
  * flight when the final came (the hub answered after the silence timer). */
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "echo", "refused", "request_failed", "started", "confirmed", "discarded"] as const;
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "echo", "refused", "request_failed", "started", "interrupt_started", "confirmed", "discarded"] as const;
 /** `busy_*`: the edge partial came while the session was not listening (the last reply still thinking or speaking); `muted`: the mic was muted. */
 export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** The optional labels and counts a client adds to its timing report, beside the speech-path stamps. */

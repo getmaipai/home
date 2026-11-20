@@ -1108,6 +1108,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     stt_ms?: number;
     /** STT-SMARTTURN-01: begin this spoken turn on the edge partial and hold it (the response is the ids, nothing streams). */
     speculative?: boolean;
+    /** The active turn is the reply the speaker is interrupting. */
+    interrupting?: boolean;
     /** STT-SMARTTURN-01: with `resume_token`, release a held turn whose partial the final transcript confirmed. */
     confirm?: boolean;
     ask_answer?: unknown;
@@ -1238,7 +1240,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   // STT-SMARTTURN-01: a speculative start is refused here, before any work, by the rule 0 gates (speculation.ts).
   let hold: SpeculationHold | undefined;
   if (body.speculative === true) {
-    const refused = speculationRefusal({ actor, surface, spoken: body.spoken === true, wordCount: wordCount(body.text ?? ""), pendingAsk: typeof body.conversation_id === "string" && getPendingAsk(body.conversation_id) !== null, activeTurns: activeTurnCount() });
+    const refused = speculationRefusal({ actor, surface, spoken: body.spoken === true, wordCount: wordCount(body.text ?? ""), pendingAsk: typeof body.conversation_id === "string" && getPendingAsk(body.conversation_id) !== null, activeTurns: activeTurnCount(), interrupting: body.interrupting === true });
     if (refused || body.bare === true || body.temporary === true || body.ephemeral === true || body.continuation_text !== undefined || body.supersedes !== undefined) {
       noteSpeculation("refused", refused ?? "turn shape");
       return c.json({ error: refused ?? "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);

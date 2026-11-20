@@ -205,8 +205,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // One start request in flight at a time, carrying the text it was sent with; a newer edge partial with other words replaces it.
   const speculationInFlightRef = useRef<string | null>(null);
   const latestEdgeTextRef = useRef<string | null>(null);
+  const latestEdgeInterruptingRef = useRef(false);
   const refusedThisUtteranceRef = useRef(false);
-  const startSpeculation = (text: string, unfinished = false) => {
+  const startSpeculation = (text: string, unfinished = false, interrupting = false) => {
     if (!speculation || !text) return;
     if (speculationOffRef.current) { speculativeOutcomeRef.current = "off"; return; }
     if (refusedThisUtteranceRef.current) return;
@@ -216,6 +217,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     const conversationId = speculation.getConversationId();
     if (!conversationId) { speculativeOutcomeRef.current = "no_conversation"; return; }
     latestEdgeTextRef.current = text;
+    latestEdgeInterruptingRef.current = interrupting;
     // A plainly unfinished fragment ("what is a", "I want to, uh") is not worth a model run; the next edge partial may be.
     if (unfinished) { if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "unfinished"; return; }
     const held = speculationRef.current;
@@ -225,7 +227,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     speculationInFlightRef.current = text;
     const epoch = reactionEpochRef.current;
     trace("speculate", { words: text.split(/\s+/).length });
-    void api.speculateTurn(text, conversationId).then((ids) => {
+    void api.speculateTurn(text, conversationId, interrupting).then((ids) => {
       speculationInFlightRef.current = null;
       // The final already went out, a new utterance began or the session changed meanwhile (the epoch moved), or another held run
       // took the slot: a run that no longer matches anything is dropped at once. The partial handler marks speech as active for
@@ -233,10 +235,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       // (found 2026-11-12 on the live hub: every spoken turn still waited the whole silence timer).
       if (epoch !== reactionEpochRef.current || speculationRef.current) { void api.discardTurn(ids.turn_id).catch(() => undefined); return; }
       speculationRef.current = { turnId: ids.turn_id, resumeToken: ids.resume_token, conversationId: ids.conversation_id, text };
-      speculativeOutcomeRef.current = "started";
+      speculativeOutcomeRef.current = interrupting ? "interrupt_started" : "started";
       // A later edge partial with other words arrived while this one was in flight: it is the better guess.
       const latest = latestEdgeTextRef.current;
-      if (latest !== null && latest !== text) startSpeculation(latest);
+      if (latest !== null && latest !== text) startSpeculation(latest, false, latestEdgeInterruptingRef.current);
     }).catch((error: unknown) => {
       speculationInFlightRef.current = null;
       if (epoch !== reactionEpochRef.current) return;
@@ -539,7 +541,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (("edge" in message && message.edge === true) || (edgePartialPendingRef.current && !activeSpeechRef.current)) {
               const edgeText = message.v.trim();
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
-              else if (modeRef.current === "listening" && !isReplySpeaking() && !mutedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true);
+              else if (isReaction(normalizedTranscript(edgeText), edgeText)) { /* reactions resume the reply; they do not start a held answer */ }
+              else if (!mutedRef.current && (modeRef.current === "listening" || isReplySpeaking() || overlapPausedRef.current)) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, isReplySpeaking() || overlapPausedRef.current);
               // The session was not listening (the last reply still thinking or speaking, or the mic muted): labelled, so a live record names it.
               else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
             }
@@ -666,6 +669,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 if (normalized) duplexCounters.reactionResumes++;
                 if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_reaction"; restoreVoice(); }
                 overlapPausedRef.current = false;
+                if (speculationRef.current) { discardSpeculation(); speculativeOutcomeRef.current = "discarded"; }
                 break;
               }
               overlapTranscriptRef.current = true;

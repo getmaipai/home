@@ -50,7 +50,7 @@ const storedTurns = () => db.select().from(conversationTurns).all().length;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("STT-SMARTTURN-01: the refusal (rule 0 gates first)", () => {
-  const adult = { role: "owner", birthdate: null } as never;
+  const adult = { id: "adult-test", role: "owner", birthdate: null } as never;
   test("switched off: a speculative request is refused with 400 and nothing runs", async () => {
     const { client } = await owner();
     setHouseholdSettingValue(SPECULATIVE_START_KEY, false);
@@ -64,12 +64,18 @@ describe("STT-SMARTTURN-01: the refusal (rule 0 gates first)", () => {
   test("a minor, a robot surface, a written turn, a pending ask, an active turn and a long message are each refused", () => {
     const base = { actor: adult, surface: "chat", spoken: true, wordCount: 5, pendingAsk: false, activeTurns: 0, enabled: true };
     expect(speculationRefusal(base)).toBeNull();
-    expect(speculationRefusal({ ...base, actor: { role: "child", birthdate: null } as never })).toContain("adults");
-    expect(speculationRefusal({ ...base, actor: { role: "teen", birthdate: null } as never })).toContain("adults");
+    expect(speculationRefusal({ ...base, actor: { id: "child-test", role: "child", birthdate: null } as never })).toContain("adults");
+    expect(speculationRefusal({ ...base, actor: { id: "teen-test", role: "teen", birthdate: null } as never })).toContain("adults");
     expect(speculationRefusal({ ...base, surface: "robot" })).toContain("surface");
     expect(speculationRefusal({ ...base, spoken: false })).toContain("spoken");
     expect(speculationRefusal({ ...base, pendingAsk: true })).toContain("confirmation");
     expect(speculationRefusal({ ...base, activeTurns: 1 })).toContain("already running");
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true })).toBeNull();
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, pendingAsk: true })).toContain("confirmation");
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, spoken: false })).toContain("spoken");
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, surface: "robot" })).toContain("surface");
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, actor: { id: "teen-test", role: "teen", birthdate: null } as never })).toContain("adults");
+    expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, wordCount: 41 })).toContain("long");
     expect(speculationRefusal({ ...base, wordCount: 41 })).toContain("long");
     expect(speculationRefusal({ ...base, enabled: false })).toContain("off");
   });

@@ -39,14 +39,14 @@ export function __resetSpeculationForTests(): void { for (const key of Object.ke
 /** The server-side refusal, decided before any work (rule 0: the age and surface gates outrank the feature). Null means allowed.
  * Confirmed identity is the signed-in person on their own chat or phone surface; a robot speaker, whose identity is evidence,
  * never speculates. */
-export function speculationRefusal(input: { actor: PersonRow; surface: string; spoken: boolean; wordCount: number; pendingAsk: boolean; activeTurns: number; enabled?: boolean; now?: Date }): string | null {
+export function speculationRefusal(input: { actor: PersonRow; surface: string; spoken: boolean; wordCount: number; pendingAsk: boolean; activeTurns: number; interrupting?: boolean; enabled?: boolean; now?: Date }): string | null {
   const enabled = input.enabled ?? getHouseholdSettingValue(SPECULATIVE_START_KEY) === true;
   if (!enabled) return "Speculative start is off.";
   if (!input.spoken) return "Speculative start is for spoken turns.";
   if (input.surface !== "chat" && input.surface !== "phone") return "Speculative start is not available on this surface.";
   if (speakerAgeBand(input.actor, input.now ?? new Date()) !== "adult") return "Speculative start is for adults.";
   if (input.pendingAsk) return "A confirmation is waiting; the full message is needed.";
-  if (input.activeTurns > 0) return "A turn is already running.";
+  if (input.activeTurns > 0 && input.interrupting !== true) return "A turn is already running.";
   if (input.wordCount > SPECULATION_MAX_WORDS) return "The message is long; the full message is needed.";
   return null;
 }

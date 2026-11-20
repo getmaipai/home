@@ -424,6 +424,41 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); }
   });
 
+  test("STT-SMARTTURN-01: an edge partial during reply playback starts an interrupting held run without cancelling playback", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    const stop = mock(() => {});
+    try {
+      const socket = controlledSocket();
+      const pendingRef = { current: null as { turnId: string; resumeToken: string; conversationId: string } | null };
+      render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef }} stopScheduler={stop} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "tell me about the old lighthouse", edge: true }));
+      expect(speculate).toHaveBeenCalledWith("tell me about the old lighthouse", "conv-1", true);
+      expect(cancel).not.toHaveBeenCalled();
+      expect(stop).not.toHaveBeenCalled();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => { socket.send({ t: "final", v: "tell me about the old lighthouse" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(cancel.mock.calls[0]?.[0]).toBe("turn-test");
+      expect(api.discardTurn).not.toHaveBeenCalled();
+      expect(stop).toHaveBeenCalledTimes(1);
+    } finally { speculate.mockRestore(); cancel.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("STT-SMARTTURN-01: an unfinished edge partial during playback does not start a held run", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    try {
+      const socket = controlledSocket();
+      render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef: { current: null } }} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "I want to", edge: true, end: { unfinished: true } }));
+      expect(speculate).not.toHaveBeenCalled();
+    } finally { speculate.mockRestore(); }
+  });
+
   test("STT-SMARTTURN-01: the held run started on the edge partial survives until the final, which confirms it on an exact match (the live-hub miss of 2026-11-12)", async () => {
     const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
     const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });

@@ -2018,8 +2018,8 @@ export const api = {
   activeChatVoice: () => request<{ voice: string }>("/api/tts/voice", { timeoutMs: 3000 }),
   // STT-SMARTTURN-01: begin a spoken turn on the edge partial, held privately on the server; the final transcript's send confirms it
   // (streamTurn with resumeToken, turnId, resumeFrom 0 and confirm) or discardTurn drops it unstored. A 400 means the server refused it.
-  speculateTurn: (text: string, conversationId: string, signal?: AbortSignal) =>
-    request<{ turn_id: string; resume_token: string; conversation_id: string }>("/api/turn/stream", { method: "POST", body: JSON.stringify({ surface: "chat", text, spoken: true, speculative: true, conversation_id: conversationId }), ...(signal ? { signal } : {}) }),
+  speculateTurn: (text: string, conversationId: string, interrupting = false, signal?: AbortSignal) =>
+    request<{ turn_id: string; resume_token: string; conversation_id: string }>("/api/turn/stream", { method: "POST", body: JSON.stringify({ surface: "chat", text, spoken: true, speculative: true, ...(interrupting ? { interrupting: true } : {}), conversation_id: conversationId }), ...(signal ? { signal } : {}) }),
   discardTurn: (turnId: string) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST", body: JSON.stringify({ discard: true }) }),
   prewarmTurn: () => request<{ warmed: boolean }>("/api/turn/prewarm", { method: "POST" }),
   // VOICE-TRACE-01: one utterance's voice-client timeline (event names and numbers only), owner or admin.
