@@ -74,6 +74,22 @@
             }
           }
         }
+      ],
+      "waiting_actions": [
+        {
+          "label": "Stop",
+          "icon": "square",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/cancel",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              },
+              "success_label": "Stopped"
+            }
+          }
+        }
       ]
     },
     {

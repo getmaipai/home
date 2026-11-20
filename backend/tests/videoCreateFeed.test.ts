@@ -511,6 +511,7 @@ describe("the manifest of three pages", () => {
       expect(stage).toBeDefined();
       expect((stage as { bind: { params: { scope: string } } }).bind.params.scope).toBe("stage");
       expect(stage).toHaveProperty("poll_while");
+      expect((stage as { waiting_actions?: Array<{ label: string }> }).waiting_actions?.map((a) => a.label)).toEqual(["Stop"]); // a running edit can be stopped from its own card
       const text = await Bun.file(join(PACKAGES_DIR, "video", "pages", `${file}.json`)).text();
       if (file !== "studio") expect(text).not.toContain('"then"'); // the Studio's export card keeps its Spatial sound hop to Create (SPATIAL-REACH)
     }
