@@ -373,7 +373,7 @@
       },
       {
         "id": "drafts",
-        "label": "Drafts",
+        "label": "Unfinished",
         "icon": "bookmark",
         "nav": false,
         "kind": "schema",
