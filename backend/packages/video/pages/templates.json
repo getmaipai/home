@@ -73,6 +73,18 @@
           }
         },
         {
+          "icon": "square-pen",
+          "label": "Rename",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/template-rename",
+              "state": {
+                "id": "{id}"
+              }
+            }
+          }
+        },
+        {
           "icon": "trash",
           "label": "Delete",
           "action": {
@@ -132,6 +144,18 @@
                 "id": "{id}"
               },
               "success_label": "Not shared any more"
+            }
+          }
+        },
+        {
+          "icon": "square-pen",
+          "label": "Rename",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/template-rename",
+              "state": {
+                "id": "{id}"
+              }
             }
           }
         },

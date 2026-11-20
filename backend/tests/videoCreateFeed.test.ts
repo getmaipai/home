@@ -549,6 +549,9 @@ describe("TEMPLATE-02 pages: the Templates page shelves over the saved templates
     const page = await (await adult.client.get("/api/plugins/video/pages/templates")).json() as { body: Array<{ row_actions?: unknown[] }> };
     expect(PageNodeSchema.safeParse(page).success).toBe(true);
     for (const node of page.body) expect((node.row_actions ?? []).length).toBeLessThanOrEqual(3);
+    const rename = await adult.client.get("/api/plugins/video/pages/template-rename");
+    expect(rename.status).toBe(200);
+    expect(PageNodeSchema.safeParse(await rename.json()).success).toBe(true);
   });
 });
 

@@ -324,6 +324,15 @@
         "min_role": "adult"
       },
       {
+        "id": "template-rename",
+        "label": "Rename template",
+        "icon": "square-pen",
+        "nav": false,
+        "kind": "schema",
+        "module": "template-rename",
+        "min_role": "adult"
+      },
+      {
         "id": "captions",
         "label": "Captions",
         "icon": "captions",

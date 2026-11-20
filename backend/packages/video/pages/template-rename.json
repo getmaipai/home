@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "video-template-rename",
+  "title": "Rename template",
+  "body": [
+    {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "New name",
+      "placeholder": "Type the new name for the template.",
+      "prompt_state": "prompt",
+      "max_length": 120,
+      "submit_label": "Rename",
+      "submit": {
+        "call": {
+          "target": "/api/plugins/video/actions/template-rename",
+          "method": "POST",
+          "args": {
+            "id": "{id}",
+            "name": "{prompt}"
+          },
+          "success_label": "Renamed"
+        }
+      }
+    },
+    {
+      "type": "empty_state",
+      "icon": "square-pen",
+      "text": "Type a new name. Videos made from the template keep working."
+    }
+  ]
+}
