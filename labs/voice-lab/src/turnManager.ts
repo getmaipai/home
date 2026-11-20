@@ -174,6 +174,8 @@ export class TurnManager {
     return [];
   }
   get cutting() { return this.cutAt >= 0; }
+  /** The transcript was her own voice coming back: forget this turn without stopping or answering anything. */
+  dropTurn(): Command[] { this.state = "idle"; this.resetTurn(); this.resetCut(); return this.emit("discard", {}); }
   stop(): Command[] { this.state = "idle"; this.resetTurn(); this.resetCut(); return this.emit("interrupt", { tap: true }); }
   configure(values: Partial<Options>) { this.opts = { ...this.opts, ...values }; }
 }

@@ -90,3 +90,14 @@ test("her own garbled echo (one or two odd words per window) does not add up to 
   for (const w of heard) res = snw(h, (t += 380), rc(w, spoken));
   expect(res.interrupt).toBe(false);
 });
+import { isOwnEchoTurn as echoTurn } from "../src/selfEcho";
+const T0 = 100_000;
+test("her own words committed as a user turn are dropped (recorded: 'I'm so sorry.', 'that I'm sorry you're')", () => {
+  expect(echoTurn({ transcript: "I'm so sorry.", spoken: "[sigh]\nOh, I am so sorry. That is a real loss.", speechStartMs: T0 - 500, lastSpokeMs: T0, nowMs: T0 + 600 }).drop).toBe(true);
+  expect(echoTurn({ transcript: "that I'm sorry you're", spoken: "Oh, just that I’m sorry *you’re* the one saying sorry.", speechStartMs: T0 - 300, lastSpokeMs: T0, nowMs: T0 + 800 }).drop).toBe(true);
+});
+test("a real new turn is not dropped, and neither is the person repeating her last sentence after she stopped for more than a second", () => {
+  expect(echoTurn({ transcript: "Wait, stop. Sorry about that. What were you going to say?", spoken: "Oh, I am so sorry. That is a real loss.", speechStartMs: T0 - 200, lastSpokeMs: T0, nowMs: T0 + 900 }).drop).toBe(false);
+  expect(echoTurn({ transcript: "Oh, I am so sorry.", spoken: "Oh, I am so sorry. That is a real loss.", speechStartMs: T0 + 2000, lastSpokeMs: T0, nowMs: T0 + 3500 }).drop).toBe(false);   // she was quiet for 2 s, then the person repeats her
+  expect(echoTurn({ transcript: "I'm so sorry.", spoken: "Oh, I am so sorry.", speechStartMs: T0 - 300, lastSpokeMs: T0 - 15_000, nowMs: T0 }).drop).toBe(false);                       // she spoke more than 10 s ago
+});

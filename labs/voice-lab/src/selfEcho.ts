@@ -56,3 +56,12 @@ export function sustainedNewWords(history: Array<{ at: number; words: string[] }
   history.push({ at, words: resid }); while (history.length && at - history[0]!.at > cfg.windowMs) history.shift();
   const all = [...new Set(history.flatMap((h) => h.words))]; return { interrupt: all.length >= cfg.needWords, words: all };
 }
+
+export const ECHO_DROP = { windowMs: 10_000, ratio: 0.7, graceMs: 1000, minWords: 2 };
+/** Second layer behind the word matching: before a turn commits, a transcript that is mostly (70%+, fuzzy) made of words she said in the last 10 s, and that started while she was speaking (or within a second of it), is her own voice coming back, not a person. A person who repeats her last sentence after she has been quiet for more than a second still commits. */
+export function isOwnEchoTurn(i: { transcript: string; spoken: string; speechStartMs: number; lastSpokeMs: number; nowMs: number }, cfg = ECHO_DROP): { drop: boolean; ratio: number } {
+  const hw = words(i.transcript); if (hw.length < cfg.minWords || !i.spoken || i.lastSpokeMs < 0) return { drop: false, ratio: 0 };
+  if (i.nowMs - i.lastSpokeMs > cfg.windowMs || i.speechStartMs > i.lastSpokeMs + cfg.graceMs) return { drop: false, ratio: 0 };
+  const sw = [...new Set(words(i.spoken))]; const hit = hw.filter((w) => sw.some((x) => near(w, x))).length; const ratio = hit / hw.length;
+  return { drop: ratio >= cfg.ratio, ratio: +ratio.toFixed(2) };
+}

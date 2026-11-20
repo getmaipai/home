@@ -14,7 +14,7 @@ import { pickSound, availableTags } from "./sounds";
 import { shouldNod } from "./listenerNod";
 import { StreamingAsr, norm } from "./streamingAsr";
 import { voiceSettings } from "./voiceSettings";
-import { judgeCutIn, residualContent, sustainedNewWords } from "./selfEcho";
+import { judgeCutIn, residualContent, sustainedNewWords, isOwnEchoTurn } from "./selfEcho";
 import { decideYield } from "./yieldDecision";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -151,7 +151,9 @@ export class VoiceSession {
     switch (c.type) {
       case "state": if (c.state === "user_speaking") activeSince.set(this, Date.now()); else if (c.state === "idle") activeSince.delete(this); this.send({ t: "state", state: c.state }); break;
       case "check_turn": void this.check(Number(c.revision ?? this.tm.checkRevision)); break;
-      case "transcript_ready": for (const next of this.tm.transcriptReady(String(c.text), this.now(), Number(c.revision ?? this.tm.checkRevision))) this.command(next); break;
+      case "transcript_ready": { const echo = isOwnEchoTurn({ transcript: String(c.text), spoken: this.recentSpoken(), speechStartMs: this.speechOrigin, lastSpokeMs: this.lastSpokeAt, nowMs: this.now() });
+        if (echo.drop) { this.logStop("dropped-as-echo", { heard: String(c.text), ratio: echo.ratio, spokenTail: this.recentSpoken().slice(-120) }); this.send({ t: "state", state: "idle" }); for (const next of this.tm.dropTurn()) this.command(next); break; } }
+        for (const next of this.tm.transcriptReady(String(c.text), this.now(), Number(c.revision ?? this.tm.checkRevision))) this.command(next); break;
       case "start_reply_held":
         if (this.held && this.streamDraft) {
           // A draft was started from the streaming text. The whole-utterance text decides: same words keep it, different words discard it.
@@ -193,7 +195,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
+  private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -439,7 +441,7 @@ export class VoiceSession {
       }
       if (j.t === "played_end") { for (const c of this.tm.playbackEnded()) this.command(c); this.finishMetrics(); }
       if (j.t === "played" && Number.isInteger(j.chunk) && Number.isFinite(j.ms)) {
-        this.playedMs[j.chunk] = Math.min(this.chunkDurations[j.chunk] ?? j.ms, Math.max(this.playedMs[j.chunk] ?? 0, j.ms));
+        this.playedMs[j.chunk] = Math.min(this.chunkDurations[j.chunk] ?? j.ms, Math.max(this.playedMs[j.chunk] ?? 0, j.ms)); this.lastSpokeAt = this.now();
         this.updatePlayedReference();
         if (!this.heardAudio) { this.heardAudio = true; this.metrics.t_first_audio_played = this.metricNow(); if (this.toolPendingAudio) { this.metrics.t_first_audio_after_tool = this.metricNow(); this.toolPendingAudio = false; } for (const c of this.tm.firstAudioPlayed()) this.command(c); }
       }
