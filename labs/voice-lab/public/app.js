@@ -2,6 +2,8 @@ import { TurnState } from "./turn-state.js";
 import { LocalDuckDetector } from "./local-duck.js";
 import { watchSocket } from "./reconnect.js";
 import { OverlapDetector, shouldStopLocally } from "./overlap.js";
+import { isIOS, micConstraints, unlockAudio, installLifecycle, keepScreenOn } from "./device.js";
+import { runDeviceCheck, postDeviceReport } from "./devicecheck.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -21,23 +23,24 @@ if (prefs.netSim) $('#netSim').value = prefs.netSim;
 if (typeof prefs.localDuck === 'boolean') $('#localDuck').checked = prefs.localDuck;
 
 $('#start').onclick = async () => {
+  unlockAudio(window.__voiceCtx); // first thing, before any await: iOS only starts audio inside the tap
   const secret = $('#secret').value || sessionStorage.labSecret;
   if (!secret) { status.textContent = 'Enter the secret first.'; return; }
   status.textContent = 'Starting. Allow the microphone if asked.';
   sessionStorage.labSecret = secret;
   const echoValue = $('#echoSetting').value;
   const echoSetting = echoValue === 'true' ? true : echoValue === 'false' ? false : echoValue;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: echoSetting, noiseSuppression: false, autoGainControl: false } });
-  } catch {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
-  }
+  const ios = isIOS(); const constraints = () => micConstraints(echoSetting, ios);
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: constraints() }); }
+  catch { stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(true, ios) }); }
   const ctx = window.__voiceCtx;
   await ctx.resume();
+  if (!ctx.audioWorklet) { status.textContent = 'This browser cannot capture the microphone this way (iPhone: iOS 14.5 or newer is needed).'; return; }
   await ctx.audioWorklet.addModule('mic-worklet.js');
   source = ctx.createMediaStreamSource(stream);
   node = new AudioWorkletNode(ctx, 'voice-mic');
   source.connect(node);
+  const rebuildMic = async () => { const handler = node.port.onmessage; try { source.disconnect(); node.disconnect(); stream.getTracks().forEach((t) => t.stop()); } catch {} stream = await navigator.mediaDevices.getUserMedia({ audio: constraints() }); source = ctx.createMediaStreamSource(stream); node = new AudioWorkletNode(ctx, 'voice-mic'); node.port.onmessage = handler; source.connect(node); };
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   const turnState = new TurnState();
@@ -178,6 +181,11 @@ $('#start').onclick = async () => {
     ws.send(bytes);
   };
   watchSocket(ws, { make: () => { const n = new WebSocket(ws.url); n.binaryType = 'arraybuffer'; return n; }, status: (t) => { status.textContent = t; }, onSwap: (n) => { ws = n; } });
+  const secretNow = secret; const settings = () => stream?.getAudioTracks?.()[0]?.getSettings?.() ?? {};
+  const note = (why, did) => postDeviceReport(secretNow, { event: why, did: did.join(', '), ctxState: ctx.state, ctxRate: ctx.sampleRate, ios, hidden: document.visibilityState });
+  installLifecycle({ ctx, doc: document, nav: navigator, win: window, getWs: () => ws, reconnect: () => { try { ws.close(); } catch {} }, getStream: () => stream, rebuildMic, report: note });
+  keepScreenOn(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepScreenOn(); });
+  postDeviceReport(secretNow, { event: 'start', ctxState: ctx.state, ctxRate: ctx.sampleRate, micRate: settings().sampleRate, echoCancellation: settings().echoCancellation, noiseSuppression: settings().noiseSuppression, autoGainControl: settings().autoGainControl, ios, secure: window.isSecureContext, worklet: !!ctx.audioWorklet, outputLatencyMs: Math.round((ctx.outputLatency || 0) * 1000) });
   $('#start').disabled = true;
   $('#stop').disabled = false;
   $('#output').onchange = () => window.__configureOutput($('#output').value);
@@ -240,3 +248,5 @@ try { if (localStorage.voiceLabDuckLevel) document.querySelector('#duckLevel').v
 document.querySelector('#duckLevel').addEventListener('change', (e) => window.__setDuckLevel(parseFloat(e.target.value)));
 try { document.querySelector('#finishWord').checked = localStorage.voiceLabFinishWord !== '0'; } catch {}
 document.querySelector('#finishWord').addEventListener('change', (e) => window.__setFinishWord(e.target.checked));
+
+$('#deviceCheck').onclick = () => runDeviceCheck({ ctx: window.__voiceCtx, secret: $('#secret').value || sessionStorage.labSecret, ws: () => ws, el: $('#deviceResult'), echoSetting: $('#echoSetting').value });
