@@ -5,7 +5,9 @@ const STOPPERS = new Set(["stop", "wait", "hold", "shut", "nope", "hang", "enoug
 // Words that are common openers in her own replies ("Hey!", "I am so sorry", "excuse me"): they stop her only when they are NOT words she is saying right now.
 const SOFT = new Set(["hey", "sorry", "excuse"]);
 const FUNCTION = new Set("the a an of to and in on at as is was were be been are am it its that this these those there then than so but while with for from by or if not we you i he she they me him her them us my your his their our what who which when where how just very really about into over out up down too also can could would should will did does do had has have get got let lets said say says one".split(" "));
-const words = (t: string) => t.toLowerCase().replace(/[^a-z'\s-]/g, " ").replace(/-/g, "").split(/\s+/).filter(Boolean);
+// Curly and straight apostrophes are the same, and contractions are two words ("I'm" and "I am" are the same speech): her written reply says "I’m", the recognizer writes "I'm" or "I am". Recorded self-stops: "I'm so sorry." vs "Oh, I am so sorry", "that I'm sorry" vs "that I’m sorry".
+const CONTRACTIONS: Array<[RegExp, string]> = [[/\bwon't\b/g, "will not"], [/\bcan't\b/g, "can not"], [/n't\b/g, " not"], [/'m\b/g, " am"], [/'re\b/g, " are"], [/'ve\b/g, " have"], [/'ll\b/g, " will"], [/'d\b/g, " would"], [/'s\b/g, " is"]];
+const words = (t: string) => { let x = t.toLowerCase().replace(/[\u2018\u2019`]/g, "'"); for (const [re, to] of CONTRACTIONS) x = x.replace(re, to); return x.replace(/[^a-z\s-]/g, " ").replace(/-/g, "").split(/\s+/).filter(Boolean); };
 function near(a: string, b: string) {
   if (a === b) return true;
   if (a.length < 4 || b.length < 4) return false;

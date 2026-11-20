@@ -33,6 +33,7 @@ async function startRun() {
   const spawnStep = (cmd: string[], file: string) => Bun.spawn(["bun", ...cmd], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/${file}`), stderr: "ignore" });
   const finish = (code: number, step: string) => { burst.finish(Date.now()); const bs = burst.summary(); log({ event: "finished", step, code, attempt: attempts, hubSpeechBursts: bs }); console.log(`hub speech bursts: ${bs.count}, total ${(bs.totalMs / 1000).toFixed(1)} s ${JSON.stringify(bs.intervals)}`); console.log(`CLEAN RUN FINISHED (${step}, attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt${step === "round1" ? " and round1-clean.txt" : ""}`); process.exit(code === 0 ? 0 : 1); };
   const engineDied = async (code: number) => { if (code !== 0 && !(await chatDeps.health())) { log({ event: "waiting: memory", why: "chat engine died mid-run", attempt: attempts }); console.log("chat engine died mid-run; waiting, not a failure"); child = null; win.finish(); return true; } return false; };
+  try { (await import("node:fs")).rmSync(`${W}/ready-clean.txt`, { force: true }); (await import("node:fs")).rmSync(`${W}/round1-clean.txt`, { force: true }); } catch {} // Bun.file stdout does not truncate: old lines used to stay below the new ones
   child = spawnStep(["rig/ready.ts", ...(full ? [] : ["--quick"])], "ready-clean.txt");
   void child.exited.then(async (code) => {
     if (aborted) return; if (await engineDied(code)) return;

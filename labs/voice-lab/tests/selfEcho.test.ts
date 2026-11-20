@@ -72,3 +72,8 @@ test("a person saying wait or stop louder than her still stops her, even if she 
   expect(jc("Wait.", "Wait, let me think about that for a second.", false, "Wait, let me think about that for a second.", true)).toBe("interrupt");
   expect(jc("Wait, stop.", "You got it. There was a dragon named", false, "You got it. There was a dragon named", true)).toBe("interrupt");
 });
+test("contractions and curly apostrophes are the same speech (recorded self-stops: I'm so sorry / that I'm sorry)", () => {
+  expect(jc("I'm so sorry.", "[sigh]\nOh, I am so sorry. That is a real", false, "[sigh]\nOh, I am so sorry. That is a real", true)).toBe("echo");
+  expect(jc("that I'm sorry.", "Oh, just that I’m sorry *you’re* the one", false, "Oh, just that I’m sorry *you’re* the one", true)).toBe("echo");
+  expect(jc("Wait, stop.", "Oh, I’m so sorry you’re hurting", false, "Oh, I’m so sorry you’re hurting", true)).toBe("interrupt");
+});
