@@ -26,30 +26,6 @@
       }
     },
     {
-      "id": "from-picture",
-      "label": "From a picture",
-      "icon": "image",
-      "page": "from-picture",
-      "route": "/apps/video/from-picture",
-      "engine": "video",
-      "gate": "videos",
-      "tools": [
-        "clear"
-      ]
-    },
-    {
-      "id": "animate",
-      "label": "Animate",
-      "icon": "layers",
-      "page": "animate",
-      "route": "/apps/video/animate",
-      "engine": "video",
-      "gate": "videos",
-      "tools": [
-        "clear"
-      ]
-    },
-    {
       "id": "talking-avatar",
       "label": "Talking avatar",
       "icon": "user-round",

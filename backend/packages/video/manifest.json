@@ -99,9 +99,7 @@
           "title": "Make",
           "pages": [
             "create",
-            "from-picture",
             "talking-avatar",
-            "animate",
             "film-maker",
             "templates"
           ]
@@ -291,30 +289,12 @@
         "module": "categories"
       },
       {
-        "id": "from-picture",
-        "label": "From a picture",
-        "icon": "camera",
-        "nav": false,
-        "kind": "schema",
-        "module": "from-picture",
-        "min_role": "adult"
-      },
-      {
         "id": "talking-avatar",
         "label": "Talking avatar",
         "icon": "user-round",
         "nav": false,
         "kind": "schema",
         "module": "talking-avatar",
-        "min_role": "adult"
-      },
-      {
-        "id": "animate",
-        "label": "Animate a picture",
-        "icon": "layers",
-        "nav": false,
-        "kind": "schema",
-        "module": "animate",
         "min_role": "adult"
       },
       {

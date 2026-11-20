@@ -118,6 +118,32 @@ describe("Routes appearance", () => {
     } finally { globalThis.fetch = originalFetch; }
   });
 
+  // VF-IA-01: From a picture and Animate are folded into Create; each old route lands there with its query string and hash kept.
+  test.each([
+    ["/apps/video/from-picture", "/apps/video/create"],
+    ["/apps/video/from-picture?start_frame=file-1&prompt=wave", "/apps/video/create?start_frame=file-1&prompt=wave"],
+    ["/apps/video/animate", "/apps/video/create"],
+    ["/apps/video/animate?start_frame=file-2", "/apps/video/create?start_frame=file-2"],
+  ])("the removed Video route %s opens Create with its query kept", async (from, to) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      function Where() { const location = useLocation(); return <output>{location.pathname}{location.search}{location.hash}</output>; }
+      renderWithQueryClient(
+        <MemoryRouter initialEntries={[from]}>
+          <ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>
+          <Where />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.querySelector("output")?.textContent).toBe(to));
+    } finally { globalThis.fetch = originalFetch; }
+  });
+
   test.each([
     ["light", true, "light", "dark"],
     ["dark", false, "dark", "light"],

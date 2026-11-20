@@ -17,16 +17,6 @@ const SUGGESTIONS: Record<string, readonly ModeSuggestion[]> = {
     { title: "A dog", label: "running on a sunny beach", prompt: "A happy dog running along a sunny beach, waves in the background." },
     { title: "Clouds", label: "drifting over a green valley", prompt: "Time-lapse of clouds drifting over a green valley at sunset." },
   ],
-  "from-picture": [
-    { title: "Make it", label: "come alive with a slow zoom", prompt: "Slowly zoom in, with a gentle breeze moving everything softly." },
-    { title: "Add", label: "falling snow and soft light", prompt: "Snow falls gently while the light slowly warms." },
-    { title: "Pan across", label: "the whole scene", prompt: "The camera slowly pans across the whole scene from left to right." },
-  ],
-  animate: [
-    { title: "Wave", label: "hello and smile", prompt: "The character waves hello and smiles." },
-    { title: "Turn", label: "and look at the camera", prompt: "The character slowly turns and looks straight at the camera." },
-    { title: "Walk", label: "forward with a happy bounce", prompt: "The character walks forward with a happy bounce." },
-  ],
   "talking-avatar": [
     { title: "Say", label: "a warm good morning", prompt: "Good morning, everyone! I hope today is a good one." },
     { title: "Tell", label: "a short bedtime goodnight", prompt: "Goodnight, sleep tight. See you in the morning." },

@@ -364,7 +364,8 @@ describe("Create is adult-only; Browse is unchanged", () => {
     }
     for (const page of PAGES) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(200);
     // The three old pages are gone for adults too: a removed page is a plain 404, not an empty page.
-    for (const page of ["make-video", "creations"]) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
+    // VF-IA-01: From a picture and Animate are folded into Create; their pages are gone for adults too (the browser redirects their routes).
+    for (const page of ["make-video", "creations", "from-picture", "animate"]) expect((await adult.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
   });
 });
 

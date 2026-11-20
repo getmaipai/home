@@ -186,6 +186,12 @@ function LegacyVideoRedirect() {
   return <Navigate to={{ pathname: location.pathname.replace(/^\/apps\/videos(?=\/|$)/, "/apps/video"), search: location.search, hash: location.hash }} replace />;
 }
 
+/** VF-IA-01: From a picture and Animate are folded into Create (its Image slot makes the same video), so their old routes land there with the query string and the hash kept. */
+function LegacyCreateRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/apps/video/create", search: location.search, hash: location.hash }} replace />;
+}
+
 function PageHeaderLayout() {
   const { pathname } = useLocation();
   useHeaderExtra(PageHeaderTitle, PageHeaderActions);
@@ -539,6 +545,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
               title bar had no entry for them and drew an empty 52 px strip above every app. */}
           <Route path="apps/music/*" element={<LegacyAudioRedirect />} />
           <Route path="apps/videos/*" element={<LegacyVideoRedirect />} />
+          <Route path="apps/video/from-picture" element={<LegacyCreateRedirect />} />
+          <Route path="apps/video/animate" element={<LegacyCreateRedirect />} />
           <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />

@@ -7159,7 +7159,7 @@ msgid "Could not delete this voice. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:442
+#: src/shell/Routes.tsx:448
 msgid "Could not discard Incognito chats. Try again."
 msgstr ""
 
@@ -7630,7 +7630,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:344
+#: src/shell/Routes.tsx:350
 msgid "Could not reach {name}. Try again."
 msgstr ""
 
@@ -8047,7 +8047,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:458
+#: src/shell/Routes.tsx:464
 msgid "Create"
 msgstr ""
 
@@ -10358,7 +10358,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:344
+#: src/shell/Routes.tsx:350
 msgid "Find me"
 msgstr ""
 
@@ -11798,8 +11798,8 @@ msgstr ""
 #: src/shell/pages/WikipediaPage.tsx:155
 #: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:456
-#: src/shell/Routes.tsx:510
+#: src/shell/Routes.tsx:462
+#: src/shell/Routes.tsx:516
 msgid "Home"
 msgstr ""
 
@@ -14923,7 +14923,7 @@ msgstr ""
 #: src/shell/pages/personAccessCopy.ts:10
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:459
+#: src/shell/Routes.tsx:465
 msgid "Library"
 msgstr ""
 
@@ -16727,8 +16727,8 @@ msgstr ""
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:457
-#: src/shell/Routes.tsx:510
+#: src/shell/Routes.tsx:463
+#: src/shell/Routes.tsx:516
 msgid "Media"
 msgstr ""
 
@@ -24499,7 +24499,7 @@ msgstr ""
 #: src/shell/pages/FilesPage.tsx:304
 #: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
-#: src/shell/Routes.tsx:510
+#: src/shell/Routes.tsx:516
 msgid "Settings"
 msgstr ""
 
@@ -24744,7 +24744,7 @@ msgid "Show keyboard shortcuts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:418
+#: src/shell/Routes.tsx:424
 msgid "Show me around"
 msgstr ""
 
@@ -27193,7 +27193,7 @@ msgstr ""
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:344
+#: src/shell/Routes.tsx:350
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr ""
@@ -29788,7 +29788,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:390
-#: src/shell/Routes.tsx:195
+#: src/shell/Routes.tsx:201
 msgid "Turn trace"
 msgstr ""
 

@@ -36,7 +36,7 @@ describe("composer modes by band", () => {
     stack(all);
     const { row } = await owner();
     const res = await composerModesFor(row as PersonRow);
-    expect(ids(res)).toEqual(["ask", "picture", "video", "from-picture", "animate", "talking-avatar", "voiceover", "film", "song", "sound"]);
+    expect(ids(res)).toEqual(["ask", "picture", "video", "talking-avatar", "voiceover", "film", "song", "sound"]);
     const picture = res.modes.find((m) => m.id === "picture")!;
     expect(picture.route).toBe("/apps/image/create");
     expect(picture.placeholder).toContain("@");
@@ -64,14 +64,12 @@ describe("composer modes by band", () => {
     expect(video.availability).toBe("ready");
   });
 
-  test("the video stub pages are modes: two hand the picture to Video Create; Talking avatar, Voiceover and Film are live pages", async () => {
+  test("From a picture and Animate are no longer modes (VF-IA-01: Create's Image slot does it); Talking avatar, Voiceover and Film are live pages", async () => {
     stack(all);
     const { row } = await owner();
     const res = await composerModesFor(row as PersonRow);
     const mode = (id: string) => res.modes.find((m) => m.id === id)!;
-    expect(mode("from-picture").references.map((r) => r.id)).toEqual(["start_frame"]);
-    expect(mode("from-picture").comingSoon).toBeNull();
-    expect(mode("animate").comingSoon).toBeNull();
+    expect(res.modes.some((m) => m.id === "from-picture" || m.id === "animate")).toBe(false);
     expect(mode("talking-avatar").comingSoon).toBeNull();
     expect(mode("talking-avatar").route).toBe("/apps/video/talking-avatar");
     expect(mode("talking-avatar").references.map((r) => r.id)).toEqual(["cast"]);
