@@ -151,11 +151,8 @@ export function assumedMinor(entry: Pick<CastEntry, "minor" | "real" | "person_i
   return !entry.person_id || bandOf(entry.person_id) === null;
 }
 
-/** The plan's one speaking character (its name), else the film's narration. Never an invented name. Matches the storyboard rows. */
-export function speakerOfPlan(plan: Pick<FilmPlan, "cast">): { name: string; member: FilmPlan["cast"][number] | null } {
-  const characters = plan.cast.filter((entry) => entry.kind === "character");
-  return characters.length === 1 ? { name: characters[0]!.name, member: characters[0]! } : { name: "Narration", member: null };
-}
+export { speakerOfPlan } from "./speaker";
+import { speakerOfPlan } from "./speaker";
 
 const asAddress = (voice: string | null | undefined): string | undefined => (voice && voice !== VOICE_ENGINE_DEFAULT && isPresetVoice(voice) ? voicePresetName(voice) ?? voice : undefined);
 

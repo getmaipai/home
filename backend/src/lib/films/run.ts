@@ -1,7 +1,7 @@
 import { getMediaProduction, setShotClip, setShotPicture, setShotVoiceLine, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
 import { synthIdOfSubject } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
-import { speakerOfPlan } from "./roughCut";
+import { speakerOfPlan } from "./speaker";
 import type { FilmPlan } from "@/lib/films/plan";
 
 export type FilmStage = "cast" | "stills" | "clips" | "music" | "assemble" | "keep";
