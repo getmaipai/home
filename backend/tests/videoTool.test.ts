@@ -174,15 +174,24 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
-  test("orientation, seconds and a named style map to the Stack's shapes, with the trigger words added by Home", async () => {
-    const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "a street fair", orientation: "portrait", seconds: 3, style: "old colour film" }) };
+  test("orientation and seconds map to the Stack's shapes", async () => {
+    const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "a street fair", orientation: "portrait", seconds: 3 }) };
     await withStub(script(call), async () => {
-      await streamValue(people.owner, "a phone-shaped 3 second clip of a street fair in old colour film");
+      await streamValue(people.owner, "a phone-shaped 3 second clip of a street fair");
+      await until(() => fake.submitted.length > 0);   // the door is tried first, so the old door's submit lands a moment later
       const sent = fake.submitted[0]!;
       expect(sent.size).toBe(standardSize(true));
       expect(sent.seconds).toBe(3);
-      expect(sent.prompt).toBe("HST style, a street fair");
-      expect(sent.loras).toEqual([{ id: "lora-1111111111111111", strength: 1 }]);
+    });
+  });
+
+  test("an adult's Standard clip has no LoRA (VIDEO-WAN-HIDE-01: the sound maker takes none), so a named style that is a Wan LoRA starts no clip", async () => {
+    const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "a street fair", orientation: "portrait", seconds: 3, style: "old colour film" }) };
+    await withStub(script(call), async () => {
+      const { value } = await streamValue(people.owner, "a phone-shaped 3 second clip of a street fair in old colour film");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(value.video ?? null).toBeNull();
+      expect(fake.submitted).toHaveLength(0);
     });
   });
 

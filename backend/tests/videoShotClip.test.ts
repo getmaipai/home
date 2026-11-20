@@ -9,6 +9,7 @@ import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { resetDb } from "./reset-db";
 import { installFakeVideoStack } from "./videoFixture";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { until } from "./pictureFixture";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 
@@ -18,7 +19,7 @@ describe("generate_video Production shot clips", () => {
   let productionId: string;
   const shotId = "shot-1";
   beforeEach(() => {
-    resetDb(); owner = createBenchPeople().owner; fake = installFakeVideoStack();
+    resetDb(); owner = createBenchPeople().owner; fake = installFakeVideoStack(); fake.ltx25 = "ready"; fake.ltx25Picture = true; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
     productionId = createMediaProduction(owner, { title: "Moon", episodes: [{ id: "ep", scenes: [{ id: "scene", shots: [{ id: shotId, subject_ids: [] }] }] }] }).id;
   });
@@ -52,7 +53,8 @@ describe("generate_video Production shot clips", () => {
     const { updateMediaProduction } = await import("@/lib/mediaProductions");
     updateMediaProduction(owner, productionId, { episodes: [{ ...prod.episodes[0]!, scenes: [{ ...prod.episodes[0]!.scenes[0]!, shots: [{ id: shotId, subject_ids: [], picture_file_id: first }] }] }] });
     await call({}); await until(() => fake.submitted.length === 1); expect(fake.submitted[0]?.image).toBeTruthy();
-    fake.restore(); fake = installFakeVideoStack();
+    await until(() => db.select().from(videoJobs).all().every((job) => job.state === "done"));   // a shot with a running clip refuses a second one
+    fake.restore(); fake = installFakeVideoStack(); fake.ltx25 = "ready"; fake.ltx25Picture = true; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
     const second = await picture("red");
     const { createAttachment } = await import("@/lib/attachments");
     const chat = (await import("@/lib/conversationHistory")).resolveOrCreateConversation(owner, "chat"); if (!chat.ok) throw new Error("conversation");
@@ -60,13 +62,13 @@ describe("generate_video Production shot clips", () => {
     db.insert((await import("@/db/schema")).conversationTurns).values({ id: turnId, personId: owner.id, surface: "chat", conversationId: chat.value.id, userText: "make", replyText: "ok", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: "1:0:test" }).run();
     const attached = storeFile(owner, { conversationId: chat.value.id, turnId, mediaType: "image/png", bytes: new Uint8Array(await sharp({ create: { width: 32, height: 32, channels: 3, background: "red" } }).png().toBuffer()), provenance: "picture-gen:{\"v\":1,\"audience\":\"all-ages\"}", deduplicate: false, retention: "kept" }); if (!attached.ok) throw new Error("picture");
     await runGenerateVideo({ state: { actor: owner, temporary: false, conversationId: chat.value.id, turnId, }, args: { prompt: "A boat sails", production: productionId, shot: shotId, from_picture: attached.value.id }, callId: "c", spoken: false, audience: { actor: owner, band: "adult", surface: "chat", surfaceClass: "written", spoken: false } as never });
-    expect(JSON.parse(db.select().from(videoJobs).all().at(-1)!.request).source_file_id).toBe(attached.value.id);
+    expect(db.select().from(videoJobs).all().map((job) => JSON.parse(job.request).source_file_id)).toContain(attached.value.id);   // rows come back in id order, not creation order
   }, 15000);
   test("failed job writes nothing", async () => { fake.failWith = { code: "failed", error: "failed" }; await call({}); await until(() => db.select().from(videoJobs).all().some((job) => job.state === "failed")); expect(getMediaProduction(owner, productionId)?.episodes[0]?.scenes[0]?.shots[0]?.clip_file_id).toBeUndefined(); });
   test("a later targeted take replaces the shot clip id", async () => {
     const make = async () => { const before = db.select().from(videoJobs).all().filter((job) => job.state === "done").length; await call({}); await until(() => db.select().from(videoJobs).all().filter((job) => job.state === "done").length > before); };
     await make(); const first = getMediaProduction(owner, productionId)?.episodes[0]?.scenes[0]?.shots[0]?.clip_file_id;
-    fake.restore(); fake = installFakeVideoStack(); await make(); const second = getMediaProduction(owner, productionId)?.episodes[0]?.scenes[0]?.shots[0]?.clip_file_id;
+    fake.restore(); fake = installFakeVideoStack(); fake.ltx25 = "ready"; fake.ltx25Picture = true; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); await make(); const second = getMediaProduction(owner, productionId)?.episodes[0]?.scenes[0]?.shots[0]?.clip_file_id;
     expect(first).toBeTruthy(); expect(second).toBeTruthy(); expect(second).not.toBe(first);
   }, 15000);
 });

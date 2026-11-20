@@ -138,7 +138,8 @@ describe("A: the Stack's picture flags decide, Home hard-codes nothing", () => {
   test("on a Stack without the flags an adult's picture clip is refused with the plain line, never sent to the silent maker (VIDEO-WAN-HIDE-01)", async () => {
     __setVideoStatusForTests(READY());
     const { res } = await pictureClip("owner", "max");
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(422);   // VF-WORDS-01: the plain "describe it in words" line with its own code
+    expect(((await res.clone().json()) as { code: string }).code).toBe("no_picture_start");
     expect(video.submitted).toHaveLength(0);
   });
 });
