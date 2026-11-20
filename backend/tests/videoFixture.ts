@@ -54,6 +54,9 @@ export const TEST_VIDEO_LORAS: StackVideoLora[] = [
   { id: "lora-2222222222222222", name: "Boudoir Motion", sha256: "2".repeat(64), bytes: 100, base_model: "wan2.2-ti2v-5b", licence: "acknowledged", source_url: null, classification: "adult-only", trigger_words: ["boudoirmotion"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" },
 ];
 
+/** An adult-only style on the model adults use now (LTX-2.5), shaped like a catalog style: base `ltx-2.5`, adult-only, an acknowledged licence. Since 534d4c229 (VIDEO-WAN-HIDE-01) no adult clip runs the Wan-based styles above; a test that needs an adult style adds this one to `fake.loras` itself. */
+export const TEST_VIDEO_LTX_ADULT_STYLE: StackVideoLora = { id: "lora-3333333333333333", name: "Boudoir Motion LTX", sha256: "3".repeat(64), bytes: 100, base_model: "ltx-2.5", licence: "acknowledged", source_url: null, classification: "adult-only", trigger_words: ["boudoirmotionltx"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" };
+
 /** A byte string that passes Home's mp4 check (a box header with `ftyp`) and is big enough to look like a file. */
 export function testMp4(): Uint8Array {
   const bytes = new Uint8Array(4096);

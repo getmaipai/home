@@ -21,11 +21,12 @@ import { people as peopleTable } from "@/db/schema";
 import { stackAudienceFor, videoAdapterAudiencesFor, videoDenial, videosAllowed, refuseVideoPrompt, VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { videoAdaptersFor } from "@/lib/videos/adapters";
 import { getVideoJobFor, startVideoJob, __setVideoTurnWaitForTests } from "@/lib/videos/jobs";
-import { __setVideoStatusForTests } from "@/lib/videos/ready";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
+import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import { hasAudioTrack, videoFileName } from "@/lib/videos/messagesCopy";
-import { installFakeVideoStack, testJpeg, type FakeVideoStack } from "./videoFixture";
+import { installFakeVideoStack, testJpeg, TEST_VIDEO_LTX_ADULT_STYLE, type FakeVideoStack } from "./videoFixture";
 import { videoCardView } from "@/routes/videos";
 import { until } from "./pictureFixture";
 import { TestClient } from "./client";
@@ -243,9 +244,12 @@ describe("the chat tool, even when a model calls it without being offered it", (
   });
   test("with adult-only styles allowed, an adult's named adult-only style rides along with audience adult", async () => {
     __unlockRestOfTest(people.owner.id); // ADULT-LOCK-02: an adult-only style from chat needs an unlocked page
-    await withStub(calling({ prompt: "a woman by a window", style: "boudoir motion" }, "On its way."), async () => {
-      await turn(people.owner, "a clip of a woman by a window in boudoir motion style");
-      expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-2222222222222222", strength: 0.9 }]);
+    // Setup: the style adults can use now is an LTX-2.5 one (534d4c229), and the Stack reports that model takes styles, as it does (loras03.test.ts).
+    fake.loras.push(TEST_VIDEO_LTX_ADULT_STYLE); __resetVideoAdapterCacheForTests();
+    const status = readyVideoStatusForTests({ ltx25: "ready" }); status.qualities!.ltx25!.loras = { supported: true, max: 2, mode: "unfused", negative_prompt: "none" }; __setVideoStatusForTests(status);
+    await withStub(calling({ prompt: "a woman by a window", style: "boudoir motion ltx" }, "On its way."), async () => {
+      await turn(people.owner, "a clip of a woman by a window in boudoir motion ltx style");
+      expect(fake.submitted[0]!.loras).toEqual([{ id: "lora-3333333333333333", strength: 0.9, sha256: "3".repeat(64) }]); // an LTX-2.5 style rides with its file identity (loraWire.ts)
       expect(fake.submitted[0]!.audience).toBe("adult");
     });
   });
