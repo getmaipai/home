@@ -41,6 +41,13 @@ job can fail; 2 GB (the current floor) is a state where the database cannot writ
 numbers live in `commons/spec` as one function `diskLevels(totalBytes)` plus the Settings keys `storage.warn_free_gb` and the existing
 `storage.critical_free_gb` as overrides (0 = use the rule); Stack and Home both call it. `critical_free_gb` default changes from 2 to 0.
 
+**How free space is read.** `statfs` of the folder being written to, `bavail * bsize` (Node `statfsSync`), never `df` figures from a
+different mount and never Finder's "available" (it counts purgeable space a download cannot use). Checked 2026-11-20: `statfs` on the
+data volume matched `diskutil info` "Container Free Space" (56.2 GB). Every volume the product writes to is read separately (APFS
+volumes of one container share one number; the sampler dedupes by device). Measured 2026-11-19: free space fell from 47 GB to 15 GB
+inside one hour while four sessions downloaded models, so the sampler runs every 60 s and refuses on the reading plus the job's own
+declared need, not on the last reading alone.
+
 **Behavior.**
 - Warning: Repairs item "Storage is getting full" (warning severity) with the fix below; one notification to admins when it first appears.
 - Critical: item becomes an error; new model and engine downloads, video, music and picture generation, and backups are refused with
@@ -61,12 +68,20 @@ does not free itself).
 3. Old failed job outputs: older than 7 days, only outputs of failed or cancelled jobs.
 Never the Library, backups, or anything a person made. The repair sums reclaimable bytes first; if it cannot reach the warning line it says so and names what is biggest.
 
-**Missing files.** A slot's model path that is gone from disk shows as "needs repair" with a Reinstall action, found by the same
+**Never delete by "nothing has it open" (2026-11-19 incidents: a cleanup removed a model file the live hub reads through
+`MAIPAI_H3_VIDEO_HOME`, a scratch folder set by environment override; another removed a folder a sibling had symlinked).** The
+safe-to-clear list is built only from what the product itself owns and can prove unused by pointer: not selected by a slot, not
+referenced by a record, not named by an environment override, not the target of a symlink. An item outside the product's own models, engines,
+cache and job folders is never listed. Open-file checks are an extra guard, never the proof.
+
+**Missing files.** Includes paths that come from environment overrides (such as `MAIPAI_H3_VIDEO_HOME`), not only Stack model records:
+the sampler resolves each selected quality's real file paths the way the engine does and stats them, so "this quality's files are
+gone" shows as needs repair with a plain fix (reinstall, or "point it at the files again" for an override). A slot's model path that is gone from disk shows as "needs repair" with a Reinstall action, found by the same
 sampler tick (a stat of each selected slot's files), instead of a job failing later. This also guards the exact incident: a deleted
 file in use.
 
 **Dev machine.** The product never deletes outside its own data and models folders. A separate `scripts/disk-report.sh` (read only,
-no deletes) lists the biggest folders: checkouts' `data-scratch/`, `~/video-bench`, Hugging Face caches, the Library, models. Developer tool, not product.
+no deletes) lists the biggest folders and the symlinks that point into any folder before anyone removes it: checkouts' `data-scratch/`, `~/video-bench`, Hugging Face caches, the Library, models. Developer tool, not product.
 
 **Safety and privacy.** Nothing leaves the home; no gate, rating or audience change; adults-only paths are unaffected; the reading is local statfs.
 
