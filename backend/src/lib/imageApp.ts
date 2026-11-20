@@ -14,25 +14,7 @@ import { peekPictureEngineStatus, pictureReferenceLimit } from "@/lib/pictures/r
 import { pictureJobLockState } from "@/lib/pictures/lock";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { pictureActivityItem } from "@/lib/activity";
-import { listCast } from "@/lib/cast";
-import { getMediaSubject, isSheetReference } from "@/lib/mediaSubjects";
-import { CHARACTER_PROMPT_PREFIX, characterScenePrompt } from "@/lib/pictures/characterFaces";
 import type { PersonRow } from "@/types";
-
-/** CREATOR-19: the viewer's saved characters. `listCast` already drops adult-only entries and real-person likenesses for a minor, so the filter is the one place that rule lives. */
-function characterRows(person: PersonRow) {
-  const rows = listCast(person).filter((entry) => entry.kind === "subject" && entry.subject_kind === "character" && entry.subject_id).map((entry) => {
-    const subject = getMediaSubject(person, entry.subject_id!);
-    const first = (subject?.reference_ids ?? []).find((id) => {
-      const file = db.select({ provenance: attachments.provenance }).from(attachments).where(and(eq(attachments.id, id), isNull(attachments.deletedAt))).get();
-      return !!file && !isSheetReference(file.provenance);
-    });
-    const count = (subject?.reference_ids ?? []).length;
-    return { id: entry.id, title: entry.name, subtitle: count > 0 ? `Character, ${count} ${count === 1 ? "picture" : "pictures"}` : "Character", thumbnail: first ? `/api/files/${first}/thumb?w=320` : "", scene_prompt: characterScenePrompt(entry.name), cast: entry.id, start_prompt: "" };
-  });
-  // The first tile starts the Make a character flow (four faces, then Save as a character).
-  return [{ id: "make-a-character", title: "Make a character", subtitle: "Describe them, pick a face", thumbnail: "", scene_prompt: "", cast: "", start_prompt: CHARACTER_PROMPT_PREFIX }, ...rows];
-}
 
 const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
   const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
@@ -80,7 +62,6 @@ const rows = (person: PersonRow, body: unknown, madeOnly = false) => {
 
 export function imageAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
   if (dataId === "templates") return listTemplates({ actor: person, kind: "picture" }).map((template) => ({ id: template.id, title: template.title, subtitle: template.summary, summary: template.summary, thumbnail: templateCoverUrl(template.id) }));
-  if (dataId === "characters") return characterRows(person);
   if (dataId === "library") return rows(person, body);
   if (dataId === "recent") return rows(person, body, true);
   // IMG-STUDIO-02: the Studio page. `studio` is the opened picture (one row, empty until a picture is chosen), `studio-tools` the registry's extra operations
@@ -92,7 +73,6 @@ export function imageAppData(person: PersonRow, dataId: string, body: unknown): 
   return null;
 }
 
-export { characterRows };
 
 registerAppData("image", imageAppData);
 /** CREATOR-13: the Create page's preset chips (Look by family, Light, Angle, Format), from the preset records. A Create page chip holds at most 24 options,

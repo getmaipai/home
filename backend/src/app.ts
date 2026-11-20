@@ -21,6 +21,7 @@ import { operatorRoutes } from "@/routes/operator";
 import { appsRoutes } from "@/routes/apps";
 import { pluginsRoutes } from "@/routes/plugins";
 import { mediaAppRoutes, imageAppRoutes } from "@/routes/mediaApps";
+import { elementsAppRoutes } from "@/routes/elementsApp";
 import { mediaOpsRoutes } from "@/routes/mediaOps";
 import { toursRoutes } from "@/routes/tours";
 import { commandsRoutes } from "@/routes/commands";
@@ -255,6 +256,7 @@ app.route("/api/apps", appsRoutes);
 // MEDIA-VIDEOS-01: each media app's own data and action routes come first; any other package falls through to the generic ones.
 for (const { id, routes } of mediaAppRoutes) app.route(`/api/plugins/${id}`, routes);
 app.route("/api/plugins/image", imageAppRoutes);
+app.route("/api/plugins/elements", elementsAppRoutes);
 app.route("/api/plugins", pluginsRoutes);
 app.route("/api/tours", toursRoutes);
 app.route("/api/commands", commandsRoutes);

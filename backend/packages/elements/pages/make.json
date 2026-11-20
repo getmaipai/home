@@ -1,0 +1,61 @@
+{
+  "type": "page",
+  "id": "elements-make",
+  "title": "Make an element",
+  "body": [
+    {
+      "type": "prompt_bar",
+      "placement": "inline",
+      "layout": "chat",
+      "chat_distribution": "start_end",
+      "label": "Describe it",
+      "placeholder": "Describe a character, a place or a prop. You get four pictures to choose from.",
+      "prompt_state": "prompt",
+      "max_length": 600,
+      "submit_label": "Make pictures",
+      "starts": "picture",
+      "chips": [
+        {
+          "state": "kind",
+          "label": "Kind",
+          "default": "character",
+          "group": "Settings",
+          "icon": "layers",
+          "presentation": "popover",
+          "options": [
+            {
+              "value": "character",
+              "label": "Character",
+              "icon": "user-round"
+            },
+            {
+              "value": "place",
+              "label": "Place",
+              "icon": "map-pin"
+            },
+            {
+              "value": "prop",
+              "label": "Prop",
+              "icon": "box"
+            }
+          ]
+        }
+      ],
+      "submit": {
+        "call": {
+          "target": "/api/plugins/elements/actions/make",
+          "method": "POST",
+          "args": {
+            "prompt": "{prompt}",
+            "kind": "{kind}"
+          }
+        }
+      }
+    },
+    {
+      "type": "empty_state",
+      "icon": "sparkles",
+      "text": "Pick the kind, describe it, and four pictures are made. Open one in your Library and choose Save as an element."
+    }
+  ]
+}

@@ -56,6 +56,15 @@
             "characters",
             "places",
             "props"
+          ],
+          "mode": "browse"
+        },
+        {
+          "id": "create-make",
+          "mode": "create",
+          "title": "Make",
+          "pages": [
+            "make"
           ]
         }
       ]
@@ -100,6 +109,14 @@
         "nav": false,
         "kind": "schema",
         "module": "search"
+      },
+      {
+        "id": "make",
+        "label": "Make an element",
+        "icon": "sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "make"
       }
     ],
     "data": [
@@ -111,7 +128,21 @@
     "header": {
       "search": {
         "label": "Search Elements"
-      }
+      },
+      "modes": [
+        {
+          "id": "browse",
+          "label": "Browse",
+          "icon": "layers",
+          "page": "index"
+        },
+        {
+          "id": "create",
+          "label": "Make",
+          "icon": "sparkles",
+          "page": "make"
+        }
+      ]
     }
   },
   "smoke": {

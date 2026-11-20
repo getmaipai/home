@@ -56,17 +56,6 @@
           ]
         },
         {
-          "id": "browse-cast",
-          "mode": "browse",
-          "title": "Cast and places",
-          "pages": [
-            "characters",
-            "props",
-            "places",
-            "productions"
-          ]
-        },
-        {
           "id": "create-make",
           "mode": "create",
           "title": "Make",
@@ -144,38 +133,6 @@
         "module": "shared"
       },
       {
-        "id": "characters",
-        "label": "Characters",
-        "icon": "user-round",
-        "nav": true,
-        "kind": "schema",
-        "module": "characters"
-      },
-      {
-        "id": "props",
-        "label": "Props",
-        "icon": "box",
-        "nav": true,
-        "kind": "schema",
-        "module": "props"
-      },
-      {
-        "id": "places",
-        "label": "Places",
-        "icon": "map-pin",
-        "nav": true,
-        "kind": "schema",
-        "module": "places"
-      },
-      {
-        "id": "productions",
-        "label": "Productions",
-        "icon": "clapperboard",
-        "nav": true,
-        "kind": "schema",
-        "module": "productions"
-      },
-      {
         "id": "create",
         "label": "New picture",
         "icon": "wand-sparkles",
@@ -198,14 +155,6 @@
         "nav": false,
         "kind": "schema",
         "module": "from-template"
-      },
-      {
-        "id": "character-sheet",
-        "label": "Character sheet",
-        "icon": "palette",
-        "nav": false,
-        "kind": "schema",
-        "module": "character-sheet"
       },
       {
         "id": "studio",
@@ -241,10 +190,6 @@
       }
     ],
     "data": [
-      {
-        "id": "characters",
-        "rows": "list"
-      },
       {
         "id": "templates",
         "rows": "list"
