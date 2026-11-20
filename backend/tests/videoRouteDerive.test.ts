@@ -46,7 +46,7 @@ beforeEach(async () => {
     ? { people_count: 1, apparent_min_age_estimate: 8, label: "child" as const, is_nude_or_sexual: true, confidence: 1 }
     : { people_count: 1, apparent_min_age_estimate: 30, label: "adult" as const, is_nude_or_sexual: false, confidence: 1 } })));
 });
-afterEach(() => { __setVideosFetchForTests(null); __setPicturesFetchForTests(null); __setAgeCheckRunnerForTests(null); __setDerivePollMsForTests(null); });
+afterEach(() => { __setVideosFetchForTests(null); __setPicturesFetchForTests(null); __setDerivePollMsForTests(null); });
 
 describe("the identity input", () => {
   test("a clip with the cast's picture sends it as an identity input and no start picture", () => {
