@@ -1,4 +1,4 @@
-import { recordShotFailure, recordShotJob, recordShotNote } from "./progressStore";
+import { recordRunJob, recordShotFailure, recordShotJob, recordShotNote } from "./progressStore";
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import type { PersonRow } from "@/types";
@@ -140,6 +140,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const submitted = composed ?? (starter
         ? await submitGeneration({ ...body, init_image: Buffer.from(starter.bytes).toString("base64"), image_source: "uploaded", strength: REFERENCE_STILL_STRENGTH }).catch(() => submitGeneration(body))
         : await submitGeneration(body));
+      recordShotNote(productionId, shot.id, { still_job: submitted.job });
       try {
         let finished = !!submitted.done?.length;
         const deadline = Date.now() + 8 * 60_000;
@@ -225,6 +226,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const result = await runGenerateMusic({ state: { actor, surface: "chat", conversationId: turn.conversationId, turnId: turn.turnId, temporary: false, planBasis: { surfaceClass: "written" }, context: [], utterance: brief, musicAllowed: true, musicEditAllowed: true, crisis: false } as never, args: { description: brief, instrumental: true, seconds, tier: "standard" }, callId: "film-music", spoken: false });
       const jobId = (result.result?.data as { musicJobId?: string } | undefined)?.musicJobId;
       if (!jobId) throw new Error("The song could not be started.");
+      recordRunJob(productionId, "music", jobId);
       const job = await poll(() => getMusicJobFor(actor, jobId), signal, 15 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? value.errorLine ?? "The song did not finish." : null);
       if (musicJobLockState(job, actor) !== "open") throw new Error(LOCKED_MUSIC_START_LINE);
       if (!job.fileId) throw new Error("The finished song is unavailable.");
@@ -284,6 +286,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const film = await runEditVideo({ state, args: { change: "film", production: productionId, seam_transitions: plan.shots.slice(1).map((shot) => shot.transition ?? "fade"), ...(plan.title_card === false ? { no_title: true } : {}), ...(plan.credits_card === false ? { no_credits: true } : {}), ...(plan.look ? { look: plan.look } : {}), ...(plan.letterbox ? { letterbox: plan.letterbox } : {}) }, callId: "film-assemble", spoken: false });
       let id = (film.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { console.error("[film] assemble refused", JSON.stringify(film.result?.reply ?? film).slice(0, 600)); throw new Error("The film could not be assembled."); }
+      recordRunJob(productionId, "edit", id);
       let job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? (/isn.t ready/i.test(value.error ?? "") ? "The video editor is restarting." : "The film could not be assembled.") : null);
       const cut = job.files[0]?.id;
       if (!cut) throw new Error("The assembled film is unavailable.");
@@ -293,6 +296,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const mixed = await runEditVideo({ state, args: { change: "mix", clip: job.id, sound: "music", track: musicFileId }, callId: "film-mix", spoken: false });
       id = (mixed.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!id) { engines.note = "The film is ready, but I couldn't add its music."; return cut; }
+      recordRunJob(productionId, "edit", id);
       try {
         job = await poll(() => getVideoJobFor(actor, id!), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The music mix failed." : null);
         if (job.files[0]?.id) return job.files[0].id;

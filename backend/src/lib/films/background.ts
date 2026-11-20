@@ -7,7 +7,9 @@ import { subjectViewById } from "@/lib/mediaSubjects";
 import { changeFilmMusic, realFilmEngines, redoFilmShot, resumeFilm } from "./engines";
 import { FilmStepError, runFilm, type FilmEngines, type FilmStage } from "./run";
 import { getVideoJobFor, cancelVideoJob } from "@/lib/videos/jobs";
-import { filmShotJobIds } from "./progressStore";
+import { filmRunJobs } from "./progressStore";
+import { cancelMusicJob, getMusicJobFor } from "@/lib/music/jobs";
+import { cancelOrDelete } from "@/lib/pictures/stack";
 import { createFilmRun, failInterruptedFilmRuns, getFilmRun, listFilmRunsInStates, updateFilmRun, type FilmRun } from "./store";
 
 const active = new Map<string, AbortController>();
@@ -109,22 +111,36 @@ export function cancelFilm(actor:PersonRow,id:string): FilmRun | null {
   if(!["planning","running","waiting_for_go"].includes(run.state))return run;
   active.get(id)?.abort(new Error("Film cancelled."));
   const stopped=updateFilmRun(actor,id,{state:"cancelled",error_line:null});
-  void cancelFilmShotJobs(actor,id);
+  void cancelFilmJobs(actor,id);
   return stopped;
 }
-/** FILM-CANCEL-01: the run's shot clip jobs that are still queued or running are cancelled through their own cancel (owner-checked inside; a finished job keeps its result and a
- * half-made shot stores nothing). They are found one way only: VF-FILMPROGRESS-01's shot-to-job link. Counts only; no words or file names are logged. */
-export async function cancelFilmShotJobs(actor:PersonRow,runId:string): Promise<number> {
+/** FILM-CANCEL-01: every child job of the run that is still queued or running is cancelled through its own cancel: the shot clips and the cut and mix edits (`cancelVideoJob`), the song
+ * (`cancelMusicJob`), the pictures (the picture Stack job, `cancelOrDelete`). They are found one way only: the shot-to-job link in the run's progress column (VF-FILMPROGRESS-01). The
+ * owner check is each cancel's own (a job that is not the actor's is not found); a finished job keeps its result; a half-made shot stores nothing. Counts only are logged. */
+export async function cancelFilmJobs(actor:PersonRow,runId:string,deps:{cancelPicture?:(job:string)=>Promise<void>}={}): Promise<number> {
+  const links=filmRunJobs(runId);
   let stopped=0;
-  for(const jobId of filmShotJobIds(runId)){
+  const live=(state:string|undefined)=>state==="queued"||state==="running";
+  for(const jobId of [...links.clips,...links.edits]){
     try{
-      const before=getVideoJobFor(actor,jobId);
-      if(!before||before.state==="done"||before.state==="failed"||before.state==="cancelled") continue;
-      const after=await cancelVideoJob(actor,jobId);
-      if(after?.state==="cancelled") stopped++;
+      if(!live(getVideoJobFor(actor,jobId)?.state)) continue;
+      if((await cancelVideoJob(actor,jobId))?.state==="cancelled") stopped++;
     }catch{ /* one job that will not stop must not keep the others running */ }
   }
-  if(stopped>0) console.info(`[film] stopped ${stopped} shot job${stopped===1?"":"s"}`);
+  if(links.music){
+    try{
+      if(live(getMusicJobFor(actor,links.music)?.state)&&(await cancelMusicJob(actor,links.music))?.state==="cancelled") stopped++;
+    }catch{ /* as above */ }
+  }
+  // A picture already saved is finished: only the stills of shots with no saved picture are cancelled.
+  const run=getFilmRun(actor,runId);
+  const production=run?.production_id?getMediaProduction(actor,run.production_id):null;
+  const pictured=new Set((production?.episodes.flatMap((e)=>e.scenes.flatMap((sc)=>sc.shots))??[]).filter((shot)=>!!shot.picture_file_id).map((shot)=>shot.id));
+  for(const {shot,job} of links.stills){
+    if(pictured.has(shot)) continue;
+    try{ await (deps.cancelPicture??cancelOrDelete)(job); stopped++; }catch{ /* as above */ }
+  }
+  if(stopped>0) console.info(`[film] stopped ${stopped} child job${stopped===1?"":"s"}`);
   return stopped;
 }
 export function resumeFilmRun(actor:PersonRow,id:string): FilmRun | {line:string} | null {

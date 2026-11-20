@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { db } from "@/db";
 import { filmRuns, people } from "@/db/schema";
 import { resetDb } from "../../../tests/reset-db";
-import { filmProgressRows, filmShotJobIds, parseProgress, readProgress, recordShotFailure, recordShotJob, recordShotNote, pageShotRow, shotProgressRow } from "./filmProgress";
+import { filmProgressRows, filmRunJobs, filmShotJobIds, recordRunJob, parseProgress, readProgress, recordShotFailure, recordShotJob, recordShotNote, pageShotRow, shotProgressRow } from "./filmProgress";
 import type { PersonRow } from "@/types";
 
 const stamp = new Date().toISOString();
@@ -39,6 +39,22 @@ describe("the progress column", () => {
     expect(filmShotJobIds("run-1")).toEqual(["vid-b"]);
     recordShotNote("prod-9", "s1", { job_id: "vid-z" });
     expect(readProgress("run-1").shots.s1!.job_id).toBe("vid-b");
+  });
+});
+
+describe("the child-job links (FILM-CANCEL-01)", () => {
+  test("a picture's Stack job, the song and the edit jobs are kept in the same column, with no second store", () => {
+    const owner = addPerson("o4", "owner");
+    addRun(owner.id, "run-4", "prod-4");
+    recordShotNote("prod-4", "s1", { still_job: "pic-1" });
+    recordShotJob("prod-4", "s1", "vid-1");
+    recordRunJob("prod-4", "music", "song-1");
+    recordRunJob("prod-4", "edit", "edit-1");
+    recordRunJob("prod-4", "edit", "edit-1");
+    recordRunJob("prod-4", "edit", "edit-2");
+    expect(filmRunJobs("run-4")).toEqual({ stills: [{ shot: "s1", job: "pic-1" }], clips: ["vid-1"], music: "song-1", edits: ["edit-1", "edit-2"] });
+    expect(parseProgress('{"shots":{},"run":{"music_job":7,"edit_jobs":["a",3]}}')).toEqual({ shots: {}, run: { edit_jobs: ["a"] } });
+    expect(filmRunJobs("missing")).toEqual({ stills: [], clips: [], music: null, edits: [] });
   });
 });
 

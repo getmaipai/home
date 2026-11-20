@@ -4,12 +4,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { PageNodeSchema } from "@/kit/schema/types";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { __setFilmPlanCompleterForTests } from "@/lib/films/plan";
-import { __setFilmEnginesForTests } from "@/lib/films/background";
+import { __setFilmEnginesForTests, cancelFilmJobs } from "@/lib/films/background";
 import { getFilmRun } from "@/lib/films/store";
 import { activityForViewer } from "@/lib/activity";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { filmRuns, videoJobs } from "@/db/schema";
+import { filmRuns, musicJobs, videoJobs } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { household } from "./fixtures/adultLock";
 import { owner as signedInOwner } from "./support/testAuth";
@@ -353,6 +353,28 @@ describe("refusals and access", () => {
       expect((await owner.post(`${T}/actions/film-cancel`, { run: id })).status).toBe(200); // a second Stop changes nothing
       expect(getFilmRun(row, id)!.state).toBe("cancelled");
       expect(jobState("done-job")).toBe("done");
+    });
+
+    test("Stop reaches every kind of child job through the link: the clip, the cut and mix edits, the song and a picture not yet saved; never a finished job or someone else's", async () => {
+      const { adult, teen, row: person } = await household();
+      const row = person("Marlow");
+      const id = await planned(adult.client, row);
+      const at = new Date().toISOString();
+      addJob(row.id, "clip-live", "running"); addJob(row.id, "edit-live", "running"); addJob(row.id, "edit-done", "done"); addJob(row.id, "other-owner", "running");
+      db.update(videoJobs).set({ personId: teen.id }).where(eq(videoJobs.id, "other-owner")).run();
+      const music = (jobId: string, state: string) => db.insert(musicJobs).values({ id: jobId, personId: row.id, task: "text2music", state, request: "{}", createdAt: at, updatedAt: at, hlc: "h" }).run();
+      music("song-live", "running"); music("song-done", "done");
+      db.update(filmRuns).set({ state: "running", progressJson: JSON.stringify({ shots: { one: { job_id: "clip-live", still_job: "pic-stack-1" }, two: { job_id: "other-owner" } }, run: { music_job: "song-live", edit_jobs: ["edit-live", "edit-done"] } }) }).where(eq(filmRuns.id, id)).run();
+      const pictures: string[] = [];
+      const stopped = await cancelFilmJobs(row, id, { cancelPicture: async (job) => { pictures.push(job); } });
+      expect(jobState("clip-live")).toBe("cancelled");
+      expect(jobState("edit-live")).toBe("cancelled");
+      expect(jobState("edit-done")).toBe("done");
+      expect(jobState("other-owner")).toBe("running"); // not this person's: not found, not touched
+      expect(db.select().from(musicJobs).all().map((job) => `${job.id}:${job.state}`).sort()).toEqual(["song-done:done", "song-live:cancelled"]);
+      expect(pictures).toEqual(["pic-stack-1"]);
+      expect(stopped).toBe(4);
+      expect(await cancelFilmJobs(row, id, { cancelPicture: async () => {} })).toBe(1); // a second Stop finds nothing live but the unsaved picture's Stack job (a no-op on the Stack)
     });
 
     test("Resume starts the film again from the first unfinished shot; a teen cannot stop, resume or see the bars", async () => {
