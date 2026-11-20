@@ -84,7 +84,7 @@ describe("AMBIENT-03 side conversations", () => {
     await childClient.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
     const response = await childClient.post("/api/conversations", { surface: "chat", placement: "side", mode: "temporary" });
     expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ error: "temporary chat is not available for minors" });
+    expect(await response.json()).toMatchObject({ error: "That one isn't available here. Try something else." });
   });
 
   test("a typed side turn enters the ordinary written chat turn path", async () => {
