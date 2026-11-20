@@ -273,7 +273,7 @@ describe("refusals and access", () => {
     __setVoicedMakerForTests(null);
   });
 
-  test("the film-voiced offer is one row only when the Stack lists media.rough_cut, the film is waiting with a plan that has a line, for an adult; unknown reads as not offered", async () => {
+  test("the film-voiced scope: a waiting film with a line to speak gets ONE row, available true with the offer line when the Stack lists media.rough_cut and available false with the plain reason when it does not (or has not answered); no line, no row, and never for a non-adult", async () => {
     const { owner, row } = await household();
     const { __setStackHttpFetchForTests, __resetRoughCutAvailabilityForTests, refreshRoughCutAvailability } = await import("@/lib/films/roughCut");
     const listing = (kinds: string[]) => __setStackHttpFetchForTests((async () => new Response(JSON.stringify({ media: { kinds } }), { status: 200 })) as unknown as typeof fetch);
@@ -285,11 +285,13 @@ describe("refusals and access", () => {
     const { updateFilmRun } = await import("@/lib/films/store");
     const run = getFilmRun(row("Sage"), id)!;
     updateFilmRun(row("Sage"), id, { plan: { ...run.plan!, shots: run.plan!.shots.map((shot, i) => (i === 0 ? { ...shot, line: "Please put the blue mug back." } : shot)) } });
+    // A line to speak but the preview cannot be made now: one row that says so in plain words, so the person learns that voices exist.
+    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
     listing(["media.edit"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
-    expect(await rows(owner, "film-voiced", id)).toEqual([]);
+    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
     listing(["media.edit", "media.rough_cut"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
     const offered = await rows(owner, "film-voiced", id);
-    expect(offered).toEqual([{ run_id: id, reason: "Hear the lines in the voices of your cast." }]);
+    expect(offered).toEqual([{ run_id: id, available: true, reason: "Hear the lines in the voices of your cast." }]);
     __setStackHttpFetchForTests(null); __resetRoughCutAvailabilityForTests();
   });
 

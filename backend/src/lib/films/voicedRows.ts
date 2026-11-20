@@ -26,11 +26,16 @@ import { shotText } from "./lines";
 
 export function voicedAvailable(person: PersonRow): boolean { return allowed(person) && roughCutAvailableNow(); }
 
-/** `film-voiced`: one row, `{ run_id, reason }`, only when the voiced preview can be made now: available, and the film is waiting with a plan that has a line to speak. */
-export function voicedOfferRows(person: PersonRow, id?: string): Array<{ run_id: string; reason: string }> {
-  if (!voicedAvailable(person)) return [];
+export const VOICED_OFFER_LINE = "Hear the lines in the voices of your cast.";
+export const VOICED_BLOCKED_LINE = "Hearing the voices needs the speech engine, which is not ready yet.";
+export type VoicedOfferRow = { run_id: string; available: boolean; reason: string };
+
+/** `film-voiced`: one row `{ run_id, available, reason }` for a waiting film whose plan has a line to speak, an adult's only. `available: true` means the preview can be made now and `reason` is the
+ * offer's own line; `available: false` means it cannot be made now and `reason` says why in plain words, so the person learns that voices exist. No row: not an adult, no waiting film, or nothing to speak. */
+export function voicedOfferRows(person: PersonRow, id?: string): VoicedOfferRow[] {
+  if (!allowed(person)) return [];
   const run = pageFilmRun(person, id);
   if (!run?.plan || run.state !== "waiting_for_go" || !run.production_id) return [];
   if (!run.plan.shots.some((shot) => (shot as { kept?: boolean }).kept !== false && shotText(run.plan!, shot))) return [];
-  return [{ run_id: run.id, reason: "Hear the lines in the voices of your cast." }];
+  return voicedAvailable(person) ? [{ run_id: run.id, available: true, reason: VOICED_OFFER_LINE }] : [{ run_id: run.id, available: false, reason: VOICED_BLOCKED_LINE }];
 }
