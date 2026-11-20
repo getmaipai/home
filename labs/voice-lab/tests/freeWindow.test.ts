@@ -34,3 +34,13 @@ test("the lab's own llama-server at 60% GPU is not another job; a second llama-s
   const j = otherJobs(other, own, new Map([[200, 51700]]));
   expect(j.length).toBe(1); expect(j[0]).toContain("pid=200"); expect(j[0]).toContain("port=51700");
 });
+import { gpuClass } from "../src/gpuLoad";
+test("free means the chip is idle: a resident idle engine or a CPU-only python is free; 80% GPU with no named job is busy", () => {
+  const R = (pid: number, rss: number, pcpu: number, cmd: string): ProcRow => ({ pid, ppid: 1, rss, pcpu, cmd });
+  expect(otherJobs([R(1, 14 * 1048576, 0.5, "/x/splash-chat/engine/splash-chat --port 51000")], new Set())).toEqual([]);
+  expect(otherJobs([R(2, 1e6, 90, "host/.venv/bin/python scripts/feature-ledger.py")], new Set())).toEqual([]);
+  expect(gpuClass({ util: 30, jobs: "" })).toBe("free");           // remote-desktop streaming baseline
+  expect(gpuClass({ util: 80, jobs: "" })).toBe("shared");         // unnamed load still counts at rest
+  expect(gpuClass({ util: 90, jobs: "" }, true)).toBe("free");     // during a run our own engines raise it
+  expect(gpuClass({ util: 90, jobs: "pid=5 60% llama-server" }, true)).toBe("shared");
+});

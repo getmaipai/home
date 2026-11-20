@@ -73,10 +73,14 @@ if (!quick) {
 { const { readProcs, ownPids, otherJobs } = await import("../src/gpuLoad"); const { rows, listeners } = await readProcs(); const own = ownPids(listeners, rows);
   const loud = rows.map((r) => (own.has(r.pid) ? { ...r, pcpu: 100, rss: 20 * 1048576 } : r)).filter((r) => own.has(r.pid)); const flagged = otherJobs(loud, own, listeners);
   line(listeners.size > 0 && flagged.length === 0, `busy detector ignores own engines: own pids ${[...own].join(",") || "none"} (ports ${[...listeners.values()].join(",") || "none up"}), flagged ${flagged.length ? flagged.join(" | ") : "none"}`); }
+{ const { otherJobs, gpuClass: gc } = await import("../src/gpuLoad"); const R = (pid: number, rss: number, pcpu: number, cmd: string) => ({ pid, ppid: 1, rss, pcpu, cmd });
+  const idleBig = otherJobs([R(1, 14 * 1048576, 1, "/x/splash-chat/engine/splash-chat --port 51000"), R(2, 1e6, 90, "host/.venv/bin/python scripts/feature-ledger.py")], new Set());
+  const ok = idleBig.length === 0 && gc({ util: 20, jobs: "" }) === "free" && gc({ util: 80, jobs: "" }) === "shared";
+  line(ok, `busy detector: idle 14 GB engine and a CPU-only python are not busy; 80% GPU with no named job is (flagged ${idleBig.length})`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
 
-const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd) === "free" ? "GPU FREE" : "GPU SHARED"; console.log(`RUN CLASS: ${klass} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
+const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd, true) === "free" ? "GPU FREE" : "GPU SHARED"; console.log(`RUN CLASS: ${klass} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
 const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 && klass === "GPU SHARED" ? "ALL PASS but the GPU was shared: not a valid ready run (rerun with --wait-gpu-free)" : bad === 0 ? (quick ? "QUICK PASS (fast loop only: the full run must also pass before the owner is told to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
 process.exit(bad ? 1 : 0);

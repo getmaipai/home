@@ -29,7 +29,7 @@ async function startRun() {
   });
 }
 while (true) {
-  const g = await sampleGpu(); const free = gpuClass(g) === "free"; const now = Date.now();
+  const g = await sampleGpu(); const free = gpuClass(g, win.running) === "free"; const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
   if (s.abort && child) { aborted = true; child.kill(); try { Bun.spawnSync(["pkill", "-f", "rig/(measure|echotest|listen|round1)\\.ts"]); } catch {} log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
