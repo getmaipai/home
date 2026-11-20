@@ -17,7 +17,14 @@ const chatDeps = { health: async () => { try { return (await fetch("http://127.0
   warm: async () => { for (let i = 0; i < 2; i++) await fetch("http://127.0.0.1:9921/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Say hi." }], max_tokens: 8, stream: false }), signal: AbortSignal.timeout(120000) }); },
   sleep: (ms: number) => Bun.sleep(ms), nice: ownNice, log };
 if (process.argv.includes("--engine-only")) { const r = await ensureChat(chatDeps); console.log("engine:", r); process.exit(r === "ready" ? 0 : 3); }
+/** The "tests are stable" line must never fail a clean run for a stale stamp: when it is stale, run the flaky loop here first (CPU only, before the run starts). */
+async function ensureFlaky() {
+  const { flakyVerdict } = await import("../src/flakyStatus"); const { statSync, readdirSync, readFileSync } = await import("node:fs"); const T = import.meta.dir + "/../tests";
+  const check = () => { const newest = Math.max(...readdirSync(T).filter((f) => f.endsWith(".ts")).map((f) => statSync(`${T}/${f}`).mtimeMs)); let st = null; try { st = JSON.parse(readFileSync(`${W}/flaky-last.json`, "utf8")); } catch {} return flakyVerdict(st, newest); };
+  if (check().ok) return; log({ event: "flaky-stale", why: check().why }); const p = Bun.spawn(["bash", "rig/flaky.sh", "10"], { cwd: import.meta.dir + "/..", stdout: "ignore", stderr: "ignore" }); await p.exited; log({ event: "flaky-ran", verdict: check() });
+}
 async function startRun() {
+  await ensureFlaky();
   attempts++; aborted = false; log({ event: "start", attempt: attempts });
   const spawnStep = (cmd: string[], file: string) => Bun.spawn(["bun", ...cmd], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/${file}`), stderr: "ignore" });
   const finish = (code: number, step: string) => { log({ event: "finished", step, code, attempt: attempts }); console.log(`CLEAN RUN FINISHED (${step}, attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt${step === "round1" ? " and round1-clean.txt" : ""}`); process.exit(code === 0 ? 0 : 1); };
