@@ -416,8 +416,6 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(rows[0]!.tags).toEqual(["Standard", "10 s"]);
   });
 
-  // Today the feed and the "making-films" scope list nothing for that queued first part, so the making-list half of the old test has no row to assert: it is a todo below, found while rewriting this test.
-  test.todo("a long take being made (a Boost 10 second request) shows on the making list with its parts line (found 2026-11-20: tests/videoCreate Boost 10 s, feed and making-films both empty while the first part is queued)", () => {});
   // Boost still tops out at 5 seconds per piece, and a longer request is made as parts carrying on from each other (LONGTAKE-01), said in one plain line.
   test("a Boost 10 second request is made in two 5 second parts and says so, also on the making list", async () => {
     const { adult } = await household();
@@ -434,6 +432,17 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(db.select().from((await import("@/db/schema")).videoJobs).all().map((row) => row.state)).toEqual(["queued"]);
   });
 
+  // The parts of a long take are background jobs, so the feed lists none of them; the stage shows the take itself, once, with its part word (found 2026-11-20).
+  test("a long take being made is the stage's one row with its part word, and the feed and shelves do not list it twice", async () => {
+    const { adult } = await household();
+    fake.pollsToFinish = 1000;
+    expect((await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, tier: "boost", seconds: 10 })).status).toBe(200);
+    const stage = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json() as Array<Record<string, unknown>>;
+    expect(stage).toHaveLength(1);
+    expect(stage[0]).toMatchObject({ stage_state: "waiting", eyebrow: "Part 1 of 2", subtitle: "10 seconds, made in 2 parts", progress: 0 });
+    expect(await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json()).toEqual([]);
+    await adult.client.post(`/api/videos/long/${(stage[0] as { id: string }).id}/cancel`, {}); // a take left running would refuse the next test's long take
+  });
   test("an unknown look or voices choice is a plain 422", async () => {
     const { adult } = await household();
     expect((await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, look: "neon" })).status).toBe(422);

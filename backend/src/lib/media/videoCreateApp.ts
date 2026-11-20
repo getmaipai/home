@@ -19,7 +19,8 @@ import { syncLoras } from "@/lib/loras/sync";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, h3EndPictureReady, h3VideoReady, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason, videoStatusReady } from "@/lib/videos/ready";
-import { MAX_TAKE_SECONDS } from "@/lib/videos/longTake";
+import { MAX_TAKE_SECONDS, decodeParams, takeProgress } from "@/lib/videos/longTake";
+import { listMediaProductions } from "@/lib/mediaProductions";
 import { estimateVideoMinutes } from "@/lib/videos/estimate";
 import { householdActiveVideoJobs } from "@/lib/videos/jobs";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
@@ -424,7 +425,25 @@ export function filmShelfRows(person: PersonRow, states: FilmRunState[]): Array<
 
 /** VF-UI-03b: the newest take of the Create feed as the one row of the page's media_stage: a finished take loops, a take being made waits with its progress, a failed take shows
  * its plain error with Try again. Nothing here names a model or a pixel size; the facts line is the shape word and the length. A locked take (the feed's lock tile) makes no stage. */
+/** A long take being made is a media production, and its parts are background jobs with no page behind them, so the feed never lists them. While one runs it is the stage's one row:
+ * the part it is on, how many it has, and the share done. Only a running take shows (a stopped or failed one has no job id the stage's pills could act on). */
+function runningTakeStage(person: PersonRow): Array<Record<string, unknown>> {
+  for (const production of listMediaProductions(person)) {
+    if (production.owner_person_id !== person.id || !production.provenance.includes('"long-take"')) continue;
+    const progress = takeProgress(person, production.id);
+    const params = decodeParams(production.summary);
+    if (!progress || !params || progress.state !== "running") continue;
+    const words = params.prompt.trim().split(/\s+/).filter(Boolean);
+    const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
+    const part = Math.min(progress.parts_done + 1, progress.parts_total);
+    return [{ id: production.id, prompt: params.prompt, still: null, loop: null, position: null, description: `The clip: ${title}`, stage_state: "waiting", eyebrow: `Part ${part} of ${progress.parts_total}`, title, subtitle: `${progress.parts_total * params.per_part} seconds, made in ${progress.parts_total} parts`, progress: Math.round((progress.parts_done / progress.parts_total) * 100), error_message: null }];
+  }
+  return [];
+}
+
 export function stageRows(person: PersonRow): Array<Record<string, unknown>> {
+  const making = runningTakeStage(person);
+  if (making.length) return making;
   const row = feedRows(person, { limit: 1 })[0];
   if (!row || typeof row.id !== "string" || row.locked === true || row.status === "locked" || row.status === "cancelled") return [];
   const words = String(row.prompt ?? "").trim().split(/\s+/).filter(Boolean);
