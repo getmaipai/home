@@ -105,10 +105,10 @@ test("ELEMENTS-HOME-02: Delete is offered only on the owner's own saved elements
   const { row } = await owner();
   const own = createMediaSubject(row, { name: "Mug", kind: "prop", look: "a blue mug" });
   expect(elementEditRows(row, own.id)).toHaveLength(1);
-  expect(elementActions(row, own.id)).toEqual([{ id: own.id, reason: "A look is captured for characters." }]);
+  expect(elementActions(row, own.id)).toEqual([{ id: own.id, reason: "" }]); // a saved prop (or place) can capture its look now, like a character
   const companions = elementRows(row, { kind: "character" }).filter((item) => !MADE.has(item.title));
   expect(companions.length).toBeGreaterThan(0);
-  for (const item of companions) expect(elementEditRows(row, item.id)).toEqual([]);
+  for (const item of companions) { expect(elementEditRows(row, item.id)).toEqual([]); expect(elementActions(row, item.id)[0]?.reason).toBe("Save this one as an element first."); }
 });
 
 test("ELEMENTS-HOME-02: where used lists the viewer's own films whose shots name the element", async () => {

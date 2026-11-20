@@ -65,7 +65,7 @@ export function elementActions(person: PersonRow, id: string) {
   const entry = entryFor(person, id);
   if (!entry) return [];
   const subject = entry.subject_id ? getMediaSubject(person, entry.subject_id) : null;
-  const reason = entry.subject_kind !== "character" ? "A look is captured for characters." : !subject ? "Save this one as an element first." : subject.owner_person_id !== person.id ? "Only the person who saved this can capture its look." : "";
+  const reason = !subject ? "Save this one as an element first." : subject.owner_person_id !== person.id ? "Only the person who saved this can capture its look." : "";
   return [{ id, reason }];
 }
 export function elementEditRows(person: PersonRow, id: string) {
