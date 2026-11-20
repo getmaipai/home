@@ -12,18 +12,19 @@ import { creditsSecondsFor, SEAM_SECONDS, TITLE_CARD_SECONDS } from "@/lib/video
 import { getStackClient, isRemoteStackSelected } from "@/lib/stackEngine";
 import { stageClipForStack } from "@/lib/videos/stackEdit";
 import type { FilmPlan } from "@/lib/films/plan";
+import { shotText } from "./lines";
 
 export interface VerifyShot { id: string; start_s: number; end_s: number; kind: "moving"; line?: string }
 export interface FilmShotList { shots: VerifyShot[]; /** Where the plan says the picture ends, before the credits. */ picture_end_s: number; total_s: number }
 
 /** The shot windows of an exported film, from the plan: the title card first, then each kept shot, each seam but a cut overlapping by the blend length. */
-export function filmShotList(plan: Pick<FilmPlan, "shots" | "title_card" | "credits_card" | "credits">): FilmShotList {
+export function filmShotList(plan: Pick<FilmPlan, "shots" | "cast" | "title_card" | "credits_card" | "credits">): FilmShotList {
   const kept = plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false);
   let at = plan.title_card === false ? 0 : TITLE_CARD_SECONDS;
   const shots: VerifyShot[] = [];
   kept.forEach((shot, i) => {
     if (i > 0 && (shot.transition ?? "fade") !== "cut") at -= SEAM_SECONDS;
-    shots.push({ id: shot.id, start_s: Math.round(at * 100) / 100, end_s: Math.round((at + shot.seconds) * 100) / 100, kind: "moving", ...(shot.line?.trim() ? { line: shot.line.trim() } : {}) });
+    shots.push({ id: shot.id, start_s: Math.round(at * 100) / 100, end_s: Math.round((at + shot.seconds) * 100) / 100, kind: "moving", ...(shotText(plan, shot) ? { line: shotText(plan, shot) } : {}) });
     at += shot.seconds;
   });
   const credits = plan.credits_card === false ? 0 : creditsSecondsFor(plan.credits?.length ?? 1);
@@ -143,8 +144,8 @@ export async function verifyRoughCutFile(input: { path: string; shots: Array<{ i
 }
 
 /** VF-REPAIR-01 slice 1: one shot's own stored clip, checked alone (its picture, its sound, its line heard), so a fault in the cut can be told from a fault in the clip. `unchecked` when the Stack cannot answer or the clip's length is not the shot's. */
-export async function verifyShotClipBytes(bytes: Uint8Array, shot: { id: string; seconds: number; line?: string }, signal?: AbortSignal, deps?: VerifyDeps): Promise<FilmVerdict> {
-  const line = shot.line?.trim();
+export async function verifyShotClipBytes(bytes: Uint8Array, shot: { id: string; seconds: number; text?: string }, signal?: AbortSignal, deps?: VerifyDeps): Promise<FilmVerdict> {
+  const line = shot.text?.trim();
   return withStagedFile(bytes, (path) => verifyAtPath({ path, shots: [{ id: shot.id, start_s: 0, end_s: shot.seconds, kind: "moving", ...(line ? { line } : {}) }], total_s: shot.seconds, has_audio: !!line, signal }, deps ?? realDeps()));
 }
 

@@ -1,7 +1,7 @@
 import { getMediaProduction, setShotClip, setShotPicture, setShotVoiceLine, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
 import { synthIdOfSubject } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
-import { speakerOfPlan } from "./speaker";
+import { shotLines, shotText } from "./lines";
 import type { FilmPlan } from "@/lib/films/plan";
 
 export type FilmStage = "cast" | "stills" | "clips" | "music" | "assemble" | "keep";
@@ -12,10 +12,10 @@ export class FilmStepError extends Error {
 export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string; /** A cast member the person picked: its subject, used as it is. */ subjectId?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
-  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** Who speaks the shot's line (the film's one character, else "Narration"). */ speaker?: string; /** Another take of this shot: the file id of the first take (VF-REPAIR-01 slice 1; the engine sends `take_of`). */ takeOf?: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
+  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** What the shot says, line by line with its speaker (FILM-LINES-01; read through `shotLines`). */ lines?: import("./plan").FilmShotLine[]; /** Another take of this shot: the file id of the first take (VF-REPAIR-01 slice 1; the engine sends `take_of`). */ takeOf?: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
   /** FILM-REAL-05: how far a finished clip drifted from its starting picture (measure only; null when it cannot be measured). */
   measureClip?(input: { stillFileId: string; clipFileId: string; seconds: number }): Promise<{ first: number; middle: number; last: number } | null>;
-  makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
+  makeNarration?(input: { shot: FilmPlan["shots"][number]; /** What the shot says (the faceless narration). */ text: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   readNarration?(input: { fileId: string }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
   makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
@@ -23,7 +23,7 @@ export interface FilmEngines {
   /** VF-CHECK-01: check the finished file against the plan (shots, lines, sound, picture). Lines are plain sentences for the film's card; `checked: false` means it could not be checked. */
   verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[]; entries?: import("./verifyFinished").VerdictEntry[]; faults?: import("./verifyFinished").FilmFault[] }>;
   /** VF-REPAIR-01 slice 1: one shot's stored clip checked alone (told apart from a fault in the cut). */
-  verifyClip?(input: { shot: FilmPlan["shots"][number]; clipFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; faults?: import("./verifyFinished").FilmFault[] }>;
+  verifyClip?(input: { shot: FilmPlan["shots"][number]; clipFileId: string; /** What the shot says, as one passage. */ text: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; faults?: import("./verifyFinished").FilmFault[] }>;
   /** Whether another take of this clip already exists, so the shot's one retry is spent (VF-REPAIR-01 slice 1; shared with the clip check's own retake). */
   retakeSpent?(clipFileId: string): boolean;
   /** A plain progress line for the film's own card while the run works (S6: the run's note). */
@@ -132,14 +132,14 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
         if (!engines.makeNarration || !engines.makeMotionClip || (stored.voice_line_id && !engines.readNarration)) throw new FilmStepError("clips", "The narration step is unavailable.", planned.id);
         const narration = stored.voice_line_id
           ? await callEngine("clips", planned.id, engines, signal, () => engines.readNarration!({ fileId: stored.voice_line_id! }, { signal }))
-          : await callEngine("clips", planned.id, engines, signal, () => engines.makeNarration!({ shot: planned }, { signal }));
+          : await callEngine("clips", planned.id, engines, signal, () => engines.makeNarration!({ shot: planned, text: shotText(plan, planned) }, { signal }));
         if (!stored.voice_line_id) setShotVoiceLine(actor.id, productionId, planned.id, narration.fileId);
         engines.onProgress?.({ stage: "clips", done: i * 2 + 1, total: plan.shots.length * 2, shotId: planned.id });
         fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeMotionClip!({ shot: planned, stillFileId: stored.picture_file_id!, narrationFileId: narration.fileId, seconds: Math.max(planned.seconds, narration.seconds + 0.6) }, { signal }));
       } else {
         const last = plan.shots[plan.shots.length - 1]!, lastStored = productionShots(current).find((shot) => shot.id === last.id);
         const endsOnReveal = i === plan.shots.length - 2 && !!lastStored?.picture_file_id && plan.cast.some((member) => member.reveal_last === true && last.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()));
-        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, speaker: speakerOfPlan(plan).name, ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
+        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, lines: shotLines(plan, planned), ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
       }
       setShotClip(actor.id, productionId, planned.id, fileId);
       if (!faceless && engines.measureClip) { const drift = await engines.measureClip({ stillFileId: stored.picture_file_id!, clipFileId: fileId, seconds: planned.seconds }).catch(() => null); if (drift) console.log(`[film] drift ${planned.id} first ${drift.first} middle ${drift.middle} last ${drift.last}`); }

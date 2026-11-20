@@ -166,10 +166,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         return saved.value.id;
       } catch (error) { void cancelOrDelete(submitted.job); throw error; }
     },
-    async makeClip({ shot, endStillFileId, speaker, takeOf }) {
-      const prompt = `${shot.motion}${shot.line ? ` Say "${shot.line}".` : ""}`;
+    async makeClip({ shot, endStillFileId, lines = [], takeOf }) {
+      // The old door's sentence: today's generic Say for one line; an exchange names each speaker. No per-engine wording.
+      const said = lines.length === 0 ? "" : lines.length === 1 ? ` Say "${lines[0]!.text}".` : lines.map((entry) => ` ${entry.speaker === "Narration" ? "A voice" : entry.speaker} says "${entry.text}".`).join("");
+      const prompt = `${shot.motion}${said}`;
       // VF-ROUTE-01 follow-up: the shot goes to the generic door as a film shot (its look paragraph and its line as one dialogue entry; the Stack picks the recipe and the size). A Stack that does not list those keys, or refuses the shot, takes the old door with the prompt above, as before.
-      const filmShot = { look: shot.still.slice(0, 1200), ...(shot.line?.trim() ? { dialogue: [{ speaker: speaker ?? "Narration", text: shot.line.trim().slice(0, 300) }] } : {}) };
+      const filmShot = { look: shot.still.slice(0, 1200), ...(lines.length ? { dialogue: lines.map((entry) => ({ speaker: entry.speaker, text: entry.text.slice(0, 160) })) } : {}) };
       // Another take of a shot (the repair): the first take's video job names it, so the Stack makes it with the same route and recipe and a new seed.
       const firstJob = takeOf ? getVideoJobByFileFor(actor, takeOf) : null;
       const result = await runGenerateVideo({ filmShot, ...(firstJob ? { takeOf: firstJob.id, retakeOf: firstJob.id } : {}), state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
@@ -196,10 +198,10 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const still = readAttachment(actor, stillFileId), clip = readAttachment(actor, clipFileId);
       return still.ok && clip.ok ? measureClipDrift(still.value.bytes, clip.value.bytes, seconds) : null;
     },
-    async makeNarration({ shot }) {
-      if (!shot.line || refuseVideoPrompt(shot.line, { lane: "adult" })) throw new Error("The narration line could not be used.");
+    async makeNarration({ shot, text }) {
+      if (!text || refuseVideoPrompt(text, { lane: "adult" })) throw new Error("The narration line could not be used.");
       const voice = voiceForSpeech({ actor });
-      const spoken = await speakToBytes(shot.line, voice);
+      const spoken = await speakToBytes(text, voice);
       if (!spoken.ok || spoken.seconds === null) throw new Error("Home can't speak right now. Try again in a minute.");
       const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "audio/wav", bytes: spoken.bytes, provenance: `voiceover:${JSON.stringify({ v: 1, source: "film-narration", shot: shot.id, engine: spoken.engine, ...(spoken.revision ? { revision: spoken.revision } : {}), voice, kind: "household" })}`, retention: "kept", name: `Film narration ${shot.id}`, deduplicate: false });
       if (!saved.ok) throw new Error("Home could not keep the narration file.");
@@ -321,10 +323,10 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
     /** Whether another take of this clip already exists (the clip check's own retake or a repair's): the shot's one retry is spent. */
     retakeSpent(clipFileId) { const job = getVideoJobByFileFor(actor, clipFileId); return !!job && videoJobHasAnotherTake(actor, job.id); },
     /** VF-REPAIR-01 slice 1: one shot's stored clip, checked alone by the same Stack check (never throws). */
-    async verifyClip({ shot, clipFileId }, options) {
+    async verifyClip({ shot, clipFileId, text }, options) {
       const clip = readAttachment(actor, clipFileId);
       if (!clip.ok) return { checked: false };
-      return verifyShotClipBytes(clip.value.bytes, { id: shot.id, seconds: shot.seconds, ...(shot.line ? { line: shot.line } : {}) }, options.signal);
+      return verifyShotClipBytes(clip.value.bytes, { id: shot.id, seconds: shot.seconds, ...(text ? { text } : {}) }, options.signal);
     },
     /** VF-CHECK-01: the Stack checks the finished file against the plan's shot list and lines. Advisory; never throws. */
     async verifyCut({ plan, cutFileId }, options) {
@@ -338,15 +340,15 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
 
 export async function makeFilm(input: { actor: PersonRow; idea: string; shots?: number; look?: string; castHints?: string[]; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"] }): Promise<{ productionId: string; plan: FilmPlan; filmFileId: string; note?: string } | { line: string }> {
   if (input.actor.role === "guest" || laneOfPerson(input.actor) !== "adult") return { line: "Making a film is for adults on their own written screen." };
-  const planned = await planFilm({ idea: input.idea, shots: input.shots, look: input.look, castHints: input.castHints, faceless: input.faceless });
-  if (!planned.ok) return { line: planned.line };
-  const production = createMediaProduction(input.actor, { title: planned.plan.title, summary: planned.plan.summary });
+  const made = await planFilm({ idea: input.idea, shots: input.shots, look: input.look, castHints: input.castHints, faceless: input.faceless });
+  if (!made.ok) return { line: made.line };
+  const production = createMediaProduction(input.actor, { title: made.plan.title, summary: made.plan.summary });
   const engines = realFilmEngines({ actor: input.actor, signal: input.signal, productionId: production.id, faceless: input.faceless });
   engines.onProgress = input.onProgress;
-  const completed = await runFilm({ actor: input.actor, productionId: production.id, plan: planned.plan, faceless: input.faceless, engines, signal: input.signal });
+  const completed = await runFilm({ actor: input.actor, productionId: production.id, plan: made.plan, faceless: input.faceless, engines, signal: input.signal });
   const filmFileId = completed.finished_cut_file_ids.at(-1);
   if (!filmFileId) throw new Error("The film did not finish.");
-  return { productionId: production.id, plan: planned.plan, filmFileId, ...(engines.note ? { note: engines.note } : {}) };
+  return { productionId: production.id, plan: made.plan, filmFileId, ...(engines.note ? { note: engines.note } : {}) };
 }
 
 export async function resumeFilm(input: { actor: PersonRow; productionId: string; plan: FilmPlan; faceless?: boolean; signal: AbortSignal; onProgress?: FilmEngines["onProgress"]; /** The engines whose `note` the caller will read afterwards (the film's card note); made here when absent. */ engines?: FilmEngines }) {

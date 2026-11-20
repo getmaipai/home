@@ -13,7 +13,7 @@ import type { FilmEngines } from "./run";
 import type { FilmPlan, FilmShotRepair } from "./plan";
 import type { FilmFault, FilmFaultKind, VerdictEntry } from "./verifyFinished";
 import { shotReview } from "./review";
-import { speakerOfPlan } from "./speaker";
+import { shotLines, shotText } from "./lines";
 
 const shotsOf = (production: Production): Shot[] => production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));
 const WHAT: Record<FilmFaultKind, string> = { no_speech: "no sound where its line should be", copied_sound: "another shot's sound", frozen: "a frozen picture", black: "a black picture" };
@@ -84,7 +84,7 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
     if (kind === "no_speech" || kind === "copied_sound") {
       // The cut may have lost a clip's sound while the clip itself is fine: look at the clip alone before spending a new take.
       const clipId = stored.find((item) => item.id === id)?.clip_file_id;
-      const alone = clipId && engines.verifyClip ? await engines.verifyClip({ shot, clipFileId: clipId }, { signal }).catch(() => null) : null;
+      const alone = clipId && engines.verifyClip ? await engines.verifyClip({ shot, clipFileId: clipId, text: shotText(plan, shot) }, { signal }).catch(() => null) : null;
       if (alone?.checked && !(alone.faults ?? []).some((f) => f.kind === kind)) cutOnly.push(id);
       else if (alone?.checked) toTake.push(id);
       else cutOnly.push(id); // not provable: the cheap repair only
@@ -114,14 +114,14 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
     acted = true; handled.add(id);
     engines.say?.(`Fixing shot ${n}: ${WHY[kind]}.`);
     let fresh: string;
-    try { fresh = await engines.makeClip({ shot, stillFileId: still, speaker: speakerOfPlan(plan).name, takeOf: first }, { signal }); }
+    try { fresh = await engines.makeClip({ shot, stillFileId: still, lines: shotLines(plan, shot), takeOf: first }, { signal }); }
     catch (error) {
       if (signal.aborted) throw error;
       const withheld: FilmShotRepair = { retries: 1, fault: kind, state: "withheld", first_clip_id: first };
       lines.push(repairLine(n, withheld)); setRepair(id, withheld);
       continue;
     }
-    const alone = engines.verifyClip ? await engines.verifyClip({ shot, clipFileId: fresh }, { signal }).catch(() => null) : null;
+    const alone = engines.verifyClip ? await engines.verifyClip({ shot, clipFileId: fresh, text: shotText(plan, shot) }, { signal }).catch(() => null) : null;
     if (alone?.checked && (alone.faults ?? []).some((f) => f.kind === kind)) {
       const failed: FilmShotRepair = { retries: 1, fault: kind, state: "failed", first_clip_id: first, new_clip_id: fresh };
       lines.push(repairLine(n, failed)); setRepair(id, failed);

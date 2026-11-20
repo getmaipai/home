@@ -22,6 +22,8 @@ export function voicedRows(person: PersonRow, id?: string): ReturnType<typeof st
 export const voicedStoryboardRows = voicedRows;
 
 /** True when this person may be offered the voiced preview: an adult, and the Stack lists `media.rough_cut`. Fails closed (false) while that is unknown. */
+import { shotText } from "./lines";
+
 export function voicedAvailable(person: PersonRow): boolean { return allowed(person) && roughCutAvailableNow(); }
 
 /** `film-voiced`: one row, `{ run_id, reason }`, only when the voiced preview can be made now: available, and the film is waiting with a plan that has a line to speak. */
@@ -29,6 +31,6 @@ export function voicedOfferRows(person: PersonRow, id?: string): Array<{ run_id:
   if (!voicedAvailable(person)) return [];
   const run = pageFilmRun(person, id);
   if (!run?.plan || run.state !== "waiting_for_go" || !run.production_id) return [];
-  if (!run.plan.shots.some((shot) => (shot as { kept?: boolean }).kept !== false && shot.line?.trim())) return [];
+  if (!run.plan.shots.some((shot) => (shot as { kept?: boolean }).kept !== false && shotText(run.plan!, shot))) return [];
   return [{ run_id: run.id, reason: "Hear the lines in the voices of your cast." }];
 }

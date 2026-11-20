@@ -18,7 +18,7 @@ const shot = (over: Record<string, unknown>) => ({ id: "s1", still: "A lighthous
 
 describe("animaticRequest (the same lengths, motion and words the animatic always had)", () => {
   test("each shot keeps its seconds, its motion words and its line as the caption; the audience is adult and no lines are voiced", () => {
-    const request = animaticRequest([shot({}), shot({ id: "s2", motion: "pan left", line: "", seconds: 7 })], ["/m/1.png", "/m/2.png"]);
+    const request = animaticRequest({ cast: [], shots: [shot({}), shot({ id: "s2", motion: "pan left", line: "", seconds: 7 })] } as never, ["/m/1.png", "/m/2.png"]);
     expect(request).toEqual({ audience: "adult", shots: [
       { id: "s1", picture: "/m/1.png", seconds: 5, motion: "zoom in", caption: "The light came on at six." },
       { id: "s2", picture: "/m/2.png", seconds: 7, motion: "pan left" },
@@ -26,7 +26,7 @@ describe("animaticRequest (the same lengths, motion and words the animatic alway
     expect("lines" in request).toBe(false);
   });
   test("a long line is cut to 200 characters like before", () => {
-    expect(animaticRequest([shot({ line: "x".repeat(300) })], ["/m/1.png"]).shots[0]!.caption).toHaveLength(200);
+    expect(animaticRequest({ cast: [], shots: [shot({ line: "x".repeat(300) })] } as never, ["/m/1.png"]).shots[0]!.caption).toHaveLength(200);
   });
 });
 
@@ -36,7 +36,7 @@ describe("runRoughCutJob (one Stack job, one plain line on any failure)", () => 
     submit: async () => ({ id: "j1", state: "queued" }), job: async () => ({ id: "j1", state: "done", result: { file: "/stack/out.mp4", total_s: 12 } }),
     cancel: async () => undefined, sleep: async () => { clock += 500; }, now: () => clock, readFile: () => new Uint8Array([1, 2, 3]), ...over,
   });
-  const request = animaticRequest([shot({})], ["/m/1.png"]);
+  const request = animaticRequest({ cast: [], shots: [shot({})] } as never, ["/m/1.png"]);
   test("done: the file's bytes, its length and the wall time", async () => {
     clock = 0;
     expect(await runRoughCutJob(request, undefined, deps())).toMatchObject({ ok: true, bytes: new Uint8Array([1, 2, 3]), seconds: 12, ms: 500 });
@@ -70,7 +70,7 @@ describe("roughCutRequest (voiced): the shared fixture's shape", () => {
   test("every shot spoken: the request is a valid StackRoughCutRequest with one line per shot and one voice entry", async () => {
     const shots = sixShots.map((s) => ({ ...s, line: s.line ?? "A quiet moment." }));
     const { script } = await voicedScript(sage, planOf(shots));
-    const request = roughCutRequest(shots as never, shots.map((_, i) => `/m/${i}.png`), script);
+    const request = roughCutRequest({ cast: [], shots } as never, shots.map((_, i) => `/m/${i}.png`), script);
     expect(StackRoughCutRequest.safeParse(request).success).toBe(true);
     expect(request.audience).toBe("adult");
     expect(request.lines!.map((l) => l.shot_id)).toEqual(shots.map((s) => s.id));
@@ -78,7 +78,7 @@ describe("roughCutRequest (voiced): the shared fixture's shape", () => {
     expect(request.shots.every((s) => !("caption" in s))).toBe(true);
   });
   test("a shot whose line is spoken carries no caption; a shot with a dropped line keeps its words as the caption", () => {
-    const request = roughCutRequest([shot({ id: "a" }), shot({ id: "b" })], ["/1.png", "/2.png"], { lines: [{ shot_id: "a", line: { speaker: "Willow", text: "The light came on at six." } }], voices: [{ speaker: "Willow" }] });
+    const request = roughCutRequest({ cast: [], shots: [shot({ id: "a" }), shot({ id: "b" })] } as never, ["/1.png", "/2.png"], { lines: [{ shot_id: "a", line: { speaker: "Willow", text: "The light came on at six." } }], voices: [{ speaker: "Willow" }] });
     expect(request.shots.map((s) => s.caption)).toEqual([undefined, "The light came on at six."]);
   });
 });

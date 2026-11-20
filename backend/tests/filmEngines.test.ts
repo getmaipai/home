@@ -68,6 +68,26 @@ describe("film engine entry", () => {
     } finally { delete process.env.MAIPAI_TEST_DOOR; }
   });
 
+  test("FILM-LINES-01: a two-character shot sends every line, each with its speaker, as the clip request's dialogue", async () => {
+    process.env.MAIPAI_TEST_DOOR = "1";
+    try {
+      image = installFakeImageStack(); video = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); music = installFakeMusicStack(); edit = installFakeEditStack();
+      __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
+      __setKeyframesForTests(async () => [new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]);
+      const shots = [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: `Willow in a blue coat, shot ${n}.`, motion: "The tide rolls gently.", seconds: 5, ...(n === 2 ? { lines: [{ speaker: "Willow", text: "Please put the blue mug back." }, { speaker: "Marlow", text: "It was never mine." }] } : {}) }));
+      __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify({ ...plan, cast: [...plan.cast, { name: "Marlow", kind: "character", locked: "A green scarf." }], shots }) }));
+      const actor = person("person-filmowner");
+      const result = await makeFilm({ actor, idea: "A quiet crossing", signal: new AbortController().signal });
+      expect("productionId" in result).toBe(true);
+      const filmShots = video.makeRequests.filter((request) => request.operation === "clip_film_shot");
+      expect(filmShots).toHaveLength(3);
+      expect(filmShots.map((request) => request.look)).toEqual([1, 2, 3].map((n) => `Willow in a blue coat, shot ${n}.`));
+      expect(filmShots[1]!.dialogue).toEqual([{ speaker: "Willow", text: "Please put the blue mug back." }, { speaker: "Marlow", text: "It was never mine." }]);
+      expect("dialogue" in filmShots[0]!).toBe(false);
+      for (const request of filmShots) { expect("size" in request).toBe(false); expect(String(request.start_picture)).toMatch(/^data:image\/png;base64,/); expect(request.level).toBe("standard"); }
+    } finally { delete process.env.MAIPAI_TEST_DOOR; }
+  });
+
   test("makes stills, clips, a song, and sequential film and mix edits, then keeps the artifacts on its production", async () => {
     image = installFakeImageStack(); video = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); music = installFakeMusicStack(); edit = installFakeEditStack();
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));

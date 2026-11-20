@@ -18,7 +18,7 @@ const transitionKinds = ["cut", "fade", "dissolve", "speckle", "wipeleft", "wipe
 /** The planner writes a few thousand tokens on the same model the household is using; the Stack client's 30 s default is too short when that model is busy. */
 const PLAN_TIMEOUT_MS = 240_000;
 const SHOT_FLOOR = 3, SHOT_CEILING = 10;
-const filmPlanShotShape = {
+const filmPlanShotBase = {
   framing: z.string().min(1),
   still: z.string().min(1).max(600),
   motion: z.string().min(1).max(400),
@@ -26,8 +26,15 @@ const filmPlanShotShape = {
   line: z.string().max(160).optional(),
   transition: z.enum(transitionKinds).optional(),
 };
+/** FILM-LINES-01: one spoken line of a shot with its speaker: the exact name of a `character` cast entry, or "Narration". */
+export const filmShotLineSchema = z.object({ speaker: z.string().min(1).max(80), text: z.string().min(1).max(160) });
+export type FilmShotLine = z.infer<typeof filmShotLineSchema>;
+export const MAX_LINES_PER_SHOT = 3;
+/** A character film's shot: `line` (one line, the film's speaker) OR `lines` (an exchange, at most 3, each with its speaker), never both. Read through `shotLines` (./lines) only. */
+const filmPlanShotShape = { ...filmPlanShotBase, lines: z.array(filmShotLineSchema).min(1).max(MAX_LINES_PER_SHOT).optional() };
 export const filmPlanShotSchema = productionShotSchema.extend(filmPlanShotShape);
 
+export const NARRATION = "Narration";
 const filmPlanShape = {
   title: z.string().min(1).max(80),
   summary: z.string().min(1).max(400),
@@ -64,12 +71,20 @@ export const filmShotRepairSchema = z.object({
 });
 export type FilmShotRepair = z.infer<typeof filmShotRepairSchema>;
 const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional(), repair: filmShotRepairSchema.optional() });
-export const filmPlanSchema = z.object({ ...filmPlanShape, shots: z.array(storedFilmShotSchema).min(2).max(12), cast: filmPlanShape.cast.min(1) });
+export const filmPlanSchema = z.object({ ...filmPlanShape, shots: z.array(storedFilmShotSchema).min(2).max(12), cast: filmPlanShape.cast.min(1) }).superRefine((plan, ctx) => {
+  // FILM-LINES-01: no cast entry may be named "Narration" (it is the one name a line may use for a voice that is no character); a shot has `line` or `lines`, never both; a speaker is a character's exact name or Narration.
+  const characters = new Set(plan.cast.filter((member) => member.kind === "character").map((member) => member.name));
+  plan.cast.forEach((member, index) => { if (member.name === NARRATION) ctx.addIssue({ code: "custom", path: ["cast", index, "name"], message: `A cast entry cannot be named ${NARRATION}.` }); });
+  plan.shots.forEach((shot, index) => {
+    if (shot.line !== undefined && shot.lines !== undefined) ctx.addIssue({ code: "custom", path: ["shots", index], message: "A shot has line or lines, never both." });
+    shot.lines?.forEach((entry, at) => { if (entry.speaker !== NARRATION && !characters.has(entry.speaker)) ctx.addIssue({ code: "custom", path: ["shots", index, "lines", at, "speaker"], message: `A speaker is the exact name of a character in the cast, or ${NARRATION}.` }); });
+  });
+});
 export const facelessFilmPlanSchema = z.object({
   ...filmPlanShape,
   cast: filmPlanShape.cast.min(0),
   shots: z.array(productionShotSchema.extend({
-    ...filmPlanShotShape,
+    ...filmPlanShotBase,
     line: z.string().max(300).regex(/^(?:\S+\s+){11,34}\S+$/, "Narration must contain 12 to 35 words."),
     seconds: z.number().int().min(4).max(10),
     motion: z.enum(["zoom in", "zoom out", "pan left", "pan right"]),
@@ -107,7 +122,7 @@ Every cast entry has exactly four fields: name, kind, locked and reveal_last (tr
 Cast hints that read "Name (use; photograph or illustration): look" describe pictures the person attached. Give each one a cast entry with exactly that Name, its look as the locked description, and the kind that fits (actor: character; product, prop: prop; set and closing wide shot: place). Use every one: an actor plays the part, a product is shown clearly and is what the film is about, a set is where scenes happen, and a closing wide shot picture is the last shot, pulling back to reveal it. Write the picture's Name first in the still text of the shots it is the subject of. A shot that shows the actor with the product at a place (for example the actor holding the product outside the building) names the actor, the product and the place in that shot's still text and says what the actor does with it. When a hint says photograph, the whole film is photorealistic: write "photorealistic, shot on a cinema camera, natural light" in every shot's still and motion text and in every locked description, and never write cartoon, illustration, flat or stylized for it. Only a hint that says illustration, or an art style the person asked for, may be drawn.
 A real person's name is just a name in the prompt.
 Put spoken lines in quotes, let one person speak at a time, and keep each line under 12 words.
-At most one character speaks per shot.
+In a film with one character, at most that character speaks in a shot (use line). In a film with two or more characters a shot may hold a short exchange instead: lines, at most 3 entries of speaker (a character's exact name, or Narration) and text, each under 12 words, one person at a time. A shot has line or lines, never both. Never name a cast entry Narration.
 Make each shot 5 to 7 seconds.
 If the person gave no shot number, plan 4 to 8 shots.
 Return every required field in the JSON schema, with 2 to 12 shots overall. Give each shot a unique id and subject_ids as an empty array when no saved subject ids were supplied.`;
@@ -177,6 +192,7 @@ export function holdBackReveals(plan: FilmPlan, idea = ""): FilmPlan {
       still: strip(shot.still) || `${shot.framing} of the scene`,
       motion: strip(shot.motion) || "slow push in",
       ...(shot.line ? { line: strip(shot.line).slice(0, 160) || undefined } : {}),
+      ...(shot.lines ? (() => { const kept = shot.lines.map((entry) => ({ ...entry, text: strip(entry.text).slice(0, 160) })).filter((entry) => entry.text !== ""); return { lines: kept.length ? kept : undefined }; })() : {}),
     }),
   };
 }
@@ -325,11 +341,27 @@ function durationError(plan: FilmPlan, input: PlanFilmInput): string | undefined
   return description;
 }
 
+/** FILM-LINES-01: what the model wrote is made to fit the rules before the schema judges it, so a small slip never costs a whole plan: both `line` and `lines` keep `lines`; a film with fewer than
+ *  two characters has no exchanges (one line by its one speaker becomes `line`, the rest is dropped); an entry whose speaker is not a character or Narration is dropped; more than 3 entries keep the first 3. */
+function normalizeShotLines(value: Record<string, unknown>): void {
+  const cast = Array.isArray(value.cast) ? (value.cast as Array<Record<string, unknown>>) : [];
+  const characters = cast.filter((member) => member.kind === "character").map((member) => String(member.name));
+  const shots = Array.isArray(value.shots) ? (value.shots as Array<Record<string, unknown>>) : [];
+  for (const shot of shots) {
+    if (!("lines" in shot)) continue;
+    const entries = (Array.isArray(shot.lines) ? shot.lines : []).filter((entry): entry is { speaker: string; text: string } => !!entry && typeof (entry as { speaker?: unknown }).speaker === "string" && typeof (entry as { text?: unknown }).text === "string" && (entry as { text: string }).text.trim() !== "" && ((entry as { speaker: string }).speaker === NARRATION || characters.includes((entry as { speaker: string }).speaker))).slice(0, MAX_LINES_PER_SHOT);
+    delete shot.lines;
+    if (characters.length >= 2) { if (entries.length) { shot.lines = entries.map((entry) => ({ speaker: entry.speaker, text: entry.text.trim().slice(0, 160) })); delete shot.line; } }
+    else if (entries.length && !shot.line) shot.line = entries[0]!.text.trim().slice(0, 160);
+  }
+}
+
 function safeParsePlan(text: string, schema: typeof filmPlanSchema | typeof facelessFilmPlanSchema) {
   try {
     const value = JSON.parse(text) as Record<string, unknown>;
     if (typeof value.format === "string" && !getReelFormat(value.format)) delete value.format;
     if (typeof value.preset === "string" && !getReelPreset(value.preset)) delete value.preset;
+    if (schema === filmPlanSchema) normalizeShotLines(value);
     return schema.safeParse(value);
   }
   catch { return schema.safeParse(undefined); }

@@ -37,10 +37,10 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       let current=getFilmRun(actor,run.id); if(!current) return;
       let plan=current.plan;
       if(mode==="plan" || !plan) {
-        const planned=await planFilm(planInput ?? {idea:current.idea,faceless:current.faceless});
+        const made=await planFilm(planInput ?? {idea:current.idea,faceless:current.faceless});
         if(controller.signal.aborted) return;
-        if(!planned.ok){updateFilmRun(actor,run.id,{state:"failed",error_line:planned.line});return;}
-        plan=planned.plan;
+        if(!made.ok){updateFilmRun(actor,run.id,{state:"failed",error_line:made.line});return;}
+        plan=made.plan;
         // CREATOR-05: the members the person cast carry their subject into the run (by the ids `resolveCast` checked, not by name).
         if(castSubjectIds?.length) plan=bindCastSubjects(plan,castSubjectIds.flatMap(id=>{const subject=subjectViewById(id); return subject?[{id,name:subject.name}]:[];}));
         const ownSong=ownMusic.get(run.id);

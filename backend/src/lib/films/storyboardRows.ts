@@ -6,6 +6,7 @@ import { getMediaProduction } from "@/lib/mediaProductions";
 import { allowed } from "./background";
 import { pageFilmRun } from "./pageFilm";
 import type { FilmRun } from "./store";
+import { shotLines } from "./lines";
 import type { PersonRow } from "@/types";
 
 export type StoryboardRow = ReturnType<typeof roughCutShotRows>[number];
@@ -18,12 +19,6 @@ function captionOf(index: number, framing: string | undefined, motion: string): 
   return `${index + 1}${frame || words ? ` · ${frame || words}` : ""}`;
 }
 
-/** The speaker of a line is the film's one cast character when there is exactly one; otherwise the line is narration. Never an invented name. */
-function speakerOf(run: FilmRun): string {
-  const characters = (run.plan?.cast ?? []).filter((entry) => entry.kind === "character");
-  return characters.length === 1 ? characters[0]!.name : "Narration";
-}
-
 /** The silent animatic: each planned shot's picture held for its seconds, its line as words. A shot with no picture yet is `no_picture`. */
 export function storyboardRows(person: PersonRow, id?: string): StoryboardRow[] {
   if (!allowed(person)) return [];
@@ -31,12 +26,13 @@ export function storyboardRows(person: PersonRow, id?: string): StoryboardRow[] 
   if (!run?.plan) return [];
   const production = run.production_id ? getMediaProduction(person, run.production_id) : null;
   const stored = production?.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots)) ?? [];
-  const speaker = speakerOf(run);
   return run.plan.shots.filter((shot) => shot.kept !== false).map((planned, index) => {
     const still = thumb(stored.find((shot) => shot.id === planned.id)?.picture_file_id);
+    const first = shotLines(run.plan!, planned)[0];
     return {
       shot_id: planned.id, caption: captionOf(index, (planned as { framing?: string }).framing, planned.motion), duration_sec: planned.seconds, still, clip: null, status: still ? "ready" : "no_picture",
-      line_speaker: planned.line ? speaker : null, line_text: planned.line ?? null, line_start_sec: planned.line ? 0 : null, line_audio: null, line_wave: null,
+      // FILM-LINES-01: a row shows the shot's FIRST line (the row has one line field until the kit row grows a list); the film itself keeps every line.
+      line_speaker: first?.speaker ?? null, line_text: first?.text ?? null, line_start_sec: first ? 0 : null, line_audio: null, line_wave: null,
     };
   });
 }

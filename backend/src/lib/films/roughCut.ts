@@ -43,16 +43,17 @@ export interface RoughCutRequest {
 }
 /** `withheld`: shots whose line the text gate refused. That line is neither spoken nor shown as a caption. */
 export interface VoicedScript { lines: NonNullable<RoughCutRequest["lines"]>; voices: NonNullable<RoughCutRequest["voices"]>; withheld?: string[] }
-export function roughCutRequest(shots: PlanShot[], pictures: string[], voiced?: VoicedScript): RoughCutRequest {
+export function roughCutRequest(plan: Pick<FilmPlan, "shots" | "cast">, pictures: string[], voiced?: VoicedScript): RoughCutRequest {
+  const shots: PlanShot[] = plan.shots;
   const spoken = new Set([...(voiced?.lines ?? []).map((entry) => entry.shot_id), ...(voiced?.withheld ?? [])]);
   return { audience: "adult", shots: shots.map((shot, index) => {
     // A shot whose line is spoken is captioned by the Stack from the line itself; every other shot shows its line (if any) as words, as the silent animatic always did.
-    const caption = spoken.has(shot.id) ? undefined : shot.line?.trim().slice(0, 200);
+    const caption = spoken.has(shot.id) ? undefined : shotText(plan, shot).slice(0, 200);
     return { id: shot.id, picture: pictures[index]!, seconds: shot.seconds, ...(shot.motion ? { motion: shot.motion } : {}), ...(caption ? { caption } : {}) };
   }), ...(voiced && voiced.lines.length > 0 ? { lines: voiced.lines, voices: voiced.voices } : {}) };
 }
 /** The silent animatic's request. */
-export const animaticRequest = (shots: PlanShot[], pictures: string[]): RoughCutRequest => roughCutRequest(shots, pictures);
+export const animaticRequest = (plan: Pick<FilmPlan, "shots" | "cast">, pictures: string[]): RoughCutRequest => roughCutRequest(plan, pictures);
 export type AnimaticRequest = RoughCutRequest;
 
 export const ANIMATIC_OLD_STACK_LINE = "The storyboard could not be made. The AI engine does not have the storyboard step yet. Update it, then try again.";
@@ -153,6 +154,7 @@ export function assumedMinor(entry: Pick<CastEntry, "minor" | "real" | "person_i
 
 export { speakerOfPlan } from "./speaker";
 import { speakerOfPlan } from "./speaker";
+import { shotLines, shotText } from "./lines";
 
 const asAddress = (voice: string | null | undefined): string | undefined => (voice && voice !== VOICE_ENGINE_DEFAULT && isPresetVoice(voice) ? voicePresetName(voice) ?? voice : undefined);
 
@@ -162,8 +164,10 @@ export async function voicedScript(actor: PersonRow, plan: FilmPlan): Promise<{ 
   const withheld: string[] = [];
   const lines: VoicedScript["lines"] = [];
   for (const shot of plan.shots.filter((entry) => (entry as { kept?: boolean }).kept !== false)) {
-    const text = shot.line?.trim();
-    if (!text) continue;
+    // FILM-LINES-01 slice 1: the voiced preview speaks a shot with ONE line by the film's one speaker (as before); an exchange or another speaker waits for the Stack's several-lines-per-shot half and is shown as words.
+    const said = shotLines(plan, shot);
+    if (said.length !== 1 || said[0]!.speaker !== name) continue;
+    const text = said[0]!.text;
     if (refuseVideoPrompt(text, { lane: "adult" })) { withheld.push(shot.id); continue; }
     lines.push({ shot_id: shot.id, line: { speaker: name, text: text.slice(0, 300) } });
   }
@@ -222,7 +226,7 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   const staged = await stageFilesForStack(files);
   if (!staged) return { ok: false, line: ANIMATIC_FAILED_LINE };
   let made: Awaited<ReturnType<typeof runRoughCutJob>>;
-  try { made = await runRoughCutJob(roughCutRequest(plan.shots, staged.paths, script), signal, input.deps ?? realJobDeps(fullViewForJob("adult", actor))); } finally { staged.cleanup(); }
+  try { made = await runRoughCutJob(roughCutRequest(plan, staged.paths, script), signal, input.deps ?? realJobDeps(fullViewForJob("adult", actor))); } finally { staged.cleanup(); }
   if (!made.ok) return { ok: false, line: made.line };
   const result = made.result as StackRoughCutResultRead;
   console.log("[film-rough-cut] %s: %d shots, %d lines, %d ms", kind, plan.shots.length, result.lines?.length ?? 0, made.ms);
@@ -265,13 +269,13 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
 }
 
 /** A short fingerprint of what a voiced preview was made from (each kept shot's id, length, motion and line): a preview made from other words is stale. */
-export function planFingerprint(plan: Pick<FilmPlan, "shots">): string {
-  const text = plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false).map((shot) => [shot.id, shot.seconds, shot.motion, shot.line?.trim() ?? ""].join("|")).join("\n");
+export function planFingerprint(plan: Pick<FilmPlan, "shots" | "cast">): string {
+  const text = plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false).map((shot) => [shot.id, shot.seconds, shot.motion, shotText(plan, shot)].join("|")).join("\n");
   return new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 16);
 }
 
 /** The newest stored voiced preview of a production: its file and the result Home kept (shots, and each line's own audio address and wave). Null when there is none. */
-export function latestVoicedPreview(actor: PersonRow, productionId: string, plan?: Pick<FilmPlan, "shots">): { fileId: string; result: { total_s: number; shots: Array<{ id: string; start_s: number; end_s: number }>; lines: Array<{ shot_id: string; speaker: string; start_s: number; length_s: number; audio: string; wave?: number[] }> } } | null {
+export function latestVoicedPreview(actor: PersonRow, productionId: string, plan?: Pick<FilmPlan, "shots" | "cast">): { fileId: string; result: { total_s: number; shots: Array<{ id: string; start_s: number; end_s: number }>; lines: Array<{ shot_id: string; speaker: string; start_s: number; length_s: number; audio: string; wave?: number[] }> } } | null {
   const rows = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), like(attachments.provenance, 'video-edit:%"kind":"film-rough-cut"%'))).orderBy(desc(attachments.createdAt)).all();
   for (const row of rows) {
     try {

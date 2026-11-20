@@ -631,9 +631,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
 | `backend/src/lib/films/filmProgress.ts` | shotProgressRow, pageShotRow, filmProgressPageRows, filmProgressRows |
 | `backend/src/lib/films/junkCleanup.ts` | JUNK, deriveJunkRegion, JUNK_PROMPT, cleanJunk |
+| `backend/src/lib/films/lines.ts` | shotLines, shotText |
 | `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmRepairRows |
 | `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
-| `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmShotRepairSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT |
+| `backend/src/lib/films/plan.ts` | filmShotLineSchema, MAX_LINES_PER_SHOT, filmPlanShotSchema, NARRATION, filmShotRepairSchema, filmPlanSchema |
 | `backend/src/lib/films/progressStore.ts` | parseProgress, readProgress, recordShotNote, recordShotJob, recordShotFailure, filmShotJobIds |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
