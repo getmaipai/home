@@ -25,7 +25,7 @@ import { stackAudienceFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, t
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { promptCheck } from "@/lib/pictures/promptDoor";
 import { rewriteForChild } from "@/lib/pictures/childRewrite";
-import { videoEngineStatus, videoNotReadyReason, videoStatusReady } from "./ready";
+import { NO_PICTURE_START_LINE, videoEngineStatus, videoNotReadyReason, videoStatusReady } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
 import { householdVideoQuality } from "./policy";
 import { DETAILED_MAX_SECONDS, H3_MODEL, LTX25_MAX_MODEL, LTX25_MODEL, chooseVideoQuality, h3EndPictureReady, ltx25MaxReady, ltx25VideoReady, ltx25EndPictureReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, videoSizeFor } from "./quality";
@@ -274,8 +274,14 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const asksMax = tierAsked.tier === "max" && maxReady;
   const ltx25Route = ltx25Styles && (asksMax ? ltx25LorasSupported(engine, LTX25_MAX_MODEL) : ltx25LorasSupported(engine, LTX25_MODEL) && ltx25VideoReady(engine));
   if (ltx25Styles && !asksMax && ltx25VideoReady(engine) && !ltx25LorasSupported(engine, LTX25_MODEL)) return styleRefusal(callId, args, LORAS_UNSUPPORTED_LINE, "loras_unsupported");
-  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
-  if (!choice) return styleRefusal(callId, args, videoNotReadyReason(engine, true), "not_ready");
+  const pickFor = (hasPicture: boolean) => chooseVideoQuality({ requested: isVideoQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "video", args.quality, audience.band) : tierAsked.quality && allowedQuality(state.actor as PersonRow, "video", tierAsked.quality, audience.band), household: allowedQuality(state.actor as PersonRow, "video", householdVideoQuality(), audience.band), style: ltx25Route ? null : adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture, quickOnly: lane !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick", adultLane: lane === "adult", max: tierAsked.tier === "max" && maxReady });
+  const choice = pickFor(image !== undefined);
+  if (!choice) {
+    // VF-WORDS-01: no choice WITH the picture but one WITHOUT it means only the picture start is missing, so the person is told that; the Stack's answer alone decides (no model is named or read here).
+    // A child never reaches this line with a picture (the no-photos redirect above answers first), so a rating ceiling is never explained as a missing capability (C8, C10).
+    if (image !== undefined && pickFor(false)) return styleRefusal(callId, args, NO_PICTURE_START_LINE, "no_picture_start");
+    return styleRefusal(callId, args, videoNotReadyReason(engine, true), "not_ready");
+  }
   if (ending || loop) {
     const endMaker = h3EndPictureReady(engine) ? "h3" : maxReady && ltx25MaxReady(engine) && engine?.qualities?.ltx25max?.end_image === true && engine.qualities.ltx25max.image_to_video === true ? "ltx25max" : ltx25VideoReady(engine) && engine?.qualities?.ltx25?.end_image === true && engine.qualities.ltx25.image_to_video === true ? "ltx25" : null;
     if (!endMaker) return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: This computer's video model cannot end on a picture yet." }, data: { refused: "end_frame_unavailable" }, actions: [] } });

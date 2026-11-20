@@ -87,6 +87,8 @@ export function videoMaxNotReadyReason(engine: StackVideoStatus | null): string 
   return "Max is not ready on this computer yet. An admin can check Settings, Models and storage.";
 }
 
+/** VF-WORDS-01: the video model here works from words but cannot start from a picture. */
+export const NO_PICTURE_START_LINE = "The video model on this computer can't start from a picture yet. Describe the video in words and I'll make it from that.";
 const NO_VIDEO_MODEL = "No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.";
 const VIDEO_ENGINE_UNREACHABLE = "Videos are not ready yet. Try again in a few minutes.";
 

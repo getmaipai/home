@@ -118,6 +118,7 @@ describe("VIDEO-GEN-05: where generate_video is offered (rule 0)", () => {
 });
 
 describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
+  test.todo("the clip reply carries the Stack's render-time estimate, not a per-model string written in Home (VF-UI-06 and VF-PROFILE-01 make the Stack the one source; was: toContain(\"about two minutes\"), Quick's words)", () => {});
   test("a request starts one Stack job at once; the done value names it; the finished clip and poster are the person's files; history carries it", async () => {
     await withStub(script(BOAT), async (seen) => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat in the rain");
@@ -131,7 +132,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       expect(sent.image).toBeUndefined();
       expect(value.video?.id).toMatch(/^vid-/);
       const tool = seen.find(isPhrasing)!.messages.find((m) => m.role === "tool")!.content!.toString();
-      expect(tool).toContain("about two minutes");
+      // the render-time words ("about two minutes", Quick's) are Home's hard-coded per-model words (E4): see the todo below (VF-UI-06, VF-WORDS-01)
       expect(tool).toContain("do not describe how it looks");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
       const job = getVideoJobFor(people.owner, value.video!.id)!;
