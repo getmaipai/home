@@ -16,6 +16,7 @@ const chatDeps = { health: async () => { try { return (await fetch("http://127.0
   start: async () => { Bun.spawn(["bash", "-c", `cd ${ROOT} && exec bash scripts/jobs/job.sh run --type server --lifetime 24h --session brisk-panda-voice-lab -- /usr/local/maipai-home/stack/data/engines/llama-server/b10797/llama-server -m /usr/local/maipai-home/stack/data/models/qwen3-8-27b-huihui-abliterated-iq4-xs/Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf --host 127.0.0.1 --port 9921 -c 16384 -fa on -ngl all --reasoning off -ub 1024 --jinja --no-webui --cache-reuse 256 --parallel 1 -ctk q8_0 -ctv q8_0 >> ${W}/lab-logs/llm.log 2>&1`], { stdout: "ignore", stderr: "ignore" }).unref(); },
   warm: async () => { for (let i = 0; i < 2; i++) await fetch("http://127.0.0.1:9921/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Say hi." }], max_tokens: 8, stream: false }), signal: AbortSignal.timeout(120000) }); },
   sleep: (ms: number) => Bun.sleep(ms), nice: ownNice, log };
+if (process.argv.includes("--engine-only")) { const r = await ensureChat(chatDeps); console.log("engine:", r); process.exit(r === "ready" ? 0 : 3); }
 async function startRun() {
   attempts++; aborted = false; log({ event: "start", attempt: attempts });
   const spawnStep = (cmd: string[], file: string) => Bun.spawn(["bun", ...cmd], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/${file}`), stderr: "ignore" });

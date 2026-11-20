@@ -38,7 +38,7 @@ export class VoiceSession {
   private heldChunkEvents: Array<{ t: string; turn: number; chunk: number; text: string }> = []; private heldFinalText = "";
   private chunks: string[] = []; private chunkDurations: number[] = []; private playedMs: number[] = []; private generatedText = ""; private generatedComplete = false;
   private metricsWritten = false; private metrics: TurnMetrics = {}; private heardAudio = false; private echoThreshold = config.echoThreshold;
-  private lastVoiceAt = performance.now(); private speechOrigin = performance.now(); private earlyStart = config.earlyStart;
+  private lastVoiceAt = performance.now(); private speechOrigin = performance.now(); private earlyStart = config.earlyStart; private firstWords = Number(Bun.env.LAB_FIRST_WORDS ?? 0); private stamp = Bun.env.LAB_STAMP !== "0";
   private closed = false;
   private checkControllers = new Map<number, AbortController>();
   private committedSamples: number[] = [];
@@ -156,9 +156,9 @@ export class VoiceSession {
         if (this.draftStartedAt >= 0) this.metrics.draft_head_start_ms = Math.max(0, this.now() - this.draftStartedAt);
         if (this.resumingCommitted) {
           const last = this.history.messages.at(-1);
-          if (last?.role === "user") last.content = datedUser(String(c.transcript));
+          if (last?.role === "user") last.content = datedUser(String(c.transcript), new Date(), this.stamp);
           this.resumingCommitted = false;
-        } else this.history.commitUser(datedUser(String(c.transcript)));
+        } else this.history.commitUser(datedUser(String(c.transcript), new Date(), this.stamp));
         this.committedSamples = this.samples.slice(); this.committedSegments = this.transcriptSegments.slice(); this.committedAt = this.now(); this.samples = [];
         if (this.held) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.draftInterrupted = false; this.send({ t: "final", text: String(c.transcript), turn: this.turn }); this.held = false; for (const event of this.heldChunkEvents) this.send(event); this.heldChunkEvents = []; for (const f of this.heldFrames) this.ws.send(f); this.heldFrames = []; if (this.generatedComplete && this.heldFinalText) { this.history.commitAssistant(this.heldFinalText); this.send({ t: "reply_final", text: this.heldFinalText, turn: this.turn }); this.heldFinalText = ""; activeSince.delete(this); } }
         else { void this.reply(String(c.transcript), true); this.send({ t: "final", text: String(c.transcript), turn: this.turn }); }
@@ -229,10 +229,10 @@ export class VoiceSession {
     if (!text.trim()) return;
     if (!Object.keys(this.metrics).length || this.metricsWritten) { this.metrics = { failure: "none", draft: "off", ok: false }; this.metricsWritten = false; }
     this.abort = new AbortController(); const signal = this.abort.signal; this.smileChunk = -1; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
-    const requestMessages: any[] = committed ? [...this.history.messages] : [...this.history.messages, { role: "user", content: datedUser(text) }];
+    const requestMessages: any[] = committed ? [...this.history.messages] : [...this.history.messages, { role: "user", content: datedUser(text, new Date(), this.stamp) }];
     this.draftMessages = []; this.draftInterrupted = false;
     this.replyStyle = ""; this.warming?.abort(); this.warming = null;
-    const chunker = new Chunker(), tagger = new TagStream(); let full = "", rounds = 0, toolTextLength = 0, headerGate: Promise<void> = Promise.resolve(), sendQueue: Promise<void> = Promise.resolve();
+    const chunker = new Chunker(this.firstWords), tagger = new TagStream(); let full = "", rounds = 0, toolTextLength = 0, headerGate: Promise<void> = Promise.resolve(), sendQueue: Promise<void> = Promise.resolve();
     const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_phrase_ready === undefined) this.metrics.t_first_phrase_ready = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); const mood = requestedStyle && !this.injected ? await moodVoice(this.voice, requestedStyle, voiceSettings(this.voice).moodStrength) : this.voice; if (mood !== this.voice) return { voice: mood, style: "" }; return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
     const speakText = async (delta: string) => { full += delta; this.generatedText = full; const clean = tagger.push(delta); for (const piece of chunker.push(clean)) schedule(piece); };
     try {
@@ -397,6 +397,8 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
+        if (typeof j.values?.stamp === "boolean") this.stamp = j.values.stamp;
+        if (Number.isFinite(j.values?.firstWords)) this.firstWords = Math.max(0, Math.min(8, Math.floor(j.values.firstWords)));
         if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
         if (typeof j.values?.echoReference === "boolean") this.echoRef = j.values.echoReference;
         if (typeof j.values?.streamingDraft === "boolean") this.streamEnabled = j.values.streamingDraft;
