@@ -13,10 +13,7 @@ import { generateDiagnostics } from "@/lib/diagnostics";
 import { clearPackageCache, getCacheSourceStats, getCacheStats, OTHER_CACHE_SOURCE } from "@/lib/packageCache";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { loadManifestOnly } from "@/lib/plugins";
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { repoRoot } from "@/lib/paths";
 // Renamed from the bare `File` export, same reason attachments.ts's own
 // toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
 // zod object under that name would shadow it.
@@ -25,17 +22,23 @@ import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 export const storageRoutes = apiRouter();
 
 const CleanupItemSchema = z.object({ id: z.string(), kind: z.enum(["superseded", "orphan_folder", "partial_download", "package_cache", "previews", "rollback_copies"]), label: z.string(), bytes: z.number().nonnegative(), reversible: z.boolean(), how: z.string(), blocked: z.string().nullable() });
-const rollbackHelper = () => process.env.MAIPAI_ROLLBACK_HELPER ?? "/usr/local/libexec/maipai-prune-rollbacks";
-function runRollbackHelper(args: string[], timeout: number) {
+const underTest = () => process.env.NODE_ENV === "test" && !!process.env.MAIPAI_ROLLBACK_HELPER;
+const rollbackHelper = () => (underTest() ? process.env.MAIPAI_ROLLBACK_HELPER! : "/usr/local/libexec/maipai-prune-rollbacks");
+/** Runs the root helper without blocking the event loop (the list walks about 13 GB). sudo drops the environment, so the helper uses its own fixed install root. */
+async function runRollbackHelper(args: string[], timeoutMs: number): Promise<{ status: number; stdout: string }> {
   const helper = rollbackHelper();
-  const installRoot = resolve(process.env.MAIPAI_INSTALL_ROOT ?? repoRoot);
-  return process.env.MAIPAI_ROLLBACK_HELPER
-    ? spawnSync(helper, args, { encoding: "utf8", timeout, env: { ...process.env, MAIPAI_INSTALL_ROOT: installRoot } })
-    : spawnSync("sudo", ["-n", helper, ...args], { encoding: "utf8", timeout, env: { ...process.env, MAIPAI_INSTALL_ROOT: installRoot } });
+  const command = underTest() ? [helper, ...args] : ["sudo", "-n", helper, ...args];
+  const env = underTest() ? { ...process.env, MAIPAI_PRUNE_TEST_ROOT: process.env.MAIPAI_INSTALL_ROOT ?? "" } : process.env;
+  const child = Bun.spawn(command, { stdout: "pipe", stderr: "ignore", env });
+  const timer = setTimeout(() => child.kill(), timeoutMs);
+  try {
+    const stdout = await new Response(child.stdout).text();
+    return { status: await child.exited, stdout };
+  } finally { clearTimeout(timer); }
 }
-function rollbackCopies(): Array<{ name: string; bytes: number }> {
+async function rollbackCopies(): Promise<Array<{ name: string; bytes: number }>> {
   if (!existsSync(rollbackHelper())) return [];
-  const result = runRollbackHelper(["list"], 8_000);
+  const result = await runRollbackHelper(["list"], 8_000);
   if (result.status !== 0) return [];
   return result.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => {
     const [name, bytesText, extra] = line.split("\t");
@@ -53,7 +56,7 @@ async function cleanupItems() {
   if (cacheBytes) rows.push({ id: "package_cache", kind: "package_cache", label: "Package cache", bytes: cacheBytes, reversible: true, how: "Saved copies fetched by packages; they can be fetched again.", blocked: null });
   const previews = previewStats();
   if (previews.bytes) rows.push({ id: "previews", kind: "previews", label: "Previews", bytes: previews.bytes, reversible: true, how: "Previews rebuild when viewed again.", blocked: null });
-  const rollbacks = rollbackCopies();
+  const rollbacks = await rollbackCopies();
   if (rollbacks.length > 2) rows.push({ id: "rollback-copies", kind: "rollback_copies", label: "Old update backups", bytes: rollbacks.slice(0, -2).reduce((sum, item) => sum + item.bytes, 0), reversible: true, how: `${rollbacks.length - 2} old update backups can be removed.`, blocked: null });
   return rows;
 }
@@ -81,10 +84,10 @@ storageRoutes.openapi(cleanupRunRoute, async (c) => {
   if (chosen.some((item) => item.id === "package_cache")) freed += clearPackageCache().bytes;
   if (chosen.some((item) => item.id === "previews")) freed += clearPreviews().bytes;
   if (chosen.some((item) => item.id === "rollback-copies")) {
-    const copies = rollbackCopies();
+    const copies = await rollbackCopies();
     const clearable = copies.slice(0, -2);
     if (clearable.length) {
-      const result = runRollbackHelper(["prune", ...clearable.map((item) => item.name)], 30_000);
+      const result = await runRollbackHelper(["prune", ...clearable.map((item) => item.name)], 30_000);
       if (result.status !== 0) return c.json({ error: "Could not clear old update backups." }, 500);
       freed += clearable.reduce((sum, item) => sum + item.bytes, 0);
     }

@@ -11,7 +11,7 @@ const fakeId = join(bin, "id");
 writeFileSync(fakeId, "#!/bin/sh\necho 0\n");
 chmodSync(fakeId, 0o755);
 afterAll(() => rmSync(root, { recursive: true, force: true }));
-function run(...args: string[]) { return Bun.spawnSync(["bash", helper, ...args], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, MAIPAI_INSTALL_ROOT: root } }); }
+function run(...args: string[]) { return Bun.spawnSync(["bash", helper, ...args], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, MAIPAI_PRUNE_TEST_ROOT: root } }); }
 
 describe("rollback pruning helper", () => {
   test("lists names and byte sizes", () => {

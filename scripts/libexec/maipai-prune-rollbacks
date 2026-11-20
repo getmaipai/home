@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="${MAIPAI_INSTALL_ROOT:-/usr/local/maipai-home}"
+# The install root is fixed; only the tests may point it elsewhere, through a name nothing else sets.
+ROOT="${MAIPAI_PRUNE_TEST_ROOT:-/usr/local/maipai-home}"
 fail() { echo "maipai-prune-rollbacks: $1" >&2; exit "${2:-1}"; }
 [[ "$(id -u)" == 0 ]] || fail "run it with sudo." 77
 [[ $# -ge 1 ]] || fail "usage: maipai-prune-rollbacks list | prune <name>..." 64
