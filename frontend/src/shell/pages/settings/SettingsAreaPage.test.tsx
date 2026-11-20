@@ -211,7 +211,8 @@ describe("the settings route", () => {
 
   test("Advanced checks and Developer draw the spec cards on their tabs", async () => {
     const checks = open(makePerson("owner"), "/settings/advanced?tab=checks");
-    expect(await checks.findByText("Is the internet reachable")).toBeTruthy();
+    // Spec 0.1.415 renamed the card (it was "Is the internet reachable").
+    expect(await checks.findByText("Check whether the internet is reachable")).toBeTruthy();
     cleanup();
     fixture?.restore();
     fixture = null;
@@ -299,7 +300,8 @@ describe("the settings route", () => {
   test("Backups area renders storage and all standalone management links", async () => {
     const view = open(makePerson("owner"), "/settings/backups?tab=storage");
     await waitFor(() => expect(where(view)).toBe("/settings/backups?tab=storage"));
-    expect(await view.findByText("Storage for the whole home")).toBeTruthy();
+    // Spec 0.1.415 renamed the storage section heading (it was "Storage for the whole home"); the section is now "Limits".
+    expect(await view.findByRole("heading", { name: "Limits" })).toBeTruthy();
     for (const label of ["Backups", "Storage"]) expect(view.getByRole("link", { name: label })).toBeTruthy();
     cleanup();
     fixture?.restore();
