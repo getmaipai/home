@@ -8,7 +8,7 @@ export const metricNames = new Set([
   "t_stop_sent", "t_tool_start", "t_tool_end", "t_first_audio_after_tool",
   "draft_head_start_ms", "duration_ms", "chunks", "tool_rounds", "rtt_ms",
   "underruns", "output_latency_ms", "prompt_tokens", "cached_tokens",
-  "t_llm_request", "t_local_stop", "prompt_tokens_read", "prompt_tokens_reused", "prompt_ms", "llm_wait_ms", "voice_wait_ms", "load1",
+  "t_llm_request", "t_local_stop", "prompt_tokens_read", "prompt_tokens_reused", "prompt_ms", "llm_wait_ms", "voice_wait_ms", "load1", "gpu_util", "gpu_other_jobs",
   "dropped_late_frames", "page_underruns", "page_gate_ms", "page_audio_s", "page_voice_speed", "stream_draft", "sounds",
   "ok", "failure", "draft", "early_start", "commit_reason", "backchannel",
 ]);

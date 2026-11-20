@@ -5,6 +5,7 @@ import { History } from "./history";
 import { buildPrompt, datedUser } from "./prompt";
 import { encodeWav, StreamingWavReader } from "./wav";
 import { loadavg } from "node:os";
+import { sampleGpu } from "./gpuLoad";
 import { chat, lastChatTimings, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
@@ -230,7 +231,7 @@ export class VoiceSession {
     try {
       while (rounds <= 2) {
         let toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
-        if (rounds === 0) { this.metrics.t_llm_request = this.metricNow(); this.metrics.load1 = Math.round(loadavg()[0]! * 10) / 10; }
+        if (rounds === 0) { this.metrics.t_llm_request = this.metricNow(); void sampleGpu().then((g) => { this.metrics.gpu_util = g.util; if (g.jobs) this.metrics.gpu_other_jobs = g.jobs; }); this.metrics.load1 = Math.round(loadavg()[0]! * 10) / 10; }
         for await (const event of this.chatFn(requestMessages, signal, undefined, toolDefinitions, rounds === 0 ? "auto" : "none")) {
           if (signal.aborted || this.closed) break;
           if (!this.metrics.t_llm_first_token) this.metrics.t_llm_first_token = this.metricNow();
