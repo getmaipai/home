@@ -1382,7 +1382,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/clipNotice.ts` | CLIP_READY_TYPE, notifyClipReady |
 | `backend/src/lib/videos/createStyles.ts` | styleTiersOf, styleDisabledLine, styleNote, styleChips |
 | `backend/src/lib/videos/deriveStart.ts` | START_PICTURE_WITHHELD_LINE, START_PICTURE_FAILED_LINE, __setDerivePollMsForTests, isNeedsStartPicture, deriveStartPicture |
-| `backend/src/lib/videos/doorClip.ts` | legacyDoorForced, OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitVideoViaDoor |
+| `backend/src/lib/videos/doorClip.ts` | legacyDoorForced, OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitVideoViaDoor, submitEditViaDoor |
 | `backend/src/lib/videos/editGate.ts` | EDIT_MINOR_LINE, editRefusal, editableClip, clipFileOf, clipMarkNow, clipMarkOf |
 | `backend/src/lib/videos/editPlan.ts` | VIDEO_RESTYLES, restyleBody, MIX_LEVEL_IDS, MIX_LEVELS, DEFAULT_VOICE_LEVEL, DEFAULT_MUSIC_LEVEL |
 | `backend/src/lib/videos/editTool.ts` | EDIT_VIDEO_TOOL_ID, editVideoArgs, NO_CLIP_LINE, WHAT_TO_CHANGE_LINE, NO_STYLE_LINE, NO_PICTURE_LINE |
