@@ -52,7 +52,7 @@ import { renewTailscaleCert } from "@/lib/tailscale";
 import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { trigger, deliverHeldNotifications } from "@/lib/notifications";
-import { checkDiskFull } from "@/lib/storage";
+import { checkDiskFull, checkMissingModelFiles } from "@/lib/storage";
 import { reconcileFileStore } from "@/lib/storage/usage";
 import { reclaimQueuedBlobs } from "@/lib/fileBlobs";
 import { syncAllFileReferences } from "@/lib/fileContent";
@@ -405,6 +405,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "storage.check_disk_full": async () => {
     await checkDiskFull();
+    await checkMissingModelFiles();
   },
   // STORE-CAP-01: bytes on disk with no File record, or a record with no
   // bytes - reported as a health item, never purged (lib/storage/usage.ts's

@@ -21,6 +21,7 @@ import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settin
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { diskSpace } from "@maipai/core/src/hardware";
 import { diskLevel, type DiskLevel, type DiskLevelOverrides } from "@maipai/spec/stack/ts/disk-levels.js";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 
 /** Recursive directory walk, calling `onFile` with every regular file's
  * full path - shared by dirSizeBytes() below and lib/storage/usage.ts's
@@ -173,6 +174,16 @@ export function diskIsLow(): boolean {
   return levelOfDisk(diskUsage()) === "critical";
 }
 
+export async function stackDiskReading() {
+  if (!isStackConfigured()) return null;
+  try { return await getStackClient().disk?.() ?? null; } catch { return null; }
+}
+export async function diskIsCritical(): Promise<boolean> {
+  const local = diskIsLow();
+  const stack = await stackDiskReading();
+  return local || stack?.level === "critical";
+}
+
 const ISSUE_SOURCE = "storage";
 const ISSUE_KEY = "disk_full";
 const FIX_LINK = "/settings/models";
@@ -183,7 +194,11 @@ const FIX_LINK = "/settings/models";
 export async function checkDiskFull(read: () => DiskUsage = diskUsage): Promise<void> {
   let disk = read();
   let level = levelOfDisk(disk, lastLevel);
+  const stack = await stackDiskReading();
+  const worseLevel = (home: DiskLevel): DiskLevel => stack?.level === "critical" || (stack?.level === "warn" && home === "normal") ? stack.level : home;
+  level = worseLevel(level);
   if (level === "critical") { clearPreviews(); disk = read(); level = levelOfDisk(disk, lastLevel); }
+  level = worseLevel(level);
   lastLevel = level;
   if (level === "normal") { resolveIssue(ISSUE_SOURCE, ISSUE_KEY); return; }
   const critical = level === "critical";
@@ -198,4 +213,14 @@ export async function checkDiskFull(read: () => DiskUsage = diskUsage): Promise<
     learnMore: FIX_LINK,
     notifyOnEscalation: true,
   });
+}
+
+/** DISK-GUARD-05: refreshes the one Repairs row from the Stack's selected-file check. */
+export async function checkMissingModelFiles(read: typeof stackDiskReading = stackDiskReading): Promise<void> {
+  const disk = await read();
+  const key = "model_files_missing";
+  if (!disk) return;
+  if (disk.missing.length === 0) { resolveIssue("storage", key); return; }
+  const missing = disk.missing.map((row) => `${row.role} (${row.model})`).join(", ");
+  await raiseIssue({ source: "storage", key, severity: "error", title: "A model the AI needs is missing", detail: `Missing for ${missing}. Install it again in Models and storage.`, learnMore: "/settings/models" });
 }

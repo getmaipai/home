@@ -13,7 +13,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
+import { componentsApi, type CleanupItem, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
 import { downloadProgress } from "@/lib/downloadProgress";
 import { errorLine } from "@/lib/hubReachability";
 
@@ -196,15 +196,39 @@ function LicencePrompt({ refresh, setError, installing }: { refresh: () => void;
 export function ModelsAndStorageSection() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [selectedCleanup, setSelectedCleanup] = useState<string[]>([]);
+  const [cleanupConfirm, setCleanupConfirm] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const cleanupQuery = useQuery({ queryKey: ["storage-cleanup"], queryFn: componentsApi.cleanup, refetchInterval: 30_000 });
   const query = useQuery({
     queryKey: KEY, queryFn: componentsApi.list,
     refetchInterval: (q) => (q.state.data?.components?.some((row) => row.state === "installing") ? 2000 : 30_000),
   });
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: KEY }); };
+  const refreshCleanup = () => { void queryClient.invalidateQueries({ queryKey: ["storage-cleanup"] }); };
+  const chosenCleanup = (cleanupQuery.data ?? []).filter((item) => selectedCleanup.includes(item.id));
+  async function clearSelectedCleanup() {
+    setCleanupConfirm(false); setCleanupBusy(true); setError(null);
+    try { await componentsApi.clearCleanup(selectedCleanup); setSelectedCleanup([]); refreshCleanup(); }
+    catch (e) { setError(messageOf(e, i18n._({ id: "Could not free up space. Try again.", message: "Could not free up space. Try again." }))); }
+    finally { setCleanupBusy(false); }
+  }
   const data = query.data;
   return (
     <section aria-labelledby="models-storage-heading" className="flex flex-col gap-3">
       <h2 id="models-storage-heading" className="text-lg font-semibold">{i18n._({ id: "Models and storage", message: "Models and storage" })}</h2>
+      <section aria-label={i18n._({ id: "Free up space", message: "Free up space" })}>
+        <h3>{i18n._({ id: "Free up space", message: "Free up space" })}</h3>
+        {cleanupQuery.isError ? <Alert variant="destructive"><AlertTitle>{i18n._({ id: "Cleanup list did not load", message: "Cleanup list did not load" })}</AlertTitle><AlertDescription>{messageOf(cleanupQuery.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))}</AlertDescription></Alert> : null}
+        {(cleanupQuery.data?.length ?? 0) > 0 ? <ItemGroup variant="card" aria-label={i18n._({ id: "Items that can free space", message: "Items that can free space" })}>
+          {(cleanupQuery.data ?? []).map((item: CleanupItem) => <Item key={item.id} data-testid={`cleanup-${item.id}`}>
+            <ItemContent><ItemTitle>{item.label}</ItemTitle><ItemDescription clamp={false}>{item.blocked ? i18n._({ id: "Kept: {reason}", message: "Kept: {reason}", values: { reason: item.blocked } }) : `${item.how} ${i18n._({ id: "Frees {size}", message: "Frees {size}", values: { size: sizeWords(item.bytes) } })}`}</ItemDescription></ItemContent>
+            {!item.blocked ? <ItemActions><Button type="button" variant={selectedCleanup.includes(item.id) ? "secondary" : "outline"} disabled={cleanupBusy} aria-pressed={selectedCleanup.includes(item.id)} onClick={() => setSelectedCleanup((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])}>{selectedCleanup.includes(item.id) ? i18n._({ id: "Selected", message: "Selected" }) : i18n._({ id: "Select", message: "Select" })}</Button></ItemActions> : null}
+          </Item>)}
+        </ItemGroup> : cleanupQuery.data ? <p className="text-body text-muted-foreground">{i18n._({ id: "Nothing can be cleared right now.", message: "Nothing can be cleared right now." })}</p> : null}
+        <Button type="button" disabled={!chosenCleanup.length || cleanupBusy} onClick={() => setCleanupConfirm(true)}>{i18n._({ id: "Clear selected", message: "Clear selected" })}</Button>
+        <AlertDialog open={cleanupConfirm} onOpenChange={setCleanupConfirm}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n._({ id: "Clear selected items?", message: "Clear selected items?" })}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "This frees {size}. Models can be installed again, and caches rebuild when needed.", message: "This frees {size}. Models can be installed again, and caches rebuild when needed.", values: { size: sizeWords(chosenCleanup.reduce((sum, item) => sum + item.bytes, 0)) } })}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Keep them", message: "Keep them" })}</AlertDialogCancel><AlertDialogAction onClick={() => void clearSelectedCleanup()}>{i18n._({ id: "Clear selected", message: "Clear selected" })}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      </section>
       {data ? (
         <p className="text-sm text-muted-foreground">{i18n._({ id: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", message: "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer.", values: { sizeWords: sizeWords(data.installed_bytes), value: data.free_disk_bytes !== null ? i18n._({ id: ", {size} free", message: ", {size} free", values: { size: sizeWords(data.free_disk_bytes) } }) : "" } })}</p>
       ) : null}

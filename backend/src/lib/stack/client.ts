@@ -121,6 +121,11 @@ export interface StackTalkFramesBody { job: string; sourceEye?: number; sourceLi
 export type StackTalkFramesReply = { kind: "done"; body: StackTalkFramesBody } | { kind: "running"; job: string };
 /** One finished edit as POST /v1/images/edits states it: a PNG with no metadata. */
 export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number }
+/** DISK-GUARD-03: local mirror of the worktree Stack disk endpoint until this wire shape is pinned in @maipai/spec. */
+export interface StackDiskReading { level: "normal" | "warn" | "critical"; volumes: Array<{ path: string; free_bytes: number; total_bytes: number; level: "normal" | "warn" | "critical"; warn_bytes: number; critical_bytes: number }>; missing: Array<{ role: string; model: string; missing_paths: string[] }> }
+/** DISK-GUARD-04: local mirror of Stack tidy plan/run responses. */
+export interface StackTidyItem { id: string; kind: "superseded" | "orphan_folder" | "partial_download"; bytes: number; reason: string; blocked: string | null }
+export interface StackTidyPlan { reclaimable_bytes: number; items: StackTidyItem[] }
 export type StackImageEditReply = { kind: "done"; job: string; item: StackImageEditItem } | { kind: "running"; job: string };
 
 /** The coding role's four generation paths on the Stack (CODE-STACK-01). */
@@ -137,6 +142,9 @@ export type StackReducedResult =
   | { state: "refused"; reason: string };
 
 export interface StackClient {
+  disk?(opts?: { signal?: AbortSignal }): Promise<StackDiskReading>;
+  tidyPlan?(opts?: { signal?: AbortSignal }): Promise<StackTidyPlan>;
+  tidyRun?(dryRun: boolean, opts?: { signal?: AbortSignal }): Promise<{ dry_run: boolean; removed: StackTidyItem[]; skipped: StackTidyItem[] }>;
   /** POST /v1/audio/speaker-embedding: one local, in-memory voice embedding. */
   speakerEmbedding(form: FormData, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<{ data: { model_id: string; dim: number; embedding: number[] }; identity: EngineIdentity }>;
   getCodingMode(opts?: { signal?: AbortSignal }): Promise<StackCodingMode>;
@@ -418,6 +426,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
   }
 
   return {
+    disk: (opts) => call("/stack/v1/disk", { method: "GET" }, json<StackDiskReading>, opts),
+    tidyPlan: (opts) => call("/stack/v1/components/tidy", { method: "GET" }, json<StackTidyPlan>, opts),
+    tidyRun: (dryRun, opts) => call("/stack/v1/components/tidy", jsonInit({ dry_run: dryRun }), json<{ dry_run: boolean; removed: StackTidyItem[]; skipped: StackTidyItem[] }>, opts),
     speakerEmbedding: (form, opts) => call("/v1/audio/speaker-embedding", formInit(form), rawJson<{ model_id: string; dim: number; embedding: number[] }>, opts),
     async chat(request, opts) {
       const stream = request.stream === true;

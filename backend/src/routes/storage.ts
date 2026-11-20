@@ -10,7 +10,8 @@ import { storageUsageOverview } from "@/lib/storage/usage";
 import { listNasMounts, createNasMount, deleteNasMount } from "@/lib/nasMounts";
 import { stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
-import { clearPackageCache, getCacheSourceStats, OTHER_CACHE_SOURCE } from "@/lib/packageCache";
+import { clearPackageCache, getCacheSourceStats, getCacheStats, OTHER_CACHE_SOURCE } from "@/lib/packageCache";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { loadManifestOnly } from "@/lib/plugins";
 // Renamed from the bare `File` export, same reason attachments.ts's own
 // toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
@@ -18,6 +19,45 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { FileObject as FileRecordSchema } from "@/lib/fileRecordObject";
 
 export const storageRoutes = apiRouter();
+
+const CleanupItemSchema = z.object({ id: z.string(), kind: z.enum(["superseded", "orphan_folder", "partial_download", "package_cache", "previews"]), label: z.string(), bytes: z.number().nonnegative(), reversible: z.boolean(), how: z.string(), blocked: z.string().nullable() });
+async function cleanupItems() {
+  const rows: Array<z.infer<typeof CleanupItemSchema>> = [];
+  if (isStackConfigured()) try {
+    const plan = await getStackClient().tidyPlan?.();
+    for (const item of plan?.items ?? []) rows.push({ id: `tidy:${item.id}`, kind: item.kind, label: item.kind === "superseded" ? `Superseded model: ${item.id}` : item.kind === "orphan_folder" ? `Orphan model folder: ${item.id.split("/").pop()}` : `Partial download: ${item.id.split("/").pop()}`, bytes: item.bytes, reversible: true, how: item.reason, blocked: item.blocked ?? (item.reason.includes("removable after") ? item.reason : null) });
+  } catch { /* Stack cleanup is unavailable until it answers. */ }
+  const cacheBytes = getCacheStats().reduce((sum, item) => sum + item.sizeBytes, 0);
+  if (cacheBytes) rows.push({ id: "package_cache", kind: "package_cache", label: "Package cache", bytes: cacheBytes, reversible: true, how: "Saved copies fetched by packages; they can be fetched again.", blocked: null });
+  const previews = previewStats();
+  if (previews.bytes) rows.push({ id: "previews", kind: "previews", label: "Previews", bytes: previews.bytes, reversible: true, how: "Previews rebuild when viewed again.", blocked: null });
+  return rows;
+}
+const cleanupListRoute = createRoute({ method: "get", path: "/cleanup", tags: ["Storage"], summary: "List safely clearable product files", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.array(CleanupItemSchema) } }, description: "Product-owned cleanup candidates; blocked candidates remain listed." }, ...errorResponses({ 403: "Not owner/admin" }) } });
+storageRoutes.openapi(cleanupListRoute, async (c) => c.json(await cleanupItems(), 200));
+const cleanupRunRoute = createRoute({
+  method: "post", path: "/cleanup", tags: ["Storage"], summary: "Clear selected safe product files", middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()).min(1).max(100) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ bytes_freed: z.number().nonnegative() }) } }, description: "Bytes freed." }, ...errorResponses({ 400: "Unknown or blocked item" }) },
+});
+storageRoutes.openapi(cleanupRunRoute, async (c) => {
+  const { ids } = c.req.valid("json");
+  const available = await cleanupItems();
+  if (new Set(ids).size !== ids.length || ids.some((id) => !available.some((item) => item.id === id))) return c.json({ error: "Unknown or blocked cleanup item." }, 400);
+  const chosen = ids.map((id) => available.find((item) => item.id === id)!);
+  if (chosen.some((item) => item.blocked)) return c.json({ error: "Unknown or blocked cleanup item." }, 400);
+  let freed = 0;
+  const tidyIds = chosen.filter((item) => item.id.startsWith("tidy:")).map((item) => item.id.slice(5));
+  if (tidyIds.length) {
+    const full = available.filter((item) => item.id.startsWith("tidy:") && !item.blocked).map((item) => item.id.slice(5));
+    if (full.some((id) => !tidyIds.includes(id))) return c.json({ error: "Select every available model cleanup item together." }, 400);
+    const result = await getStackClient().tidyRun?.(false);
+    freed += result?.removed.reduce((sum, item) => sum + item.bytes, 0) ?? 0;
+  }
+  if (chosen.some((item) => item.id === "package_cache")) freed += clearPackageCache().bytes;
+  if (chosen.some((item) => item.id === "previews")) freed += clearPreviews().bytes;
+  return c.json({ bytes_freed: freed }, 200);
+});
 
 const PackageCacheSourceSchema = z.object({ source: z.string(), packageId: z.string(), label: z.string(), entryCount: z.number(), sizeBytes: z.number() });
 const packageCacheRoute = createRoute({

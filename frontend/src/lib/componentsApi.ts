@@ -28,9 +28,12 @@ export interface ComponentsOverview {
   /** VIDEO-SETTINGS-02: some adult-only styles are locked; one tile stands for them, never a count. */
   locked_styles?: boolean;
 }
+export interface CleanupItem { id: string; kind: "superseded" | "orphan_folder" | "partial_download" | "package_cache" | "previews"; label: string; bytes: number; reversible: boolean; how: string; blocked: string | null }
 
 
 export const componentsApi = {
+  cleanup: () => requestJson<CleanupItem[]>("/api/storage/cleanup"),
+  clearCleanup: (ids: string[]) => requestJson<{ bytes_freed: number }>("/api/storage/cleanup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids }) }),
   list: () => requestJson<ComponentsOverview>("/api/components"),
   install: (id: string, acceptedLicence?: string) => requestJson<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
   licences: () => requestJson<LicenceOverview>("/api/install/licences"),

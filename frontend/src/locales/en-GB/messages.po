@@ -84,7 +84,7 @@ msgid " You can also turn off an extra above."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:209
+#: src/apps/settings/ModelsAndStorageSection.tsx:233
 #: src/apps/settings/ReferenceLibrarySettings.tsx:195
 msgid ", {size} free"
 msgstr ""
@@ -1330,7 +1330,7 @@ msgid "{sizeGb} will be freed. {value} You can download them again later."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:209
+#: src/apps/settings/ModelsAndStorageSection.tsx:233
 msgid "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer."
 msgstr ""
 
@@ -5362,7 +5362,8 @@ msgid "Check that Home is running, then open Free up space again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:212
+#: src/apps/settings/ModelsAndStorageSection.tsx:222
+#: src/apps/settings/ModelsAndStorageSection.tsx:236
 msgid "Check that Home is running, then reload this page."
 msgstr ""
 
@@ -5372,7 +5373,7 @@ msgid "Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:385
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.advice.unreachable.next_step"
 msgstr ""
 
@@ -6177,6 +6178,11 @@ msgid "Cleans every recording above before the voice is made. When you edit a vo
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:222
+msgid "Cleanup list did not load"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceBox.tsx:61
 #: src/apps/settings/AddVoiceBox.tsx:66
 #: src/shell/pages/status/StatusBoard.tsx:45
@@ -6243,6 +6249,17 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AutoLocksSection.tsx:83
 msgid "Clear locks"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:229
+#: src/apps/settings/ModelsAndStorageSection.tsx:230
+msgid "Clear selected"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:230
+msgid "Clear selected items?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7198,6 +7215,11 @@ msgid "Could not forget those memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:213
+msgid "Could not free up space. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:187
 msgid "Could not get that backup ready."
 msgstr ""
@@ -7636,7 +7658,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:396
+#: ../backend/src/lib/failureCopy.ts:402
 msgid "failure.tool.unavailable.verb"
 msgstr ""
 
@@ -10153,7 +10175,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:399
+#: ../backend/src/lib/failureCopy.ts:405
 msgid "failure.tool.errored.verb"
 msgstr ""
 
@@ -10758,7 +10780,7 @@ msgid "Forward 30 seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:398
+#: ../backend/src/lib/failureCopy.ts:404
 msgid "failure.tool.found_nothing.verb"
 msgstr ""
 
@@ -10783,7 +10805,7 @@ msgid "Free memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:382
+#: ../backend/src/lib/failureCopy.ts:388
 msgid "failure.advice.memory.next_step"
 msgstr ""
 
@@ -10840,6 +10862,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:59
+#: src/apps/settings/ModelsAndStorageSection.tsx:220
+#: src/apps/settings/ModelsAndStorageSection.tsx:221
 #: src/shell/pages/settings/settingsViews.tsx:114
 msgid "Free up space"
 msgstr ""
@@ -10852,6 +10876,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpMemory.tsx:38
 msgid "Freeing"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:225
+msgid "Frees {size}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11448,7 +11477,7 @@ msgid "setting.content.filters.option_label.gore"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:400
+#: ../backend/src/lib/failureCopy.ts:406
 msgid "failure.tool.bad_arguments.verb"
 msgstr ""
 
@@ -12117,12 +12146,12 @@ msgid "Home could not make that voiceover. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:385
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.advice.unreachable.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:386
+#: ../backend/src/lib/failureCopy.ts:392
 msgid "failure.advice.engine_computer.cause"
 msgstr ""
 
@@ -13165,12 +13194,12 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:457
+#: ../backend/src/lib/failureCopy.ts:463
 msgid "failure.ask_form.unreachable"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:458
+#: ../backend/src/lib/failureCopy.ts:464
 msgid "failure.ask_form.other"
 msgstr ""
 
@@ -13195,17 +13224,17 @@ msgid "failure.context_too_large.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:418
+#: ../backend/src/lib/failureCopy.ts:424
 msgid "failure.partial.slow"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:419
+#: ../backend/src/lib/failureCopy.ts:425
 msgid "failure.partial.other"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:417
+#: ../backend/src/lib/failureCopy.ts:423
 msgid "failure.partial.minor"
 msgstr ""
 
@@ -13794,6 +13823,11 @@ msgid "Item"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:223
+msgid "Items that can free space"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:144
 msgid "Its chat was deleted, so it cannot be edited here."
 msgstr ""
@@ -14017,6 +14051,7 @@ msgstr ""
 #: src/apps/memory/PersonMemories.tsx:428
 #: src/apps/memory/PersonMemories.tsx:449
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
+#: src/apps/settings/ModelsAndStorageSection.tsx:230
 #: src/apps/settings/PersonMore.tsx:106
 #: src/apps/settings/UsersSection.tsx:241
 #: src/shell/library/LibraryTrash.tsx:28
@@ -14191,6 +14226,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/TrashPage.tsx:62
 msgid "Kept until {date}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:225
+msgid "Kept: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17041,7 +17081,7 @@ msgid "Model:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:207
+#: src/apps/settings/ModelsAndStorageSection.tsx:219
 msgid "Models and storage"
 msgstr ""
 
@@ -18837,6 +18877,11 @@ msgid "Note"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:228
+msgid "Nothing can be cleared right now."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:334
 msgid "Nothing has finished yet."
 msgstr ""
@@ -19534,7 +19579,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:456
+#: ../backend/src/lib/failureCopy.ts:462
 msgid "failure.ask_form.invalid"
 msgstr ""
 
@@ -22668,12 +22713,12 @@ msgid "Retry"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:396
+#: ../backend/src/lib/failureCopy.ts:402
 msgid "failure.tool.unavailable.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:386
+#: ../backend/src/lib/failureCopy.ts:392
 msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
@@ -22683,32 +22728,32 @@ msgid "Retry with current companion"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:387
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.advice.context_too_large.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:400
+#: ../backend/src/lib/failureCopy.ts:406
 msgid "failure.tool.bad_arguments.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:397
+#: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.tool.timed_out.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:384
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.advice.slow.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.advice.other.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:399
+#: ../backend/src/lib/failureCopy.ts:405
 msgid "failure.tool.errored.next_step"
 msgstr ""
 
@@ -24049,6 +24094,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
+#: src/apps/settings/ModelsAndStorageSection.tsx:226
 #: src/shell/pages/FilesPage.tsx:402
 msgid "Select"
 msgstr ""
@@ -24094,6 +24140,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:223
 msgid "Select people"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:226
+msgid "Selected"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25950,7 +26001,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:383
+#: ../backend/src/lib/failureCopy.ts:389
 msgid "failure.advice.stopped.next_step"
 msgstr ""
 
@@ -27052,7 +27103,7 @@ msgstr ""
 #: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
-#: src/apps/settings/ModelsAndStorageSection.tsx:214
+#: src/apps/settings/ModelsAndStorageSection.tsx:238
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
 #: src/apps/settings/PersonAccessEditor.tsx:122
@@ -27215,7 +27266,7 @@ msgid "api.error.list_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:441
+#: ../backend/src/lib/failureCopy.ts:447
 msgid "failure.prompt_limit.too_big.adult"
 msgstr ""
 
@@ -27225,7 +27276,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:442
+#: ../backend/src/lib/failureCopy.ts:448
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -27448,7 +27499,7 @@ msgid "The AI is installing. Chat works after."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:213
+#: src/apps/settings/ModelsAndStorageSection.tsx:237
 msgid "The AI is waiting for its helper to start. The Status page shows what is happening."
 msgstr ""
 
@@ -27498,7 +27549,7 @@ msgid "settings.attention.install.failed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:455
+#: ../backend/src/lib/failureCopy.ts:461
 msgid "failure.ask_form.field"
 msgstr ""
 
@@ -27568,17 +27619,17 @@ msgid "The character could not be saved. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:384
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.advice.slow.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:381
+#: ../backend/src/lib/failureCopy.ts:387
 msgid "failure.advice.busy.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:383
+#: ../backend/src/lib/failureCopy.ts:389
 msgid "failure.advice.stopped.cause"
 msgstr ""
 
@@ -27618,7 +27669,7 @@ msgid "setting.companions.enabled.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:382
+#: ../backend/src/lib/failureCopy.ts:388
 msgid "failure.advice.memory.cause"
 msgstr ""
 
@@ -27855,7 +27906,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:65
-#: src/apps/settings/ModelsAndStorageSection.tsx:212
+#: src/apps/settings/ModelsAndStorageSection.tsx:236
 msgid "The list did not load"
 msgstr ""
 
@@ -28187,12 +28238,12 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.advice.other.cause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:387
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.advice.context_too_large.cause"
 msgstr ""
 
@@ -28731,12 +28782,12 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:437
+#: ../backend/src/lib/failureCopy.ts:443
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:438
+#: ../backend/src/lib/failureCopy.ts:444
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
@@ -28852,8 +28903,13 @@ msgid "api.error.file_belongs_to_item"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:454
+#: ../backend/src/lib/failureCopy.ts:460
 msgid "failure.ask_form.stale"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/ModelsAndStorageSection.tsx:230
+msgid "This frees {size}. Models can be installed again, and caches rebuild when needed."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29164,7 +29220,7 @@ msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:397
+#: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.tool.timed_out.verb"
 msgstr ""
 
@@ -29570,7 +29626,7 @@ msgid "api.next.internal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:398
+#: ../backend/src/lib/failureCopy.ts:404
 msgid "failure.tool.found_nothing.next_step"
 msgstr ""
 
@@ -31047,7 +31103,7 @@ msgid "Volume"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:381
+#: ../backend/src/lib/failureCopy.ts:387
 msgid "failure.advice.busy.next_step"
 msgstr ""
 

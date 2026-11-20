@@ -23,7 +23,7 @@ export type MakingRole = "image" | "video" | "music" | "voices";
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
 import { maintenanceActive } from "@/lib/maintenanceFlag";
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "never_fits" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "disk" | "never_fits" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); __bumpStackEpochForTests(); }
 
@@ -137,7 +137,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean; fresh
 /** One read of the Stack's role list, memory watchdog and mode for both making roles, shared by the image and video rows of one
  * health snapshot (the same requests the chat row already makes, plus the memory read), so a health poll costs one round. */
 let makingInputs: { at: number; read: Promise<MakingInputs> } | null = null;
-type MakingInputs = { roles: Awaited<ReturnType<ReturnType<typeof getStackClient>["roles"]>>["roles"] | null; paused: boolean; coding: boolean };
+type MakingInputs = { roles: Awaited<ReturnType<ReturnType<typeof getStackClient>["roles"]>>["roles"] | null; paused: boolean; coding: boolean; diskCritical: boolean };
 function readMakingInputs(): Promise<MakingInputs> {
   if (makingInputs && Date.now() - makingInputs.at < 1_000) return makingInputs.read;
   const safe = async <T,>(read: () => Promise<T>, fallback: T): Promise<T> => { try { return await read(); } catch { return fallback; } };
@@ -145,7 +145,8 @@ function readMakingInputs(): Promise<MakingInputs> {
     safe(async () => (await sharedStackRoles()).roles, null),
     safe(async () => (await getStackClient().memory?.())?.watchdog?.generation_paused === true, false),
     safe(async () => { const mode = await sharedCodingMode(); return mode.mode === "coding" || mode.state === "switching"; }, false),
-  ]).then(([roles, paused, coding]) => ({ roles, paused, coding }));
+    safe(async () => (await getStackClient().disk?.())?.level === "critical", false),
+  ]).then(([roles, paused, coding, diskCritical]) => ({ roles, paused, coding, diskCritical }));
   makingInputs = { at: Date.now(), read };
   return read;
 }
@@ -156,8 +157,9 @@ export function __resetMakingHealthForTests(): void { makingInputs = null; __res
  * then the role's own state. A role that is installed but idle reads ready: a job waits for the engine to load. No raw Stack reason
  * reaches the row; the household line is chosen from `cause` in failureCopy.ts. */
 async function makingHealth(role: MakingRole): Promise<RoleHealth> {
-  const { roles, paused, coding } = await readMakingInputs();
+  const { roles, paused, coding, diskCritical } = await readMakingInputs();
   if (!roles) return { availability: "starting", reason: "stack_unreachable", cause: "restarting" };
+  if (diskCritical && role !== "voices") return { availability: "unavailable", reason: null, cause: "disk" };
   // Music has its own status read (lib/music/ready.ts, kept for 20 s, and a ready answer for 5 minutes after a failed read); voices is the Stack's speaking role.
   const row = role === "music" ? undefined : roles.find((item) => item.id === (role === "voices" ? "tts" : role));
   if (role === "music") {

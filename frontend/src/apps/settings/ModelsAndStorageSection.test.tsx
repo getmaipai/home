@@ -3,7 +3,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ModelsAndStorageSection, lastUsedWords, sizeWords } from "@/apps/settings/ModelsAndStorageSection";
-import { componentsApi, type ComponentRow, type ComponentsOverview, type LicenceOverview } from "@/lib/componentsApi";
+import { componentsApi, type CleanupItem, type ComponentRow, type ComponentsOverview, type LicenceOverview } from "@/lib/componentsApi";
 import { ApiError } from "@/lib/api";
 
 afterEach(() => { cleanup(); licenceData = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: null }; });
@@ -19,6 +19,8 @@ let licenceData: LicenceOverview = { stack: "ok", terms_version: "v", acknowledg
 function mount(data: ComponentsOverview) {
   const original = { ...componentsApi };
   componentsApi.list = mock(async () => data);
+  componentsApi.cleanup = mock(async () => []);
+  componentsApi.clearCleanup = mock(async () => ({ bytes_freed: 0 }));
   componentsApi.licences = mock(async () => licenceData);
   componentsApi.acceptLicences = mock(async () => ({ accepted: true as const, auto_install: false }));
   componentsApi.installExtras = mock(async () => ({ started: true as const, models: 1 }));
@@ -43,6 +45,29 @@ describe("words", () => {
 });
 
 describe("Models and storage", () => {
+  test("lists safe cleanup items, keeps blocked items, and confirms before clearing selected items", async () => {
+    const original = { ...componentsApi };
+    componentsApi.list = mock(async () => overview([]));
+    componentsApi.licences = mock(async () => licenceData);
+    componentsApi.cleanup = mock(async (): Promise<CleanupItem[]> => [
+      { id: "package_cache", kind: "package_cache", label: "Package cache", bytes: 2_500_000_000, reversible: true, how: "Saved copies can be fetched again.", blocked: null },
+      { id: "tidy:/models/live", kind: "orphan_folder", label: "Orphan model folder: live", bytes: 4_000_000_000, reversible: true, how: "Unreferenced folder.", blocked: "A role slot has selected this model." },
+    ]);
+    componentsApi.clearCleanup = mock(async () => ({ bytes_freed: 2_500_000_000 }));
+    const v = renderWithQueryClient(<ModelsAndStorageSection />);
+    expect(await v.findByText("Package cache")).toBeTruthy();
+    expect(v.getByTestId("cleanup-package_cache").textContent).toContain("Frees 2.5 GB");
+    expect(v.getByText("Kept: A role slot has selected this model.")).toBeTruthy();
+    expect(v.getByRole("button", { name: "Select" })).toBeTruthy();
+    fireEvent.click(v.getByRole("button", { name: "Select" }));
+    fireEvent.click(v.getByRole("button", { name: "Clear selected" }));
+    expect(await v.findByText("This frees 2.5 GB. Models can be installed again, and caches rebuild when needed.")).toBeTruthy();
+    expect(componentsApi.clearCleanup).not.toHaveBeenCalled();
+    fireEvent.click(v.getByRole("button", { name: "Clear selected" }).closest("[role=alertdialog]")?.querySelector("button:last-child") ?? v.getAllByRole("button", { name: "Clear selected" }).at(-1)!);
+    await waitFor(() => expect(componentsApi.clearCleanup).toHaveBeenCalledWith(["package_cache"]));
+    Object.assign(componentsApi, original);
+  });
+
   test("the music maker is listed under its own Music heading", async () => {
     const v = mount(overview([
       row({ id: "music", label: "Music: ACE-Step 1.5", summary: "Writes and sings songs on this computer.", group: "music", download_bytes: 11_460_000_000 }),

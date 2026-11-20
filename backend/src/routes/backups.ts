@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { createJob, updateJob } from "@/lib/jobs";
 import { devices as devicesTable } from "@/db/schema";
 import { apiError } from "@/lib/apiErrorCopy";
+import { diskIsCritical } from "@/lib/storage";
 
 export const backupsRoutes = apiRouter();
 
@@ -42,10 +43,11 @@ const runRoute = createRoute({
   middleware: [requireRoleOrGrant(["owner", "admin"], "backups.run")] as const,
   responses: {
     200: { content: { "application/json": { schema: BackupInfoSchema } }, description: "The new backup." },
-    ...errorResponses({ 403: "Not owner/admin" }),
+    ...errorResponses({ 403: "Not owner/admin", 409: "Not enough room to start a backup" }),
   },
 });
 backupsRoutes.openapi(runRoute, async (c) => {
+  if (await diskIsCritical()) return c.json({ error: "There is not enough room left on this computer for that. Free up space in Settings, then try again." }, 409);
   const actor = c.get("person"); const id = `backup:${crypto.randomUUID()}`;
   createJob({ id, kind: "backup", startedBy: actor.id, forPerson: actor.id, title: "Backup", state: "running", progress: { phase: "starting" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "backup", legacy: "POST /api/backups/run remains readable through 2026-10-13" } });
   try { const info = await runBackupAndMirror(); updateJob(id, { state: "done", progress: { phase: "complete" }, resultRef: info.filename }); return c.json(info, 200); }

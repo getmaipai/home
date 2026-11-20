@@ -265,7 +265,7 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
  * the words from the health row (`engines.image.notice`, `engines.video.notice`).
  * No figure (no sizes, no percentages) ever appears in these lines. */
 export type MakingKind = "image" | "video" | "music" | "voices";
-export type MakingCause = "restarting" | "memory" | "never_fits" | "not_installed" | "mode_change" | "offline" | "gpu";
+export type MakingCause = "restarting" | "memory" | "disk" | "never_fits" | "not_installed" | "mode_change" | "offline" | "gpu";
 
 const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string }> = {
   image: { thing: "picture", Thing: "Picture", things: "Pictures" },
@@ -277,6 +277,12 @@ const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: st
 function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {
   const { Thing, things } = MAKING_NOUN[kind];
   switch (cause) {
+    case "disk": return {
+      adult: "There is not enough room left on this computer for that. Free up space in Settings, then try again.",
+      teen: "There is not enough room left on this computer for that. Ask an owner to free up space in Settings.",
+      child: "There isn't room for that right now. Ask a grown-up to free up space in Settings.",
+      repairs_link: "/settings/models",
+    };
     case "never_fits": return {
       adult: kind === "video" ? "This is too big for this computer even with everything else paused. Try Boost." : "This is too big for this computer even with everything else paused. Try Boost.",
       teen: `${Thing} making isn't working right now. Try again later.`,
