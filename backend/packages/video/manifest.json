@@ -327,6 +327,15 @@
         "min_role": "adult"
       },
       {
+        "id": "film-render",
+        "label": "Making your film",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "film-render",
+        "min_role": "adult"
+      },
+      {
         "id": "templates",
         "label": "Templates",
         "icon": "rectangle-horizontal",

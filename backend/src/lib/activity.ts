@@ -199,7 +199,7 @@ function filmItems(actor: PersonRow): ActivityItem[] {
     if (run.state === "cancelled" && !(run.plan && run.production_id)) continue; // FILM-CANCEL-01: only a stopped film that can carry on is listed
     const state: ActivityState = run.state === "done" ? "done" : run.state === "failed" ? "failed" : run.state === "waiting_for_go" ? "attention" : run.state === "cancelled" ? "waiting" : "making"; // a stopped film waits for its Resume: never Failed, and no bell dot
     const line = run.state === "cancelled" ? "Stopped. The shots already made are kept. Press Resume to carry on." : run.state === "planning" ? "Planning the shots." : run.state === "waiting_for_go" ? "Your shot list is waiting for you." : run.state === "failed" ? "It did not finish. Open it to try again." : run.state === "running" ? `${run.stage ?? "Working"}, step ${Math.min(run.done_steps, run.total_steps)} of ${run.total_steps}.` : null;
-    out.push({ id: `film:${run.id}`, source: "job", state, title: oneLine(run.plan?.title ?? run.idea), line, percent: run.state === "running" && run.total_steps > 0 ? percentOf(Math.round((run.done_steps / run.total_steps) * 100)) : null, typicalMinutes: null, href: "/apps/video/film-maker", at: run.updated_at });
+    out.push({ id: `film:${run.id}`, source: "job", state, title: oneLine(run.plan?.title ?? run.idea), line, percent: run.state === "running" && run.total_steps > 0 ? percentOf(Math.round((run.done_steps / run.total_steps) * 100)) : null, typicalMinutes: null, href: run.state === "running" ? "/apps/video/film-render" : "/apps/video/film-maker", at: run.updated_at });
   }
   return out;
 }

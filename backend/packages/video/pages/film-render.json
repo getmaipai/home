@@ -1,0 +1,68 @@
+{
+  "type": "page",
+  "id": "film-render",
+  "title": "Making your film",
+  "body": [
+    {
+      "type": "job_progress",
+      "title": "Making your film",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-progress"
+        }
+      },
+      "item_fields": {
+        "shot_id": "shot_id",
+        "label": "label",
+        "state": "state",
+        "progress": "progress",
+        "thumb": "thumb",
+        "note": "note",
+        "held_reason": "held_reason",
+        "failure_message": "failure_message",
+        "failure_actions": "failure_actions"
+      },
+      "poll_while": {
+        "field": "state",
+        "values": [
+          "queued",
+          "running",
+          "held"
+        ]
+      },
+      "cancel": {
+        "call": {
+          "target": "/api/plugins/video/actions/film-cancel",
+          "method": "POST",
+          "args": {}
+        }
+      }
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-resume"
+        }
+      },
+      "primary": {
+        "label": "Resume the film",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-resume",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        }
+      },
+      "sticky": false,
+      "estimate": "reason"
+    }
+  ]
+}

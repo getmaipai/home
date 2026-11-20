@@ -404,4 +404,24 @@ describe("refusals and access", () => {
     // a `reason` blocks the button; only the Render film bar has one (the three offers word themselves as an estimate line)
     expect(bars.map((bar) => bar.reason ?? null)).toEqual(["reason", null, null, null]);
   });
+
+  test("the render page is served to an adult as a valid page on the progress block, with the poll, the stop and the resume bar, and is closed to a teen and a child; a running film's Activity row opens it (VF-UI-10)", async () => {
+    const { owner, teen, child, row } = await household();
+    const page = await owner.get(`${T}/pages/film-render`);
+    expect(page.status).toBe(200);
+    const doc = await page.json() as { body: Array<Record<string, any>> };
+    expect(PageNodeSchema.safeParse(doc).success).toBe(true);
+    const progress = doc.body.find((node) => node.type === "job_progress")!;
+    expect(progress.bind.params.scope).toBe("film-progress");
+    expect(progress.poll_while).toEqual({ field: "state", values: ["queued", "running", "held"] });
+    expect(progress.cancel.call.target).toBe("/api/plugins/video/actions/film-cancel");
+    expect(doc.body.filter((node) => node.type === "action_bar").map((bar) => bar.bind.params.scope)).toEqual(["film-resume"]);
+    for (const who of [teen.client, child.client]) expect([403, 404]).toContain((await who.get(`${T}/pages/film-render`)).status);
+    const id = await planned(owner, row("Sage"));
+    db.update(filmRuns).set({ state: "running" }).where(eq(filmRuns.id, id)).run();
+    expect(activityForViewer(row("Sage")).items.find((entry) => entry.id === `film:${id}`)).toMatchObject({ href: "/apps/video/film-render" });
+    db.update(filmRuns).set({ state: "cancelled" }).where(eq(filmRuns.id, id)).run();
+    expect(activityForViewer(row("Sage")).items.find((entry) => entry.id === `film:${id}`)).toMatchObject({ href: "/apps/video/film-maker" });
+    expect(await rows(owner, "film-progress", id)).toEqual([]); // a stopped film shows its Stopped line and Resume, not shots that read as failed
+  });
 });

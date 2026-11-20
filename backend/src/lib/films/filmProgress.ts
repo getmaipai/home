@@ -63,6 +63,8 @@ export function filmProgressRows(person: PersonRow, id?: string): ShotProgressRo
   if (!allowed(person)) return [];
   const run = pageFilmRun(person, id);
   if (!run || !run.plan) return [];
+  // A stopped film has no shots in progress: its unfinished shots would read as failed or waiting (and keep the page's spinner and Cancel), so the page shows its Stopped line and Resume instead (FILM-CANCEL-01).
+  if (run.state === "cancelled") return [];
   const column = readProgress(run.id);
   const production = run.production_id ? getMediaProduction(person, run.production_id) : null;
   const shots = production?.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots)) ?? [];
