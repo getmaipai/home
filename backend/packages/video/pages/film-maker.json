@@ -414,20 +414,6 @@
       },
       "row_actions": [
         {
-          "icon": "image",
-          "label": "Draft all",
-          "show_when_field": "can_draft",
-          "action": {
-            "call": {
-              "target": "/api/plugins/video/actions/film-draft",
-              "method": "POST",
-              "args": {
-                "run": "{run_id}"
-              }
-            }
-          }
-        },
-        {
           "icon": "clapperboard",
           "label": "Finish kept",
           "show_when_field": "can_finish",
