@@ -91,7 +91,7 @@ async function conversation(run: number) {
     const t = script[ti]!; const clip = clips.get(t.say)!; const evStart = events.length; const turnBefore = turn;
     userClip = clip; userPos = 0; userEndAt = 0; inter.length = 0; await runFor(clip.length / 16 + 200, () => userEndAt > 0); const endAt = userEndAt || rel();
     const firstAt = () => firstFrameAt; const replyStart = rel(); void replyStart;
-    for (const d of t.during ?? []) inter.push({ at: 0, clip: clips.get(d.say)!, say: d.say, expect: d.expect });
+    for (const d of t.during ?? []) inter.push({ at: Infinity, clip: clips.get(d.say)!, say: d.say, expect: d.expect }); // not due until her first sound sets the time (at: 0 made them fire at once, before she spoke: the "Mm-hm stopped her" and "rig stalled 39 s" findings were this bug)
     // wait for her first sound, then schedule the interjections relative to it
     await runFor(12000, () => firstAt() > 0 && turn !== turnBefore); const speakAt = rel(); let k2 = 0; for (const it of inter) { it.at = speakAt + (t.during![k2++]!.atMs); }
     const outStart = outLen; let silentTicks = 0; const maxMs = 60000; const t1 = performance.now();
@@ -145,7 +145,7 @@ for (let run = 1; run <= RUNS; run++) {
   const outRel = (o: number) => o / 24 ; const timings: number[] = []; for (let i = 0; i < c.recs.length; i++) { const r = c.recs[i]!; if (!r.heard || r.kind === "after-cutin") continue; const first = firstAudible(c.out.subarray(r.replyStartOut, r.replyEndOut), 24000); if (first === null) continue; const replyAudibleAt = outRel(r.replyStartOut) + first * 1000; timings.push(replyAudibleAt - r.userEndAt); }
   const sorted = [...timings].sort((a, b) => a - b); const med = sorted[Math.floor(sorted.length / 2)] ?? NaN, p90 = sorted[Math.floor(sorted.length * 0.9)] ?? NaN, worst = sorted.at(-1) ?? NaN;
   const conv: string[] = []; const events = c.events;
-  for (const r of c.recs) for (const j of r.interjections) { if (j.atRel < 0) continue; if ((j.lateMs ?? 0) > 1500) conv.push(`rig stalled: "${j.say}" started ${j.lateMs} ms late (a rig problem under load, not a voice result)`); const stopAfter = r.stops.find((s) => s >= j.atRel); const latency = stopAfter === undefined ? null : Math.round(stopAfter - j.atRel);
+  for (const r of c.recs) for (const j of r.interjections) { if (j.atRel < 0) continue; if (j.atRel < r.firstAt) conv.push(`rig bug: "${j.say}" was played before her first sound (not a voice result)`); if ((j.lateMs ?? 0) > 1500) conv.push(`rig stalled: "${j.say}" started ${j.lateMs} ms late (a rig problem under load, not a voice result)`); const stopAfter = r.stops.find((s) => s >= j.atRel); const latency = stopAfter === undefined ? null : Math.round(stopAfter - j.atRel);
     if (j.expect === "stop" && (latency === null || latency > 2500)) conv.push(`"${j.say}" did not stop her within 2.5 s`); if (j.expect === "continue" && latency !== null && latency < 2500) conv.push(`"${j.say}" stopped her but should not have`); }
   const firstUserAt = c.recs.length ? c.recs[0]!.userEndAt : 0; const selfStops = events.filter((e) => e.t === "stop" && c.recs.some((r) => r.heard && e.at >= r.firstAt && e.at <= r.firstAt + 120000 && e.turn === r.turn) && !c.recs.some((r) => r.interjections.some((j) => j.atRel >= 0 && e.at >= j.atRel - 50 && e.at <= j.atRel + 3000))).length;
   // stops that happened with no interjection and no new user turn are self-interruptions; a stop right before a final is the draft discard path (nothing playing)
