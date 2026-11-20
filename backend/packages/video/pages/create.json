@@ -78,6 +78,109 @@
       ]
     },
     {
+      "type": "media_stage",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "stage"
+        }
+      },
+      "size": "stage",
+      "media": {
+        "still": "still",
+        "loop": "loop",
+        "position": "position"
+      },
+      "description": "description",
+      "scrim": "strong",
+      "state": "stage_state",
+      "eyebrow": "eyebrow",
+      "title": "title",
+      "subtitle": "subtitle",
+      "progress": "progress",
+      "pills": [
+        {
+          "label": "Another take",
+          "icon": "rotate-ccw",
+          "action": {
+                        "call": {
+              "target": "/api/plugins/video/actions/reshoot",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "label": "Edit and make again",
+          "icon": "pencil",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/create",
+              "state": {
+                "prompt": "{prompt}",
+                "look": "{look}",
+                "camera": "{camera}",
+                "seconds": "{seconds}",
+                "tier": "{tier}",
+                "orientation": "{orientation}",
+                "start_frame": "{start_frame}"
+              }
+            }
+          }
+        },
+        {
+          "label": "Favorite",
+          "icon": "heart",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/favorite",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ],
+      "error_message": "error_message",
+      "error_actions": [
+        {
+          "label": "Try again",
+          "icon": "refresh-cw",
+          "action": {
+                        "call": {
+              "target": "/api/plugins/video/actions/another",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "label": "Change the words",
+          "icon": "pencil",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/create",
+              "state": {
+                "prompt": "{prompt}",
+                "look": "{look}",
+                "camera": "{camera}",
+                "seconds": "{seconds}",
+                "tier": "{tier}",
+                "orientation": "{orientation}",
+                "start_frame": "{start_frame}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "type": "media_shelf",
       "heading": "Templates",
       "bind": {

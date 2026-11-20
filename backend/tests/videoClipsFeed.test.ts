@@ -98,6 +98,20 @@ describe("scope short: the clips feed rows", () => {
     expect(rows.some((r) => "autoplay" in r)).toBe(false);
   });
 
+  test("the Create page's stage is the newest take: it loops, says shape and length in plain words, names no model or pixel size, and a teen or child gets none", async () => {
+    const { adult, teen, row } = await household();
+    expect(await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json()).toEqual([]);
+    const made = await makeClip(adult.client, row("Marlow"));
+    const stage = (await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json()) as Row[];
+    expect(stage).toHaveLength(1);
+    expect(stage[0]).toMatchObject({ id: made.jobId, stage_state: "looping", eyebrow: "Latest take" });
+    expect(String(stage[0]!.loop)).toMatch(/^\/api\//);
+    expect(String(stage[0]!.description).length).toBeGreaterThan(0);
+    expect(String(stage[0]!.subtitle)).toMatch(/^(Wide|Tall|Square) · \d+ seconds$/);
+    expect(JSON.stringify(stage[0])).not.toMatch(/ltx|wan|h3|minimax|\d{3,4}\s*[x×]\s*\d{3,4}/i);
+    expect((await teen.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).status).toBe(404);
+  });
+
   test("the heart is the Favorite mark: liking a clip shows it liked on the next read, per person", async () => {
     const { adult, other, row } = await household();
     const { fileId } = await makeClip(adult.client, row("Marlow"));
@@ -149,7 +163,7 @@ describe("scope short: the clips feed rows", () => {
 
   test("a child and a teen reach no other scope of recipes (feed, job, clips, showcase, studio)", async () => {
     const { teen, child } = await household();
-    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
+    for (const who of [teen, child]) for (const scope of ["feed", "job", "clips", "showcase", "studio", "studio-picker", "header", "stage"]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope, id: "x" })).status).toBe(404);
     // The Clips shelf and page ask for the short scope: open to both.
     for (const who of [teen, child]) expect((await who.client.post("/api/plugins/video/data/recipes", { scope: "short" })).status).toBe(200);
     // VF-UI-02: the Library's film shelves are served to every role, and a teen or child gets no rows (films are adult-only), so the shelves are absent, never a load error.

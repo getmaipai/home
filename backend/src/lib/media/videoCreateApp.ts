@@ -421,6 +421,34 @@ export function filmShelfRows(person: PersonRow, states: FilmRunState[]): Array<
   });
 }
 
+/** VF-UI-03b: the newest take of the Create feed as the one row of the page's media_stage: a finished take loops, a take being made waits with its progress, a failed take shows
+ * its plain error with Try again. Nothing here names a model or a pixel size; the facts line is the shape word and the length. A locked take (the feed's lock tile) makes no stage. */
+export function stageRows(person: PersonRow): Array<Record<string, unknown>> {
+  const row = feedRows(person, { limit: 1 })[0];
+  if (!row || typeof row.id !== "string" || row.locked === true || row.status === "locked" || row.status === "cancelled") return [];
+  const words = String(row.prompt ?? "").trim().split(/\s+/).filter(Boolean);
+  const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
+  const job = getVideoJobFor(person, row.id);
+  const [width, height] = (job?.request.size ?? "").split("x").map(Number);
+  const seconds = job?.files[0]?.seconds ?? job?.request.seconds ?? null;
+  const shape = width && height ? videoShape(width, height) : null;
+  const facts = [shape ? `${shape[0]!.toUpperCase()}${shape.slice(1)}` : null, seconds ? `${seconds} seconds` : null].filter(Boolean).join(" · ");
+  const made = row.state === "done";
+  const waiting = row.state === "queued" || row.state === "running";
+  const failed = row.state === "failed";
+  const still = typeof row.still === "string" ? row.still : null;
+  return [{
+    ...row,
+    still, loop: made && typeof row.src === "string" ? row.src : null, position: null,
+    description: title ? `The clip: ${title}` : "Your latest clip",
+    stage_state: failed ? "error" : waiting ? "waiting" : made ? (typeof row.src === "string" ? "looping" : "idle") : "paused",
+    eyebrow: failed ? "Did not finish" : waiting ? (typeof row.phase === "string" && row.phase ? row.phase : "Waiting for its turn") : "Latest take",
+    title, subtitle: facts || null,
+    progress: waiting && typeof row.percent === "number" ? row.percent : null,
+    error_message: failed ? String(row.error ?? "It did not finish. Try again.") : null,
+  }];
+}
+
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];
 
 /** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
@@ -443,6 +471,7 @@ registerMediaAppData("video", (person, dataId, params) => {
   switch (params.scope) {
     case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);
+    case "stage": return stageRows(person);
     case "making-films": return filmShelfRows(person, ["planning", "running"]);
     case "unfinished-films": return filmShelfRows(person, ["waiting_for_go", "failed", "cancelled"]);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
