@@ -126,6 +126,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/drafts.json` | video | Unfinished |
 | `backend/packages/video/pages/family-picks.json` | video | Family Picks |
 | `backend/packages/video/pages/film-maker.json` | video | Film maker |
+| `backend/packages/video/pages/film-render.json` | video | Making your film |
 | `backend/packages/video/pages/from-picture.json` | video | From a picture |
 | `backend/packages/video/pages/history.json` | video | History |
 | `backend/packages/video/pages/how-made.json` | video | How it was made |
