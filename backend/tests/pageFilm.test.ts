@@ -5,6 +5,7 @@ import { PageNodeSchema } from "@/kit/schema/types";
 import { createMediaSubject } from "@/lib/mediaSubjects";
 import { __setFilmPlanCompleterForTests } from "@/lib/films/plan";
 import { __setFilmEnginesForTests, cancelFilmJobs } from "@/lib/films/background";
+import { stillSeed } from "@/lib/films/engines";
 import { getFilmRun } from "@/lib/films/store";
 import { activityForViewer } from "@/lib/activity";
 import { eq } from "drizzle-orm";
@@ -25,13 +26,14 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 10));
 async function until(fn: () => boolean) { for (let i = 0; i < 300 && !fn(); i++) await wait(); expect(fn()).toBe(true); }
 const T = "/api/plugins/video";
 let calls: string[];
+let stillShots: Array<{ id: string; redos: number }>;
 beforeEach(() => {
-  resetDb(); calls = [];
+  resetDb(); calls = []; stillShots = [];
   __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify(plan) }));
   __setFilmEnginesForTests(({ actor }) => ({
     waitForIdle: async () => {},
     ensureSubject: async ({ name, kind, locked }) => { calls.push("cast"); return createMediaSubject(actor, { name, kind, look: locked }).id; },
-    makeStill: async ({ shot }) => { calls.push(`still:${shot.id}`); return `pic:${shot.id}:${calls.length}`; },
+    makeStill: async ({ shot }) => { calls.push(`still:${shot.id}`); stillShots.push({ id: shot.id, redos: (shot as { redos?: number }).redos ?? 0 }); return `pic:${shot.id}:${calls.length}`; },
     makeClip: async ({ shot }) => { calls.push(`clip:${shot.id}`); return `clip:${shot.id}`; },
     makeMusic: async () => { calls.push("music"); return "music"; },
     assemble: async ({ plan: finished, clipFileIds }) => { calls.push(`assemble:${finished.shots.map((s) => s.id).join("+")}:${clipFileIds.length}`); return "cut"; },
@@ -125,6 +127,23 @@ describe("plan, draft, keep or skip, finish", () => {
     expect(few.status).toBe(422);
     expect(((await few.json()) as { error: string }).error).toContain("at least two");
     expect(calls.some((c) => c.startsWith("clip:"))).toBe(false);
+  });
+
+  test("Make this shot again draws with a new seed and clears the Kept mark (FILM-REDO-01)", async () => {
+    const { client: owner, row } = await signedInOwner();
+    const id = await planned(owner, row);
+    await owner.post(`${T}/actions/film-draft`, { run: id });
+    await until(() => getFilmRun(row, id)?.state === "waiting_for_go" && calls.filter((c) => c.startsWith("still:")).length === 3);
+    expect((await owner.post(`${T}/actions/film-review`, { run: id, shot: "two", keep: true })).status).toBe(200);
+    expect(getFilmRun(row, id)!.plan!.shots.find((s) => s.id === "two")).toMatchObject({ kept: true });
+    expect((await owner.post(`${T}/actions/film-again`, { run: id, shot: "two" })).status).toBe(200);
+    await until(() => getFilmRun(row, id)?.state === "waiting_for_go" && calls.filter((c) => c === "still:two").length === 2);
+    const two = getFilmRun(row, id)!.plan!.shots.find((s) => s.id === "two") as { kept?: boolean; redos?: number };
+    expect(two.kept).toBeUndefined();
+    expect(two.redos).toBe(1);
+    expect(stillShots.filter((s) => s.id === "two").map((s) => s.redos)).toEqual([0, 1]);
+    expect(stillSeed("two", 0)).not.toBe(stillSeed("two", 1));
+    expect(stillSeed("two", 1)).not.toBe(stillSeed("one", 1));
   });
 
   test("Make this shot again redraws only that picture while drafting, and a finished film accepts a redo", async () => {

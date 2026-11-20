@@ -52,6 +52,11 @@ async function poll<T>(read: () => T | null, signal: AbortSignal, timeout: numbe
   throw new Error("The job took too long. Try again.");
 }
 
+/** The picture seed for a shot: the same for the first draft (the shot id alone), a new one for each "make this shot again" so a redo is a different picture. */
+export function stillSeed(shotId: string, redos: number): number {
+  return createHash("sha256").update(redos > 0 ? `${shotId}#${redos}` : shotId).digest().readUInt32BE(0);
+}
+
 export function backgroundTurn(actor: PersonRow) {
   const conversation = resolveOrCreateConversation(actor, "chat");
   if (!conversation.ok) throw new Error(conversation.error);
@@ -131,7 +136,7 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         if (kept.ok) return kept.value.id;
       }
       const prompt = [shot.still, ...castLocked].filter(Boolean).join(" ");
-      const seed = createHash("sha256").update(shot.id).digest().readUInt32BE(0);
+      const seed = stillSeed(shot.id, (shot as { redos?: number }).redos ?? 0);
       const view = fullViewForJob("adult", actor);
       // A character the person supplied pictures for starts the still from that picture, so the face carries through (retry from words alone if the Stack declines it).
       const starter = pickStarter(shot.still, castLocked.map((line) => line.split(":")[0]!.trim()).flatMap((name) => { const picture = subjectOf(name)?.references[0]; return picture ? [{ name, picture }] : []; }))?.picture;

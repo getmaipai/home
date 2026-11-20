@@ -70,7 +70,7 @@ export const filmShotRepairSchema = z.object({
   new_clip_id: z.string().min(1).max(80).optional(),
 });
 export type FilmShotRepair = z.infer<typeof filmShotRepairSchema>;
-const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional(), repair: filmShotRepairSchema.optional() });
+const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional(), redos: z.number().int().min(0).optional(), repair: filmShotRepairSchema.optional() });
 export const filmPlanSchema = z.object({ ...filmPlanShape, shots: z.array(storedFilmShotSchema).min(2).max(12), cast: filmPlanShape.cast.min(1) }).superRefine((plan, ctx) => {
   // FILM-LINES-01: no cast entry may be named "Narration" (it is the one name a line may use for a voice that is no character); a shot has `line` or `lines`, never both; a speaker is a character's exact name or Narration.
   const characters = new Set(plan.cast.filter((member) => member.kind === "character").map((member) => member.name));
