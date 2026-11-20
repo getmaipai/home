@@ -95,7 +95,7 @@ test("1 recognizer gets 12 and 45 second utterances in order while turn check se
 test("2 forced cut-in keeps its opening frame and 300 ms pre-roll once", async () => {
   const recognized: Float32Array[] = [];
   const h = harness({
-    transcribe: async (wav: Uint8Array) => { recognized.push(wavPcm(wav)); return "the interruption"; },
+    transcribe: async (wav: Uint8Array) => { recognized.push(wavPcm(wav)); return recognized.length === 1 ? "the interruption" : "wait the interruption"; },
     chat: async function* () {},
   });
   h.feed(true, 4); h.feed(false, 8); await h.flush();

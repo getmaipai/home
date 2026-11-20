@@ -1,7 +1,7 @@
 import { decideBackchannel, type BackchannelDecision } from "./backchannel";
 // A person's interruption is judged on the words that are NOT the assistant's own: when the page's microphone hears her voice
 // from the speakers, the recognizer writes her own words down, and those must never stop her.
-const STOPPERS = new Set(["stop", "wait", "hold", "shut", "nope", "hang", "enough", "quiet", "pause"]);
+const STOPPERS = new Set(["stop", "wait", "hold", "shut", "no", "nope", "hang", "enough", "quiet", "pause", "hey", "sorry", "excuse", "actually", "but"]);
 const words = (t: string) => t.toLowerCase().replace(/[^a-z'\s-]/g, " ").replace(/-/g, "").split(/\s+/).filter(Boolean);
 function near(a: string, b: string) {
   if (a === b) return true;
@@ -11,14 +11,14 @@ function near(a: string, b: string) {
   let diff = 0; const m = Math.min(a.length, b.length); for (let i = 0; i < m && diff < 2; i++) if (a[i] !== b[i]) diff++; return diff < 2;
 }
 export type EchoVerdict = BackchannelDecision | "echo";
+/** Only these, or three or more unrecognised words, count as a person asking her to stop. One or two stray words (a half-heard name, a
+ * blur of her own voice) never do: a person who really wants her to stop says "wait" or "stop", or goes on talking, and the next check hears more. */
 export function judgeCutIn(heard: string, spoken: string): EchoVerdict {
   const hw = words(heard); if (!hw.length) return "unknown";
   const spokenWords = [...new Set(words(spoken))];
-  const resid: string[] = []; let echoCount = 0;
-  for (const w of hw) { if (spokenWords.some((s) => near(w, s))) echoCount++; else resid.push(w); }
-  if (echoCount === 0) return decideBackchannel(heard);
+  const resid = hw.filter((w) => !spokenWords.some((s) => near(w, s)));
   if (!resid.length) return "echo";
-  if (resid.some((w) => STOPPERS.has(w)) || (resid.length >= 1 && resid.join(" ").match(/\b(no way)\b/) === null && resid.some((w) => w === "no"))) return "interrupt";
-  if (echoCount >= resid.length && resid.length < 3) return "echo";
-  return decideBackchannel(resid.join(" "));
+  if (decideBackchannel(resid.join(" ")) === "ack") return "ack";
+  if (resid.some((w) => STOPPERS.has(w))) return "interrupt";
+  return resid.length >= 3 ? "interrupt" : "echo";
 }

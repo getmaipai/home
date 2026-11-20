@@ -91,6 +91,7 @@ async function one(run: number, gain: number, delayMs: number) {
   if (SCEN === "silent") r.pass = !r.selfStop && finals.length === 0 && ev.filter((x) => x.t === "pause").length === 0;
   if (SCEN === "mmhm" || SCEN === "briefly") { r.stopAfterUser = afterUser("stop").length; r.finalAfterUser = afterUser("final").length; r.pass = !r.selfStop && r.stopAfterUser === 0 && r.finalAfterUser === 0; }
   if (SCEN === "stop") { const s = afterUser("stop")[0]; r.stopLatencyMs = s ? Math.round(s.at - userStartAt) : null; r.silentAfterMs = s && stopWordAt >= 0 ? Math.round(stopWordAt + 25 - userStartAt) : null; r.pass = !!s && !r.selfStop && s.at - userStartAt < 2500; }
+  if (!r.pass || args.includes("--events")) console.log("  events:", ev.filter((x) => x.t !== "duck" && x.t !== "local_duck").map((x) => x.t + "@" + Math.round(x.at)).join(" "));
   console.log(JSON.stringify(r)); return r;
 }
 const pass = results.filter((x) => x.pass).length;

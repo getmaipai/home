@@ -17,3 +17,9 @@ test("mm-hm and yeah keep her going, with or without echo mixed in", () => {
   expect(["ack", "echo"]).toContain(judgeCutIn("yeah the dragon was honestly a little nervous", said));
 });
 test("nothing recognised is unknown, not an interruption", () => { expect(judgeCutIn("", said)).toBe("unknown"); });
+
+test("one or two stray words, such as half a name from her own voice, never stop her", () => {
+  expect(judgeCutIn("Ignati", said)).toBe("echo");
+  expect(judgeCutIn("map massive", said)).toBe("echo");
+  expect(judgeCutIn("no way", said)).toBe("ack"); // a reaction, not a stop
+});
