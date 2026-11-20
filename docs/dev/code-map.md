@@ -640,6 +640,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/run.ts` | FilmStepError, isTransientStackError, __setFilmRetryDelaysForTests, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, cutOutPeople, makeSheetFromPictures |
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
+| `backend/src/lib/films/speaker.ts` | speakerOfPlan |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/storyboardRows.ts` | storyboardRows, roughCutRows, renderPlanRows, filmControlRows |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
