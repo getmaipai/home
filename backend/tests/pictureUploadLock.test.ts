@@ -37,7 +37,7 @@ beforeEach(async () => {
   fake = installFakeImageStack({ pollsToFinish: 1 });
   sage = (await owner()).row;
 });
-afterEach(() => { fake.restore(); __setAgeCheckRunnerForTests(null); __resetPictureJobsForTests(); __setPicturePollMsForTests(null); });
+afterEach(() => { fake.restore(); __resetPictureJobsForTests(); __setPicturePollMsForTests(null); });
 
 test("adult-owned unlabeled Library source starts open and keeps the result all-ages", async () => {
   const source = await file(sage);

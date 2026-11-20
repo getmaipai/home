@@ -13,7 +13,6 @@ import { swapReferencePhotos } from "@/lib/videos/swapReferences";
 import { editVideoArgs } from "@/lib/videos/editTool";
 import { readyVideoStatusForTests, __setVideoStatusForTests } from "@/lib/videos/ready";
 import { __resetVideoJobsForTests, getVideoJobFor } from "@/lib/videos/jobs";
-import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { installFakeVideoStack } from "./videoFixture";
 import { owner } from "./support/testAuth";
 import { runEditVideo } from "@/lib/videos/editTool";
@@ -24,7 +23,7 @@ import type { PersonRow } from "@/types";
 
 let fake: ReturnType<typeof installFakeVideoStack>;
 beforeEach(() => { resetDb(); fake = installFakeVideoStack(); __setStackSwapTimingForTests({ pollMs: 1, deadlineMs: 1000 }); });
-afterEach(() => { fake.restore(); __setSwapFetchForTests(null); __setVideoStatusForTests(undefined); __setAgeCheckRunnerForTests(null); __resetVideoJobsForTests(); __setStackSwapTimingForTests(null); });
+afterEach(() => { fake.restore(); __setSwapFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoJobsForTests(); __setStackSwapTimingForTests(null); });
 function person(name: string, role = "owner"): PersonRow { const now = new Date().toISOString(), id = `person-${name}-swap`; db.insert(people).values({ id, displayName: name, role, avatarSeed: name, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run(); return db.select().from(people).where(eq(people.id, id)).get() as PersonRow; }
 function photo(actor: PersonRow, n: number, provenance = "media-subject-reference"): string { const x = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/jpeg", bytes: new Uint8Array([n, 2, 3]), provenance, retention: "kept", name: `${n}.jpg` }); if (!x.ok) throw Error(x.error); return x.value.id; }
 
