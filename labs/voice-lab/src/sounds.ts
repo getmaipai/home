@@ -5,7 +5,7 @@ import { join } from "node:path";
 // skipped, and the prompt never offers it the tag).
 export const SOUND_DIR = Bun.env.LAB_SOUNDS ?? join(import.meta.dir, "..", "engines", "sounds");
 export type Sound = { pcm: Int16Array; seconds: number; level: number | null; kind: string; file: string };
-const KIND_OF_TAG: Record<string, string> = { laugh: "laugh", chuckle: "laugh", sigh: "sigh", gasp: "breath", breath: "breath", cough: "cough", "clear throat": "cough" };
+const KIND_OF_TAG: Record<string, string> = { laugh: "laugh", chuckle: "laugh", sigh: "sigh", gasp: "breath", breath: "breath", cough: "cough", "clear throat": "throat" };
 const cache = new Map<string, Record<string, Sound[]>>();
 
 /** "casual_mild_happy" and "casual" share the recordings in sounds/casual. */

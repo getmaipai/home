@@ -11,7 +11,7 @@ index = {}; counts = {}
 for m in meta:
     a = asr[m["name"]]; ts = a["timestamps"] or []
     x, sr = sf.read(f"{raw}/clips/{m['name']}.wav", dtype="float32"); dur = len(x) / sr
-    if m["pos"] == "end": lo, hi = (ts[-1] + 0.30 if ts else 0.0), dur
+    if m["pos"] == "end": lo, hi = (ts[-1] + float(os.environ.get("END_OFF","0.30")) if ts else 0.0), dur
     else: lo, hi = 0.0, (ts[0] - 0.03 if ts else dur)
     if hi - lo < 0.25: continue
     seg = x[int(lo * sr):int(hi * sr)]

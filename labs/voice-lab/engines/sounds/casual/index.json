@@ -1,0 +1,573 @@
+{
+ "breath_1.wav": {
+  "kind": "breath",
+  "seconds": 0.92,
+  "level_vs_speech": 0.35,
+  "source": "ex03-ex02_sympathetic-sad_009-ex02_sad_css024",
+  "text": "Thanks, Gary. \ud83c\udf2c\ufe0f",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_1.wav": {
+  "kind": "sigh",
+  "seconds": 0.48,
+  "level_vs_speech": 2.04,
+  "source": "ex04-ex02_awe_001-ex02_awe_css047",
+  "text": "\ud83d\ude24 The stars. That's just stunning. Have you ever seen a shooting star before?",
+  "asr": "Mm.",
+  "use": true
+ },
+ "breath_2.wav": {
+  "kind": "breath",
+  "seconds": 1.58,
+  "level_vs_speech": 0.09,
+  "source": "ex04-ex02_fearful_001-ex02_fearful_css016",
+  "text": "I don't know, did we take more of a left or did we go more to the right? Do you ",
+  "asr": "",
+  "use": true
+ },
+ "cough_1.wav": {
+  "kind": "cough",
+  "seconds": 3.24,
+  "level_vs_speech": 0.81,
+  "source": "ex04-ex02_nonverbal_007-ex02_nonverbal_css000",
+  "text": "\ud83d\ude37 I'm so grateful for...",
+  "asr": "",
+  "use": false
+ },
+ "breath_3.wav": {
+  "kind": "breath",
+  "seconds": 0.59,
+  "level_vs_speech": 0.18,
+  "source": "ex03-ex02_sympathetic-sad_008-ex02_sad_css008",
+  "text": "He didn't even care. He didn't even try to own it. \ud83c\udf2c\ufe0f",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_2.wav": {
+  "kind": "sigh",
+  "seconds": 0.62,
+  "level_vs_speech": 0.34,
+  "source": "ex04-ex02_disgusted_013-ex02_disgusted_css028",
+  "text": "\ud83d\ude24 Nope, I'm turning it off.",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_3.wav": {
+  "kind": "sigh",
+  "seconds": 0.2,
+  "level_vs_speech": 0.33,
+  "source": "ex04-ex02_nonverbal_010-ex02_nonverbal_css001",
+  "text": "\ud83d\ude24 Corgi is over there. ",
+  "asr": "Mm.",
+  "use": true
+ },
+ "laugh_1.wav": {
+  "kind": "laugh",
+  "seconds": 1.62,
+  "level_vs_speech": 1.1,
+  "source": "ex04-ex02_calm_003-ex02_calm_css026",
+  "text": "Sorry, my stomach. I need more s'mores. \ud83e\udd23",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "breath_4.wav": {
+  "kind": "breath",
+  "seconds": 0.84,
+  "level_vs_speech": 0.37,
+  "source": "ex04-ex02_nonverbal_010-ex02_nonverbal_css000",
+  "text": "\ud83c\udf2c\ufe0f Look at that.",
+  "asr": "Hmm.",
+  "use": true
+ },
+ "sigh_4.wav": {
+  "kind": "sigh",
+  "seconds": 1.06,
+  "level_vs_speech": 0.56,
+  "source": "ex04-ex02_confused_005-ex02_confused_css013",
+  "text": "Um... \ud83d\ude24",
+  "asr": "Mm-hmm.",
+  "use": false
+ },
+ "breath_5.wav": {
+  "kind": "breath",
+  "seconds": 0.76,
+  "level_vs_speech": 0.09,
+  "source": "ex04-ex02_fearful_006-ex02_fearful_css010",
+  "text": "A bull? But then that means we have to get close to it. Why don't you just use t",
+  "asr": "",
+  "use": true
+ },
+ "breath_6.wav": {
+  "kind": "breath",
+  "seconds": 1.12,
+  "level_vs_speech": 3.33,
+  "source": "ex04-ex02_fearful_005-ex02_fearful_css011",
+  "text": "Yes. \ud83c\udf2c\ufe0f ",
+  "asr": "Okay.",
+  "use": false
+ },
+ "breath_7.wav": {
+  "kind": "breath",
+  "seconds": 0.29,
+  "level_vs_speech": 2.67,
+  "source": "ex04-ex02_disgusted_007-ex02_disgusted_css016",
+  "text": "Yeah. \ud83c\udf2c\ufe0f",
+  "asr": "Mm.",
+  "use": true
+ },
+ "breath_8.wav": {
+  "kind": "breath",
+  "seconds": 0.97,
+  "level_vs_speech": 0.4,
+  "source": "ex04-ex02_awe_001-ex02_awe_css041",
+  "text": "Galloping over. \ud83c\udf2c\ufe0f",
+  "asr": "",
+  "use": true
+ },
+ "breath_9.wav": {
+  "kind": "breath",
+  "seconds": 0.38,
+  "level_vs_speech": 1.11,
+  "source": "ex04-ex02_sarcastic_001-ex02_sarcastic_css017",
+  "text": "\ud83c\udf2c\ufe0f Was it just the prize? ",
+  "asr": "Huh?",
+  "use": true
+ },
+ "sigh_5.wav": {
+  "kind": "sigh",
+  "seconds": 1.09,
+  "level_vs_speech": 0.15,
+  "source": "ex03-ex02_sympathetic-sad_011-ex02_sad_css001",
+  "text": "I'm safe, I just... \ud83d\ude24",
+  "asr": "",
+  "use": true
+ },
+ "breath_10.wav": {
+  "kind": "breath",
+  "seconds": 1.28,
+  "level_vs_speech": 0.07,
+  "source": "ex04-ex02_fearful_005-ex02_fearful_css007",
+  "text": "Spider Man, I don't know how to get out of these things. \ud83c\udf2c\ufe0f",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "breath_11.wav": {
+  "kind": "breath",
+  "seconds": 1.29,
+  "level_vs_speech": 0.85,
+  "source": "ex03-ex02_sympathetic-sad_011-ex02_sad_css007",
+  "text": "\ud83c\udf2c\ufe0f Thanks. I'm sorry.",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_6.wav": {
+  "kind": "sigh",
+  "seconds": 0.86,
+  "level_vs_speech": 1.79,
+  "source": "ex04-ex02_laughing_006-ex02_laughing_css004",
+  "text": "Oh my god. \ud83d\ude24",
+  "asr": "Ugh.",
+  "use": true
+ },
+ "sigh_7.wav": {
+  "kind": "sigh",
+  "seconds": 1.58,
+  "level_vs_speech": 0.22,
+  "source": "ex03-ex02_sympathetic-sad_010-ex02_sad_css018",
+  "text": "garden \ud83d\ude24",
+  "asr": "",
+  "use": true
+ },
+ "breath_12.wav": {
+  "kind": "breath",
+  "seconds": 2.24,
+  "level_vs_speech": 0.23,
+  "source": "ex04-ex02_nonverbal_009-ex02_nonverbal_css004",
+  "text": "is the... \ud83c\udf2c\ufe0f ",
+  "asr": "Yeah.",
+  "use": false
+ },
+ "laugh_2.wav": {
+  "kind": "laugh",
+  "seconds": 0.22,
+  "level_vs_speech": 0.23,
+  "source": "ex02_laughing_00336",
+  "text": "Well yeah. \ud83e\udd23",
+  "asr": "Mm.",
+  "use": false
+ },
+ "breath_13.wav": {
+  "kind": "breath",
+  "seconds": 0.93,
+  "level_vs_speech": 0.27,
+  "source": "ex03-ex02_sympathetic-sad_009-ex02_sad_css016",
+  "text": "I don't want to go home. \ud83c\udf2c\ufe0f",
+  "asr": "Thank you.",
+  "use": false
+ },
+ "sigh_8.wav": {
+  "kind": "sigh",
+  "seconds": 0.93,
+  "level_vs_speech": 0.14,
+  "source": "ex03-ex02_animaldir-animal_011-ex02_animal_css016",
+  "text": "Mmm. \ud83d\ude24",
+  "asr": "you",
+  "use": false
+ },
+ "sigh_9.wav": {
+  "kind": "sigh",
+  "seconds": 0.64,
+  "level_vs_speech": 0.25,
+  "source": "ex04-ex02_desire_001-ex02_desire_css027",
+  "text": "Yeah. \ud83d\ude24",
+  "asr": "",
+  "use": true
+ },
+ "laugh_3.wav": {
+  "kind": "laugh",
+  "seconds": 1.96,
+  "level_vs_speech": 1.14,
+  "source": "ex02_laughing_00044__laugh",
+  "text": "We borrowed some of your bubbly! \ud83e\udd23",
+  "mid": true,
+  "asr": "Some of your bubbly.",
+  "use": false
+ },
+ "sigh_10.wav": {
+  "kind": "sigh",
+  "seconds": 0.48,
+  "level_vs_speech": 2.04,
+  "source": "ex04-ex02_awe_001-ex02_awe_css047__sigh",
+  "text": "\ud83d\ude24 The stars. That's just stunning. Have you ever seen a shooting star before?",
+  "mid": true,
+  "asr": "Mm.",
+  "use": true
+ },
+ "laugh_4.wav": {
+  "kind": "laugh",
+  "seconds": 2.74,
+  "level_vs_speech": 0.82,
+  "source": "ex04-ex02_fearful_002-ex02_fearful_css004__laugh",
+  "text": "15 minutes and I just can't be bothered to wait another time. \ud83e\udd23 \ud83c\udf2c\ufe0f",
+  "mid": true,
+  "asr": "I just can't be bothered to wait another day.",
+  "use": false
+ },
+ "sigh_11.wav": {
+  "kind": "sigh",
+  "seconds": 0.62,
+  "level_vs_speech": 0.34,
+  "source": "ex04-ex02_disgusted_013-ex02_disgusted_css028__sigh",
+  "text": "\ud83d\ude24 Nope, I'm turning it off.",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_12.wav": {
+  "kind": "sigh",
+  "seconds": 1.17,
+  "level_vs_speech": 0.59,
+  "source": "ex04-ex02_confused_005-ex02_confused_css013__sigh",
+  "text": "Um... \ud83d\ude24",
+  "mid": true,
+  "asr": "Mm.",
+  "use": true
+ },
+ "laugh_5.wav": {
+  "kind": "laugh",
+  "seconds": 1.94,
+  "level_vs_speech": 1.05,
+  "source": "ex02_laughing_00055__laugh",
+  "text": "Jurassic World is \ud83e\udd23 awesome!",
+  "mid": true,
+  "asr": "Classic world is awesome.",
+  "use": false
+ },
+ "sigh_13.wav": {
+  "kind": "sigh",
+  "seconds": 2.9,
+  "level_vs_speech": 0.98,
+  "source": "ex04-ex02_happy_013-ex02_happy_css006__sigh",
+  "text": "We're going to stop in Havana. Of course we're going to stop in Havana. \ud83d\ude24",
+  "mid": true,
+  "asr": "Stop in Havana. Of course, we're gonna stop in Havana.",
+  "use": false
+ },
+ "laugh_6.wav": {
+  "kind": "laugh",
+  "seconds": 1.74,
+  "level_vs_speech": 1.0,
+  "source": "ex02_laughing_00110__laugh",
+  "text": "There is no \ud83e\udd23 guarantee.",
+  "mid": true,
+  "asr": "No guarantee.",
+  "use": false
+ },
+ "laugh_7.wav": {
+  "kind": "laugh",
+  "seconds": 1.62,
+  "level_vs_speech": 0.56,
+  "source": "ex04-ex02_bored_002-ex02_bored_css011__laugh",
+  "text": "I'll eat it. \ud83e\udd23 \ud83c\udf2c\ufe0f",
+  "mid": true,
+  "asr": "That",
+  "use": false
+ },
+ "sigh_14.wav": {
+  "kind": "sigh",
+  "seconds": 1.66,
+  "level_vs_speech": 0.85,
+  "source": "ex03-ex02_sympathetic-sad_011-ex02_sad_css001__sigh",
+  "text": "I'm safe, I just... \ud83d\ude24",
+  "mid": true,
+  "asr": "Dave, I just",
+  "use": false
+ },
+ "laugh_8.wav": {
+  "kind": "laugh",
+  "seconds": 0.6,
+  "level_vs_speech": 0.43,
+  "source": "ex04-ex02_laughing_002-ex02_laughing_css021__laugh",
+  "text": "\ud83c\udf2c\ufe0f Don't leave, you have to pay for all that. \ud83e\udd23  You're accountable for her. \ud83c\udf2c\ufe0f ",
+  "mid": true,
+  "asr": "How?",
+  "use": false
+ },
+ "sigh_15.wav": {
+  "kind": "sigh",
+  "seconds": 0.72,
+  "level_vs_speech": 1.34,
+  "source": "ex04-ex02_disgusted_001-ex02_disgusted_css010__sigh",
+  "text": "And I can see why. \ud83d\ude24",
+  "mid": true,
+  "asr": "Could see why.",
+  "use": false
+ },
+ "sigh_16.wav": {
+  "kind": "sigh",
+  "seconds": 1.6,
+  "level_vs_speech": 1.37,
+  "source": "ex04-ex02_laughing_006-ex02_laughing_css004__sigh",
+  "text": "Oh my god. \ud83d\ude24",
+  "mid": true,
+  "asr": "Ugh.",
+  "use": true
+ },
+ "sigh_17.wav": {
+  "kind": "sigh",
+  "seconds": 1.77,
+  "level_vs_speech": 0.24,
+  "source": "ex03-ex02_sympathetic-sad_010-ex02_sad_css018__sigh",
+  "text": "garden \ud83d\ude24",
+  "mid": true,
+  "asr": "",
+  "use": true
+ },
+ "laugh_9.wav": {
+  "kind": "laugh",
+  "seconds": 0.5,
+  "level_vs_speech": 2.56,
+  "source": "ex04-ex02_laughing_002-ex02_laughing_css013__laugh",
+  "text": "\ud83e\udd23 What? \ud83c\udf2c\ufe0f",
+  "mid": true,
+  "asr": "What's right?",
+  "use": false
+ },
+ "laugh_10.wav": {
+  "kind": "laugh",
+  "seconds": 1.94,
+  "level_vs_speech": 0.99,
+  "source": "ex02_laughing_00290__laugh",
+  "text": "It is a natural reaction. \ud83e\udd23",
+  "mid": true,
+  "asr": "is a natural reaction.",
+  "use": false
+ },
+ "cough_2.wav": {
+  "kind": "cough",
+  "seconds": 0.29,
+  "level_vs_speech": 2.47,
+  "source": "ex04-ex02_nonverbal_006-ex02_nonverbal_css005__cough",
+  "text": "\ud83d\ude37 of your \ud83d\ude37 grandparents. \ud83d\ude37 ",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "cough_3.wav": {
+  "kind": "cough",
+  "seconds": 0.5,
+  "level_vs_speech": 2.39,
+  "source": "ex04-ex02_nonverbal_006-ex02_nonverbal_css004__cough",
+  "text": "\ud83c\udf2c\ufe0f \ud83d\ude37 Okay. \ud83d\ude37 I'll make sure I know.",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "laugh_11.wav": {
+  "kind": "laugh",
+  "seconds": 0.78,
+  "level_vs_speech": 0.94,
+  "source": "ex02_laughing_00336__laugh",
+  "text": "Well yeah. \ud83e\udd23",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_18.wav": {
+  "kind": "sigh",
+  "seconds": 0.88,
+  "level_vs_speech": 0.13,
+  "source": "ex03-ex02_animaldir-animal_011-ex02_animal_css016__sigh",
+  "text": "Mmm. \ud83d\ude24",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "sigh_19.wav": {
+  "kind": "sigh",
+  "seconds": 1.58,
+  "level_vs_speech": 0.89,
+  "source": "ex04-ex02_fearful_004-ex02_fearful_css003__sigh",
+  "text": "with everything that just came down okay. \ud83d\ude24",
+  "mid": true,
+  "asr": "That just came down, okay.",
+  "use": false
+ },
+ "sigh_20.wav": {
+  "kind": "sigh",
+  "seconds": 0.83,
+  "level_vs_speech": 0.24,
+  "source": "ex04-ex02_desire_001-ex02_desire_css027__sigh",
+  "text": "Yeah. \ud83d\ude24",
+  "mid": true,
+  "asr": "Yeah.",
+  "use": false
+ },
+ "laugh_v1.wav": {
+  "kind": "laugh",
+  "seconds": 2.22,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2958",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 91.5
+ },
+ "laugh_v2.wav": {
+  "kind": "laugh",
+  "seconds": 1.66,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f0838",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 91.2
+ },
+ "laugh_v3.wav": {
+  "kind": "laugh",
+  "seconds": 2.28,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f0177",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 90.9
+ },
+ "laugh_v4.wav": {
+  "kind": "laugh",
+  "seconds": 0.92,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2904",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.5
+ },
+ "laugh_v5.wav": {
+  "kind": "laugh",
+  "seconds": 0.78,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2215",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.3
+ },
+ "laugh_v6.wav": {
+  "kind": "laugh",
+  "seconds": 1.32,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f1209",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 88.8
+ },
+ "cough_v1.wav": {
+  "kind": "cough",
+  "seconds": 1.24,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f0775",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 90.9
+ },
+ "cough_v2.wav": {
+  "kind": "cough",
+  "seconds": 0.84,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2861",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.7
+ },
+ "cough_v3.wav": {
+  "kind": "cough",
+  "seconds": 0.76,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f0152",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.6
+ },
+ "cough_v4.wav": {
+  "kind": "cough",
+  "seconds": 0.7,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2739",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.2
+ },
+ "throat_v1.wav": {
+  "kind": "throat",
+  "seconds": 0.66,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f1209",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 91.9
+ },
+ "throat_v2.wav": {
+  "kind": "throat",
+  "seconds": 1.24,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f0740",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 90.9
+ },
+ "throat_v3.wav": {
+  "kind": "throat",
+  "seconds": 1.36,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f2215",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 90.6
+ },
+ "throat_v4.wav": {
+  "kind": "throat",
+  "seconds": 1.14,
+  "level_vs_speech": 0.8,
+  "source": "VocalSound f1552",
+  "speaker": "other",
+  "use": true,
+  "snr_db": 89.7
+ }
+}
