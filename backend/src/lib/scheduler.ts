@@ -403,8 +403,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   "backup.run": async () => {
     await runBackupAndMirror();
   },
-  "storage.check_disk_full": () => {
-    checkDiskFull();
+  "storage.check_disk_full": async () => {
+    await checkDiskFull();
   },
   // STORE-CAP-01: bytes on disk with no File record, or a record with no
   // bytes - reported as a health item, never purged (lib/storage/usage.ts's
