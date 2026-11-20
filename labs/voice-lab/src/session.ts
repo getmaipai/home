@@ -4,7 +4,7 @@ import { TurnManager } from "./turnManager";
 import { History } from "./history";
 import { buildPrompt, datedUser } from "./prompt";
 import { encodeWav, StreamingWavReader } from "./wav";
-import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared } from "./stack";
+import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
 import { TagStream, forEngine } from "./tags";
 import { appendMetrics, type TurnMetrics } from "./metrics";
@@ -45,11 +45,11 @@ export class VoiceSession {
   private runToolFn: typeof runTool;
   private metricsFn: typeof appendMetrics;
   private vadDetector: { detect(frame: Float32Array): boolean };
-  private voice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private useStyles = true; private replyStyle = "";
+  private injected = false; private voice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private useStyles = true; private replyStyle = "";
   private stylesFn: typeof supportedStyles;
   private voicePreparedFn: typeof voicePrepared;
   private voiceChecked = new Set<string>();
-  private styleFor(piece: string): string { if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|sad)\]/i.exec(piece); if (m) this.replyStyle = m[1]!.toLowerCase(); return this.replyStyle; }
+  private styleFor(piece: string): string { if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|happy|sad|sarcastic)\]/i.exec(piece); if (m) this.replyStyle = m[1]!.toLowerCase(); return this.replyStyle; }
   private warming: AbortController | null = null; private lastWarmAt = 0;
   private prewarmChatFn: typeof prewarmChat;
   private prewarmVoiceFn: typeof prewarmVoice;
@@ -70,7 +70,7 @@ export class VoiceSession {
     this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
     this.metricsFn = deps.appendMetrics ?? appendMetrics;
     this.prewarmChatFn = deps.prewarmChat ?? prewarmChat; this.prewarmVoiceFn = deps.prewarmVoice ?? prewarmVoice;
-    this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
+    this.injected = !!deps.speech; this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
     this.timerSet = deps.setTimeout ?? setTimeout; this.timerClear = deps.clearTimeout ?? clearTimeout;
     this.send({ t: "state", state: "idle", vad: this.vad.mode });
   }
@@ -162,7 +162,7 @@ export class VoiceSession {
     this.draftMessages = []; this.draftInterrupted = false;
     this.replyStyle = ""; this.warming?.abort(); this.warming = null;
     const chunker = new Chunker(), tagger = new TagStream(); let full = "", rounds = 0, toolTextLength = 0, headerGate: Promise<void> = Promise.resolve(), sendQueue: Promise<void> = Promise.resolve();
-    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_phrase_ready === undefined) this.metrics.t_first_phrase_ready = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
+    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_phrase_ready === undefined) this.metrics.t_first_phrase_ready = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); const mood = requestedStyle && !this.injected ? await moodVoice(this.voice, requestedStyle) : this.voice; if (mood !== this.voice) return { voice: mood, style: "" }; return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
     const speakText = async (delta: string) => { full += delta; this.generatedText = full; const clean = tagger.push(delta); for (const piece of chunker.push(clean)) schedule(piece); };
     try {
       while (rounds <= 2) {

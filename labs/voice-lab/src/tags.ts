@@ -1,4 +1,4 @@
-export const TAGS = ["laugh", "chuckle", "sigh", "gasp", "cough", "clear throat", "whisper", "shout", "excited", "angry", "sad", "breath"] as const;
+export const TAGS = ["laugh", "chuckle", "sigh", "gasp", "cough", "clear throat", "whisper", "shout", "excited", "happy", "angry", "sad", "sarcastic", "breath"] as const;
 const known = new Set<string>(TAGS);
 export type Segment = { type: "text"; value: string } | { type: "tag"; value: string };
 

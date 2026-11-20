@@ -151,3 +151,16 @@ export async function prewarmVoice(voice: string, signal?: AbortSignal): Promise
   await r.arrayBuffer();
   return performance.now() - t0;
 }
+
+const MOOD_NAMES: Record<string, string> = { excited: "happy", happy: "happy", sad: "sad", whisper: "whisper", angry: "angry", sarcastic: "sarcastic" };
+let voiceIds: { expires: number; ids: Set<string> } | null = null;
+/** The voice to use for a mood: "<voice>_mild_<mood>" when the voice server has it, otherwise the plain voice. */
+export async function moodVoice(voice: string, style: string, strength = Bun.env.LAB_MOOD_STRENGTH ?? "mild", now = Date.now()): Promise<string> {
+  const mood = MOOD_NAMES[style]; if (!mood || strength === "off") return voice;
+  if (!voiceIds || voiceIds.expires < now) {
+    try { const r = await fetch(`${TTS}/voices`); const j = await r.json() as { voices?: Array<{ id: string }> }; voiceIds = { expires: now + 60_000, ids: new Set((j.voices ?? []).map((v) => v.id)) }; }
+    catch { return voice; }
+  }
+  const id = strength === "full" ? `${voice}_${mood}` : strength === "medium" ? `${voice}_blend_${mood}` : `${voice}_mild_${mood}`;
+  return voiceIds.ids.has(id) ? id : voice;
+}
