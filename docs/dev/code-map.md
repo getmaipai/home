@@ -120,9 +120,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/shows/pages/watch.json` | shows | Watch |
 | `backend/packages/shows/pages/watchlist.json` | shows | Watchlist |
 | `backend/packages/video/pages/captions.json` | video | Captions |
-| `backend/packages/video/pages/categories.json` | video | Categories |
 | `backend/packages/video/pages/channel.json` | video | Channel |
-| `backend/packages/video/pages/channels.json` | video | Channels |
 | `backend/packages/video/pages/clips-feed.json` | video | Clips |
 | `backend/packages/video/pages/clips.json` | video | My clips |
 | `backend/packages/video/pages/create.json` | video | Create |
@@ -135,7 +133,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/video/pages/index.json` | video | Video |
 | `backend/packages/video/pages/library.json` | video | All videos |
 | `backend/packages/video/pages/liked.json` | video | Liked videos |
-| `backend/packages/video/pages/new-uploads.json` | video | New uploads |
 | `backend/packages/video/pages/playlist.json` | video | Playlist |
 | `backend/packages/video/pages/playlists.json` | video | Playlists |
 | `backend/packages/video/pages/search.json` | video | Search |
