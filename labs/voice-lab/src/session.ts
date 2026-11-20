@@ -231,6 +231,8 @@ export class VoiceSession {
       if (!sent) throw new Error("voice response contained no audio");
     };
     const fail = () => { this.metrics.ok = false; this.metrics.failure = "voice_failed"; this.send({ t: "error", code: "voice_failed" }); this.abort?.abort(); this.finishMetrics(); };
+    // A piece that is only a sound tag has no words for this voice; the engine refuses it, which used to fail the whole reply.
+    if (!/[\p{L}\p{N}]/u.test(forEngine(text, supported).replace(/\[[^\]]*\]/g, ""))) { if (!signal.aborted && !this.closed) { const t = new Uint8Array(488), tv2 = new DataView(t.buffer); tv2.setUint32(0, this.turn, true); tv2.setUint16(4, index, true); tv2.setUint16(6, 1, true); this.sendFrame(t); } return; }
     try { await synth(choice.style); }
     catch {
       if (signal.aborted || this.closed) return;

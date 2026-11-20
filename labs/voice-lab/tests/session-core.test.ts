@@ -477,3 +477,16 @@ test("12 empty interruption transcript remains lowered and undecided", async () 
   expect(tm.cutting).toBe(true);
   h.session.close();
 });
+
+test("a piece that is only a sound tag is skipped and does not fail the reply", async () => {
+  const spoken: string[] = [];
+  const h = harness({
+    speech: async (text: string) => { spoken.push(text); return new Response(encodeWav(new Int16Array(512))); },
+    chat: async function* () { yield { type: "text", text: "[whisper] " }; yield { type: "text", text: "[laugh]. " }; yield { type: "text", text: "That is funny to me." }; },
+  });
+  (h.session as any).history.commitUser("question");
+  await (h.session as any).reply("question", true);
+  expect((h.session as any).metrics.failure).not.toBe("voice_failed");
+  expect(spoken.every((t) => /[a-z]/i.test(t))).toBe(true);
+  h.session.close();
+});
