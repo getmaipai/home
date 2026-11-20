@@ -6,7 +6,7 @@ import { TAGS } from "../src/tags";
 import { machineBusy, labPriorities } from "./loadcheck";
 import { sampleGpu, gpuClass, waitForGpuFree } from "../src/gpuLoad";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
-const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = quick ? 4 : 10;
+const quick = process.argv.includes("--quick"), RUNS = quick ? 5 : 10, TURNS = quick ? 4 : 10;
 const FIRST_SOUND_TARGET_MS = 1350, P90_LIMIT_MS = 2300, WORST_LIMIT_MS = 3500; // median 1.17 s, p90 1.93 s, worst about 2.6 s measured, plus 15 percent where the sample is stable // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
 // --wait-gpu-free: start only when no hub video job (or other GPU engine) is running; a run is valid for "ready for the owner" only if the GPU stayed free the whole time
 if (process.argv.includes("--wait-gpu-free")) { console.log("waiting for the GPU to be free of other jobs..."); if (!(await waitForGpuFree())) { console.log("NOT RUN: the GPU did not become free within 20 minutes (a hub video job is running)"); process.exit(4); } }
@@ -40,6 +40,7 @@ const silent = offered.filter((t) => { const p = pickSound("casual", t, 0.08); r
 const refusedNow = refusedSounds("casual"); line(refusedNow.length === 0, `every library sound is from the voice's own speaker${refusedNow.length ? "; FROM ANOTHER SPEAKER: " + refusedNow.join(", ") : ""}`);
 line(offered.length > 0 && silent.length === 0, `every sound tag the prompt offers makes a real sound (${offered.join(", ") || "none offered"})${silent.length ? "; NO SOUND FOR: " + silent.join(", ") : ""}`);
 
+if (!quick) {
 // 5 + 6 first sound and gaps over TURNS turns
 const J = "/private/tmp/claude-501/ready-measure.json";
 await run(["bun", "rig/measure.ts", SECRET_FILE, "--n", String(TURNS), "--json", J]);
@@ -49,6 +50,7 @@ try { const s = JSON.parse(await Bun.file(J).text()).summary;
   line(s.totalGaps === 0, `audio gaps in those turns: ${s.totalGaps} (the page's playback gate, replayed on the real frame arrivals)`);
 } catch { line(false, "the measuring run produced no result"); line(false, "no gap result"); }
 
+}
 // 3 + 4 echo tests
 for (const [scenario, label, need] of [["silent", "her own voice fed back into the microphone at speaker level causes no stop", (m: RegExpMatchArray) => Number(m[1]) === RUNS && m[2] === "0"], ["stop", '"wait, stop" over her voice stops her', (m: RegExpMatchArray) => Number(m[1]) === RUNS]] as const) {
   const out = await run(["bun", "rig/echotest.ts", SECRET_FILE, "--scenario", scenario, "--runs", String(RUNS)]);
@@ -62,11 +64,11 @@ if (!quick) {
     const out = await run(["bun", "rig/listen.ts", SECRET_FILE, ...extra]); const ok = /ALL RUNS: PASS/.test(out);
     const files = out.match(/LISTEN FILES[^\n]*/)?.[0] ?? ""; line(ok, `listener, three-minute conversation (${label}; room is SIMULATED, not real speakers): ${ok ? "same person, right words, smooth, joins, timing and stumble pattern all pass" : out.split("\n").filter((l) => /^(RUN|  )/.test(l)).slice(0, 4).join(" / ").slice(0, 400)} ${ok ? "" : files}`);
   }
-} else line(true, "listener skipped in quick mode (not valid for telling the owner to test)");
+} else { const out = await run(["bun", "rig/listen.ts", SECRET_FILE, "--runs", "1", "--quick"]); const ok = /ALL RUNS: PASS/.test(out); const t = out.match(/timing median (\d+) p90 (\d+) worst (\d+)/); line(ok, `listener, 8-turn conversation (room SIMULATED): ${ok ? "same person, right words, smooth, joins, stumbles, stops all pass" : out.split("\n").filter((l) => /^(RUN|  )/.test(l)).slice(0, 5).join(" / ").slice(0, 600)}${t ? `; first sound from the recording median ${t[1]} p90 ${t[2]} worst ${t[3]} ms` : ""} ${out.match(/LISTEN FILES[^\n]*/)?.[0] ?? ""}`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
 
 const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd) === "free" ? "GPU FREE" : "GPU SHARED"; console.log(`RUN CLASS: ${klass} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
-const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 && klass === "GPU SHARED" ? "ALL PASS but the GPU was shared: not a valid ready run (rerun with --wait-gpu-free)" : bad === 0 ? (quick ? "ALL PASS (quick mode: not valid for telling the owner to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
+const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 && klass === "GPU SHARED" ? "ALL PASS but the GPU was shared: not a valid ready run (rerun with --wait-gpu-free)" : bad === 0 ? (quick ? "QUICK PASS (fast loop only: the full run must also pass before the owner is told to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
 process.exit(bad ? 1 : 0);

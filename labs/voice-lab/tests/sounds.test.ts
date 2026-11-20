@@ -7,8 +7,8 @@ import { join } from "node:path";
 test("the casual voice is offered only sounds that exist for it, and mood variants share them", () => {
   expect(soundVoice("casual_mild_happy")).toBe("casual");
   const tags = availableTags("casual");
-  for (const tag of ["laugh", "sigh", "breath"]) expect(tags).toContain(tag);
-  for (const tag of ["cough", "clear throat"]) expect(tags).not.toContain(tag); // no same-speaker recording, so not offered
+  for (const tag of ["sigh", "breath", "gasp"]) expect(tags).toContain(tag);
+  for (const tag of ["laugh", "chuckle", "cough", "clear throat"]) expect(tags).not.toContain(tag); // baseline: laughs wait for approval; no same-speaker cough recording
 });
 test("every offered tag really yields audible, level-matched audio, and a voice with no recordings yields nothing", () => {
   for (const tag of availableTags("casual")) {

@@ -6,6 +6,8 @@ import { join } from "node:path";
 export const SOUND_DIR = Bun.env.LAB_SOUNDS ?? join(import.meta.dir, "..", "engines", "sounds");
 export type Sound = { pcm: Int16Array; seconds: number; level: number | null; kind: string; file: string };
 const KIND_OF_TAG: Record<string, string> = { laugh: "laugh", chuckle: "laugh", sigh: "sigh", gasp: "breath", breath: "breath", cough: "cough", "clear throat": "throat" };
+/** Baseline: only sounds the owner has had a chance to approve are offered. Laughs wait until a listener pass and his ears say so (LAB_SOUND_KINDS=sigh,breath,laugh). */
+export const ENABLED_KINDS = (Bun.env.LAB_SOUND_KINDS ?? "sigh,breath").split(",").map((x) => x.trim()).filter(Boolean);
 const cache = new Map<string, Record<string, Sound[]>>();
 /** Library entries refused because their speaker is not the voice's speaker (must always be empty). */
 export const refused: Record<string, string[]> = {};
@@ -33,12 +35,12 @@ export function loadSounds(voice: string, dir = SOUND_DIR): Record<string, Sound
 }
 /** The sound tags this voice can really make: the only ones the chat model is told about. */
 export function availableTags(voice: string, dir = SOUND_DIR): string[] {
-  const lib = loadSounds(voice, dir); return Object.entries(KIND_OF_TAG).filter(([, kind]) => (lib[kind]?.length ?? 0) > 0).map(([tag]) => tag);
+  const lib = loadSounds(voice, dir); return Object.entries(KIND_OF_TAG).filter(([, kind]) => ENABLED_KINDS.includes(kind) && (lib[kind]?.length ?? 0) > 0).map(([tag]) => tag);
 }
 let last = new Map<string, string>();
 /** A sound for a tag, level-matched to the voice's current speech loudness (rms, 0 to 1), never the same file twice in a row. */
 export function pickSound(voice: string, tag: string, speechRms: number, dir = SOUND_DIR, rnd = Math.random): Int16Array | null {
-  const kind = KIND_OF_TAG[tag]; if (!kind) return null;
+  const kind = KIND_OF_TAG[tag]; if (!kind || !ENABLED_KINDS.includes(kind)) return null;
   let options = (loadSounds(voice, dir)[kind] ?? []);
   if (tag === "chuckle") { const short = options.filter((s) => s.seconds <= 1.0); if (short.length) options = short; }
   if (tag === "gasp") { const short = options.filter((s) => s.seconds <= 0.6); if (short.length) options = short; }

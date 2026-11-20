@@ -38,7 +38,7 @@ const SCRIPT: Turn[] = [
   { kind: "normal", say: "What is a good name for a goldfish?" }, { kind: "normal", say: "Why is the sky blue?" }, { kind: "normal", say: "Do you like music?" },
   { kind: "normal", say: "How far away is the moon?" }, { kind: "normal", say: "What should I cook tonight?" }, { kind: "normal", say: "Tell me something interesting about octopuses." }, { kind: "normal", say: "Okay, thanks. Goodnight." },
 ];
-const script = QUICK ? [SCRIPT[0]!, SCRIPT[1]!, SCRIPT[4]!, SCRIPT[5]!] : SCRIPT;
+const script = QUICK ? [SCRIPT[0]!, SCRIPT[1]!, SCRIPT[3]!, SCRIPT[4]!, SCRIPT[5]!, SCRIPT[6]!, SCRIPT[8]!, SCRIPT[9]!] : SCRIPT; // quick: 8 turns including the story with mm-hm and wait-stop
 const clips = new Map<string, Float32Array>(); for (const t of script) { clips.set(t.say, await say(t.say)); for (const d of t.during ?? []) clips.set(d.say, await say(d.say)); }
 const refW = readWav(`${W}/data-scratch/voices/voices_store/casual/ref.wav`); const refE = embed(refW.samples, refW.rate);
 
