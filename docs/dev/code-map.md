@@ -624,7 +624,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/fillerEvents.ts` | reportFillerEvent |
-| `backend/src/lib/films/animatic.ts` | animaticShotOps, makeFilmAnimatic |
+| `backend/src/lib/films/animatic.ts` | animaticRequest, ANIMATIC_OLD_STACK_LINE, ANIMATIC_FAILED_LINE, ANIMATIC_TIMEOUT_LINE, ANIMATIC_MISSING_LINE, runRoughCutJob |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
