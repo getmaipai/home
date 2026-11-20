@@ -1080,7 +1080,7 @@ export type AiOverviewLevel = { tier: "reduced" | "standard" | "boost" | "max"; 
 export type AiOverviewFeature = { id: string; name: string; used_by: string[]; levels: AiOverviewLevel[]; ready_count: number; level_count: number };
 export type AiOverviewHelper = { id: string; name: string; parent: string; component_id: string | null; size_bytes_missing: number | null; model_label: string | null; used_by: string[]; state: AiOverviewState; action: AiOverviewAction | null };
 /** GET /api/ai/feature-models: the models behind each ordered feature, every name, line and size from the Stack's parts list (rule E1). */
-export type AiFeatureModel = { id: string; label: string; description: string; rank: number; state: "ready" | "missing" | "installing" | "updating" | "failed" | "unsupported"; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null };
+export type AiFeatureModel = { id: string; label: string; description: string; rank: number; state: "ready" | "missing" | "installing" | "updating" | "failed" | "unsupported"; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null; for_minors?: true };
 export type AiFeatureModels = { audience: "adult" | "minor"; features: Array<{ id: "pictures" | "videos" | "music"; ordered: true; order: string[]; models: AiFeatureModel[] }> };
 export type AiOverview = {
   features: AiOverviewFeature[];

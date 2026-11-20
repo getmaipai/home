@@ -6,6 +6,7 @@ import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settin
 import { featureModels } from "@/lib/featureModels";
 import type { StackClient } from "@/lib/stack/client";
 import { TestClient } from "./client";
+import { child as makeChild, teen as makeTeen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
 const view = (id: string, category: string, priority: number, over: Record<string, unknown> = {}) => ({
@@ -85,5 +86,44 @@ describe("feature models", () => {
   });
   test("only an owner or admin reads it", async () => {
     expect((await new TestClient().get("/api/ai/feature-models")).status).toBe(401);
+  });
+});
+
+// WAN-DEFAULT-01: a home that gains a child or teen after setup installs the children's video model from here. The admin's Videos list adds it, marked for_minors,
+// after the adult order; an adult-only home's admin, a non-admin and a minor never get it.
+describe("the children's video model on an admin's Videos list", () => {
+  const withMinorsOnly = () => {
+    const base = stack() as unknown as { parts: (query: { audience: string; kind?: string }) => Promise<{ audience: string; parts: Array<Record<string, unknown>> }> };
+    return { ...base, parts: async (query: { audience: string; kind?: string }) => {
+      const listed = await base.parts(query);
+      return query.audience === "minor" ? { ...listed, parts: [...listed.parts, view("vm1", "video", 50, { label: "Neutral clip maker", description: "Makes short clips.", state: "missing", size_bytes: 0, download_bytes: 24e9 })] } : listed;
+    } } as unknown as StackClient;
+  };
+  beforeEach(() => { __setStackClientForTests(withMinorsOnly()); });
+  const videos = async (client: TestClient) => (await read(client)).features.find((row) => row.id === "videos")!.models as Array<{ id: string; rank: number; state: string; for_minors?: true }>;
+
+  test("the admin of an adult-only home does not see it, and the Stack is asked for the adult list only", async () => {
+    const client = await owner();
+    expect((await videos(client)).map((model) => model.id)).toEqual(["v1"]);
+    expect(audiences).toEqual(["adult"]);
+  });
+  test("the admin of a home with a teen sees it after the adult models, marked for children and teens, missing so the page offers Install for exactly that part", async () => {
+    const client = await owner();
+    await makeTeen(client);
+    const models = await videos(client);
+    expect(models.map((model) => model.id)).toEqual(["v1", "vm1"]);
+    expect(models[1]).toMatchObject({ for_minors: true, state: "missing", rank: 2 });
+    expect(models[0]!.for_minors).toBeUndefined();
+    expect(audiences).toEqual(["adult", "minor"]);
+    // It never joins the household's adult order.
+    expect((await read(client)).features.find((row) => row.id === "videos")!.order).toEqual([]);
+  });
+  test("a home with a child gets it too; a minor reading the list gets the minor list without the mark, and a non-admin cannot read the route at all", async () => {
+    const client = await owner();
+    const { client: childClient } = await makeChild(client);
+    expect((await videos(client)).map((model) => model.id)).toEqual(["v1", "vm1"]);
+    expect((await childClient.get("/api/ai/feature-models")).status).toBe(403);
+    const asMinor = await featureModels("minor");
+    expect(asMinor.features.find((row) => row.id === "videos")!.models.some((model) => model.for_minors)).toBe(false);
   });
 });

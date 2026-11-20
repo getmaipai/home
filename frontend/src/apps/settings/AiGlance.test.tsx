@@ -64,6 +64,28 @@ describe("AI and models feature rows", () => {
     fireEvent.click(within(missing!).getByRole("button", { name: "Install 36 GB" }));
     await waitFor(() => expect(view.calls.filter((call) => call.url === "/api/components/b/install")).toHaveLength(1));
   });
+  // WAN-DEFAULT-01: an admin of a home with a child or teen gets the children's video model as one more Videos line, marked for children and teens, with Install for exactly that part.
+  test("the children's video model shows after the adult models with who it is for and its own Install, and the Change sheet leaves it out", async () => {
+    const view = render(base, "owner", modelsFor({ videos: [fm("v1", 1, "ready"), fm("v2", 2, "ready"), fm("kids", 3, "missing", { for_minors: true })] }));
+    const list = (await view.findAllByRole("list", { name: "Videos models" }))[0]!;
+    const lines = within(list).getAllByTestId("ai-model-line");
+    expect(lines.map((line) => within(line).getByTestId("ai-model-name").textContent)).toEqual(["Model v1", "Model v2", "Model kids"]);
+    expect(within(lines[2]!).getByText("For children and teens")).toBeTruthy();
+    expect(within(lines[2]!).queryByText("Primary")).toBeNull();
+    expect(within(lines[2]!).queryByText("Secondary")).toBeNull();
+    fireEvent.click(within(lines[2]!).getByRole("button", { name: /^Install/ }));
+    await waitFor(() => expect(view.calls.filter((call) => call.url === "/api/components/kids/install")).toHaveLength(1));
+    expect(view.calls.some((call) => call.url === "/api/components/v1/install" || call.url === "/api/components/v2/install")).toBe(false);
+    fireEvent.click(view.getByRole("button", { name: "Change Videos" }));
+    const sheet = await view.findByTestId("ai-model-chooser");
+    expect(sheet.textContent).toContain("Model v1");
+    expect(sheet.textContent).not.toContain("Model kids");
+  });
+  test("an adult-only home's Videos list has no such line", async () => {
+    const view = render(base, "owner", modelsFor({ videos: [fm("v1", 1, "ready"), fm("v2", 2, "ready")] }));
+    const list = (await view.findAllByRole("list", { name: "Videos models" }))[0]!;
+    expect(within(list).queryByText("For children and teens")).toBeNull();
+  });
   test("Change is plain text and opens a sheet of the Stack's models with their descriptions; Move to top writes the household order", async () => {
     const view = render();
     await view.findAllByTestId("ai-model-line");

@@ -12155,6 +12155,11 @@ msgid "For children"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/FeatureModelLine.tsx:22
+msgid "For children and teens"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:85
 #, needs-review
 msgid "For example, make the smile bigger"
@@ -15366,7 +15371,7 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/apps/settings/CodingSettings.tsx:132
 #: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:25
+#: src/apps/settings/FeatureModelLine.tsx:26
 #: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/shell/pages/EnginesPage.tsx:242
 #, needs-review
@@ -15384,7 +15389,7 @@ msgstr "Instalar {label}"
 #: src/apps/settings/AiGlance.tsx:139
 #: src/apps/settings/AiGlance.tsx:184
 #: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:25
+#: src/apps/settings/FeatureModelLine.tsx:26
 msgid "Install {size}"
 msgstr ""
 
@@ -15515,7 +15520,7 @@ msgstr "Instalado, necesario"
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/CodingSettings.tsx:132
-#: src/apps/settings/FeatureModelLine.tsx:27
+#: src/apps/settings/FeatureModelLine.tsx:28
 #: src/apps/settings/ModelsAndStorageSection.tsx:41
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:480
@@ -15527,7 +15532,7 @@ msgid "Installing"
 msgstr "Instalando"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:27
+#: src/apps/settings/FeatureModelLine.tsx:28
 msgid "Installing {percent}%"
 msgstr ""
 
@@ -21330,7 +21335,7 @@ msgid "Not offered"
 msgstr "No disponible"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:28
+#: src/apps/settings/FeatureModelLine.tsx:29
 msgid "Not on this computer"
 msgstr ""
 
@@ -33610,7 +33615,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/settings/AutoLocksSection.tsx:78
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:26
+#: src/apps/settings/FeatureModelLine.tsx:27
 #: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:160

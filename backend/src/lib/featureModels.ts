@@ -11,7 +11,9 @@ import { getStackClient } from "@/lib/stackEngine";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 
 export type FeatureModelState = StackPartView["state"];
-export interface FeatureModel { id: string; label: string; description: string; rank: number; state: FeatureModelState; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null }
+export interface FeatureModel { id: string; label: string; description: string; rank: number; state: FeatureModelState; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null;
+  /** WAN-DEFAULT-01: a model only the household's children and teens use, listed for an admin of a home that has one so it can be installed here; never part of the adult order. */
+  for_minors?: true }
 export interface FeatureModelsRow { id: "pictures" | "videos" | "music"; ordered: true; order: string[]; models: FeatureModel[] }
 export interface FeatureModelsView { audience: "adult" | "minor"; features: FeatureModelsRow[] }
 
@@ -25,10 +27,12 @@ const orderKeyOf = (category: string) => `engines.${category}.order`;
 const storedOrder = (category: string): string[] => { const raw = getHouseholdSettingValue(orderKeyOf(category)); return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : []; };
 const alreadyRuns = (part: StackPartView, order: readonly string[]) => part.state !== "missing" && part.state !== "unsupported" || order.includes(part.id);
 
-export async function featureModels(audience: "adult" | "minor"): Promise<FeatureModelsView> {
+export async function featureModels(audience: "adult" | "minor", options: { alsoMinors?: boolean } = {}): Promise<FeatureModelsView> {
   const stack = getStackClient();
   if (!stack.parts) return { audience, features: FEATURES.map((feature) => ({ id: feature.id, ordered: true, order: storedOrder(feature.category), models: [] })) };
   const [list, catalog] = await Promise.all([stack.parts({ audience, kind: "model" }), stack.jobsCatalog ? stack.jobsCatalog(audience).catch(() => null) : Promise.resolve(null)]);
+  // WAN-DEFAULT-01: for an admin of a home with a child or teen, the models the Stack lists only for minors are added to the Videos line, after the adult order, marked for_minors.
+  const minorsOnly = audience === "adult" && options.alsoMinors === true ? await stack.parts({ audience: "minor", kind: "model" }).then((minor) => minor.parts.filter((part) => !list.parts.some((adult) => adult.id === part.id))).catch(() => []) : [];
   const features = FEATURES.map((feature): FeatureModelsRow => {
     const order = storedOrder(feature.category);
     const inCategory = list.parts.filter((part) => part.category === feature.category);
@@ -42,7 +46,11 @@ export async function featureModels(audience: "adult" | "minor"): Promise<Featur
       id: part.id, label: part.label, description: part.description, rank: index + 1, state: part.state, size_bytes: part.size_bytes, download_bytes: part.download_bytes, percent: part.percent,
       running: part.enabled && part.state === "ready", failure: part.state === "failed" ? part.install_block : null, install_block: part.can_install ? null : part.install_block,
     }));
-    return { id: feature.id, ordered: true, order: audience === "adult" ? order : [], models };
+    const forMinors = feature.id === "videos" ? minorsOnly.filter((part) => part.category === feature.category).map((part, index): FeatureModel => ({
+      id: part.id, label: part.label, description: part.description, rank: models.length + index + 1, state: part.state, size_bytes: part.size_bytes, download_bytes: part.download_bytes, percent: part.percent,
+      running: part.enabled && part.state === "ready", failure: part.state === "failed" ? part.install_block : null, install_block: part.can_install ? null : part.install_block, for_minors: true,
+    })) : [];
+    return { id: feature.id, ordered: true, order: audience === "adult" ? order : [], models: [...models, ...forMinors] };
   });
   return { audience, features };
 }

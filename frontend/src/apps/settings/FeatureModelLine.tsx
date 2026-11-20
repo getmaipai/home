@@ -18,7 +18,8 @@ export interface FeatureModelLineProps { model: AiFeatureModel; tagged: boolean;
 
 export function FeatureModelLine({ model, tagged, busy, onInstall }: FeatureModelLineProps) {
   const ready = model.state === "ready";
-  const tag = tagged ? priorityTag(model.rank) : null;
+  // WAN-DEFAULT-01: the children's video model is not part of the adult order, so it carries who it is for instead of a priority.
+  const tag = model.for_minors ? i18n._({ id: "For children and teens", message: "For children and teens" }) : tagged ? priorityTag(model.rank) : null;
   const muted = !ready || model.rank !== 1;
   const bytes = model.download_bytes || model.size_bytes;
   const control = (() => {
