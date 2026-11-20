@@ -55,7 +55,8 @@ export async function submitVideoViaDoor(body: VideoBody): Promise<{ job: string
     if (!made.ok) return null;   // shape_not_served, level_not_served, too_long, not_on_this_model, not_available ...: the old door decides
     return { job: made.job, done: null, warnings: [] };
   } catch (error) {
-    if (error instanceof StackVideoError && (error.status === 404 || error.status === 405)) return null;   // a Stack older than the door
+    // A Stack older than the door (no such route) or one whose strict request schema does not know a key we send (the live build rejects `wait` with 400 and a raw validation line): the old door decides, and the person never sees the engine's words.
+    if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status)) return null;
     throw error;
   }
 }

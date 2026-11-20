@@ -209,6 +209,8 @@ export function plainVideoFailure(error: unknown): string {
       case "lora_not_allowed": case "unknown_lora": case "wrong_base_model": case "lora_changed": case "lora_missing": return `${VIDEO_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;
       case "reference_not_generated": case "reference_source_required": case "reference_image_refused": case "bad_image": return `${VIDEO_FAILED_PREFIX} I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.`;
       case "timeout": return `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`;
+      // A request the Stack's validator rejected has no code, only the engine's raw words (`Unrecognized key: "wait"`): never shown to a person.
+      case "http_400": case "http_422": return `${VIDEO_FAILED_PREFIX} Something in the request did not work on this computer. Try again, or ask for something simpler.`;
       default: return `${VIDEO_FAILED_PREFIX} ${trimSentence(error.message)} Try again or change the request.`;
     }
   }

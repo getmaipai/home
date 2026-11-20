@@ -71,6 +71,15 @@ test("a Stack older than the door (no such route) sends the clip back to the old
   await expect(submitVideoViaDoor(base())).rejects.toMatchObject({ code: "queue_full", status: 429 });
 });
 
+test("a Stack that validates strictly and does not know a key we send (the live build: 400, { error: 'Unrecognized key: \"wait\"' }) sends the clip back to the old door, never to the person", async () => {
+  makeAnswer = () => json({ error: 'Unrecognized key: "wait"' }, 400);
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  makeAnswer = () => json({ error: "Invalid input" }, 422);
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  makeAnswer = () => json({ error: "Try again", code: "no_memory" }, 503);
+  await expect(submitVideoViaDoor(base())).rejects.toMatchObject({ code: "no_memory" });
+});
+
 test("MAIPAI_VIDEO_LEGACY_DOOR=1 keeps every clip on the old door without a call", async () => {
   process.env.MAIPAI_VIDEO_LEGACY_DOOR = "1";
   expect(await submitVideoViaDoor(base())).toBeNull();
@@ -90,4 +99,12 @@ test("a clip that stays on the old door is decided without waiting (no extra ste
   expect(doorWanted(base({ audience: "all-ages" }))).toBe(false);
   process.env.MAIPAI_VIDEO_LEGACY_DOOR = "1";
   expect(doorWanted(base())).toBe(false);
+});
+
+test("the engine's raw validation words never reach a person's toast on any video path", async () => {
+  const { plainVideoFailure } = await import("@/lib/videos/jobs");
+  const { StackVideoError } = await import("@/lib/videos/stack");
+  const line = plainVideoFailure(new StackVideoError(400, "http_400", 'Unrecognized key: "wait"'));
+  expect(line).not.toContain("Unrecognized");
+  expect(line).toContain("Try again");
 });
