@@ -142,7 +142,7 @@ describe("an app that declares a settings area", () => {
 });
 
 describe("a package app at /apps/<id>", () => {
-  test("a music station keeps the phone section navigation", async () => {
+  test("on a phone the shell keeps its main-apps bar only; the app's sections are the tab row under the header (PHONE-05-AMEND-01)", async () => {
     rows = [{ ...musicRow, sections: [{ page: "station", label: "Radio", icon: null }] }];
     const view = open("/apps/audio/station", 402);
     await view.findByText("Live radio station.");
@@ -151,7 +151,8 @@ describe("a package app at /apps/<id>", () => {
     expect(nav.className).toContain("rounded-full");
     expect(nav.getAttribute("aria-label")).toBe("Primary");
     expect(nav.textContent).toMatch(/Home.*Media.*Create.*Library/);
-    expect(view.container.querySelector('[data-slot="phone-nav"]:not([data-floating])')).not.toBeNull();
+    expect(view.container.querySelectorAll('[data-slot="phone-nav"]').length).toBe(1);
+    expect(view.container.querySelector('[data-slot="app-section-tabs"]')).not.toBeNull();
   });
 
   test("detail pages put Back in the shell header (no empty row); only video watch keeps a controls row with Minimize", async () => {

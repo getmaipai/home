@@ -27,8 +27,7 @@ import { navigateOf, useAppSidebar } from "@/shell/useAppSidebar";
 import { rememberMode, rememberedMode, resolveMode, sidebarInMode } from "@/shell/appHeaderModes";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
-import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
-import { PhoneNav } from "@maipai/ui/src/PhoneNav";
+import { PackageAppHeaderActions, PackageAppHeaderLeft, publishPackageAppHeader } from "@/shell/pages/packageAppHeaderBar";
 import { MusicStudioPage, isStudioPage } from "@/shell/pages/MusicStudioPages";
 import { formatDate, formatTime } from "@/lib/format";
 import { navigateBack } from "@/shell/media/navigateBack";
@@ -222,9 +221,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
   useHeaderExtra(PackageAppHeaderLeft, PackageAppHeaderActions);
-  // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Back first; Search sits in the header beside the companion when the
-  // app has a search page; a page that plays something (a video, a book) draws no bar.
-  const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search"), app.header?.modes) : null;
+  // PHONE-05-AMEND-01: a phone keeps the shell's main-apps bar only. An app's sections show in its own screen as the pill tab row under the header (AppToolbar);
+  // Search sits in the header beside the companion when the app has a search page; a page that plays something (a video, a book) draws no extra row.
+  const phoneSearchTo = inShellBar && app && !isMediaPlayPage(packageId, pageId) && pagesOf(app).includes("search") ? `${app.to}/search` : undefined;
   // The reader draws its own Back and action pill, so on a phone the shell bar shrinks to the menu button and the pill sits beside it
   // (packageAppNews.css) instead of under an empty bar.
   const readingStory = packageId === "news" && pageId === "story";
@@ -271,9 +270,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
   useEffect(() => {
-    publishPackageAppHeader(app ? { to: app.to, label: app.label, detail, ...(detail && !controlsRow && !sectionsBar ? { back: app.to } : {}), ...(sectionsBar?.searchTo ? { phoneSearchTo: sectionsBar.searchTo } : {}), ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
+    publishPackageAppHeader(app ? { to: app.to, label: app.label, detail, ...(detail && !controlsRow ? { back: app.to } : {}), ...(phoneSearchTo ? { phoneSearchTo } : {}), ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}), ...(app.header ? { header: app.header, ...(mode ? { mode, onMode } : {}), ...(searchTo ? { searchTo } : {}) } : {}) } : null);
     return () => publishPackageAppHeader(null);
-  }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo, detail, controlsRow]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
+  }, [app?.to, app?.label, app?.settings_area?.id, app?.header, contextTitle, mode, onMode, searchTo, detail, controlsRow, phoneSearchTo]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
@@ -281,10 +280,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // topic, a source), never the app's own name, which the column already carries. A page whose body draws its own header (a story
   // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "audio" && pageId === "play" && "relative z-10 overflow-y-auto", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "audio" && pageId === "play" && "relative z-10 overflow-y-auto", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
       {controlsRow ? <div data-slot="page-controls" data-testid="page-controls" data-header-flat="" className="sm:hidden"><Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "Back", message: "Back" })} onClick={() => navigateBack(navigate, app?.to ?? `/apps/${packageId}`)}><ArrowLeftIcon aria-hidden="true" /></Button><span className="ms-auto flex items-center gap-2">{app && pagesOf(app).includes("search") ? <Button type="button" variant="ghost" size="icon-lg" data-testid="play-page-search" aria-label={i18n._({ id: "Search {name}", message: "Search {name}", values: { name: app.label } })} onClick={() => navigate(`${app.to}/search`)}><SearchIcon aria-hidden="true" /></Button> : null}<MinimizeButton appHome={`/apps/${packageId}`} /></span></div> : null}
-      {sectionsBar ? <PhoneNav variant="docked" label={i18n._({ id: "{name} sections", message: "{name} sections", values: { name: app?.label ?? i18n._({ id: "App", message: "App" }) } })} entries={sectionsBar.entries} more={sectionsBar.more} leading={{ label: i18n._({ id: "Back", message: "Back" }), onClick: () => navigateBack(navigate, app?.to ?? `/apps/${packageId}`), disabled: pageId === "index" && ((window.history.state as { idx?: number } | null)?.idx ?? 0) === 0 }} /> : null}
-      {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
+      {app ? <AppToolbar inShellBar={inShellBar} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -293,8 +291,8 @@ export function PackageAppPage({ person }: { person: Roster }) {
         errorMessage={i18n._({ id: "Could not open this app. Check your connection and try again.", message: "Could not open this app. Check your connection and try again." })}
         loadingLabel={i18n._({ id: "Opening the app", message: "Opening the app" })}
       >
-        {(shown) => { const doc = sectionsBar?.searchTo && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
-          {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></ArticleSpeechBridge>}
+        {(shown) => { const doc = phoneSearchTo && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
+          {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "audio" && isMediaPlayPage(packageId, pageId) ? <div className="flex max-sm:hidden"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "video" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "audio" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
