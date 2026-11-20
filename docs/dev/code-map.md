@@ -1228,7 +1228,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/songNameTool.ts` | SONG_NAME_TOOL_ID, shownTitle, sendSongTitle, songNameText, runSongNameTool |
 | `backend/src/lib/speakerLine.ts` | speakerLine |
 | `backend/src/lib/specDir.ts` | SPEC_DIR |
-| `backend/src/lib/speculation.ts` | SPECULATIVE_START_KEY, SPECULATION_HOLD_MS, SPECULATION_MAX_WORDS, newSpeculationHold, speculationCounters, noteSpeculation |
+| `backend/src/lib/speculation.ts` | SPECULATIVE_START_KEY, SPECULATION_HOLD_MS, SPECULATION_MAX_WORDS, speculationRefusalCode, newSpeculationHold, speculationCounters |
 | `backend/src/lib/speechDictionary.ts` | speechDictionary |
 | `backend/src/lib/speechJobs.ts` | tagsForDelivery, startSpeechJob, resumeSpeechJob |
 | `backend/src/lib/spokenArg.ts` | wantsSpoken |
