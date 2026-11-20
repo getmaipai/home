@@ -46,8 +46,8 @@ test("a lone late stop word counts only when the microphone does not look like h
 
 test("a short utterance with a stop word is a command even when her own story used the same words", () => {
   const story = said + " Wait, stop, said the baker.";
-  expect(judgeCutIn("Wait, stop.", story)).toBe("interrupt");
-  expect(judgeCutIn("Stop.", story, true)).toBe("interrupt");
+  expect(judgeCutIn("Wait, stop.", story, true, "the first loaf was a disaster")).toBe("interrupt");
+  expect(judgeCutIn("Stop.", story, true, "the first loaf was a disaster")).toBe("interrupt");
 });
 
 test("her own \"hold on\" from the phrase playing right now is echo; the same words from a person are a command", () => {
