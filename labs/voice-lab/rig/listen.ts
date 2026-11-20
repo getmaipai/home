@@ -64,7 +64,7 @@ async function conversation(run: number) {
     } else { const buf = e.data as ArrayBuffer, dv = new DataView(buf); const tn = dv.getUint32(0, true), idx = dv.getUint16(4, true);
       if (tn !== turn) { turn = tn; queue = new Float32Array(24000 * 120); qLen = 0; playhead = 0; chunkStarts = new Map(); stoppedTurn = false; stopWordAt = -1; gate.reset(performance.now()); curSounds = []; replyText = ""; firstFrameAt = 0; speaking = false; }
       if (stoppedTurn) return; const pcm = new Int16Array(buf, 8); if (!chunkStarts.has(idx)) chunkStarts.set(idx, qLen);
-      for (let i = 0; i < pcm.length; i++) queue[qLen + i] = pcm[i]! / 32768; qLen += pcm.length; gate.noteArrival(performance.now()); if (!firstFrameAt) firstFrameAt = rel(); lastFrameAt = rel(); speaking = true; }
+      for (let i = 0; i < pcm.length; i++) queue[qLen + i] = pcm[i]! / 32768; qLen += pcm.length; gate.noteArrival(performance.now(), pcm.length / 24000); if (!firstFrameAt) firstFrameAt = rel(); lastFrameAt = rel(); speaking = true; }
   };
   const recs: Rec[] = []; const frame = 512, tickMs = 32; const duck = new LocalDuckDetector(); let k = 0; const start = performance.now();
   let userClip: Float32Array | null = null, userPos = -1; let userEndAt = 0; const inter: Array<{ at: number; clip: Float32Array; say: string; expect: string }> = []; let lastPlayedReport = 0;

@@ -33,3 +33,15 @@ test("target eases back after clean turns and never goes below the minimum", () 
   for (let i = 0; i < 30; i++) gate.cleanTurn();
   expect(gate.targetMs).toBe(160);
 });
+// Recorded (the owner's live test, turn at 19:13:39Z): the first phrase took 887 ms, the gate was already at its cap of 700 ms, and the reply still had 3 page underruns.
+// Why: a gate waits for a FIXED amount of queued audio; when the voice's first block is small and the voice then stalls (GPU contention), the gate starts playing on the small block, drains it, and every later stall is a gap.
+test("late first phrase with later stalls: the default gate, even at its cap, gaps; a slow-start rule (wait for a bigger buffer when the first block is small and the voice looks slower than 2x real time) halves the gaps", () => {
+  const frames_ = [{ at: 1000, sec: 0.3 }, { at: 1350, sec: 0.4 }, { at: 1500, sec: 0.5 }, { at: 2700, sec: 0.6 }, { at: 2900, sec: 0.5 }, { at: 3050, sec: 0.5 }, { at: 4300, sec: 0.6 }, { at: 4500, sec: 0.5 }, { at: 4650, sec: 0.7 }];
+  const plain = replay(frames_, new JitterGate()); expect(plain.gaps).toBeGreaterThanOrEqual(2);
+  const capped = new JitterGate(); capped.targetMs = 700; expect(replay(frames_, capped).gaps).toBeGreaterThanOrEqual(1);   // the cap alone does not remove them
+  const slow = replay(frames_, new JitterGate({ slowStartMs: 600 })); expect(slow.gaps).toBeLessThan(plain.gaps); expect(slow.gapMs).toBeLessThan(plain.gapMs);
+});
+test("the slow-start rule costs nothing when the voice is fast (first block big, or arriving at 2x real time or better)", () => {
+  const fast = [{ at: 1000, sec: 0.5 }, { at: 1100, sec: 0.5 }, { at: 1200, sec: 0.5 }, { at: 1400, sec: 0.5 }, { at: 1600, sec: 0.5 }];
+  const a = replay(fast, new JitterGate()), b = replay(fast, new JitterGate({ slowStartMs: 600 })); expect(b.startAt).toBe(a.startAt); expect(b.gaps).toBe(0);
+});

@@ -72,7 +72,7 @@ function playPcm(samples, rate = 24000, turn = activeTurn) {
   if (turn !== activeTurn) { if (gate.underruns === turnUnderrunsAtStart) gate.cleanTurn(); turnUnderrunsAtStart = gate.underruns; gate.reset(performance.now()); buffer.stop(); scheduled = []; activeTurn = turn; next = ctx.currentTime + .01; playedCursor = 0; ducked = false; ramp(1); }
   if (!buffer.length) sampleRate = rate;
   const startSample = buffer.length;
-  gate.noteArrival(performance.now());
+  gate.noteArrival(performance.now(), samples.length / rate);
   buffer.append(samples);
   pump();
   return { at: scheduled.find((item) => item.startCursor === startSample)?.at ?? Math.max(ctx.currentTime, next), duration: samples.length / rate, startSample };
