@@ -171,9 +171,11 @@ describe("the cards", () => {
     expect(reading === null || reading > 0).toBe(true);
     expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
-    expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
+    expect(pictures.choices.map((choice) => choice.id)).toContain("pictures.klein");
+    expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(false);
+    expect(pictures.choices.find((choice) => choice.id === "pictures.ernie")!.current).toBe(true);
     expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);
-    expect(body.recommended!.changes.map((change) => change.job)).toContain("pictures");
+    expect(body.recommended!.changes.map((change) => change.job)).not.toContain("pictures");
     const wake = body.cards.find((card) => card.id === "wakeword")!;
     expect(wake.choices.map((choice) => choice.id)).toEqual(["wakeword.detector"]);
   });
@@ -232,13 +234,14 @@ describe("choosing", () => {
     expect(householdDetailedEnabled()).toBe(true);
   });
 
-  test("picking Klein as the Quick model writes the setting and installs nothing extra", async () => {
+  test("refuses the retired Klein Quick model in plain words", async () => {
     const { client } = await owner();
     components = everything(["pictures-ernie", "pictures"]);
     const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.klein" });
     expect(res.status).toBe(200);
+    expect(((await res.json()) as { started: string[] }).started).toEqual([]);
     expect(installs()).toEqual([]);
-    expect(householdQuickModel()).toBe("klein");
+    expect(householdQuickModel()).toBe("ernie");
   });
 
   test("the wake word row lists the stock detector and its two feature files, and removing it deletes them", async () => {
@@ -367,16 +370,16 @@ describe("choosing", () => {
 });
 
 describe("set everything to recommended", () => {
-  test("changes Klein back to ERNIE, starts only the missing installs, never calls DELETE", async () => {
+  test("recommended setup leaves the one picture model choice alone and starts only missing installs", async () => {
     const { client } = await owner();
     writeChoiceSetting("engines.image.tier.standard", "klein");
     const res = await client.post("/api/ai/recommended", {});
     expect(res.status).toBe(200);
     const body = await res.json() as { changed: string[]; started: string[] };
-    expect(body.changed.some((line) => line.startsWith("Standard pictures:"))).toBe(true);
+    expect(body.changed.some((line) => line.startsWith("Standard pictures:"))).toBe(false);
     expect(householdQuickModel()).toBe("ernie");
-    expect(installs()).toContain(idOf("video"));
-    expect(installs()).not.toContain(idOf("pictures-ernie"));
+    expect(installs()).toContain(idOf("pictures-h3"));
+    expect(installs()).not.toContain(idOf("video"));
     expect(installs()).not.toContain(idOf("video-ltx25"));
     expect(deletes()).toEqual([]);
   });
@@ -400,8 +403,9 @@ describe("set everything to recommended", () => {
     const res = await client.post("/api/ai/recommended", {});
     expect(res.status).toBe(200);
     const body = await res.json() as { needs_licence: Array<{ id: string }>; started: string[] };
-    expect(body.needs_licence.map((item) => item.id)).toEqual([videoId]);
-    expect(body.started.length).toBeGreaterThanOrEqual(0);
+    expect(body.needs_licence.map((item) => item.id)).toEqual([]);
+    expect(body.started.length).toBeGreaterThan(0);
+    expect(body.started).not.toContain(videoId);
   });
 });
 
@@ -411,8 +415,9 @@ describe("free up space", () => {
   test("GET /api/ai/unused lists unused parts largest first by plain name", async () => {
     const { client } = await owner();
     withUnused();
-    const body = await (await client.get("/api/ai/unused")).json() as { items: Array<{ id: string; name: string }>; total_bytes: number };
-    expect(body.items.map((item) => item.name)).toEqual(expect.arrayContaining(["Detailed pictures", "Boost videos"]));
+    const body = await (await client.get("/api/ai/unused")).json() as { items: Array<{ id: string; name: string; bytes: number }>; total_bytes: number };
+    expect(body.items.map((item) => item.name)).toEqual(expect.arrayContaining(["Detailed pictures", "Extra picture model"]));
+    expect(body.items.map((item) => item.bytes)).toEqual([...body.items.map((item) => item.bytes)].sort((a, b) => b - a));
     expect(body.items.map((item) => item.id)).not.toContain(idOf("pictures"));
     expect(body.total_bytes).toBeGreaterThan(0);
   });
@@ -420,8 +425,10 @@ describe("free up space", () => {
   test("removes unused ids one at a time and reports freed bytes", async () => {
     const { client } = await owner();
     withUnused();
-    const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-ltx25")] });
+    const extraPictureId = idOf("video");
+    const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), extraPictureId] });
     const body = await res.json() as { results: Array<{ id: string; status: string }>; freed_bytes: number; kept: number; failed: number };
+    expect(body.results.map((entry) => entry.id)).toEqual([idOf("pictures-zimage"), extraPictureId]);
     expect(body.results.map((entry) => entry.status)).toEqual(["removed", "removed"]);
     expect(body.freed_bytes).toBeGreaterThan(0);
     expect(deletes().length).toBe(2);
@@ -443,7 +450,7 @@ describe("free up space", () => {
     const { client } = await owner();
     withUnused();
     failDelete.add(idOf("pictures-zimage"));
-    const body = await (await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video-ltx25")] })).json() as { results: Array<{ status: string; message: string }>; failed: number };
+    const body = await (await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage"), idOf("video")] })).json() as { results: Array<{ status: string; message: string }>; failed: number };
     expect(body.results.map((entry) => entry.status)).toEqual(["failed", "removed"]);
     expect(body.results[0]!.message).toMatch(/could not remove/);
     expect(body.failed).toBe(1);
