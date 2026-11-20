@@ -374,6 +374,49 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     session.close();
   });
 
+  test("a finished partial commits after 500 ms while the endpointer remains unsure", async () => {
+    scriptTranscript("Why do cats purr?");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => false }, 0.8, { silenceTimeoutS: 0.8 }), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 500);
+    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    expect(finals(events)).toEqual([{ t: "final", v: "Why do cats purr?" }]);
+    session.close();
+  });
+
+  test("unfinished partial keeps the configured endpointer hold", async () => {
+    scriptTranscript("so I was thinking, and");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => false }, 0.4, { silenceTimeoutS: 0.3 }), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 500);
+    expect(finals(events)).toHaveLength(0);
+    await pushPause(session, 200);
+    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    expect(finals(events)).toHaveLength(1);
+    session.close();
+  });
+
+  test("a finished partial that resumes before 500 ms stays in the same utterance", async () => {
+    scriptTranscript("The whole sentence continues.");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => false }, 0.8, { silenceTimeoutS: 0.8 }), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 300);
+    expect(finals(events)).toHaveLength(0);
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    expect(finals(events)).toHaveLength(0);
+    await pushPause(session, 500);
+    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    expect(finals(events)).toHaveLength(1);
+    session.close();
+  });
+
   test("with the endpointer on and answering finished, the utterance ends at the base silence", async () => {
     scriptTranscript("finished");
     const events: SttTestEvent[] = [];

@@ -2,7 +2,7 @@
 // lowest level at which the edge partial counts as finished (`none`, `gentle`, `natural`); the rows are what the recognizer gives at
 // a pause (a period after any segment, a question mark on a question, no punctuation now and then).
 import { describe, expect, test } from "bun:test";
-import { firesAt, predictTurnEnd, stepDown, UNFINISHED_BELOW } from "@/lib/turnEnd";
+import { firesAt, isFinishedSentence, predictTurnEnd, stepDown, UNFINISHED_BELOW } from "@/lib/turnEnd";
 import { ACKNOWLEDGEMENT_GROUPS } from "@/lib/replyVariation";
 import { evaluateSafety } from "@/lib/safety";
 
@@ -61,6 +61,11 @@ const LABELLED: ReadonlyArray<[text: string, level: "none" | "gentle" | "natural
 ];
 
 describe("TALK-OVER-01: the end-of-turn predictor", () => {
+  test("finished sentence commit rule handles punctuation and dangling endings", () => {
+    for (const text of ["Why do cats purr?", "What can I do on a sunny afternoon with the kids?", "She said, ‘We’re ready.’", "That is enough.)"]) expect(isFinishedSentence(text)).toBe(true);
+    for (const text of ["so I was thinking, and", "Well,", "Okay.", "I want to tell you about", "Hello?", "Yes it is the"]) expect(isFinishedSentence(text)).toBe(false);
+  });
+
   test(`the labelled set (${LABELLED.length} rows) matches row by row`, () => {
     const wrong = LABELLED.filter(([text, level]) => predictTurnEnd(text).level !== level).map(([text, level]) => `${JSON.stringify(text)}: expected ${level}, got ${predictTurnEnd(text).level} (${predictTurnEnd(text).reason}, ${predictTurnEnd(text).score})`);
     expect(wrong).toEqual([]);

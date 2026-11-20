@@ -23,6 +23,17 @@ export const NATURAL_THRESHOLD = 0.5;
 /** Below this the fragment is plainly mid-sentence (a dangling "and", "to", "uh", a trailing comma): the client starts no held run on it. */
 export const UNFINISHED_BELOW = 0.3;
 
+/** Silence after a clearly closed, multiword sentence before committing the STT turn. */
+export const SENTENCE_END_COMMIT_S = 0.5;
+const FINISHED_SENTENCE_DANGLING = /(?:\b(?:and|but|so|because|or|um|uh|like|the|a|to|of|with|my|i|if|when|that|which)|,)\s*[?.!]?["')\]]*\s*$/i;
+const SENTENCE_CLOSURE = /[?.!]["'’”’)}\]]*\s*$/;
+
+/** Text-only turn boundary rule; does not decide whether to search or call a tool. */
+export function isFinishedSentence(text: string): boolean {
+  const trimmed = text.trim();
+  return SENTENCE_CLOSURE.test(trimmed) && trimmed.split(/\s+/).length >= 3 && !FINISHED_SENTENCE_DANGLING.test(trimmed);
+}
+
 // A sentence does not end on one of these: the recognizer still adds a period to any segment ("I want to."), so the word wins
 // over the punctuation. Only words that practically never close a spoken sentence: connectives, articles, a few prepositions,
 // possessives and subject pronouns. Words that do close sentences ("what time is it", "turn the lights on", "how are you",

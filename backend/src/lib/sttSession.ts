@@ -20,6 +20,7 @@ import { getStackClient } from "@/lib/stackEngine";
 import { voiceFailureLine } from "@/lib/failureCopy";
 import { getSileroStream, type SileroVadStream } from "@/lib/sileroVad";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
+import { isFinishedSentence, SENTENCE_END_COMMIT_S } from "@/lib/turnEnd";
 
 export interface SttSessionConfig {
   sampleRate: number;
@@ -281,13 +282,20 @@ export class SttSession {
       if (this.pendingEdge !== null && this.silenceSamples >= EDGE_SILENCE_S * this.cfg.sampleRate) { const text = this.pendingEdge; this.pendingEdge = null; this.sendEdge(text); }
       const endpointing = this.cfg.endpointing;
       const baseSamples = this.cfg.silenceTimeoutS * this.cfg.sampleRate;
-      if (endpointing && this.silenceSamples >= baseSamples) {
+      const sentenceSamples = SENTENCE_END_COMMIT_S * this.cfg.sampleRate;
+      const reusableText = this.reusablePartial && this.reusablePartial.voicedLen === this.lastVoicedLen
+        ? this.reusablePartial.text
+        : null;
+      const sentenceCommitReady = this.silenceSamples >= sentenceSamples && reusableText !== null && isFinishedSentence(reusableText);
+      if (sentenceCommitReady) {
+        void this.finalize();
+      } else if (endpointing && this.silenceSamples >= baseSamples) {
         if (!this.endpointAsked) this.askEndpointer(endpointing.endpointer);
-        if (this.endpointDecision === true ||
-          this.silenceSamples >= (this.cfg.silenceTimeoutS + endpointing.holdS) * this.cfg.sampleRate) {
+        const sentenceText = reusableText !== null && isFinishedSentence(reusableText);
+        if ((this.endpointDecision === true || this.silenceSamples >= (this.cfg.silenceTimeoutS + endpointing.holdS) * this.cfg.sampleRate) && (!sentenceText || sentenceCommitReady)) {
           void this.finalize();
         }
-      } else if (this.silenceSamples >= baseSamples) {
+      } else if (this.silenceSamples >= baseSamples && !(reusableText !== null && isFinishedSentence(reusableText))) {
         void this.finalize();
       }
       } else if (silero) {
@@ -354,9 +362,15 @@ export class SttSession {
     setTimeout(() => {
       this.endpointCheckScheduled = false;
       if (this.closed || this.finalizing || !this.speaking || !this.cfg.endpointing || checkGeneration !== this.endpointGeneration) return;
-      if (this.endpointDecision === true && this.silenceSamples >= this.cfg.silenceTimeoutS * this.cfg.sampleRate) {
-        void this.finalize();
-      } else if (this.endpointDecision === false && this.silenceSamples >= (this.cfg.silenceTimeoutS + this.cfg.endpointing.holdS) * this.cfg.sampleRate) {
+      const sentenceSamples = SENTENCE_END_COMMIT_S * this.cfg.sampleRate;
+      const reusableText = this.reusablePartial && this.reusablePartial.voicedLen === this.lastVoicedLen
+        ? this.reusablePartial.text
+        : null;
+      const sentenceCommitReady = this.silenceSamples >= sentenceSamples && reusableText !== null && isFinishedSentence(reusableText);
+      const sentenceText = reusableText !== null && isFinishedSentence(reusableText);
+      const baseReached = this.silenceSamples >= this.cfg.silenceTimeoutS * this.cfg.sampleRate;
+      const holdReached = this.silenceSamples >= (this.cfg.silenceTimeoutS + this.cfg.endpointing.holdS) * this.cfg.sampleRate;
+      if (sentenceCommitReady || (baseReached && this.endpointDecision === true || holdReached && this.endpointDecision === false) && (!sentenceText || sentenceCommitReady)) {
         void this.finalize();
       }
     }, 10);
