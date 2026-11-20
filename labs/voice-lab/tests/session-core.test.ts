@@ -540,6 +540,7 @@ test("the reply draft starts from the streaming text during the first moments of
       transcribe: async () => final,
       chat: async function* () { chats++; yield { type: "text", text: "Once upon a time." }; },
     });
+    (h.session as any).message(JSON.stringify({ t: "config", values: { streamingDraft: true } }));
     h.feed(true, 40); h.feed(false, 3);                  // 96 ms of silence: before the 160 ms check
     await h.flush();
     expect(chats).toBe(1);                               // the draft is already running, started before the check
