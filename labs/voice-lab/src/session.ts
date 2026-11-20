@@ -8,6 +8,7 @@ import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, support
 import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
 import { pickSound, availableTags } from "./sounds";
+import { voiceSettings } from "./voiceSettings";
 import { judgeCutIn } from "./selfEcho";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -167,7 +168,7 @@ export class VoiceSession {
     this.draftMessages = []; this.draftInterrupted = false;
     this.replyStyle = ""; this.warming?.abort(); this.warming = null;
     const chunker = new Chunker(), tagger = new TagStream(); let full = "", rounds = 0, toolTextLength = 0, headerGate: Promise<void> = Promise.resolve(), sendQueue: Promise<void> = Promise.resolve();
-    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_phrase_ready === undefined) this.metrics.t_first_phrase_ready = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); const mood = requestedStyle && !this.injected ? await moodVoice(this.voice, requestedStyle) : this.voice; if (mood !== this.voice) return { voice: mood, style: "" }; return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
+    const schedule = (piece: string) => { const index = this.chunks.length; this.chunks.push(piece); this.chunkDurations[index] = 0; this.playedMs[index] = 0; this.chunkRefEnvelopes[index] = []; this.chunkRefWindows[index] = []; if (this.metrics.t_first_phrase_ready === undefined) this.metrics.t_first_phrase_ready = this.metricNow(); const event = { t: "chunk", turn: this.turn, chunk: index, text: piece }; if (this.held) this.heldChunkEvents.push(event); else this.send(event); const ready = headerGate.then(async () => { if (!this.voiceChecked.has(this.voice)) { this.voiceChecked.add(this.voice); if (!await this.voicePreparedFn(this.voice)) { this.voice = "builtin"; this.send({ t: "notice", code: "voice_not_ready" }); } } const requestedStyle = this.styleFor(piece); const allowed = requestedStyle ? await this.stylesFn(this.voice) : new Set<string>(); const mood = requestedStyle && !this.injected ? await moodVoice(this.voice, requestedStyle, voiceSettings(this.voice).moodStrength) : this.voice; if (mood !== this.voice) return { voice: mood, style: "" }; return { voice: this.voice, style: allowed.has(requestedStyle) ? requestedStyle : "" }; }); headerGate = ready.then(() => {}, () => {}); sendQueue = sendQueue.then(() => this.say(piece, index, signal, ready)).catch(() => {}); };
     const speakText = async (delta: string) => { full += delta; this.generatedText = full; const clean = tagger.push(delta); for (const piece of chunker.push(clean)) schedule(piece); };
     try {
       while (rounds <= 2) {
@@ -322,7 +323,7 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
-        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice)); this.prewarm("voice"); }
+        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
         if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles;
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
         if (j.values?.netSim) this.netSim = j.values.netSim;
