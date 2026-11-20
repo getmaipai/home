@@ -581,7 +581,13 @@ file_issue() {
     (cd "$main" && bash -c "$command \"\$1\" \"\$2\"" _ "$title" "$note") || { echo "watcher.sh: could not file issue for $title" >> "$data/watcher.log"; return 1; }
     return 0
   fi
-  number="$(gh issue list -R getmaipai/home --state open --search "Watcher: $first_file" --limit 5 --json number -q '.[0].number' 2>/dev/null || true)"
+  # WATCHER-STARVED-01 B: a duplicate is an open issue with the exact same title (which names the sha). GitHub search is fuzzy: a looser
+  # match once buried a red main as a comment on an old issue about another file.
+  number="$(gh issue list -R getmaipai/home --state open --search "$title in:title" --limit 30 --json number,title 2>/dev/null | python3 -c 'import json,sys
+t=sys.argv[1]
+try: rows=json.load(sys.stdin)
+except Exception: rows=[]
+print(next((str(r["number"]) for r in rows if r.get("title")==t),""))' "$title" 2>/dev/null || true)"
   if [[ -n "$number" ]]; then
     gh issue comment "$number" --body-file "$note" >>"$data/watcher.log" 2>&1 || { echo "watcher.sh: could not comment on issue $number" >> "$data/watcher.log"; return 1; }
   else

@@ -101,6 +101,22 @@ describe("watcher starvation protection", () => {
     expect(lines(closes).some((line) => line.includes("unverified"))).toBe(true);
   });
 
+  test("a red main files its own issue even when an old open issue has a similar title (no comment on a stale issue)", () => {
+    const f = fixture();
+    const gh = join(f.scratch, "ghbin"); mkdirSync(gh);
+    const calls = join(f.scratch, "gh2.calls");
+    const similar = JSON.stringify([{ number: 292, title: "Watcher: main red at cca428c: scripts/watcherExecution.test.ts" }]);
+    writeFileSync(join(gh, "gh"), `#!/bin/sh\necho "$*" >> '${calls}'\ncase "$*" in *"issue list"*) echo '${similar}';; esac\nexit 0\n`); chmodSync(join(gh, "gh"), 0o755);
+    const env = { ...f.env, MAIPAI_WATCH_ISSUE_CMD: "", PATH: `${gh}:${process.env.PATH}` };
+    expect(run(f, "watcher.sh", ["run-once"], env).status).toBe(0);
+    commit(f, "break tests", { RED: "red\n" });
+    expect(run(f, "watcher.sh", ["run-once"], env).status).toBe(0);
+    expect(records(f).at(-1).result).toBe("red");
+    const all = lines(calls);
+    expect(all.some((line) => line.startsWith("issue create"))).toBe(true);
+    expect(all.some((line) => line.startsWith("issue comment"))).toBe(false);
+  });
+
   test("the log rotates over 5 MB (the duplicate-start quieting has no automated test: it needs a live second watcher process)", () => {
     const f = fixture();
     mkdirSync(f.data, { recursive: true });
