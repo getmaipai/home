@@ -69,16 +69,16 @@ export const VoiceTimingMessageSchema = z.object({ t: z.literal("timing"), turn_
   // Counts and labels only. The server's own `confirmed` mark is never overwritten by a client label.
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(), early_release_ms: z.number().finite().min(-60_000).max(60_000).optional(),
   edge_partials: z.number().int().nonnegative().max(1000).optional(), echo_drops: z.number().int().nonnegative().max(1000).optional(),
-  barge_pause_ms: z.number().finite().nonnegative().optional(), barge_gate_blocked_ms: z.number().finite().nonnegative().optional(), barge_since_reply_ms: z.number().finite().nonnegative().optional(), barge_outcome: z.enum(["stopped", "resumed_noise", "resumed_reaction", "resumed_echo", "none"]).optional() }).strict();
+  barge_pause_ms: z.number().finite().nonnegative().max(60_000).optional(), barge_gate_blocked_ms: z.number().finite().nonnegative().max(60_000).optional(), barge_since_reply_ms: z.number().finite().nonnegative().max(60_000).optional(), barge_outcome: z.enum(["stopped", "resumed_noise", "resumed_reaction", "resumed_echo", "none"]).optional() }).strict();
 
 /** The speculative start's outcome and retained voice counts, from the client's timing message or server confirmation. */
 export function setVoiceOutcome(record: VoiceTimingRecord | undefined, fields: { speculative?: SpeculativeOutcome; early_release_ms?: number; edge_partials?: number; echo_drops?: number; barge_pause_ms?: number; barge_gate_blocked_ms?: number; barge_since_reply_ms?: number; barge_outcome?: NonNullable<VoiceTimingRecord["barge_outcome"]> }): void {
   if (!record) return;
   if (fields.speculative !== undefined && record.speculative !== "confirmed") record.speculative = fields.speculative;
   for (const key of ["early_release_ms", "edge_partials", "echo_drops"] as const) { const value = fields[key]; if (value !== undefined && Number.isFinite(value)) Object.assign(record, { [key]: Math.round(value) }); }
-  if (fields.barge_pause_ms !== undefined && Number.isFinite(fields.barge_pause_ms)) record.barge_pause_ms = Math.round(fields.barge_pause_ms);
-  if (fields.barge_gate_blocked_ms !== undefined && Number.isFinite(fields.barge_gate_blocked_ms)) record.barge_gate_blocked_ms = Math.round(fields.barge_gate_blocked_ms);
-  if (fields.barge_since_reply_ms !== undefined && Number.isFinite(fields.barge_since_reply_ms)) record.barge_since_reply_ms = Math.round(fields.barge_since_reply_ms);
+  if (fields.barge_pause_ms !== undefined && Number.isFinite(fields.barge_pause_ms) && fields.barge_pause_ms <= 60_000) record.barge_pause_ms = Math.round(fields.barge_pause_ms);
+  if (fields.barge_gate_blocked_ms !== undefined && Number.isFinite(fields.barge_gate_blocked_ms) && fields.barge_gate_blocked_ms <= 60_000) record.barge_gate_blocked_ms = Math.round(fields.barge_gate_blocked_ms);
+  if (fields.barge_since_reply_ms !== undefined && Number.isFinite(fields.barge_since_reply_ms) && fields.barge_since_reply_ms <= 60_000) record.barge_since_reply_ms = Math.round(fields.barge_since_reply_ms);
   if (fields.barge_outcome !== undefined) record.barge_outcome = fields.barge_outcome;
   persist();
 }

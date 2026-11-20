@@ -183,6 +183,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const replyStartedAtRef = useRef(0);
   const replyStartedPerfRef = useRef(0);
   const bargeOutcomeRef = useRef<"stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none">("none");
+  const resetBargeMetrics = () => { bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeSinceReplyMsRef.current = undefined; bargeOutcomeRef.current = "none"; };
   const mutedRef = useRef(false);
   const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
@@ -265,7 +266,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     if (overlapTranscriptRef.current) {
       // Real words since the pause: a cut-in. The reply stops for good; the final, when it lands, is the next turn.
       trace("pause_resolved", { reason: "deadline_interrupt", played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
-      if (bargePauseStartedRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargePauseStartedRef.current);
+      if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargeStartRef.current);
       duplexCounters.interruptions++;
       bargeOutcomeRef.current = "stopped";
       interrupt("voice");
@@ -277,7 +278,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     }
   };
   const pauseWithDeadline = () => {
-    bargePauseStartedRef.current = Date.now();
+    if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargeStartRef.current);
     turnSchedulerRef.current?.pause();
     overlapPausedRef.current = true;
     clearPauseDeadline();
@@ -464,14 +465,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 const gate = echoGateRef.current;
                 const playbackLevel = turnSchedulerRef.current?.readLevel() ?? 0;
                 const passed = gate?.pass(frame, playing, undefined, playbackLevel) !== false;
-                if (playing && gate?.isLoud(frame, playbackLevel) && gate.lastLoudBlocked()) {
+                const loud = playing && gate?.isLoud(frame, playbackLevel) === true;
+                if (loud) {
                   if (bargeStartRef.current === null) {
-                    const now = Date.now();
-                    bargeStartRef.current = now;
+                    bargeStartRef.current = performance.now();
                     bargeSinceReplyMsRef.current = Math.max(0, performance.now() - replyStartedPerfRef.current);
                   }
                 }
-                if (playing && gate?.lastLoudBlocked() && bargePauseStartedRef.current !== null) bargeGateBlockedMsRef.current = (bargeGateBlockedMsRef.current ?? 0) + 20;
+                if (loud && gate?.lastFrameBlocked()) bargeGateBlockedMsRef.current = (bargeGateBlockedMsRef.current ?? 0) + frame.length / 16;
                 socket.sendAudio(passed ? frame : silentFrame(frame.length));
               },
               onSource: (context, source) => {
@@ -587,7 +588,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // she spoke was the "blip" the owner heard: the microphone hears her own reply, that sound lasts as long as the reply, and
               // the pause came before any transcript could say whose voice it was. Her words in a partial (two real words that are not
               // her own) pause her; the final decides the rest (Jesse, 2026-10-30: she pauses only once the sound is clearly speech).
-              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) { overlapTranscriptRef.current = false; bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeSinceReplyMsRef.current = undefined; bargeOutcomeRef.current = "none"; }
+              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) { overlapTranscriptRef.current = false; resetBargeMetrics(); }
             } else {
               activeSpeechRef.current = false;
               edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
@@ -717,10 +718,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             refusedThisUtteranceRef.current = false;
             const edgePartials = edgeCountRef.current; edgeCountRef.current = 0;
             const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
-            if (bargePauseStartedRef.current !== null && bargePauseMsRef.current === undefined) bargePauseMsRef.current = Math.max(0, Date.now() - bargePauseStartedRef.current);
+            if (bargeStartRef.current !== null && overlapPausedRef.current && bargePauseMsRef.current === undefined) bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current);
             trace("turn_send", { words: text.split(/\s+/).filter(Boolean).length, speculative, edges: edgePartials, echo_drops: echoDrops });
             traceRef.current?.endUtterance();
-            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops, ...(bargeOutcomeRef.current !== "none" || bargeStartRef.current !== null ? { bargeOutcome: bargeOutcomeRef.current, ...(bargePauseMsRef.current !== undefined ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}) } : {}) });
+            const bargeFields = bargeStartRef.current !== null ? { ...(bargePauseMsRef.current !== undefined && bargePauseMsRef.current <= 60_000 ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined && bargeGateBlockedMsRef.current <= 60_000 ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined && bargeSinceReplyMsRef.current <= 60_000 ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}), bargeOutcome: bargeOutcomeRef.current } : {};
+            if (bargeStartRef.current !== null && [bargePauseMsRef.current, bargeGateBlockedMsRef.current, bargeSinceReplyMsRef.current].some((value) => value !== undefined && value > 60_000)) trace("barge_metric_out_of_range");
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops, ...bargeFields });
+            resetBargeMetrics();
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());

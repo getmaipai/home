@@ -36,6 +36,16 @@ describe("ECHO-GATE-01", () => {
     expect(results.at(-1)).toBe(true);
   });
 
+  test("marks only loud frames actually replaced by silence", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    for (let i = 0; i < OPEN_AFTER_FRAMES; i++) {
+      gate.pass(frame(0.3), true, now, 0.5);
+      expect(gate.lastFrameBlocked()).toBe(i < OPEN_AFTER_FRAMES - 1);
+      now += 20;
+    }
+  });
+
   test("the first reply calibrates but a loud frame at 300 ms of the second reply passes", () => {
     let now = 0; const gate = createEchoGate({ now: () => now });
     gate.replyStarted(now);

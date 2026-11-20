@@ -39,6 +39,8 @@ export interface EchoGate {
   isLoud(frame: Float32Array, playbackLevel?: number): boolean;
   /** The last raw frame was above threshold and dropped by the three-frame gate. */
   lastLoudBlocked(): boolean;
+  /** True when the last loud frame was replaced by silence, including during the gate's opening run. */
+  lastFrameBlocked(): boolean;
   /** Snapshot for the trace; resets the frame counts. */
   report(): EchoGateReport;
   /** The person's call ended or a new reply begins. The first reply (and an unknown coupling) calibrates for one window. */
@@ -68,6 +70,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
   let couplingTarget: number | null = null;
   let thresholdRms: number | null = null;
   let lastLoudWasBlocked = false;
+  let lastFrameWasBlocked = false;
   const thresholdFor = (playbackLevel?: number, now = clock()) => {
     const envelope = playbackLevel === undefined ? 0 : (playbackLevel < 0.1 ? playbackLevel : Math.max(0.01, ...playbackHistory.filter((sample) => now - sample.at <= PLAYBACK_ENVELOPE_MS).map((sample) => sample.level)));
     const reference = playbackLevel === undefined ? Math.min(echoRms ?? Infinity, 0.06) : (coupling ?? 0) * envelope;
@@ -92,10 +95,12 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
     },
     isLoud(frame, playbackLevel) { return frameRms(frame) > thresholdFor(playbackLevel); },
     lastLoudBlocked() { return lastLoudWasBlocked; },
+    lastFrameBlocked() { return lastFrameWasBlocked; },
     pass(frame, playing, now = clock(), playbackLevel) {
       const rms = frameRms(frame);
       if (!playing) {
         lastLoudWasBlocked = false;
+        lastFrameWasBlocked = false;
         // Room noise: the quietest tenth of what the microphone hears while nobody speaks, kept as a slow average.
         if (rms < (silenceRms ?? Infinity) * 1.5 || silenceRms === null) silenceRms = silenceRms === null ? Math.max(NOISE_FLOOR, rms) : silenceRms * 0.95 + Math.max(NOISE_FLOOR, rms) * 0.05;
         if (calibrating.length > 0) finishCalibration();
@@ -109,6 +114,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
       // Home is playing. During the first window of a reply the frames calibrate the echo; nothing passes until a level is known.
       if (calibrationEndsAt > 0 && now < calibrationEndsAt) {
         lastLoudWasBlocked = false;
+        lastFrameWasBlocked = true;
         calibrating.push(rms);
         if (playbackLevel !== undefined) {
           const envelope = Math.max(0.01, playbackLevel);
@@ -128,7 +134,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
       lastLoudWasBlocked = loud;
       if (loud) { loudRun += 1; if (loudRun >= OPEN_AFTER_FRAMES) openUntil = now + HOLD_OPEN_MS; }
       else loudRun = 0;
-      if (now < openUntil || (loud && loudRun >= OPEN_AFTER_FRAMES)) { passed += 1; return true; }
+      if (now < openUntil || (loud && loudRun >= OPEN_AFTER_FRAMES)) { lastFrameWasBlocked = false; passed += 1; return true; }
       if (playbackLevel !== undefined && !loud && now >= openUntil && loudRun === 0) {
         couplingSamples.push({ at: now, value: rms / Math.max(0.01, playbackLevel) });
         couplingSamples = couplingSamples.filter((sample) => now - sample.at <= COUPLING_WINDOW_MS).slice(-200);
@@ -139,6 +145,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
         if (coupling !== null && couplingTarget !== null) coupling += Math.max(-Math.abs(coupling) * 0.1, Math.min(Math.abs(coupling) * 0.1, couplingTarget - coupling));
       }
       blocked += 1;
+      lastFrameWasBlocked = loud;
       return false;
     },
     report() {
