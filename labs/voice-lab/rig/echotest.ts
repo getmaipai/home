@@ -87,7 +87,7 @@ async function one(run: number, gain: number, delayMs: number) {
   const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final" && x.at > firstAudioAt);
   const afterUser = (t: string) => ev.filter((x) => x.t === t && (userStartAt < 0 || x.at >= userStartAt));
   const preStops = ev.filter((x) => x.t === "stop" && (userStartAt < 0 || x.at < userStartAt));
-  const r: any = { run: run + 1, gain, delayMs, selfStop: preStops.length > 0 || (userStartAt < 0 && stops.length > 0), duck: ev.filter((x) => x.t === "duck").length, pauses: ev.filter((x) => x.t === "pause").length };
+  const r: any = { run: run + 1, gain, delayMs, selfStop: preStops.some((x) => x.at > firstAudioAt) || (userStartAt < 0 && stops.some((x) => x.at > firstAudioAt)), duck: ev.filter((x) => x.t === "duck").length, pauses: ev.filter((x) => x.t === "pause").length };
   if (SCEN === "silent") r.pass = !r.selfStop && finals.length === 0 && ev.filter((x) => x.t === "pause").length === 0;
   if (SCEN === "mmhm" || SCEN === "briefly") { r.stopAfterUser = afterUser("stop").length; r.finalAfterUser = afterUser("final").length; r.pass = !r.selfStop && r.stopAfterUser === 0 && r.finalAfterUser === 0; }
   if (SCEN === "stop") { const s = afterUser("stop")[0]; r.stopLatencyMs = s ? Math.round(s.at - userStartAt) : null; r.silentAfterMs = s && stopWordAt >= 0 ? Math.round(stopWordAt + 25 - userStartAt) : null; r.pass = !!s && !r.selfStop && s.at - userStartAt < 2500; }
