@@ -120,8 +120,8 @@ export async function turnCheck(wav: Uint8Array, _signal?: AbortSignal): Promise
   return { probability, complete: true };
 }
 
-export async function speech(text: string, signal?: AbortSignal, opts: { voice?: string; style?: string } = {}): Promise<Response> {
-  const f = new FormData(); f.append("text", text);
+export async function speech(text: string, signal?: AbortSignal, opts: { voice?: string; style?: string; reply?: string; cont?: boolean } = {}): Promise<Response> {
+  const f = new FormData(); f.append("text", text); if (opts.reply && opts.cont) { f.append("reply", opts.reply); f.append("cont", "1"); } else if (opts.reply) f.append("reply", opts.reply);
   if (opts.voice && opts.voice !== "builtin") f.append("voice", opts.voice);
   if (opts.style) f.append("style", opts.style);
   const r = await fetch(`${TTS}/tts`, { method: "POST", body: f, signal });

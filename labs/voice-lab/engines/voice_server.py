@@ -108,6 +108,7 @@ class Core:
         self.task = "starting"      # None when idle
         self.maintenance = False    # true while a long job (style references) makes /tts unavailable
         self.preps = {}             # (voice, style) -> prepared form, for the loaded model only
+        self.reply_tails = {}       # reply id -> (audio, text) of its latest phrase, for the continuation experiment
         threading.Thread(target=self._worker, daemon=True).start()
 
     # ---- worker -----------------------------------------------------------------------------
@@ -267,6 +268,14 @@ class Core:
             if style != "neutral" and style in eng.native_instruct and style_ref is None:
                 run_opts["instruct"] = eng.native_instruct[style]
             prep = self._prep(vid, style_ref)
+            reply_id = run_opts.get("reply") if run_opts.get("cont") and hasattr(eng, "prepare_cont") else None
+            if reply_id:
+                prev = self.reply_tails.get(reply_id)
+                if prev is not None and len(prev[0]) / SR <= 5.0:
+                    try:
+                        prep = eng.prepare_cont(prep, prev[0], prev[1])
+                    except Exception as e:  # never fail the phrase over the experiment: fall back to the plain voice
+                        log(f"cont prepare failed: {e}")
             txt = apply_tags(text, eng.native_tags)
             if not txt.strip():
                 raise vs.VoiceError("The text is empty once the unsupported sound tags are removed.")
@@ -278,6 +287,7 @@ class Core:
                 gen = eng.stream(prefix + txt, prep, temperature)
             from voice_store import Resampler, pcm16
             rs, sh = Resampler(eng.rate), Shaper()
+            kept = []
             # runaway guard: more audio than 2.2 times the text's length estimate ends the piece
             room = int(speech_guard.runaway_limit_seconds(txt) * SR) if eng.guard else None
             try:
@@ -293,12 +303,18 @@ class Core:
                         room -= len(audio)
                     out = sh.feed(audio)
                     if out is not None and len(out):
+                        if reply_id:
+                            kept.append(out)
                         job.out.put(("audio", pcm16(out)))
                     if job.runaway:
                         break
                 tail = sh.finish()
                 if tail is not None and len(tail):
                     job.out.put(("audio", pcm16(tail)))
+                if reply_id and kept:
+                    self.reply_tails[reply_id] = (np.concatenate(kept).astype(np.float32), txt)
+                    while len(self.reply_tails) > 16:
+                        self.reply_tails.pop(next(iter(self.reply_tails)))
             finally:
                 gen.close()
         self.task = self.task  # tts does not change the reported status
@@ -459,6 +475,10 @@ class Handler(BaseHTTPRequestHandler):
         opts = {"context": parse_context(f.get("context"))}
         if f.get("seed") not in (None, ""):
             opts["seed"] = int(f["seed"])
+        if f.get("reply") not in (None, ""):
+            opts["reply"] = str(f["reply"])[:64]
+        if str(f.get("cont") or "") == "1":
+            opts["cont"] = True
         vid = f.get("voice") or None
         if c.maintenance:
             raise Busy("The server is busy building styled references. Try again in a minute.")

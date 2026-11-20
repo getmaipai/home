@@ -331,6 +331,19 @@ class VoxCPM2(Engine):
             prompt, ref = encode_reference(self.model, f.name)
         return {"prompt_feat": prompt, "ref_feat": ref, "text": text}
 
+    def prepare_cont(self, prep, wav24, text):
+        """CONTINUATION (lab experiment, off by default): the previous phrase of the same reply, as audio and words, leads the new text instead of the reference clip,
+        so the model carries on in the same pitch and level. The identity latents (ref_feat) stay the reference clip's."""
+        import tempfile
+        from scipy.io import wavfile
+        from voxcpm_stream import encode_reference
+        if self.prep_tail_s:
+            wav24 = np.concatenate([wav24, np.zeros(int(self.prep_tail_s * SR), np.float32)])
+        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
+            wavfile.write(f.name, SR, (np.clip(wav24, -1, 1) * 32767).astype(np.int16))
+            prompt, _ref = encode_reference(self.model, f.name)
+        return {"prompt_feat": prompt, "ref_feat": prep["ref_feat"], "text": text}
+
     def to_arrays(self, prep):
         import mlx.core as mx
         return {"prompt_feat": np.array(prep["prompt_feat"].astype(mx.float32)),
