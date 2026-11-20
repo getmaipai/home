@@ -83,7 +83,11 @@ function stopPlayback(turn) {
     ramp(1); stopTick();
   }, 15);
 }
-function duck() { ducked = true; buffer.duck(); ramp(.3); }
+// People do not turn their voice down when someone says "mm-hm", so the reply keeps its volume while the lab decides
+// whether the person is interrupting. The level is kept as a setting (1 = no change) in case a device needs help hearing.
+let duckLevel = 1; try { const v = parseFloat(localStorage.voiceLabDuckLevel); if (v > 0 && v <= 1) duckLevel = v; } catch {}
+window.__setDuckLevel = (v) => { duckLevel = Math.min(1, Math.max(0.1, v)); try { localStorage.voiceLabDuckLevel = String(duckLevel); } catch {} };
+function duck() { ducked = true; buffer.duck(); if (duckLevel < 1) ramp(duckLevel); }
 function restore() { ducked = false; buffer.restore(); ramp(1); }
 function pause() {
   if (paused) return;

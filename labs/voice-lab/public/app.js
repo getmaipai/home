@@ -221,3 +221,7 @@ $('#recordVoice').onclick = async () => {
     catch { $('#recordStatus').textContent = 'Your voice could not be made. Record again somewhere quieter, speaking for the full 10 seconds.'; }
   };
 };
+
+// Volume during a possible interruption: unchanged by default.
+try { if (localStorage.voiceLabDuckLevel) document.querySelector('#duckLevel').value = String(parseFloat(localStorage.voiceLabDuckLevel)); } catch {}
+document.querySelector('#duckLevel').addEventListener('change', (e) => window.__setDuckLevel(parseFloat(e.target.value)));
