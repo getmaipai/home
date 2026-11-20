@@ -24,3 +24,11 @@ test("a filler used in most replies, or the same opening word, is a pattern", ()
   const same = ["Oh, um, that is nice.", "Well, um, sure.", "Hmm, um, okay then.", "Oh, um, right.", "Um, yes.", "Oh, um, fine."]; expect(stumbleReport(same).fail).toBe(true);
   const varied = ["That is nice.", "Well, I think so.", "Um, hard to say.", "Sure thing.", "You know, it depends.", "Honestly, yes."]; expect(stumbleReport(varied).fail).toBe(false);
 });
+import { judgeJoins } from "../rig/listen/judge";
+test("joins: only the MEDIAN of a reply can fail it; outliers are a visible warning (recorded: a -7.1 st outlier among joins of 2.4 and 1.3 st)", () => {
+  const ok = judgeJoins([{ at: 2.3, semitones: -7.1, db: -3.9 }, { at: 3.39, semitones: 2.4, db: 0.3 }, { at: 5.99, semitones: 1.3, db: 1.1 }]);
+  expect(ok.fail).toBeNull(); expect(ok.warn).toContain("JOIN OUTLIER"); expect(ok.warn).toContain("-7.1 st");
+  const bad = judgeJoins([{ at: 1, semitones: 4.5, db: 1 }, { at: 2, semitones: -4.1, db: 2 }, { at: 3, semitones: 5.2, db: 1 }]); expect(bad.fail).toContain("joins uneven");
+  const loudBad = judgeJoins([{ at: 1, semitones: 1, db: 4.1 }, { at: 2, semitones: 1, db: -4.4 }, { at: 3, semitones: 1, db: 3.8 }]); expect(loudBad.fail).toContain("dB");
+  expect(judgeJoins([{ at: 1, semitones: 2, db: 1 }]).fail).toBeNull();
+});

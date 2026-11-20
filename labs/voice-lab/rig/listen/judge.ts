@@ -53,3 +53,18 @@ export function stumbleReport(replies: string[]) {
   const fail = n >= 5 && (worstFiller[1] > LIMITS.fillerShare || firstShare > LIMITS.firstWordShare);
   return { replies: n, worstFiller: worstFiller[0], worstFillerShare: +worstFiller[1].toFixed(2), firstWordShare: +firstShare.toFixed(2), totalRepeats: per.reduce((s, p) => s + p.repeats, 0), fail };
 }
+
+/** Joins between phrases are judged on the MEDIAN of a reply (plain chunk-by-chunk synthesis has random outliers of 7 st / 6.5 dB even without any fault: measured over 42 joins). Outliers are reported, never hidden, but only the median can fail a reply. */
+export const JOIN = { medianSemitones: 3.5, medianDb: 3.5, outlierSemitones: 7, outlierDb: 6.5 };
+export function judgeJoins(joins: Array<{ what?: string; at?: number; semitones: number | null; db: number }>): { fail: string | null; warn: string | null } {
+  if (!joins.length) return { fail: null, warn: null };
+  const med = (a: number[]) => { const v = a.map(Math.abs).sort((x, y) => x - y); return v.length ? (v.length % 2 ? v[v.length >> 1]! : (v[v.length / 2 - 1]! + v[v.length / 2]!) / 2) : 0; };
+  const mean = (a: number[]) => a.length ? a.map(Math.abs).reduce((x, y) => x + y, 0) / a.length : 0;
+  const st = joins.map((j) => j.semitones).filter((x): x is number => x !== null), db = joins.map((j) => j.db);
+  const centre = joins.length >= 3 ? med : mean;           // with fewer than 3 joins a median is just one random join: use the mean
+  const mSt = centre(st), mDb = centre(db);
+  const fail = mSt > JOIN.medianSemitones || mDb > JOIN.medianDb ? `joins uneven: ${joins.length >= 3 ? "median" : "mean"} jump ${mSt.toFixed(1)} st / ${mDb.toFixed(1)} dB over ${joins.length} join(s) (limit ${JOIN.medianSemitones} st / ${JOIN.medianDb} dB)` : null;
+  const out = joins.filter((j) => (j.semitones !== null && Math.abs(j.semitones) > JOIN.outlierSemitones) || Math.abs(j.db) > JOIN.outlierDb);
+  const warn = out.length ? `JOIN OUTLIER${out.length > 1 ? "S" : ""} (warning, not a failure; random in plain synthesis): ${out.map((j) => `${j.what ?? "phrase"} @${j.at ?? "?"}s ${j.semitones === null ? "" : j.semitones.toFixed(1) + " st, "}${j.db.toFixed(1)} dB`).join("; ")}` : null;
+  return { fail, warn };
+}

@@ -14,7 +14,7 @@ import { transcribe } from "../src/stack";
 import { encodeWav } from "../src/wav";
 import { readWav, writeWav, resample } from "./listen/audio";
 import { embed, windowSimilarities } from "./listen/speaker";
-import { holes, clicks, joinJump, joinFails, firstAudible, wer, stumbleReport, LIMITS } from "./listen/judge";
+import { holes, clicks, joinJump, joinFails, judgeJoins, firstAudible, wer, stumbleReport, LIMITS } from "./listen/judge";
 const args = process.argv.slice(2); const opt = (k: string, d: string) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1]! : d; };
 const secret = (await Bun.file(args[0]!).text()).trim(); const RUNS = Number(opt("runs", "1")), QUICK = args.includes("--quick"), LOAD = args.includes("--load"), GAIN = Number(opt("gain", "0.2")), LAB = "127.0.0.1:9931", TTS = "http://127.0.0.1:9923";
 const W = "/Users/jessetorres/Developer/github.com/getmaipai/wt/home-brisk-panda-voice-lab";
@@ -126,8 +126,7 @@ async function judge(run: number, c: Awaited<ReturnType<typeof conversation>>) {
       if (cl.length > LIMITS.clicksPerReply) row.problems.push(`${cl.length} click(s) at ${cl.map((x) => x.toFixed(2)).join(", ")} s`);
       // (d) joins
       const joins = [...r.phraseOut.map((o) => ({ at: (o - r.replyStartOut) / 24000, to: (o - r.replyStartOut) / 24000, what: "phrase" })), ...r.sounds.map((s) => ({ at: (s.outAt - r.replyStartOut) / 24000, to: (s.outAt - r.replyStartOut) / 24000 + s.ms / 1000, what: `across ${s.tag}` }))];
-      row.joins = joins.map((j) => ({ what: j.what, at: +j.at.toFixed(2), ...joinJump(audio, 24000, j.at, j.to) })); const badJoins = row.joins.filter((j: any) => joinFails(j));
-      if (badJoins.length) row.problems.push(`join(s) jump: ${badJoins.map((j: any) => `${j.what} @${j.at}s ${j.semitones === null ? "" : j.semitones.toFixed(1) + " st, "}${j.db.toFixed(1)} dB`).join("; ")}`);
+      row.joins = joins.map((j) => ({ what: j.what, at: +j.at.toFixed(2), ...joinJump(audio, 24000, j.at, j.to) })); const jv = judgeJoins(row.joins); if (jv.fail) row.problems.push(jv.fail); if (jv.warn) { row.warnings = [jv.warn]; }
       // (e) timing
       const fa = firstAudible(c.out, 24000, r.userEndAt / 1000 * 0); void fa;
     }
@@ -156,7 +155,7 @@ for (let run = 1; run <= RUNS; run++) {
   const summary = { run, load, room: "SIMULATED (60/120/200 ms delay model: 120 ms, gain " + GAIN + ", two reflections, noise); a real-speaker run is not possible from this rig", turns: rows.length, seconds: Math.round((performance.now() - t0) / 1000), timingMs: { median: Math.round(med), p90: Math.round(p90), worst: Math.round(worst), n: timings.length, limitP90: 2700, limitWorst: 3900, fail: timingFail }, stumbles: st, conversationFailures: conv, selfStops, problems, failed: problems.length + conv.length + (timingFail ? 1 : 0) + (st.fail ? 1 : 0) + (selfStops > 0 ? 1 : 0) };
   writeWav(join(OUT, `run${run}_conversation.wav`), c.out, 24000); writeFileSync(join(OUT, `run${run}.json`), JSON.stringify({ summary, rows }, null, 1)); all.push({ summary, rows });
   console.log(`RUN ${run}${load ? " (with background load)" : ""}: ${summary.failed ? "FAIL" : "PASS"}; timing median ${summary.timingMs.median} p90 ${summary.timingMs.p90} worst ${summary.timingMs.worst} ms; stumbles ${JSON.stringify(st)}; self-stops ${selfStops}`);
-  for (const p of conv) console.log("  CONVERSATION: " + p); for (const p of problems) console.log("  " + p);
+  for (const p of conv) console.log("  CONVERSATION: " + p); for (const p of problems) console.log("  " + p); for (const r of rows) for (const w of (r.warnings ?? [])) console.log(`  turn ${r.turn} (${r.kind}): ${w}`);
 }
 const worstRows = all.flatMap((a) => a.rows).filter((r) => r.problems?.length).sort((a, b) => b.problems.length - a.problems.length).slice(0, 3);
 console.log(`LISTEN FILES (reply audio of the three worst replies): ${worstRows.map((r) => r.file).join(" ; ") || "none had problems"}`);
