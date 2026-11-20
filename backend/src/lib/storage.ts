@@ -18,8 +18,9 @@ import { clonedVoices } from "@/db/schema";
 import { dataDir, modelsDir, enginesDir, wakewordDir, visionDir, sttDir, cacheDir, clonedVoicesDir, backupDir, receivedBackupsDir } from "@/lib/paths";
 import { getCacheStats } from "@/lib/packageCache";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
-import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { diskSpace } from "@maipai/core/src/hardware";
+import { trigger } from "@/lib/notifications";
 import { diskLevel, type DiskLevel, type DiskLevelOverrides } from "@maipai/spec/stack/ts/disk-levels.js";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 
@@ -57,6 +58,7 @@ export interface AreaUsage {
 export interface DiskUsage {
   totalBytes: number;
   freeBytes: number;
+  device?: number;
 }
 
 export interface StorageSummary {
@@ -69,7 +71,7 @@ export function diskUsage(path: string = dataDir): DiskUsage {
   const target = existsSync(path) ? path : dataDir;
   try {
     const { freeBytes, totalBytes } = diskSpace(target);
-    return { totalBytes, freeBytes };
+    return { totalBytes, freeBytes, device: statSync(target).dev };
   } catch {
     // Not available on every platform/CI sandbox - see packageCache.ts's
     // own freeDiskBytes() for the identical fallback and why.
@@ -176,11 +178,19 @@ export function diskIsLow(): boolean {
 
 export async function stackDiskReading() {
   if (!isStackConfigured()) return null;
-  try { return await getStackClient().disk?.() ?? null; } catch { return null; }
+  try {
+    const value = await getStackClient().disk?.();
+    return value && Array.isArray(value.volumes) && Array.isArray(value.missing) ? value : null;
+  } catch { return null; }
 }
-export async function diskIsCritical(): Promise<boolean> {
-  const local = diskIsLow();
+export async function diskIsCritical(path: string = dataDir): Promise<boolean> {
+  const disk = diskUsage(path);
+  const local = levelOfDisk(disk) === "critical";
   const stack = await stackDiskReading();
+  if (disk.device !== undefined) {
+    const volume = stack?.volumes.find((row) => { try { return statSync(row.path).dev === disk.device; } catch { return false; } });
+    if (volume) return volume.level === "critical";
+  }
   return local || stack?.level === "critical";
 }
 
@@ -191,28 +201,49 @@ const FIX_LINK = "/settings/models";
 /** The core job (scheduler.ts's "storage.check_disk_full", hourly) with two levels (DISK-GUARD-03): a warning Repairs item when free space is
  * under the warning line, an error (which notifies the admins once) under the critical line, resolved once free space is a margin above.
  * Caches and previews are cleared first at critical; real household data never shrinks itself. */
+export async function syncStackDiskConfig(): Promise<void> {
+  if (!isStackConfigured()) return;
+  try {
+    const settings = diskOverrides();
+    await getStackClient().diskConfig?.({ warn_free_gb: Number(settings.warnFreeGb), critical_free_gb: Number(settings.criticalFreeGb) });
+  } catch { /* A later hourly check retries this best-effort sync. */ }
+}
+
 export async function checkDiskFull(read: () => DiskUsage = diskUsage): Promise<void> {
+  await syncStackDiskConfig();
   let disk = read();
   let level = levelOfDisk(disk, lastLevel);
   const stack = await stackDiskReading();
-  const worseLevel = (home: DiskLevel): DiskLevel => stack?.level === "critical" || (stack?.level === "warn" && home === "normal") ? stack.level : home;
-  level = worseLevel(level);
-  if (level === "critical") { clearPreviews(); disk = read(); level = levelOfDisk(disk, lastLevel); }
-  level = worseLevel(level);
-  lastLevel = level;
-  if (level === "normal") { resolveIssue(ISSUE_SOURCE, ISSUE_KEY); return; }
+  const stackDevices = new Set<number>();
+  const stackKeys = new Set<string>();
+  if (stack) for (const volume of stack.volumes) {
+    let correlatedDevice: number | undefined;
+    if (correlatedDevice === undefined) { try { correlatedDevice = statSync(volume.path).dev; } catch {} }
+    if (correlatedDevice !== undefined) stackDevices.add(correlatedDevice);
+    const currentKey = correlatedDevice === undefined ? `${ISSUE_KEY}:stack:${volume.path}` : `${ISSUE_KEY}:device:${correlatedDevice}`;
+    stackKeys.add(currentKey);
+    if (volume.level === "normal") { resolveIssue(ISSUE_SOURCE, currentKey); continue; }
+    await raiseDiskIssue(currentKey, volume.level, true);
+  }
+  const { listIssues } = await import("@/lib/issues");
+  resolveIssue(ISSUE_SOURCE, ISSUE_KEY);
+  for (const issue of listIssues()) if (issue.source === ISSUE_SOURCE && issue.key.startsWith(`${ISSUE_KEY}:`) && !stackKeys.has(issue.key) && !(disk.device !== undefined && issue.key === `${ISSUE_KEY}:device:${disk.device}`)) resolveIssue(ISSUE_SOURCE, issue.key);
+  if (disk.device !== undefined && stackDevices.has(disk.device)) {
+    resolveIssue(ISSUE_SOURCE, `${ISSUE_KEY}:device:${disk.device}`);
+    return;
+  }
+  let levelForHome = level;
+  if (levelForHome === "critical") { clearPreviews(); disk = read(); levelForHome = levelOfDisk(disk, lastLevel); }
+  lastLevel = levelForHome;
+  const homeKey = disk.device === undefined ? ISSUE_KEY : `${ISSUE_KEY}:device:${disk.device}`;
+  if (levelForHome === "normal") { resolveIssue(ISSUE_SOURCE, homeKey); return; }
+  await raiseDiskIssue(homeKey, levelForHome, false);
+}
+
+async function raiseDiskIssue(key: string, level: DiskLevel, stackOwned: boolean): Promise<void> {
   const critical = level === "critical";
-  await raiseIssue({
-    source: ISSUE_SOURCE,
-    key: ISSUE_KEY,
-    severity: critical ? "error" : "warning",
-    title: critical ? "The hub is almost out of room" : "The hub's storage is getting full",
-    detail: critical
-      ? "There is not enough room left for new downloads, backups or picture, video and music making. Open Models and storage to free up space."
-      : "Free space is getting low. Open Models and storage to see what can be cleared safely before it runs short.",
-    learnMore: FIX_LINK,
-    notifyOnEscalation: true,
-  });
+  await raiseIssue({ source: ISSUE_SOURCE, key, severity: critical ? "error" : "warning", title: critical ? "The hub is almost out of room" : "The hub's storage is getting full", detail: critical ? "There is not enough room left for new downloads, backups or picture, video and music making. Open Settings, Models and storage to free up space." : "Free space is getting low. Open Settings, Models and storage to see what can be cleared safely before it runs short.", learnMore: FIX_LINK, notifyOnEscalation: true });
+  if (level === "warn" && !stackOwned) void trigger("storage.disk_warning", { title: "The hub's storage is getting full" }).catch(() => {});
 }
 
 /** DISK-GUARD-05: refreshes the one Repairs row from the Stack's selected-file check. */
@@ -221,6 +252,11 @@ export async function checkMissingModelFiles(read: typeof stackDiskReading = sta
   const key = "model_files_missing";
   if (!disk) return;
   if (disk.missing.length === 0) { resolveIssue("storage", key); return; }
-  const missing = disk.missing.map((row) => `${row.role} (${row.model})`).join(", ");
-  await raiseIssue({ source: "storage", key, severity: "error", title: "A model the AI needs is missing", detail: `Missing for ${missing}. Install it again in Models and storage.`, learnMore: "/settings/models" });
+  const row = disk.missing[0]!;
+  const part = row.part_id ?? row.model;
+  const detail = row.override
+    ? `Install this part again in Settings, Models and storage. Its override folder is outside what Home manages.`
+    : "Install this part again in Settings, Models and storage.";
+  registerFixHandler(`storage.reinstall_model:${part}`, async () => { await getStackClient().installPart?.(part); });
+  await raiseIssue({ source: "storage", key, severity: "error", title: "A model part needs repair", detail, learnMore: "/settings/models", fix: { label: `Install ${part} again`, action: `storage.reinstall_model:${part}` } });
 }

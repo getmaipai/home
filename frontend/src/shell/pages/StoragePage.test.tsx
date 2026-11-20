@@ -88,6 +88,7 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
       if ("status" in overview) return Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: overview.status }));
       return Promise.resolve(Response.json(overview));
     }
+    if (url.includes("/api/storage/cleanup")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/storage/package-cache") && url.endsWith("/clear")) {
       return Promise.resolve(Response.json({ removed: 14, bytes: 2.1 * 1024 * 1024 }));
     }
@@ -207,6 +208,7 @@ describe("StoragePage", () => {
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/storage/usage")) return Promise.resolve(Response.json(makeOverview()));
+      if (url.includes("/api/storage/cleanup")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/storage/package-cache/clear")) return Promise.resolve(new Response("{}", { status: 500 }));
       if (url.includes("/api/storage/package-cache")) return Promise.resolve(Response.json([{ source: "weather:current", packageId: "weather", label: "Weather", entryCount: 1, sizeBytes: 100 }]));
       if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));

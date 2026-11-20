@@ -67,6 +67,7 @@ import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { warmStack } from "@/lib/stackWarmup";
 import { notifyHostGuardRestart } from "@/lib/hostGuardNotice";
 import { pushCodingSettings } from "@/lib/stackCodingSync";
+import { syncStackDiskConfig } from "@/lib/storage";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
@@ -347,6 +348,7 @@ void startKiwixSidecar();
 startDdgsStackSync();
 // CODE-STACK-01 H2: Home's coding settings are the Stack's source; send them at start (never throws; the Stack may not be up yet and gets them on the next change).
 void pushCodingSettings().then(() => import("@/lib/codingMode")).then(({ reconcileCodingModeAtStartup }) => reconcileCodingModeAtStartup()).catch(() => {});
+void syncStackDiskConfig();
 // ROBOT-HOST-01: hosted StackChan Bot apps register here (never throws; one failing host raises its own Repairs item).
 void startRobotHosts();
 startRobotOfflineWatch();

@@ -122,7 +122,7 @@ export type StackTalkFramesReply = { kind: "done"; body: StackTalkFramesBody } |
 /** One finished edit as POST /v1/images/edits states it: a PNG with no metadata. */
 export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number }
 /** DISK-GUARD-03: local mirror of the worktree Stack disk endpoint until this wire shape is pinned in @maipai/spec. */
-export interface StackDiskReading { level: "normal" | "warn" | "critical"; volumes: Array<{ path: string; free_bytes: number; total_bytes: number; level: "normal" | "warn" | "critical"; warn_bytes: number; critical_bytes: number }>; missing: Array<{ role: string; model: string; missing_paths: string[] }> }
+export interface StackDiskReading { level: "normal" | "warn" | "critical"; volumes: Array<{ path: string; free_bytes: number; total_bytes: number; level: "normal" | "warn" | "critical"; warn_bytes: number; critical_bytes: number }>; missing: Array<{ role: string; model: string; part_id?: string; override?: boolean; missing_paths: string[] }> }
 /** DISK-GUARD-04: local mirror of Stack tidy plan/run responses. */
 export interface StackTidyItem { id: string; kind: "superseded" | "orphan_folder" | "partial_download"; bytes: number; reason: string; blocked: string | null }
 export interface StackTidyPlan { reclaimable_bytes: number; items: StackTidyItem[] }
@@ -143,6 +143,8 @@ export type StackReducedResult =
 
 export interface StackClient {
   disk?(opts?: { signal?: AbortSignal }): Promise<StackDiskReading>;
+  diskConfig?(body: { warn_free_gb: number; critical_free_gb: number }, opts?: { signal?: AbortSignal }): Promise<unknown>;
+  installPart?(id: string, opts?: { signal?: AbortSignal }): Promise<unknown>;
   tidyPlan?(opts?: { signal?: AbortSignal }): Promise<StackTidyPlan>;
   tidyRun?(dryRun: boolean, opts?: { signal?: AbortSignal }): Promise<{ dry_run: boolean; removed: StackTidyItem[]; skipped: StackTidyItem[] }>;
   /** POST /v1/audio/speaker-embedding: one local, in-memory voice embedding. */
@@ -379,7 +381,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       const value = res.headers.get(name);
       return value && value !== "none" ? value : undefined;
     };
-    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model"), reason: typeof fb?.reason === "string" ? fb.reason : bodyReason };
+    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model"), reason: typeof fb?.reason === "string" ? fb.reason : bodyReason, refusalKind: typeof fb?.kind === "string" ? fb.kind : undefined };
     if (kind === "offline") {
       throw new StackError("offline", message, { ...facts, offline_reason: fb?.offline_reason });
     }
@@ -427,6 +429,8 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
 
   return {
     disk: (opts) => call("/stack/v1/disk", { method: "GET" }, json<StackDiskReading>, opts),
+    diskConfig: (body, opts) => call("/stack/v1/disk/config", { method: "POST", body: JSON.stringify(body) }, json<unknown>, opts),
+    installPart: (id, opts) => call(`/stack/v1/components/${encodeURIComponent(id)}/install`, jsonInit({}), json<unknown>, opts),
     tidyPlan: (opts) => call("/stack/v1/components/tidy", { method: "GET" }, json<StackTidyPlan>, opts),
     tidyRun: (dryRun, opts) => call("/stack/v1/components/tidy", jsonInit({ dry_run: dryRun }), json<{ dry_run: boolean; removed: StackTidyItem[]; skipped: StackTidyItem[] }>, opts),
     speakerEmbedding: (form, opts) => call("/v1/audio/speaker-embedding", formInit(form), rawJson<{ model_id: string; dim: number; embedding: number[] }>, opts),

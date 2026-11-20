@@ -23,8 +23,9 @@ export class StackError extends Error {
   engine?: string;
   model?: string;
   reason?: string;
+  refusalKind?: string;
 
-  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string; state?: string; engine?: string; model?: string; reason?: string }) {
+  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string; state?: string; engine?: string; model?: string; reason?: string; refusalKind?: string }) {
     super(message);
     this.name = "StackError";
     this.kind = kind;
@@ -35,5 +36,6 @@ export class StackError extends Error {
     this.engine = extra?.engine;
     this.model = extra?.model;
     this.reason = extra?.reason;
+    this.refusalKind = extra?.refusalKind;
   }
 }

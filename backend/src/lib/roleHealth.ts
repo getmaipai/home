@@ -113,7 +113,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean; fresh
   // STACK_REFUSAL_TTL_MS (stackEngine.ts), so this never pins a role
   // offline after the machine has recovered.
   const refusal = opts.live ? null : stackRefusal(STACK_REFUSAL_KEY[role]);
-  if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household, ...(/memory/i.test(refusal.household) ? { cause: "memory" as const } : {}) };
+  if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household, ...(refusal.refusalKind === "disk" || refusal.kind === "disk" ? { cause: "disk" as const } : refusal.kind === "memory" ? { cause: "memory" as const } : {}) };
   try {
     const id = STACK_ROLE_ID[role] ?? role;
     const { roles } = opts.live || opts.fresh ? await getStackClient().roles() : await sharedStackRoles();

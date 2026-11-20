@@ -7,12 +7,12 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 const GB = 1_000_000_000;
 const TB18 = 1_800_000_000_000;
 const disk = (freeGb: number, total = TB18) => ({ totalBytes: total, freeBytes: freeGb * GB });
-const open = () => listIssues().filter((i) => i.source === "storage" && i.key === "disk_full");
+const open = () => listIssues().filter((i) => i.source === "storage" && i.key.startsWith("disk_full"));
 
 beforeEach(() => { resetDb(); __resetReminderTimersForTests(); __resetDiskLevelForTests(); __resetStackEngineForTests(); });
 
 describe("disk levels in Home (DISK-GUARD-03)", () => {
-  test("47 GB free of 1.8 TB is critical, the case that went unnoticed", () => { expect(levelOfDisk(disk(47))).toBe("critical"); });
+  test("47 GB free of 1.8 TB is critical", () => { expect(levelOfDisk(disk(47))).toBe("critical"); });
   test("an unreadable disk is normal, never a false alarm", () => {
     expect(levelOfDisk({ totalBytes: Number.POSITIVE_INFINITY, freeBytes: Number.POSITIVE_INFINITY })).toBe("normal");
   });
@@ -24,10 +24,12 @@ describe("disk levels in Home (DISK-GUARD-03)", () => {
     await checkDiskFull(() => disk(400));
     expect(open()).toEqual([]);
   });
-  test("uses the worse Stack disk level when the local data volume is clear", async () => {
-    __setStackClientForTests({ disk: async () => ({ level: "critical", volumes: [], missing: [] }) } as never);
-    await checkDiskFull(() => disk(400));
-    expect(open().map((item) => item.severity)).toEqual(["error"]);
+  test("uses Stack volume levels and avoids a duplicate Home item for the same device", async () => {
+    const device = 4242;
+    __setStackClientForTests({ disk: async () => ({ level: "critical", volumes: [{ path: "/tmp", free_bytes: 1, total_bytes: 1, level: "warn", warn_bytes: 1, critical_bytes: 1 }], missing: [] }) } as never);
+    await checkDiskFull(() => ({ ...disk(400), device }));
+    expect(open()).toHaveLength(1);
+    expect(open()[0]?.key).toContain("disk_full:");
   });
   test("a level clears only a margin above its line", async () => {
     await checkDiskFull(() => disk(40));
@@ -48,9 +50,9 @@ describe("missing selected model files (DISK-GUARD-05)", () => {
     await checkMissingModelFiles(read);
     const issue = listIssues().find((item) => item.source === "storage" && item.key === "model_files_missing");
     expect(issue?.severity).toBe("error");
-    expect(issue?.title).toBe("A model the AI needs is missing");
-    expect(issue?.detail).toContain("video (video-model)");
-    expect(issue?.detail).toContain("Install it again in Models and storage.");
+    expect(issue?.title).toBe("A model part needs repair");
+    expect(issue?.detail).not.toContain("video-model");
+    expect(issue?.detail).toContain("Install this part again in Settings, Models and storage.");
     expect(issue?.learn_more).toBe("/settings/models");
     await checkMissingModelFiles(async () => ({ level: "normal", volumes: [], missing: [] }));
     expect(listIssues().filter((item) => item.source === "storage" && item.key === "model_files_missing")).toEqual([]);

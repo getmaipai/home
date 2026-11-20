@@ -21,6 +21,7 @@ import { api, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type P
 import type { PackageCacheSourceRow } from "@maipai/home-backend/src/wire";
 import { useTabItem } from "@/shell/tabIdentity";
 import { errorLine } from "@/lib/hubReachability";
+import { componentsApi, type CleanupItem } from "@/lib/componentsApi";
 
 // Exported: pageHeaderTitle.tsx's own MANAGE_PAGE_ENTRIES imports this
 // directly for the header's left slot, the same "that page's own exported
@@ -45,6 +46,7 @@ interface CacheRow extends Record<string, unknown> {
   entries: string;
   size: string;
 }
+interface CleanupRow extends Record<string, unknown> { id: string; item: CleanupItem; itemLabel: string; frees: string; reason: string }
 
 const cacheColumns = (): readonly DataTableColumn<CacheRow>[] => [
   { id: "label", header: i18n._({ id: "Source", message: "Source" }) },
@@ -167,6 +169,18 @@ function HouseholdTotal({ household }: { household: StorageUsageOverview["househ
 }
 
 function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear, clearProblem }: { data: StorageUsageOverview; person: Roster; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void>; clearProblem: string }) {
+  const client = useQueryClient();
+  const cleanupQuery = useQuery<CleanupItem[]>({ queryKey: ["storage-cleanup"], queryFn: componentsApi.cleanup, enabled: isAdmin, refetchInterval: 30_000 });
+  const [selectedCleanup, setSelectedCleanup] = useState<string[]>([]);
+  const [cleanupConfirm, setCleanupConfirm] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const chosenCleanup = (cleanupQuery.data ?? []).filter((item) => selectedCleanup.includes(item.id));
+  async function clearSelectedCleanup() {
+    setCleanupConfirm(false); setCleanupBusy(true);
+    try { await componentsApi.clearCleanup(selectedCleanup); setSelectedCleanup([]); await client.invalidateQueries({ queryKey: ["storage-cleanup"] }); }
+    catch { /* Keep the current list visible so the admin can retry. */ }
+    finally { setCleanupBusy(false); }
+  }
   const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
   const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
     person: 180,
@@ -181,6 +195,24 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
       <DataTable {...model.tableProps} toolbar={rows.length >= 10 ? <DataTableControls model={model} /> : undefined} caption={i18n._({ id: "Storage usage by person", message: "Storage usage by person" })} getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
+        <PlainSection heading={i18n._({ id: "Free up space", message: "Free up space" })}>
+          {clearProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={clearProblem} /> : null}
+          {cleanupQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "Cleanup list did not load", message: "Cleanup list did not load" })} line={errorLine(cleanupQuery.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))} /> : null}
+          <DataTable<CleanupRow>
+            columns={[
+              { id: "itemLabel", header: i18n._({ id: "Item", message: "Item" }), cell: (row) => row.itemLabel },
+              { id: "reason", header: i18n._({ id: "Details", message: "Details" }), cell: (row) => row.item.blocked ? i18n._({ id: "Kept: {reason}", message: "Kept: {reason}", values: { reason: row.item.blocked } }) : row.reason },
+              { id: "frees", header: i18n._({ id: "Frees", message: "Frees" }), cell: (row) => row.frees, align: "end" },
+            ]}
+            rows={(cleanupQuery.data ?? []).map((item) => ({ id: item.id, item, itemLabel: item.label, frees: item.blocked ? "" : formatBytes(item.bytes), reason: item.how }))}
+            caption={i18n._({ id: "Items that can free space", message: "Items that can free space" })}
+            getRowId={(row) => row.id}
+            emptyLabel={cleanupQuery.isLoading ? i18n._({ id: "Loading cleanup items…", message: "Loading cleanup items…" }) : i18n._({ id: "Nothing can be cleared right now.", message: "Nothing can be cleared right now." })}
+            rowActions={(row) => row.item.blocked ? undefined : <DataTableRowActions actions={[{ label: selectedCleanup.includes(row.id) ? i18n._({ id: "Remove {name} from selection", message: "Remove {name} from selection", values: { name: row.itemLabel } }) : i18n._({ id: "Select {name}", message: "Select {name}", values: { name: row.itemLabel } }), onClick: () => setSelectedCleanup((ids) => ids.includes(row.id) ? ids.filter((id) => id !== row.id) : [...ids, row.id]) }]} />}
+          />
+          <Button type="button" disabled={!chosenCleanup.length || cleanupBusy} onClick={() => setCleanupConfirm(true)}>{i18n._({ id: "Clear selected", message: "Clear selected" })}</Button>
+          <AlertDialog open={cleanupConfirm} onOpenChange={setCleanupConfirm}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n._({ id: "Clear selected items?", message: "Clear selected items?" })}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "This frees {size}. Models can be installed again, and caches rebuild when needed.", message: "This frees {size}. Models can be installed again, and caches rebuild when needed.", values: { size: formatBytes(chosenCleanup.reduce((sum, item) => sum + item.bytes, 0)) } })}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Keep them", message: "Keep them" })}</AlertDialogCancel><AlertDialogAction onClick={() => void clearSelectedCleanup()}>{i18n._({ id: "Clear selected", message: "Clear selected" })}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        </PlainSection>
         <BackupsSection person={person} />
         <PlainSection heading={i18n._({ id: "Saved online data", message: "Saved online data" })}>
           {clearProblem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={clearProblem} /> : null}

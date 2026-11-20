@@ -374,6 +374,7 @@ export interface FailureBody {
   job?: string;
   role?: string;
   state?: string;
+  kind?: string;
 }
 
 /** GET /stack/v1/engines/self-heal (ROBUST-01): the Stack's own restarts of engines that stopped. */

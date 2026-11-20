@@ -10,6 +10,7 @@ import { getHouseholdSettingValue, listValues, setValue, resetValue, parseScope,
 import { getRegistry } from "@/lib/settingsRegistry";
 import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
+import { syncStackDiskConfig } from "@/lib/storage";
 import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, codeAdmission, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingsChange } from "@maipai/spec/gen/ts/settings-change.js";
@@ -194,6 +195,7 @@ async function applySettingSideEffects(scope: string, key: string, value: unknow
     else if (scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(key)) refreshConfiguredEngineLink();
     publishSettingsChanged(scope, key, value);
     if (scope === "household" && isCodingStackKey(key)) await pushCodingSettings([key]);
+    if (scope === "household" && ["storage.warn_free_gb", "storage.critical_free_gb"].includes(key)) await syncStackDiskConfig();
     if (scope === "household" && ["home.base_url", "home.access_token"].includes(key)) refreshHomeAssistantEvents();
     if (scope === "household" && key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
     if (scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(key)) scheduleHubRestart();

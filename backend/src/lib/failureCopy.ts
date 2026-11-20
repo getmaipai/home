@@ -12,7 +12,7 @@ function englishOf<T>(table: object): T {
 export function formatMessage(line: MessageDescriptor, values: Record<string, string | number> = line.values ?? {}): string {
   return line.message.replace(/\{(\w+)\}/g, (whole, name: string) => (name in values ? String(values[name]) : whole));
 }
-export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
+export type FailureKind = "busy" | "memory" | "disk" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
 
 export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy";
 const VOICE_FAILURE_MESSAGES: Record<VoiceFailureKind, { adult: MessageDescriptor; adultNoRepairs: MessageDescriptor; minor: MessageDescriptor }> = {
@@ -102,11 +102,13 @@ export const INGREDIENTS_FAILURE_COPY = {
 
 interface FailureCopy {
   adult: string;
+  adultNoRepairs?: string;
   adultAway?: string;
   minor: string;
 }
 interface FailureMessages {
   adult: MessageDescriptor;
+  adultNoRepairs?: MessageDescriptor;
   adultAway?: MessageDescriptor;
   minor: MessageDescriptor;
 }
@@ -122,6 +124,11 @@ const FAILURE_MESSAGES: Record<FailureKind, FailureMessages> = {
   memory: {
     adult: /*i18n*/ { id: "failure.memory.adult", message: "One moment. Try again in a bit." },
     minor: /*i18n*/ { id: "failure.memory.minor", message: "One moment. Ask again soon." },
+  },
+  disk: {
+    adult: /*i18n*/ { id: "failure.disk.adult", message: "There is not enough room left on this computer for that. Free up space in Settings, Models and storage, then try again." },
+    adultNoRepairs: /*i18n*/ { id: "failure.disk.adultNoRepairs", message: "Tell whoever looks after this hub." },
+    minor: /*i18n*/ { id: "failure.disk.minor", message: "That is paused for now." },
   },
   // CHAT-CALM-ERRORS-01b: the Stack answered with the role's state
   // `installed` (its engine stopped), so nothing will start on a retry
@@ -277,12 +284,7 @@ const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: st
 function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {
   const { Thing, things } = MAKING_NOUN[kind];
   switch (cause) {
-    case "disk": return {
-      adult: "There is not enough room left on this computer for that. Free up space in Settings, then try again.",
-      teen: "There is not enough room left on this computer for that. Ask an owner to free up space in Settings.",
-      child: "There isn't room for that right now. Ask a grown-up to free up space in Settings.",
-      repairs_link: "/settings/models",
-    };
+    case "disk": return { adult: FAILURE_COPY.disk.adult, teen: "That is paused for now.", child: "That is paused for now.", repairs_link: "/settings/models" };
     case "never_fits": return {
       adult: kind === "video" ? "This is too big for this computer even with everything else paused. Try Boost." : "This is too big for this computer even with everything else paused. Try Boost.",
       teen: `${Thing} making isn't working right now. Try again later.`,
@@ -365,7 +367,8 @@ export function adminPauseLine(adminMessage?: string | null): string {
  * the Stack exposes a structured memory state (backlog note on
  * CHAT-CALM-ERRORS-01b). A body with no state (an older Stack) keeps the
  * pre-state reading; a state outside the list is `other`. */
-export function stackRefusalKind(state: string | undefined, offline_reason: string | undefined): FailureKind {
+export function stackRefusalKind(state: string | undefined, offline_reason: string | undefined, refusalKind?: string): FailureKind {
+  if (refusalKind === "disk") return "disk";
   const lowMemory = offline_reason !== undefined && offline_reason.toLowerCase().includes("memory");
   if (state === undefined) return lowMemory ? "memory" : "busy";
   if (state === "installed") return "stopped";
@@ -386,6 +389,7 @@ export interface FailureAdvice {
 const FAILURE_ADVICE_MESSAGES: Record<FailureKind, { cause: MessageDescriptor; next_step: MessageDescriptor; repairs: boolean }> = {
   busy: { cause: /*i18n*/ { id: "failure.advice.busy.cause", message: "The chat engine was still starting or busy, so the reply never started." }, next_step: /*i18n*/ { id: "failure.advice.busy.next_step", message: "Wait a moment, then retry." }, repairs: false },
   memory: { cause: /*i18n*/ { id: "failure.advice.memory.cause", message: "The computer was too low on memory to run the chat engine." }, next_step: /*i18n*/ { id: "failure.advice.memory.next_step", message: "Free some memory, then retry." }, repairs: false },
+  disk: { cause: /*i18n*/ { id: "failure.advice.disk.cause", message: "There was not enough room for this work." }, next_step: /*i18n*/ { id: "failure.advice.disk.next_step", message: "Free up space in Settings, Models and storage, then retry." }, repairs: true },
   stopped: { cause: /*i18n*/ { id: "failure.advice.stopped.cause", message: "The chat engine was stopped, so the reply never started." }, next_step: /*i18n*/ { id: "failure.advice.stopped.next_step", message: "Start the chat engine in Repairs." }, repairs: true },
   slow: { cause: /*i18n*/ { id: "failure.advice.slow.cause", message: "The chat engine stopped answering before the reply finished." }, next_step: /*i18n*/ { id: "failure.advice.slow.next_step", message: "Retry. If it keeps happening, check Repairs." }, repairs: true },
   unreachable: { cause: /*i18n*/ { id: "failure.advice.unreachable.cause", message: "Home could not reach the chat engine." }, next_step: /*i18n*/ { id: "failure.advice.unreachable.next_step", message: "Check that the MaiPai Stack is running in Repairs." }, repairs: true },

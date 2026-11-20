@@ -204,6 +204,7 @@ export interface StackRefusal {
   /** CHAT-CALM-ERRORS-01b: the role state the body stated, and the kind
    * Home reads from it (failureCopy.ts's stackRefusalKind). */
   state: string | undefined;
+  refusalKind?: string;
   kind: FailureKind;
   /** The same reason in the household's wording - the one line the
    * chat reply and the health row both carry. */
@@ -252,6 +253,7 @@ export function stackFailureFacts(err: unknown): StackFailureFacts {
       stack_error: boundedRawBody(err.message),
       ...(err.status !== undefined ? { http_status: err.status } : {}),
       ...(err.state ? { state: err.state } : {}),
+      ...(err.refusalKind ? { refusal_kind: err.refusalKind } : {}),
       ...(err.offline_reason ? { offline_reason: boundedRawBody(err.offline_reason) } : {}),
       ...(err.body ? { raw_body: boundedRawBody(err.body) } : {}),
       ...(err.engine ? { engine_id: err.engine } : {}),
@@ -275,9 +277,9 @@ function withLastChatIdentity(facts: StackFailureFacts): StackFailureFacts {
 }
 
 function rememberStackRefusal(role: string, err: StackError): void {
-  const kind = stackRefusalKind(err.state, err.offline_reason);
+  const kind = stackRefusalKind(err.state, err.offline_reason, err.refusalKind);
   const facts = role === "chat" ? withLastChatIdentity(stackFailureFacts(err)) : stackFailureFacts(err);
-  refusals.set(role, { offline_reason: err.offline_reason, state: err.state, kind, household: FAILURE_COPY[kind].adult, facts, at: Date.now() });
+  refusals.set(role, { offline_reason: err.offline_reason, state: err.state, kind, refusalKind: err.refusalKind, household: FAILURE_COPY[kind].adult, facts, at: Date.now() });
 }
 
 /** ENGINE-STATUS-MEDIA-01: the picture and video calls go to the Stack's
@@ -288,6 +290,10 @@ function rememberStackRefusal(role: string, err: StackError): void {
 export function rememberMediaRefusal(role: "image" | "video", cause: "memory" | "restarting", code: string, household: string): void {
   const kind: FailureKind = cause === "memory" ? "memory" : "unreachable";
   refusals.set(role, { offline_reason: undefined, state: undefined, kind, household, facts: { stack_error: code }, at: Date.now() });
+}
+
+export function rememberDiskRefusalForTests(role: string, now = Date.now()): void {
+  refusals.set(role, { offline_reason: undefined, state: undefined, kind: "disk", refusalKind: "disk", household: FAILURE_COPY.disk.adult, facts: { stack_error: "disk refusal" }, at: now });
 }
 
 export function forgetMediaRefusal(role: "image" | "video"): void {
