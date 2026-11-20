@@ -295,6 +295,11 @@ registerAppPageFill("video", "clips-feed", (person, page) => {
   if (actions) delete actions.remake;
 });
 
+/** Words for a clip's frame shape; pixel dimensions stay internal. */
+export function videoShape(width: number, height: number): "wide" | "tall" | "square" {
+  return width > height ? "wide" : height > width ? "tall" : "square";
+}
+
 /** Only labels and values already held by the maker's guarded creation record are returned. */
 export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ label: string; value: string }> {
   // The feed row id is the job id; a file id also works.
@@ -306,13 +311,9 @@ export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ l
   const rows: Array<{ label: string; value: string }> = [];
   const add = (label: string, value: string | null | undefined) => { if (value) rows.push({ label, value }); };
   add("Prompt", creation.words?.written ?? creation.words?.composed);
-  const engine = creation.generation?.engine.id;
-  const model = creation.generation?.model.id;
-  const modelWords = model === "unknown" || !model ? null : model === "minimax-h3" ? "MiniMax H3" : model === "ltx25-q8" ? "LTX-2.5" : model === "ltx25-max" ? "LTX-2.5 Max" : model.toLowerCase().includes("wan") ? "Wan" : null;
-  add("Engine and model", engine && engine !== "unknown" && modelWords ? `${engine}, ${modelWords}` : modelWords ?? (engine && engine !== "unknown" ? engine : null));
   add("Length", creation.generation?.duration_s ? `${creation.generation.duration_s} seconds` : creation.settings?.seconds ? `${creation.settings.seconds} seconds` : null);
   const { width, height } = creation.settings ?? {};
-  add("Size", width && height ? `${width} × ${height}` : null);
+  add("Shape", width && height ? videoShape(width, height) : null);
   const seed = creation.generation?.seed;
   add("Seed", seed === null || seed === undefined ? null : String(seed));
   const styles = (creation.settings?.styles ?? []).map((style) => getLoraRecord(style.style_id)?.name).filter((name): name is string => Boolean(name));

@@ -23122,11 +23122,6 @@ msgid "Role and access"
 msgstr "Role and access"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/personAccessCopy.ts:17
-msgid "Role default"
-msgstr "Role default"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/PersonAccessEditor.tsx:112
 msgid "Role for {name}"
 msgstr "Role for {name}"
@@ -24274,6 +24269,11 @@ msgstr "Set a ratio above 1 or some make-up gain in the Compressor panel first."
 #: src/apps/settings/VoiceManagerSection.tsx:124
 msgid "Set as default"
 msgstr "Set as default"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/personAccessCopy.ts:17
+msgid "Set by their role"
+msgstr "Set by their role"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/personAccessCopy.ts:18

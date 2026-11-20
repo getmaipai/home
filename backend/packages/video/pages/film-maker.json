@@ -233,6 +233,31 @@
     },
     {
       "type": "media_shelf",
+      "heading": "Inspiration",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": { "scope": "showcase", "limit": 3 }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "rail",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/film-maker",
+          "state": { "prompt": "{prompt}", "look": "{look}", "camera": "{camera}" }
+        }
+      },
+      "media_loop": true,
+      "item_loop_field": "loop"
+    },
+    {
+      "type": "media_shelf",
       "heading": "Your film",
       "bind": {
         "source": "package",

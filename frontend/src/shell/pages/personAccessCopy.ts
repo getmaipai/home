@@ -14,6 +14,6 @@ export const accessKindName = (kind: string): string => ({
 /** UNSEEN-01 (C10): where a level came from. `ceiling` and `ceiling.web` are overrides on the person's own row or the household's; no entry is the role's default. */
 export function accessSource(access: PersonAccess, kind: string): string {
   const own = access.overrides.find((entry) => entry.key === `ceiling.${kind}`) ?? access.overrides.find((entry) => entry.key === "ceiling");
-  if (!own) return i18n._({ id: "Role default", message: "Role default" });
+  if (!own) return i18n._({ id: "Set by their role", message: "Set by their role" });
   return own.scope === "person" ? i18n._({ id: "Set for this person", message: "Set for this person" }) : i18n._({ id: "Set for the household", message: "Set for the household" });
 }

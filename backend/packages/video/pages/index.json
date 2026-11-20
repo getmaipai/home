@@ -607,17 +607,6 @@
           "media_id": "{id}"
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No videos yet. Make one in Create, and it shows up here.",
-        "action": {
-          "navigate": {
-            "to": "/apps/video/create"
-          }
-        },
-        "action_label": "Make a video"
-      },
       "card_radius": "soft",
       "item_avatar_field": "channel_avatar",
       "look": "backdrop"

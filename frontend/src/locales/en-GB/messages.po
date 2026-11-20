@@ -23109,11 +23109,6 @@ msgid "Role and access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/personAccessCopy.ts:17
-msgid "Role default"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/PersonAccessEditor.tsx:112
 msgid "Role for {name}"
 msgstr ""
@@ -24260,6 +24255,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:124
 msgid "Set as default"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/personAccessCopy.ts:17
+msgid "Set by their role"
 msgstr ""
 
 #. js-lingui-explicit-id
