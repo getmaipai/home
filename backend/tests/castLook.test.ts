@@ -160,10 +160,10 @@ describe("gates per band, exactly as the cast resolver applies them", () => {
   test("a child or teen household member is never turned into a sheet, and a child or teen cannot capture a real person", async () => {
     const { sage, kid, teenRow } = await world();
     const photos = [await photo(sage, 40)];
-    expect(await captureLook(sage, kid.id, { sheetMaker: maker, photoFileIds: photos })).toMatchObject({ ok: false, line: expect.stringMatching(/child's or teen's pictures/) });
-    expect(await captureLook(sage, teenRow.id, { sheetMaker: maker, photoFileIds: photos })).toMatchObject({ ok: false, line: expect.stringMatching(/child's or teen's pictures/) });
-    expect(await captureLook(kid, sage.id, { sheetMaker: maker, photoFileIds: [await photo(kid, 40)] })).toMatchObject({ ok: false, line: expect.stringMatching(/Real-person subjects are not available/) });
-    expect(await captureLook(teenRow, sage.id, { sheetMaker: maker })).toMatchObject({ ok: false, line: expect.stringMatching(/Real-person subjects are not available/) });
+    expect(await captureLook(sage, kid.id, { sheetMaker: maker, photoFileIds: photos })).toMatchObject({ ok: false, line: "That one isn't available here. Try something else." });
+    expect(await captureLook(sage, teenRow.id, { sheetMaker: maker, photoFileIds: photos })).toMatchObject({ ok: false, line: "That one isn't available here. Try something else." });
+    expect(await captureLook(kid, sage.id, { sheetMaker: maker, photoFileIds: [await photo(kid, 40)] })).toMatchObject({ ok: false, line: "That one isn't available here. Try something else." });
+    expect(await captureLook(teenRow, sage.id, { sheetMaker: maker })).toMatchObject({ ok: false, line: "That one isn't available here. Try something else." });
     expect(calls).toHaveLength(0);
     expect(db.select().from(mediaSubjects).where(eq(mediaSubjects.personId, kid.id)).get()?.referenceIds ?? "[]").toBe("[]"); // the child's photos were never stored on the subject
   });
