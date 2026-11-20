@@ -4,7 +4,8 @@ import { TurnManager } from "./turnManager";
 import { History } from "./history";
 import { buildPrompt, datedUser } from "./prompt";
 import { encodeWav, StreamingWavReader } from "./wav";
-import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
+import { loadavg } from "node:os";
+import { chat, lastChatTimings, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
 import { pickSound, availableTags } from "./sounds";
@@ -118,7 +119,15 @@ export class VoiceSession {
     this.lastNodAt = now; this.nodsThisTurn++; this.nodSuppressUntil = now + this.nodClip.length / 24 + 350;
     this.send({ t: "nod", pcm: Buffer.from(this.nodClip.buffer, this.nodClip.byteOffset, this.nodClip.byteLength).toString("base64"), rate: 24000 });
   }
-  private finishMetrics() { if (this.metricsWritten || !Object.keys(this.metrics).length) return; this.metricsWritten = true; this.metrics.chunks = this.chunks.length; this.metricsFn(metricsPath, this.metrics); this.send({ t: "timing", ...this.metrics }); }
+  /** Every live turn records what the slow stage was: prompt tokens read fresh against reused, time not spent reading the prompt (slot busy, queue), voice wait and machine load. */
+  private addEngineMetrics() {
+    const t = lastChatTimings; const m = this.metrics;
+    if (t.prompt_n != null) { m.prompt_tokens_read = t.prompt_n; m.prompt_tokens_reused = t.cache_n ?? 0; m.prompt_ms = Math.round(t.prompt_ms ?? 0); }
+    if (typeof m.t_llm_request === "number" && typeof m.t_llm_first_token === "number") m.llm_wait_ms = Math.max(0, Math.round(m.t_llm_first_token - m.t_llm_request - (t.prompt_ms ?? 0)));
+    if (typeof m.t_first_phrase_ready === "number" && typeof m.t_voice_first_audio === "number") m.voice_wait_ms = Math.round(m.t_voice_first_audio - m.t_first_phrase_ready);
+    m.load1 ??= Math.round(loadavg()[0]! * 10) / 10;
+  }
+  private finishMetrics() { if (this.metricsWritten || !Object.keys(this.metrics).length) return; this.addEngineMetrics(); this.metricsWritten = true; this.metrics.chunks = this.chunks.length; this.metricsFn(metricsPath, this.metrics); this.send({ t: "timing", ...this.metrics }); }
   private command(c: { type: string; [key: string]: unknown }) {
     switch (c.type) {
       case "state": this.send({ t: "state", state: c.state }); break;
@@ -221,6 +230,7 @@ export class VoiceSession {
     try {
       while (rounds <= 2) {
         let toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
+        if (rounds === 0) { this.metrics.t_llm_request = this.metricNow(); this.metrics.load1 = Math.round(loadavg()[0]! * 10) / 10; }
         for await (const event of this.chatFn(requestMessages, signal, undefined, toolDefinitions, rounds === 0 ? "auto" : "none")) {
           if (signal.aborted || this.closed) break;
           if (!this.metrics.t_llm_first_token) this.metrics.t_llm_first_token = this.metricNow();
@@ -387,6 +397,7 @@ export class VoiceSession {
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
         if (j.values?.netSim) this.netSim = j.values.netSim;
       }
+      if (j.t === "stats" && j.turn === this.turn) { for (const [k, to] of [["underruns", "page_underruns"], ["gate_ms", "page_gate_ms"], ["audio_s", "page_audio_s"], ["voice_speed", "page_voice_speed"]] as const) if (Number.isFinite(j[k])) this.metrics[to] = Number(j[k]); }
       if (j.t === "overlap" && Number.isFinite(j.ms)) { this.overlapMs = Math.max(0, Math.min(60000, j.ms)); this.lastOverlapAt = this.now(); }
       if (j.t === "local_stop" && this.echoRef && j.turn === this.turn) { this.metrics.t_local_stop = this.metricNow(); for (const c of this.tm.forceInterrupt()) this.command(c); }
       if (j.t === "ping") this.send({ t: "pong", at: j.at });

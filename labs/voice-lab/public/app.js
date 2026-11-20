@@ -44,12 +44,13 @@ $('#start').onclick = async () => {
   const localDuckDetector = new LocalDuckDetector(); const overlapDetector = new OverlapDetector(); let lastOverlapSent = 0, localStopSent2 = false;
   const active = new Map();
   const chunkTexts = new Map();
-  const playedTimes = [];
+  const playedTimes = []; const turnStats = {};
   let thinkTimer = 0, localRestoreTimer = 0, failedTurns = 0, turnCount = 0, localDuckSent = false;
   let currentTurn = 0, replyFinished = false, endSent = false, firstPlayedTurn = -1;
   const finishTurnIfReady = (turn) => {
     if (replyFinished && active.size === 0 && !endSent && turnState.isCurrent(turn) && ws?.readyState === 1) {
       endSent = true;
+      { const st = turnStats[turn]; if (st) { const wall = (st.last - st.first) / 1000; ws.send(JSON.stringify({ t: 'stats', turn, underruns: (window.__jitter?.underruns ?? 0) - st.u0, gate_ms: Math.round(window.__jitter?.targetMs ?? 0), audio_s: Math.round(st.sec * 100) / 100, voice_speed: wall > 0.3 ? Math.round(st.sec / wall * 100) / 100 : 0 })); delete turnStats[turn]; } }
       ws.send(JSON.stringify({ t: 'played_end', turn }));
     }
   };
@@ -69,6 +70,7 @@ $('#start').onclick = async () => {
       if (!turnState.accepts(turn)) return;
       const pcm = new Int16Array(event.data, 8);
       const samples = Float32Array.from(pcm, (sample) => sample / 32768);
+      { const st = (turnStats[turn] ??= { first: performance.now(), last: 0, sec: 0, u0: window.__jitter?.underruns ?? 0 }); st.last = performance.now(); st.sec += pcm.length / 24000; }
       const scheduled = window.__playPcm(samples, 24000, turn);
       const key = `${turn}:${index}`;
       currentTurn = turn;

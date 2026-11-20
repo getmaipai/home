@@ -44,6 +44,8 @@ export type ChatEvent = { type: "text"; text: string } | { type: "tool_calls"; c
 export function chatRequestBody(messages: unknown[], temperature = config.temperature, tools?: unknown[]) {
   return { stream: true, cache_prompt: true, id_slot: 0, messages, max_tokens: 220, temperature, ...(tools ? { tools, tool_choice: "auto" } : {}) };
 }
+/** What the chat engine reported for the last streamed request: prompt tokens read fresh (prompt_n), reused from its cache (cache_n) and the time spent reading them. */
+export let lastChatTimings: { prompt_n?: number; cache_n?: number; prompt_ms?: number; predicted_per_second?: number } = {};
 export async function* chat(messages: unknown[], signal: AbortSignal, temperature = config.temperature, tools?: unknown[], toolChoice: "auto" | "none" = "auto"): AsyncGenerator<ChatEvent> {
   const r = await fetch(`${LLM}/v1/chat/completions`, { method: "POST", signal, headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...chatRequestBody(messages, temperature, tools), ...(tools ? { tool_choice: toolChoice } : {}) }) });
@@ -61,7 +63,8 @@ export async function* chat(messages: unknown[], signal: AbortSignal, temperatur
         return;
       }
       try {
-        const delta = JSON.parse(data).choices?.[0]?.delta;
+        const parsed = JSON.parse(data); if (parsed.timings) lastChatTimings = parsed.timings;
+        const delta = parsed.choices?.[0]?.delta;
         if (typeof delta?.content === "string" && delta.content) yield { type: "text", text: delta.content };
         for (const part of delta?.tool_calls ?? []) {
           const old = calls.get(part.index) ?? { id: "", name: "", arguments: "" };

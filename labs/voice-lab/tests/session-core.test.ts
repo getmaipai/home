@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { VoiceSession } from "../src/session";
 import { config } from "../src/config";
 import { TurnManager } from "../src/turnManager";
-import { chatRequestBody } from "../src/stack";
+import { chatRequestBody, lastChatTimings } from "../src/stack";
 import { encodeWav } from "../src/wav";
 import { toolCapabilities } from "../src/tools";
 
@@ -590,5 +590,23 @@ test("after a laugh the words that follow (and the next phrase) are spoken from 
   expect(v["that is funny."]).toContain("happy");
   expect(v["And then it got better."]).toContain("happy");
   expect(v["Anyway, enough of that."]).not.toContain("happy");
+  h.session.close();
+});
+
+test("every live turn records prompt tokens read and reused, the wait that was not prompt reading, the voice wait and the machine load", () => {
+  const h = harness({}); const s = h.session as any;
+  Object.assign(lastChatTimings, { prompt_n: 30, cache_n: 1100, prompt_ms: 300 });
+  s.metrics = { t_llm_request: 100, t_llm_first_token: 1500, t_first_phrase_ready: 1700, t_voice_first_audio: 3200 };
+  s.addEngineMetrics();
+  expect(s.metrics.prompt_tokens_read).toBe(30); expect(s.metrics.prompt_tokens_reused).toBe(1100); expect(s.metrics.llm_wait_ms).toBe(1100); expect(s.metrics.voice_wait_ms).toBe(1500);
+  expect(typeof s.metrics.load1).toBe("number");
+  h.session.close();
+});
+
+test("the page reports underruns, gate size and voice speed for every live turn and they land in the turn record", () => {
+  const h = harness({}); const s = h.session as any; s.metrics = { ok: true }; s.turn = 3;
+  s.message(JSON.stringify({ t: "stats", turn: 3, underruns: 2, gate_ms: 320, audio_s: 7.5, voice_speed: 1.8 }));
+  expect(s.metrics).toMatchObject({ page_underruns: 2, page_gate_ms: 320, page_audio_s: 7.5, page_voice_speed: 1.8 });
+  s.message(JSON.stringify({ t: "stats", turn: 2, underruns: 9 })); expect(s.metrics.page_underruns).toBe(2); // another turn's numbers never land here
   h.session.close();
 });
