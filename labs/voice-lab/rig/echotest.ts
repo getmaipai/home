@@ -2,13 +2,19 @@
 // (delay, gain, short room reflections, noise floor) plus, in some scenarios, a scripted person.
 // Scenarios: silent (must not interrupt itself), mmhm (must keep talking), stop ("wait, stop": must stop, finishing the word),
 // briefly (a short "yeah, right, okay" talk-over: must keep talking).
+// Round 1 (--round1 --out <dir>): echo-reference cut-in, local stop, overlap messages and her rare "mm-hm" are ON, the simulated browser echo canceller leaves 8% residue, each run saves her
+// speaker output as <out>/<scenario>-<run>.wav and prints measurements for rig/round1.ts to judge. Extra scenarios: repeat, cough, yeah, sentence, overlap, nodmid. THE ROOM IS SIMULATED.
 // Usage: bun rig/echotest.ts <secret-file> --scenario silent|mmhm|stop|briefly --runs 20 [--gain 0.35] [--delay 120] [--aec 1]
 import { waitForNoLivePage } from "./guard";
 import { LocalDuckDetector } from "../public/local-duck.js";
 import { wordEnd } from "../public/word-end.js";
+import { OverlapDetector, shouldStopLocally } from "../public/overlap.js";
+import { writeWav } from "./listen/audio";
+import { mkdirSync } from "node:fs";
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1]! : d; };
 const secret = (await Bun.file(args[0]!).text()).trim();
+const R1 = args.includes("--round1"), OUT = opt("out", ""); if (OUT) mkdirSync(OUT, { recursive: true });
 const SCEN = opt("scenario", "silent"), RUNS = Number(opt("runs", "20")), GAIN_FIXED = opt("gain", ""), DELAY_FIXED = opt("delay", ""), LAB = "127.0.0.1:9931", TTS = "http://127.0.0.1:9923";
 async function say(text: string): Promise<Float32Array> {
   const f = new FormData(); f.set("text", text); f.set("voice", "lj");
@@ -18,8 +24,13 @@ async function say(text: string): Promise<Float32Array> {
   let end = m; while (end > 0 && Math.abs(out[end - 1]!) < 0.01) end--; return out.subarray(0, Math.min(m, end + 320));
 }
 if (!(await waitForNoLivePage(secret, LAB))) { console.log("not running: a real page stayed connected (or the lab is down)"); process.exit(2); }
-const Q = await say("Tell me a long story about a dragon who learns to bake bread.");
-const INTERJECT: Record<string, Float32Array | null> = { silent: null, mmhm: await say("Mm-hm."), stop: await say("Wait, stop."), briefly: await say("Yeah, right, okay.") };
+let Q = await say("Tell me a long story about a dragon who learns to bake bread.");
+const NODMID_TEXT = "I have been thinking about our trip next month and where we should stay. The hotel near the lake looks lovely, and the one by the station is cheaper. Tell me a long story about a dragon who learns to bake bread.";
+const cough = () => { const n = 4800, o = new Float32Array(n); let sd = 7; for (let i = 0; i < n; i++) { sd = (sd * 1664525 + 1013904223) >>> 0; const env = Math.sin(Math.PI * i / n) ** 2; o[i] = ((sd / 4294967296) - 0.5) * 0.9 * env; } return o; };
+const USER_TEXT: Record<string, string> = { stop: "Wait, stop.", mmhm: "Mm-hm.", briefly: "Yeah, right, okay.", repeat: "Dragon.", yeah: "Yeah.", sentence: "Actually, I wanted to ask you something different, can we talk about the weather instead?", overlap: "Thursday?" };
+if (SCEN === "nodmid") { const a = await say("I have been thinking about our trip next month and where we should stay. The hotel near the lake looks lovely, and the one by the station is cheaper."), b = await say("Tell me a long story about a dragon who learns to bake bread."); const g = new Float32Array(Math.round(16000 * 0.65)); Q = Float32Array.from([...a, ...g, ...b]); }
+const INTERJECT: Record<string, Float32Array | null> = { silent: null, nodmid: null, cough: cough() };
+if (USER_TEXT[SCEN]) INTERJECT[SCEN] = await say(USER_TEXT[SCEN]!);
 const user = INTERJECT[SCEN] ?? null;
 // the person's level at the mic: the TTS clip is roughly -20 dBFS rms; scale so a near talker is about as loud as the echo
 const rmsOf = (a: Float32Array) => Math.sqrt(a.reduce((s, x) => s + x * x, 0) / Math.max(1, a.length));
@@ -30,7 +41,8 @@ for (let run = 0; run < RUNS; run++) {
   results.push(await one(run, gain, delayMs));
 }
 async function one(run: number, gain: number, delayMs: number) {
-  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true }));
+  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true })); if (R1) ws.send(JSON.stringify({ t: "config", values: { echoReference: true, backchannel: true } }));
+  const texts: string[] = []; let askEndAt = -1; let nods = 0;
   const ev: Array<{ t: string; at: number; extra?: any }> = []; const T0 = performance.now(); const rel = () => performance.now() - T0;
   // virtual speaker
   let queue: Float32Array[] = [], qLen = 0, playhead = 0, playing = false, stopAt = -1, stopped = false, paused = false, firstAudioAt = 0, turn = 0, replyFinished = false;
@@ -38,6 +50,7 @@ async function one(run: number, gain: number, delayMs: number) {
   const chunkStarts = new Map<number, number>(); let stopWordAt = -1;
   ws.onmessage = (e) => {
     if (typeof e.data === "string") { const j = JSON.parse(e.data);
+      if (j.t === "nod") nods++; if ((j.t === "partial" || j.t === "final") && typeof j.text === "string") texts.push(j.text);
       if (["stop", "pause", "duck", "final", "reply_final", "error"].includes(j.t) || (j.t === "state")) ev.push({ t: j.t === "state" ? "state:" + j.state : j.t, at: rel() });
       if (j.t === "stop" && (userStartAt < 0 || stopWordAt >= 0 || rel() < userStartAt)) { /* only the first stop after the person starts counts for the timing */ } if (j.t === "stop" && !(stopWordAt >= 0 && userStartAt >= 0)) { const a = flat(); const target = wordEnd(a, playhead, 24000); stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopAt = rel(); stopped = true; }
       if (j.t === "pause") paused = true; if (j.t === "resume") paused = false;
@@ -49,9 +62,9 @@ async function one(run: number, gain: number, delayMs: number) {
   };
   const out24: number[] = []; // everything the speaker has played, 24 kHz, one entry per sample
   let outAll = new Float32Array(24000 * 60), outLen = 0;
-  const duck = new LocalDuckDetector(); let userPos = -1, userStartAt = -1, localDuckSent = false;
+  const ovl = new OverlapDetector(); let localStopSent = false; const duck = new LocalDuckDetector(); let userPos = -1, userStartAt = -1, localDuckSent = false;
   const tick = 32, frame = 512; let k = 0; const start = performance.now();
-  let phase: "ask" | "wait" | "settle" | "observe" = "ask"; let askPos = 0, settleStart = 0, endAt = 0; let lastPlayedReport = 0;
+  let phase: "ask" | "wait" | "settle" | "observe" = "ask"; let askPos = 0, settleStart = 0, endAt = 0; let lastPlayedReport = 0, lastOvl = 0;
   const OBS = SCEN === "stop" ? 5000 : 8000;
   while (true) {
     const due = start + (k + 1) * tick; const w = due - performance.now(); if (w > 0) await Bun.sleep(w); k++;
@@ -63,7 +76,7 @@ async function one(run: number, gain: number, delayMs: number) {
     outAll.set(seg, outLen); outLen += n24;
     // microphone frame (16 kHz): the speaker's output d ms ago, gain, two reflections, noise, plus the person
     const mic = new Float32Array(frame);
-    const dly = Math.round(delayMs * 24), echoGain = gain;
+    const dly = Math.round(delayMs * 24), echoGain = R1 ? gain * 0.08 : gain;
     for (let i = 0; i < frame; i++) {
       const pos24 = (outLen - n24) + i * 1.5 - dly; let e = 0;
       for (const [d, g] of [[0, 1], [168, 0.35], [456, 0.18]] as const) { const p = Math.floor(pos24 - d); if (p >= 0 && p < outLen) e += g * outAll[p]!; }
@@ -73,8 +86,10 @@ async function one(run: number, gain: number, delayMs: number) {
     // the page's instant local lowering
     const playingNow = speakerOn && !replyFinished;
     if (phase !== "ask" && duck.frame(mic, { playing: playingNow, enabled: true }) && !localDuckSent) { localDuckSent = true; ws.send(JSON.stringify({ t: "local_duck", turn })); ev.push({ t: "local_duck", at: rel() }); setTimeout(() => (localDuckSent = false), 600); }
+    if (R1 && phase !== "ask") { const ms = ovl.frame(mic, { playing: playingNow }); if (ms >= 250 && rel() - lastOvl > 90) { lastOvl = rel(); ws.send(JSON.stringify({ t: "overlap", ms, turn })); }
+      if (shouldStopLocally(ms, { playing: playingNow, alreadySent: localStopSent })) { localStopSent = true; const a2 = flat(); const target = wordEnd(a2, playhead, 24000); if (!(stopWordAt >= 0)) stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopped = true; ev.push({ t: "local_stop_dev", at: rel() }); ws.send(JSON.stringify({ t: "local_stop", turn })); } }
     // timeline
-    if (phase === "ask") { const f = new Float32Array(frame); f.set(Q.subarray(askPos, askPos + frame)); mic.set(f.map((x, i) => x + mic[i]!)); askPos += frame; if (askPos >= Q.length) phase = "wait"; }
+    if (phase === "ask") { const f = new Float32Array(frame); f.set(Q.subarray(askPos, askPos + frame)); mic.set(f.map((x, i) => x + mic[i]!)); askPos += frame; if (askPos >= Q.length) { phase = "wait"; askEndAt = rel(); ev.push({ t: "ask_end", at: askEndAt }); } }
     else if (phase === "wait" && firstAudioAt) { phase = "settle"; settleStart = rel(); }
     else if (phase === "settle" && rel() - settleStart >= 3500) { phase = "observe"; endAt = rel() + OBS; if (user) { userPos = 0; userStartAt = rel(); ev.push({ t: "user_start", at: userStartAt }); } }
     else if (phase === "observe" && rel() >= endAt) break;
@@ -84,6 +99,7 @@ async function one(run: number, gain: number, delayMs: number) {
     if (rel() - lastPlayedReport >= 100 && firstAudioAt && queue.length && !stopped) { lastPlayedReport = rel(); for (const [idx, s0] of chunkStarts) { const ms = Math.max(0, (playhead - s0) / 24); if (ms >= 0) ws.send(JSON.stringify({ t: "played", turn, chunk: idx, ms })); } }
   }
   ws.close(); await Bun.sleep(200);
+  if (OUT) writeWav(`${OUT}/${SCEN}-${run + 1}.wav`, outAll.subarray(0, outLen), 24000);
   const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final" && x.at > firstAudioAt);
   const afterUser = (t: string) => ev.filter((x) => x.t === t && (userStartAt < 0 || x.at >= userStartAt));
   const preStops = ev.filter((x) => x.t === "stop" && (userStartAt < 0 || x.at < userStartAt));
@@ -91,7 +107,8 @@ async function one(run: number, gain: number, delayMs: number) {
   if (SCEN === "silent") r.pass = !r.selfStop && finals.length === 0 && ev.filter((x) => x.t === "pause").length === 0;
   if (SCEN === "mmhm" || SCEN === "briefly") { r.stopAfterUser = afterUser("stop").length; r.finalAfterUser = afterUser("final").length; r.pass = !r.selfStop && r.stopAfterUser === 0 && r.finalAfterUser === 0; }
   if (SCEN === "stop") { const s = afterUser("stop")[0]; r.stopLatencyMs = s ? Math.round(s.at - userStartAt) : null; r.silentAfterMs = s && stopWordAt >= 0 ? Math.round(stopWordAt + 25 - userStartAt) : null; r.pass = !!s && !r.selfStop && s.at - userStartAt < 2500; }
-  if (!r.pass || args.includes("--events")) console.log("  events:", ev.filter((x) => x.t !== "duck" && x.t !== "local_duck").map((x) => x.t + "@" + Math.round(x.at)).join(" "));
+  if (R1) { const ue = user && userStartAt >= 0 ? userStartAt + user.length / 16 : -1; Object.assign(r, { round1: true, scenario: SCEN, wav: OUT ? `${OUT}/${SCEN}-${run + 1}.wav` : "", firstAudioAt: Math.round(firstAudioAt), userStartAt: Math.round(userStartAt), userEndAt: Math.round(ue), askEndAt: Math.round(askEndAt), userText: SCEN === "nodmid" ? NODMID_TEXT : USER_TEXT[SCEN] ?? "", texts, nods, finals: ev.filter((x) => x.t === "final").map((x) => Math.round(x.at)), stops: stops.map((x) => Math.round(x.at)), pauses: ev.filter((x) => x.t === "pause").map((x) => Math.round(x.at)), localStopAt: ev.find((x) => x.t === "local_stop_dev")?.at ?? null }); }
+  if (!R1 && (!r.pass || args.includes("--events"))) console.log("  events:", ev.filter((x) => x.t !== "duck" && x.t !== "local_duck").map((x) => x.t + "@" + Math.round(x.at)).join(" "));
   console.log(JSON.stringify(r)); return r;
 }
 const pass = results.filter((x) => x.pass).length;
