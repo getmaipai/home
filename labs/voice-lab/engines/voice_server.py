@@ -579,6 +579,20 @@ def main():
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     srv.daemon_threads = True
     log(f"voice server on 127.0.0.1:{a.port}, model {a.model}, store {a.store}")
+
+    def _prewarm():
+        """Always prewarm (owner's standing rule): load the model and the default voice now, not on the first request. A conversation that starts right after a restart then never finds a cold voice."""
+        try:
+            vid = os.environ.get("LAB_DEFAULT_VOICE", "casual")
+            job = Handler.core.job_tts("Okay.", vid, "neutral", None, {})
+            while True:
+                kind, v = job.out.get()
+                if kind in ("end", "error"):
+                    break
+            log(f"prewarmed model and voice {vid}")
+        except Exception as e:  # never block the server over a warm-up
+            log(f"prewarm failed: {e}")
+    threading.Thread(target=_prewarm, daemon=True).start()
     srv.serve_forever()
 
 
