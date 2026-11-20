@@ -24,6 +24,7 @@ import type { SheetPicture, MadeSheet } from "@/lib/films/sheetMaker";
 import type { PictureRole } from "@/lib/pictures/roles";
 import type { PersonRow } from "@/types";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
+import { makeStackLookSheet, useStackLookSheet } from "@/lib/stackLookSheet";
 
 export const MAX_LOOK_SOURCES = 7; // a subject keeps at most 8 reference files and one of them is the sheet
 export const LOOK_MINOR_LINE = NOT_AVAILABLE_HERE;
@@ -167,8 +168,16 @@ async function doCapture(actor: PersonRow, ref: string, options: CaptureOptions)
   // 5. Build it with the one sheet builder and store it as the subject's sheet reference.
   const pictures: SheetPicture[] = sources.map((s, index) => ({ bytes: s.bytes, mediaType: s.mediaType, name: sources.length > 1 ? `${member.name} ${index + 1}` : member.name, role: roleOf(member.subject_kind), look: row.look }));
   let made: MadeSheet;
-  try { made = await (options.sheetMaker ?? sheetMakerOverride ?? realSheetMaker)(pictures, options.onStep); }
-  catch (error) { console.error("[cast-look] sheet failed:", error instanceof Error ? error.message : error); return { ok: false, line: LOOK_FAILED_LINE }; }
+  const injected = options.sheetMaker ?? sheetMakerOverride;
+  // PLACE-SHEET-01e: a place or a prop is made by the Stack (several views, one composed sheet) when the flag is on and the Stack offers it. The age check and the finished-picture gate
+  // run here on the composed sheet, and a refusal or an error ends the capture: nothing is stored (fail closed). Everything else keeps the one sheet builder.
+  if (!injected && await useStackLookSheet(member.subject_kind, adultOnly)) {
+    try { made = await makeStackLookSheet(sources, { actor, adultOnly, kind: member.subject_kind as "place" | "prop", look: row.look, subjectId: row.id }); }
+    catch (error) { console.error("[cast-look] stack sheet failed:", error instanceof Error ? error.message : error); return { ok: false, line: error instanceof Error && error.message ? error.message : LOOK_FAILED_LINE }; }
+  } else {
+    try { made = await (injected ?? realSheetMaker)(pictures, options.onStep); }
+    catch (error) { console.error("[cast-look] sheet failed:", error instanceof Error ? error.message : error); return { ok: false, line: LOOK_FAILED_LINE }; }
+  }
   // The locked sentence: written from the look words, and rewritten on a rebuild only when the person has not edited it by hand.
   const auto = row.look.trim().slice(0, 400) || null;
   const locked = row.lockedDescription && row.lockedDescription !== currentNote?.locked ? row.lockedDescription : auto;

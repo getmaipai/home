@@ -8,7 +8,7 @@ import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
 import type { StackJobsCatalogRead } from "@/lib/stack/jobsCatalogShape";
-import type { StackMakePictureRequest, StackMakeRefusalRead, StackMakeResultRead } from "@/lib/stack/makeShape";
+import type { StackMakePictureRequest, StackMakeRefusalRead, StackMakeResultRead, StackMakeSheetRequest } from "@/lib/stack/makeShape";
 import { pictureJobView, type PictureJobView, type PictureList } from "./catalog";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -297,6 +297,32 @@ export async function makePicture(body: StackMakePictureRequest): Promise<{ ok: 
     throw new StackPicturesError(409, "refused", "That picture could not be made right now. Try again in a few minutes.");
   }
   return failure(res);
+}
+
+/**
+ * POST /stack/v1/jobs/make for a `character_sheet` (SHEET-01, PLACE-SHEET-01): the Stack makes each view one after another and, with `compose`, one composed sheet picture. The call
+ * holds until the last panel is made (minutes), so its timeout is long; a refusal is returned, not thrown. A 202 means a panel was still running: the Stack cannot resume a sheet, so
+ * the caller treats it as not made.
+ */
+export async function makeSheetJob(body: StackMakeSheetRequest): Promise<{ ok: true; done: boolean; composed: string | null; files: string[]; notes: string[] } | { ok: false; refusal: StackMakeRefusalRead }> {
+  const res = await request("/stack/v1/jobs/make", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 20 * 60_000 });
+  if (res.status === 200 || res.status === 202) {
+    const result = await res.json() as { state?: string; files?: string[]; composed?: string; made_with?: { notes?: string[] } | null };
+    return { ok: true, done: res.status === 200 && result.state === "done", composed: typeof result.composed === "string" ? result.composed : null, files: Array.isArray(result.files) ? result.files : [], notes: result.made_with?.notes ?? [] };
+  }
+  if (res.status === 409 || res.status === 422) {
+    const refusal = await res.json().catch(() => null) as StackMakeRefusalRead | null;
+    if (refusal && typeof refusal.code === "string" && typeof refusal.line === "string") return { ok: false, refusal };
+  }
+  return failure(res);
+}
+
+/** A file the Stack answered with a path for (a made picture's own route), as bytes. */
+export async function fetchStackPicture(path: string, view?: FullView): Promise<Uint8Array> {
+  if (!path.startsWith("/v1/")) throw new StackPicturesError(502, "bad_reply", "That did not work. Try again.");
+  const res = await request(path, { method: "GET", timeoutMs: 60_000 }, view);
+  if (!res.ok) return failure(res);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 export async function listLoras(): Promise<StackLora[]> {

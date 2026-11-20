@@ -8,5 +8,6 @@ import type { StackMakeRefusal, StackMakeRequest, StackMakeResult } from "@maipa
 export type StackMakeAudience = StackMakeRequest["audience"];
 export type StackMakePictureRequest = Extract<StackMakeRequest, { job: "picture" }>;
 export type StackMakeClipRequest = Extract<StackMakeRequest, { job: "clip" }>;
+export type StackMakeSheetRequest = Extract<StackMakeRequest, { job: "character_sheet" }>;
 export type StackMakeResultRead = Pick<StackMakeResult, "id" | "job" | "state" | "percent" | "status" | "files" | "poster" | "made_with">;
 export type StackMakeRefusalRead = StackMakeRefusal | { code: "not_available"; line: string };

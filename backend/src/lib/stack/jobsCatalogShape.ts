@@ -20,5 +20,7 @@ export interface StackJobsCatalogRead {
     limits?: Partial<Pick<SpecEntry["limits"], "levels" | "max_references" | "max_words" | "shapes">>;
     /** `text`: the part spells words (chat rule W2's `text: true` mark). */
     capabilities?: { text: boolean } & Partial<Omit<SpecEntry["capabilities"], "text">>;
+    /** The optional request keys this Stack's generic door accepts for the job (absent on an older Stack). */
+    request_fields?: string[];
   }>;
 }
