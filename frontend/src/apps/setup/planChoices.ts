@@ -14,8 +14,6 @@ export interface SetupJob {
   hubPart: boolean;
   /** Why this part cannot be installed from the wizard (the adapter needs a Hugging Face token and an accepted licence); null when it can. */
   blocked: string | null;
-  /** WAN-DEFAULT-01: rows of choices the card starts on although the wizard does not list them (the minors-only video model, only on a card where a child or teen lives). Installed with the job, as the plan's default used to. */
-  defaultRows: string[];
 }
 export interface JobPick { on: boolean; choiceId: string }
 export type Picks = Partial<Record<AiJobId, JobPick>>;
@@ -31,8 +29,7 @@ export function setupJobs(cards: readonly AiCard[], plan: DiskPlan): SetupJob[] 
     if (!card || job === "wakeword" || options.length === 0) return [];
     const hubPart = HUB_PART_JOBS.has(job);
     const blocked = hubPart && options.length === 1 && options[0]!.state !== "installed" ? options[0]!.blockedReason : null;
-    const defaultRows = card.choices.filter((choice) => choice.defaultOn === true && !options.some((option) => option.id === choice.id)).flatMap((choice) => choice.rowIds);
-    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required"), hubPart, blocked, defaultRows }];
+    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required"), hubPart, blocked }];
   });
 }
 
@@ -43,7 +40,8 @@ export function defaultPicks(jobs: readonly SetupJob[], plan: DiskPlan): Picks {
   for (const { job, options, required, hubPart, blocked } of jobs) {
     // A hub part is no plan row: it starts on when the card recommends it (the small face finder files) and cannot be on while something blocks it.
     if (hubPart) { const option = options[0]!; picks[job] = { on: blocked === null && (option.recommended || option.state === "installed"), choiceId: option.id }; continue; }
-    const selected = options.filter((option) => chosen.has(specRow(option)) || rowOf(plan, specRow(option))?.need === "required");
+    // WAN-DEFAULT-01: a choice the card starts on (the minors-only video model, listed only where a child or teen lives) is on although its plan row is optional.
+    const selected = options.filter((option) => chosen.has(specRow(option)) || rowOf(plan, specRow(option))?.need === "required" || option.defaultOn === true);
     const pick = selected.find((option) => option.recommended) ?? selected[0];
     picks[job] = pick ? { on: true, choiceId: pick.id } : { on: required, choiceId: (options.find((option) => option.recommended) ?? options[0]!).id };
   }
@@ -60,7 +58,6 @@ export function selectedRows(jobs: readonly SetupJob[], plan: DiskPlan, picks: P
     const pick = picks[job.job];
     const choice = job.options.find((option) => option.id === pick?.choiceId);
     if (pick?.on && choice) for (const id of choice.rowIds) if (isModel(id)) rows.add(id);
-    for (const id of job.defaultRows) if (isModel(id) && rowOf(plan, id)) rows.add(id);
   }
   return rows;
 }

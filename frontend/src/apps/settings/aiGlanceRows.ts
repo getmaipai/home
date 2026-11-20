@@ -31,9 +31,10 @@ export interface GlanceRow {
 
 const HIDDEN = new Set(["pictures.edit"]);
 
-/** The models a person picks between for a job: the radio and fixed choices (plus the Apple-chip chat engine), or the job's own switch. */
+/** The models a person picks between for a job: the radio and fixed choices (plus the Apple-chip chat engine and any choice the card starts on), or the job's own switch. */
 export function optionsOf(card: AiCard): AiChoice[] {
-  const picks = card.choices.filter((choice) => (choice.kind === "radio" || choice.kind === "fixed" || choice.id === "chat.mlx") && !HIDDEN.has(choice.id));
+  // WAN-DEFAULT-01: a choice flagged defaultOn (the minors-only video model, listed only where a child or teen lives) is an option beside the radio choices, in Settings and in the setup wizard, from the same card data.
+  const picks = card.choices.filter((choice) => (choice.kind === "radio" || choice.kind === "fixed" || choice.id === "chat.mlx" || choice.defaultOn === true) && !HIDDEN.has(choice.id));
   return picks.length > 0 ? picks : card.choices.filter((choice) => choice.kind === "switch" && !HIDDEN.has(choice.id)).slice(0, 1);
 }
 
