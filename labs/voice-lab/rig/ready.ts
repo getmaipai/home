@@ -55,7 +55,8 @@ try { const s = JSON.parse(await Bun.file(J).text()).summary;
 }
 // 3 + 4 echo tests
 for (const [scenario, label, need] of [["silent", "her own voice fed back into the microphone at speaker level causes no stop", (m: RegExpMatchArray) => Number(m[1]) === RUNS && m[2] === "0"], ["stop", '"wait, stop" over her voice stops her', (m: RegExpMatchArray) => Number(m[1]) === RUNS]] as const) {
-  const out = await run(["bun", "rig/echotest.ts", SECRET_FILE, "--scenario", scenario, "--runs", String(RUNS), "--round1"]); // the setup the page sees: echo canceller leaves 8% and the device stops her locally (same as round 1)
+  const traceDir = `${import.meta.dir}/../../../data-scratch/echo-traces/${RUN_START.replace(/[:.]/g, "-")}`; (await import("node:fs")).mkdirSync(traceDir, { recursive: true });
+  const out = await run(["env", "ECHO_TRACE=1", `ECHO_TRACE_DIR=${traceDir}`, "bun", "rig/echotest.ts", SECRET_FILE, "--scenario", scenario, "--runs", String(RUNS), "--round1"]); // every run keeps its overlap trace so a miss always has evidence // the setup the page sees: echo canceller leaves 8% and the device stops her locally (same as round 1)
   const m = out.match(/SCENARIO \w+: (\d+)\/(\d+) pass; self-interruptions (\d+)/);
   const ok = !!m && Number(m[1]) === Number(m[2]) && (scenario === "stop" ? true : m[3] === "0");
   line(ok, `${label} [simulated room, echo canceller residue 8%, local stop on]: ${m ? `${m[1]} of ${m[2]} runs, self-interruptions ${m[3]}` : "no result"}`);

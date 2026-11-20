@@ -99,7 +99,7 @@ async function one(run: number, gain: number, delayMs: number) {
     // played reports like the page (every 100 ms)
     if (rel() - lastPlayedReport >= 100 && firstAudioAt && queue.length && !stopped) { lastPlayedReport = rel(); for (const [idx, s0] of chunkStarts) { const ms = Math.max(0, (playhead - s0) / 24); if (ms >= 0) ws.send(JSON.stringify({ t: "played", turn, chunk: idx, ms })); } }
   }
-  if (Bun.env.ECHO_TRACE) { Bun.write(`/private/tmp/echo-trace-${run + 1}-g${gain}.tsv`, "ms_since_user\tmic_rms\tfloor\toverlap_ms\n" + traceLines.join("\n")); traceLines.length = 0; }
+  if (Bun.env.ECHO_TRACE) { Bun.write(`${Bun.env.ECHO_TRACE_DIR ?? "/private/tmp"}/echo-trace-${SCEN}-run${run + 1}-g${gain}.tsv`, "ms_since_user\tmic_rms\tfloor\toverlap_ms\n" + traceLines.join("\n")); traceLines.length = 0; }
   ws.close(); await Bun.sleep(200);
   if (OUT) writeWav(`${OUT}/${SCEN}-${run + 1}.wav`, outAll.subarray(0, outLen), 24000);
   const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final" && x.at > firstAudioAt);
