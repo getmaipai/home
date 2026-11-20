@@ -135,6 +135,33 @@ describe("watcher suite scheduling", () => {
     expect(existsSync(join(f.scratch, "issue.calls"))).toBe(false);
   }, 20_000);
 
+  test("WATCHER-STARVED-01: a leg with no output and no CPU past the idle limit is stopped and the pass is unverified, long before the leg limit", () => {
+    const f = fixture();
+    const bin = join(f.scratch, "fake-bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "bun"), "#!/usr/bin/env bash\nsleep 60\n");
+    chmodSync(join(bin, "bun"), 0o755);
+    const started = Date.now();
+    const result = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      PATH: bin + ":" + (process.env.PATH ?? ""),
+      MAIPAI_WATCH_SUITE_CMD: "",
+      MAIPAI_WATCH_LEGS: "backend",
+      MAIPAI_WATCH_LEG_MAX_SECONDS: "1500",
+      MAIPAI_WATCH_IDLE_SECONDS: "3",
+      MAIPAI_WATCH_IDLE_POLL_SECONDS: "1",
+    });
+    const sha = git(f.warm, "rev-parse", "origin/main");
+    expect(result.status).toBe(0);
+    expect(Date.now() - started).toBeLessThan(30_000);
+    expect(result.stdout).toContain(`unverified at ${sha.slice(0, 7)}: backend stopped (not a pass)`);
+    expect(records(f).at(-1).result).toBe("unverified");
+    expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("leg backend hung (no output, no CPU for 3 s)");
+    expect(existsSync(join(f.data, "reds", `${sha}.md`))).toBe(false);
+    expect(existsSync(join(f.data, "green", sha))).toBe(false);
+    expect(existsSync(join(f.scratch, "issue.calls"))).toBe(false);
+  }, 40_000);
+
   test("ignores a queued lander after its configurable busy window", () => {
     const f = fixture();
     const queue = join(f.env.MAIPAI_LAND_DATA!, "queue");

@@ -119,6 +119,41 @@ atomic_value() {
   mv -f "$tmp" "$path"
 }
 
+# WATCHER-STARVED-01 follow-up: a test leg that prints nothing and uses no CPU for MAIPAI_WATCH_IDLE_SECONDS (default 600) is hung, not slow. The leg limit alone left a hung
+# shard holding the machine-wide gate lock for up to 25 minutes (2026-11-20). cpu_seconds_of_tree prints the CPU seconds used so far by a process and all its descendants.
+cpu_seconds_of_tree() {
+  ps -axo pid=,ppid=,cputime= 2>/dev/null | awk -v root="$1" '
+    { pid[NR]=$1; ppid[NR]=$2; t=$3; n=split(t, a, ":"); s=a[n]+0; if (n>1) s+=60*a[n-1]; if (n>2) s+=3600*a[n-2]; cpu[$1]=s; par[$1]=$2; seen[NR]=$1 }
+    END {
+      keep[root]=1; changed=1
+      while (changed) { changed=0; for (i=1;i<=NR;i++) { p=seen[i]; if (!(p in keep) && (par[p] in keep)) { keep[p]=1; changed=1 } } }
+      total=0; for (p in keep) if (p in cpu) total+=cpu[p]
+      printf "%d\n", total
+    }'
+}
+
+# idle_watch <leg_pid> <output file> <flag file>: runs beside a leg. When the output file has not grown and the leg tree has used no CPU for the idle limit,
+# it writes the flag and stops the leg's process group (TERM, then KILL). The leg then counts as stopped (unverified), like a job.sh stop.
+idle_watch() {
+  local pid="$1" file="$2" flag="$3" limit poll last_size=-1 size last_cpu=-1 cpu idle_since now
+  limit="${MAIPAI_WATCH_IDLE_SECONDS:-600}"; [[ "$limit" =~ ^[0-9]+$ ]] || limit=600
+  poll="${MAIPAI_WATCH_IDLE_POLL_SECONDS:-30}"; [[ "$poll" =~ ^[0-9]+$ ]] || poll=30
+  (( limit > 0 )) || return 0
+  idle_since="$(date +%s)"
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep "$poll"
+    kill -0 "$pid" 2>/dev/null || return 0
+    size="$(wc -c < "$file" 2>/dev/null | tr -d ' ' || echo 0)"; cpu="$(cpu_seconds_of_tree "$pid")"
+    now="$(date +%s)"
+    if [[ "$size" != "$last_size" || "$cpu" != "$last_cpu" ]]; then idle_since="$now"; last_size="$size"; last_cpu="$cpu"; continue; fi
+    if (( now - idle_since >= limit )); then
+      : > "$flag"
+      kill -TERM -"$pid" 2>/dev/null || true; sleep 5; kill -KILL -"$pid" 2>/dev/null || true
+      return 0
+    fi
+  done
+}
+
 watch_unverified_age() {
   python3 - "$data" "${1:-$(date +%s)}" <<'PY'
 import datetime,json,os,sys
@@ -256,7 +291,7 @@ run_suite() {
   if [[ -n "$command" ]]; then
     (cd "$checkout" && bash -c "$command") >"$output" 2>&1
   else
-    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds wait_rc timed_out leg_limit
+    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds wait_rc timed_out leg_limit idle_pid
     local requested configured="${MAIPAI_WATCH_LEGS:-backend frontend scripts}"
     local -a requested_legs=() legs=()
     read -r -a requested_legs <<< "$configured"
@@ -287,6 +322,9 @@ run_suite() {
       local_started="$(date +%s)"
       (cd "$checkout" && export MAIPAI_GATE_MIN_SHARDS="$min_shards" MAIPAI_GATE_YIELD_FILE="${MAIPAI_LAND_DATA:-$main/data-scratch/land}/current-entry" MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && exec perl -e 'setpgrp(0, 0); exec @ARGV' -- bash -c 'started=$(date +%s); nice -n ${MAIPAI_WATCH_NICE:-10} bun scripts/gate/shardTests.ts --dir "$1" --root "$2" --shards "$3"; rc=$?; printf "%s %s\n" "$rc" "$(( $(date +%s) - started ))" > "$4"; exit "$rc"' _ "$leg" "$root" "$shards" "$leg_status") >"$leg_output" 2>&1 &
       leg_pid=$!
+      rm -f "$leg_status.idle"
+      idle_watch "$leg_pid" "$leg_output" "$leg_status.idle" &
+      idle_pid=$!
       if (( leg_limit > 0 )); then
         ( sleep "$leg_limit"; if kill -0 "$leg_pid" 2>/dev/null; then : > "$leg_status.timeout"; kill -TERM -"$leg_pid" 2>/dev/null || true; sleep 10; kill -KILL -"$leg_pid" 2>/dev/null || true; fi ) &
         watchdog_pid=$!
@@ -296,6 +334,16 @@ run_suite() {
         wait "$watchdog_pid" 2>/dev/null || true
       else
         if wait "$leg_pid"; then wait_rc=0; else wait_rc=$?; fi
+      fi
+      pkill -P "$idle_pid" 2>/dev/null || true
+      kill "$idle_pid" 2>/dev/null || true
+      wait "$idle_pid" 2>/dev/null || true
+      if [[ -e "$leg_status.idle" ]]; then
+        printf '%s\n' "$leg" >> "$output.stopped"
+        printf 'shard: leg %s was stopped after %s s with no output and no CPU (hung); it is not counted as a failure or a pass\n' "$leg" "${MAIPAI_WATCH_IDLE_SECONDS:-600}" >> "$output"
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) leg $leg hung (no output, no CPU for ${MAIPAI_WATCH_IDLE_SECONDS:-600} s): stopped, the pass is unverified" >> "$data/watcher.log"
+        rm -f "$leg_output" "$leg_status" "$leg_status.timeout" "$leg_status.idle"
+        continue
       fi
       if [[ -e "$leg_status.timeout" ]]; then
         printf '124 %s timed_out\n' "$(( $(date +%s) - local_started ))" > "$leg_status"
