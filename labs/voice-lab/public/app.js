@@ -1,5 +1,6 @@
 import { TurnState } from "./turn-state.js";
 import { LocalDuckDetector } from "./local-duck.js";
+import { watchSocket } from "./reconnect.js";
 const $ = (selector) => document.querySelector(selector);
 const status = $('#status');
 let ws, stream, source, node;
@@ -166,19 +167,7 @@ $('#start').onclick = async () => {
     }
     ws.send(bytes);
   };
-  // If the lab server goes away (restart, network drop) the page says so and reconnects by itself.
-  let retry = 0;
-  const wsUrl = ws.url, handlers = { onopen: ws.onopen, onmessage: ws.onmessage };
-  const lost = () => {
-    status.textContent = 'Reconnecting...'; clearTimeout(retry);
-    retry = setTimeout(() => {
-      const next = new WebSocket(wsUrl); next.binaryType = 'arraybuffer';
-      next.onopen = (e) => { status.textContent = 'Reconnected.'; handlers.onopen(e); };
-      next.onmessage = handlers.onmessage; next.onclose = lost; next.onerror = () => {};
-      ws = next;
-    }, 1500);
-  };
-  ws.onclose = lost;
+  watchSocket(ws, { make: () => { const n = new WebSocket(ws.url); n.binaryType = 'arraybuffer'; return n; }, status: (t) => { status.textContent = t; }, onSwap: (n) => { ws = n; } });
   $('#start').disabled = true;
   $('#stop').disabled = false;
   $('#output').onchange = () => window.__configureOutput($('#output').value);

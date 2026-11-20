@@ -18,3 +18,12 @@ test("every offered tag really yields audible, level-matched audio, and a voice 
   expect(pickSound("no_such_voice", "laugh", 0.08)).toBeNull();
   expect(Object.keys(loadSounds("me"))).toEqual([]);
 });
+
+import { buildPrompt } from "../src/prompt";
+test("the prompt offers exactly the sound tags the voice can make: no tag without a sound", () => {
+  const prompt = buildPrompt();
+  const line = prompt.split("\n").find((l) => l.startsWith("Sounds you can make:"))!;
+  const offered = [...line.split(". ")[0]!.matchAll(/\[([a-z ]+)\]/g)].map((m) => m[1]!);
+  expect(offered.sort()).toEqual(availableTags("casual").sort());
+  expect(buildPrompt([])).not.toContain("Sounds you can make");
+});
