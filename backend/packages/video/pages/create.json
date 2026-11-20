@@ -87,7 +87,7 @@
         }
       },
       "size": "stage",
-    "compact": true,
+    "aspect": "short",
       "media": {
         "still": "still",
         "loop": "loop",
@@ -103,6 +103,7 @@
       "pills": [
         {
           "label": "Another take",
+          "starts": "video",
           "icon": "rotate-ccw",
           "action": {
                         "call": {
@@ -150,6 +151,7 @@
       "error_actions": [
         {
           "label": "Try again",
+          "starts": "video",
           "icon": "refresh-cw",
           "action": {
                         "call": {

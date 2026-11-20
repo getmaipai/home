@@ -125,16 +125,12 @@ describe("scope short: the clips feed rows", () => {
     expect(stage[0]!.id).toBe(b.jobId);
   });
 
-  test("the stage offers Another take and Try again only while the video maker is ready; Edit and make again and Favorite stay", async () => {
+  test("the stage's start controls say they start a video (the kit disables them while video is not ready); the others do not", async () => {
     const { adult } = await household();
-    const labels = async () => {
-      const page = (await (await adult.client.get("/api/plugins/video/pages/create")).json()) as { body: Array<Record<string, any>> };
-      const stage = page.body.find((node) => node.type === "media_stage")!;
-      return { pills: (stage.pills as Array<{ label: string }>).map((p) => p.label), errors: (stage.error_actions as Array<{ label: string }>).map((p) => p.label) };
-    };
-    expect(await labels()).toEqual({ pills: ["Another take", "Edit and make again", "Favorite"], errors: ["Try again", "Change the words"] });
-    __setVideoStatusForTests(null);
-    expect(await labels()).toEqual({ pills: ["Edit and make again", "Favorite"], errors: ["Change the words"] });
+    const page = (await (await adult.client.get("/api/plugins/video/pages/create")).json()) as { body: Array<Record<string, any>> };
+    const stage = page.body.find((node) => node.type === "media_stage")!;
+    expect((stage.pills as Array<{ label: string; starts?: string }>).map((p) => [p.label, p.starts ?? null])).toEqual([["Another take", "video"], ["Edit and make again", null], ["Favorite", null]]);
+    expect((stage.error_actions as Array<{ label: string; starts?: string }>).map((p) => [p.label, p.starts ?? null])).toEqual([["Try again", "video"], ["Change the words", null]]);
   });
 
   test("the heart is the Favorite mark: liking a clip shows it liked on the next read, per person", async () => {

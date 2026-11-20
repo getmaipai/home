@@ -162,11 +162,6 @@ export function capChips(chips: Array<Record<string, unknown>>, max = 16): Array
 registerAppPageFill("video", "create", (person, page) => {
   // A card whose loop is not in the package (not made yet, or removed) is a plain tile with its label, never a broken video.
   const media = (loop: string): { media?: string } => (packageAssetFile("video", loop) ? { media: loop } : {});
-  // VF-UI-03b: while the video maker is not ready, the stage offers no start control (a control that looks live then fails). The kit has no `starts` on a stage action yet, so the page leaves these two out.
-  const stage = findNode(page.body, "media_stage");
-  if (stage && !videoStatusReady(peekVideoEngineStatus(), true)) {
-    for (const key of ["pills", "error_actions"] as const) if (Array.isArray(stage[key])) stage[key] = (stage[key] as Array<{ label?: string }>).filter((item) => item.label !== "Another take" && item.label !== "Try again");
-  }
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
