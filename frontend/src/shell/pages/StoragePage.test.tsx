@@ -72,6 +72,9 @@ function makeOverview(overrides: Partial<StorageUsageOverview> = {}): StorageUsa
   };
 }
 
+let cleanupItems: unknown[] = [];
+let cleanupPosts: unknown[] = [];
+
 function mockFetch(overview: StorageUsageOverview | { status: number }, registry: SettingsKey[] = []) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -88,7 +91,10 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
       if ("status" in overview) return Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: overview.status }));
       return Promise.resolve(Response.json(overview));
     }
-    if (url.includes("/api/storage/cleanup")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/storage/cleanup")) {
+      if (init?.method === "POST") { cleanupPosts.push(JSON.parse(String(init.body))); return Promise.resolve(Response.json({ bytes_freed: 2_500_000_000 })); }
+      return Promise.resolve(Response.json(cleanupItems));
+    }
     if (url.includes("/api/storage/package-cache") && url.endsWith("/clear")) {
       return Promise.resolve(Response.json({ removed: 14, bytes: 2.1 * 1024 * 1024 }));
     }
@@ -114,6 +120,31 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
 }
 
 describe("StoragePage", () => {
+  // Moved here from ModelsAndStorageSection.test.tsx when the Free up space list moved to this page (DISK-GUARD-04).
+  test("Free up space lists safe cleanup items, keeps blocked items, and confirms before clearing selected items", async () => {
+    cleanupItems = [
+      { id: "package_cache", kind: "package_cache", label: "Package cache", bytes: 2_500_000_000, reversible: true, how: "Saved copies can be fetched again.", blocked: null },
+      { id: "tidy:/models/live", kind: "orphan_folder", label: "Orphan model folder: live", bytes: 4_000_000_000, reversible: true, how: "Unreferenced folder.", blocked: "A role slot has selected this model." },
+    ];
+    cleanupPosts = [];
+    const restore = mockFetch(makeOverview(), []);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      expect((await view.findAllByText("Package cache")).length).toBeGreaterThan(0);
+      expect(document.body.textContent).toContain("2.3 GB");
+      expect(document.body.textContent).toContain("A role slot has selected this model.");
+      fireEvent.pointerDown(view.getAllByRole("button", { name: /actions/i })[0]!, { button: 0, ctrlKey: false });
+      fireEvent.click(view.getAllByRole("button", { name: /actions/i })[0]!);
+      fireEvent.click(await view.findByRole("menuitem", { name: "Select Package cache" }));
+      fireEvent.click(view.getByRole("button", { name: "Clear selected" }));
+      expect(await view.findByText(/This frees 2\.3 GB/)).toBeTruthy();
+      expect(cleanupPosts).toHaveLength(0);
+      const dialog = document.querySelector("[role=alertdialog]")!;
+      fireEvent.click(dialog.querySelector("button:last-child")!);
+      await waitFor(() => expect(cleanupPosts).toEqual([{ ids: ["package_cache"] }]));
+    } finally { restore(); cleanupItems = []; }
+  });
+
   test("an admin sees the household total, every person's row, and the cap controls", async () => {
     const restore = mockFetch(
       makeOverview({
