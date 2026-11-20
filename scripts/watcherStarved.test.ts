@@ -117,6 +117,21 @@ describe("watcher starvation protection", () => {
     expect(all.some((line) => line.startsWith("issue comment"))).toBe(false);
   });
 
+  test("a failing file that passes alone at the named commit blames no commit (flaky under load), while a file that still fails there names it", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const calls = join(f.scratch, "rerun.count");
+    const rerun = join(f.scratch, "flaky-rerun.sh");
+    // The first three isolated reruns (the classification) fail, every later one passes: the failure came from the busy machine, not from the commit.
+    writeFileSync(rerun, `#!/bin/sh\nn=$(cat '${calls}' 2>/dev/null || echo 0)\nn=$((n+1))\necho $n > '${calls}'\n[ "$n" -le 3 ] && exit 1\nexit 0\n`); chmodSync(rerun, 0o755);
+    const sha = commit(f, "break tests", { RED: "red\n" });
+    expect(run(f, "watcher.sh", ["run-once"], { ...f.env, MAIPAI_WATCH_RERUN_CMD: `bash ${rerun}` }).status).toBe(0);
+    const last = records(f).at(-1);
+    expect(last.result).toBe("red");
+    expect(last.culprit ?? "").toBe("");
+    expect(readFileSync(join(f.data, "reds", `${sha}.md`), "utf8")).toContain("flaky under load");
+  }, 60_000);
+
   test("the log rotates over 5 MB (the duplicate-start quieting has no automated test: it needs a live second watcher process)", () => {
     const f = fixture();
     mkdirSync(f.data, { recursive: true });

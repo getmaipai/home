@@ -431,7 +431,7 @@ if target not in value:
 PY
 }
 
-find_culprit() {
+find_culprit_raw() {
   local head="$1" last_green="$2" files="$3" candidates count lo hi mid candidate culprit="unknown"
   local started budget max_candidates spent
   budget="${MAIPAI_WATCH_BISECT_MAX_SECONDS:-600}"; [[ "$budget" =~ ^[0-9]+$ ]] || budget=600
@@ -464,6 +464,17 @@ find_culprit() {
   spent=$(( $(date +%s) - started )); if (( spent >= budget )); then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) bisect budget spent after ${spent} s; culprit unknown" >> "$data/watcher.log"; echo unknown; return 0; fi
   echo "$culprit"
 }
+
+# WATCHER-STARVED-01: a commit is blamed only if the failing files still fail there, alone, on every confirming rerun (MAIPAI_WATCH_RERUNS, 3). A file that passes alone
+# at the named commit failed because the machine was busy: the answer is "flaky", not a commit (the bisect's single rerun under load blamed a UI commit that never touched the file).
+confirm_culprit() {
+  local culprit="$1" files="$2" file
+  [[ "$culprit" != unknown && -n "$files" ]] || { printf '%s\n' "$culprit"; return 0; }
+  git -C "$checkout" checkout --detach "$culprit" >/dev/null 2>&1 || { printf '%s\n' "$culprit"; return 0; }
+  for file in $files; do file_is_red "$file" && { printf '%s\n' "$culprit"; return 0; }; done
+  printf '%s\n' flaky
+}
+find_culprit() { local raw; raw="$(find_culprit_raw "$@")"; confirm_culprit "$raw" "${3:-}"; }
 
 work_cpu_percent() {
   local raw
@@ -795,11 +806,12 @@ run_once_body() {
   if [[ "$culprit" == unknown ]] && (( bisect_spent >= bisect_budget )); then budget_spent=1; fi
   git -C "$checkout" checkout --detach "$head" >/dev/null 2>&1 || true
   subject="unknown"
-  if [[ "$culprit" != unknown ]]; then subject="$(git -C "$checkout" show -s --format=%s "$culprit" 2>/dev/null || echo unknown)"; fi
+  if [[ "$culprit" != unknown && "$culprit" != flaky ]]; then subject="$(git -C "$checkout" show -s --format=%s "$culprit" 2>/dev/null || echo unknown)"; fi
   note="$data/reds/$head.md"; note_tmp="$(mktemp "$data/reds/.red.XXXXXX")"
   {
     printf '# Main test failure: %s\n\n' "$head"
     if (( budget_spent )); then printf -- '- Main SHA: `%s`\n- Culprit: unknown (bisect budget spent)\n- Failing files: %s\n\n' "$head" "${files:-unknown}"
+    elif [[ "$culprit" == flaky ]]; then printf -- '- Main SHA: `%s`\n- Culprit: none (flaky under load: the failing files pass alone at the commit the bisect named, so no commit is blamed)\n- Failing files: %s\n\n' "$head" "${files:-unknown}"
     else printf -- '- Main SHA: `%s`\n- Culprit: `%s` (%s)\n- Failing files: %s\n\n' "$head" "$culprit" "$subject" "${files:-unknown}"; fi
     printf '## Last 60 lines of suite output\n\n```text\n'
     tail -n 60 "$output"
@@ -808,7 +820,7 @@ run_once_body() {
     printf '\n```\n'
   } > "$note_tmp"
   mv -f "$note_tmp" "$note"
-  append_run "$head" red "$seconds" "$files" "$([[ "$culprit" == unknown ]] || printf %s "$culprit")"
+  append_run "$head" red "$seconds" "$files" "$([[ "$culprit" == unknown || "$culprit" == flaky ]] || printf %s "$culprit")"
   t2_discharge "$head" red >"$data/.discharged-$head"
   if [[ -s "$data/.discharged-$head" ]]; then { printf "\n## T2 obligations discharged by this run\n\n"; sed "s/ /\n- /g" "$data/.discharged-$head" | sed "s/^/- /"; } >>"$note"; rm -f "$data/.discharged-$head"; fi
   watch_unverified_alert

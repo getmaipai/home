@@ -108,7 +108,8 @@ describe("main watcher", () => {
       MAIPAI_WATCH_BISECT_CANDIDATES: "2",
     });
     expect(out.status).toBe(0);
-    expect(readFileSync(calls, "utf8").trim().split(/\r?\n/)).toHaveLength(2);
+    // The classification, the newest candidate (the cap stops the walk there), and one confirming rerun of the named commit (WATCHER-STARVED-01).
+    expect(readFileSync(calls, "utf8").trim().split(/\r?\n/)).toHaveLength(3);
     expect(records(f).at(-1).sha).toBe(sha);
   }, 20_000);
 });
