@@ -40,7 +40,7 @@ New: the typed clip request, capability rows, the job receipt, the planner, the 
 
 ## 1. Evidence (POC, 2026-11-19 and 2026-11-20)
 
-Sources: the POC results of 2026-11-19 and 2026-11-20 (video, swap and H3 speed tests), the owner's ratings of about 250 H3 clips (recomputed 2026-11-19), and the Stack at `f5a696b`. One fictional adult character, seeds 1101 to 1103 and 2101, one job at a time on the shared Mac. Sound checked by loudness and by the Stack's speech-to-text.
+Sources: the POC results of 2026-11-19 and 2026-11-20 (video, swap and H3 speed tests), the owner's ratings of about 250 H3 clips (recomputed 2026-11-19), and the Stack at `f5a696b`. One fictional adult character, seeds 1101 to 1103 and 2101, one job at a time on one Mac. Sound checked by loudness and by the Stack's speech-to-text.
 
 ### 1.1 What each recipe cost and looked like
 
@@ -49,7 +49,7 @@ Sources: the POC results of 2026-11-19 and 2026-11-20 (video, swap and H3 speed 
 | H3 FL2VA 8-bit, turbo adapter, 7 steps (6 ran) | 864x480 | 3.9 min | 45 GB footprint | exact ("Please put the blue mug back.") | Face and freckles hold; soft; quiet sound |
 | H3 FL2VA 8-bit, no adapter, 24 steps | 864x480 | 13.0 min | 43 GB | exact | A little cleaner than turbo; nearly the same motion |
 | LTX 2.5 Boost (Stack, q8) | 768x448 | 1.2 min | about 22 GB | exact | Owner: "had the best performance". One eye-squeeze glitch |
-| LTX 2.5 Max bf16 | 1024x576 | 1.6 min (95 to 195 s on a busy Mac) | 49 GB | exact | Owner: "a little soft"; face drifts in a medium shot |
+| LTX 2.5 Max bf16 | 1024x576 | 1.6 min (95 to 195 s under load) | 49 GB | exact | Owner: "a little soft"; face drifts in a medium shot |
 | LTX 2.5 Max bf16 plus detail pass (DFR) | 1024x576 | 3.3 min | 71 GB | exact | Skin much sharper; a new take, not the same performance; 1.2x time |
 | LTX 2.5 Max bf16 | 1280x704 | 2.4 min | 55 GB | exact | |
 | LTX 2.5 Max bf16 | 1536x832 | 3.6 min | 61 GB | exact | |
@@ -85,7 +85,7 @@ Reading: close-ups hold on every recipe (0.6 and up). In medium shots every firs
 |---|---|---|
 | Film A (all LTX) had no speech, repeated footsteps, looked like different camera crews, teeth problems (owner) | One `loudnorm` over six audio inputs in a single ffmpeg graph made every shot carry the first shot's audio (correlation 0.999 between shots). Only the parts were checked; the speech-to-text returned empty on the final file and was blamed on length. Silent shots had a -53 to -71 dB floor that loudness leveling raised to speech level. Crews and footsteps: independent stills and independent voices per shot (inference, not tested) | Finished-file checks (7.7); one room tone bed per location (7.5) |
 | H3 opens every clip with a noise burst and a small mouth movement in the first 130 ms | Found by the owner ("her lips move with that odd sound"); in every engine; no official fix. Our start picture had parted lips and our prompt did not follow H3's official format | Start pictures with closed lips for speaking shots; trim or cover the first four frames at 24 fps; H3 prompt grammar (6.3) |
-| Teeth merge on wide-open mouths | At every LTX size and on H3 at 1088x608 in a medium shot; close-ups with calm delivery are clean on every recipe. The detail pass neither fixes nor causes it. All three seeds of the original prompt had a wide-open stretch; "speaks quietly, lips parting only slightly" cut it to one small stretch in one take (one take: not proof). Refine Details could not be run (gated Hugging Face repo, access needs the owner's account) | Close-ups for speech; the wording above; a mouth check per take (7.6); no automatic mouth repair |
+| Teeth merge on wide-open mouths | At every LTX size and on H3 at 1088x608 in a medium shot; close-ups with calm delivery are clean on every recipe. The detail pass neither fixes nor causes it. All three seeds of the original prompt had a wide-open stretch; "speaks quietly, lips parting only slightly" cut it to one small stretch in one take (one take: not proof). Refine Details could not be run (the adapter's repo is gated behind accepting its model terms) | Close-ups for speech; the wording above; a mouth check per take (7.6); no automatic mouth repair |
 | Identity in medium shots | Face under 120 px; first-frame routes score 0.27 to 0.35 | Reference route on a capable pack (6); close-ups for faces |
 | The live Stack cancelled LTX Max three times | Memory governor, "too busy", at 9 percent, 9 percent and 12 percent (2026-11-19). Max needs 49 to 74 GB peak, above what the governor left free. Not proven whether another job was running | Open (section 13); the hub must be able to admit Max HD (VF-PROFILE-01) |
 | The old swap compositor fails its own check | Its mask covers about 48 percent of a two-person dialogue clip (a color rule tuned to one clip) and the check grades the mask against itself. Repaired independent check: 41,694 persistent changed pixels (largest blob 15,877) outside the true face region; 51,723 as written; 10.6 percent of pixels changed outside the region on the dialogue clip | Section 8 |
