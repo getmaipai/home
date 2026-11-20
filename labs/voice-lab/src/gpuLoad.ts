@@ -54,3 +54,7 @@ export class FreeWindow {
   }
   finish() { this.running = false; }
 }
+
+/** A heavy GPU load that no named engine explains while the owner's remote screen is quiet (a foreign python job, a build): the run is not valid. At rest only (our own engines raise utilization during a run). */
+export const UNNAMED_UTIL = 70;
+export const unnamedGpuLoad = (g: { util: number; jobs: string }, rows: ProcRow[]) => g.util > UNNAMED_UTIL && g.jobs === "" && remoteScreenLabel(rows) === "quiet";

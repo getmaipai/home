@@ -44,3 +44,11 @@ test("a run is valid when no other NAMED engine is active; the owner's remote sc
   expect(remoteScreenLabel([R(3, 1, 80, "/System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd")])).toBe("remote screen active");
   expect(remoteScreenLabel([R(4, 1, 1, "/Applications/Sunshine.app/Contents/MacOS/Sunshine")])).toBe("quiet");
 });
+import { unnamedGpuLoad } from "../src/gpuLoad";
+test("heavy GPU use with no named engine and a quiet remote screen is an unnamed load; with the remote screen active it is not", () => {
+  const R = (pid: number, pcpu: number, cmd: string) => ({ pid, ppid: 1, rss: 1, pcpu, cmd });
+  expect(unnamedGpuLoad({ util: 98, jobs: "" }, [R(1, 1, "/Applications/Sunshine.app/Contents/MacOS/Sunshine")])).toBe(true);
+  expect(unnamedGpuLoad({ util: 98, jobs: "" }, [R(2, 80, "/System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd")])).toBe(false);
+  expect(unnamedGpuLoad({ util: 30, jobs: "" }, [])).toBe(false);
+  expect(unnamedGpuLoad({ util: 98, jobs: "pid=5 60% llama-server" }, [])).toBe(false);   // named: handled by the named-engine rule
+});
