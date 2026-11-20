@@ -4,10 +4,13 @@ import { availableTags, pickSound, refusedSounds } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";
 import { machineBusy, labPriorities } from "./loadcheck";
-import { sampleGpu } from "../src/gpuLoad";
+import { sampleGpu, gpuClass, waitForGpuFree } from "../src/gpuLoad";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
 const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = quick ? 4 : 10;
 const FIRST_SOUND_TARGET_MS = 1350, P90_LIMIT_MS = 2300, WORST_LIMIT_MS = 3500; // median 1.17 s, p90 1.93 s, worst about 2.6 s measured, plus 15 percent where the sample is stable // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
+// --wait-gpu-free: start only when no hub video job (or other GPU engine) is running; a run is valid for "ready for the owner" only if the GPU stayed free the whole time
+if (process.argv.includes("--wait-gpu-free")) { console.log("waiting for the GPU to be free of other jobs..."); if (!(await waitForGpuFree())) { console.log("NOT RUN: the GPU did not become free within 20 minutes (a hub video job is running)"); process.exit(4); } }
+const gpuAtStart = await sampleGpu();
 const secret = (await Bun.file(SECRET_FILE).text()).trim(), LAB = "127.0.0.1:9931";
 const results: Array<[boolean, string]> = []; const line = (ok: boolean, text: string) => { results.push([ok, text]); console.log(`${ok ? "PASS" : "FAIL"}  ${text}`); };
 const run = async (cmd: string[]) => { const p = Bun.spawn(cmd, { cwd: import.meta.dir + "/..", stdout: "pipe", stderr: "pipe" }); const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]); await p.exited; return out + "\n" + err; };
@@ -64,5 +67,6 @@ if (!quick) {
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
 
-const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 ? (quick ? "ALL PASS (quick mode: not valid for telling the owner to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
+const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd) === "free" ? "GPU FREE" : "GPU SHARED"; console.log(`RUN CLASS: ${klass} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
+const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 && klass === "GPU SHARED" ? "ALL PASS but the GPU was shared: not a valid ready run (rerun with --wait-gpu-free)" : bad === 0 ? (quick ? "ALL PASS (quick mode: not valid for telling the owner to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
 process.exit(bad ? 1 : 0);
