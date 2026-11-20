@@ -24,6 +24,7 @@ import { runTool, toolDefinitions } from "./tools";
 import { fileURLToPath } from "node:url";
 import { commitDelay } from "./commitDelay";
 const supported = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"];
+const commitsPath = fileURLToPath(new URL("../results/commits.jsonl", import.meta.url));
 const stopsPath = fileURLToPath(new URL("../results/stops.jsonl", import.meta.url));
 const metricsPath = fileURLToPath(new URL("../results/turns.jsonl", import.meta.url));
 const cutinsPath = fileURLToPath(new URL("../results/cutins.jsonl", import.meta.url));
@@ -164,7 +165,7 @@ export class VoiceSession {
       case "commit":
         if (this.streamDraft === "kept") this.metrics.stream_draft = "kept";
         this.streamDraft = "";
-        this.metrics.t_commit = this.metricNow(); this.metrics.commit_reason = c.reason as "model" | "timeout";
+        this.metrics.t_commit = this.metricNow(); this.metrics.commit_reason = c.reason as "model" | "timeout"; try { appendFileSync(commitsPath, JSON.stringify({ at: new Date().toISOString(), reason: c.reason, probability: +this.tm.turnProbability.toFixed(3), text: String(c.transcript ?? "").slice(0, 120), endsPunct: /[.?!]\s*$/.test(String(c.transcript ?? "")) }) + "\n"); } catch {}
         if (this.draftStartedAt >= 0) this.metrics.draft_head_start_ms = Math.max(0, this.now() - this.draftStartedAt);
         if (this.resumingCommitted) {
           const last = this.history.messages.at(-1);
