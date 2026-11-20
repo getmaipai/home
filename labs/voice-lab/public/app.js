@@ -120,6 +120,7 @@ $('#start').onclick = async () => {
       replyFinished = true;
       finishTurnIfReady(message.turn);
     }
+    if (message.t === 'nod') { try { const raw = atob(message.pcm), pcm = new Int16Array(raw.length / 2); for (let i = 0; i < pcm.length; i++) pcm[i] = (raw.charCodeAt(i * 2) | (raw.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16; const buf = ctx.createBuffer(1, pcm.length, message.rate || 24000); buf.copyToChannel(Float32Array.from(pcm, (v) => v / 32768), 0); const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(); } catch {} return; }
     if (message.t === 'duck') { clearTimeout(localRestoreTimer); localDuckSent = false; window.__duck(); }
     if (message.t === 'pause') { clearTimeout(localRestoreTimer); localDuckSent = false; window.__pause(); }
     if (message.t === 'tool_start') { $('#light').textContent = 'Looking that up'; window.__startTick(); }
@@ -174,9 +175,9 @@ $('#start').onclick = async () => {
   window.__configureOutput($('#output').value);
 };
 $('#stop').onclick = () => ws?.send(JSON.stringify({ t: 'stop', turn: currentTurn }));
-for (const id of ['silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
+for (const id of ['backchannel', 'silence', 'threshold', 'early', 'echoThreshold', 'output', 'echoSetting', 'talkOver', 'toolDelay', 'netSim', 'localDuck']) {
   $('#' + id).onchange = () => {
-    const sim = $('#netSim').value; const values = { talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
+    const sim = $('#netSim').value; const values = { backchannel: $('#backchannel').checked, talkOverMode: $('#talkOver').value, toolDelayMs: +$('#toolDelay').value, netSim: sim === 'phone' ? { delayMs: 80, jitterMs: 30, lossPercent: 1, burstEveryMs: 0, burstStallMs: 0 } : sim === 'hotel' ? { delayMs: 200, jitterMs: 120, lossPercent: 3, burstEveryMs: 7000, burstStallMs: 800 } : { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }, checkSilenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value, outputPath: $('#output').value, echoSetting: $('#echoSetting').value };
     if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'config', turn: currentTurn, values }));
     if (id === 'output') window.__configureOutput($('#output').value);
     save({ talkOver: $('#talkOver').value, toolDelay: +$('#toolDelay').value, netSim: $('#netSim').value, localDuck: $('#localDuck').checked, output: $('#output').value, echoSetting: $('#echoSetting').value, silenceMs: +$('#silence').value, turnThreshold: +$('#threshold').value, earlyStart: $('#early').checked, echoThreshold: +$('#echoThreshold').value });

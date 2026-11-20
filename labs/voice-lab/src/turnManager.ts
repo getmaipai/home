@@ -27,6 +27,8 @@ export class TurnManager {
 
   constructor(clock: () => number = () => performance.now()) { this.clock = clock; }
   private emit(type: string, extra: Record<string, unknown> = {}): Command[] { return [{ type, ...extra }]; }
+  silenceMs(now = this.clock()) { return this.silenceAt < 0 ? 0 : now - this.silenceAt; }
+  get turnProbability() { return this.probability; }
   get echoLikely() { return this.echo; }
   get cutDuration() { return this.cutSpeech; }
   get checkRevision() { return this.revision; }

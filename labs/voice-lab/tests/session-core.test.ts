@@ -509,3 +509,24 @@ test("a sound tag becomes the recorded sound between the two halves of the phras
   expect(total).toBeGreaterThanOrEqual(2400 * 3 + 7200);
   h.session.close();
 });
+
+test("the listener nod is off by default, and when on is made by the voice engine and sent once at a pause in a long turn only", async () => {
+  const asked: string[] = [];
+  const mk = () => harness({
+    turnCheck: async () => ({ probability: 0.1, complete: true }),
+    transcribe: async () => "I was thinking about the trip we talked about and",
+    speech: async (text: string) => { asked.push(text); return new Response(encodeWav(new Int16Array(7200).fill(900))); },
+  });
+  // off by default
+  const off = mk(); (off.session as any).nodRoll = () => 0;
+  off.feed(true, 220); off.feed(false, 14); await off.flush(); expect(off.messages().some((m) => m.t === "nod")).toBe(false); off.session.close();
+  // on: a short turn never nods
+  const short = mk(); (short.session as any).message(JSON.stringify({ t: "config", values: { backchannel: true } })); await short.flush(); (short.session as any).nodRoll = () => 0;
+  short.feed(true, 30); short.feed(false, 14); await short.flush(); expect(short.messages().some((m) => m.t === "nod")).toBe(false); short.session.close();
+  // on: a long turn nods at the pause
+  const long = mk(); (long.session as any).message(JSON.stringify({ t: "config", values: { backchannel: true } })); await long.flush(); (long.session as any).nodRoll = () => 0;
+  long.feed(true, 220); long.feed(false, 16); await long.flush();
+  expect(asked).toContain("Mm-hm.");
+  expect(long.messages().filter((m) => m.t === "nod").length).toBe(1);
+  long.session.close();
+});

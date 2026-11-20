@@ -8,6 +8,7 @@ import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, support
 import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
 import { pickSound, availableTags } from "./sounds";
+import { shouldNod } from "./listenerNod";
 import { voiceSettings } from "./voiceSettings";
 import { judgeCutIn } from "./selfEcho";
 import { appendMetrics, type TurnMetrics } from "./metrics";
@@ -45,6 +46,7 @@ export class VoiceSession {
   private turnCheckFn: typeof turnCheck;
   private chatFn: typeof chat;
   private speechFn: typeof speech;
+  private nodEnabled = false; private nodClip: Int16Array | null = null; private lastNodAt = -1e9; private nodsThisTurn = 0; private nodSuppressUntil = 0; private nodRoll: () => number = Math.random;
   private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
   private metricsFn: typeof appendMetrics;
@@ -86,6 +88,23 @@ export class VoiceSession {
   private sendFrame(frame: Uint8Array) { if (this.held) this.heldFrames.push(frame); else { if (this.metrics.t_first_frame_sent === undefined) this.metrics.t_first_frame_sent = this.metricNow(); const generation = this.turn; this.delayOutgoing(() => { if (generation === this.turn && this.ws.readyState === 1) this.ws.send(frame); }, false, frame); } }
   private metricNow() { return Math.max(0, this.now() - this.speechOrigin); }
   private updatePlayedReference() { const all: number[] = []; for (let i = 0; i < this.chunkRefEnvelopes.length; i++) all.push(...this.chunkRefEnvelopes[i].slice(0, Math.floor((this.playedMs[i] ?? 0) / 10))); this.refEnvelope = all.slice(-100); }
+  /** The listener's "mm-hm", made by the voice engine in the cloned voice (never typed by a model), kept ready like the rest of the prewarm. */
+  private async makeNod() {
+    if (this.nodClip) return;
+    try { const r = await this.speechFn("Mm-hm.", undefined, { voice: this.voice }); if (!r.body) return; const reader = r.body.getReader(), w = new StreamingWavReader(); const parts: Int16Array[] = [];
+      while (true) { const x = await reader.read(); if (x.done) break; const pcm = w.push(x.value); if (pcm.length) parts.push(pcm); }
+      const all = new Int16Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { all.set(p, at); at += p.length; }
+      let sum = 0; for (const v of all) sum += (v / 32768) ** 2; const rms = Math.sqrt(sum / Math.max(1, all.length)) || 1; const gain = Math.min(4, 0.035 / rms); // quiet: about -29 dBFS rms
+      for (let i = 0; i < all.length; i++) all[i] = Math.max(-32768, Math.min(32767, Math.round(all[i]! * gain)));
+      if (all.length > 24000 * 0.15 && all.length < 24000 * 1.6) this.nodClip = all;
+    } catch {}
+  }
+  private maybeNod(now: number) {
+    if (!this.nodEnabled || !this.nodClip || this.tm.state !== "maybe_done") return;
+    if (!shouldNod({ enabled: true, turnSpeechMs: now - this.speechOrigin, silenceMs: this.tm.silenceMs(now), turnProbability: this.tm.turnProbability, sinceLastNodMs: now - this.lastNodAt, nodsThisTurn: this.nodsThisTurn, roll: this.nodRoll() })) return;
+    this.lastNodAt = now; this.nodsThisTurn++; this.nodSuppressUntil = now + this.nodClip.length / 24 + 350;
+    this.send({ t: "nod", pcm: Buffer.from(this.nodClip.buffer, this.nodClip.byteOffset, this.nodClip.byteLength).toString("base64"), rate: 24000 });
+  }
   private finishMetrics() { if (this.metricsWritten || !Object.keys(this.metrics).length) return; this.metricsWritten = true; this.metrics.chunks = this.chunks.length; this.metricsFn(metricsPath, this.metrics); this.send({ t: "timing", ...this.metrics }); }
   private command(c: { type: string; [key: string]: unknown }) {
     switch (c.type) {
@@ -277,14 +296,15 @@ export class VoiceSession {
   private processAudio(frame: Float32Array, now: number) {
     const prior = this.tm.state;
     const priorPreRoll = this.preRoll.slice();
-    const speech = this.vadDetector.detect(frame);
+    const speech = this.vadDetector.detect(frame) && now >= this.nodSuppressUntil;
     if (speech) this.lastVoiceAt = now;
     if (prior === "idle") {
       for (const c of this.tm.frame(speech, now)) this.command(c);
-      if (this.tm.state === "user_speaking") { this.speechOrigin = this.lastVoiceAt; this.samples = [...priorPreRoll, ...frame]; this.transcriptSegments = []; }
+      if (this.tm.state === "user_speaking") { this.speechOrigin = this.lastVoiceAt; this.nodsThisTurn = 0; this.samples = [...priorPreRoll, ...frame]; this.transcriptSegments = []; }
     } else if (prior === "user_speaking" || prior === "maybe_done") {
       this.samples.push(...frame);
       for (const c of this.tm.frame(speech, now)) this.command(c);
+      this.maybeNod(now);
     } else {
       this.micEnvelope.push(...rmsEnvelope(frame, config.sampleRate));
       if (this.micEnvelope.length > 100) this.micEnvelope.splice(0, this.micEnvelope.length - 100);
@@ -323,7 +343,8 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
-        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
+        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
+        if (typeof j.values?.backchannel === "boolean") { this.nodEnabled = j.values.backchannel; if (this.nodEnabled) void this.makeNod(); }
         if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles;
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
         if (j.values?.netSim) this.netSim = j.values.netSim;
