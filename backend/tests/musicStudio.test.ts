@@ -260,7 +260,7 @@ describe("gaps closed after the first landing", () => {
 });
 
 describe("the tool cap with every music tool in play", () => {
-  test("no mix of gates and objects offers more than sixteen, and every music tool is offered somewhere", () => {
+  test("no mix of gates and objects offers more than sixteen, and every music tool but the retired make_sound is offered somewhere", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
     const seen = new Set<string>();
     for (let mask = 0; mask < 512; mask++) {
@@ -271,7 +271,9 @@ describe("the tool cap with every music tool in play", () => {
         for (const t of tools) seen.add(t);
       }
     }
-    for (const id of ["generate_music", "make_sound", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"]) expect(seen.has(id)).toBe(true);
+    // make_sound is mode "off" in its manifest (sound creation goes through generate_music kind=sound; the id stays for provenance), so it is offered nowhere.
+    expect(seen.has("make_sound")).toBe(false);
+    for (const id of ["generate_music", "edit_music", "make_band", "make_album", "make_song_style", "edit_band", "edit_album", "edit_song_style"]) expect(seen.has(id)).toBe(true);
   }, 30000);
 
   test("the band, album and style cards satisfy the strict spec, so the thread draws them (a six-button band card was dropped)", () => {
