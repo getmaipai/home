@@ -444,4 +444,20 @@ describe("refusals and access", () => {
     expect(shotNow.clip_file_id).toBe("fresh-clip");
     expect((await owner.post(`${T}/actions/film-use-take`, { run: id, shot: "no-such-shot" })).status).toBe(422);
   });
+
+  test("the Checked shots card binds film-repairs and offers the three repair buttons the row's flags allow, each on an existing action (VF-REPAIR-01 slice 1)", async () => {
+    const page = JSON.parse((await import("node:fs")).readFileSync("packages/video/pages/film-maker.json", "utf8")) as { body: Array<Record<string, any>> };
+    const card = page.body.find((node) => node.type === "media_shelf" && node.heading === "Checked shots")!;
+    expect(card.bind.params.scope).toBe("film-repairs");
+    expect(card.hide_when_empty).toBe(true);
+    expect(card.item_subtitle_field).toBe("{line}");
+    // Row buttons are drawn only in the vertical orientation (the grid and rail tiles draw none), so every shelf with row buttons is vertical.
+    for (const shelf of page.body.filter((node) => node.type === "media_shelf" && node.row_actions?.length)) expect(shelf.orientation).toBe("vertical");
+    expect(card.row_actions.map((a: any) => [a.label, a.show_when_field, a.action.call.target.split("/").pop(), a.action.call.args.take ?? null])).toEqual([
+      ["Use the earlier take", "can_use_earlier", "film-use-take", "first"],
+      ["Use the new take", "can_use_new", "film-use-take", "new"],
+      ["Make it again", "can_make_again", "film-again", null],
+    ]);
+    expect(page.body.indexOf(card)).toBeLessThan(page.body.findIndex((node) => node.heading === "Shots"));
+  });
 });
