@@ -31,14 +31,13 @@ No second status system, no second cleaner. Tidy stays the one model cleaner; th
 each volume the Stack writes to (models, engines, outputs), keeps the level with hysteresis, exposes `lowDiskRefusal()` and
 `diskAdmission(needBytes)`. The sampler rides the existing watchdog tick (no new timer). Home keeps `checkDiskFull`, now with two
 levels, for its own volumes (data folder, backups, Library) plus the Stack's reading (`/stack/v1/disk`, additive).
-The host guard stays as is: a root daemon with no say over product files; it only gains a one-line disk reading on the Status row
-(DISK-GUARD-06, optional).
+The host guard stays as is: a root daemon with no say over product files; it reads no disk; the admin Status row shows the same level Home computes (DISK-GUARD-06, which overlaps the open STATUS-RESOURCES-01 and cites it).
 
 **Levels, one definition.** Warning when free space is under the larger of 30 GB and 10 percent of the volume; critical under the
 larger of 10 GB and 3 percent. Stricter of bytes and share, so a small drive and a 2 TB drive both warn early enough. Reason: the
 largest single install is about 80 GB and a long video render writes tens of GB, so 3 percent of 1.8 TB (54 GB) is where one more big
 job can fail; 2 GB (the current floor) is a state where the database cannot write. Clears at 1 percent above the line (hysteresis). The
-numbers live in `commons/spec` as one function `diskLevels(totalBytes)` plus the Settings keys `storage.warn_free_gb` and the existing
+numbers live in `commons/spec` as two pure functions `diskLines(totalBytes, overrides)` and `diskLevel(free, total, previous, overrides)` (landed, `spec/stack/ts/disk-levels.ts`) plus the Settings keys `storage.warn_free_gb` and the existing
 `storage.critical_free_gb` as overrides (0 = use the rule); Stack and Home both call it. `critical_free_gb` default changes from 2 to 0.
 
 **How free space is read.** `statfs` of the folder being written to, `bavail * bsize` (Node `statfsSync`), never `df` figures from a
@@ -65,7 +64,7 @@ does not free itself).
 **Fixes.** The Repairs item's fix links to the existing admin Storage page (a fix handler takes no arguments, so it cannot hold a pick list). The list lives there, built from shipped kit Elements (rule 9, no new panel): an admin sees each item and what it frees, one tap clears the selection:
 1. Superseded models, orphan folders, partial downloads: the Stack's existing `planTidy`/`runTidy`, grace ignored only on the admin's tap, never a model a slot selects or a role has loaded. Tidy today only blocks a loaded role (`loadedRoleForModel`); DISK-GUARD-02 adds a "selected by a slot" guard first, since that is the incident. Reversible by reinstall.
 2. Package cache, previews, temporary job folders: existing sweeps (`clearPackageCache`, `clearPreviews`).
-3. Old failed job outputs: older than 7 days, only outputs of failed or cancelled jobs.
+3. Old failed job outputs: older than 7 days, only outputs of failed or cancelled jobs, shown as one row with a count and a size, never one by one (rule 6a).
 Never the Library, backups, or anything a person made. The repair sums reclaimable bytes first; if it cannot reach the warning line it says so and names what is biggest.
 
 **Never delete by "nothing has it open" (2026-11-19 incidents: a cleanup removed a model file the live hub reads through
@@ -95,3 +94,16 @@ code: `diskState.ts` (Stack), a spec function, a repair list route in Home. A se
 
 - Thresholds above are proposed defaults, adjustable per household; no automatic deletion at any level (the owner's rule on deleting is respected: only on the admin's tap). Decided.
 - Order: spec (commons), Stack, Home, then the dev script.
+
+## 5. Amendments after the architect's verdict (2026-11-20, REJECTED then amended; where this section differs from earlier text, this section wins)
+
+1. **Words per audience (S6).** A `disk` cause is added to `failureCopy` (the source of the "Pictures and video are not ready" notice, `makingNotice`) with variants for admin, adult, teen and child. Only admins are told to free up space; everyone else gets "This is paused for now. Ask a grown-up who looks after the hub." style lines in each audience's voice, with no size or resource words. The single line quoted in section 2 is the admin variant.
+2. **One level, one item, typed (S6).** The Stack's `/stack/v1/disk` answer is the level per volume and Home uses it as is; Home never recomputes the Stack's volumes. Home's own check covers only Home's writes (Library, backups, podcasts, job outputs). There is one Repairs item per physical volume (`storage/disk_full` keyed by volume), never two for the same one. The Stack's refusal carries a typed `kind: "disk"`; `roleHealth` maps that kind to the `disk` cause, with no pattern-matching of the copy (the memory path's `/memory/i` is the debt not to repeat).
+3. **Rule 6a.** Old failed job outputs are one row with a count and a size on the admin page. Model rows may be itemised (models are parts).
+4. **Settings (E5).** The household's choice is stored once, by Home (`storage.warn_free_gb`, `storage.critical_free_gb`) and sent to the Stack; the Stack keeps no copy, so the `stack.storage.*` disk settings added in the first pass are removed in DISK-GUARD-02.
+5. **Who answers "does it fit" (E7, E4).** The per-job peak output estimate lives in each model's pack, not in Home. Whether a download or job fits is the Stack's answer (`diskAdmission`); Home's critical check never gates Stack work. Backup admission reads the backup destination's volume, not the main one.
+6. **Env-override paths.** The missing-file check calls each part's own path resolver, override included (`MAIPAI_H3_VIDEO_HOME` is read in the shared `video/videoGen.ts` and `video/swap.ts`, already E7 debt), and adds no new check that names a model. Home shows the Stack's "needs repair" state; Reinstall is a call to the Stack by part id. When a file came from an override folder, Reinstall installs into the managed folder and the repair says the override folder is outside what the product manages. Separate follow-up row DISK-GUARD-07: a live Stack reading production model files from a developer scratch folder is what let a cleanup delete a file in use.
+7. **Safe-to-clear proof.** DISK-GUARD-04's acceptance: items come only from what the product owns and can prove unused by job records, tidy's guards and the Stack's class markers (DATA-LOCATION-03), never "no process has it open". The list goes into the existing `DataTable` on `StoragePage.tsx` (kit Elements as shipped, rule 9).
+8. **One reader for free space.** Commons core `diskSpace()` (`core/src/hardware.ts`, `bavail * bsize`) and Home's `diskUsage()` are the readers; the Stack's `diskState.ts` calls `diskSpace` and writes no third. The reuse table also lists `diskSpace` and `diskFacts` (DATA-LOCATION-00d).
+9. **Related rows.** INSTALL-DISK-01 (done; admission reuses its size table), DATA-LOCATION-01e (watches whole folders going missing; DISK-GUARD-05 mirrors its watch and issue pattern), DATA-LOCATION-03 (describe a folder before deleting), STATUS-RESOURCES-01 (open; DISK-GUARD-06 cites it). HOST-GUARD-04 and SPLASH-DISK-01 are separate work.
+10. **Warning notification.** Its type in `lib/notificationTypes.ts` belongs to DISK-GUARD-03, not 06.
