@@ -23,7 +23,8 @@
 // have a side effect on the third-party service (or is at least not
 // provably idempotent from here), and caching one could serve a stale
 // result for what looks like a fresh action.
-import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync, rmdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync, unlinkSync, statSync, utimesSync, rmSync, rmdirSync } from "node:fs";
+import { diskSpace } from "@maipai/core/src/hardware";
 import { join, relative, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -163,8 +164,7 @@ function freeDiskBytes(): number {
   // ensureDataDir() call long before packageCache.ts's first write.
   const target = existsSync(cacheDir) ? cacheDir : dataDir;
   try {
-    const stats = statfsSync(target);
-    return stats.bavail * stats.bsize;
+    return diskSpace(target).freeBytes;
   } catch {
     // Filesystem stats aren't available on every platform/CI sandbox;
     // falling back to the fixed ceiling alone (below) rather than

@@ -10,7 +10,7 @@ import { clearPreviews, previewStats } from "@/lib/fileThumbnails";
 // still critically low AFTER caches have done everything they can, the
 // only honest response left is a Repairs item, never a silent failure
 // or a crash.
-import { existsSync, readdirSync, statSync, statfsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -19,6 +19,7 @@ import { dataDir, modelsDir, enginesDir, wakewordDir, visionDir, sttDir, cacheDi
 import { getCacheStats } from "@/lib/packageCache";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { diskSpace } from "@maipai/core/src/hardware";
 import { diskLevel, type DiskLevel, type DiskLevelOverrides } from "@maipai/spec/stack/ts/disk-levels.js";
 
 /** Recursive directory walk, calling `onFile` with every regular file's
@@ -66,8 +67,8 @@ export interface StorageSummary {
 export function diskUsage(path: string = dataDir): DiskUsage {
   const target = existsSync(path) ? path : dataDir;
   try {
-    const stats = statfsSync(target);
-    return { totalBytes: stats.blocks * stats.bsize, freeBytes: stats.bavail * stats.bsize };
+    const { freeBytes, totalBytes } = diskSpace(target);
+    return { totalBytes, freeBytes };
   } catch {
     // Not available on every platform/CI sandbox - see packageCache.ts's
     // own freeDiskBytes() for the identical fallback and why.
