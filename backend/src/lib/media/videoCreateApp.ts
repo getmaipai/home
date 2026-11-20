@@ -36,7 +36,7 @@ import { fillFilmMakerPage, filmRows, filmShotRows } from "@/lib/films/pageFilm"
 import { allowed as filmAllowed } from "@/lib/films/background";
 import { listFilmRunsInStates, type FilmRunState } from "@/lib/films/store";
 import { renderPlanRows, storyboardRows } from "@/lib/films/storyboardRows";
-import { voicedStoryboardRows } from "@/lib/films/voicedRows";
+import { voicedOfferRows, voicedRows } from "@/lib/films/voicedRows";
 import { getMediaProduction } from "@/lib/mediaProductions";
 import type { PersonRow } from "@/types";
 import { captionEditRows, captionLineRows, captionMakeRows } from "@/lib/videos/captionsPage";
@@ -509,7 +509,8 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "short": return shortClipRows(person);
     case "stage": return stageRows(person);
     case "storyboard": return storyboardRows(person, params.id);
-    case "storyboard-voiced": return voicedStoryboardRows(person, params.id);
+    case "storyboard-voiced": return voicedRows(person, params.id);
+    case "film-voiced": return voicedOfferRows(person, params.id);
     case "render-plan": return renderPlanRows(person, params.id);
     case "making-films": return filmShelfRows(person, ["planning", "running"]);
     case "unfinished-films": return filmShelfRows(person, ["waiting_for_go", "failed", "cancelled"]);

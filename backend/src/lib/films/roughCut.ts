@@ -128,6 +128,21 @@ export async function roughCutAvailable(): Promise<boolean> {
   } catch { return false; }
 }
 
+// The page's scopes answer synchronously, so they read the last answer of the check above (at most 30 s old) and ask again in the background: false until the first answer arrives (fail closed).
+let availability: { value: boolean; at: number } = { value: false, at: 0 };
+let refreshing: Promise<void> | null = null;
+export function refreshRoughCutAvailability(): Promise<void> {
+  refreshing ??= roughCutAvailable().then((value) => { availability = { value, at: Date.now() }; }).finally(() => { refreshing = null; });
+  return refreshing;
+}
+/** The last known answer of `roughCutAvailable`; starts a refresh when it is older than 30 s. Never throws, never waits. */
+export function roughCutAvailableNow(): boolean {
+  if (Date.now() - availability.at > 30_000) void refreshRoughCutAvailability().catch(() => undefined);
+  return availability.value;
+}
+/** Test seam: forget the last answer. */
+export function __resetRoughCutAvailabilityForTests(): void { availability = { value: false, at: 0 }; refreshing = null; }
+
 const bandOf = (personId: string) => { const person = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get(); return person ? speakerAgeBand(person, new Date()) : null; };
 /** The minor flag for a voice: the cast's own `minor` (`subjectFacts`), and, when Home cannot tell, assumed minor: a real subject with no person to read an age from, or a person whose age band is unknown. */
 export function assumedMinor(entry: Pick<CastEntry, "minor" | "real" | "person_id">): boolean {
@@ -220,7 +235,8 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
     const lineByShot = new Map((script?.lines ?? []).map((entry) => [entry.shot_id, entry.line.text]));
     const verdict = await (input.seams?.verify ?? verifyRoughCutBytes)(made.bytes, {
       total_s: result.total_s, has_audio: lines.length > 0, signal,
-      shots: result.shots.map((entry) => { const planned = plan.shots.find((shot) => shot.id === entry.id); const holds = !/^(zoom (in|out)|pan (left|right))$/i.test(planned?.motion?.trim() ?? ""); return { id: entry.id, start_s: entry.start_s, end_s: entry.end_s, held_still: holds, ...(lineByShot.has(entry.id) ? { line: lineByShot.get(entry.id)! } : {}) }; }),
+      // Every shot is a still with a camera move (a slow pan moves a few pixels): the frozen-picture check does not apply, so each is a held still. Black and sound checks do.
+      shots: result.shots.map((entry) => ({ id: entry.id, start_s: entry.start_s, end_s: entry.end_s, held_still: true, ...(lineByShot.has(entry.id) ? { line: lineByShot.get(entry.id)! } : {}) })),
     });
     if (!verdict.checked) return { ok: false, line: "The voiced preview could not be checked, so it was not kept. Try again." };
     if (verdict.lines.length > 0) return { ok: false, line: `The voiced preview did not pass its check. ${verdict.lines.join(" ")}` };

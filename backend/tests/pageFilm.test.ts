@@ -66,6 +66,7 @@ describe("the served Film maker page", () => {
     for (const who of [teen.client, child.client]) {
       expect((await who.post(`${T}/data/recipes`, { scope: "film" })).status).toBe(404);
       expect((await who.post(`${T}/data/recipes`, { scope: "storyboard-voiced" })).status).toBe(404);
+      expect((await who.post(`${T}/data/recipes`, { scope: "film-voiced" })).status).toBe(404);
       for (const name of ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview"]) expect((await who.post(`${T}/actions/${name}`, { prompt: "A boat crosses a lake", run: "x", shot: "y" })).status).toBe(404);
     }
   });
@@ -250,5 +251,25 @@ describe("refusals and access", () => {
     await until(() => getFilmRun(row("Sage"), id)?.note === null);
     expect((await owner.post(`${T}/actions/film-voiced-preview`, { run: "film-nope" })).status).toBe(404);
     __setVoicedMakerForTests(null);
+  });
+
+  test("the film-voiced offer is one row only when the Stack lists media.rough_cut, the film is waiting with a plan that has a line, for an adult; unknown reads as not offered", async () => {
+    const { owner, row } = await household();
+    const { __setStackHttpFetchForTests, __resetRoughCutAvailabilityForTests, refreshRoughCutAvailability } = await import("@/lib/films/roughCut");
+    const listing = (kinds: string[]) => __setStackHttpFetchForTests((async () => new Response(JSON.stringify({ media: { kinds } }), { status: 200 })) as unknown as typeof fetch);
+    const id = await planned(owner, row("Sage"));
+    expect(getFilmRun(row("Sage"), id)!.plan!.shots.some((shot) => shot.line)).toBe(false);
+    __resetRoughCutAvailabilityForTests();
+    // Never answered, and a plan with no line to speak: not offered.
+    expect(await rows(owner, "film-voiced", id)).toEqual([]);
+    const { updateFilmRun } = await import("@/lib/films/store");
+    const run = getFilmRun(row("Sage"), id)!;
+    updateFilmRun(row("Sage"), id, { plan: { ...run.plan!, shots: run.plan!.shots.map((shot, i) => (i === 0 ? { ...shot, line: "Please put the blue mug back." } : shot)) } });
+    listing(["media.edit"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
+    expect(await rows(owner, "film-voiced", id)).toEqual([]);
+    listing(["media.edit", "media.rough_cut"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
+    const offered = await rows(owner, "film-voiced", id);
+    expect(offered).toEqual([{ run_id: id, reason: "Hear the lines in the voices of your cast." }]);
+    __setStackHttpFetchForTests(null); __resetRoughCutAvailabilityForTests();
   });
 });
