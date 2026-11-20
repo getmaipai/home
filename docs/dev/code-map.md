@@ -627,7 +627,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
-| `backend/src/lib/fillerEvents.ts` | reportFillerEvent |
 | `backend/src/lib/films/animatic.ts` | makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | stillSeed, backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm |
@@ -1086,7 +1085,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/promptPrefix.ts` | comparePrompt |
 | `backend/src/lib/promptSanitize.ts` | sanitizeForPrompt |
 | `backend/src/lib/quickConnect.ts` | createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode, __resetQuickConnectForTests |
-| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, FILLER_GROUP_DEADLINE_MS, ruleFillerGroup, __setFillerGroupRunnerForTests, __resetFillerGroupForTests, __setQuickReactionRunnerForTests |
+| `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, __setQuickReactionRunnerForTests, __resetQuickReactionForTests, parseQuickCue, cleanReaction, quickReaction |
 | `backend/src/lib/quickTimers.ts` | listQuickTimers, createQuickTimer, updateQuickTimer, deleteQuickTimer |
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
@@ -1275,7 +1274,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/structuredPartIds.ts` | SPEC_SHEET_READY, SPEC_SHEET_BOUND |
 | `backend/src/lib/stt.ts` | transcribeUtterance, transcribeAudioClip |
 | `backend/src/lib/sttAssets.ts` | SILERO_VAD_ASSET, sileroVadPath, ensureSileroVadAsset |
-| `backend/src/lib/sttSession.ts` | RESUME_CONFIRM_S, EDGE_SILENCE_S, getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech |
+| `backend/src/lib/sttSession.ts` | EDGE_SILENCE_S, getEndpointer, __setSileroLoaderForTests, __resetSileroLoaderForTests, isLikelySpeech, SttSession |
 | `backend/src/lib/styleLock.ts` | pictureStyleAccess, styleOfComponent, styleAccessResolver, componentStyleAccess |
 | `backend/src/lib/subjects.ts` | findEntityByName, ensureSubjectEntity, findSubjectByName, ensurePersonEntity, RELATION_PHRASES, writeRelation |
 | `backend/src/lib/summaryRefresh.ts` | scheduleSummaryRefresh, __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests |
@@ -1296,7 +1295,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/talent/studio.ts` | speakableText, splitAtWord, renderLines, layout, mixEpisode |
 | `backend/src/lib/talent/types.ts` | OutlineSchema, LineSchema, SegmentScriptSchema |
 | `backend/src/lib/talent/writer.ts` | TalentWriteError, __setTalentWriterSafetyForTests, __setTalentWriterMinorCheckForTests, OUTLINE_PROMPT, SEGMENT_PROMPT, checkText |
-| `backend/src/lib/talkOver.ts` | TALK_OVER_KEY, TALK_OVER_WINDOW_KEY, TALK_OVER_WINDOW_DEFAULT_MS, TALK_OVER_WINDOW_MIN_MS, TALK_OVER_WINDOW_MAX_MS, talkOverLevel |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/templateCovers.ts` | TEMPLATE_COVER_IDS, templateCoverUrl |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
@@ -1343,7 +1341,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
 | `backend/src/lib/turnActivity.ts` | LISTENING_ACTIVE_WINDOW_MS, noteListeningActivity, DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
-| `backend/src/lib/turnEnd.ts` | GENTLE_THRESHOLD, NATURAL_THRESHOLD, UNFINISHED_BELOW, SENTENCE_END_COMMIT_S, isFinishedSentence, predictTurnEnd |
+| `backend/src/lib/turnEnd.ts` | scoreEdgePartial, UNFINISHED_BELOW, SENTENCE_END_COMMIT_S, isFinishedSentence, predictTurnEnd |
 | `backend/src/lib/turnErrorDetail.ts` | canReadErrorDetail, turnOwnerId, turnErrorDetail, turnErrorDetailFrom, missingTurnErrorDetail, statsForViewer |
 | `backend/src/lib/turnMachine/backbone.ts` | BACKBONE_CHARS, EXTRA_READ_CHARS, __setBackboneWriterForTests, choosePrompt, parseChosen, overlapChoice |
 | `backend/src/lib/turnMachine/bareCompare.ts` | startBareCompare |
@@ -1467,7 +1465,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesLanguage, voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, peekOfferedVoices |
 | `backend/src/lib/voiceSamples.ts` | __enhanceForTests, ECHO_FALLBACK_NOTICE, removeEcho, __isolateForTests, isolateVoice, cleanFilter |
 | `backend/src/lib/voiceShift.ts` | INSPIRED_LEVELS, INSPIRED_SEMITONES, PREVIEW_SECONDS, isInspiredLevel, decodeWavClip, encodeWavClip |
-| `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, TALK_OVER_DECISIONS, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords |
+| `backend/src/lib/voiceTiming.ts` | SPECULATIVE_OUTCOMES, VoiceTimingMessageSchema, setVoiceOutcome, recordPrewarmTiming, voicePrewarmRecords, beginVoiceTiming |
 | `backend/src/lib/voiceTools.ts` | VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID, GET_SCORE_TOOL_ID, voiceoverToolSpec |
 | `backend/src/lib/voiceTrace.ts` | VOICE_TRACE_EVENTS, TraceEntrySchema, VoiceTraceUploadSchema, storeVoiceTrace, voiceTraces, formatVoiceTrace |
 | `backend/src/lib/voiceover.ts` | voicesFor, makeVoiceover, speakToBytes, speakAndStore |
