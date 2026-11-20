@@ -202,6 +202,29 @@ describe("runDueJobs", () => {
     expect(stored).toBeTruthy();
   });
 
+  // VISION-EVICT-01: the per-minute retry used to ask the Stack for an embedding even when the Stack said the embed role has no installed model; each ask made the
+  // Stack try to start the missing engine (and, before the Stack fix, unload a picture-checking engine to do it). The job now waits for the install.
+  test("memory.embedding_retry does not ask for embeddings while the embed role is not installed, and drains once it is", async () => {
+    const { row: ownerRow } = await owner();
+    const created = remember(ownerRow, { text: "the spare key is under the blue pot", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5 });
+    if (!created.ok) throw new Error("setup failed");
+    db.insert(pendingEmbeddings).values({ memoryId: created.value.id, queuedAt: new Date().toISOString() }).onConflictDoNothing().run();
+    const { __setRoleHealthForTests } = await import("@/lib/roleHealth");
+    __setRoleHealthForTests({ embed: { availability: "unavailable", reason: "not_installed", cause: "not_installed" } });
+    try {
+      ensureCoreJob("memory.embedding_retry", "every:1m");
+      for (let i = 0; i < 3; i++) {
+        db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.job, "memory.embedding_retry")).run();
+        expect((await runDueJobs(runPlugin)).errors).toBe(0);
+      }
+      expect(db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, created.value.id)).all().length).toBe(1);
+      expect(db.select().from(memoryEmbeddings).where(eq(memoryEmbeddings.memoryId, created.value.id)).get()).toBeFalsy();
+    } finally { __setRoleHealthForTests({}); }
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.job, "memory.embedding_retry")).run();
+    expect((await runDueJobs(runPlugin)).errors).toBe(0);
+    expect(db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, created.value.id)).all().length).toBe(0);
+  });
+
   // Step 6's own two core jobs (lib/memoryJudge.ts): a real wiring test,
   // not a behavioral one (memoryJudge.test.ts already covers what each
   // job actually does) - this just proves the CORE_JOBS map's own keys

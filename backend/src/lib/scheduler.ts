@@ -40,6 +40,7 @@ import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, repairWronglyArchivedDurables, drainPendingEmbeddings } from "@/lib/memory";
 import { embedPendingEpisodes } from "@/lib/episodes";
+import { roleHealth } from "@/lib/roleHealth";
 import { pollActiveStackImageJobs } from "@/lib/jobProducers";
 import { reconcileLoraInstalls } from "@/lib/loras/install";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
@@ -449,6 +450,10 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     return made === 0 && missing === 0 ? IDLE : undefined;
   },
   "memory.embedding_retry": async () => {
+    // VISION-EVICT-01: while the Stack says the embed role has no installed model there is nothing to retry; asking every minute made the Stack try to start the
+    // missing engine each time. The job resumes by itself once the role is installed (the next tick reads it ready).
+    const embedRole = await roleHealth("embed");
+    if (embedRole.availability === "unavailable" && embedRole.cause === "not_installed") return IDLE;
     const drained = await drainPendingEmbeddings();
     const episodes = await embedPendingEpisodes();
     return drained.embedded === 0 && drained.stillPending === 0 && episodes === 0 ? IDLE : undefined;

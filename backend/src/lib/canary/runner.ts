@@ -67,7 +67,8 @@ async function applyResult(check: CanaryCheck, result: CheckResult, outcome: Out
 async function maybeRestart(deps: CanaryDeps): Promise<void> {
   if (results.restartAlreadyAsked("chat_hello")) return;
   const role = await deps.chatRole();
-  const dead = role.availability === "unavailable";
+  // VISION-EVICT-01: a role with no installed model is not a dead engine; there is nothing to restart until the install finishes.
+  const dead = role.availability === "unavailable" && role.cause !== "not_installed";
   const recent = results.history("chat_hello").slice(-3);
   const hung = recent.length === 3 && recent.every((r) => r.status === "fail" && r.life === "hung");
   if (!dead && !hung) return;

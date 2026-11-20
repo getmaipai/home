@@ -178,6 +178,11 @@ describe("restarts only for a dead or hung engine", () => {
     expect(restarts).toBe(1);
   });
 
+  test("VISION-EVICT-01: a role that is not installed is not a dead engine: no restart is asked however often it is checked", async () => {
+    await hellos(deps({ chatRole: async () => ({ availability: "unavailable", reason: "not_installed", cause: "not_installed" }) }), 6);
+    expect(restarts).toBe(0);
+  });
+
   test("three hellos in a row with no token at all ask for one restart; two do not", async () => {
     await hellos(deps({ chat: async () => HUNG }), 2);
     expect(restarts).toBe(0);
