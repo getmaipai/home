@@ -786,6 +786,7 @@ commons_archive_sha256() {
     spec-v0.1.467) printf '%s\n' "42ee9f65f84a36110f7a617103d2c8a9fd4fac0ec1ec8437bed7fad4f9c58d27" ;;
     ui-v0.5.721) printf '%s\n' "2a2da9ece4607bbc0f7ab2e50a7d017965539ccf5d0974bb09296aa7930a070b" ;;
     spec-v0.1.469) printf '%s\n' "9984aa45f0a77bdaa3099874bc9a9cd9bf79d6e21a2b371fc1e6e67632e41308" ;;
+    ui-v0.5.722) printf '%s\n' "cc9191487861fe8799f2049b854c2ef1c5ae5689068c27df60c560cdde824bce" ;;
     *) return 1 ;;
   esac
 }
