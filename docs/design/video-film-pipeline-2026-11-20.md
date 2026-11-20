@@ -1,20 +1,19 @@
 # Video and film pipeline: one clip pipeline for LTX and H3, characters, films, swap, speed (2026-11-20)
 
 Status: proposed, for the architect; no product code in this note's commit. Saves the design from the video proof of concept (POC) of
-2026-11-19 and 2026-11-20 and four review rounds with a second reviewer (Astra). Owner ask (Jesse, 2026-11-20): "ok save the design and its details".
+2026-11-19 and 2026-11-20 and several rounds of outside review. Owner ask (Jesse, 2026-11-20): "ok save the design and its details".
 Where an earlier note in the repo and this one disagree, this one wins for the points listed in Supersedes.
 
 **Five lines.**
 
-1. The Mac Studio (M5 Max, 128 GB) makes a postable HD clip with LTX 2.5 Max at native 1920x1088 in 6.5 to 8.1 minutes (74 GB peak). No enlargement step is needed.
+1. An M5 Max Mac with 128 GB makes a postable HD clip with LTX 2.5 Max at native 1920x1088 in 6.5 to 8.1 minutes (74 GB peak). No enlargement step is needed.
 2. Our clip path is the weak part, not the models: the H3 path runs the turbo adapter by default, a saved character reaches a clip as one raw photo, nothing records what a job really ran, and a film cut once lost all its speech and nothing checked.
 3. The fix is one generic clip request (typed roles, structured dialogue, explicit intent), a capability row and profile per pack, a planner in the Stack, and a receipt on every job. LTX works alone; H3 is an optional pack.
 4. A film is approved once as a timed storyboard with voices, rendered riskiest shots first, repaired within a bound, and checked as a finished file before it is called done.
 5. Face-only swap failed the owner's likeness bar ("awful"); whole-head swap cannot carry the new head yet; the old compositor fails its own preservation check. Swap stays an open experiment.
 
-Numbers are as of 2026-11-20. Three test sessions were still running when this was written; section 13 lists what is coming.
-Licence: MiniMax H3's licence excludes the US, and the owner ruled private testing only (2026-11-16). H3 here is an optional Stack pack,
-never a default, and nothing in this note treats H3 output as publishable. Every "postable" verdict below is about LTX.
+Numbers are as of 2026-11-20. Three test runs were still going when this was written; section 13 lists what is coming.
+H3 is an optional Stack pack: not a default and not a recommended slot. Its licence territory is recorded in [minimax-h3-eval-2026-11-15.md](minimax-h3-eval-2026-11-15.md) section 7 and is not repeated here. Every "postable" verdict below is about LTX.
 
 Related notes this fits and does not duplicate: [model-packs-2026-11-17.md](model-packs-2026-11-17.md) (the Stack knows each model, Home asks generic jobs; this note adds the clip job's shape),
 [make-film-2026-11-06.md](make-film-2026-11-06.md), [video-create-2026-11-01.md](video-create-2026-11-01.md), [video-tiers-2026-11-02.md](video-tiers-2026-11-02.md),
@@ -41,7 +40,7 @@ New: the typed clip request, capability rows, the job receipt, the planner, the 
 
 ## 1. Evidence (POC, 2026-11-19 and 2026-11-20)
 
-Sources: the POC results recorded in the session's scratch results of 2026-11-20 (video, swap and H3 speed sessions), the owner's ratings of about 250 H3 clips (`minimax-eval/video/feedback.json`, recomputed 2026-11-19), and the Stack at `f5a696b`. One fictional adult character, seeds 1101 to 1103 and 2101, one job at a time on the shared Mac. Sound checked by loudness and by the Stack's speech-to-text.
+Sources: the POC results of 2026-11-19 and 2026-11-20 (video, swap and H3 speed tests), the owner's ratings of about 250 H3 clips (recomputed 2026-11-19), and the Stack at `f5a696b`. One fictional adult character, seeds 1101 to 1103 and 2101, one job at a time on the shared Mac. Sound checked by loudness and by the Stack's speech-to-text.
 
 ### 1.1 What each recipe cost and looked like
 
@@ -58,7 +57,7 @@ Sources: the POC results recorded in the session's scratch results of 2026-11-20
 | LTX 2.5 Max bf16 plus DFR and 2x upscale | 2048x1152 | 9.1 min | 71 GB | exact | One eyes-closed run (face score 0.02) |
 | H3 FL2VA, 8-step 768p adapter, Metal engine (vpipe) | 1344x768 | 13.7 min (14.7 without the model preloaded) | not logged | exact | Owner: "teeth are better, sharpness is the same as ltx" |
 | Same, 4-step adapter | 1344x768 | 8.0 min (8.0 preloaded) | not logged | exact | Same mouth words; quality not yet rated |
-| H3 FL2VA, h3.c engine, exact mode, 12 steps | 864x480 | 4.6 min (277 s) | not logged | not yet checked | Run by the H3 speed session; recorded in its clip receipt only, so ratings are pending |
+| H3 FL2VA, h3.c engine, exact mode, 12 steps | 864x480 | 4.6 min (277 s) | not logged | not yet checked | Run by the H3 speed test; recorded in its clip receipt only, so ratings are pending |
 | H3 singularity Ref2VA, 20 steps, one face and one body reference | 864x480, medium shot | 26.6 min | 38 GB | exact | Real walk and turn; face by SFace 0.54 at 103 px |
 | H3 FL2VA 24 steps, first frame at 1088x608 | 1088x608 | 20.1 min | 47 GB | exact | No better than 864x480 (1.7x cost, no gain) |
 
@@ -88,8 +87,8 @@ Reading: close-ups hold on every recipe (0.6 and up). In medium shots every firs
 | H3 opens every clip with a noise burst and a small mouth movement in the first 130 ms | Found by the owner ("her lips move with that odd sound"); in every engine; no official fix. Our start picture had parted lips and our prompt did not follow H3's official format | Start pictures with closed lips for speaking shots; trim or cover the first four frames at 24 fps; H3 prompt grammar (6.3) |
 | Teeth merge on wide-open mouths | At every LTX size and on H3 at 1088x608 in a medium shot; close-ups with calm delivery are clean on every recipe. The detail pass neither fixes nor causes it. All three seeds of the original prompt had a wide-open stretch; "speaks quietly, lips parting only slightly" cut it to one small stretch in one take (one take: not proof). Refine Details could not be run (gated Hugging Face repo, access needs the owner's account) | Close-ups for speech; the wording above; a mouth check per take (7.6); no automatic mouth repair |
 | Identity in medium shots | Face under 120 px; first-frame routes score 0.27 to 0.35 | Reference route on a capable pack (6); close-ups for faces |
-| The live Stack cancelled LTX Max three times | Memory governor, "too busy", at 9 percent, 9 percent and 12 percent (2026-11-19, 21:23, 21:42, 22:12). About 48 GB free plus 40 GB inactive at the time, the live chat engine held about 13 GB. Max needs 49 to 74 GB peak, above the governor's threshold. Not proven whether a sibling session's job was running | Open (section 13); the hub must be able to admit Max HD (VF-PROFILE-01) |
-| The old swap compositor fails its own check | Its mask covers about 48 percent of a sitcom clip (a color rule tuned to one clip) and the check grades the mask against itself. Repaired independent check: 41,694 persistent changed pixels (largest blob 15,877) outside the true face region; 51,723 as written; 10.6 percent of pixels changed outside the region on the sitcom clip | Section 8 |
+| The live Stack cancelled LTX Max three times | Memory governor, "too busy", at 9 percent, 9 percent and 12 percent (2026-11-19). Max needs 49 to 74 GB peak, above what the governor left free. Not proven whether another job was running | Open (section 13); the hub must be able to admit Max HD (VF-PROFILE-01) |
+| The old swap compositor fails its own check | Its mask covers about 48 percent of a two-person dialogue clip (a color rule tuned to one clip) and the check grades the mask against itself. Repaired independent check: 41,694 persistent changed pixels (largest blob 15,877) outside the true face region; 51,723 as written; 10.6 percent of pixels changed outside the region on the dialogue clip | Section 8 |
 | Face-only swap fails likeness | Passes every preservation check and swaps the right person, but the swapper rewrites only the inner-face template (brows to chin); hair, hairline, beard and head shape stay the actor's, so it reads as a third person. Owner: "faceswap is awful" (2026-11-20). Models, boost sizes and face restore changed nothing | Section 8 |
 | Head-swap adapter reverts within 5 frames | The LTX head-swap adapter fed a good anchor still: frame 0 carries the anchor, frame 5 scores -0.07, then about 0 to the end; the guide video's own head wins. The paste-back worked (0 pixels outside the region); the result is nearly the original again | Section 8; V3 mode not yet run |
 | An earlier POC run used an empty prompt | A script changed folder before reading its prompt file; discarded and rerun | Receipt records prompt bytes (3.4) |
@@ -107,7 +106,7 @@ Reading: close-ups hold on every recipe (0.6 and up). In medium shots every firs
 | D1 | HD recipe: LTX 2.5 Max bf16 native 1920x1088, crop four rows top and bottom to 1920x1080, light luma sharpen (or contrast-adaptive sharpen 0.3), crf 15 for the upload copy | Owner called it postable; sharpen adds what enlargement cannot |
 | D2 | No enlargement at 1920 width. A 2560x1440 upload copy is an owner choice, never a detail claim | The owner could not tell native with sharpen from the 1.5x version; enlargements add no detail |
 | D3 | Retire SeedVR2 and frame interpolation from the video path; keep one cheap finish | Rated down (1.5 and 2.2 stars) |
-| D4 | No draft mode (a fast preview clip followed by a new final take). A kept Boost clip already is a final; approving a preview cannot promise a later render. "Keep" and "Another take" do that job. Stills drafts inside Films stay (Films only) | Astra's ruling 2026-11-19; the POC's 71 s Boost takes agree |
+| D4 | No draft mode (a fast preview clip followed by a new final take). A kept Boost clip already is a final; approving a preview cannot promise a later render. "Keep" and "Another take" do that job. Stills drafts inside Films stay (Films only) | outside review, 2026-11-19; the POC's 71 s Boost takes agree |
 | D5 | "Enhance this take" (Refine Details on a kept clip, original kept) ships only if its test passes (section 9) | Unverified here; the repo is gated |
 | D6 | ComfyUI is not adopted on the Mac. It stays a Stack-owned engine for images. What would change that: a measured matched run of a Mac Comfy graph against our runner on equal inputs that is not slower than our MLX runner and loads the INT8/NVFP4 weights correctly on this chip; or an NVIDIA machine (24 to 32 GB) that the owner chooses to add | The workflows worth importing rely on NVIDIA-only parts; Mac nodes cover one generator node; every Mac report found was 12 to 90 minutes |
 | D7 | One reference picture per character to start (a sharp face, plus a full-body or outfit picture only when it measurably fixes a failure) | A reference costs 19.5 min for one photo and 59.1 min for three on a published Mac run; ours cost 26.6 min |
@@ -336,17 +335,17 @@ Review of the compositor (Stack `f5a696b`, `composite_swap_worker.py`): the cont
 | 11 | The preservation check recolors original skin outside the mask on purpose, then exempts skin from the failure count; the encoded check allows 1 percent of pixels to differ by more than 24 | A second actor's face is exactly what it can miss; a wrong mask passes a check against itself |
 | 12 | Two swap routes (legacy `video/swap.ts`, the generic job) with different limits | One should go (H3-ONE-RUNTIME-01) |
 
-**Repaired preservation check** (built in scratch, not in the Stack): no skin exemption; a declared edit region that does not come from the compositor's own mask (the target face box grown by a margin); before encoding, every pixel outside the region equals the source; after encoding, the delivered file is compared with a source-only encode made with the same settings, with a control encode that has a violent edit inside the region only; real edits persist at the same pixels frame after frame while encoder drift does not, so "persistent changed pixels outside the region" decides (a blob of 50 pixels or more fails). An exact-equal rule after a lossy encode is impossible: 12,511 pixels drifted over 70 untouched frames.
+**Repaired preservation check** (prototyped outside the repo, not in the Stack): no skin exemption; a declared edit region that does not come from the compositor's own mask (the target face box grown by a margin); before encoding, every pixel outside the region equals the source; after encoding, the delivered file is compared with a source-only encode made with the same settings, with a control encode that has a violent edit inside the region only; real edits persist at the same pixels frame after frame while encoder drift does not, so "persistent changed pixels outside the region" decides (a blob of 50 pixels or more fails). An exact-equal rule after a lossy encode is impossible: 12,511 pixels drifted over 70 untouched frames.
 
 **Face-only against whole-head.**
 
 | | Face-only (classic per-frame swapper, FaceFusion 3.9.2 with hyperswap, GPU via CoreML) | Whole-head (generative, on a stabilized head crop) |
 |---|---|---|
-| Result on a two-person sitcom clip with cuts and a turn | 230 of 300 frames swapped; wrong person in 0 frames; 0 pixels outside the region before encoding; original sound identical; mouth proxy correlation 0.48; 0.10 machine minutes per footage second (43 s swap for 10 s) | LTX head-swap adapter (768 square crops, 102 s, 76 GB): the new head is lost within 5 frames |
-| Likeness | Identity score 0.52 against the owner's photos, but reads as a third person: hair, hairline, beard, head shape stay the actor's. Owner: "awful". Models 1a, 1b, 1c at boost 512 and 1024, inswapper, simswap, and face restore gave the same man | Anchor still from the picture model scored 0.22 to 0.29 (below the 0.36 same-person line) and reads heavier and older |
+| Result on a two-person dialogue clip with cuts and a turn | 230 of 300 frames swapped; wrong person in 0 frames; 0 pixels outside the region before encoding; original sound identical; mouth proxy correlation 0.48; 0.10 machine minutes per footage second (43 s swap for 10 s) | LTX head-swap adapter (768 square crops, 102 s, 76 GB): the new head is lost within 5 frames |
+| Likeness | Identity score 0.52 against a consenting adult's own photos, but reads as a third person: hair, hairline, beard, head shape stay the actor's. Owner: "awful". Models 1a, 1b, 1c at boost 512 and 1024, inswapper, simswap, and face restore gave the same man | Anchor still from the picture model scored 0.22 to 0.29 (below the 0.36 same-person line) and reads heavier and older |
 | Verdict | Valid only where hair, beard and head shape are close to the actor's | Not yet: V3 mode (reference photo kept in a side strip on every guide frame), tight margin, strength above 1.0 and the r128 file are untried |
 
-Paste-back comparison on seven frames: the swapper's own aligned paste is cleaner at the jaw and follows an occluder through its occlusion model; our compositor's hull ignores the cowl and cuts across the nose bridge. Decision: the swapper's own paste is the default; keep our footage handling, per-frame grain, color state across frames, review strip and report. Face restore (GFPGAN) sharpened skin (Laplacian 76 against 30) with heavy eye outlines, took 219 s against 43 s, and did not change the likeness: optional for sharp 1080p sources only.
+Paste-back comparison on seven frames: the swapper's own aligned paste is cleaner at the jaw and follows an occluder through its occlusion model; our compositor's hull ignores the mask and cuts across the nose bridge. Decision: the swapper's own paste is the default; keep our footage handling, per-frame grain, color state across frames, review strip and report. Face restore (GFPGAN) sharpened skin (Laplacian 76 against 30) with heavy eye outlines, took 219 s against 43 s, and did not change the likeness: optional for sharp 1080p sources only.
 
 **Decisions.**
 
@@ -355,7 +354,7 @@ Paste-back comparison on seven frames: the swapper's own aligned paste is cleane
 3. **Target selection.** The person picks the actor once; the identity is followed through the clip (accept at similarity 0.45, or 0.30 when continuing the same face from the previous frame; a face after a cut must match alone). When the target leaves, turns beyond recognition or is hidden, keep the source frames; reacquire after cuts. A missed swap can be reviewed; swapping the other actor is an immediate failure. Carry color and tracking state across chunks inside a shot; reset at real cuts. The thresholds were tuned on two clips only.
 4. Whole-head stays an experiment: keep hair, jaw, neck and the foreground occluder in the guide; compare two margins on the same turn.
 5. Likeness as the owner judges it is the bar, not the preservation numbers. Adults only, the person's own unlocked clip, existing cast and audience gates, nothing published.
-6. Licences block a product default: the swap weights (hyperswap research-only, ArcFace non-commercial, the occlusion and face-detector weights GPL-3.0) are private-test only; no commercially usable swap weight set has been found.
+6. Weight licences block a product default: the swap model is research-only, the identity embedding non-commercial, the occlusion and face-detector weights GPL-3.0 (per the tool's own metadata); no commercially usable swap weight set has been found.
 
 Decisive test still owed: one two-person exchange with a cut, a turn and a stretch where the target is absent, plus one hand-over-face shot; target, other actor and occluder marked by hand on a few frames; fail on any wrong-person edit, a changed foreground hand or visible mouth drift at normal speed (listened to with the original soundtrack); record total time per accepted second; ceiling one machine minute per footage second for now.
 
@@ -399,7 +398,7 @@ Acceptance cases kept as release evidence: replay a legacy start and end job on 
 
 ## 12. Build order and work packages
 
-Order (Astra's, adopted): (1) typed roles, receipts and capability tests around the current runners, no behavior change; (2) route ordinary Home clips and film shots through one planner, exercising LTX with H3 absent; (3) H3 reference conditioning and explicit H3 profiles; (4) compare quality and promote a default per task and per tier, separately. For films: voiced storyboard, finished-export checks, approved character and location references through Films, bounded repairs. Swap: repair the preservation check, then the face-only decisive test. First milestone in the person's words: "I give MaiPai a sentence and a photo, watch a 30 second version with voices, change one thing, and approve what it is about to spend time rendering."
+Order (from the outside review, adopted): (1) typed roles, receipts and capability tests around the current runners, no behavior change; (2) route ordinary Home clips and film shots through one planner, exercising LTX with H3 absent; (3) H3 reference conditioning and explicit H3 profiles; (4) compare quality and promote a default per task and per tier, separately. For films: voiced storyboard, finished-export checks, approved character and location references through Films, bounded repairs. Swap: repair the preservation check, then the face-only decisive test. First milestone in the person's words: "I give MaiPai a sentence and a photo, watch a 30 second version with voices, change one thing, and approve what it is about to spend time rendering."
 
 Shared shapes go spec first (`commons/spec`), then Stack, then Home. Packages touching child or audience gates take the full gate and a review. Each is sized for one session.
 
@@ -414,7 +413,7 @@ Shared shapes go spec first (`commons/spec`), then Stack, then Home. Packages to
 | VF-PROMPT-01 | Per-engine prompt rendering with golden fixtures (H3 base and reference grammars, LTX paragraph) | Stack | VF-ROLES-01, VF-PROFILE-01 | 6.1 |
 | VF-H3REF-01 | H3 reference route behind a capability that stays off until a full job passes (extends H3-REFS-01) | Stack | VF-CAPS-01, VF-PROFILE-01 | 3.2 |
 | VF-FINISH-01 | Finish and sound: paired comparison, then one finisher per pack and operation; the H3 start trim | Stack | VF-RECEIPT-01 | 6.3, 7.5 |
-| VF-EVAL-01 | Evaluation harness: three scenes, arms A to E and L-A to L-E, sheet-maker bake-off, blind scorecard, receipts attached (scratch, no product code) | scratch | VF-RECEIPT-01 | 11 |
+| VF-EVAL-01 | Evaluation harness: three scenes, arms A to E and L-A to L-E, sheet-maker bake-off, blind scorecard, receipts attached (bench, no product code) | bench | VF-RECEIPT-01 | 11 |
 | VF-TAKES-01 | Takes and continuity: another take, retake, extend, shot chaining; surface retake and cast controls in Films (extends VIDEO-TAKES-01, CREATOR-25) | Stack, Home | VF-PLAN-01, VF-H3REF-01 | 3.3 |
 | VF-CHECK-01 | Finished-export checker with the three deliberate-break tests and the held-still case; export fails on a missing or inaudible line | Home, Stack ffmpeg | none | 7.7 |
 | VF-STORYBOARD-01 | Voiced storyboard: one voice per character, line recordings, timed still playback with room sound, estimated render time, edit-in-place (extends FILM-ANIMATIC-01) | Home | VF-CHECK-01, VF-CAST-01 | 7.1 |
@@ -423,7 +422,7 @@ Shared shapes go spec first (`commons/spec`), then Stack, then Home. Packages to
 | VF-ENHANCE-01 | "Enhance this take" test and, if it passes, the action (LTX first) | Stack, Home | VF-RECEIPT-01 | 9 |
 | VF-SWAPCHECK-01 | Repair the swap preservation check in the Stack (independent region, source-only encode, persistence rule) | Stack | none | 8 |
 | VF-SWAP-01 | Face-only swap job on the repaired check: target selection and tracking, swapper's own paste, per-frame grain, color state across chunks; decisive test; weights licence resolved first | Stack | VF-SWAPCHECK-01 | 8 |
-| VF-SPEED-01 | H3 speed matched tests (runner against runner, references separately, decoder, Pika schedule) and the verdict on a fast-H3 profile | scratch bench | none | 10 |
+| VF-SPEED-01 | H3 speed matched tests (runner against runner, references separately, decoder, Pika schedule) and the verdict on a fast-H3 profile | bench | none | 10 |
 
 Packages VF-RECEIPT-01, VF-ROLES-01, VF-CHECK-01, VF-SWAPCHECK-01 and VF-SPEED-01 can start at once. Existing rows to cite rather than duplicate: MODELPACK-* (the pack record and generic jobs these rows ride on), H3-ONE-RUNTIME-01, H3-REFS-01, H3-SHEET-*, FILM-ANIMATIC-01, FILM-GRADE-01, VIDEO-TAKES-01, CREATOR-10, CREATOR-25, DISK-GUARD-02.
 
@@ -431,9 +430,9 @@ Packages VF-RECEIPT-01, VF-ROLES-01, VF-CHECK-01, VF-SWAPCHECK-01 and VF-SPEED-0
 
 Results still coming (a follow-up updates this note):
 
-- The H3 speed session's blind ratings and words checks: vpipe 8 and 4 step at 768p, h3.c exact mode, FastH3-Omni with one reference, Pika's real schedule, the preview and fast decoders, Regenerate-2K as the finish, and whether the 24-step clip is worth its minutes over turbo.
-- The swap session's whole-head V3 mode, tight margin and r128 runs, and the decisive two-actor test with a hand over the face.
-- The video session's Refine Details compatibility check (needs the owner's Hugging Face access), the Union Control test, and medium and wide shots at native 1920x1088 (only a close-up was tested at that size).
+- The H3 speed test's blind ratings and words checks: vpipe 8 and 4 step at 768p, h3.c exact mode, FastH3-Omni with one reference, Pika's real schedule, the preview and fast decoders, Regenerate-2K as the finish, and whether the 24-step clip is worth its minutes over turbo.
+- The swap test's whole-head V3 mode, tight margin and r128 runs, and the decisive two-actor test with a hand over the face.
+- The video test's Refine Details compatibility check (needs the maintainer's model terms accepted), the Union Control test, and medium and wide shots at native 1920x1088 (only a close-up was tested at that size).
 
 Open decisions and unknowns:
 
@@ -446,9 +445,9 @@ Open decisions and unknowns:
 | Whether H3 can take a start picture and references together | Untested; refuse plainly |
 | Audio-to-video on our LTX runner | Documented upstream, unverified here |
 | LTX compression ratio and the 12,555 versus 5,376 token estimate | Estimate only |
-| Swap weights licence | No commercially usable swap weight set found; private test only |
+| Swap weights licence | No commercially usable swap weight set found |
 | Voice conversion in a swap | Separate owner decision |
 | Reference and approval rules for audience gates through derivatives | Packages touching them take the full gate |
 | Film continuity cause ("different crews") | Inference that independent stills and voices cause it; the storyboard test can disprove it |
 | Tests were one take or one seed per cell; owner's ratings of H3 clips are about 250 clips, effect sizes small | Treat as direction, not proof |
-| H3 licence | Private testing only; no H3 clip is described here as publishable, and no H3 default is proposed |
+| H3 as a product part | Optional pack, never a default; no H3 clip is described here as publishable |
