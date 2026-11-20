@@ -631,12 +631,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
 | `backend/src/lib/films/filmProgress.ts` | shotProgressRow, pageShotRow, filmProgressPageRows, filmProgressRows |
 | `backend/src/lib/films/junkCleanup.ts` | JUNK, deriveJunkRegion, JUNK_PROMPT, cleanJunk |
-| `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmShotRows |
+| `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmRepairRows |
 | `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
-| `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
+| `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmShotRepairSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT |
 | `backend/src/lib/films/progressStore.ts` | parseProgress, readProgress, recordShotNote, recordShotJob, recordShotFailure, filmShotJobIds |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
+| `backend/src/lib/films/repair.ts` | repairLine, CHECKING_LINE, REBUILDING_LINE, repairFinishedFilm |
+| `backend/src/lib/films/review.ts` | shotReview |
 | `backend/src/lib/films/roughCut.ts` | roughCutRequest, animaticRequest, ANIMATIC_OLD_STACK_LINE, ANIMATIC_FAILED_LINE, ANIMATIC_TIMEOUT_LINE, ANIMATIC_MISSING_LINE |
 | `backend/src/lib/films/run.ts` | FilmStepError, isTransientStackError, __setFilmRetryDelaysForTests, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, cutOutPeople, makeSheetFromPictures |
@@ -645,7 +647,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/storyboardRows.ts` | storyboardRows, roughCutRows, renderPlanRows, filmControlRows |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
-| `backend/src/lib/films/verifyFinished.ts` | filmShotList, verdictLines, verifyFinishedFilm, verifyRoughCutFile, verifyRoughCutBytes, verifyFinishedFilmBytes |
+| `backend/src/lib/films/verifyFinished.ts` | filmShotList, faultsOf, verdictLines, verifyFinishedFilm, verifyRoughCutFile, verifyShotClipBytes |
 | `backend/src/lib/films/voicedPreview.ts` | VOICED_WORKING_NOTE, __setVoicedMakerForTests, startVoicedPreview |
 | `backend/src/lib/films/voicedRows.ts` | voicedRows, voicedStoryboardRows, voicedAvailable, voicedOfferRows |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |

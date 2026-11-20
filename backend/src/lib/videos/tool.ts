@@ -106,6 +106,8 @@ export interface RunGenerateVideoInput {
   takeOf?: string;
   /** The job this clip is another take of: known when the job is made, so the release (which may run at once) already sees it. */
   anotherOf?: string;
+  /** This clip is another take of that video job (the film repair): it is marked as a retake, so the clip check neither retakes it again nor loses the first. */
+  retakeOf?: string;
   /** A film shot (films/engines.ts): the shot's look paragraph and spoken line, sent to the generic door as `operation: clip_film_shot` (VF-ROUTE-01 follow-up). */
   filmShot?: { look?: string; dialogue?: Array<{ speaker: string; text: string }> };
 }
@@ -344,6 +346,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     const job = await startVideoJob({
       ...(input.takeOf ? { takeOf: input.takeOf } : {}),
       ...(input.anotherOf ? { anotherOf: input.anotherOf } : {}),
+      ...(input.retakeOf ? { retakeOf: input.retakeOf } : {}),
       actor,
       conversationId: state.conversationId,
       turnId: state.turnId,

@@ -54,7 +54,16 @@ const filmPlanShape = {
   preset: z.string().optional(),
 };
 /** FILM-PAGE-01: the stored plan's shot also carries the person's keep or skip mark from the Film maker page (`kept: false` is skipped). The model never writes it (`filmPlanForModel` is built from `filmPlanShape`). */
-const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional() });
+/** VF-REPAIR-01 slice 1: what the bounded repair did to a shot, kept on the stored plan shot (the model never writes it). `retries` is the shot's one automatic retry, shared with CREATOR-10's per-clip retake: whichever uses it first uses it up. Both takes are kept (`first_clip_id`, `new_clip_id`), never deleted. `state`: fixed (the new take replaced the first and passes), failed (a second failure: the first take stays), withheld (the new take could not be shown: the first stays), flagged (a kept shot with a fault, left as kept). */
+export const filmShotRepairSchema = z.object({
+  retries: z.number().int().min(0).max(1),
+  fault: z.enum(["no_speech", "copied_sound", "frozen", "black"]),
+  state: z.enum(["fixed", "failed", "withheld", "flagged"]),
+  first_clip_id: z.string().min(1).max(80).optional(),
+  new_clip_id: z.string().min(1).max(80).optional(),
+});
+export type FilmShotRepair = z.infer<typeof filmShotRepairSchema>;
+const storedFilmShotSchema = filmPlanShotSchema.extend({ kept: z.boolean().optional(), repair: filmShotRepairSchema.optional() });
 export const filmPlanSchema = z.object({ ...filmPlanShape, shots: z.array(storedFilmShotSchema).min(2).max(12), cast: filmPlanShape.cast.min(1) });
 export const facelessFilmPlanSchema = z.object({
   ...filmPlanShape,

@@ -32,7 +32,26 @@ export function filmShotList(plan: Pick<FilmPlan, "shots" | "title_card" | "cred
 
 interface Check { check: string; status: string; shot_id?: string; other_shot_id?: string; value?: number | string }
 export interface VerifyReply { verdict: "pass" | "fail" | "incomplete"; checks: Check[]; file: { duration_s: number | null } }
-export interface FilmVerdict { checked: boolean; lines: string[] }
+/** VF-REPAIR-01 slice 1: the faults the repair rule acts on, by shot id. `no_speech`: no speech or no sound where a line is expected; `copied_sound`: the shot carries another shot's sound (or its line is heard in another shot); `frozen`, `black`: the picture. Everything else stays a plain line only. */
+export type FilmFaultKind = "no_speech" | "copied_sound" | "frozen" | "black";
+export interface FilmFault { shot_id: string; kind: FilmFaultKind }
+export interface FilmVerdict { checked: boolean; lines: string[]; /** Present when checked; empty when nothing the repair rule acts on failed. */ faults?: FilmFault[] }
+
+/** The faults of a reply that the repair rule acts on, each once per shot and kind, in shot order. */
+export function faultsOf(reply: VerifyReply, shotIds: string[]): FilmFault[] {
+  const out: FilmFault[] = [];
+  const add = (shot_id: string | undefined, kind: FilmFaultKind) => { if (shot_id && shotIds.includes(shot_id) && !out.some((f) => f.shot_id === shot_id && f.kind === kind)) out.push({ shot_id, kind }); };
+  for (const c of reply.checks) {
+    if (c.status !== "fail") continue;
+    if (c.check === "sound.copied") { add(c.shot_id, "copied_sound"); add(c.other_shot_id, "copied_sound"); }
+    else if (c.check === "speech.line" && c.other_shot_id) add(c.shot_id, "copied_sound");
+    else if (c.check === "speech.line" && c.value === 0) add(c.shot_id, "no_speech");
+    else if (c.check === "sound.silent") add(c.shot_id, "no_speech");
+    else if (c.check === "picture.frozen") add(c.shot_id, "frozen");
+    else if (c.check === "picture.black") add(c.shot_id, "black");
+  }
+  return out.sort((a, b) => shotIds.indexOf(a.shot_id) - shotIds.indexOf(b.shot_id));
+}
 const AGAIN = "Render that shot again.";
 
 /** The film's card lines for a verdict, by shot number in the film. Plain words, what is wrong and what to do. */
@@ -97,7 +116,8 @@ async function verifyAtPath(input: { path: string; shots: Array<{ id: string; st
     // and a per-shot finding could be wrong, so the film is reported as not checked rather than wrongly failed.
     const actual = reply.file?.duration_s;
     if (typeof actual !== "number" || Math.abs(actual - input.total_s) > DURATION_SLACK_S) return unchecked;
-    return { checked: true, lines: verdictLines(reply, input.shots.map((s) => s.id)) };
+    const ids = input.shots.map((s) => s.id);
+    return { checked: true, lines: verdictLines(reply, ids), faults: faultsOf(reply, ids) };
   } catch {
     return unchecked;
   }
@@ -112,6 +132,12 @@ export async function verifyFinishedFilm(input: { path: string; plan: Parameters
 /** A rough cut's own check (the voiced storyboard): its shot windows and lines come from the Stack's result, not the plan. A shot with no motion holds still, so it is exempt from the frozen check. */
 export async function verifyRoughCutFile(input: { path: string; shots: Array<{ id: string; start_s: number; end_s: number; held_still: boolean; line?: string }>; total_s: number; has_audio: boolean; signal?: AbortSignal }, deps: VerifyDeps = realDeps()): Promise<FilmVerdict> {
   return verifyAtPath({ ...input, shots: input.shots.map(({ held_still, ...rest }) => ({ ...rest, kind: held_still ? "held_still" as const : "moving" as const })) }, deps);
+}
+
+/** VF-REPAIR-01 slice 1: one shot's own stored clip, checked alone (its picture, its sound, its line heard), so a fault in the cut can be told from a fault in the clip. `unchecked` when the Stack cannot answer or the clip's length is not the shot's. */
+export async function verifyShotClipBytes(bytes: Uint8Array, shot: { id: string; seconds: number; line?: string }, signal?: AbortSignal, deps?: VerifyDeps): Promise<FilmVerdict> {
+  const line = shot.line?.trim();
+  return withStagedFile(bytes, (path) => verifyAtPath({ path, shots: [{ id: shot.id, start_s: 0, end_s: shot.seconds, kind: "moving", ...(line ? { line } : {}) }], total_s: shot.seconds, has_audio: !!line, signal }, deps ?? realDeps()));
 }
 
 /** Stages a rough cut's bytes where the Stack can read them, verifies, cleans up. */

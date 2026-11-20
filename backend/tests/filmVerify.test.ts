@@ -68,12 +68,12 @@ describe("verifyFinishedFilm", () => {
   test("sends the shot list with the lines and Home's one rule table, and returns the card lines", async () => {
     const sent: Record<string, unknown>[] = [];
     const verdict = await verifyFinishedFilm({ path: "/x/film.mp4", plan }, fakeDeps(reply([{ check: "speech.line", status: "fail", shot_id: "b", value: 0 }], total), sent));
-    expect(verdict).toEqual({ checked: true, lines: ["Shot 2: no speech is heard where a line is expected. Render that shot again."] });
+    expect(verdict).toEqual({ checked: true, lines: ["Shot 2: no speech is heard where a line is expected. Render that shot again."], faults: [{ shot_id: "b", kind: "no_speech" }] });
     const input = sent[0] as { rules: Record<string, number>; expect: { shots: Array<{ id: string; line?: string }>; has_audio: boolean } };
     expect(input.rules).toEqual({ blackLuma: CLIP_RULES.blackLuma, blackSeconds: CLIP_RULES.blackSeconds, frozenDiff: CLIP_RULES.frozenDiff, frozenSeconds: CLIP_RULES.frozenSeconds });
     expect(input.expect.shots.map((s) => s.line)).toEqual([undefined, "Please put the blue mug back.", "It was my grandmother's."]);
   });
-  test("a clean film is checked with no lines", async () => { expect(await verifyFinishedFilm({ path: "/x", plan }, fakeDeps(reply([], total)))).toEqual({ checked: true, lines: [] }); });
+  test("a clean film is checked with no lines", async () => { expect(await verifyFinishedFilm({ path: "/x", plan }, fakeDeps(reply([], total)))).toEqual({ checked: true, lines: [], faults: [] }); });
   test("a file whose length is not what the plan adds up to is not checked, never wrongly failed", async () => {
     expect(await verifyFinishedFilm({ path: "/x", plan }, fakeDeps(reply([{ check: "speech.line", status: "fail", shot_id: "b", value: 0 }], total + 9)))).toEqual({ checked: false, lines: [] });
   });
@@ -114,5 +114,32 @@ describe("the film runner reports the verdict on the film's own card", () => {
     const e = engines(actor, async () => ({ checked: true, lines: ["Shot 1: the picture goes black. Render that shot again."] }));
     await resumeFilm({ actor, productionId: production.id, plan, signal: new AbortController().signal, engines: e });
     expect(e.note).toBe("Shot 1: the picture goes black. Render that shot again.");
+  });
+});
+
+describe("VF-REPAIR-01 slice 1: the faults the repair rule acts on", () => {
+  const ids = ["shot-1", "shot-2", "shot-3", "shot-4"];
+  const reply = (checks: Array<Record<string, unknown>>) => ({ verdict: "fail" as const, checks: checks as never, file: { duration_s: 20 } });
+  test("a missing line, silence, copied sound, a frozen picture and a black picture map to one fault each, in shot order; other failures stay plain lines only", async () => {
+    const { faultsOf } = await import("@/lib/films/verifyFinished");
+    expect(faultsOf(reply([
+      { check: "picture.frozen", status: "fail", shot_id: "shot-4" },
+      { check: "speech.line", status: "fail", shot_id: "shot-2", value: 0 },
+      { check: "sound.silent", status: "fail", shot_id: "shot-2" },
+      { check: "sound.copied", status: "fail", shot_id: "shot-3", other_shot_id: "shot-1" },
+      { check: "picture.black", status: "fail", shot_id: "shot-1" },
+      { check: "speech.line", status: "fail", shot_id: "shot-2", value: 2 },
+      { check: "sound.quiet", status: "fail", shot_id: "shot-3" },
+      { check: "picture.frozen", status: "pass", shot_id: "shot-3" },
+    ]), ids)).toEqual([
+      { shot_id: "shot-1", kind: "copied_sound" }, { shot_id: "shot-1", kind: "black" },
+      { shot_id: "shot-2", kind: "no_speech" },
+      { shot_id: "shot-3", kind: "copied_sound" },
+      { shot_id: "shot-4", kind: "frozen" },
+    ]);
+  });
+  test("a fault on a shot that is not in the film is dropped", async () => {
+    const { faultsOf } = await import("@/lib/films/verifyFinished");
+    expect(faultsOf(reply([{ check: "picture.frozen", status: "fail", shot_id: "shot-9" }]), ids)).toEqual([]);
   });
 });

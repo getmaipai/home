@@ -1,7 +1,8 @@
+import { repairFinishedFilm } from "./repair";
 import type { PersonRow } from "@/types";
 import { recordFilmCreation, safely } from "@/lib/creations/writers";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { clearShotArtifacts, createMediaProduction, getMediaProduction } from "@/lib/mediaProductions";
+import { clearShotArtifacts, createMediaProduction, getMediaProduction, setShotClip, updateMediaProduction } from "@/lib/mediaProductions";
 import { bindCastSubjects, planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
 import { subjectViewById } from "@/lib/mediaSubjects";
 import { changeFilmMusic, realFilmEngines, redoFilmShot, resumeFilm } from "./engines";
@@ -51,7 +52,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       current=getFilmRun(actor,run.id)!;
       if(!current.production_id || !plan) throw new Error("The film plan is unavailable. Start a new film.");
       updateFilmRun(actor,run.id,{state:"running",error_line:null});
-      const engines=engineFactory({actor,signal:controller.signal,productionId:current.production_id,faceless:current.faceless}); engines.onProgress=onProgress(actor,run.id);
+      const engines=engineFactory({actor,signal:controller.signal,productionId:current.production_id,faceless:current.faceless}); engines.onProgress=onProgress(actor,run.id); engines.say=(line)=>{ updateFilmRun(actor,run.id,{note:line}); };
       const input={actor,productionId:current.production_id,plan,faceless:current.faceless,engines,signal:controller.signal};
       if((mode==="plan" || mode==="stills") && previewFirst.delete(run.id)) {
         await runFilm({...input,stopAfterStills:true});
@@ -64,6 +65,17 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
       else if(mode==="run" && engineFactory===realFilmEngines) await resumeFilm({actor,productionId:current.production_id,plan,faceless:current.faceless,signal:controller.signal,onProgress:engines.onProgress,engines});
       else await runFilm(input);
       if(controller.signal.aborted) return;
+      // VF-REPAIR-01 slice 1: what the finished-film check found is repaired once (a rebuild of the cut, or one new take per faulty shot the person has not marked), never in a loop.
+      const found=engines.lastCheck;
+      if(!current.faceless && found?.faults.length && engines.verifyCut) {
+        const repaired=await repairFinishedFilm({actor,productionId:current.production_id,plan,cutId:found.cutId,musicFileId:found.musicFileId,faults:found.faults,engines,signal:controller.signal});
+        if(controller.signal.aborted) return;
+        plan=repaired.plan; updateFilmRun(actor,run.id,{plan});
+        if(repaired.acted || repaired.lines.length) {
+          const stripped=found.lines.reduce((text,line)=>text.replace(line,""),engines.note ?? "").replace(/\s+/g," ").trim();
+          engines.note=[stripped,...repaired.lines].filter(Boolean).join(" ") || undefined;
+        }
+      }
       const latest=getFilmRun(actor,run.id)!;
       const prod=(await import("@/lib/mediaProductions")).getMediaProduction(actor,latest.production_id!);
       const fileId=prod?.finished_cut_file_ids.at(-1) ?? null;
@@ -152,6 +164,17 @@ export function resumeFilmRun(actor:PersonRow,id:string): FilmRun | {line:string
 }
 export function redoFilmRunShot(actor:PersonRow,id:string,shotId:string): FilmRun | {line:string} | null { const run=ownedAdult(actor,id); if(!run)return null; if(anotherActiveRun(actor,id))return {line:"A film is already running. Wait for it to finish or cancel it first."}; if(!run.plan||!run.production_id||run.state!=="done")return {line:"Finish the film before redoing a shot."}; if(!run.plan.shots.some(s=>s.id===shotId))return {line:"That shot is not in the film plan."}; updateFilmRun(actor,id,{state:"running"}); launch(actor,getFilmRun(actor,id)!,"redo",shotId); return getFilmRun(actor,id); }
 export function changeFilmRunMusic(actor:PersonRow,id:string): FilmRun | {line:string} | null { const run=ownedAdult(actor,id); if(!run)return null; if(anotherActiveRun(actor,id))return {line:"A film is already running. Wait for it to finish or cancel it first."}; if(!run.plan||!run.production_id||run.state!=="done")return {line:"Finish the film before changing its music."}; updateFilmRun(actor,id,{state:"running"}); launch(actor,getFilmRun(actor,id)!,"music"); return getFilmRun(actor,id); }
+/** VF-REPAIR-01 slice 1: "Use the new take" / "Use the earlier take" on a repaired shot. Both takes are kept (`repair.first_clip_id`, `repair.new_clip_id`); this picks which is in the film, puts the film back together and lets the checks run again. The repair itself never runs a second time (the shot's one retry is spent). */
+export function useFilmTake(actor:PersonRow,id:string,shotId:string,which:"new"|"first"): FilmRun | {line:string} | null {
+  const run=ownedAdult(actor,id); if(!run)return null;
+  const shot=run.plan?.shots.find(item=>item.id===shotId); const repair=shot?.repair;
+  if(!run.plan||!run.production_id||!shot||!repair?.first_clip_id||!repair.new_clip_id)return {line:"That shot has no other take to use."};
+  if(run.state==="running"||run.state==="planning"||anotherActiveRun(actor,id))return {line:BUSY_LINE};
+  setShotClip(actor.id,run.production_id,shotId,which==="new"?repair.new_clip_id:repair.first_clip_id);
+  updateMediaProduction(actor,run.production_id,{finished_cut_file_ids:[]});
+  const plan={...run.plan,shots:run.plan.shots.map(item=>item.id===shotId?{...item,repair:{...repair,state:which==="new"?"fixed" as const:"failed" as const}}:item)};
+  updateFilmRun(actor,id,{plan,state:"running",note:null,error_line:null}); launch(actor,getFilmRun(actor,id)!,"run"); return getFilmRun(actor,id);
+}
 // FILM-PAGE-01: the Film maker page's steps on a planned film (waiting for Go). Each is a plain line or the run; nothing here renders a clip before "finish kept".
 const BUSY_LINE="A film is already running. Wait for it to finish or cancel it first.";
 function pictured(actor:PersonRow,run:FilmRun): Set<string> { const production=run.production_id?getMediaProduction(actor,run.production_id):null; return new Set((production?.episodes.flatMap(e=>e.scenes.flatMap(sc=>sc.shots))??[]).filter(shot=>!!shot.picture_file_id).map(shot=>shot.id)); }

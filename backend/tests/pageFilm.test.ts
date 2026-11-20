@@ -70,7 +70,8 @@ describe("the served Film maker page", () => {
       expect((await who.post(`${T}/data/recipes`, { scope: "film" })).status).toBe(404);
       expect((await who.post(`${T}/data/recipes`, { scope: "storyboard-voiced" })).status).toBe(404);
       expect((await who.post(`${T}/data/recipes`, { scope: "film-voiced" })).status).toBe(404);
-      for (const name of ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview"]) expect((await who.post(`${T}/actions/${name}`, { prompt: "A boat crosses a lake", run: "x", shot: "y" })).status).toBe(404);
+      expect((await who.post(`${T}/data/recipes`, { scope: "film-repairs" })).status).toBe(404);
+      for (const name of ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview", "film-use-take"]) expect((await who.post(`${T}/actions/${name}`, { prompt: "A boat crosses a lake", run: "x", shot: "y" })).status).toBe(404);
     }
   });
 });
@@ -424,5 +425,23 @@ describe("refusals and access", () => {
     db.update(filmRuns).set({ state: "cancelled" }).where(eq(filmRuns.id, id)).run();
     expect(activityForViewer(row("Sage")).items.find((entry) => entry.id === `film:${id}`)).toMatchObject({ href: "/apps/video/film-maker" });
     expect(await rows(owner, "film-progress", id)).toEqual([]); // a stopped film shows its Stopped line and Resume, not shots that read as failed
+  });
+
+  test("VF-REPAIR-01 slice 1: the film-repairs rows carry each repaired shot's plain line and only the buttons its state allows; Use the new take puts the other take in the film", async () => {
+    const { owner, row } = await household();
+    const id = await planned(owner, row("Sage"));
+    const { updateFilmRun } = await import("@/lib/films/store");
+    const { updateMediaProduction, setShotClip, getMediaProduction } = await import("@/lib/mediaProductions");
+    const run = getFilmRun(row("Sage"), id)!;
+    updateMediaProduction(row("Sage"), run.production_id!, { episodes: [{ id: "e", title: "t", scenes: [{ id: "s", title: "t", shots: run.plan!.shots.map(({ id: shotId }) => ({ id: shotId, subject_ids: [] })) }] }] as never, finished_cut_file_ids: ["cut-1"] });
+    for (const shot of run.plan!.shots) setShotClip(row("Sage").id, run.production_id!, shot.id, `clip-${shot.id}`);
+    updateFilmRun(row("Sage"), id, { state: "done", plan: { ...run.plan!, shots: run.plan!.shots.map((shot, i) => (i === 1 ? { ...shot, repair: { retries: 1, fault: "frozen" as const, state: "failed" as const, first_clip_id: `clip-${shot.id}`, new_clip_id: "fresh-clip" } } : shot)) } });
+    const rowsNow = await rows(owner, "film-repairs", id);
+    expect(rowsNow).toHaveLength(1);
+    expect(rowsNow[0]).toMatchObject({ run_id: id, title: "Shot 2", line: "Shot 2 still has a frozen picture after one more try. The film is ready with the first take.", state: "failed", can_use_new: true, can_use_earlier: false, can_make_again: true });
+    expect((await owner.post(`${T}/actions/film-use-take`, { run: id, shot: run.plan!.shots[1]!.id, take: "new" })).status).toBe(200);
+    const shotNow = getMediaProduction(row("Sage"), run.production_id!)!.episodes[0]!.scenes[0]!.shots.find((shot) => shot.id === run.plan!.shots[1]!.id)!;
+    expect(shotNow.clip_file_id).toBe("fresh-clip");
+    expect((await owner.post(`${T}/actions/film-use-take`, { run: id, shot: "no-such-shot" })).status).toBe(422);
   });
 });

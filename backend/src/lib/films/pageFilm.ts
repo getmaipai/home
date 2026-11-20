@@ -3,6 +3,7 @@
 // kept shots and joins them (the same run a full Go makes), and "Music video to the beat" is the chat tool's `cut_to_beat` edit over the finished film's clips.
 // The page's rows are `recipes` scopes `film` (the person's newest film) and `film-shots` (its shots); the actions are `film-*` under /api/plugins/video/actions.
 import { startVoicedPreview } from "./voicedPreview";
+import { repairLine } from "./repair";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { castForTool } from "@/lib/cast";
@@ -10,14 +11,14 @@ import { getMediaProduction } from "@/lib/mediaProductions";
 import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { startClipEdit } from "@/lib/videos/clipEditStart";
 import { getVideoJobByFileFor } from "@/lib/videos/jobs";
-import { allowed, cancelFilm, draftFilmRun, editFilmShot, filmDraftedShots, finishKeptFilm, redoDraftShot, redoFilmRunShot, resumeFilmRun, reviewFilmShot, startFilm } from "./background";
+import { allowed, cancelFilm, draftFilmRun, editFilmShot, filmDraftedShots, finishKeptFilm, redoDraftShot, redoFilmRunShot, resumeFilmRun, reviewFilmShot, startFilm, useFilmTake } from "./background";
 import { getReelFormat, listReelFormats } from "./reelFormats";
 import { castHintsFor } from "./tool";
 import { getFilmRun, listFilmRunsInStates, type FilmRun, type FilmRunState } from "./store";
 
 export type FilmPageResult = { ok: true; id: string; state: string } | { ok: false; status: 403 | 404 | 422 | 423; error: string; code: string };
 const fail = (status: 403 | 404 | 422 | 423, error: string, code: string): FilmPageResult => ({ ok: false, status, error, code });
-export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview", "film-cancel", "film-resume"] as const;
+export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview", "film-cancel", "film-resume", "film-use-take"] as const;
 export type FilmPageAction = (typeof FILM_PAGE_ACTIONS)[number];
 
 const GONE_LINE = "That film isn't available any more. Describe a new one and press Plan the film.";
@@ -100,6 +101,7 @@ export async function filmPageAction(person: PersonRow, action: FilmPageAction, 
   if (action === "film-beat") return beatFromPage(person, runId, body);
   const run = pageFilmRun(person, runId || undefined);
   if (!run) return fail(404, GONE_LINE, "gone");
+  if (action === "film-use-take") { if (!shotId) return fail(422, "Pick a shot first.", "bad_arguments"); const which = given(body.take) === "first" ? "first" : "new"; return lineOr(useFilmTake(person, run.id, shotId, which)); }
   if (action === "film-draft") return lineOr(draftFilmRun(person, run.id));
   if (action === "film-finish") return lineOr(finishKeptFilm(person, run.id));
   // FILM-CANCEL-01: stop a film being made (its queued or running shot jobs are cancelled, finished shots are kept) and carry on from the first unfinished shot.
@@ -149,6 +151,25 @@ export function filmRows(person: PersonRow, id?: string): Array<Record<string, u
     // The film's own note (S6, no new status surface): what the voiced preview is doing, why it was not kept, or which lines were left out, in the plain words it was written in. Empty when there is none.
     note: run.note ?? "",
   }];
+}
+
+/** `recipes` scope `film-repairs` (VF-REPAIR-01 slice 1): one row per repaired or flagged shot of the film, with the plain line and the buttons its state allows (the UI session's card draws them). */
+export function filmRepairRows(person: PersonRow, id?: string): Array<Record<string, unknown>> {
+  if (!allowed(person)) return [];
+  const run = pageFilmRun(person, id);
+  if (!run?.plan) return [];
+  const kept = run.plan.shots.filter((shot) => shot.kept !== false);
+  return kept.flatMap((shot, index) => {
+    const repair = shot.repair;
+    if (!repair) return [];
+    const idle = run.state === "done" || run.state === "waiting_for_go";
+    return [{
+      id: shot.id, run_id: run.id, title: `Shot ${index + 1}`, line: repairLine(index + 1, repair), state: repair.state,
+      can_use_new: idle && repair.state === "failed" && !!repair.new_clip_id && !!repair.first_clip_id,
+      can_use_earlier: idle && repair.state === "fixed" && !!repair.first_clip_id && !!repair.new_clip_id,
+      can_make_again: idle && repair.state !== "fixed",
+    }];
+  });
 }
 
 /** `recipes` scope `film-shots`: the shot list of the newest film as cards (words, seconds, camera, the draft picture, its keep mark). */

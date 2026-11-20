@@ -32,7 +32,7 @@ import { listFragments, listTemplates, templateBlanks } from "@/lib/media/templa
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
-import { fillFilmMakerPage, filmRows, filmShotRows } from "@/lib/films/pageFilm";
+import { fillFilmMakerPage, filmRepairRows, filmRows, filmShotRows } from "@/lib/films/pageFilm";
 import { allowed as filmAllowed } from "@/lib/films/background";
 import { listFilmRunsInStates, type FilmRunState } from "@/lib/films/store";
 import { filmControlRows, renderPlanRows, storyboardRows } from "@/lib/films/storyboardRows";
@@ -513,6 +513,7 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "storyboard": { const voiced = voicedRows(person, params.id); return voiced.length ? voiced : storyboardRows(person, params.id); }
     case "storyboard-voiced": return voicedRows(person, params.id);
     case "film-voiced": return voicedOfferRows(person, params.id);
+    case "film-repairs": return filmRepairRows(person, params.id);
     case "render-plan": return renderPlanRows(person, params.id);
     case "film-stop": return filmControlRows(person, "stop", params.id);
     case "film-resume": return filmControlRows(person, "resume", params.id);

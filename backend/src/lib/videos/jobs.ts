@@ -351,6 +351,12 @@ export function markAnotherTake(job: VideoJob, source: VideoJob): void {
   saveVideoJob(job);
 }
 
+/** Whether another take of this video job already exists (the automatic clip retake, or the film repair's): a shot's one retry is spent when it does. */
+export function videoJobHasAnotherTake(actor: PersonRow, jobId: string): boolean {
+  if ([...memory.values()].some((job) => job.personId === actor.id && job.request.anotherOf === jobId)) return true;
+  return !!db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, actor.id), like(videoJobs.request, `%"anotherOf":"${jobId.replace(/[%_"\\]/g, "")}"%`))).get();
+}
+
 export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
   const live = memory.get(id) ?? liveJobs.get(id);
   if (live) return live.personId === actor.id ? live : null;

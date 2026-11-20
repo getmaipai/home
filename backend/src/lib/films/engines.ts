@@ -19,7 +19,7 @@ import { musicJobLockState, LOCKED_MUSIC_START_LINE } from "@/lib/music/lock";
 import { fileLockState } from "@/lib/adultLock";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { makeAudienceOf } from "@/lib/videos/make";
-import { getVideoJobFor } from "@/lib/videos/jobs";
+import { getVideoJobByFileFor, getVideoJobFor, videoJobHasAnotherTake } from "@/lib/videos/jobs";
 import { runEditVideo } from "@/lib/videos/editTool";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
@@ -31,7 +31,7 @@ import { measureClipDrift } from "./fidelity";
 import { runStackEdit } from "@/lib/videos/stackEdit";
 import { DEFAULT_CROSSFADE_S, filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, seamJoinOps, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
-import { verifyFinishedFilmBytes } from "./verifyFinished";
+import { verifyFinishedFilmBytes, verifyShotClipBytes } from "./verifyFinished";
 import { changeMusic, isTransientStackError, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
@@ -166,11 +166,13 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         return saved.value.id;
       } catch (error) { void cancelOrDelete(submitted.job); throw error; }
     },
-    async makeClip({ shot, endStillFileId, speaker }) {
+    async makeClip({ shot, endStillFileId, speaker, takeOf }) {
       const prompt = `${shot.motion}${shot.line ? ` Say "${shot.line}".` : ""}`;
       // VF-ROUTE-01 follow-up: the shot goes to the generic door as a film shot (its look paragraph and its line as one dialogue entry; the Stack picks the recipe and the size). A Stack that does not list those keys, or refuses the shot, takes the old door with the prompt above, as before.
       const filmShot = { look: shot.still.slice(0, 1200), ...(shot.line?.trim() ? { dialogue: [{ speaker: speaker ?? "Narration", text: shot.line.trim().slice(0, 300) }] } : {}) };
-      const result = await runGenerateVideo({ filmShot, state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
+      // Another take of a shot (the repair): the first take's video job names it, so the Stack makes it with the same route and recipe and a new seed.
+      const firstJob = takeOf ? getVideoJobByFileFor(actor, takeOf) : null;
+      const result = await runGenerateVideo({ filmShot, ...(firstJob ? { takeOf: firstJob.id, retakeOf: firstJob.id } : {}), state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
       const jobId = (result.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!jobId) {
         const why = JSON.stringify(result.result?.reply ?? result).slice(0, 500);
@@ -315,6 +317,14 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         engines.note = "The film is ready, but I couldn't add its music.";
         return cut;
       }
+    },
+    /** Whether another take of this clip already exists (the clip check's own retake or a repair's): the shot's one retry is spent. */
+    retakeSpent(clipFileId) { const job = getVideoJobByFileFor(actor, clipFileId); return !!job && videoJobHasAnotherTake(actor, job.id); },
+    /** VF-REPAIR-01 slice 1: one shot's stored clip, checked alone by the same Stack check (never throws). */
+    async verifyClip({ shot, clipFileId }, options) {
+      const clip = readAttachment(actor, clipFileId);
+      if (!clip.ok) return { checked: false };
+      return verifyShotClipBytes(clip.value.bytes, { id: shot.id, seconds: shot.seconds, ...(shot.line ? { line: shot.line } : {}) }, options.signal);
     },
     /** VF-CHECK-01: the Stack checks the finished file against the plan's shot list and lines. Advisory; never throws. */
     async verifyCut({ plan, cutFileId }, options) {

@@ -12,7 +12,7 @@ export class FilmStepError extends Error {
 export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string; /** A cast member the person picked: its subject, used as it is. */ subjectId?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
-  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** Who speaks the shot's line (the film's one character, else "Narration"). */ speaker?: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
+  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** Who speaks the shot's line (the film's one character, else "Narration"). */ speaker?: string; /** Another take of this shot: the file id of the first take (VF-REPAIR-01 slice 1; the engine sends `take_of`). */ takeOf?: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
   /** FILM-REAL-05: how far a finished clip drifted from its starting picture (measure only; null when it cannot be measured). */
   measureClip?(input: { stillFileId: string; clipFileId: string; seconds: number }): Promise<{ first: number; middle: number; last: number } | null>;
   makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
@@ -21,7 +21,15 @@ export interface FilmEngines {
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; /** Null when the song could not be made: a film still ends with its picture and sound. */ musicFileId: string | null }, options: { signal: AbortSignal }): Promise<string>;
   /** VF-CHECK-01: check the finished file against the plan (shots, lines, sound, picture). Lines are plain sentences for the film's card; `checked: false` means it could not be checked. */
-  verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[] }>;
+  verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[]; faults?: import("./verifyFinished").FilmFault[] }>;
+  /** VF-REPAIR-01 slice 1: one shot's stored clip checked alone (told apart from a fault in the cut). */
+  verifyClip?(input: { shot: FilmPlan["shots"][number]; clipFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; faults?: import("./verifyFinished").FilmFault[] }>;
+  /** Whether another take of this clip already exists, so the shot's one retry is spent (VF-REPAIR-01 slice 1; shared with the clip check's own retake). */
+  retakeSpent?(clipFileId: string): boolean;
+  /** A plain progress line for the film's own card while the run works (S6: the run's note). */
+  say?: (line: string) => void;
+  /** What the finished-film check found on the cut just made, for the repair step after the run. */
+  lastCheck?: { cutId: string; musicFileId: string | null; faults: import("./verifyFinished").FilmFault[]; lines: string[] };
   waitForIdle(): Promise<void>;
   note?: string;
   onProgress?: (progress: { stage: FilmStage; done: number; total: number; shotId?: string }) => void;
@@ -159,8 +167,10 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     current = updateMediaProduction(actor, productionId, { finished_cut_file_ids: [...current.finished_cut_file_ids, cutId] })!;
     // VF-CHECK-01: the finished file is checked against the plan; what is wrong goes on the film's own card (the note), and the film stays usable.
     if (!faceless && engines.verifyCut) {
-      const verdict = await engines.verifyCut({ plan, cutFileId: cutId }, { signal }).catch(() => ({ checked: false, lines: [] as string[] }));
+      engines.say?.("Checking the finished film.");
+      const verdict = await engines.verifyCut({ plan, cutFileId: cutId }, { signal }).catch(() => ({ checked: false, lines: [] as string[], faults: undefined }));
       if (verdict.lines.length) engines.note = [engines.note, ...verdict.lines].filter(Boolean).join(" ");
+      if (verdict.checked && verdict.faults?.length) engines.lastCheck = { cutId, musicFileId: musicFileId ?? null, faults: verdict.faults, lines: verdict.lines };
     }
     engines.onProgress?.({ stage: "keep", done: 1, total: 1 });
   }
