@@ -42,16 +42,21 @@ describe("picture template Create", () => {
     const templateDir = new URL("../packages/generate_image/images/templates", import.meta.url);
     const templates = readdirSync(templateDir).filter((name) => name.endsWith(".json")).map((name) => JSON.parse(readFileSync(new URL(`../packages/generate_image/images/templates/${name}`, import.meta.url), "utf8")) as { id: string; prompt: string });
     expect(templates).toHaveLength(23);
+    let photoTemplates = 0;
     for (const template of templates) {
       const before = fake.submitted.length;
       const hasCast = promptBlanks(template.prompt).some((blank) => blank.name.startsWith("cast_"));
+      // Images templates are recipes (eb409b864): a template with a photo_* blank needs the person's own picture, which this test does not supply.
+      const needsPhoto = promptBlanks(template.prompt).some((blank) => blank.name.startsWith("photo_"));
+      if (needsPhoto) photoTemplates++;
       const result = await makePictureFor(owner, { prompt: "", template: template.id, ...(hasCast ? { cast: [owner.id] } : {}) });
       if (result.ok) await until(() => fake.submitted.length > before);
       if (result.ok) expect(String(fake.submitted.at(-1)?.prompt)).not.toContain("{{");
-      else expect(result.error).toBe("This template needs a person from your cast. Pick one in Cast, then try again.");
+      else expect(result.error).toBe(needsPhoto ? "This template needs your own photo. Add one with the picture button, then make the picture." : "This template needs a person from your cast. Pick one in Cast, then try again.");
       if (!result.ok) expect(fake.submitted.length).toBe(before);
     }
-    expect(fake.submitted).toHaveLength(templates.length);
+    expect(photoTemplates).toBeGreaterThan(0);
+    expect(fake.submitted).toHaveLength(templates.length - photoTemplates);
   });
 
   test("a cast template with no cast returns the plain cast instruction", async () => {
