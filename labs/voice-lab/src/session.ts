@@ -9,6 +9,8 @@ import { loadavg } from "node:os";
 import { sampleGpu } from "./gpuLoad";
 import { chat, lastChatTimings, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
+import { LevelMatcher } from "./levelMatch";
+import { MoodPolicy } from "./moodPolicy";
 import { TagStream, forEngine, splitTags } from "./tags";
 import { pickSound, availableTags } from "./sounds";
 import { shouldNod } from "./listenerNod";
@@ -68,7 +70,12 @@ export class VoiceSession {
   private stylesFn: typeof supportedStyles;
   private voicePreparedFn: typeof voicePrepared;
   private voiceChecked = new Set<string>();
-  private styleFor(piece: string): string { if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|happy|sad|sarcastic)\]/i.exec(piece); if (m) this.replyStyle = m[1]!.toLowerCase(); return this.replyStyle; }
+  private mood = new MoodPolicy(); private lastUserText = "";
+  private styleFor(piece: string): string {
+    if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|happy|sad|sarcastic)\]/i.exec(piece);
+    if (m) { const tag = m[1]!.toLowerCase(); const v = this.mood.check(tag); if (v.ok) this.replyStyle = tag; else { this.replyStyle = ""; this.logStop("mood-suppressed", { tag, why: v.reason, user: this.lastUserText.slice(0, 80) }); } }
+    return this.replyStyle;
+  }
   private warming: AbortController | null = null; private lastWarmAt = 0;
   private prewarmChatFn: typeof prewarmChat;
   private prewarmVoiceFn: typeof prewarmVoice;
@@ -196,7 +203,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
+  private contMode = Bun.env.LAB_CONT === "1"; private sessionTag = Math.random().toString(36).slice(2, 8); private levelMatch = Bun.env.LAB_LEVEL_MATCH !== "0"; private levelMatcher = new LevelMatcher(); private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -245,7 +252,7 @@ export class VoiceSession {
     if (this.checkControllers.get(revision) === controller) this.checkControllers.delete(revision);
   }
   private async reply(text: string, committed: boolean) {
-    this.cancelPrefill();
+    this.cancelPrefill(); this.levelMatcher = new LevelMatcher(); this.lastUserText = text; this.mood.beginReply(text);
     if (!text.trim()) return;
     if (!Object.keys(this.metrics).length || this.metricsWritten) { this.metrics = { failure: "none", draft: "off", ok: false }; this.metricsWritten = false; }
     this.abort = new AbortController(); const signal = this.abort.signal; this.smileChunk = -1; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
@@ -295,6 +302,7 @@ export class VoiceSession {
       this.generatedText = full; this.generatedComplete = true;
       if (!this.chunkDurations.some((duration) => duration > 0)) { this.metrics.ok = false; if (this.metrics.failure === "none") this.metrics.failure = "no_audio"; }
       else { this.metrics.ok = true; this.metrics.failure = "none"; }
+      if (full) this.mood.finishReply();
       if (!this.held) this.send({ t: "reply_final", text: full, turn: this.turn }); else this.heldFinalText = full;
       if (full && !this.held) this.history.commitAssistant(full);
       if (this.metrics.failure === "no_audio") this.finishMetrics();
@@ -310,17 +318,18 @@ export class VoiceSession {
     };
     let sent = 0;
     const synth = async (style: string, part: string, voiceId: string = choice.voice) => {
-      const response = await this.speechFn(forEngine(part, supported), signal, { voice: voiceId, style });
+      const response = await this.speechFn(forEngine(part, supported), signal, { voice: voiceId, style, reply: `${this.sessionTag}-${this.turn}`, cont: this.contMode });
       if (!response.body) throw new Error("empty voice response");
-      const reader = response.body.getReader(), wavReader = new StreamingWavReader();
+      const reader = response.body.getReader(), wavReader = new StreamingWavReader(); const lm = this.levelMatch ? this.levelMatcher : null; lm?.startChunk();
       while (true) {
         const piece = await reader.read(); if (piece.done) break;
         const pcm = wavReader.push(piece.value); if (!pcm.length) continue;
         if (signal.aborted || this.closed) return;
         if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow();
         let sum = 0; for (const v of pcm) sum += (v / 32768) ** 2; this.speechRms = this.speechRms * 0.7 + Math.sqrt(sum / pcm.length) * 0.3;
-        sent += pcm.length; emit(pcm);
+        if (lm) { for (const p of lm.push(pcm)) { sent += p.length; emit(p); } } else { sent += pcm.length; emit(pcm); }
       }
+      if (lm) for (const p of lm.endChunk()) { sent += p.length; emit(p); }
       if (!sent) throw new Error("voice response contained no audio");
     };
     const fail = () => { this.metrics.ok = false; this.metrics.failure = "voice_failed"; this.send({ t: "error", code: "voice_failed" }); this.abort?.abort(); this.finishMetrics(); };
@@ -418,6 +427,8 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
+        if (typeof j.values?.cont === "boolean") this.contMode = j.values.cont;
+        if (typeof j.values?.levelMatch === "boolean") this.levelMatch = j.values.levelMatch;
         if (typeof j.values?.prefill === "boolean") this.prefill = j.values.prefill;
         if (typeof j.values?.stamp === "boolean") this.stamp = j.values.stamp;
         if (Number.isFinite(j.values?.firstWords)) this.firstWords = Math.max(0, Math.min(8, Math.floor(j.values.firstWords)));

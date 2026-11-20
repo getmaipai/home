@@ -324,6 +324,7 @@ test("6 style tags are sent only when the current voice supports them", async ()
       speech: async (_text: string, _signal: AbortSignal, opts: { style?: string }) => { sentStyles.push(opts.style ?? ""); return new Response(encodeWav(new Int16Array(512))); },
       chat: async function* () { yield { type: "text", text: "[whisper]Hello there." }; },
     });
+    (h.session as any).mood = { beginReply() {}, check: () => ({ ok: true }), finishReply() {} };
     await (h.session as any).reply("question", true);
     expect(sentStyles).toEqual([expected]);
     h.session.close();
@@ -340,6 +341,7 @@ test("6 empty voice audio retries without style then reports voice_failed", asyn
     chat: async function* () { yield { type: "text", text: "[whisper]Hello there." }; },
     appendMetrics: (_path: string, value: any) => metrics.push(value),
   });
+  (h.session as any).mood = { beginReply() {}, check: () => ({ ok: true }), finishReply() {} };
   await (h.session as any).reply("question", true);
   await h.flush();
   expect(calls).toBe(2);
@@ -618,4 +620,15 @@ test("a conversation turn is flagged active from the start of his speech until t
   (h.session as any).history.commitUser("q"); await (h.session as any).reply("q", true); // synthesis of the whole reply done
   expect(conversationActiveCount()).toBe(0);                            // the heavy job may run again
   h.feed(true, 12); h.session.close(); expect(conversationActiveCount()).toBe(0);
+});
+test("mood policy in the session: a [whisper] on the first reply is stripped in code, the voice stays normal", async () => {
+  const sentStyles: string[] = [];
+  const h = harness({
+    supportedStyles: async () => new Set(["whisper"]),
+    speech: async (_text: string, _signal: AbortSignal, opts: { style?: string }) => { sentStyles.push(opts.style ?? ""); return new Response(encodeWav(new Int16Array(512))); },
+    chat: async function* () { yield { type: "text", text: "[whisper]Hello there." }; },
+  });
+  await (h.session as any).reply("Hi there", true);
+  expect(sentStyles).toEqual([""]);
+  h.session.close();
 });
