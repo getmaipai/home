@@ -30,8 +30,8 @@ export async function deriveStartPicture(actor: PersonRow, body: VideoBody, refu
   // The Stack names the inputs to use; the only one Home holds is the identity picture. Anything else asked for ends the request plainly.
   if (!identity || refusal.inputs.some((role) => role !== "identity")) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);
   const started = Date.now();
-  const made = await makePicture({ job: "picture", audience: "adult", description: body.prompt, shape: refusal.shape, level: "standard", intent: "derived_start", inputs: [{ role: "identity", file: `data:image/png;base64,${identity}` }] });
-  if (!made.ok) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);
+  const made = await makePicture({ job: "picture", audience: "adult", description: body.prompt, shape: refusal.shape, level: "standard", intent: "new_shot", inputs: [{ role: "identity", file: `data:image/png;base64,${identity}` }] }).catch((): never => { throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE); });
+  if (!made.ok) throw new StackVideoError(422, "start_picture_failed", made.refusal.line || START_PICTURE_FAILED_LINE);   // the Stack's own plain line; never a words-only picture in its place
   const view = fullViewForJob("adult", actor);
   let bytes: Uint8Array | null = null;
   try {

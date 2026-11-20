@@ -290,9 +290,10 @@ export async function makePicture(body: StackMakePictureRequest): Promise<{ ok: 
     forgetMediaRefusal("image");
     return { ok: true, job: result.id, part: result.made_with?.part ?? null, notes: result.made_with?.notes ?? [] };
   }
-  if (res.status === 409) {
+  if (res.status === 409 || res.status === 422) {
     const refusal = await res.json().catch(() => null) as StackMakeRefusalRead | null;
     if (refusal && typeof refusal.code === "string" && typeof refusal.line === "string") return { ok: false, refusal };
+    if (res.status === 422) throw new StackPicturesError(422, "refused", "That picture could not be made right now. Try again in a few minutes.");
     throw new StackPicturesError(409, "refused", "That picture could not be made right now. Try again in a few minutes.");
   }
   return failure(res);

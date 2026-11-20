@@ -18,7 +18,7 @@ let png = "";
 let calls: Array<{ path: string; body: Record<string, any> | null }> = [];
 let clipAnswers: Array<() => Response> = [];
 let withheld = false;
-const needs = () => json({ code: "needs_start_picture", line: "This part starts a person from a first picture.", shape: "landscape", inputs: ["identity"] }, 409);
+const needs = () => json({ code: "needs_start_picture", line: "This part starts a person from a first picture.", shape: "landscape", inputs: ["identity"] }, 422);
 const clipOk = () => json({ id: "clip-1", job: "clip", state: "running", percent: 0, status: "Making", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [], route: "start_picture", route_reason: "A derived first picture starts it." } }, 202);
 const answer = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
   const path = new URL(String(input), "http://stack.test").pathname;
@@ -70,13 +70,13 @@ describe("needs_start_picture", () => {
     expect(made).toMatchObject({ job: "clip-1", derivedImage: png });
     expect(derived).toEqual([png]);
     expect(pictureMakes()).toHaveLength(1);
-    expect(pictureMakes()[0]!.body).toMatchObject({ job: "picture", audience: "adult", shape: "landscape", intent: "derived_start", description: "she waves at the sea", inputs: [{ role: "identity", file: `data:image/png;base64,${IDENTITY}` }] });
+    expect(pictureMakes()[0]!.body).toMatchObject({ job: "picture", audience: "adult", shape: "landscape", intent: "new_shot", description: "she waves at the sea", inputs: [{ role: "identity", file: `data:image/png;base64,${IDENTITY}` }] });
     expect(pictureMakes()[0]!.body).not.toHaveProperty("model");
     expect(pictureMakes()[0]!.body).not.toHaveProperty("size");
     const [first, second] = clipMakes();
     expect(first!.body).toHaveProperty("inputs");
     expect(second!.body).toMatchObject({ start_picture: `data:image/png;base64,${png}`, intent: "derived_start" });
-    expect(second!.body).not.toHaveProperty("inputs");
+    expect(second!.body).toHaveProperty("inputs");   // the same inputs ride the resend (spec-v0.1.448)
   });
   test("a picture the gate withholds ends the request with the plain line, and nothing else is tried", async () => {
     clipAnswers = [needs, clipOk]; withheld = true;
@@ -91,7 +91,7 @@ describe("needs_start_picture", () => {
   });
   test("a resend that already carries the derived start is never derived again", async () => {
     clipAnswers = [needs];
-    expect(await submitVideoViaDoor(body({ identity_image: undefined, image: png, derived_start: true }), actor)).toBeNull();
+    expect(await submitVideoViaDoor(body({ image: png, derived_start: true }), actor)).toBeNull();
     expect(pictureMakes()).toHaveLength(0);
   });
   test("only the typed answer starts a derivation: any other refusal goes back to the old door", async () => {
@@ -122,5 +122,15 @@ describe("needs_start_picture", () => {
     await expect(submitVideoViaDoor(body(), actor, (image) => kept.push(image))).rejects.toMatchObject({ code: "queue_full" });
     expect(kept).toEqual([png]);
     expect(pictureMakes()).toHaveLength(1);
+  });
+  test("a typed refusal of the picture job (422, no likeness-keeping model) ends the request with the Stack's plain line, never a words-only picture", async () => {
+    clipAnswers = [needs];
+    const wrap = async (input: string | URL | Request, init?: RequestInit) => {
+      if (new URL(String(input), "http://stack.test").pathname === "/stack/v1/jobs/make" && JSON.parse(String(init?.body)).job === "picture") return json({ code: "input_not_supported", line: "No picture model on this computer can keep a person's likeness yet." }, 422);
+      return answer(input, init);
+    };
+    __setPicturesFetchForTests(wrap as unknown as typeof fetch);
+    await expect(submitVideoViaDoor(body(), actor)).rejects.toMatchObject({ code: "start_picture_failed", message: "No picture model on this computer can keep a person's likeness yet." });
+    expect(clipMakes()).toHaveLength(1);
   });
 });

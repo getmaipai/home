@@ -243,7 +243,8 @@ export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; 
     forgetMediaRefusal("video");
     return { ok: true, job: result.id, part: result.made_with?.part ?? null };
   }
-  if (res.status === 409) {
+  // A typed refusal (code and line) is a 409, or a 422 for `needs_start_picture` (spec-v0.1.448); a 422 without a code is the engine's validation and is thrown below.
+  if (res.status === 409 || res.status === 422) {
     const refusal = await res.clone().json().catch(() => null) as StackMakeRefusalRead | null;
     if (refusal && typeof refusal.code === "string" && typeof refusal.line === "string") return { ok: false, refusal };
   }

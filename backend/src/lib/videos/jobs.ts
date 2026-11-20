@@ -308,7 +308,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
-    const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); delete (storedBody as { identity_image?: string }).identity_image; persistVideoJob(job); } };
+    const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); persistVideoJob(job); } };
     const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept, () => explicitlyStopped.has(job.id) || (job.state as string) === "cancelled") : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job;

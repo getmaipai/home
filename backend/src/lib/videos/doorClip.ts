@@ -61,7 +61,7 @@ export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onD
       if (isNeedsStartPicture(made.refusal) && actor && body.identity_image && !body.derived_start) {
         const derived = await deriveStartPicture(actor, body, made.refusal, isStopped);
         onDerived?.(derived);   // kept on the job at once: a hold after this resend never derives a second picture
-        const resend = clipRequestFor({ ...body, image: derived, identity_image: undefined, derived_start: true });
+        const resend = clipRequestFor({ ...body, image: derived, derived_start: true });
         // A queue or memory answer is thrown as the old door throws it (the job holds, and the derived picture is already kept); any other failure here ends the request: the picture is never swapped for the old door's start.
         const again = resend ? await makeClip(resend).catch((error: unknown) => { if (error instanceof StackVideoError && ["queue_full", "no_memory", "out_of_memory", "memory_cancelled"].includes(String(error.code))) throw error; throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE); }) : null;
         if (!again || !again.ok) throw new StackVideoError(422, "start_picture_failed", START_PICTURE_FAILED_LINE);
