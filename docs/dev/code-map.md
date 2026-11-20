@@ -482,7 +482,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/appHelperInstall.ts` | helperScriptPath, canInstallHelper, installLogPath, installHelper |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
-| `backend/src/lib/apps.ts` | registerAppData, settingsAreaProblems, sidebarFor, headerFor, appPackageProblems, appVisibleTo |
+| `backend/src/lib/apps.ts` | registerAppData, settingsAreaProblems, appLoadProblems, sidebarFor, headerFor, appPackageProblems |
 | `backend/src/lib/artifacts.ts` | toArtifact, createArtifact, updateArtifact, getArtifactRow, currentArtifactRow, deleteArtifactsForTurns |
 | `backend/src/lib/askForm.ts` | ASK_FORM_TTL_MS, ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues |
 | `backend/src/lib/askNames.ts` | subjectsForTurn, answerWhoTurn, NO_ASK_APPEND, askAppendFor |
@@ -1050,7 +1050,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
 | `backend/src/lib/placement.ts` | defaultModelBytes, minimum, checkPlacement |
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, homeOrAway, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable |
-| `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
+| `backend/src/lib/plugins.ts` | almanacHostInputs, bundledPackageIds, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
 | `backend/src/lib/prefixPrewarm.ts` | prewarmFailureReason, notePrefix, prewarmPrefix, prewarmConversation, rewarmConversation, prewarmPrefixHit |
 | `backend/src/lib/privacy.ts` | platformConnections, pluginConnections, offlinePluginNames, privacyConnections, privacyPageData |
