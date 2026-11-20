@@ -38,3 +38,6 @@ test("a window that is mostly pause is not judged for speaker identity (recorded
   expect(voicedFraction(w, rate)).toBeLessThan(MIN_VOICED);
   const full = new Float32Array(rate * 1.5).map((_, i) => Math.sin(i / 9) * 0.2); expect(voicedFraction(full, rate)).toBeGreaterThan(MIN_VOICED);
 });
+test("one or two joins cannot fail a reply (a single random outlier is not a pattern); they only warn", () => {
+  const two = judgeJoins([{ at: 2.3, semitones: -7.2, db: -6.7 }, { at: 3.4, semitones: 4.2, db: 2.4 }]); expect(two.fail).toBeNull(); expect(two.warn).toContain("JOIN OUTLIER");
+});

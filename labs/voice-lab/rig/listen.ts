@@ -51,18 +51,19 @@ type Rec = { firstAt: number; turn: number; kind: string; heard: boolean; userEn
 async function conversation(run: number) {
   const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true }));
   const T0 = performance.now(); const rel = () => performance.now() - T0;
-  const gate = new JitterGate(); let queue = new Float32Array(0), qLen = 0, playhead = 0, speaking = false, stopWordAt = -1, stoppedTurn = false, turn = 0, replyText = "", paused = false;
+  const gate = new JitterGate(); let queue = new Float32Array(0), qLen = 0, playhead = 0, speaking = false, stopWordAt = -1, stoppedTurn = false, turn = 0, replyText = "", chunkTexts: string[] = [], paused = false;
   let outAll = new Float32Array(24000 * 60 * 6), outLen = 0; let chunkStarts = new Map<number, number>(); const chunkOut = new Map<number, number>();
   let firstFrameAt = 0, lastFrameAt = 0; const events: Array<{ t: string; at: number; turn?: number }> = []; let curSounds: Array<{ tag: string; chunk: number; atMs: number; ms: number }> = []; let lastNowQueued = 0;
   ws.onmessage = (e) => {
     if (typeof e.data === "string") { const j = JSON.parse(e.data);
       if (["stop", "final", "reply_final", "pause", "error"].includes(j.t)) events.push({ t: j.t, at: rel(), turn: j.turn });
       if (j.t === "reply_final") replyText = j.text ?? "";
+      if (j.t === "chunk" && Number.isInteger(j.chunk)) chunkTexts[j.chunk] = String(j.text ?? "");
       if (j.t === "sound") curSounds.push({ tag: j.tag, chunk: j.chunk, atMs: j.atMs, ms: j.ms });
       if (j.t === "pause") paused = true; if (j.t === "resume") paused = false;
       if (j.t === "stop") { const plan = stopPlan(queue.subarray(0, qLen), playhead, 24000); stopWordAt = rel() + plan.waitMs; stoppedTurn = true; }
     } else { const buf = e.data as ArrayBuffer, dv = new DataView(buf); const tn = dv.getUint32(0, true), idx = dv.getUint16(4, true);
-      if (tn !== turn) { turn = tn; queue = new Float32Array(24000 * 120); qLen = 0; playhead = 0; chunkStarts = new Map(); stoppedTurn = false; stopWordAt = -1; gate.reset(performance.now()); curSounds = []; replyText = ""; firstFrameAt = 0; speaking = false; }
+      if (tn !== turn) { turn = tn; queue = new Float32Array(24000 * 120); qLen = 0; playhead = 0; chunkStarts = new Map(); stoppedTurn = false; stopWordAt = -1; chunkTexts = []; gate.reset(performance.now()); curSounds = []; replyText = ""; firstFrameAt = 0; speaking = false; }
       if (stoppedTurn) return; const pcm = new Int16Array(buf, 8); if (!chunkStarts.has(idx)) chunkStarts.set(idx, qLen);
       for (let i = 0; i < pcm.length; i++) queue[qLen + i] = pcm[i]! / 32768; qLen += pcm.length; gate.noteArrival(performance.now(), pcm.length / 24000); if (!firstFrameAt) firstFrameAt = rel(); lastFrameAt = rel(); speaking = true; }
   };
@@ -98,7 +99,7 @@ async function conversation(run: number) {
     const outStart = outLen; let silentTicks = 0; const maxMs = 60000; const t1 = performance.now();
     while (performance.now() - t1 < maxMs) { await tick(); const done = events.slice(evStart).some((e) => e.t === "reply_final") && playhead >= qLen && qLen > 0 && !inter.some((i) => !(i as any).done); if (done || (stoppedTurn && rel() > stopWordAt + 600 && !inter.some((i) => !(i as any).done))) { if (++silentTicks > 25) break; } else silentTicks = 0; }
     ws.send(JSON.stringify({ t: "played_end", turn })); await runFor(300);
-    recs.push({ firstAt: speakAt, turn, kind: t.kind, heard: firstFrameAt > 0 && turn !== turnBefore, userEndAt: endAt, replyStartOut: outStart, replyEndOut: outLen, text: replyText, stops: events.slice(evStart).filter((e) => e.t === "stop").map((e) => e.at), sounds: curSounds.map((s) => ({ tag: s.tag, outAt: (chunkOut.get(turn * 1000 + s.chunk) ?? outStart) + s.atMs * 24, ms: s.ms })), phraseOut: [...chunkStarts.keys()].filter((i) => i > 0).map((i) => chunkOut.get(turn * 1000 + i) ?? -1).filter((x) => x >= 0), interjections: inter.map((i: any) => ({ say: i.say, expect: i.expect, atRel: i.startedAt ?? -1, lateMs: i.lateMs ?? 0 })), stopped: stoppedTurn });
+    recs.push({ firstAt: speakAt, turn, kind: t.kind, heard: firstFrameAt > 0 && turn !== turnBefore, userEndAt: endAt, replyStartOut: outStart, replyEndOut: outLen, text: replyText || chunkTexts.filter(Boolean).join(" "), stops: events.slice(evStart).filter((e) => e.t === "stop").map((e) => e.at), sounds: curSounds.map((s) => ({ tag: s.tag, outAt: (chunkOut.get(turn * 1000 + s.chunk) ?? outStart) + s.atMs * 24, ms: s.ms })), phraseOut: [...chunkStarts.keys()].filter((i) => i > 0).map((i) => chunkOut.get(turn * 1000 + i) ?? -1).filter((x) => x >= 0), interjections: inter.map((i: any) => ({ say: i.say, expect: i.expect, atRel: i.startedAt ?? -1, lateMs: i.lateMs ?? 0 })), stopped: stoppedTurn });
     await runFor(700);
   }
   ws.close(); return { recs, out: outAll.subarray(0, outLen), events, T0 };
