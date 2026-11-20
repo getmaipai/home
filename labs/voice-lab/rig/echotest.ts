@@ -39,7 +39,7 @@ async function one(run: number, gain: number, delayMs: number) {
   ws.onmessage = (e) => {
     if (typeof e.data === "string") { const j = JSON.parse(e.data);
       if (["stop", "pause", "duck", "final", "reply_final", "error"].includes(j.t) || (j.t === "state")) ev.push({ t: j.t === "state" ? "state:" + j.state : j.t, at: rel() });
-      if (j.t === "stop") { const a = flat(); const target = wordEnd(a, playhead, 24000); stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopAt = rel(); stopped = true; }
+      if (j.t === "stop" && (userStartAt < 0 || stopWordAt >= 0 || rel() < userStartAt)) { /* only the first stop after the person starts counts for the timing */ } if (j.t === "stop" && !(stopWordAt >= 0 && userStartAt >= 0)) { const a = flat(); const target = wordEnd(a, playhead, 24000); stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopAt = rel(); stopped = true; }
       if (j.t === "pause") paused = true; if (j.t === "resume") paused = false;
       if (j.t === "reply_final") replyFinished = true;
     } else { const buf = e.data as ArrayBuffer, dv = new DataView(buf); const tn = dv.getUint32(0, true), idx = dv.getUint16(4, true);

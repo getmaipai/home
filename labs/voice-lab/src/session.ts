@@ -171,7 +171,7 @@ export class VoiceSession {
     const audio = Float32Array.from(this.cutInSamples);
     let text = ""; try { text = await this.transcribeFn(encodeWav(audio), this.abort?.signal); } catch {}
     const decision = judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
-    if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)}`);
+    if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
     for (const command of this.tm.cutTranscript(text, decision)) this.command(command);
     if (decision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
   }
