@@ -113,6 +113,17 @@ User-facing routes registered by the Home shell and package page JSON files. Dyn
 | `/settings/home` | LegacySettingsRedirect | Settings | Card, List, Button | Shell route. |
 | `/settings/account` | LegacySettingsRedirect | Settings | Card, List, Button | Shell route. |
 | `/customize` | CustomizeRedirect | Settings | Card, List, Button | Shell route. |
+| `/apps/video/from-picture` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/video/animate` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/video/trim` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/video/new-uploads` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/video/channels` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/video/categories` | LegacyCreateRedirect | Video | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/image/characters` | LegacyImageCastRedirect | Image | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/image/places` | LegacyImageCastRedirect | Image | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/image/props` | LegacyImageCastRedirect | Image | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/image/productions` | LegacyImageCastRedirect | Image | Card, List, Button | Shell route: the old address redirects. |
+| `/apps/image/character-sheet` | LegacyImageCastRedirect | Image | Card, List, Button | Shell route: the old address redirects. |
 | `/apps/audio/like-this` | MusicLikeThisPage | Music | Card, List, Button | Shell route. |
 | `/apps/news/discuss` | NewsDiscussPage | News | Card, List, Button | Shell route. |
 | `/companions` | CompanionsPage | Companions | Card, List, Button | Shell route. |
@@ -853,6 +864,61 @@ Route manifest used by the scripted capture. `auth: none` means the signed-out s
   {
     "slug": "settings-advanced",
     "path": "/settings/advanced",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-from-picture",
+    "path": "/apps/video/from-picture",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-animate",
+    "path": "/apps/video/animate",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-trim",
+    "path": "/apps/video/trim",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-new-uploads",
+    "path": "/apps/video/new-uploads",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-channels",
+    "path": "/apps/video/channels",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-video-categories",
+    "path": "/apps/video/categories",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-image-characters",
+    "path": "/apps/image/characters",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-image-places",
+    "path": "/apps/image/places",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-image-props",
+    "path": "/apps/image/props",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-image-productions",
+    "path": "/apps/image/productions",
+    "auth": "sage"
+  },
+  {
+    "slug": "apps-image-character-sheet",
+    "path": "/apps/image/character-sheet",
     "auth": "sage"
   }
 ]
