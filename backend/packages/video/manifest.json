@@ -65,22 +65,22 @@
           "mode": "play",
           "pages": [
             "index",
-            "clips-feed"
+            "clips-feed",
+            "library",
+            "clips",
+            "drafts"
           ]
         },
         {
-          "id": "play-library",
+          "id": "play-watch",
           "mode": "play",
-          "title": "Library",
+          "title": "Watch",
           "pages": [
-            "library",
             "watch-later",
             "liked",
             "history",
             "family-picks",
-            "playlists",
-            "clips",
-            "drafts"
+            "playlists"
           ]
         },
         {

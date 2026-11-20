@@ -342,16 +342,20 @@ describe("Create is adult-only; Browse is unchanged", () => {
   test("the create group, the Create header mode and the three pages are gone below adult", async () => {
     const { adult, teen, child } = await household();
     const adultApp = await appRow(adult.client);
-    expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover", "create-make", "create-edit"]);
+    expect(adultApp.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-watch", "play-discover", "create-make", "create-edit"]);
     const adultCreatePages = adultApp.sidebar.groups.filter((g: { id: string }) => g.id.startsWith("create")).flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page));
     for (const page of ["create", "studio"]) expect(adultCreatePages).toContain(page);
-    // My clips sits under Browse in the Library group, for adults.
-    expect(adultApp.sidebar.groups.find((g: { id: string }) => g.id === "play-library").pages.map((p: { page: string }) => p.page)).toContain("clips");
+    // VF-IA-03: the top group is Home, Clips, All videos, then (adults) My clips and Unfinished; one "Watch" heading holds the five watching pages; Discover stays its own group below it.
+    const adultGroups = adultApp.sidebar.groups as Array<{ id: string; title?: string; pages: Array<{ page: string }> }>;
+    expect(adultGroups.find((g) => g.id === "play")!.pages.map((p) => p.page)).toEqual(["index", "clips-feed", "library", "clips", "drafts"]);
+    expect(adultGroups.find((g) => g.id === "play-watch")).toMatchObject({ title: "Watch" });
+    expect(adultGroups.find((g) => g.id === "play-watch")!.pages.map((p) => p.page)).toEqual(["watch-later", "liked", "history", "family-picks", "playlists"]);
+    expect(adultGroups.find((g) => g.id === "play-discover")!.pages.map((p) => p.page)).toEqual(["new-uploads", "channels", "categories"]);
     expect(adultApp.header.modes.map((m: { id: string }) => m.id)).toEqual(["play", "create"]);
     for (const other of [teen, child]) {
       const row = await appRow(other.client);
-      expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover"]);
-      // Family Picks is in the play-library group since 09cddba74 (VIDEO-LD-04, 2026-11-13); the list is exact on purpose.
+      expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-watch", "play-discover"]);
+      // A child sees Home, Clips, All videos, then Watch (five pages) and Discover; no My clips or Unfinished. The list is exact on purpose.
       expect(row.sidebar.groups.flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page))).toEqual(["index", "clips-feed", "library", "watch-later", "liked", "history", "family-picks", "playlists", "new-uploads", "channels", "categories"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
       // Every Create page, including the coming-soon rows, is adult-only: a teen and a child get 404.
