@@ -396,12 +396,12 @@ describe("refusals and access", () => {
     });
   });
 
-  test("the film page's bars: Render film, the voiced offer, Stop and Resume bind one-row scopes, are not sticky yet (the phone scroller is taller than the screen, so a sticky bar still reaches under the bottom bar), and the three offers put their line in `note` so it never disables the button", async () => {
+  test("the film page's bars: Render film, the voiced offer, Stop and Resume bind one-row scopes, are sticky above the phone's bottom bar (kit 708 fits the page to the screen), and the three offers put their line in `note` so it never disables the button", async () => {
     const page = JSON.parse((await import("node:fs")).readFileSync("packages/video/pages/film-maker.json", "utf8")) as { body: Array<Record<string, any>> };
     const bars = page.body.filter((node) => node.type === "action_bar");
     expect(bars.map((bar) => bar.bind.params.scope)).toEqual(["render-plan", "film-voiced", "film-stop", "film-resume"]);
     expect(bars.map((bar) => bar.primary.action.call.target.split("/").pop())).toEqual(["film-finish", "film-voiced-preview", "film-cancel", "film-resume"]);
-    expect(bars.every((bar) => bar.sticky === false)).toBe(true);
+    expect(bars.every((bar) => bar.sticky !== false)).toBe(true);
     // a `reason` disables the button: only the Render film bar has one; the offers use `note`
     expect(bars.map((bar) => bar.reason ?? null)).toEqual(["reason", null, null, null]);
     expect(bars.map((bar) => bar.note ?? null)).toEqual([null, "reason", "reason", "reason"]);
