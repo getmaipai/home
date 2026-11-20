@@ -46,7 +46,8 @@ import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { startSwap } from "@/lib/videos/swapStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { FILM_PAGE_ACTIONS, filmPageAction } from "@/lib/films/pageFilm";
-import { deleteSavedTemplate, renameSavedTemplate, shareSavedTemplate, SAVED_NOT_FOUND_LINE } from "@/lib/media/savedTemplateActions";
+import { deleteSavedTemplate, renameSavedTemplate, saveTemplate, shareSavedTemplate, SAVED_NOT_FOUND_LINE } from "@/lib/media/savedTemplateActions";
+import { templateNameFromWords } from "@/lib/media/templateName";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
@@ -337,13 +338,20 @@ export function createMediaAppRoutes(appId: MediaAppId) {
 
   // TEMPLATE-02 pages: the Templates page's Share with home, Stop sharing, Rename and Delete for a template the person saved. The same functions the /api/media-templates routes call
   // (lib/media/savedTemplateActions.ts): owner only, a child cannot share, a locked template cannot be shared, a miss is the plain "isn't available any more" line.
-  for (const name of ["template-share", "template-unshare", "template-rename", "template-delete"] as const) {
+  for (const name of ["template-share", "template-unshare", "template-rename", "template-delete", "template-save"] as const) {
     routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
       const person = c.get("person");
       if (appId !== "video") return next();
       if (!appRouteAllowed(person, appId, "actions", name)) return next();
       const body = await jsonBody(c);
       const id = typeof body.id === "string" ? body.id : "";
+      // "Save as a template" on a finished clip: saved at once under the clip's first words (ruling 2026-11-20); rename it later on the Templates page.
+      if (name === "template-save") {
+        const job = id ? getVideoJobFor(person, id) : null;
+        if (!job) return c.json({ error: SAVED_NOT_FOUND_LINE, code: "gone" }, 404);
+        const saved = await saveTemplate(person, { source: { kind: "clip", id: job.id }, title: templateNameFromWords(job.prompt) });
+        return saved.ok ? c.json({ ok: true as const, id: saved.template.id, line: `Saved as ${saved.template.title}` }, 200) : c.json({ error: saved.line, code: saved.code }, saved.status as never);
+      }
       if (name === "template-delete") return deleteSavedTemplate(person, id) ? c.json({ ok: true as const }, 200) : c.json({ error: SAVED_NOT_FOUND_LINE, code: "gone" }, 404);
       const done = name === "template-rename" ? renameSavedTemplate(person, id, typeof body.name === "string" ? body.name : "") : shareSavedTemplate(person, id, name === "template-share");
       return done.ok ? c.json({ ok: true as const }, 200) : c.json({ error: done.line, code: done.code }, done.status as never);

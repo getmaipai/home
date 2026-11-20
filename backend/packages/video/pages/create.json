@@ -414,6 +414,20 @@
               }
             },
             {
+              "label": "Save as a template",
+              "icon": "bookmark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/template-save",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  },
+                  "success_label": "Saved as {template_name}"
+                }
+              }
+            },
+            {
               "label": "Make it Max",
               "icon": "sparkles",
               "starts": "video",

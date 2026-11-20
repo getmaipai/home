@@ -16,6 +16,7 @@ import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { videoJobLockItem } from "@/lib/videos/lock";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import type { PersonRow } from "@/types";
+import { templateNameFromWords } from "./templateName";
 import { recordOf, visibleRows, type Row, type SavedKind, type VideoTemplateSettingsRow } from "./savedTemplates";
 
 export type SaveSource = { kind: "clip" | "picture"; id: string };

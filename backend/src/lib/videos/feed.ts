@@ -18,6 +18,7 @@ import { audienceBand } from "@/lib/audience";
 import { ceilingFor } from "@/lib/filter/ceiling";
 import { getStamp, stampAllowed } from "@/lib/filter/stamps";
 import { clipFindingLine, type ClipFinding } from "@/lib/videos/frameCheck";
+import { templateNameFromWords } from "@/lib/media/templateName";
 import type { PersonRow } from "@/types";
 
 /** The newest rows the feed shows. My clips is the library of everything. */
@@ -77,6 +78,7 @@ export function feedRowOf(person: PersonRow, job: VideoJob, favorites: ReadonlyS
   return {
     id: job.id,
     prompt: job.prompt,
+    template_name: templateNameFromWords(job.prompt),
     tags,
     references: job.request.source_file_id ? [{ label: "Start frame", thumb: `/api/files/${encodeURIComponent(job.request.source_file_id)}/thumb?w=320` }] : [],
     status: STATUS[job.state],

@@ -63,7 +63,7 @@ describe("scope feed: the person's own clips in the result_feed shape", () => {
     const { adult, row } = await household();
     const { jobId, fileId } = await makeClip(adult.client, row("Marlow"), { prompt: BOAT, orientation: "portrait", look: "anime", recipe: "handheld", seconds: 5 });
     const [first] = await data(adult.client, { scope: "feed" });
-    expect(Object.keys(first!).sort()).toEqual(["camera", "can_hide", "can_mark", "can_unmark", "created_at", "error", "favorite", "height", "id", "kind", "look", "orientation", "percent", "phase", "prompt", "queue_position", "references", "seconds", "src", "start_frame", "started_at", "state", "status", "still", "tags", "tier", "width"]);
+    expect(Object.keys(first!).sort()).toEqual(["camera", "can_hide", "can_mark", "can_unmark", "created_at", "error", "favorite", "height", "id", "kind", "look", "orientation", "percent", "phase", "prompt", "queue_position", "references", "seconds", "src", "start_frame", "started_at", "state", "status", "still", "tags", "template_name", "tier", "width"]);
     expect(first).toMatchObject({ id: jobId, prompt: BOAT, status: "ready", state: "done", percent: 100, phase: null, queue_position: null, error: null, favorite: false, orientation: "portrait", look: "anime", camera: "handheld", tier: "standard", references: [], start_frame: "" });
     expect(first!.src).toBe(`/api/videos/jobs/${jobId}/files/${fileId}`);
     expect(first!.tags.slice(0, 3)).toEqual(["Anime", "Handheld", "Standard"]);
@@ -450,13 +450,13 @@ describe("the Create feed's clip menu (VF-EDIT-04)", () => {
     const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Row> };
     const feed = page.body[page.body.length - 1]!.children[0];
     const labels = feed.actions.map((action: { label: string }) => action.label);
-    expect(labels.slice(0, 6)).toEqual(["Remove lock", "Lock", "Another take", "Edit and make again", "Open in Studio", "How it was made"]);
+    expect(labels.slice(0, 7)).toEqual(["Remove lock", "Lock", "Another take", "Edit and make again", "Open in Studio", "How it was made", "Save as a template"]);
     expect(labels).toEqual(expect.arrayContaining(["Make it vertical", "Sharpen 2x", "Spatial sound", "Next shot", "Extend", "Colorize", "Hide or show again"]));
     expect(feed.actions.slice(0, 2).map((action: { show_when?: string }) => action.show_when)).toEqual(["can_unmark", "can_mark"]);
     // VF-EDIT-04: the six first-level items stay ungrouped; everything else opens from the one "Change this clip" submenu.
     const grouped = feed.actions.filter((action: { group?: string }) => action.group);
-    expect(feed.actions.slice(0, 6).every((action: { group?: string }) => !action.group)).toBe(true);
-    expect(grouped.length).toBe(feed.actions.length - 6);
+    expect(feed.actions.slice(0, 7).every((action: { group?: string }) => !action.group)).toBe(true);
+    expect(grouped.length).toBe(feed.actions.length - 7);
     expect(new Set(grouped.map((action: { group: string }) => action.group))).toEqual(new Set(["Change this clip"]));
   });
 });
