@@ -119,6 +119,18 @@ export class VoiceSession {
     this.metrics = { early_start: "used", draft: "used", failure: "none", ok: false, stream_draft: "started" }; this.metricsWritten = false; this.metrics.t_check = this.metricNow();
     this.streamDraft = norm(text); this.command({ type: "start_reply_held", transcript: text, at: now, stream: true });
   }
+  /** PREFILL DURING SPEECH: every ~450 ms while the person talks, read what they have said so far (minus the last, maybe half-heard word) and let the chat model read the prompt with it and keep that work (cache only; it writes nothing that is ever spoken). At commit only the last few tokens are new. Cancelled the instant the real request starts; never blocks it. */
+  private prefill = Bun.env.LAB_PREFILL === "1"; private prefillBusy = false; private prefillAt = 0; private prefillAbort: AbortController | null = null; private prefillCount = 0;
+  private maybePrefill(now: number) {
+    if (!this.prefill || this.prefillBusy || this.held || this.tm.state !== "user_speaking" || now - this.prefillAt < 450 || this.samples.length < 16000 * 1.2) return;
+    if (this.history.messages.at(-1)?.role === "user") return;
+    this.prefillBusy = true; this.prefillAt = now; const ac = new AbortController(); this.prefillAbort = ac; const snap = Float32Array.from(this.samples);
+    void (async () => { try {
+      const text = (await this.transcribeFn(encodeWav(snap), ac.signal)).trim(); const words = text.split(/\s+/).filter(Boolean); if (ac.signal.aborted || words.length < 3) return;
+      const partial = words.slice(0, -1).join(" "); await this.prewarmChatFn([...this.history.messages, { role: "user", content: datedUser(partial, new Date(), this.stamp) }], toolDefinitions, ac.signal); this.prefillCount++;
+    } catch {} finally { this.prefillBusy = false; if (this.prefillAbort === ac) this.prefillAbort = null; } })();
+  }
+  private cancelPrefill() { this.prefillAbort?.abort(); this.prefillAbort = null; }
   private maybeNod(now: number) {
     if (!this.nodEnabled || !this.nodClip || this.tm.state !== "maybe_done") return;
     if (!shouldNod({ enabled: true, turnSpeechMs: now - this.speechOrigin, silenceMs: this.tm.silenceMs(now), turnProbability: this.tm.turnProbability, sinceLastNodMs: now - this.lastNodAt, nodsThisTurn: this.nodsThisTurn, roll: this.nodRoll() })) return;
@@ -226,6 +238,7 @@ export class VoiceSession {
     if (this.checkControllers.get(revision) === controller) this.checkControllers.delete(revision);
   }
   private async reply(text: string, committed: boolean) {
+    this.cancelPrefill();
     if (!text.trim()) return;
     if (!Object.keys(this.metrics).length || this.metricsWritten) { this.metrics = { failure: "none", draft: "off", ok: false }; this.metricsWritten = false; }
     this.abort = new AbortController(); const signal = this.abort.signal; this.smileChunk = -1; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
@@ -357,6 +370,7 @@ export class VoiceSession {
       if (speech && this.streamDraft && this.tm.state === "user_speaking") this.command({ type: "cancel_held" });
       for (const c of this.tm.frame(speech, now)) this.command(c);
       this.maybeEarlyDraft(now);
+      this.maybePrefill(now);
       this.maybeNod(now);
     } else {
       this.trackEcho(frame);
@@ -397,6 +411,7 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
+        if (typeof j.values?.prefill === "boolean") this.prefill = j.values.prefill;
         if (typeof j.values?.stamp === "boolean") this.stamp = j.values.stamp;
         if (Number.isFinite(j.values?.firstWords)) this.firstWords = Math.max(0, Math.min(8, Math.floor(j.values.firstWords)));
         if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
