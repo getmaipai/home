@@ -172,3 +172,11 @@ test("ELEMENTS-HOME-02: rename changes the owner's own element, refuses an empty
   expect(refused.status).toBe(403);
   expect(((await refused.json()) as { error: string }).error).toContain("edited where that record lives");
 });
+
+test("ELEMENTS-HOME-02: the Rename page is reached by navigate state {id} and posts that id with the typed name (the kit reads page state since ui-v0.5.719)", () => {
+  const rename = JSON.parse(readFileSync(join(PACKAGES_DIR, "elements", "pages", "rename.json"), "utf8"));
+  expect(rename.body[0].submit.call).toMatchObject({ target: "/api/plugins/elements/actions/rename", args: { id: "{id}", name: "{prompt}" } });
+  const element = JSON.parse(readFileSync(join(PACKAGES_DIR, "elements", "pages", "element.json"), "utf8"));
+  const manage = element.body.find((block: { heading?: string }) => block.heading === "Manage");
+  expect(manage.row_actions[0].action.navigate).toEqual({ to: "/apps/elements/rename", state: { id: "{id}" } });
+});
