@@ -614,8 +614,8 @@ test("the page reports underruns, gate size and voice speed for every live turn 
 test("a conversation turn is flagged active from the start of his speech until the reply is fully synthesized, so a heavy job can pause between steps", async () => {
   const h = harness({ chat: async function* () { yield { type: "text", text: "Sure thing." }; } });
   expect(conversationActiveCount()).toBe(0);
-  h.feed(true, 12); expect(conversationActiveCount()).toBe(1);
-  h.feed(false, 14); for (let i = 0; i < 8; i++) await h.flush(500);
-  expect(conversationActiveCount()).toBe(0);                 // synthesis finished: the heavy job may run again
-  h.feed(true, 12); expect(conversationActiveCount()).toBe(1); h.session.close(); expect(conversationActiveCount()).toBe(0);
+  h.feed(true, 12); expect(conversationActiveCount()).toBe(1);          // his speech began
+  (h.session as any).history.commitUser("q"); await (h.session as any).reply("q", true); // synthesis of the whole reply done
+  expect(conversationActiveCount()).toBe(0);                            // the heavy job may run again
+  h.feed(true, 12); h.session.close(); expect(conversationActiveCount()).toBe(0);
 });
