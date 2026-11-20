@@ -23,3 +23,14 @@ test("desktop app helpers are never a GPU job; real engines and jobs are", () =>
   expect(isHotCommand("/usr/local/maipai-home/stack/data/engines/llama-server/b10797/llama-server --port 51700")).toBe(true);
   expect(isHotCommand("bun test tests/foo.test.ts")).toBe(false);
 });
+import { otherJobs, ownPids, type ProcRow } from "../src/gpuLoad";
+const LL = "/usr/local/maipai-home/stack/data/engines/llama-server/b10797/llama-server --port 9921";
+test("the lab's own llama-server at 60% GPU is not another job; a second llama-server with a different pid is", () => {
+  const rows: ProcRow[] = [{ pid: 100, ppid: 1, rss: 1e6, pcpu: 60, cmd: LL }, { pid: 101, ppid: 100, rss: 1e6, pcpu: 50, cmd: "child-of-llama --embed" }];
+  const own = ownPids(new Map([[100, 9921]]), rows);
+  expect(own.has(101)).toBe(true);
+  expect(otherJobs(rows, own)).toEqual([]);
+  const other = [...rows, { pid: 200, ppid: 1, rss: 1e6, pcpu: 60, cmd: LL.replace("9921", "51700") }];
+  const j = otherJobs(other, own, new Map([[200, 51700]]));
+  expect(j.length).toBe(1); expect(j[0]).toContain("pid=200"); expect(j[0]).toContain("port=51700");
+});

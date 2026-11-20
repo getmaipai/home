@@ -69,6 +69,10 @@ if (!quick) {
 { const { flakyVerdict } = await import("../src/flakyStatus"); const { statSync, readdirSync, readFileSync } = await import("node:fs"); const T = import.meta.dir + "/../tests";
   const newest = Math.max(...readdirSync(T).filter((f) => f.endsWith(".ts")).map((f) => statSync(`${T}/${f}`).mtimeMs)); let st = null; try { st = JSON.parse(readFileSync(import.meta.dir + "/../../../data-scratch/flaky-last.json", "utf8")); } catch {}
   const v = flakyVerdict(st, newest); line(v.ok, `tests are stable: ${v.why}`); }
+// 10 the busy detector cannot flag our own engines (they once aborted the baseline run)
+{ const { readProcs, ownPids, otherJobs } = await import("../src/gpuLoad"); const { rows, listeners } = await readProcs(); const own = ownPids(listeners, rows);
+  const loud = rows.map((r) => (own.has(r.pid) ? { ...r, pcpu: 100, rss: 20 * 1048576 } : r)).filter((r) => own.has(r.pid)); const flagged = otherJobs(loud, own, listeners);
+  line(listeners.size > 0 && flagged.length === 0, `busy detector ignores own engines: own pids ${[...own].join(",") || "none"} (ports ${[...listeners.values()].join(",") || "none up"}), flagged ${flagged.length ? flagged.join(" | ") : "none"}`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
