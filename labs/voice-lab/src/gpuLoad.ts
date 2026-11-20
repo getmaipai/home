@@ -5,7 +5,7 @@ export async function sampleGpu(): Promise<{ util: number; jobs: string }> {
     const a = Bun.spawn(["ioreg", "-r", "-c", "IOAccelerator", "-w0"], { stdout: "pipe", stderr: "ignore" }), b = Bun.spawn(["ps", "-Ao", "pcpu,command", "-r"], { stdout: "pipe", stderr: "ignore" });
     const [io, ps] = await Promise.all([new Response(a.stdout).text(), new Response(b.stdout).text()]);
     const util = Number(io.match(/"Device Utilization %"=(\d+)/)?.[1] ?? -1);
-    const jobs = ps.split("\n").slice(1, 60).filter((l) => { const cmd = l.trim().replace(/^\S+\s+/, "").slice(0, 140); return /(ltx|video-bench|comfy|diffus|mlx[_-]|llama-server|seedvr|liveportrait|ace-step|sam2)/i.test(cmd) && !/bun test|hygiene|feature-ledger|voice_server|rig\/|labs\/voice-lab|--port 99/.test(cmd) && Number(l.trim().split(/\s+/)[0]) > 30; }).slice(0, 2).map((l) => l.trim().replace(/\s+/g, " ").slice(0, 80)).join(" | ");
+    const jobs = ps.split("\n").slice(1, 60).filter((l) => { const cmd = l.trim().replace(/^\S+\s+/, "").slice(0, 140); return /(ltx|video-bench|comfy|diffus|mlx[_-]|llama-server|seedvr|liveportrait|ace-step|sam2|generate|upscale|render|train|bench)/i.test(cmd) && !/bun test|hygiene|feature-ledger|voice_server|rig\/|labs\/voice-lab|--port 99/.test(cmd) && Number(l.trim().split(/\s+/)[0]) > (/llama-server/.test(cmd) ? 40 : 10); }).slice(0, 2).map((l) => l.trim().replace(/\s+/g, " ").slice(0, 80)).join(" | ");
     return { util, jobs };
   } catch { return { util: -1, jobs: "" }; }
 }
