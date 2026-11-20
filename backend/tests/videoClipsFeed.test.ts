@@ -160,25 +160,25 @@ describe("scope short: the clips feed rows", () => {
     const { adult, child, teen, row } = await household();
     const { fileId } = await makeClip(adult.client, row("Marlow"));
     expect(shortClipRows(row("Sprout"))).toEqual([]);
-    // A clip with sound is not released to anyone whose ceiling is below X (its speech was not checked), so the shared clip never reaches the child or the teen.
+    // CLIP-AUDIENCE-LOCK-01 (owner ruling 2026-11-20): a clip with sound is not adult-only for its unchecked sound, so the shared ordinary clip reaches the child and the teen.
     await action(adult.client, "share-add", { id: fileId, person_id: child.id });
     await action(adult.client, "share-add", { id: fileId, person_id: teen.id });
-    expect(shortClipRows(row("Sprout"))).toEqual([]);
-    expect(shortClipRows(row("Nova"))).toEqual([]);
-    // A silent clip with a stored G stamp clears the child's G ceiling: it is shared, listed, and the first row says autoplay is off.
+    expect(shortClipRows(row("Sprout")).map((r) => r.id)).toEqual([fileId]);
+    expect(shortClipRows(row("Nova")).map((r) => r.id)).toEqual([fileId]);
+    // A silent clip with a stored G stamp clears the child's G ceiling too: it is shared, listed, and the first row says autoplay is off.
     const silent = silentClip(row("Marlow"));
     await action(adult.client, "share-add", { id: silent, person_id: child.id });
     await action(adult.client, "share-add", { id: silent, person_id: teen.id });
     const kid = shortClipRows(row("Sprout"));
     // Whatever the Library lists for the child is what the feed lists: nothing more.
     const library = await (await child.client.get("/api/library?type=video&origin=made")).json() as { items: Array<{ id: string }> };
-    expect(kid.map((r) => r.id)).toEqual(library.items.map((i) => i.id).filter((id) => id === silent));
+    expect([...kid.map((r) => r.id)].sort()).toEqual(library.items.map((i) => i.id).filter((id) => id === silent || id === fileId).sort());
     expect(kid.length).toBeGreaterThan(0);
     for (const r of kid) expect(r.prompt).toBeUndefined();
     expect(kid[0]!.autoplay).toBe(false);
     expect(kid.slice(1).some((r) => "autoplay" in r)).toBe(false);
     const teens = shortClipRows(row("Nova"));
-    expect(teens.map((r) => r.id)).toEqual([silent]);
+    expect([...teens.map((r) => r.id)].sort()).toEqual([fileId, silent].sort());
     for (const r of teens) { expect(r.prompt).toBeUndefined(); expect("autoplay" in r).toBe(false); }
   });
 
