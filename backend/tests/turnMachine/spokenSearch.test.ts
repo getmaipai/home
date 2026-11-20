@@ -19,7 +19,7 @@ import { SPOKEN_EVIDENCE_TOKENS_MAX, SPOKEN_SOURCES_MAX, SPOKEN_SOURCE_TEXT_CHAR
 
 let people: BenchPeople;
 
-// The stub's window stands in for a small chat model. It must hold the tools block (about 3,300 tokens
+// The stub's window stands in for a small chat model. It must hold the tools block (about 3,300 tokens, grown by the scene tool in DISMISS-01c, 7348bc029: 5120 no longer held it)
 // since WRITING-FORMATS-02) plus a written reply ceiling of 1,536, or THIN-3G drops the tools for the turn.
 beforeEach(() => {
   resetDb();
@@ -28,7 +28,7 @@ beforeEach(() => {
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
   __resetSearchCacheForTests();
-  __setChatWindowContextForTests(5120);
+  __setChatWindowContextForTests(9000);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });
