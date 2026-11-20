@@ -562,4 +562,14 @@ describe("a refused app raises one Repairs item", () => {
     await settle();
     expect(rows()).toHaveLength(0);
   });
+  test("only an owner or admin can read the item through Repairs", async () => {
+    installFixtureApp({ pages: badPage });
+    listApps({ role: "owner" } as PersonRow);
+    await settle();
+    const { client: ownerClient } = await owner();
+    const seen = (await (await ownerClient.get("/api/repairs")).json()) as Array<{ source: string; key: string }>;
+    expect(seen.some((issue) => issue.source === "apps" && issue.key === `app_refused:${ID}`)).toBe(true);
+    const teenClient = await teen(ownerClient);
+    expect((await teenClient.get("/api/repairs")).status).toBe(403);
+  });
 });

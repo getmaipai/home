@@ -119,7 +119,7 @@ function reportAppLoad(manifest: PackageManifest, problems: string[]): void {
   const key = `app_refused:${manifest.id}`;
   try {
     if (problems.length === 0) { resolveIssue(APPS_ISSUE_SOURCE, key); return; }
-    if (getPackageStatus(manifest.id).status !== "enabled") return;
+    if (getPackageStatus(manifest.id).status !== "enabled") { resolveIssue(APPS_ISSUE_SOURCE, key); return; }
     registerFixHandler(`apps.reload:${manifest.id}`, () => { loadCache.delete(manifest.id); loadApp(manifest.id); });
     void raiseIssue({
       source: APPS_ISSUE_SOURCE, key, severity: "error",
