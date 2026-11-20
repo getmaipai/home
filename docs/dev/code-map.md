@@ -1419,6 +1419,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/referenceVideo.ts` | FIRST_FRAME_SECONDS, REFERENCE_VIDEO_SECONDS, MAX_REFERENCE_PICTURES, REFERENCE_PROMPT_MAX, NO_DIALOGUE_SENTENCE, stripQuotedSpeech |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/slotBody.ts` | qualityOfSlotModel, videoBodyForSlot |
+| `backend/src/lib/videos/soundStampBackfill.ts` | backfillSoundOnlyClips |
 | `backend/src/lib/videos/spatialStart.ts` | startSpatialSound |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, START_PICTURE_MAX_SIDE, START_PICTURE_MAX_BYTES, pictureNeedsFit, fitPictureForStack |
 | `backend/src/lib/videos/stackClipCheck.ts` | checkClipFile |
