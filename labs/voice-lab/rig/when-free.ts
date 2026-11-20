@@ -4,7 +4,7 @@
 import { appendFileSync } from "node:fs";
 import { stopOwnMatching } from "../src/ownProcs";
 import { ensureChat } from "../src/engineGuard";
-import { sampleGpu, gpuClass, restingBaseline, FreeWindow } from "../src/gpuLoad";
+import { sampleGpu, gpuClass, FreeWindow } from "../src/gpuLoad";
 const W = "/Users/jessetorres/Developer/github.com/getmaipai/wt/home-brisk-panda-voice-lab/data-scratch"; const full = process.argv.includes("--full");
 const log = (o: object) => appendFileSync(`${W}/gpu-log.jsonl`, JSON.stringify({ at: new Date().toISOString(), ...o }) + "\n");
 const ownNice = async () => Number((await new Response(Bun.spawn(["ps", "-o", "nice=", "-p", String(process.pid)], { stdout: "pipe" }).stdout).text()).trim());
@@ -31,7 +31,7 @@ async function startRun() {
   });
 }
 while (true) {
-  const g = await sampleGpu(); if (!win.running) { utils.push(g.util); if (utils.length > 12) utils.shift(); } const free = gpuClass(g, win.running, restingBaseline(utils)) === "free"; const now = Date.now();
+  const g = await sampleGpu(); const free = gpuClass(g) === "free"; const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
   if (s.abort && child) { aborted = true; child.kill(); void stopOwnMatching(/rig\/(measure|echotest|listen|round1)\.ts/).then((r) => log({ event: "stopped-own", ...r })); log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }

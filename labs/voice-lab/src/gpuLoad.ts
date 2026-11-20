@@ -36,8 +36,9 @@ export async function sampleGpu(): Promise<{ util: number; jobs: string }> {
 /** Resting level of the machine (remote-desktop streaming alone holds about 30%, and it is not ours to stop): the low quartile of the last minute of samples, never above 40. Busy means clearly above that level. */
 export const BUSY_MARGIN = 40;
 export function restingBaseline(samples: number[]): number { const v = samples.filter((x) => x >= 0).sort((a, b) => a - b); return v.length === 0 ? 0 : Math.min(40, v[Math.floor((v.length - 1) / 4)]); }
-/** At rest (our own engines idle) "free" means the chip is clearly not above its resting level, whoever causes the load; process names only label. During a run our own engines raise utilization, so only another named GPU engine (by pid) counts: pass running=true. */
-export const gpuClass = (g: { util: number; jobs: string }, running = false, baseline = 30) => ((running || g.util < 0 ? g.jobs === "" : g.util <= baseline + BUSY_MARGIN) ? "free" : "shared");
+/** A run is valid when no other NAMED GPU engine (video, image, hub speech or chat; found by pid, ours excluded) is active. The owner's remote screen (screensharingd, Sunshine) is part of the machine, never a reason to wait: its use is recorded as a label by remoteScreenLabel. */
+export const gpuClass = (g: { util: number; jobs: string }, _running = false, _baseline = 30) => (g.jobs === "" ? "free" : "shared");
+export function remoteScreenLabel(rows: ProcRow[]): "remote screen active" | "quiet" { return rows.some((r) => /screensharingd|Sunshine|ScreenSharing/i.test(r.cmd) && r.pcpu > 15) ? "remote screen active" : "quiet"; }
 export async function waitForGpuFree(maxMs = 20 * 60_000, quietSamples = 3): Promise<boolean> { const t0 = performance.now(); let ok = 0; while (performance.now() - t0 < maxMs) { ok = gpuClass(await sampleGpu()) === "free" ? ok + 1 : 0; if (ok >= quietSamples) return true; await Bun.sleep(5000); } return false; }
 
 /** Tracks how long the GPU has been continuously free. A run may START only after `needMs` of continuous freedom, and is ABORTED (not failed) the moment another GPU job shows up. */

@@ -34,21 +34,13 @@ test("the lab's own llama-server at 60% GPU is not another job; a second llama-s
   const j = otherJobs(other, own, new Map([[200, 51700]]));
   expect(j.length).toBe(1); expect(j[0]).toContain("pid=200"); expect(j[0]).toContain("port=51700");
 });
-import { gpuClass } from "../src/gpuLoad";
-test("free means the chip is idle: a resident idle engine or a CPU-only python is free; 80% GPU with no named job is busy", () => {
+import { gpuClass, remoteScreenLabel } from "../src/gpuLoad";
+test("a run is valid when no other NAMED engine is active; the owner's remote screen never makes it shared and is only labelled", () => {
   const R = (pid: number, rss: number, pcpu: number, cmd: string): ProcRow => ({ pid, ppid: 1, rss, pcpu, cmd });
   expect(otherJobs([R(1, 14 * 1048576, 0.5, "/x/splash-chat/engine/splash-chat --port 51000")], new Set())).toEqual([]);
   expect(otherJobs([R(2, 1e6, 90, "host/.venv/bin/python scripts/feature-ledger.py")], new Set())).toEqual([]);
-  expect(gpuClass({ util: 30, jobs: "" })).toBe("free");           // remote-desktop streaming baseline
-  expect(gpuClass({ util: 80, jobs: "" })).toBe("shared");         // unnamed load still counts at rest
-  expect(gpuClass({ util: 90, jobs: "" }, true)).toBe("free");     // during a run our own engines raise it
-  expect(gpuClass({ util: 90, jobs: "pid=5 60% llama-server" }, true)).toBe("shared");
-});
-import { restingBaseline } from "../src/gpuLoad";
-test("the resting level (remote-desktop streaming about 30%) is the baseline; busy is clearly above it, and a long job cannot become the baseline", () => {
-  expect(restingBaseline([30, 31, 29, 33, 30, 32, 31, 30, 29, 31, 30, 32])).toBe(30);
-  expect(gpuClass({ util: 35, jobs: "" }, false, 30)).toBe("free");
-  expect(gpuClass({ util: 95, jobs: "" }, false, 30)).toBe("shared");
-  expect(restingBaseline([90, 91, 92, 90, 93, 91])).toBe(40);       // capped: a sustained job never raises the baseline
-  expect(gpuClass({ util: 90, jobs: "" }, false, 40)).toBe("shared");
+  expect(gpuClass({ util: 95, jobs: "" })).toBe("free");                              // remote screen at 95% GPU, no named engine
+  expect(gpuClass({ util: 20, jobs: "pid=5 60% llama-server" })).toBe("shared");      // a named engine counts at any utilization
+  expect(remoteScreenLabel([R(3, 1, 80, "/System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd")])).toBe("remote screen active");
+  expect(remoteScreenLabel([R(4, 1, 1, "/Applications/Sunshine.app/Contents/MacOS/Sunshine")])).toBe("quiet");
 });

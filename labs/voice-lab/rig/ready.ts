@@ -4,13 +4,13 @@ import { availableTags, pickSound, refusedSounds } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";
 import { machineBusy, labPriorities } from "./loadcheck";
-import { sampleGpu, gpuClass, waitForGpuFree } from "../src/gpuLoad";
+import { sampleGpu, gpuClass, waitForGpuFree, remoteScreenLabel, readProcs } from "../src/gpuLoad";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
 const quick = process.argv.includes("--quick"), RUNS = quick ? 5 : 10, TURNS = quick ? 4 : 10;
 const FIRST_SOUND_TARGET_MS = 1350, P90_LIMIT_MS = 2300, WORST_LIMIT_MS = 3500; // median 1.17 s, p90 1.93 s, worst about 2.6 s measured, plus 15 percent where the sample is stable // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
 // --wait-gpu-free: start only when no hub video job (or other GPU engine) is running; a run is valid for "ready for the owner" only if the GPU stayed free the whole time
 if (process.argv.includes("--wait-gpu-free")) { console.log("waiting for the GPU to be free of other jobs..."); if (!(await waitForGpuFree())) { console.log("NOT RUN: the GPU did not become free within 20 minutes (a hub video job is running)"); process.exit(4); } }
-const gpuAtStart = await sampleGpu();
+const gpuAtStart = await sampleGpu(); const screenAtStart = remoteScreenLabel((await readProcs()).rows);
 const secret = (await Bun.file(SECRET_FILE).text()).trim(), LAB = "127.0.0.1:9931";
 const results: Array<[boolean, string]> = []; const line = (ok: boolean, text: string) => { results.push([ok, text]); console.log(`${ok ? "PASS" : "FAIL"}  ${text}`); };
 const run = async (cmd: string[]) => { const p = Bun.spawn(cmd, { cwd: import.meta.dir + "/..", stdout: "pipe", stderr: "pipe" }); const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]); await p.exited; return out + "\n" + err; };
@@ -75,12 +75,12 @@ if (!quick) {
   line(listeners.size > 0 && flagged.length === 0, `busy detector ignores own engines: own pids ${[...own].join(",") || "none"} (ports ${[...listeners.values()].join(",") || "none up"}), flagged ${flagged.length ? flagged.join(" | ") : "none"}`); }
 { const { otherJobs, gpuClass: gc } = await import("../src/gpuLoad"); const R = (pid: number, rss: number, pcpu: number, cmd: string) => ({ pid, ppid: 1, rss, pcpu, cmd });
   const idleBig = otherJobs([R(1, 14 * 1048576, 1, "/x/splash-chat/engine/splash-chat --port 51000"), R(2, 1e6, 90, "host/.venv/bin/python scripts/feature-ledger.py")], new Set());
-  const ok = idleBig.length === 0 && gc({ util: 20, jobs: "" }) === "free" && gc({ util: 80, jobs: "" }) === "shared";
-  line(ok, `busy detector: idle 14 GB engine and a CPU-only python are not busy; 80% GPU with no named job is (flagged ${idleBig.length})`); }
+  const ok = idleBig.length === 0 && gc({ util: 95, jobs: "" }) === "free" && gc({ util: 20, jobs: "pid=5 60% llama-server" }) === "shared";
+  line(ok, `busy detector: idle 14 GB engine and a CPU-only python are not busy; a named engine is, remote-screen GPU use is not (flagged ${idleBig.length})`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");
 
-const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd, true) === "free" ? "GPU FREE" : "GPU SHARED"; console.log(`RUN CLASS: ${klass} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
+const gpuAtEnd = await sampleGpu(); const klass = gpuClass(gpuAtStart) === "free" && gpuClass(gpuAtEnd, true) === "free" ? "GPU FREE" : "GPU SHARED"; const screenAtEnd = remoteScreenLabel((await readProcs()).rows); console.log(`RUN CLASS: ${klass}, ${screenAtStart === "quiet" && screenAtEnd === "quiet" ? "quiet" : "remote screen active"} (start: ${gpuAtStart.util}% ${gpuAtStart.jobs || "no other GPU job"}; end: ${gpuAtEnd.util}% ${gpuAtEnd.jobs || "no other GPU job"}). Only a GPU FREE run counts as ready for the owner; a GPU SHARED run shows what a video job does to the conversation.`);
 const bad = results.filter(([ok]) => !ok).length; console.log(bad === 0 && klass === "GPU SHARED" ? "ALL PASS but the GPU was shared: not a valid ready run (rerun with --wait-gpu-free)" : bad === 0 ? (quick ? "QUICK PASS (fast loop only: the full run must also pass before the owner is told to test)" : "READY: all checks passed") : `NOT READY: ${bad} check(s) failed`);
 process.exit(bad ? 1 : 0);
