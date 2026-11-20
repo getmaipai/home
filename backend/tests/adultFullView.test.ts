@@ -75,7 +75,9 @@ describe("an adult clip, through Home's routes", () => {
     // The Stack redacts this job for anyone without the headers, so a done clip with files proves Home asked for the full view.
     const reads = stack.seen.filter(jobReads);
     expect(reads.length).toBeGreaterThan(3);
-    expect(reads.every((r) => r.full && r.status === 200)).toBe(true);
+    // Every read carries the full view. The receipt read (VF-RECEIPT-01) is best-effort: a fake Stack with no receipt answers 404 and Home reads that as "none", so only it may be non-200.
+    expect(reads.every((r) => r.full)).toBe(true);
+    expect(reads.filter((r) => !/\/receipt\.json$/.test(r.path)).every((r) => r.status === 200)).toBe(true);
     expect(reads.some(aClip)).toBe(true);
     expect(reads.some((r) => /poster\.jpg$/.test(r.path))).toBe(true);
     // Only the reads of the job carry the headers: the submit, the DELETE of the Stack's copy and the status list never do.
