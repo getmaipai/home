@@ -39,6 +39,8 @@ export interface AiChoice {
   name: string;
   rowIds: string[];
   recommended: boolean; current: boolean;
+  /** WAN-DEFAULT-01: the setup wizard starts this choice on although its plan row is optional (the card exists only where it is wanted). */
+  defaultOn?: boolean;
   state: "installed"|"installing"|"notInstalled"|"failed"; percent: number|null; failure: string|null;
   downloadBytes: number; installedBytes: number;
   /** Memory the model uses while it runs. An estimate (a share of its size on disk) until the Stack measures it. */
@@ -162,6 +164,8 @@ interface ChoiceSpec {
   row: DiskRow;
   current: boolean;
   recommended: boolean;
+  /** See AiChoice.defaultOn. */
+  defaultOn?: boolean;
   setting: { key: string; value: unknown } | null;
 }
 
@@ -187,6 +191,7 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
     name: copy.label,
     rowIds: rows.map((row) => row.id),
     recommended: spec.recommended,
+    ...(spec.defaultOn ? { defaultOn: true } : {}),
     current: spec.current,
     state: state.state,
     percent: state.percent,
@@ -333,7 +338,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const hasQuick = has("video");
         const hasDetailed = has("video-ltx25");
         const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
-        if (hasQuick && settings.householdHasMinors) specs.push({ id: "videos.quick", job: "videos", kind: "switch", row: rows.get("video")!, current: true, recommended: false, setting: null });
+        if (hasQuick && settings.householdHasMinors) specs.push({ id: "videos.quick", job: "videos", kind: "switch", row: rows.get("video")!, current: true, recommended: false, defaultOn: true, setting: null });
         // VIDEO-WAN-HIDE-01: LTX-2.5 is the adult video model at Standard and Boost alike, so it is in use whenever it is installed; the level setting only picks the default level.
         if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-ltx25")!, current: rowIsInstalled(rows.get("video-ltx25")!, components) || preferDetailed, recommended: true, setting: { key: "generation.video_tier", value: "boost" } });
         break;

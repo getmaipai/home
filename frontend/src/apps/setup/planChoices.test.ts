@@ -25,7 +25,8 @@ describe("setup jobs", () => {
     const picks = defaultPicks(jobs, plan);
     expect(picks.music!.on).toBe(false);
     expect(picks.picturesdetailed!.on).toBe(false);
-    expect(picks.videos).toEqual({ on: true, choiceId: "videos.quick" });
+    // VIDEO-WAN-HIDE-01 and WAN-DEFAULT-01: an adult-only home has no minors-only clip model on its card or in its defaults, and the licensed LTX-2.5 model starts off.
+    expect(picks.videos).toEqual({ on: false, choiceId: "videos.detailed" });
   });
 
   test("turning a job off drops its rows, and choosing Detailed videos swaps the row", () => {
@@ -67,5 +68,37 @@ describe("the hub's own parts in the wizard", () => {
     expect(rows.has("faces-finder")).toBe(true);
     expect(rows.has("ingredients-adapter")).toBe(false);
     for (const id of plan.default_selected) expect(rows.has(id)).toBe(true);
+  });
+});
+
+// WAN-DEFAULT-01: the minors-only silent video model is an optional plan row, so an adult-only home's wizard selection no longer holds it, and a home with a
+// child or teen still gets it through the card (the card exists only there and starts on).
+describe("the minors-only video row in the wizard (WAN-DEFAULT-01)", () => {
+  const settings = (householdHasMinors: boolean) => ({ pictureQuickModel: "ernie" as const, pictureDetailedEnabled: false, videoQuality: "quick" as const, musicEnabled: false, householdHasMinors });
+  const select = (plan: DiskPlan, householdHasMinors: boolean) => {
+    const cards = buildAiCards({ copy: fakeCopy, plan, components: null, settings: settings(householdHasMinors), freeBytes: null }).cards;
+    const jobs = setupJobs(cards, plan);
+    return selectedRows(jobs, plan, defaultPicks(jobs, plan));
+  };
+  const downloadBytes = (plan: DiskPlan, ids: ReadonlySet<string>) => plan.rows.filter((row) => ids.has(row.id) && !row.installed).reduce((sum, row) => sum + row.download_bytes, 0);
+
+  test("on every tier the plan itself no longer defaults the row, and an adult-only home's request list holds no such row", () => {
+    for (const [tier, plan] of Object.entries(plans)) {
+      const row = plan.rows.find((candidate) => candidate.id === "video");
+      if (!row) continue;
+      expect(row.need).toBe("optional");
+      expect(plan.default_selected).not.toContain("video");
+      expect(select(plan, false).has("video")).toBe(false);
+      expect(tier.length).toBeGreaterThan(0);
+    }
+  });
+  test("a home with a child or teen still selects it through the card, and the request list is exactly that much bigger", () => {
+    const plan = plans.p128!;
+    const adultOnly = select(plan, false), withMinor = select(plan, true);
+    expect(withMinor.has("video")).toBe(true);
+    expect([...withMinor].filter((id) => !adultOnly.has(id))).toEqual(["video"]);
+    const extra = downloadBytes(plan, withMinor) - downloadBytes(plan, adultOnly);
+    expect(extra).toBe(plan.rows.find((row) => row.id === "video")!.download_bytes);
+    expect(extra).toBeGreaterThan(20 * 1024 ** 3);
   });
 });

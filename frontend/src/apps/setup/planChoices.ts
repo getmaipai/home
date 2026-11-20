@@ -14,6 +14,8 @@ export interface SetupJob {
   hubPart: boolean;
   /** Why this part cannot be installed from the wizard (the adapter needs a Hugging Face token and an accepted licence); null when it can. */
   blocked: string | null;
+  /** WAN-DEFAULT-01: rows of choices the card starts on although the wizard does not list them (the minors-only video model, only on a card where a child or teen lives). Installed with the job, as the plan's default used to. */
+  defaultRows: string[];
 }
 export interface JobPick { on: boolean; choiceId: string }
 export type Picks = Partial<Record<AiJobId, JobPick>>;
@@ -29,7 +31,8 @@ export function setupJobs(cards: readonly AiCard[], plan: DiskPlan): SetupJob[] 
     if (!card || job === "wakeword" || options.length === 0) return [];
     const hubPart = HUB_PART_JOBS.has(job);
     const blocked = hubPart && options.length === 1 && options[0]!.state !== "installed" ? options[0]!.blockedReason : null;
-    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required"), hubPart, blocked }];
+    const defaultRows = card.choices.filter((choice) => choice.defaultOn === true && !options.some((option) => option.id === choice.id)).flatMap((choice) => choice.rowIds);
+    return [{ job, title: card.title, summary: card.summary, options, required: options.some((option) => rowOf(plan, specRow(option))?.need === "required"), hubPart, blocked, defaultRows }];
   });
 }
 
@@ -57,6 +60,7 @@ export function selectedRows(jobs: readonly SetupJob[], plan: DiskPlan, picks: P
     const pick = picks[job.job];
     const choice = job.options.find((option) => option.id === pick?.choiceId);
     if (pick?.on && choice) for (const id of choice.rowIds) if (isModel(id)) rows.add(id);
+    for (const id of job.defaultRows) if (isModel(id) && rowOf(plan, id)) rows.add(id);
   }
   return rows;
 }
