@@ -125,6 +125,9 @@ describe("Routes appearance", () => {
     ["/apps/video/animate", "/apps/video/create"],
     ["/apps/video/animate?start_frame=file-2", "/apps/video/create?start_frame=file-2"],
     ["/apps/video/trim?clip=file-3", "/apps/video/studio?clip=file-3"],
+    ["/apps/video/new-uploads", "/apps/video/library"],
+    ["/apps/video/channels", "/apps/video/library"],
+    ["/apps/video/categories", "/apps/video/library"],
   ])("the removed Video route %s opens Create or the Studio with its query kept", async (from, to) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {

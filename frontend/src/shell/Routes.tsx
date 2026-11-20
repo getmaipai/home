@@ -192,6 +192,12 @@ function LegacyCreateRedirect() {
   return <Navigate to={{ pathname: "/apps/video/create", search: location.search, hash: location.hash }} replace />;
 }
 
+/** VF-STUBS-01: the three "coming soon" Discover pages are gone; their old routes open the Library. */
+function LegacyLibraryRedirect() {
+  const location = useLocation();
+  return <Navigate to={{ pathname: "/apps/video/library", search: location.search, hash: location.hash }} replace />;
+}
+
 /** VF-IA-02 (a): Trim and join is the Studio (it already rendered the same timeline); its old route opens the Studio with the clip kept. */
 function LegacyStudioRedirect() {
   const location = useLocation();
@@ -561,6 +567,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route path="apps/video/from-picture" element={<LegacyCreateRedirect />} />
           <Route path="apps/video/animate" element={<LegacyCreateRedirect />} />
           <Route path="apps/video/trim" element={<LegacyStudioRedirect />} />
+          <Route path="apps/video/new-uploads" element={<LegacyLibraryRedirect />} />
+          <Route path="apps/video/channels" element={<LegacyLibraryRedirect />} />
+          <Route path="apps/video/categories" element={<LegacyLibraryRedirect />} />
           <Route path="apps/image/characters" element={<LegacyImageCastRedirect page="characters" />} />
           <Route path="apps/image/places" element={<LegacyImageCastRedirect page="places" />} />
           <Route path="apps/image/props" element={<LegacyImageCastRedirect page="props" />} />

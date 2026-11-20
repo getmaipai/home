@@ -84,16 +84,6 @@
           ]
         },
         {
-          "id": "play-discover",
-          "mode": "play",
-          "title": "Discover",
-          "pages": [
-            "new-uploads",
-            "channels",
-            "categories"
-          ]
-        },
-        {
           "id": "create-make",
           "mode": "create",
           "title": "Make",
@@ -262,30 +252,6 @@
         "nav": false,
         "kind": "schema",
         "module": "how-made"
-      },
-      {
-        "id": "new-uploads",
-        "label": "New uploads",
-        "icon": "sparkles",
-        "nav": false,
-        "kind": "schema",
-        "module": "new-uploads"
-      },
-      {
-        "id": "channels",
-        "label": "Channels",
-        "icon": "tv",
-        "nav": false,
-        "kind": "schema",
-        "module": "channels"
-      },
-      {
-        "id": "categories",
-        "label": "Categories",
-        "icon": "compass",
-        "nav": false,
-        "kind": "schema",
-        "module": "categories"
       },
       {
         "id": "talking-avatar",
