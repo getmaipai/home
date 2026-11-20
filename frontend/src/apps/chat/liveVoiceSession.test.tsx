@@ -665,6 +665,8 @@ describe("live voice session", () => {
   test("ECHO-GUARD-01: Home's own words coming back through the microphone are an echo; the person's words are not", () => {
     const spoken = "a soft boiled egg takes about six minutes in boiling water".split(" ");
     expect(isOwnEcho("takes about six minutes", spoken)).toBe(true); // in order, every word
+    expect(isOwnEcho("I'm so sorry.", ["Oh, I am so sorry."])).toBe(true); // contractions expand before matching
+    expect(isOwnEcho("that I’m sorry.", ["that I'm sorry you're the one"])).toBe(true); // curly and straight apostrophes match
     expect(isOwnEcho("Boiled egg takes about six", spoken)).toBe(true);
     expect(isOwnEcho("about six", spoken)).toBe(true); // two of her words
     expect(isOwnEcho("six about", spoken)).toBe(true); // in any order: the recognizer reorders words of a reply heard back
