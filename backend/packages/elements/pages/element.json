@@ -82,17 +82,22 @@
           "icon": "trash",
           "label": "Delete",
           "action": {
-            "call": {
-              "target": "/api/plugins/elements/actions/delete",
-              "method": "POST",
-              "args": {
-                "id": "{id}"
-              },
-              "success_label": "Deleted",
-              "fresh_confirm": {
-                "title": "Delete this element?",
-                "description": "Pictures and films that used it keep working.",
-                "action_label": "Delete"
+            "confirm": {
+              "prompt": "Delete this element? Pictures and films that used it keep working.",
+              "on_confirm": {
+                "call": {
+                  "target": "/api/plugins/elements/actions/delete",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  },
+                  "success_label": "Deleted",
+                  "then": {
+                    "navigate": {
+                      "to": "/apps/elements"
+                    }
+                  }
+                }
               }
             }
           }

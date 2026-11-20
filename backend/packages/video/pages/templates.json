@@ -88,17 +88,17 @@
           "icon": "trash",
           "label": "Delete",
           "action": {
-            "call": {
-              "target": "/api/plugins/video/actions/template-delete",
-              "method": "POST",
-              "success_label": "Deleted",
-              "fresh_confirm": {
-                "title": "Delete this template?",
-                "description": "Videos made from it stay. Only the template goes.",
-                "action_label": "Delete"
-              },
-              "args": {
-                "id": "{id}"
+            "confirm": {
+              "prompt": "Delete this template? Videos made from it stay. Only the template goes.",
+              "on_confirm": {
+                "call": {
+                  "target": "/api/plugins/video/actions/template-delete",
+                  "method": "POST",
+                  "success_label": "Deleted",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
               }
             }
           }
@@ -163,17 +163,17 @@
           "icon": "trash",
           "label": "Delete",
           "action": {
-            "call": {
-              "target": "/api/plugins/video/actions/template-delete",
-              "method": "POST",
-              "success_label": "Deleted",
-              "fresh_confirm": {
-                "title": "Delete this template?",
-                "description": "Videos made from it stay. Only the template goes.",
-                "action_label": "Delete"
-              },
-              "args": {
-                "id": "{id}"
+            "confirm": {
+              "prompt": "Delete this template? Videos made from it stay. Only the template goes.",
+              "on_confirm": {
+                "call": {
+                  "target": "/api/plugins/video/actions/template-delete",
+                  "method": "POST",
+                  "success_label": "Deleted",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
               }
             }
           }
