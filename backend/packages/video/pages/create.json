@@ -211,7 +211,7 @@
           },
           "actions": [
             {
-              "label": "Remix",
+              "label": "Edit and make again",
               "icon": "pencil",
               "action": {
                 "navigate": {
@@ -346,7 +346,7 @@
               }
             },
             {
-              "label": "Re-shoot",
+              "label": "Another take",
               "icon": "rotate-ccw",
               "starts": "video",
               "action": {
