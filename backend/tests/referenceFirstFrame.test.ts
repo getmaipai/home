@@ -272,6 +272,27 @@ describe("the happy path: a person, a place and an object", () => {
     expect(job.request.quality).toBe("detailed");
     expect(job.request.tier).toBe("max");
   });
+  test("VF-REFCLIP-01 (flag on): the clip of the composed first picture goes through the generic door as reference_clip, the old request is not made, and the composed picture was gated", async () => {
+    process.env.MAIPAI_REFERENCE_DOOR = "1"; fake.door = true; fake.catalogSizes = { landscape: { standard: { width: 768, height: 432 }, max: { width: 1024, height: 576 } } };
+    try {
+      const state = await chatWith(actor, [PERSON_A, PLACE, OBJECT]);
+      const outcome = await run(state, { request: "she walks up to the building holding the cards" });
+      expect(outcome.status).toBe("succeeded");
+      const job = await finished(actor, outcome);
+      expect(job.state).toBe("done");
+      const recipe = getReferenceVideoRecipe(actor, job.id)!;
+      expect(fake.makeRequests).toHaveLength(1);
+      const sent = fake.makeRequests[0] as Record<string, any>;
+      expect(sent).toMatchObject({ job: "clip", operation: "reference_clip", audience: "adult", level: "max", shape: "landscape", description: recipe.prompt, seed: recipe.seed });
+      expect(String(sent.start_picture).startsWith("data:image/png;base64,")).toBe(true);
+      expect(sent.inputs.length).toBeGreaterThanOrEqual(1);
+      expect(sent.inputs.every((input: { role: string }) => input.role === "identity")).toBe(true);
+      for (const key of ["model", "size", "tier", "negative_prompt"]) expect(sent).not.toHaveProperty(key);
+      const first = await sharp(Buffer.from(String(sent.start_picture).split(",")[1]!, "base64")).metadata();
+      expect([first.width, first.height]).toEqual([1024, 576]);
+    } finally { delete process.env.MAIPAI_REFERENCE_DOOR; }
+  });
+
   test("with no Max picture start the best allowed level for an adult is Boost (a clip from the first picture at the Boost size)", async () => {
     __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
     const job = await finished(actor, await run(await chatWith(actor, [PERSON_A, PLACE]), { request: "she waves at the camera" }));

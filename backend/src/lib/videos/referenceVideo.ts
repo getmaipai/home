@@ -30,6 +30,7 @@ import { cancelOrDeleteVideo, fetchClip, getVideoJob as getStackVideoJob, StackV
 import { checkPictureIsSheet, describeProvidedSheet, fitToSheetSize, type SheetCheck } from "./referenceSheetCheck";
 import { FIRST_FRAME_PHASE, REFERENCE_PHASE } from "./phaseLabel";
 import { REFERENCE_SHEET_NOTE } from "./referenceSheets";
+import { referenceDoorOn, submitReferenceViaDoor } from "./referenceDoor";
 import { FIRST_FRAME_LINES, FIRST_FRAME_SENTENCE, FIRST_FRAME_STEP_NAMES, buildFirstPicture, decideReferenceRoute, firstFrameTools, measureClipFaces, LOOK_ALIKE_LINE, type FirstFramePicture, type FirstPictureResult } from "./referenceFirstFrame";
 
 import { MAKE_REFERENCE_VIDEO_TOOL_ID } from "./referenceToolId";
@@ -297,11 +298,27 @@ function runFirstFrameClip(picture: Uint8Array, recipe: ReferenceRecipe, actor: 
     let image: string;
     try { image = Buffer.from(await sharp(Buffer.from(picture)).resize(width, height, { fit: "cover" }).png().toBuffer()).toString("base64"); } catch { return failed("The first picture could not be read. Try again."); }
     const anchor = endAnchorEnabled() && (plan.model === LTX25_MAX_MODEL ? ltx25EndPictureReady(engine, true) : plan.model === LTX25_MODEL && ltx25EndPictureReady(engine));
-    const made = await stackClipRun(actor, "Sending the first picture to the video model", () => submitVideo({
+    // VF-REFCLIP-01: the generic door first (adult, Max, composed first picture + the people's own pictures as identity; gated, dark unless MAIPAI_REFERENCE_DOOR=1); the old request below otherwise.
+    const identityFiles = async (): Promise<string[]> => {
+      const out: string[] = [];
+      for (const id of [...new Set(recipe.panels.flatMap((panel) => panel.pictures))]) {
+        const read = readAttachment(actor, id);
+        if (read.ok) out.push((await sharp(Buffer.from(read.value.bytes)).png().toBuffer()).toString("base64"));
+      }
+      return out;
+    };
+    const made = await stackClipRun(actor, "Sending the first picture to the video model", async () => {
+      const viaDoor = plan.tier === "max" && referenceDoorOn() ? await submitReferenceViaDoor({
+        actor, description: recipe.prompt, seconds: plan.seconds, seed: recipe.seed, identity: await identityFiles(),
+        startPicture: async (size) => { const raw = await sharp(Buffer.from(picture)).resize(size.width, size.height, { fit: "cover" }).png().toBuffer(); return { base64: raw.toString("base64"), raw: new Uint8Array(raw) }; },
+      }) : null;
+      if (viaDoor) return { job: viaDoor.job, done: null };
+      return submitVideo({
       prompt: recipe.prompt, size: plan.size, seconds: plan.seconds, ...(recipe.seed !== null ? { seed: recipe.seed } : {}), image, image_source: "uploaded", audience: "adult",
       ...(anchor ? { end_image: image } : {}),
       ...(plan.model ? { model: plan.model } : {}), ...(plan.tier === "boost" || plan.tier === "max" ? { tier: plan.tier } : {}), timeout_ms: 1,
-    }))(signal, onProgress, hooks);
+      });
+    })(signal, onProgress, hooks);
     if (!made.ok) return made;
     // Measured, then told: six frames, each person's nearest face against their own photo.
     const known = recipe.firstPicture;

@@ -53,6 +53,8 @@ export interface FakeVideoStack {
   takeRecords: Set<string>;
   /** The `request_fields` the door catalog lists for the clip job; null leaves the field out (an older Stack). Left undefined, the full list. */
   catalogFields?: string[] | null;
+  /** The clip job's `limits.shapes` in the door catalog (what the Stack serves per shape and level); left out when undefined. */
+  catalogSizes?: Record<string, Record<string, { width: number; height: number }>>;
   /** The requests the generic make door received (VF-ROUTE-01: what Home sent as inputs). */
   makeRequests: Record<string, unknown>[];
   /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
@@ -103,7 +105,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
-    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, ...(fake.catalogFields === null ? {} : { request_fields: fake.catalogFields ?? ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look","style_strength","conditioning","loop"] }), part: { id: "part-a", label: "A" } }] });
+    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, ...(fake.catalogFields === null ? {} : { request_fields: fake.catalogFields ?? ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look","style_strength","conditioning","loop","inputs.role.identity","reference_clip.seconds.min=4","reference_clip.seconds.max=8"] }), ...(fake.catalogSizes ? { limits: { shapes: fake.catalogSizes } } : {}), part: { id: "part-a", label: "A" } }] });
     if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.makeRequests.push(request);
