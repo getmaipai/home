@@ -3,7 +3,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
+import { withMark } from "@/lib/adultLock";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { db } from "@/db";
@@ -310,7 +311,9 @@ describe("the video lane and the unchecked-sound mark (item 4)", () => {
   });
 });
 
-describe("a clip with sound reaches no one whose ceiling is below X (item 4; the list, the share)", () => {
+// CLIP-AUDIENCE-LOCK-01 (owner ruling 2026-11-20, "Follow the lock only"): the sound-only stamp is gone. A clip with sound is as open as its own audience says: an ordinary one
+// reaches a teen and a child it is shared with (its sound unchecked, the owner's choice), an adult-only one reaches neither.
+describe("a clip with sound is as open as its audience says (item 4, re-pointed by CLIP-AUDIENCE-LOCK-01; the list, the share)", () => {
   let fake: FakeVideoStack;
   beforeEach(() => { resetDb(); invalidatePass(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); fake.ltx25 = "ready"; __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); });
   afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
@@ -331,33 +334,38 @@ describe("a clip with sound reaches no one whose ceiling is below X (item 4; the
     return { sage, marlow, nova, row };
   }
 
-  test("Sage makes a clip with sound, shares it to a teen and a child: neither list carries it, even with unrated made things allowed", async () => {
+  test("Sage makes a clip with sound and shares it to a teen and a child: an ordinary one is on their lists, an adult-only one is on neither", async () => {
     const { sage, marlow, nova, row } = await household();
     const sageRow = row("Sage");
-    const made = await (await sage.post("/api/videos/make", { prompt: "A paper boat floats down a rainy street, soft evening light" })).json() as { id: string };
-    await until(() => getVideoJobFor(sageRow, made.id)?.state === "done");
-    const job = getVideoJobFor(sageRow, made.id)!;
-    expect(job.files[0]!.audio).toBe(true);
-    const fileId = job.files[0]!.id;
-    const provenance = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get()!;
-    expect(provenance.provenance).toContain("\"made_audience\":\"adult-only\"");
-    expect(provenance.provenance).toContain("\"lock\":\"off\""); // only the audience fields are written, the lock is left alone
-    await sage.post("/api/plugins/video/actions/share-add", { id: fileId, person_id: marlow.id });
-    await sage.post("/api/plugins/video/actions/share-add", { id: fileId, person_id: nova.id });
-    // Sage still sees it.
-    expect(shortClipRows(sageRow).map((r) => r.id)).toContain(fileId);
-    // A teen with unrated made things allowed (C9) still does not get it.
-    ok(setValue(row("Sage"), "household", "content.unrated.made", "yes"));
-    ok(setValue(row("Sage"), `person:${marlow.id}`, "content.unrated.made", "yes"));
+    const makeOne = async (prompt: string) => {
+      const made = await (await sage.post("/api/videos/make", { prompt })).json() as { id: string };
+      await until(() => getVideoJobFor(sageRow, made.id)?.state === "done");
+      const job = getVideoJobFor(sageRow, made.id)!;
+      expect(job.files[0]!.audio).toBe(true);
+      return { jobId: made.id, fileId: job.files[0]!.id };
+    };
+    const ordinary = await makeOne("A paper boat floats down a rainy street, soft evening light");
+    const stored = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, ordinary.fileId)).get()!;
+    expect(stored.provenance).toContain("\"made_audience\":\"all-ages\"");
+    expect(stored.provenance).toContain("\"lock\":\"off\"");
+    const locked = await makeOne("A paper boat floats down a rainy street, soft evening light");
+    for (const row2 of db.select().from(attachments).where(like(attachments.provenance, `%"job":"${locked.jobId}"%`)).all()) {
+      const next = withMark(row2.provenance, { lock: "on", raiseToAdult: true });
+      if (next) db.update(attachments).set({ provenance: next }).where(eq(attachments.id, row2.id)).run();
+    }
+    for (const file of [ordinary.fileId, locked.fileId]) {
+      await sage.post("/api/plugins/video/actions/share-add", { id: file, person_id: marlow.id });
+      await sage.post("/api/plugins/video/actions/share-add", { id: file, person_id: nova.id });
+    }
     invalidatePass();
+    expect(shortClipRows(sageRow).map((r) => r.id)).toContain(ordinary.fileId);
     for (const who of [row("Marlow"), row("Nova")]) {
-      expect(shortClipRows(who).map((r) => r.id)).not.toContain(fileId);
-      expect(listLibrary(who, { type: "video", origin: "made", sort: "newest", limit: 60 }).items.map((item) => item.id)).not.toContain(fileId);
+      const lists = [shortClipRows(who).map((r) => r.id), listLibrary(who, { type: "video", origin: "made", sort: "newest", limit: 60 }).items.map((item) => item.id)];
+      for (const ids of lists) { expect(ids).toContain(ordinary.fileId); expect(ids).not.toContain(locked.fileId); }
     }
     const teenList = await (await marlow.client.post("/api/plugins/video/data/recipes", { scope: "short" })).json() as Array<{ id: string }>;
-    expect(teenList.map((r) => r.id)).not.toContain(fileId);
-    const library = await (await marlow.client.get("/api/library?type=video&origin=made")).json() as { items: Array<{ id: string }> };
-    expect(library.items.map((item) => item.id)).not.toContain(fileId);
+    expect(teenList.map((r) => r.id)).toContain(ordinary.fileId);
+    expect(teenList.map((r) => r.id)).not.toContain(locked.fileId);
   }, 30_000);
 });
 

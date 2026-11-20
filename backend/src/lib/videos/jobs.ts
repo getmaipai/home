@@ -731,7 +731,7 @@ async function waitForTurnRow(turnId: string): Promise<boolean> {
 /** SPATIAL-04: the Library name of the 5.1 file of a spatial-sound clip. */
 export const SURROUND_FILE_NAME = "Spatial sound 5.1.mp4";
 
-/** Whether a finished clip carries sound whose speech no check has heard (every clip with sound today: the finished-clip check reads frames only). */
+/** Whether a finished clip carries sound whose speech no check has heard (every clip with sound today: the finished-clip check reads frames only). A fact about the clip, no longer a reason to mark it adult-only (CLIP-AUDIENCE-LOCK-01). */
 export const clipSoundUnchecked = (clip: Pick<StackClip, "audio">): boolean => clip.audio === true;
 
 /** An mp4 starts with a box header: four size bytes, then `ftyp`. Anything else is not a clip and is never stored. */
@@ -781,10 +781,10 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   job.request.adultLock = lock;
   const madeAdult = adult || verdictNude;
   job.request.adultOnly = madeAdult;
-  // AGE-ROUTING-REMOVE-01 (RULES.md C4, C9): a clip with sound is checked by its frames only; nothing in Home hears its speech. Until a check does, it is not released to anyone
-  // whose ceiling is below X, so its audience mark (only the audience fields, never `lock`) says adult-only, which RATE-INGEST-01 turns into the given level X. The Stack's own
-  // `audio` field says whether the clip has sound (never the part id or a model family, rule E2). A clip with no sound keeps the audience its words and frames earned. An edit (`video-edit`) follows its sources (`request.adultOnly`, so an edit of a clip with sound is adult-only) and adds only sound Home checked: a voice line (its words go through the prompt check) or a song.
-  const markNote = markFields({ madeAudience: madeAdult || (writer === "video-gen" && clipSoundUnchecked(clip)) ? "adult-only" : "all-ages", lock });
+  // CLIP-AUDIENCE-LOCK-01 (owner ruling 2026-11-20, "Follow the lock only"): a clip is adult-only when its words or style say so, when the finished-clip check's own verdict is nude or
+  // sexual (the lock goes on with it), or when it follows an adult-only source; never merely because it has sound that no check has heard. (AGE-ROUTING-REMOVE-01 had raised every clip
+  // with sound; VIDEO-LTX-06 owns the sound check, and a clip that fails it is withheld or raised then.) `lock` is the lock's own state and is not changed here.
+  const markNote = markFields({ madeAudience: madeAdult ? "adult-only" : "all-ages", lock });
   const conversationId = job.conversationId;
   // VIDEO-CREATE-01: no conversation means the Create page made it; the clip and poster are kept Library files, not chat attachments.
   if (!conversationId && job.temporary) throw new Error("no conversation");

@@ -41,7 +41,7 @@ export interface FakeVideoStack {
   ltx25maxSeconds: number | undefined;
   /** VIDEO-INPUTS-01: the Stack reports `image_to_video` (and `end_image`) true on LTX-2.5 Standard and Boost / on Max. */
   ltx25Picture: boolean;
-  /** AGE-ROUTING-REMOVE-01: the Stack reports no sound track on the LTX-2.5 clips it makes (a clip with sound is marked adult-only, so audience tests that need a clean clip ask for a silent one). */
+  /** AGE-ROUTING-REMOVE-01: the Stack reports no sound track on the LTX-2.5 clips it makes (CLIP-AUDIENCE-LOCK-01: a clip with sound is no longer marked adult-only for its sound, so a test needs a silent clip only when it is about sound itself). */
   silent: boolean;
   ltx25maxPicture: boolean;
   /** VF-RECEIPT-01: what the receipt route answers for a clip: a record (the default is none: 404), or "fail" for a server error. A record may use `{job}` in `job_id` and is cloned per job. */

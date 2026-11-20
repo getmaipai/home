@@ -76,6 +76,7 @@ import { maySeeSynth, synthById } from "@/lib/synths";
 import { migrateOwnerJsonAll } from "@/lib/householdCompanions";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
+import { backfillSoundOnlyClips } from "@/lib/videos/soundStampBackfill";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
 import { migrateMediaSettings } from "@/lib/settingsMediaMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
@@ -291,6 +292,8 @@ migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();
 migrateRobotsSwitch();
+// CLIP-AUDIENCE-LOCK-01: once, lower the clips the sound-only stamp raised (owner ruling 2026-11-20). Best effort: a failure leaves them adult-only, never more open.
+try { backfillSoundOnlyClips(); } catch (error) { console.error(`[clip-audience-lock] the one-time fix did not run (${error instanceof Error ? error.name : "error"})`); }
 migrateTierSlots();
 migrateMediaSettings();
 void noticeGuestsWithoutControls().catch((err: unknown) => console.error(`[boot] guest controls notice failed: ${(err as Error).message}`));
