@@ -334,7 +334,7 @@
       "hide_when_empty": true,
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{subtitle}",
+      "item_subtitle_field": "{subtitle} {note}",
       "item_media_field": "thumbnail",
       "aspect": "wide",
       "variant": "plain",

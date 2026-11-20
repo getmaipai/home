@@ -308,4 +308,10 @@ describe("refusals and access", () => {
     expect((await rows(owner, "film", id))[0]!.note).toBe("");
     expect((await teen.client.post(`${T}/data/recipes`, { scope: "film", id })).status).toBe(404);
   });
+
+  test("the film card shows the run's note after its status line, so a voiced preview's working, failure and left-out lines are on the card", async () => {
+    const page = JSON.parse((await import("node:fs")).readFileSync("packages/video/pages/film-maker.json", "utf8")) as { body: Array<Record<string, any>> };
+    const card = page.body.find((node) => node.type === "media_shelf" && node.heading === "Your film")!;
+    expect(card.item_subtitle_field).toBe("{subtitle} {note}");
+  });
 });
