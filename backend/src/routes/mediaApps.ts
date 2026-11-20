@@ -46,6 +46,7 @@ import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { startSwap } from "@/lib/videos/swapStart";
 import { studioAdd } from "@/lib/videos/studio";
 import { FILM_PAGE_ACTIONS, filmPageAction } from "@/lib/films/pageFilm";
+import { deleteSavedTemplate, renameSavedTemplate, shareSavedTemplate, SAVED_NOT_FOUND_LINE } from "@/lib/media/savedTemplateActions";
 import { startStudioExport } from "@/lib/videos/studioExport";
 import { makeStudioNleExport } from "@/lib/videos/studioNleExport";
 import { setFavoriteFile } from "@/lib/videos/favorites";
@@ -331,6 +332,21 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       if (!appRouteAllowed(person, appId, "actions", name)) return next();
       const done = await filmPageAction(person, name, await jsonBody(c));
       return done.ok ? c.json({ ok: true as const, id: done.id, state: done.state }, 200) : c.json({ error: done.error, code: done.code, ...(done.status === 423 ? { locked: true } : {}) }, done.status as never);
+    });
+  }
+
+  // TEMPLATE-02 pages: the Templates page's Share with home, Stop sharing, Rename and Delete for a template the person saved. The same functions the /api/media-templates routes call
+  // (lib/media/savedTemplateActions.ts): owner only, a child cannot share, a locked template cannot be shared, a miss is the plain "isn't available any more" line.
+  for (const name of ["template-share", "template-unshare", "template-rename", "template-delete"] as const) {
+    routes.post(`/actions/${name}`, requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (appId !== "video") return next();
+      if (!appRouteAllowed(person, appId, "actions", name)) return next();
+      const body = await jsonBody(c);
+      const id = typeof body.id === "string" ? body.id : "";
+      if (name === "template-delete") return deleteSavedTemplate(person, id) ? c.json({ ok: true as const }, 200) : c.json({ error: SAVED_NOT_FOUND_LINE, code: "gone" }, 404);
+      const done = name === "template-rename" ? renameSavedTemplate(person, id, typeof body.name === "string" ? body.name : "") : shareSavedTemplate(person, id, name === "template-share");
+      return done.ok ? c.json({ ok: true as const }, 200) : c.json({ error: done.line, code: done.code }, done.status as never);
     });
   }
 

@@ -517,3 +517,38 @@ describe("the manifest of three pages", () => {
     expect(await data(adult.client, { scope: "stage", filter: "edit" })).toEqual([]); // no clip chosen on an edit tool: nothing, never the newest unrelated take
   });
 });
+
+describe("TEMPLATE-02 pages: the Templates page shelves over the saved templates", () => {
+  const shelf = (client: TestClient, filter: string) => data(client, { scope: "templates", filter });
+  test("a saved template moves between the private and shared shelves, another adult sees it under the household shelf, and the four template actions work for the owner", async () => {
+    const { adult, other, row } = await household();
+    const clip = await makeClip(adult.client, row("Marlow"));
+    const saved = await (await adult.client.post("/api/media-templates", { source: { kind: "clip", id: clip.jobId }, title: "My boat" })).json() as { id: string };
+    expect((await shelf(adult.client, "private")).map((r) => r.id)).toContain(saved.id);
+    expect((await shelf(adult.client, "starter")).map((r) => r.id)).not.toContain(saved.id); // the first shelf is the bundled starters only
+    expect((await shelf(adult.client, "starter")).length).toBeGreaterThan(0);
+    expect((await shelf(adult.client, "private")).find((r) => r.id === saved.id)!.can_share).toBe(true);
+    expect(await shelf(adult.client, "shared")).toEqual([]);
+    expect(await shelf(other.client, "household")).toEqual([]);
+    expect((await action(adult.client, "template-share", { id: saved.id })).status).toBe(200);
+    expect((await shelf(adult.client, "shared")).map((r) => r.id)).toContain(saved.id);
+    expect((await shelf(adult.client, "private")).map((r) => r.id)).not.toContain(saved.id);
+    expect((await shelf(other.client, "household")).find((r) => r.id === saved.id)).toMatchObject({ title: "My boat", subtitle: "Shared with home", can_share: false });
+    expect((await action(adult.client, "template-unshare", { id: saved.id })).status).toBe(200);
+    expect(await shelf(other.client, "household")).toEqual([]);
+    expect((await action(adult.client, "template-rename", { id: saved.id, name: "Boat in rain" })).status).toBe(200);
+    expect((await shelf(adult.client, "private")).find((r) => r.id === saved.id)!.title).toBe("Boat in rain");
+    expect((await action(adult.client, "template-delete", { id: saved.id })).status).toBe(200)
+    expect((await action(adult.client, "template-delete", { id: saved.id })).status).toBe(404)
+    expect((await action(other.client, "template-rename", { id: saved.id, name: "x" })).status).toBe(404);
+    expect(await shelf(adult.client, "private")).toEqual([]);
+  });
+
+  test("the Templates and Rename pages are valid for the kit and every shelf carries at most three row actions", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/video/pages/templates")).json() as { body: Array<{ row_actions?: unknown[] }> };
+    expect(PageNodeSchema.safeParse(page).success).toBe(true);
+    for (const node of page.body) expect((node.row_actions ?? []).length).toBeLessThanOrEqual(3);
+  });
+});
+

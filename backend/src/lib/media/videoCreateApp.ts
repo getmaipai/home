@@ -519,10 +519,15 @@ const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard
 /** TEMPLATE-01: the video templates as rows. The Inspiration ideas are video templates too (id `mtpl-inspiration<name>`, a clip and poster at `showcase/<id>` in the package); the Templates
  * shelf leaves them out and the Inspiration rail shows only them. A tile whose poster is not in the package is left out of the rail, never a broken picture. */
 const INSPIRATION_PREFIX = "mtpl-inspiration";
-function templateRows(person: PersonRow, inspiration: boolean, limit = 100): Array<Record<string, unknown>> {
-  const rows = listTemplates({ actor: person, kind: "video" }).filter((row) => row.id.startsWith(INSPIRATION_PREFIX) === inspiration);
-  return rows.slice(0, Math.min(Math.max(limit, 1), 100)).flatMap((row) => {
-    if (!inspiration) return [{ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }];
+/** TEMPLATE-02 pages: `filter` "private" (my saved templates not shared), "shared" (mine, shared with home) and "household" (shared by someone else) feed the three shelves, and "starter" (the bundled ones, no owner) feeds the first on the Templates page; each saved row says
+ * whether it is mine, whether it is shared and whether this person may press Share with home (a child may not; the backend still refuses a locked one with its own plain line). */
+function templateRows(person: PersonRow, inspiration: boolean, limit = 100, filter?: string): Array<Record<string, unknown>> {
+  const mineOf = (row: { owner_person_id?: string }) => row.owner_person_id === person.id;
+  const sharedOf = (row: { shared_with?: string }) => row.shared_with === "household";
+  const rows = listTemplates({ actor: person, kind: "video" }).filter((row) => row.id.startsWith(INSPIRATION_PREFIX) === inspiration).filter((row) =>
+    filter === "private" ? mineOf(row) && !sharedOf(row) : filter === "shared" ? mineOf(row) && sharedOf(row) : filter === "household" ? !!row.owner_person_id && !mineOf(row) && sharedOf(row) : filter === "starter" ? !row.owner_person_id : true);
+  return rows.slice(0, Math.min(Math.max(limit, 1), 100)).flatMap<Record<string, unknown>>((row) => {
+    if (!inspiration) return [{ id: row.id, title: row.title, subtitle: sharedOf(row) && !mineOf(row) ? "Shared with home" : row.summary, thumbnail: templateCoverUrl(row.id), can_share: mineOf(row) && !sharedOf(row) && person.role !== "child" && person.role !== "guest" }];
     if (!packageAssetFile("video", `showcase/${row.id}.jpg`)) return [];
     const settings = videoTemplateSettings()[row.id];
     const look = videoLookFor(settings?.look)!, camera = videoRecipeFor(settings?.camera);
@@ -538,7 +543,7 @@ registerMediaAppData("video", (person, dataId, params) => {
   switch (params.scope) {
     // TEMPLATE-01: one list. The Templates shelf and page read it as it is; the Inspiration rails ask for `filter: "inspiration"` (the ideas that have their own clip) and each row then also
     // carries its words, look and camera for the press, and its clip and poster from the package.
-    case "templates": return templateRows(person, params.filter === "inspiration", params.limit);
+    case "templates": return templateRows(person, params.filter === "inspiration", params.limit, params.filter);
     case "short": return shortClipRows(person);
     // `filter: "edit"` (the edit tools' pages): the result of an edit of the chosen clip, so with no clip chosen there is nothing to show (never the newest unrelated take).
     case "stage": return params.filter === "edit" && !(typeof params.id === "string" && params.id) ? [] : stageRows(person, { ...(typeof params.id === "string" && params.id ? { from: params.id } : {}) });

@@ -2,16 +2,187 @@
   "type": "page",
   "id": "video-templates",
   "title": "Templates",
-  "body": [{
-    "type": "media_shelf",
-    "heading": "Start with a template",
-    "bind": { "source": "package", "path": "recipes", "params": { "scope": "templates" } },
-    "item_key_field": "id",
-    "item_label_field": "title",
-    "item_subtitle_field": "{subtitle}",
-    "item_media_field": "thumbnail",
-    "aspect": "wide",
-    "layout": "grid",
-    "on_select": { "navigate": { "to": "/apps/video/create", "state": { "template": "{id}" } } }
-  }]
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Start with a template",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "filter": "starter"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your templates",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "filter": "private"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "users",
+          "label": "Share with home",
+          "show_when_field": "can_share",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/template-share",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              },
+              "success_label": "Shared with home"
+            }
+          }
+        },
+        {
+          "icon": "trash",
+          "label": "Delete",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/template-delete",
+              "method": "POST",
+              "success_label": "Deleted",
+              "fresh_confirm": {
+                "title": "Delete this template?",
+                "description": "Videos made from it stay. Only the template goes.",
+                "action_label": "Delete"
+              },
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Shared with home",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "filter": "shared"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "lock",
+          "label": "Stop sharing",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/template-unshare",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              },
+              "success_label": "Not shared any more"
+            }
+          }
+        },
+        {
+          "icon": "trash",
+          "label": "Delete",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/template-delete",
+              "method": "POST",
+              "success_label": "Deleted",
+              "fresh_confirm": {
+                "title": "Delete this template?",
+                "description": "Videos made from it stay. Only the template goes.",
+                "action_label": "Delete"
+              },
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
+      "heading": "From your household",
+      "heading_style": "eyebrow",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "filter": "household"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "grid",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/create",
+          "state": {
+            "template": "{id}"
+          }
+        }
+      }
+    }
+  ]
 }
