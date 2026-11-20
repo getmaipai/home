@@ -1254,6 +1254,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, isStackRoleEnabled, getHomeOwnedRoles |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
+| `backend/src/lib/stackLookSheet.ts` | stackLookSheetEnabled, LOOK_SHEET_BLOCKED_LINE, STACK_SHEET_MAX_REFERENCES, __setStackLookToolsForTests, useStackLookSheet, makeStackLookSheet |
 | `backend/src/lib/stackRequirement.ts` | STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue |
 | `backend/src/lib/stackRestart.ts` | STACK_BACK_MAX_MS, isStackRestart, waitForStackBack |
 | `backend/src/lib/stackSelfHeal.ts` | UNREACHABLE_NOTICE_MS, UNREACHABLE_GAVE_UP_MS, HEAL_NOTICE_PER_ROLE_MS, PORT_PROBE_AFTER_MS, __setNotifierForTests, __setStackPortProbeForTests |
