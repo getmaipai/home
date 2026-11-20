@@ -44,11 +44,11 @@ function AppNeeds({ appId, needs }: { appId: string; needs: StatusAppNeed[] }) {
   const unused = needs.filter((need) => need.state === "unknown");
   return <div className="flex flex-col gap-3 border-t border-border pt-3">
     {attention.length ? <section aria-labelledby={`needs-attention-${appId}`}>
-      <h3 id={`needs-attention-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Needs attention", message: "Needs attention" })}</h3>
+      <h2 id={`needs-attention-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Needs attention", message: "Needs attention" })}</h2>
       <ul className="divide-y divide-border">{attention.map((need) => <NeedRow key={`${need.kind}:${need.id}`} need={need} />)}</ul>
     </section> : null}
     {working.length ? <section aria-labelledby={`needs-working-${appId}`}>
-      <h3 id={`needs-working-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Working", message: "Working" })}</h3>
+      <h2 id={`needs-working-${appId}`} className="text-sm font-semibold">{i18n._({ id: "Working", message: "Working" })}</h2>
       <ul className="divide-y divide-border">{working.map((need) => <NeedRow key={`${need.kind}:${need.id}`} need={need} />)}</ul>
     </section> : null}
     {unused.length ? <Collapsible>

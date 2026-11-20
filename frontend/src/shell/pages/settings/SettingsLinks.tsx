@@ -9,7 +9,7 @@ const Chevron = getIcon("chevron-right");
  * Item drawn as a router link with a trailing chevron. Data in, rows out. */
 export function SettingsLinks({ label, links }: { label: string; links: readonly { label: string; href: string }[] }) {
   return (
-    <section aria-label={label} className="flex flex-col gap-3">
+    <div role="group" aria-label={label} className="flex flex-col gap-3">
       <h2 className="text-sm font-medium">{label}</h2>
       <ItemGroup variant="card">
         {links.map((link, index) => (
@@ -26,6 +26,6 @@ export function SettingsLinks({ label, links }: { label: string; links: readonly
           </Fragment>
         ))}
       </ItemGroup>
-    </section>
+    </div>
   );
 }
