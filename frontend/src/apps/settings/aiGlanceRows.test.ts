@@ -108,8 +108,8 @@ describe("fill", () => {
   test("replaces known tokens and leaves unknown ones", () => expect(fill("{a} and {b}", { a: 1 })).toBe("1 and {b}"));
 });
 
-// WAN-DEFAULT-01: the minors-only video choice is an option in Settings, AI and models only where a child or teen lives, from the same card data as the wizard.
-describe("the minors-only video choice in AI and models", () => {
+// WAN-DEFAULT-01: the minors-only video choice is an option of the shared option list (the setup wizard reads it; the Settings page reads another source, see the backlog note) only where a child or teen lives.
+describe("the minors-only video choice in the shared option list", () => {
   const plan = (table as unknown as { tiers: Record<string, DiskPlan> }).tiers.p128!;
   const videosRow = (householdHasMinors: boolean) => {
     const cards = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors }, freeBytes: null }).cards;
