@@ -251,7 +251,7 @@ describe("the hub's own connections", () => {
     setHouseholdSettingValue("home.base_url", "http://homeassistant.local:8123");
     setHouseholdSettingValue("home.access_token", "test-token");
     const row = privacyConnections().find((r) => r.id === "platform:home-assistant-events");
-    expect(row?.what).toContain("sensors or devices you mapped");
+    expect(row?.what).toContain("state changes for mapped devices");
     expect(row?.what).toContain("no sensor state is sent to a third party");
     expect(row?.what).toContain("Home Assistant is told the command and nothing about who asked");
     expect(row?.retention).toContain("never a device name or who asked");

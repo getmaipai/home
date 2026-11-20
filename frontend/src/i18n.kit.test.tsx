@@ -16,7 +16,7 @@ const changed = {
 } as unknown as MergedSetting;
 
 function Row() {
-  return <SettingRow setting={changed} onChange={async () => true} onReset={() => {}} />;
+  return <SettingRow setting={changed} onChange={async () => true} onReset={() => {}} showReset />;
 }
 
 describe("kit strings follow Home's active language (I18N-K1b)", () => {
