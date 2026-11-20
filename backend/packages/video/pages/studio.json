@@ -357,7 +357,8 @@
             }
           }
         }
-      }
+      },
+      "export_placement": "auto"
     },
     {
       "type": "section",
