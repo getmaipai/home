@@ -23,6 +23,14 @@
         "type": "empty_state",
         "icon": "box",
         "text": "No props yet. A prop you save can be reused in any picture, clip or film."
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/elements/element",
+          "state": {
+            "id": "{id}"
+          }
+        }
       }
     }
   ]

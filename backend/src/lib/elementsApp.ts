@@ -7,6 +7,7 @@ import { attachments } from "@/db/schema";
 import { registerAppData } from "@/lib/apps";
 import { listCast, type CastEntry } from "@/lib/cast";
 import { getMediaSubject, isSheetReference, type SubjectKind } from "@/lib/mediaSubjects";
+import { elementActions, elementEditRows, elementFacts, elementFilms, elementPictures } from "@/lib/elementsDetail";
 import type { PersonRow } from "@/types";
 
 const KIND_LABEL: Record<SubjectKind, string> = { character: "Character", place: "Place", prop: "Prop" };
@@ -36,9 +37,15 @@ export function elementRows(person: PersonRow, input: { kind?: string; query?: s
 }
 
 export function elementsAppData(person: PersonRow, dataId: string, body: unknown): unknown | null {
-  if (dataId !== "elements") return null;
   const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
   const pick = (value: unknown) => typeof value === "string" ? value : undefined;
+  const id = pick(input.id) ?? "";
+  if (dataId === "element") return elementFacts(person, id);
+  if (dataId === "element-pictures") return elementPictures(person, id);
+  if (dataId === "element-films") return elementFilms(person, id);
+  if (dataId === "element-actions") return elementActions(person, id);
+  if (dataId === "element-edit") return elementEditRows(person, id);
+  if (dataId !== "elements") return null;
   return elementRows(person, { kind: pick(input.kind), query: pick(input.query) });
 }
 

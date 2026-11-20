@@ -117,11 +117,39 @@
         "nav": true,
         "kind": "schema",
         "module": "make"
+      },
+      {
+        "id": "element",
+        "label": "Element",
+        "icon": "layers",
+        "nav": false,
+        "kind": "schema",
+        "module": "element"
       }
     ],
     "data": [
       {
         "id": "elements",
+        "rows": "list"
+      },
+      {
+        "id": "element",
+        "rows": "list"
+      },
+      {
+        "id": "element-pictures",
+        "rows": "list"
+      },
+      {
+        "id": "element-films",
+        "rows": "list"
+      },
+      {
+        "id": "element-actions",
+        "rows": "list"
+      },
+      {
+        "id": "element-edit",
         "rows": "list"
       }
     ],

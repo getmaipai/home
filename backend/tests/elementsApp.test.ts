@@ -11,6 +11,8 @@ import { appPackageProblems } from "@/lib/apps";
 import { loadManifestOnly, __resetPackageCachesForTests } from "@/lib/plugins";
 import { elementRows, elementsAppData } from "@/lib/elementsApp";
 import { createMediaSubject, shareMediaSubject } from "@/lib/mediaSubjects";
+import { elementActions, elementEditRows, elementFacts, elementFilms, elementPictures } from "@/lib/elementsDetail";
+import { createFilmRun, updateFilmRun } from "@/lib/films/store";
 import { child, owner } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 
@@ -29,7 +31,7 @@ test("Elements is a valid bundled app: its pages exist, validate against the pag
   expect(appPackageProblems(loaded.value, join(PACKAGES_DIR, "elements"))).toEqual([]);
   expect((loaded.value.routing?.examples ?? []).length).toBeGreaterThanOrEqual(5);
   expect(loaded.value.min_role).toBe("child");
-  expect(contributes.data.map((item) => item.id)).toEqual(["elements"]);
+  expect(contributes.data.map((item) => item.id)).toEqual(["elements", "element", "element-pictures", "element-films", "element-actions", "element-edit"]);
   const ajv = new Ajv2020({ strict: false });
   for (const page of contributes.pages) expect(ajv.validate(UI_SCHEMA as object, JSON.parse(readFileSync(join(PACKAGES_DIR, "elements", "pages", `${page.module}.json`), "utf8")))).toBe(true);
 });
@@ -85,4 +87,49 @@ test("a child sees their own and shared elements only: real-person and adult-onl
   const own = createMediaSubject(kid, { name: "Kitty", kind: "character", look: "a cat" });
   expect(elementRows(kid).map((item) => item.id)).toContain(own.id);
   expect(elementRows(row).map((item) => item.id)).not.toContain(own.id);
+});
+
+test("ELEMENTS-HOME-02: the detail page shows every field or says it is empty, and an element the viewer may not cast is not found at all", async () => {
+  const { client, row } = await owner();
+  const { row: kid } = await child(client);
+  const subject = createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl in a yellow coat" });
+  const facts = Object.fromEntries(elementFacts(row, subject.id).map((fact) => [fact.id, fact.value]));
+  expect(facts).toMatchObject({ look: "a tall girl in a yellow coat", locked: "Not set yet", voice: "Not set yet", sheet: "Not made yet" });
+  expect(facts.kind).toBe("Character. Saved by you.");
+  expect(elementPictures(row, subject.id)).toEqual([]);
+  // The child was not shared it, so it is not found: facts, pictures, actions and edit rows are all empty.
+  for (const read of [elementFacts, elementPictures, elementFilms, elementActions, elementEditRows]) expect(read(kid, subject.id)).toEqual([]);
+});
+
+test("ELEMENTS-HOME-02: Delete is offered only on the owner's own saved elements, never on a companion or a household member", async () => {
+  const { row } = await owner();
+  const own = createMediaSubject(row, { name: "Mug", kind: "prop", look: "a blue mug" });
+  expect(elementEditRows(row, own.id)).toHaveLength(1);
+  expect(elementActions(row, own.id)).toEqual([{ id: own.id, reason: "A look is captured for characters." }]);
+  const companions = elementRows(row, { kind: "character" }).filter((item) => !MADE.has(item.title));
+  expect(companions.length).toBeGreaterThan(0);
+  for (const item of companions) expect(elementEditRows(row, item.id)).toEqual([]);
+});
+
+test("ELEMENTS-HOME-02: where used lists the viewer's own films whose shots name the element", async () => {
+  const { row } = await owner();
+  const subject = createMediaSubject(row, { name: "Juniper", kind: "character", look: "a tall girl" });
+  const run = createFilmRun(row, { idea: "A pier at dusk", goAhead: true });
+  expect(elementFilms(row, subject.id)).toEqual([]);
+  updateFilmRun(row, run.id, { plan: { title: "Pier at Dusk", summary: "s", cast: [{ name: "Juniper", kind: "character", locked: "A yellow coat.", reveal_last: false, subject_id: subject.id }], shots: ["shot-1", "shot-2"].map((id) => ({ id, subject_ids: [], framing: "wide", still: "Juniper on a pier.", motion: "The tide rolls.", seconds: 5 })), music: "m", credits: [] } as never });
+  expect(elementFilms(row, subject.id)).toEqual([{ id: run.id, title: "Pier at Dusk", subtitle: "In progress" }]);
+});
+
+test("ELEMENTS-HOME-02: the delete action removes the owner's own element, and refuses a companion in plain words", async () => {
+  const { client, row } = await owner();
+  const own = createMediaSubject(row, { name: "Mug", kind: "prop", look: "a blue mug" });
+  const gone = await client.post("/api/plugins/elements/actions/delete", { id: own.id });
+  expect(gone.status).toBe(200);
+  expect(elementRows(row, { kind: "prop" }).map((item) => item.id)).not.toContain(own.id);
+  const companion = elementRows(row, { kind: "character" }).find((item) => !MADE.has(item.title))!;
+  const refused = await client.post("/api/plugins/elements/actions/delete", { id: companion.id });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: string }).error).toContain("edited where that record lives");
+  const missing = await client.post("/api/plugins/elements/actions/capture-look", { id: "nope" });
+  expect(missing.status).toBe(404);
 });

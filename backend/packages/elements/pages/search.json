@@ -52,6 +52,14 @@
         "type": "empty_state",
         "icon": "search",
         "text": "Nothing matches. Try other words."
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/elements/element",
+          "state": {
+            "id": "{id}"
+          }
+        }
       }
     }
   ]

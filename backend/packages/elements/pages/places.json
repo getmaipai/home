@@ -23,6 +23,14 @@
         "type": "empty_state",
         "icon": "map-pin",
         "text": "No places yet. A place you save, like your kitchen or a beach, can be reused in any picture, clip or film."
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/elements/element",
+          "state": {
+            "id": "{id}"
+          }
+        }
       }
     }
   ]

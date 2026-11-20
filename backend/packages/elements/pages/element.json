@@ -1,0 +1,117 @@
+{
+  "type": "page",
+  "id": "elements-element",
+  "title": "Element",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Pictures",
+      "bind": {
+        "source": "package",
+        "path": "element-pictures",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "image",
+        "text": "No pictures saved for this one yet."
+      }
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "element",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "label",
+      "item_subtitle_field": "{value}"
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "element-films",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Manage",
+      "bind": {
+        "source": "package",
+        "path": "element-edit",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "aspect": "wide",
+      "row_actions": [
+        {
+          "icon": "trash",
+          "label": "Delete",
+          "action": {
+            "call": {
+              "target": "/api/plugins/elements/actions/delete",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              },
+              "success_label": "Deleted",
+              "fresh_confirm": {
+                "title": "Delete this element?",
+                "description": "Pictures and films that used it keep working.",
+                "action_label": "Delete"
+              }
+            }
+          }
+        }
+      ],
+      "item_media_field": "thumbnail"
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "element-actions",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "primary": {
+        "label": "Capture the look",
+        "action": {
+          "call": {
+            "target": "/api/plugins/elements/actions/capture-look",
+            "method": "POST",
+            "args": {
+              "id": "{id}"
+            },
+            "success_label": "Look captured"
+          }
+        }
+      },
+      "note": "reason",
+      "sticky": true
+    }
+  ]
+}

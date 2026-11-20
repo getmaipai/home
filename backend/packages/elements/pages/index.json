@@ -21,6 +21,14 @@
         "type": "empty_state",
         "icon": "layers",
         "text": "Nothing saved yet. Characters, places and props you save will show here."
+      },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/elements/element",
+          "state": {
+            "id": "{id}"
+          }
+        }
       }
     }
   ]
