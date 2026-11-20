@@ -286,12 +286,12 @@ describe("refusals and access", () => {
     const run = getFilmRun(row("Sage"), id)!;
     updateFilmRun(row("Sage"), id, { plan: { ...run.plan!, shots: run.plan!.shots.map((shot, i) => (i === 0 ? { ...shot, line: "Please put the blue mug back." } : shot)) } });
     // A line to speak but the preview cannot be made now: one row that says so in plain words, so the person learns that voices exist.
-    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
+    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet.", blocked_reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
     listing(["media.edit"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
-    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
+    expect(await rows(owner, "film-voiced", id)).toEqual([{ run_id: id, available: false, reason: "Hearing the voices needs the speech engine, which is not ready yet.", blocked_reason: "Hearing the voices needs the speech engine, which is not ready yet." }]);
     listing(["media.edit", "media.rough_cut"]); __resetRoughCutAvailabilityForTests(); await refreshRoughCutAvailability();
     const offered = await rows(owner, "film-voiced", id);
-    expect(offered).toEqual([{ run_id: id, available: true, reason: "Hear the lines in the voices of your cast." }]);
+    expect(offered).toEqual([{ run_id: id, available: true, reason: "Hear the lines in the voices of your cast.", offer: "Hear the lines in the voices of your cast." }]);
     __setStackHttpFetchForTests(null); __resetRoughCutAvailabilityForTests();
   });
 
@@ -404,9 +404,9 @@ describe("refusals and access", () => {
     expect(bars.map((bar) => bar.bind.params.scope)).toEqual(["render-plan", "film-voiced", "film-stop", "film-resume"]);
     expect(bars.map((bar) => bar.primary.action.call.target.split("/").pop())).toEqual(["film-finish", "film-voiced-preview", "film-cancel", "film-resume"]);
     expect(bars.every((bar) => bar.sticky !== false)).toBe(true);
-    // a `reason` disables the button: only the Render film bar has one; the offers use `note`
-    expect(bars.map((bar) => bar.reason ?? null)).toEqual(["reason", null, null, null]);
-    expect(bars.map((bar) => bar.note ?? null)).toEqual([null, "reason", "reason", "reason"]);
+    // a `reason` disables the button: the Render film bar has one, and the voiced bar has one that is empty while the preview can be made (`blocked_reason`, filled only when the speech engine is not ready); the offers use `note`
+    expect(bars.map((bar) => bar.reason ?? null)).toEqual(["reason", "blocked_reason", null, null]);
+    expect(bars.map((bar) => bar.note ?? null)).toEqual([null, "offer", "reason", "reason"]);
   });
 
   test("the render page is served to an adult as a valid page on the progress block, with the poll, the stop and the resume bar, and is closed to a teen and a child; a running film's Activity row opens it (VF-UI-10)", async () => {

@@ -28,7 +28,8 @@ export function voicedAvailable(person: PersonRow): boolean { return allowed(per
 
 export const VOICED_OFFER_LINE = "Hear the lines in the voices of your cast.";
 export const VOICED_BLOCKED_LINE = "Hearing the voices needs the speech engine, which is not ready yet.";
-export type VoicedOfferRow = { run_id: string; available: boolean; reason: string };
+/** `offer` is the offer line while it can be made, `blocked_reason` the plain reason while it cannot (the page binds `note` to the first and `reason`, which blocks the button, to the second; `reason` stays the one line either way). */
+export type VoicedOfferRow = { run_id: string; available: boolean; reason: string; offer?: string; blocked_reason?: string };
 
 /** `film-voiced`: one row `{ run_id, available, reason }` for a waiting film whose plan has a line to speak, an adult's only. `available: true` means the preview can be made now and `reason` is the
  * offer's own line; `available: false` means it cannot be made now and `reason` says why in plain words, so the person learns that voices exist. No row: not an adult, no waiting film, or nothing to speak. */
@@ -37,5 +38,5 @@ export function voicedOfferRows(person: PersonRow, id?: string): VoicedOfferRow[
   const run = pageFilmRun(person, id);
   if (!run?.plan || run.state !== "waiting_for_go" || !run.production_id) return [];
   if (!run.plan.shots.some((shot) => (shot as { kept?: boolean }).kept !== false && shotText(run.plan!, shot))) return [];
-  return voicedAvailable(person) ? [{ run_id: run.id, available: true, reason: VOICED_OFFER_LINE }] : [{ run_id: run.id, available: false, reason: VOICED_BLOCKED_LINE }];
+  return voicedAvailable(person) ? [{ run_id: run.id, available: true, reason: VOICED_OFFER_LINE, offer: VOICED_OFFER_LINE }] : [{ run_id: run.id, available: false, reason: VOICED_BLOCKED_LINE, blocked_reason: VOICED_BLOCKED_LINE }];
 }

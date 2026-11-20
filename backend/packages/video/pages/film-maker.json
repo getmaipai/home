@@ -330,7 +330,8 @@
         }
       },
       "sticky": true,
-      "note": "reason"
+      "note": "offer",
+      "reason": "blocked_reason"
     },
     {
       "type": "action_bar",
