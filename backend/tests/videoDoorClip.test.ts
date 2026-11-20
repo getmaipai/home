@@ -1,0 +1,84 @@
+// VF-DOOR-01: a plain clip goes through the Stack's generic make door; everything else stays on the old one, and the old one is the way back.
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { __setVideosFetchForTests, fetchClipReceipt, type VideoBody } from "@/lib/videos/stack";
+import { clipRequestFor, submitVideoViaDoor } from "@/lib/videos/doorClip";
+
+const base = (over: Partial<VideoBody> = {}): VideoBody => ({ prompt: "a dog barks", audience: "adult", size: "864x480", seconds: 5, seed: 7, timeout_ms: 1, ...over });
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+let calls: Array<{ path: string; body: Record<string, unknown> | null }> = [];
+let clipAvailable = true;
+let makeAnswer: () => Response = () => json({ id: "job-1", job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
+const answer = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  const path = new URL(String(input), "http://stack.test").pathname;
+  calls.push({ path, body: typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : null });
+  if (path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: clipAvailable, part: { id: "part-a", label: "A" } }] });
+  if (path === "/stack/v1/jobs/make") return makeAnswer();
+  if (path.endsWith("/receipt.json")) return json({ version: 1, job_id: "job-1" });
+  return json({ error: "no", code: "not_found" }, 404);
+};
+beforeEach(() => { calls = []; clipAvailable = true; delete process.env.MAIPAI_VIDEO_LEGACY_DOOR; __setVideosFetchForTests(answer as unknown as typeof fetch); });
+afterEach(() => { __setVideosFetchForTests(null); delete process.env.MAIPAI_VIDEO_LEGACY_DOOR; });
+
+test("a plain adult clip becomes a generic clip request with the level, the shape, the seconds, the seed and no wait", () => {
+  expect(clipRequestFor(base())).toEqual({ job: "clip", audience: "adult", description: "a dog barks", shape: "landscape", level: "standard", seconds: 5, seed: 7, wait: 0 });
+  expect(clipRequestFor(base({ size: "480x864", tier: "max" }))).toMatchObject({ shape: "portrait", level: "max" });
+  expect(clipRequestFor(base({ size: "512x512", tier: "boost" }))).toMatchObject({ shape: "square", level: "boost" });
+  expect(clipRequestFor(base({ quiet_seconds: 60, quiet_max_wait_seconds: null }))).toMatchObject({ quiet_seconds: 60, quiet_max_wait_seconds: null });
+});
+
+test("a start picture and an end picture travel as the clip's start and end pictures, and no model, size in pixels or step count is sent", () => {
+  const request = clipRequestFor(base({ image: "QUJD", end_image: "REVG", model: "some-model", tier: "max" }))!;
+  expect(request).toMatchObject({ start_picture: "data:image/png;base64,QUJD", end_picture: "data:image/png;base64,REVG" });
+  expect(Object.keys(request)).not.toContain("model"); expect(Object.keys(request)).not.toContain("size"); expect(Object.keys(request)).not.toContain("part");
+});
+
+test("what is not a plain clip stays on the old door: a young person's, negative words, a LoRA, an edit, a clip with no size or seconds", () => {
+  expect(clipRequestFor(base({ audience: "all-ages" }))).toBeNull();
+  expect(clipRequestFor(base({ negative_prompt: "no cats" }))).toBeNull();
+  expect(clipRequestFor(base({ loras: [{ id: "style-1", strength: 1 }] }))).toBeNull();
+  expect(clipRequestFor(base({ source_video: "/clips/a.mp4", extend_seconds: 2 }))).toBeNull();
+  expect(clipRequestFor(base({ retake_from_seconds: 2 }))).toBeNull();
+  expect(clipRequestFor(base({ size: undefined }))).toBeNull(); expect(clipRequestFor(base({ seconds: undefined }))).toBeNull();
+  expect(clipRequestFor(base({ loras: [] }))).not.toBeNull();   // an empty list is no LoRA
+});
+
+test("the door starts the clip and answers the job id the old status route polls", async () => {
+  const started = await submitVideoViaDoor(base({ tier: "boost" }));
+  expect(started).toEqual({ job: "job-1", done: null, warnings: [] });
+  const sent = calls.find((c) => c.path === "/stack/v1/jobs/make")!.body!;
+  expect(sent).toMatchObject({ job: "clip", level: "boost", wait: 0 });
+});
+
+test("when the catalog says no part serves a clip, nothing is asked of the door and the old one takes it", async () => {
+  clipAvailable = false;
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  expect(calls.some((c) => c.path === "/stack/v1/jobs/make")).toBe(false);
+});
+
+test("a planner refusal (shape not served and the like) sends the clip back to the old door", async () => {
+  makeAnswer = () => json({ code: "shape_not_served", line: "That shape is not served." }, 409);
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  makeAnswer = () => json({ code: "too_long", line: "Too long.", limit: 5 }, 409);
+  expect(await submitVideoViaDoor(base())).toBeNull();
+});
+
+test("a Stack older than the door (no such route) sends the clip back to the old door; a real Stack failure is thrown as the old door throws it", async () => {
+  makeAnswer = () => json({ error: "not found", code: "not_found" }, 404);
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  makeAnswer = () => json({ error: "The video queue is full. Try again in a few minutes.", code: "queue_full" }, 429);
+  await expect(submitVideoViaDoor(base())).rejects.toMatchObject({ code: "queue_full", status: 429 });
+});
+
+test("MAIPAI_VIDEO_LEGACY_DOOR=1 keeps every clip on the old door without a call", async () => {
+  process.env.MAIPAI_VIDEO_LEGACY_DOOR = "1";
+  expect(await submitVideoViaDoor(base())).toBeNull();
+  expect(calls).toHaveLength(0);
+});
+
+test("a clip's receipt is read from the Stack's owner route, and a missing one is null", async () => {
+  expect(await fetchClipReceipt("job-1")).toEqual({ version: 1, job_id: "job-1" });
+  expect(await fetchClipReceipt("job-gone-404")).toEqual({ version: 1, job_id: "job-1" });   // the stub answers any receipt path
+  __setVideosFetchForTests((async () => json({ error: "no", code: "no_receipt" }, 404)) as unknown as typeof fetch);
+  expect(await fetchClipReceipt("job-1")).toBeNull();
+});

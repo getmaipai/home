@@ -8,6 +8,7 @@ import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
+import type { StackMakeClipRequest, StackMakeRefusalRead, StackMakeResultRead } from "@/lib/stack/makeShape";
 import sharp from "sharp";
 import { INGREDIENTS_FAILURE_COPY } from "@/lib/failureCopy";
 
@@ -221,6 +222,46 @@ export async function fitPictureForStack(base64: string): Promise<string> {
     const fit = await sharp(bytes).rotate().resize({ width: START_PICTURE_MAX_SIDE, height: START_PICTURE_MAX_SIDE, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
     return fit.toString("base64");
   } catch { return base64; }
+}
+
+/**
+ * VF-DOOR-01: POST /stack/v1/jobs/make for a `clip`, the generic door. The Stack plans it (the part, the pixel size of the shape at the level) and hands it
+ * to the same runner as the old door, so the job id is the one `getVideoJob` polls. A refusal of the planner (`code` and `line`) is returned, not thrown:
+ * the caller decides what to try next. Any other non-success answer is the Stack's own failure, thrown as the old door's are (queue_full, no_memory ...).
+ */
+export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; job: string; part: string | null } | { ok: false; refusal: StackMakeRefusalRead }> {
+  const res = await request("/stack/v1/jobs/make", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 60_000 });
+  if (res.status === 200 || res.status === 202) {
+    const result = await res.json() as Partial<StackMakeResultRead>;
+    if (!result.id) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
+    forgetMediaRefusal("video");
+    return { ok: true, job: result.id, part: result.made_with?.part ?? null };
+  }
+  if (res.status === 409) {
+    const refusal = await res.clone().json().catch(() => null) as StackMakeRefusalRead | null;
+    if (refusal && typeof refusal.code === "string" && typeof refusal.line === "string") return { ok: false, refusal };
+  }
+  return failure(res);
+}
+
+/** VF-DOOR-01: whether the adult list's catalog shows a part serving the clip job now; null when the catalog cannot be read (that decides nothing). Read through this module's own connection. */
+export async function clipJobAvailable(): Promise<boolean | null> {
+  try {
+    const res = await request("/stack/v1/jobs/catalog?audience=adult", { method: "GET", timeoutMs: 5_000 });
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
+    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean }> };
+    if (!catalog || !Array.isArray(catalog.jobs)) return null;
+    return catalog.jobs.find((item) => item.job === "clip")?.available === true;
+  } catch { return null; }
+}
+
+/** VF-RECEIPT-01: the receipt the Stack wrote for a finished clip (the job owner's record; never logged), or null when there is none or it cannot be read. */
+export async function fetchClipReceipt(job: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/receipt.json`, { method: "GET", timeoutMs: 10_000 });
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
+    return await res.json() as Record<string, unknown>;
+  } catch { return null; }
 }
 
 /** Starts a clip and returns the job id at once (`timeout_ms` 1: the Stack answers 202 with the job; a clip takes over two minutes). */

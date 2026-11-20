@@ -142,6 +142,7 @@ describe("C2: edit_video", () => {
     expect(next.request.seed).not.toBe(job.request.seed);
     expect(next.request.size).toBe("256x512");
     expect(next.request.create).toMatchObject({ look: "anime", recipe: "dolly-in" });
+    await until(() => fake.submitted.length >= 2);   // a plain clip first tries the generic door (a 404 here), so the submission lands a moment later
     expect(fake.submitted).toHaveLength(2);
     expect(String(fake.submitted[1]!.prompt)).toStartWith(videoLookFor("anime")!.wording);
     expect(getVideoJobFor(actor, job.id)?.state).toBe("done");

@@ -7,5 +7,6 @@ import type { StackMakeRefusal, StackMakeRequest, StackMakeResult } from "@maipa
 /** `audience` is the list the job is asked for: an adult's (the household's order) or a minor's (neutral labels, shipped priority). */
 export type StackMakeAudience = StackMakeRequest["audience"];
 export type StackMakePictureRequest = Extract<StackMakeRequest, { job: "picture" }>;
+export type StackMakeClipRequest = Extract<StackMakeRequest, { job: "clip" }>;
 export type StackMakeResultRead = Pick<StackMakeResult, "id" | "job" | "state" | "percent" | "status" | "files" | "poster" | "made_with">;
 export type StackMakeRefusalRead = StackMakeRefusal | { code: "not_available"; line: string };
