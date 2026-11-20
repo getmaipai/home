@@ -28,6 +28,11 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { until } from "./pictureFixture";
+import { videoSizeFor } from "@/lib/videos/quality";
+import { readyVideoStatusForTests } from "@/lib/videos/ready";
+// 534d4c229 (VIDEO-WAN-HIDE-01): an adult's Standard clip is made on the sound maker, so its size is the code's own Standard size for it, not the removed quick model's 832x480.
+const standardSize = (portrait: boolean): string => videoSizeFor("ltx25", "quick", portrait, readyVideoStatusForTests({ ltx25: "ready" }));
+
 
 let people: BenchPeople;
 let fake: FakeVideoStack;
@@ -120,7 +125,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const sent = fake.submitted[0]!;
       expect(sent.prompt).toBe("a paper boat floating down a rainy street, soft light");
       expect(sent.timeout_ms).toBe(1);
-      expect(sent.size).toBe("832x480");
+      expect(sent.size).toBe(standardSize(false));
       expect(sent.seconds).toBe(5);
       expect(sent.audience).toBe("adult");
       expect(sent.image).toBeUndefined();
@@ -173,7 +178,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     await withStub(script(call), async () => {
       await streamValue(people.owner, "a phone-shaped 3 second clip of a street fair in old colour film");
       const sent = fake.submitted[0]!;
-      expect(sent.size).toBe("480x832");
+      expect(sent.size).toBe(standardSize(true));
       expect(sent.seconds).toBe(3);
       expect(sent.prompt).toBe("HST style, a street fair");
       expect(sent.loras).toEqual([{ id: "lora-1111111111111111", strength: 1 }]);

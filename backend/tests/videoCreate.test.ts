@@ -28,6 +28,10 @@ import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { PACKAGES_DIR } from "@/lib/paths";
 import { people as peopleTable } from "@/db/schema";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
+import { videoSizeFor } from "@/lib/videos/quality";
+// 534d4c229 (VIDEO-WAN-HIDE-01): an adult's Standard clip is made on the sound maker, so its size is the code's own Standard size for it, not the removed quick model's 832x480.
+const standardSize = (portrait: boolean): string => videoSizeFor("ltx25", "quick", portrait, readyVideoStatusForTests({ ltx25: "ready" }));
+
 
 let fake: FakeVideoStack;
 beforeEach(() => { resetDb(); __resetVideoAdapterCacheForTests(); fake = installFakeVideoStack(); });
@@ -127,7 +131,7 @@ describe("POST /api/videos/make", () => {
     const sent = fake.submitted[0]!;
     expect(String(sent.prompt)).toStartWith(BOAT);
     expect(String(sent.prompt)).toContain(videoRecipeFor("dolly-in")!.wording);
-    expect(sent.size).toBe("480x832");
+    expect(sent.size).toBe(standardSize(true));
     expect(sent.audience).toBe("adult");
     // While it is made the Make page lists it; when it finishes it is a kept Library file the person can open.
     const actor = db.select().from(peopleTable).where(eq(peopleTable.id, (await (await adult.client.get("/api/auth/me")).json() as { id: string }).id)).get()! as PersonRow;
@@ -299,14 +303,14 @@ describe("the Create page and the make action", () => {
     const { adult } = await household();
     const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "portrait", seconds: 10, tier: "standard", recipe: "none" });
     expect(res.status).toBe(200);
-    expect(fake.submitted[0]!.size).toBe("480x832");
+    expect(fake.submitted[0]!.size).toBe(standardSize(true));
   });
 
   test("untouched fields arrive as {name} and mean not given; a typed shape, length and recipe name are used", async () => {
     const { adult } = await household();
     const res = await adult.client.post("/api/plugins/video/actions/make", { prompt: BOAT, orientation: "{orientation}", seconds: "{seconds}", tier: "{tier}", recipe: "Slow orbit" });
     expect(res.status).toBe(200);
-    expect(fake.submitted[0]!.size).toBe("832x480");
+    expect(fake.submitted[0]!.size).toBe(standardSize(false));
     expect(String(fake.submitted[0]!.prompt)).toContain(videoRecipeFor("slow-orbit")!.wording);
   });
   // ONE-COMPOSER-2026-11-13: the From a picture and Animate pages ask for a picture; an empty slot is one plain line and nothing starts.
@@ -430,7 +434,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(fake.submitted).toHaveLength(2);
     const [a, b] = fake.submitted as Array<Record<string, unknown>>;
     expect(b!.prompt).toBe(a!.prompt);
-    expect(b!.size).toBe("480x832");
+    expect(b!.size).toBe(standardSize(true));
     expect(String(b!.prompt)).toStartWith(videoLookFor("anime")!.wording);
     await until(() => getVideoJobFor(actor, card.id)?.state === "done");
     const viaAction = await adult.client.post("/api/plugins/video/actions/another", { id: card.id });
@@ -477,7 +481,7 @@ describe("U3: Start frame", () => {
     const sent = fake.submitted[0]!;
     expect(sent.image_source).toBe("uploaded");
     expect(Buffer.from(sent.image as string, "base64").equals(Buffer.from(png))).toBe(true);
-    expect(sent.size).toBe("480x832");
+    expect(sent.size).toBe(standardSize(true));
   });
 
   test("an empty slot leaves {start_frame} in place and means no picture: a text clip", async () => {
