@@ -175,9 +175,9 @@ describe("an app that declares a sidebar", () => {
     cleanup();
     const phone = open("/apps/demo", 402);
     await phone.findByText("Today's stories");
-    // A phone shows the sections in the floating bottom bar, not as a row of pills (phone-minimal-2026-10-25 P2).
-    expect(phone.container.querySelector('nav[aria-label$="sections"]')).not.toBeNull();
-    expect(phone.container.querySelector('[data-slot="app-section-tabs"]')).toBeNull();
+    // A phone shows the sections as the row of pills under the header; the bottom bar is the shell's own (Home, Media, Create, Library), not the app's sections (the real app at 390 px, and PackageAppPage.test.tsx, agree).
+    expect(phone.container.querySelector('nav[aria-label$="sections"]')).toBeNull();
+    expect(phone.container.querySelector('[data-slot="app-section-tabs"]')).not.toBeNull();
   });
 
   test("an app with no sidebar draws no column and keeps its tabs as they were", async () => {
