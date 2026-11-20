@@ -84,8 +84,7 @@ describe("C1: generate_video declares what the Create page has", () => {
     expect(props.tier!.enum).toEqual(["standard", "boost", "max"]);
     expect(props.seconds).toMatchObject({ minimum: 1, maximum: 10 });
     expect(props.quality).toBeUndefined();
-    expect(props.prompt!.description).toContain("quotes");
-    expect(props.prompt!.description).toContain("one speaker at a time");
+    expect(props.prompt!.description).toBe("Scene; quoted lines, one speaker at a time.");   // the wording since 136ba4468 (2026-11-15, the Create page rewrite); it said "quotes" before
     expect(props.look!.description).toContain("era, style");
   });
 
