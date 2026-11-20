@@ -15,6 +15,7 @@ if [[ "${1:-}" == "--links" ]]; then
     [[ -d "$root" ]] || continue
     while IFS= read -r link; do
       dest="$(readlink "$link")"; [[ "$dest" == /* ]] || dest="$(dirname "$link")/$dest"
+      dest="$(cd "$(dirname "$dest")" 2>/dev/null && pwd -P)/$(basename "$dest")"
       case "$dest" in "$target"|"$target"/*) echo "  $link -> $dest"; found=1;; esac
     done < <(find "$root" -maxdepth 6 -type l -not -path '*/node_modules/*' 2>/dev/null)
   done
