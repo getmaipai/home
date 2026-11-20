@@ -20,8 +20,9 @@ import { promptCheck } from "./promptDoor";
 import { rewriteForChild } from "./childRewrite";
 import { MAX_REFERENCE_PICTURES, pictureEngineReferences, pictureEngineStatus, pictureEngineStatusPatient, pictureReferenceLimit } from "./ready";
 import { allowedQuality, jobTier, tierArgument } from "@/lib/tiers";
-import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, PICTURE_MODEL, REMOVED_MODEL_LINE, modelCanSpell } from "./quality";
-import { StackPicturesError } from "./stack";
+import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE, REMOVED_MODEL_LINE, type QualityChoice } from "./quality";
+import { listOfAudience, makePicture, pictureJobFor, StackPicturesError } from "./stack";
+import { needsNoTextLine, wordsCanStart } from "./catalog";
 import { getTemplate } from "@/lib/media/templates";
 import { composePicturePrompt, PICTURE_PICK_KEYS, resolvePicks, type PictureFragmentPicks } from "@/lib/media/pictureFragments";
 import { runMediaOp } from "@/lib/mediaOps/registry";
@@ -289,7 +290,10 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const count = clampCount(totalCount, maxN);
   const aspectSize: Record<string, string> = { "1:1":"square", "3:2":"landscape", "2:3":"portrait", "16:9":"wide", "9:16":"tall" };
   const chosenAspect = template?.aspect ?? presetAspect;
-  const size = PICTURE_SIZES[chosenAspect ? aspectSize[chosenAspect] ?? "square" : typeof args.size === "string" ? args.size : "square"] ?? PICTURE_SIZES.square!;
+  const shapeKey = chosenAspect ? aspectSize[chosenAspect] ?? "square" : typeof args.size === "string" ? args.size : "square";
+  const size = PICTURE_SIZES[shapeKey] ?? PICTURE_SIZES.square!;
+  /** The generic job's shape for this size, when it has one (wide and tall are not shapes of the generic job). */
+  const genericShape: "square" | "landscape" | "portrait" | null = shapeKey === "landscape" || shapeKey === "portrait" || shapeKey === "square" ? shapeKey : PICTURE_SIZES[shapeKey] ? null : "square";
 
   // Only an adapter this person may use right now can match; the model never sees the library.
   const available = await adaptersFor(adapterAudiencesFor(audience));
@@ -328,13 +332,21 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
   const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "image", arg: args.tier, band: audience.band });
-  const regularChoice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: PICTURE_MODEL, note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter, engine });
+  const regularChoice: QualityChoice = kid ? { quality: "quick", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter });
   if (regularChoice.removed) return refused(callId, args, { kind: "plan", why: "style_plan", line: REMOVED_MODEL_LINE });
-  const maker = engine.models?.find((model) => model.id === PICTURE_MODEL);
-  if (words.length && (!maker?.installed || maker.available === false)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: Words on a picture need the picture model, and it is not ready on this computer. An admin can check Settings, AI and models, then try again." }, data: { refused: "text_model_missing" }, actions: [] } });
-  const choice = words.length ? { quality: "quick" as const, model: PICTURE_MODEL, note: null, announce: false } : regularChoice;
+  // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
+  const sentAudience = lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages";
+  // Rule W1: a picture with words runs only on a part that spells them. The jobs catalog says whether one is on (`capabilities.text`, or another part in the list that the Stack can pick); no list of models is kept here.
+  const pictureView = await pictureJobFor("picture", listOfAudience(sentAudience));
+  // What the person asked for in the generic job's words: only a words picture that is nothing more than that (no style, no reference, not a child's) can be asked of the generic job.
+  const genericAsk = words.length && genericShape && !kid && !plan?.ok && !adapter && !combinedRefs.length ? { description: subjectPromptBase, words, shape: genericShape } : null;
+  // The part shown does not spell but another one in the list may: only the generic job lets the Stack pick it, so the first take is asked of that job.
+  const stackPicksPart = words.length > 0 && pictureView !== null && pictureView.available && !pictureView.text && pictureView.alternatives.length > 0 && genericAsk !== null;
+  if (words.length && !stackPicksPart && !wordsCanStart(pictureView)) return outcomeOf({ callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No picture was made. Say this to the person in your own words: Words on a picture need the picture model, and it is not ready on this computer. An admin can check Settings, AI and models, then try again." }, data: { refused: "text_model_missing" }, actions: [] } });
+  const choice: QualityChoice = words.length ? { quality: "quick", note: null, announce: false } : regularChoice;
   const textPrompt = words.length ? `${subjectPromptBase}. Show this text on the picture, spelled exactly as written: ${words.map((word) => `"${word}"`).join(", ")}.` : subjectPromptBase;
-  const addNoText = !words.length && !modelCanSpell(choice.model);
+  // Rule W2: a picture with no words says so when the catalog does not mark the part `text: true`.
+  const addNoText = !words.length && needsNoTextLine(pictureView);
   const subjectPrompt = addNoText ? `${textPrompt}. No text, no letters, no words, no logos anywhere in the picture.` : textPrompt;
   const qualityNote = tierAsked.line ? ` ${tierAsked.line}` : choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
@@ -361,13 +373,18 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         prompt: kid ? forceCartoon(subjectPrompt) : subjectPrompt,
         size,
         n: extra ? 1 : kid ? Math.min(count, KID_MAX_COUNT) : createPage && combinedRefs.length ? 1 : count,
-        ...(choice.model ? { model: choice.model } : {}),
         ...(input.scene ? { seed: input.scene.seed } : {}),
-        // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
-        audience: lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages",
+        audience: sentAudience,
         ...(plan?.ok ? { loras: plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength })) } : adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...((kid || addNoText) ? { negative_prompt: [kid ? CHILD_NEGATIVE_PROMPT : "", addNoText ? "text, letters, words, logos, watermark" : ""].filter(Boolean).join(", ") } : {}),
+        // What the person asked for, kept for the spelling re-make (rule W4).
+        ...(genericAsk ? { ask: genericAsk } : {}),
       },
+      ...(stackPicksPart && genericAsk ? { submit: async () => {
+        const made = await makePicture({ job: "picture", audience: listOfAudience(sentAudience), description: genericAsk.description, words: genericAsk.words.join("\n"), shape: genericAsk.shape, level: "standard", count: extra ? 1 : count, ...(input.scene ? { seed: input.scene.seed } : {}) });
+        if (!made.ok) throw new StackPicturesError(409, made.refusal.code, made.refusal.line);
+        return { job: made.job, done: null };
+      } } : {}),
       ...(combinedRefs.length ? { submit: async () => {
         const form = new FormData();
         form.append("image", new File([new Uint8Array(combinedRefs[0]!.bytes)], "picture-reference", { type: combinedRefs[0]!.mediaType }));

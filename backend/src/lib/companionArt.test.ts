@@ -5,7 +5,7 @@ import { createHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { addTake, readStates, __parseStatesForTests, takePath } from "@/lib/companionStates";
 import { addVersion, readLook, updateSheet, setRest, versionPath } from "@/lib/companionLook";
-import { resolveCompanionStillFromStatus, stackVideoModel, resolveCompanionClipFromStatus, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests } from "@/lib/companionArt";
+import { resolveCompanionStillFromCatalog, stackVideoModel, resolveCompanionClipFromStatus, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests } from "@/lib/companionArt";
 import { startLookGeneration, startLookEdit, __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { startStateTakes, __clearCompanionTakeRunsForTests } from "@/lib/companionTakes";
 import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
@@ -29,18 +29,11 @@ beforeEach(() => { rmSync(root, { recursive: true, force: true }); db.delete(set
 afterEach(() => { rmSync(root, { recursive: true, force: true }); db.delete(settingsValues).run(); __setPictureStatusForTests(undefined); __setVideoStatusForTests(undefined); __setCompanionArtStatusReadersForTests(null); __setStackClientForTests(null); __setPicturesFetchForTests(null); __setVideosFetchForTests(null); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); });
 
 describe("companion art model resolution", () => {
-  test("still honors household quality and refuses unavailable Detailed", () => {
-    const set = (key: string, value: unknown) => setHouseholdSettingValue(key, value);
-    writeChoiceSetting("engines.image.tier.standard", "ernie");
-    const ernie = readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true }, { id: "ernie-image-turbo", installed: true }] as never });
-    expect(resolveCompanionStillFromStatus(ernie)).toEqual({ model: "ernie-image-turbo", quality: "quick" });
-    writeChoiceSetting("engines.image.tier.standard", "klein");
-    const klein = resolveCompanionStillFromStatus(readyStatusForTests());
-    expect(klein.model).toBe("flux2-klein-4b");
-    set("generation.picture_tier", "boost"); writeChoiceSetting("engines.image.tier.standard", "ernie");
-    const detailed = readyStatusForTests({ models: [{ id: "z-image-turbo", installed: true, available: true }] as never });
-    expect(resolveCompanionStillFromStatus(detailed)).toEqual({ model: "z-image-turbo", quality: "detailed" });
-    try { resolveCompanionStillFromStatus(readyStatusForTests({ models: [{ id: "z-image-turbo", installed: false, available: false }] as never })); throw new Error("expected refusal"); }
+  test("a still is the part the jobs catalog serves, and is refused when none is on", () => {
+    expect(resolveCompanionStillFromCatalog({ available: true, part: { id: "part-x" } })).toEqual({ model: "part-x", quality: "quick" });
+    // A catalog that cannot be read leaves the part to the Stack.
+    expect(resolveCompanionStillFromCatalog(null)).toEqual({ model: null, quality: "quick" });
+    try { resolveCompanionStillFromCatalog({ available: false, part: null }); throw new Error("expected refusal"); }
     catch (error) { expect((error as Error).message).toContain("Settings, AI and models"); expect((error as { status?: number }).status).toBe(503); }
   });
 
@@ -58,7 +51,7 @@ describe("companion art model resolution", () => {
     // LTX-2.3 Detailed maker retired, Wan rejected) the quick clip on a Boost household is LTX-2.5 at quick quality.
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }))).toEqual({ model: "ltx25-q8", quality: "quick" });
     expect(resolveCompanionClipFromStatus(readyVideoStatusForTests({ ltx25: "ready" }), "detailed")).toEqual({ model: "fastwan2-2-ti2v-5b-mlx-bf16", quality: "quick" });
-    expect(resolveCompanionEdit().model).toBe("flux2-klein-4b");
+    expect(resolveCompanionEdit().model).toBeNull();
   });
 
   test("records model and prompt hash and old take JSON still parses", () => {
@@ -83,7 +76,7 @@ describe("companion art model resolution", () => {
     expect(COMPANION_MODEL_MISMATCH_LINE).toBe("The picture came out different from the one chosen. Try again.");
   });
 
-  test("sends explicit models through generation, edit and take submissions", async () => {
+  test("sends no picture model and an explicit video model through generation, edit and take submissions", async () => {
     const result = createHouseholdCompanion({ ...fixture.value.companion!, display_name: "Submit model test" }, { display_name: "Author", person_id: "art-test" });
     if (!result.ok) throw new Error(result.error);
     const id = result.value.id, image = new Uint8Array(await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer());
@@ -94,7 +87,7 @@ describe("companion art model resolution", () => {
     const calls: Array<{ kind: string; model?: string }> = [];
     __setPicturesFetchForTests((async (_input, init) => {
       if (init?.method === "POST" && String(_input).includes("/v1/images/generations")) { const body = JSON.parse(String(init.body)); calls.push({ kind: "generation", model: body.model }); return Response.json({ job: "pic-job", data: [] }, { status: 202 }); }
-      if (init?.method === "POST" && String(_input).includes("/v1/images/edits")) { const form = init.body as FormData; calls.push({ kind: "edit", model: String(form.get("model")) }); return Response.json({ job: `edit-${calls.length}` }, { status: 202 }); }
+      if (init?.method === "POST" && String(_input).includes("/v1/images/edits")) { const form = init.body as FormData; calls.push({ kind: "edit", ...(form.has("model") ? { model: String(form.get("model")) } : {}) }); return Response.json({ job: `edit-${calls.length}` }, { status: 202 }); }
       if (String(_input).includes("/v1/images/generations/pic-job")) return Response.json({ job: "pic-job", state: "queued", data: [] });
       return new Response(image, { status: 200 });
     }) as typeof fetch);
@@ -103,7 +96,8 @@ describe("companion art model resolution", () => {
     __clearCompanionLookJobsForTests();
     await startLookEdit({ actor, companionId: id, versionId: v.id, instruction: "make it blue" });
     __clearCompanionLookJobsForTests();
-    expect(calls.filter((call) => call.kind === "generation" || call.kind === "edit").every((call) => typeof call.model === "string" && call.model.length > 0)).toBe(true);
+    // A picture names no part of its own: the Stack picks (the catalog here is not served, so the transport adds none either).
+    expect(calls.filter((call) => call.kind === "generation" || call.kind === "edit").every((call) => call.model === undefined)).toBe(true);
 
     const rest = addVersion(id, image, { source: "generated", label: "Rest", width: 16, height: 16, from: null }); setRest(id, rest.id);
     writeFileSync(join(root, id, "look", `${rest.id}.orig.png`), image);

@@ -14,9 +14,8 @@ import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversati
 import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
-import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
-import { chooseQuality, detailedReady, isRemovedPictureModel, modelCanSpell, PICTURE_MODEL, qualityOfModel, QUALITY_NOTE_LINE, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
-import { nameEditModel } from "@/lib/pictures/editTool";
+import { __setPictureStatusForTests, readyStatusForTests, TEST_PICTURE_PART } from "@/lib/pictures/ready";
+import { chooseQuality, detailedReady, isRemovedPictureModel, QUALITY_NOTE_LINE, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
 import { cardView } from "@/routes/pictures";
 import { adaptersFor, __resetAdapterCacheForTests } from "@/lib/pictures/adapters";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -30,7 +29,7 @@ import { people as peopleTable } from "@/db/schema";
 let people: BenchPeople;
 let fake: FakeImageStack;
 
-const MINIMAX = { id: PICTURE_MODEL, family: "minimax-h3-image", installed: true, available: true, licence: "MiniMax-H3-Image Community License", loras: false, edit: true, steps_default: 6, max_references: 2, peak_gb: 22 };
+const MINIMAX = { id: TEST_PICTURE_PART, family: "test-family", installed: true, available: true, licence: "Test licence", loras: false, edit: true, steps_default: 6, max_references: 2, peak_gb: 22 };
 const REMOVED = ["flux2-klein-4b", "ernie-image-turbo", "z-image-turbo"] as const;
 const removedLora = (id: string, name: string, base: string) => ({ ...TEST_LORAS[0]!, id, name, sha256: id.slice(5, 6).repeat(64), base_model: base, trigger_words: [name.toLowerCase()] });
 
@@ -76,26 +75,18 @@ async function run(args: Record<string, unknown>, text = "draw a red fox"): Prom
   return told;
 }
 
-describe("chooseQuality (one picture model)", () => {
-  const eng = { models: [MINIMAX] };
-  test("every request is the one picture model, Quick or Detailed asked", () => {
-    expect(chooseQuality({ engine: eng, household: "quick" })).toEqual({ quality: "quick", model: PICTURE_MODEL, note: null, announce: false });
-    expect(chooseQuality({ requested: "detailed", engine: eng })).toEqual({ quality: "quick", model: PICTURE_MODEL, note: null, announce: false });
-  });
-  test("a Stack that does not list it leaves the model unnamed (the Stack's own default)", () => {
-    expect(chooseQuality({ engine: { models: [{ ...MINIMAX, installed: false }] } })).toEqual({ quality: "quick", note: null, announce: false });
-    expect(chooseQuality({ engine: null })).toEqual({ quality: "quick", note: null, announce: false });
+describe("chooseQuality (the Stack picks the part)", () => {
+  test("every request is Quick, Quick or Detailed asked, and names no model", () => {
+    expect(chooseQuality({ household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+    expect(chooseQuality({ requested: "detailed" })).toEqual({ quality: "quick", note: null, announce: false });
   });
   test("a style made for a removed model is refused (removed), never quietly run on another model", () => {
-    for (const base of REMOVED) expect(chooseQuality({ style: { base_model: base }, engine: eng })).toMatchObject({ removed: true });
-    expect(chooseQuality({ style: { base_model: PICTURE_MODEL }, engine: eng })).toMatchObject({ quality: "quick", model: PICTURE_MODEL });
+    for (const base of REMOVED) expect(chooseQuality({ style: { base_model: base } })).toMatchObject({ removed: true });
+    expect(chooseQuality({ style: { base_model: TEST_PICTURE_PART } })).toEqual({ quality: "quick", note: null, announce: false });
   });
-  test("only the one model maps to a quality; the removed ones map to nothing", () => {
-    expect(qualityOfModel(PICTURE_MODEL)).toBe("quick");
-    for (const base of REMOVED) { expect(qualityOfModel(base)).toBeNull(); expect(isRemovedPictureModel(base)).toBe(true); }
-    expect(isRemovedPictureModel(PICTURE_MODEL)).toBe(false);
-    expect(modelCanSpell(PICTURE_MODEL)).toBe(true);
-    expect(modelCanSpell("flux2-klein-4b")).toBe(false);
+  test("the removed models are recognized, the part the Stack serves is not", () => {
+    for (const base of REMOVED) expect(isRemovedPictureModel(base)).toBe(true);
+    expect(isRemovedPictureModel(TEST_PICTURE_PART)).toBe(false);
   });
   test("there is no separate Detailed model to switch to", () => {
     expect(detailedReady({ models: [MINIMAX] })).toBe(false);
@@ -103,23 +94,37 @@ describe("chooseQuality (one picture model)", () => {
 });
 
 describe("the chat tool", () => {
-  test("a plain request names the one picture model and adds no no-text sentence", async () => {
+  test("a plain request names no model of its own and adds no no-text sentence", async () => {
     await run({});
-    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
+    expect(fake.submitted[0]!.model).toBeUndefined();
     expect(String(fake.submitted[0]!.prompt)).not.toContain("No text, no letters");
     await until(() => fake.jobs.length > 0);
   });
 
-  test("words use the one model and append the exact words after the prompt, Detailed or not", async () => {
+  test("a plain request goes to the part the jobs catalog says serves it, whose id the Stack gave", async () => {
+    fake.serveCatalog([{ id: "part-x", text: true }]);
+    await run({});
+    expect(fake.submitted[0]!.model).toBe("part-x");
+    expect(String(fake.submitted[0]!.prompt)).not.toContain("No text, no letters");
+  });
+
+  test("a picture with no words says so when the catalog does not mark the part as spelling words (rule W2)", async () => {
+    fake.serveCatalog([{ id: "part-x", text: false }]);
+    await run({});
+    expect(String(fake.submitted[0]!.prompt)).toContain("No text, no letters, no words, no logos anywhere in the picture.");
+    expect(String(fake.submitted[0]!.negative_prompt)).toContain("text, letters, words, logos, watermark");
+  });
+
+  test("words append the exact words after the prompt, Detailed or not", async () => {
     await run({ words: ["  Hello  ", "World"], quality: "detailed" });
-    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
+    expect(fake.submitted[0]!.model).toBeUndefined();
     expect(fake.submitted[0]!.prompt).toContain('Show this text on the picture, spelled exactly as written: "Hello", "World".');
     expect(fake.submitted[0]!.prompt).not.toContain("No text, no letters");
     await until(() => fake.jobs.length > 0);
   });
 
-  test("words with the picture model not installed are refused before a picture job starts, naming no removed model", async () => {
-    __setPictureStatusForTests(readyStatusForTests({ models: [{ ...MINIMAX, installed: false }] }));
+  test("words with no part on that spells them are refused before a picture job starts, naming no removed model", async () => {
+    fake.serveCatalog([]);
     const told = await run({ words: ["Hello"] });
     expect(told).toContain("No picture was made");
     expect(told).toContain("Words on a picture need the picture model");
@@ -128,9 +133,27 @@ describe("the chat tool", () => {
     expect(fake.jobs).toHaveLength(0);
   });
 
+  test("words where the part shown cannot spell but another part is on: the Stack picks the part, through the generic picture job (rule W1)", async () => {
+    fake.serveCatalog([{ id: "part-x", text: false }, { id: "part-y", text: true }]);
+    const told = await run({ words: ["Hello", "World"] });
+    expect(told).not.toContain("No picture was made");
+    await until(() => fake.makes.length > 0);
+    expect(fake.makes[0]).toMatchObject({ job: "picture", description: "a red fox in the snow, soft morning light", words: "Hello\nWorld", shape: "square", level: "standard", count: 1 });
+    expect(fake.makes[0]!.part).toBeUndefined();
+    expect(fake.submitted).toHaveLength(0);
+  });
+
+  test("words where the part shown cannot spell and the picture has a style are refused: never made on a part that misspells (rule W1)", async () => {
+    fake.serveCatalog([{ id: "part-x", text: false }, { id: "part-y", text: true }]);
+    const told = await run({ words: ["Hello"], style: "pixel art" });
+    expect(told).toContain("Words on a picture need the picture model");
+    expect(fake.makes).toHaveLength(0);
+    expect(fake.submitted).toHaveLength(0);
+  });
+
   test("the model asking for Detailed makes the same picture without a note about a second model", async () => {
     const told = await run({ quality: "detailed" }, "the most detailed, photoreal fox you can");
-    expect(fake.submitted[0]!.model).toBe(PICTURE_MODEL);
+    expect(fake.submitted[0]!.model).toBeUndefined();
     expect(told).not.toMatch(/z-image|klein|flux|ernie/i);
     expect(told).not.toContain("not on this computer yet");
   });
@@ -149,11 +172,6 @@ describe("the chat tool", () => {
     expect(fake.submitted).toHaveLength(0);
   });
 
-  test("all edit forms name the one picture model", () => {
-    const form = new FormData();
-    nameEditModel(form);
-    expect(form.get("model")).toBe(PICTURE_MODEL);
-  });
 });
 
 test("no default, copy or note names a removed model", async () => {
@@ -188,7 +206,7 @@ describe("the card and its switch", () => {
     await until(() => getPictureJob(actor, job.id)?.state === "done");
     const again = await client.post(`/api/pictures/jobs/${job.id}/variation`, { quality: "detailed" });
     expect(again.status).toBe(200);
-    expect(fake.submitted.at(-1)!.model).toBe(PICTURE_MODEL);
+    expect(fake.submitted.at(-1)!.model).toBeUndefined();
   });
 });
 

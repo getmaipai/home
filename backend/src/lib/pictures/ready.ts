@@ -5,7 +5,6 @@
 import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { imageStatus, type StackImageStatus } from "./stack";
-import { PICTURE_MODEL } from "./quality";
 
 let cached: { at: number; status: StackImageStatus | null } | null = null;
 let forTests: StackImageStatus | null | undefined;
@@ -88,11 +87,14 @@ export async function pictureEngineReady(): Promise<boolean> {
   return status.available !== false;
 }
 
+/** The id of the one part in a test status: an opaque id, like every part id Home is given. */
+export const TEST_PICTURE_PART = "picture-part-a";
+
 /** A test status that is ready. */
 export function readyStatusForTests(overrides: Partial<StackImageStatus> = {}): StackImageStatus {
   return {
-    state: "idle", phase: null, available: true, reason: null, default_model: PICTURE_MODEL,
-    models: [{ id: PICTURE_MODEL, family: "minimax-h3-image", installed: true, licence: "MiniMax-H3-Image Community License", loras: false, edit: true, steps_default: 6, peak_gb: 22 }],
+    state: "idle", phase: null, available: true, reason: null, default_model: TEST_PICTURE_PART,
+    models: [{ id: TEST_PICTURE_PART, family: "test-family", installed: true, licence: "Test licence", loras: false, edit: true, steps_default: 6, peak_gb: 22 }],
     loras_supported: true, edit: { generative: true, masked: true, references: 2 },
     limits: { min_side: 256, max_side: 2048, size_step: 16, max_n: 4, max_prompt_chars: 2000, max_loras: 3, queue_max: 8 }, idle_unload_s: 600,
     memory: { fits: true, reason: null, peak_gb: 13.5 },

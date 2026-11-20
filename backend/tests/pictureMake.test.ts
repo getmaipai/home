@@ -252,6 +252,7 @@ describe("references sent to the Stack", () => {
   test("three pictures go as image, reference and reference2, each field once, each with its own source", async () => {
     const { __setPictureStatusForTests, readyStatusForTests } = await import("@/lib/pictures/ready");
     __setPictureStatusForTests(readyStatusForTests({ edit: { generative: true, masked: true, references: 2 } }));
+    fake.serveCatalog([{ id: "edit-part", text: true }]);
     try {
       const refs = [file(owner, await png()), file(owner, await png()), file(owner, await png())];
       const read = readPictureMakeBody({ prompt: "a boat at sunset", references: refs.map((ref) => ref.id) });
@@ -265,8 +266,8 @@ describe("references sent to the Stack", () => {
       expect(sent.reference_source).toBeDefined();
       expect(sent.reference2_source).toBeDefined();
       expect(sent.reference3).toBeUndefined();
-      // An edit that names no model reaches the Stack's own edit default, which is a removed model: Home always names the one picture model.
-      expect(sent.model).toBe("minimax-h3-image");
+      // An edit that names no model reaches the Stack's own edit default, which can be a model that is gone: the part the jobs catalog serves for edits is named.
+      expect(sent.model).toBe("edit-part");
     } finally { __setPictureStatusForTests(undefined); }
   });
 });

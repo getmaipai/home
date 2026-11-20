@@ -5,8 +5,8 @@ import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { getPictureJob, startPictureJob, __resetPictureJobsForTests } from "@/lib/pictures/jobs";
-import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
-import { PICTURE_MODEL, qualityOfModel, chooseQuality } from "@/lib/pictures/quality";
+import { __setPictureStatusForTests, readyStatusForTests, TEST_PICTURE_PART } from "@/lib/pictures/ready";
+import { chooseQuality } from "@/lib/pictures/quality";
 import { RECOMMENDED_MAX_IMAGE_MODEL, jobTier, maxAvailable, slotKey, MAX_NOT_ON_THIS_COMPUTER_LINE, authorizeTier, type Tier } from "@/lib/tiers";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
 
@@ -14,8 +14,8 @@ let people: BenchPeople;
 let fake: FakeImageStack;
 
 const model = (id: string) => ({ id, family: id.split("-")[0]!, installed: true, licence: "Apache-2.0", loras: true, edit: false, steps_default: 8, peak_gb: 20 });
-const KLEIN = model(PICTURE_MODEL);
-const ZIMAGE = model(PICTURE_MODEL);
+const KLEIN = model(TEST_PICTURE_PART);
+const ZIMAGE = model(TEST_PICTURE_PART);
 const QWEN = model(RECOMMENDED_MAX_IMAGE_MODEL);
 const slot = (tier: Tier, value: string) => setHouseholdSettingValue(slotKey("image", tier), { model: value, options: {} });
 
@@ -30,31 +30,31 @@ afterEach(() => { __resetPictureJobsForTests(); fake.restore(); __setPictureStat
 /** Queues one picture at `tier`, waits for the Stack to receive it and returns what it received and the stored job. */
 async function send(tier: Tier | undefined, body: Record<string, unknown> = {}, actor = people.owner) {
   const before = fake.submitted.length;
-  const job = await startPictureJob({ actor, conversationId: null, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", ...(tier ? { tier } : {}), body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult", ...(tier === "boost" || tier === "max" ? { model: PICTURE_MODEL } : {}), ...body } as never });
+  const job = await startPictureJob({ actor, conversationId: null, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", ...(tier ? { tier } : {}), body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult", ...body } as never });
   await until(() => fake.submitted.length > before);
   return { sent: fake.submitted.at(-1)!, job: getPictureJob(actor, job.id)! };
 }
 
 describe("TIER-PIC-01 a picture runs its level slot", () => {
-  test("(a) a Boost slot pinned to Klein sends that model and tier boost", async () => {
-    slot("boost", PICTURE_MODEL);
+  test("(a) a Boost slot the household pinned sends that part and tier boost", async () => {
+    slot("boost", TEST_PICTURE_PART);
     const { sent, job } = await send("boost");
-    expect(sent.model).toBe(PICTURE_MODEL);
+    expect(sent.model).toBe(TEST_PICTURE_PART);
     expect(sent.tier).toBe("boost");
     expect(job.request.tier).toBe("boost");
     expect(job.request.lowered).toBeUndefined();
   });
 
-  test("a Boost slot left on recommended keeps the Detailed model and still sends the level", async () => {
+  test("a Boost slot left on recommended names no part (the Stack picks) and still sends the level", async () => {
     const { sent } = await send("boost");
-    expect(sent.model).toBe(PICTURE_MODEL);
+    expect(sent.model).toBeUndefined();
     expect(sent.tier).toBe("boost");
   });
 
-  test("(b) a Boost slot switched off runs at Standard with the Standard model, lowered", async () => {
+  test("(b) a Boost slot switched off runs at Standard and names no part, lowered", async () => {
     slot("boost", "off");
     const { sent, job } = await send("boost");
-    expect(sent.model).toBe(PICTURE_MODEL);
+    expect(sent.model).toBeUndefined();
     expect(sent.tier).toBeUndefined();
     expect(job.request.tier).toBeUndefined();
     expect(job.request.lowered).toBe(true);
@@ -78,11 +78,11 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
     expect(sent.tier).toBe("max");
   });
 
-  test("(d) Max without Qwen-Image runs at Boost with the Boost model and keeps the line", async () => {
+  test("(d) Max without Qwen-Image runs at Boost with the Boost slot's part and keeps the line", async () => {
     expect(maxAvailable("image")).toBe(false);
     expect(jobTier("image", "max", "detailed")).toBe("boost");
     const { sent, job } = await send("max");
-    expect(sent.model).toBe(PICTURE_MODEL);
+    expect(sent.model).toBeUndefined();
     expect(sent.tier).toBe("boost");
     expect(job.request.tier).toBe("boost");
     expect(job.request.lowered).toBe(true);
@@ -91,12 +91,12 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
 
   test("(e) a child's picture never exceeds Standard whatever the slots say", async () => {
     __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE, QWEN] }));
-    slot("boost", PICTURE_MODEL);
+    slot("boost", TEST_PICTURE_PART);
     slot("max", RECOMMENDED_MAX_IMAGE_MODEL);
     expect(authorizeTier({ person: people.child, category: "image", requested: "max" }).tier).toBe("standard");
-    const { sent, job } = await send("max", { audience: "all-ages", model: PICTURE_MODEL }, people.child);
+    const { sent, job } = await send("max", { audience: "all-ages" }, people.child);
     expect(sent.tier).toBeUndefined();
-    expect(sent.model).toBe(PICTURE_MODEL);
+    expect(sent.model).toBeUndefined();
     expect(job.request.tier).toBeUndefined();
   });
 
@@ -107,11 +107,10 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
     expect(job.request.lowered).toBeUndefined();
   });
 
-  test("(f) Quick is Standard, Detailed is Boost, both on the one picture model", () => {
-    expect(qualityOfModel(PICTURE_MODEL)).toBe("quick");
-    expect(chooseQuality({ requested: "quick", engine: readyStatusForTests({ models: [KLEIN, ZIMAGE] }) }).quality).toBe("quick");
-    // One model serves both levels: Detailed asked for is the same model at the Boost level, not a second maker.
-    expect(chooseQuality({ requested: "detailed", engine: readyStatusForTests({ models: [KLEIN, ZIMAGE] }) })).toMatchObject({ quality: "quick", model: PICTURE_MODEL });
+  test("(f) Quick is Standard, Detailed is Boost, both on the part the Stack picks", () => {
+    expect(chooseQuality({ requested: "quick" }).quality).toBe("quick");
+    // One part serves both levels: Detailed asked for is the same part at the Boost level, not a second maker.
+    expect(chooseQuality({ requested: "detailed" })).toMatchObject({ quality: "quick" });
     expect(jobTier("image", "boost", "quick")).toBe("standard");
     expect(jobTier("image", "boost", "detailed")).toBe("boost");
   });

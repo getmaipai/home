@@ -16,7 +16,7 @@ import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { getLoraRecord } from "@/lib/loras/store";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
-import { chooseQuality, detailedReady, isPictureQuality, PICTURE_MODEL, plainPrompt, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
+import { chooseQuality, detailedReady, isPictureQuality, plainPrompt, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
@@ -260,7 +260,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
-  const choice = kid ? { quality: "quick" as const, model: PICTURE_MODEL, note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).quality ?? source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null, engine: await pictureEngineStatus() });
+  const choice = kid ? { quality: "quick" as const, note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).quality ?? source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null });
   if ("removed" in choice && choice.removed) return c.json({ error: REMOVED_MODEL_LINE, code: "model_removed" }, 422) as never;
   const loras = plan.loras.map((lora) => ({ id: lora.id, scale: lora.strength }));
   const slot = kid ? reserveKid(actor, "picture", 1, words) : null;
@@ -269,7 +269,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: words,
       tier: jobTier("image", tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).tier, choice.quality),
-      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultStylesAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, audience: lane === "adult" && adultStylesAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
     });
     void job;
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);

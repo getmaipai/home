@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { resolveCompanionEdit } from "@/lib/companionArt";
 import { submitEdit, waitPicture } from "@/lib/pictures/stack";
 
 type Anchor = { x: number; y: number; w: number; h: number };
@@ -88,7 +87,6 @@ export async function makeTalkPicture(input: {
   form.append("image_source", "uploaded");
   form.append("audience", "all-ages");
   form.append("timeout_ms", "1");
-  form.append("model", resolveCompanionEdit().model);
   form.append("seed", String(companionSeed(input.companionId)));
   const job = await submitEdit(form);
   const result = await waitPicture(job.job, input.signal);

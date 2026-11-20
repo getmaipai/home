@@ -9,12 +9,12 @@ import { settingsValues } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
 import { slotKey, writeSlotModel } from "@/lib/tiers";
-import { PICTURE_MODEL } from "@/lib/pictures/quality";
 
 const MARKER_KEY = "__migration.tier_slots_home_02";
 export const QUICK_MODEL_KEY = "generation.picture_quick_model";
 export const DETAILED_ENABLED_KEY = "generation.picture_detailed.enabled";
-export const MODEL_OF_CHOICE: Record<string, string> = { ernie: PICTURE_MODEL, klein: PICTURE_MODEL };
+/** The two choice names the old Standard card wrote. Both now mean the slot's own `recommended`: the Stack picks the part (Standard names none), and a model Home names is the household's own pick for Boost or Max. */
+export const MODEL_OF_CHOICE: Record<string, string> = { ernie: "recommended", klein: "recommended" };
 
 /** Copy one old key's stored value into its slot. */
 export function copyLegacyIntoSlot(key: string, value: unknown): void {

@@ -8,7 +8,6 @@ import { musicViewDenial } from "./policy";
 import { adultStylesAllowed, pictureDenial, refusePrompt } from "@/lib/pictures/policy";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureEngineReady } from "@/lib/pictures/ready";
-import { PICTURE_MODEL } from "@/lib/pictures/quality";
 import { startPictureJob, getPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { getMusicJobFor, saveMusicJob } from "./store";
 import type { MusicJob, MusicRequest } from "./types";
@@ -55,7 +54,7 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
     const source = versions.at(-1)?.id;
     // Covers stay conversation attachments so Files shows them like any made picture.
     const picture = await startPictureJob({ actor, conversationId: job.conversationId, turnId: job.turnId, temporary: false,
-      purpose: "cover", kind: "generate", prompt, body: { prompt, model: PICTURE_MODEL, size: "1024x1024", n: 1, seed, audience: adultStylesAllowed() ? "adult" : "all-ages" },
+      purpose: "cover", kind: "generate", prompt, body: { prompt, size: "1024x1024", n: 1, seed, audience: adultStylesAllowed() ? "adult" : "all-ages" },
       ...(source ? { edit: { sourceId: source, label: "New cover", method: "instruct" as const } } : {}),
     });
     const latest = getMusicJobFor(actor, job.id);

@@ -8,8 +8,7 @@ import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
 import { makePictureFor } from "@/lib/pictures/make";
 import { listTemplates } from "@/lib/media/templates";
-import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
-import { PICTURE_MODEL } from "@/lib/pictures/quality";
+import { __setPictureStatusForTests, readyStatusForTests, TEST_PICTURE_PART } from "@/lib/pictures/ready";
 import type { PersonRow } from "@/types";
 
 let owner: PersonRow;
@@ -19,7 +18,7 @@ beforeEach(() => {
   const peopleSet = createBenchPeople();
   owner = peopleSet.owner;
   fake = installFakeImageStack({ pollsToFinish: 1 });
-  __setPictureStatusForTests(readyStatusForTests({ models: [{ id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }, { id: PICTURE_MODEL, family: PICTURE_MODEL, installed: true, available: true, licence: "Apache-2.0", edit: false, steps_default: 8, peak_gb: 18.8 }] }));
+  __setPictureStatusForTests(readyStatusForTests({ models: [{ id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }, { id: TEST_PICTURE_PART, family: "test-family", installed: true, available: true, licence: "Apache-2.0", edit: false, steps_default: 8, peak_gb: 18.8 }] }));
 });
 afterEach(() => fake.restore());
 
@@ -27,14 +26,16 @@ const promptBlanks = (prompt: string) => [...prompt.matchAll(/\{\{([a-z][a-z0-9_
 
 describe("picture template Create", () => {
   test("uses typed prompt for product, example headline for words, and template aspect", async () => {
+    fake.serveCatalog([{ id: "text-part", text: true }]);
     const result = await makePictureFor(owner, { prompt: "a pink hoverboard", template: "mtpl-adpack" });
     expect(result.ok).toBe(true);
+    await until(() => fake.submitted.length > 0); // the part is asked of the jobs catalog first
     const submitted = fake.submitted[0]!;
     expect(submitted.prompt).toContain("a pink hoverboard");
     expect(submitted.prompt).toContain('"Cool and bright"');
     expect(submitted.prompt).not.toContain("{{");
     expect(submitted.size).toBe("896x1152");
-    expect(submitted.model).toBe(PICTURE_MODEL);
+    expect(submitted.model).toBe("text-part");
   });
 
   test("fills every bundled picture template and refuses unchosen cast slots", async () => {

@@ -19,7 +19,7 @@ import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { videoAdapterAudiencesFor } from "@/lib/videos/policy";
 import { TEEN_CONTENT_LINE, laneOf } from "@/lib/pictures/lane";
 import { editToolsStatus, startComment } from "@/lib/imageEdit";
-import { installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
+import { installFakeImageStack, testPng, until, type FakeImageStack, settleStack } from "./pictureFixture";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
@@ -55,7 +55,7 @@ async function put(owner: PersonRow, id: string, generated = false): Promise<Img
 function stateFor(actor: PersonRow, images: Img[] = [], utterance = "") {
   return { actor, surface: "chat" as never, speakerEvidence: undefined, planBasis: { surfaceClass: "written" } as never, plan: undefined as never, conversationId: "conv-1", turnId: `turn-${Math.random()}`, temporary: true, ephemeral: false, images, utterance } as never;
 }
-const pic = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false });
+const pic = async (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => { const outcome = await runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false }); await settleStack(); return outcome; };
 const vid = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateVideo({ state: stateFor(actor, images, utterance), args, callId: "c2", spoken: false });
 const text = (o: ToolExecutionOutcome) => (o.result?.reply as { text?: string } | undefined)?.text ?? "";
 const jobId = (o: ToolExecutionOutcome) => (o.result?.data as { pictureJobId?: string }).pictureJobId!;

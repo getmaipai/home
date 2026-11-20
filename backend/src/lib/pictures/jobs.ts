@@ -12,9 +12,8 @@ import { LIBRARY_SOURCE, loadSource, pictureUrl, saveVersion } from "@/lib/image
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, SPELLING_PHASE, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
-import { qualityOfModel } from "./quality";
+import { partsAfter, servesShape } from "./catalog";
 import { pictureBodyForSlot } from "./slotBody";
-import { pictureEngineStatus } from "./ready";
 import { passForPerson } from "@/lib/filter/pass";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { compareWords, readPictureWords } from "./readWords";
@@ -23,7 +22,7 @@ import { clearLive, updateLive } from "@/lib/genLive";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, requeueAfterCritical, holdMaxAfterMemoryRefusal, type QueueJob, PERSISTED_HOLDS, type PersistedHold } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PicturePurpose } from "./jobStore";
-import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
+import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, listOfAudience, makePicture, pictureJobFor, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 import { lockItemOfProvenance, markFields, newItemMark, unlabeledSourceMark, type MarkSource } from "@/lib/adultLock";
 import { logAutoMark } from "@/lib/adultMarks";
@@ -60,7 +59,7 @@ async function slotBodyOf(job: PictureJob): Promise<Omit<GenerationBody, "timeou
     ...(job.request.seed !== null ? { seed: job.request.seed } : {}),
   };
   const owner = db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow | undefined;
-  const run = pictureBodyForSlot(base, requestTier(job.request), owner ? passForPerson(owner) : "child", await pictureEngineStatus());
+  const run = pictureBodyForSlot(base, requestTier(job.request), owner ? passForPerson(owner) : "child");
   if (run.tier === "standard") delete request.tier; else request.tier = run.tier;
   if (run.lowered) request.lowered = true; else delete request.lowered;
   if (run.line) request.line = run.line; else delete request.line;
@@ -163,7 +162,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: qualityOfModel(input.body.model) ?? "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.words?.length ? { words: input.words } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.words?.length ? { words: input.words } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
@@ -322,13 +321,36 @@ async function fetchMade(stackJob: string | null, pics: StackPic[], view: FullVi
   return made;
 }
 
-/** TEXT-PIC-05: the same request once more with a new seed, inside this job. Null when it cannot be made again (the caller keeps what it has). */
-async function remakeWithNewSeed(job: PictureJob, view: FullView | undefined): Promise<MadePicture[] | null> {
+/**
+ * Asks for the picture again with a new seed (rule W4). A request that is only what the person asked for (`ask`, no style, no negative prompt) goes to
+ * the generic `picture` job, naming the next part after the one that ran: the part the catalog shows first, then its alternatives, in the Stack's order.
+ * The Stack refuses a part that cannot spell the words (rule W1), and the next one is tried; when none takes it, or the request is more than the generic
+ * job carries, it goes to the size-and-prompt route as before, to the same part. `ran` is the part that made the take being replaced.
+ */
+async function askAgain(stackBody: Omit<GenerationBody, "timeout_ms">, seed: number, ran: string | null): Promise<{ job: string; done: StackPic[] | null; part: string | null }> {
+  const ask = stackBody.ask;
+  if (ask?.words?.length && !stackBody.loras?.length && !stackBody.negative_prompt && !stackBody.init_image) {
+    const list = listOfAudience(stackBody.audience);
+    const view = await pictureJobFor("picture", list);
+    const level = stackBody.tier ?? "standard";
+    for (const part of partsAfter(view, ran)) {
+      // The part shown first has its shapes in the catalog: a shape it does not serve is not asked (the size route takes it). Another part answers for itself.
+      if (view?.part?.id === part && !servesShape(view, ask.shape, level)) continue;
+      const made = await makePicture({ job: "picture", audience: list, part, description: ask.description, words: ask.words.join("\n"), shape: ask.shape, level, ...(stackBody.n ? { count: stackBody.n } : {}), seed });
+      if (made.ok) return { job: made.job, done: null, part: made.part ?? part };
+    }
+  }
+  const submitted = await submitGeneration({ ...stackBody, seed, timeout_ms: 1 });
+  return { ...submitted, part: ran };
+}
+
+/** TEXT-PIC-05: the same request once more with a new seed, inside this job, on the next part that can spell (`askAgain`). Null when it cannot be made again (the caller keeps what it has). */
+async function remakeWithNewSeed(job: PictureJob, view: FullView | undefined, ran: string | null): Promise<{ made: MadePicture[]; ran: string | null } | null> {
   const stackBody = (job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody;
   if (!stackBody) return null;
   let again: string | null = null;
   try {
-    const submitted = await submitGeneration({ ...stackBody, seed: 1 + Math.floor(Math.random() * 2_000_000_000), timeout_ms: 1 });
+    const submitted = await askAgain(stackBody, 1 + Math.floor(Math.random() * 2_000_000_000), ran);
     again = submitted.job;
     let pics = submitted.done;
     const deadline = Date.now() + MAX_WATCH_MS;
@@ -339,7 +361,8 @@ async function remakeWithNewSeed(job: PictureJob, view: FullView | undefined): P
       if (status.state === "done") pics = status.data;
       else if (status.state === "failed" || status.state === "cancelled") return null;
     }
-    return await fetchMade(again, pics, view);
+    const made = await fetchMade(again, pics, view);
+    return { made, ran: made[0]?.meta.model ?? submitted.part };
   } catch {
     return null;
   } finally {
@@ -351,7 +374,7 @@ const MAX_SPELLING_RETRIES = 2;
 
 /**
  * TEXT-PIC-05: after a picture with `words` is made, the local vision model reads the text on it and Home compares it exactly
- * (compareWords). A miss makes the same request again with a new seed, at most two more times; the take with the fewest missing
+ * (compareWords). A miss makes the same request again with a new seed, at most two more times, each time on the next part that can spell (`askAgain`); the take with the fewest missing
  * words is kept for each picture. The check never fails or blocks a picture: when the model cannot read it, the picture is kept
  * as made and the result says `checked: no`. The age and adult-lock gates run afterward, on the pictures this returns.
  */
@@ -370,10 +393,13 @@ async function spellingCheck(job: PictureJob, view: FullView | undefined, made: 
   if (!bestMissing) return { made, result: { checked: "no", missing: [], takes: 1 } };
   const canRemake = job.kind === "generate" && !job.request.edit && !queuedPictureSubmits.has(job.id) && Boolean((job.request as { stackBody?: unknown }).stackBody);
   let takes = 1;
+  let ran: string | null = best[0]?.meta.model ?? null;
   while (canRemake && bestMissing.some((missing) => missing.length > 0) && takes <= MAX_SPELLING_RETRIES && !stopped(job)) {
     job.phase = SPELLING_PHASE; job.state = "running"; savePictureJob(job);
-    const next = await remakeWithNewSeed(job, view);
-    if (!next || stopped(job)) break;
+    const again = await remakeWithNewSeed(job, view, ran);
+    if (!again || stopped(job)) break;
+    const next = again.made;
+    ran = again.ran ?? ran;
     takes += 1;
     const nextMissing = await readAll(next);
     if (!nextMissing) break;

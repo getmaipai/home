@@ -7,7 +7,9 @@ import { forgetMediaRefusal, rememberMediaRefusal } from "@/lib/stackEngine";
 import { createStackHttp } from "@/lib/stack/http";
 import type { StackLiveFields } from "@/lib/genLive";
 import type { FullView } from "@/lib/stack/fullView";
-import { PICTURE_MODEL } from "./quality";
+import type { StackJobsCatalogRead } from "@/lib/stack/jobsCatalogShape";
+import type { StackMakePictureRequest, StackMakeRefusalRead, StackMakeResultRead } from "@/lib/stack/makeShape";
+import { pictureJobView, type PictureJobView, type PictureList } from "./catalog";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -89,6 +91,12 @@ export interface GenerationBody {
   strength?: number;
   /** TIER-PIC-01: the level the picture runs at (absent: Standard). The Stack opens a Max window for "max". */
   tier?: "boost" | "max";
+  /**
+   * MODELPACK-HOME-02: what the person asked for, in the words of the generic `picture` job. Set only when the request is nothing but
+   * this (no style, no negative prompt, no picture to start from), so a re-make can ask the generic job instead of the size-and-prompt
+   * route. `prompt`, `size` and `n` stay for the route that is still the first take.
+   */
+  ask?: { description: string; words?: string[]; shape: "square" | "landscape" | "portrait" };
   timeout_ms: number;
 }
 
@@ -120,7 +128,11 @@ function failure(res: Response): Promise<never> {
 
 /** Submits a picture and returns the job id at once (the Stack's 202 with `timeout_ms: 1`; a 200 means it was already done, and its pictures ride along). */
 export async function submitGeneration(body: GenerationBody): Promise<{ job: string; done: StackPic[] | null }> {
-  const res = await request("/v1/images/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  // The request names no model of its own: the part the Stack says serves a picture for this list is the one it is asked for (an opaque id from
+  // the jobs catalog), and a request that already carries a part, the household's pick for its level, keeps it.
+  const { ask: _ask, ...wire } = body;
+  const part = body.model ? undefined : await servingPartFor("picture", listOfAudience(body.audience));
+  const res = await request("/v1/images/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...wire, ...(part ? { model: part } : {}) }) });
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("image");
     const parsed = await res.json() as { job?: string; data?: StackPic[] };
@@ -132,9 +144,13 @@ export async function submitGeneration(body: GenerationBody): Promise<{ job: str
 
 /** Submits a described edit (POST /v1/images/edits operation edit or edit_masked). The picture and mask ride as files. */
 export async function submitEdit(form: FormData): Promise<{ job: string }> {
-  // The Stack routes an edit that names no model to its own edit default, which can be a removed model (measured 2026-11-16: "no picture
-  // model is installed" with MiniMax installed). Every Home edit names the one picture model unless the caller already named one.
-  if (!form.has("model")) form.set("model", PICTURE_MODEL);
+  // The Stack routes an edit that names no model to its own edit default, which can be a model that is gone (measured 2026-11-16: "no picture
+  // model is installed" with one installed). An edit that names no part is sent to the part the jobs catalog says serves `picture_edit` for its list
+  // (an opaque id the Stack gave), and no part at all when the catalog cannot be read. Only an adult's edit asks the adult list.
+  if (!form.has("model")) {
+    const part = await servingPartFor("picture_edit", form.get("audience") === "adult" ? "adult" : "minor");
+    if (part) form.set("model", part);
+  }
   const res = await request("/v1/images/edits", { method: "POST", body: form, timeoutMs: 30_000 });
   if (res.status === 202 || res.status === 200) {
     forgetMediaRefusal("image");
@@ -215,6 +231,71 @@ export async function imageStatus(): Promise<StackImageStatus | null> {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------- the jobs catalog and the generic picture job (MODELPACK-HOME-02)
+
+const CATALOG_TTL_MS = 20_000;
+const catalogCache = new Map<PictureList, { at: number; catalog: StackJobsCatalogRead }>();
+/** Test seam: forget every cached catalog read. */
+export function __resetJobsCatalogForTests(): void { catalogCache.clear(); }
+
+/** The list a picture is made for: an adult's picture asks the adult list (the household's order), every other one the minor list (neutral labels, the Stack's own priority, rule E6). */
+export const listOfAudience = (audience: "adult" | "all-ages" | undefined): PictureList => (audience === "adult" ? "adult" : "minor");
+
+/**
+ * GET /stack/v1/jobs/catalog for one list: what can be made here, now. Null when the Stack cannot be read or is too old to have the route (the
+ * caller then asks for nothing in particular and the Stack uses its own default). A good read is kept for 20 seconds; a read under a test fetch
+ * is never kept, so a test that changes the Stack's answer sees it at once.
+ */
+export async function jobsCatalogFor(list: PictureList): Promise<StackJobsCatalogRead | null> {
+  const keep = !stack.hasTestFetch();
+  const hit = keep ? catalogCache.get(list) : undefined;
+  if (hit && Date.now() - hit.at < CATALOG_TTL_MS) return hit.catalog;
+  try {
+    const res = await request(`/stack/v1/jobs/catalog?audience=${list}`, { method: "GET", timeoutMs: 5_000 });
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
+    const catalog = await res.json() as StackJobsCatalogRead;
+    if (!catalog || !Array.isArray(catalog.jobs)) return null;
+    if (keep) catalogCache.set(list, { at: Date.now(), catalog });
+    return catalog;
+  } catch {
+    return null;
+  }
+}
+
+/** What the catalog says about one picture job for a list, or null when it cannot be read. */
+export async function pictureJobFor(job: "picture" | "picture_edit", list: PictureList): Promise<PictureJobView | null> {
+  const catalog = await jobsCatalogFor(list);
+  return catalog ? pictureJobView(catalog, job) : null;
+}
+
+/** The id of the part the catalog says serves this job for this list now, or undefined (no part, or no catalog). */
+export async function servingPartFor(job: "picture" | "picture_edit", list: PictureList): Promise<string | undefined> {
+  const view = await pictureJobFor(job, list);
+  return view?.available && view.part ? view.part.id : undefined;
+}
+
+/**
+ * POST /stack/v1/jobs/make for a `picture`: the generic job, asked without a size or a model. The Stack picks the part (the named one when it
+ * serves the job), fills the part's recipe (a request with `words` goes only to a part that spells them, rule W1) and answers when the picture is
+ * done or, past its own wait, with the job id; either way the id is the one `getGenerationJob` polls. A refusal is returned, not thrown: it is
+ * the Stack's own line and code, and the caller decides what to try next (a re-make tries the next part).
+ */
+export async function makePicture(body: StackMakePictureRequest): Promise<{ ok: true; job: string; part: string | null; notes: string[] } | { ok: false; refusal: StackMakeRefusalRead }> {
+  const res = await request("/stack/v1/jobs/make", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 135_000 });
+  if (res.status === 200 || res.status === 202) {
+    const result = await res.json() as Partial<StackMakeResultRead>;
+    if (!result.id) throw new StackPicturesError(502, "bad_reply", "That did not work. Try again.");
+    forgetMediaRefusal("image");
+    return { ok: true, job: result.id, part: result.made_with?.part ?? null, notes: result.made_with?.notes ?? [] };
+  }
+  if (res.status === 409) {
+    const refusal = await res.json().catch(() => null) as StackMakeRefusalRead | null;
+    if (refusal && typeof refusal.code === "string" && typeof refusal.line === "string") return { ok: false, refusal };
+    throw new StackPicturesError(409, "refused", "That picture could not be made right now. Try again in a few minutes.");
+  }
+  return failure(res);
 }
 
 export async function listLoras(): Promise<StackLora[]> {

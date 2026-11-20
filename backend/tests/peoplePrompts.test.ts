@@ -9,7 +9,7 @@ import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attach
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
-import { installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
+import { installFakeImageStack, testPng, until, type FakeImageStack, settleStack } from "./pictureFixture";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
@@ -46,7 +46,7 @@ async function put(owner: PersonRow, id: string): Promise<Img> {
 function stateFor(actor: PersonRow, images: Img[] = [], utterance = "") {
   return { actor, surface: "chat" as never, speakerEvidence: undefined, planBasis: { surfaceClass: "written" } as never, plan: undefined as never, conversationId: "conv-1", turnId: `turn-${Math.random()}`, temporary: true, ephemeral: false, images, utterance } as never;
 }
-const pic = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false });
+const pic = async (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => { const outcome = await runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false }); await settleStack(); return outcome; };
 const vid = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateVideo({ state: stateFor(actor, images, utterance), args, callId: "c2", spoken: false });
 const text = (o: ToolExecutionOutcome) => (o.result?.reply as { text?: string } | undefined)?.text ?? "";
 

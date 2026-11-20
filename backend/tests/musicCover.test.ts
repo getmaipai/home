@@ -56,7 +56,8 @@ describe("song covers", () => {
     const { actor, client } = await owner(); const job = await song(actor);
     const done = await covered(actor, job.id);
     expect(pictures.submitted).toHaveLength(1);
-    expect(pictures.submitted[0]).toMatchObject({ model: "minimax-h3-image", n: 1 });
+    expect(pictures.submitted[0]).toMatchObject({ n: 1 });
+    expect(pictures.submitted[0]!.model).toBeUndefined(); // a cover names no model: the Stack picks the part
     const prompt = String(pictures.submitted[0]!.prompt);
     expect(prompt).toContain("Pancakes"); expect(prompt).toContain("Morning light"); expect(prompt).toContain("Warm and bright"); expect(prompt).not.toContain("[Verse]"); expect(prompt).not.toContain("[Chorus]");
     const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_pending: boolean; cover_url: string; cover_versions: { id: string; url: string }[] };
@@ -104,6 +105,7 @@ describe("song covers", () => {
     job.request = { ...job.request, description: "a cover in the original singer's voice" };
     saveMusicJob(job);
     await startSongCover(actor, getMusicJobFor(actor, job.id)!);
+    await until(() => pictures.submitted.length > 0); // the part is asked of the jobs catalog first
     expect(pictures.submitted).toHaveLength(1);
     expect(getMusicJobFor(actor, job.id)?.coverJobId).not.toBeNull();
   });

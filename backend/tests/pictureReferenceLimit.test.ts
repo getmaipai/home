@@ -2,10 +2,9 @@
 // at most 6 pictures in all (what the shipped picture model takes), at least 1. A status that reports 0 extras (the live Stack with
 // the old Klein summary) still reads the installed model's count.
 import { describe, expect, test } from "bun:test";
-import { MAX_REFERENCE_PICTURES, pictureEngineEdits, pictureEngineReferences, pictureReferenceLimit, readyStatusForTests } from "@/lib/pictures/ready";
-import { PICTURE_MODEL } from "@/lib/pictures/quality";
+import { MAX_REFERENCE_PICTURES, pictureEngineEdits, pictureEngineReferences, pictureReferenceLimit, readyStatusForTests, TEST_PICTURE_PART } from "@/lib/pictures/ready";
 
-const model = (extra: Record<string, unknown> = {}) => ({ id: PICTURE_MODEL, family: "minimax-h3-image", installed: true, loras: false, edit: true, steps_default: 6, peak_gb: 22, ...extra });
+const model = (extra: Record<string, unknown> = {}) => ({ id: TEST_PICTURE_PART, family: "test-family", installed: true, loras: false, edit: true, steps_default: 6, peak_gb: 22, ...extra });
 const status = (over: Record<string, unknown>) => readyStatusForTests({ edit: { generative: true, masked: false, references: 0 }, ...over } as never);
 
 describe("picture reference limit", () => {

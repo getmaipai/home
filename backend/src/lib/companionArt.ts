@@ -1,18 +1,18 @@
 import { WAN_QUICK_VIDEO_MODEL, type Lane } from "@/lib/pictures/lane";
 import { createHash } from "node:crypto";
-import { chooseQuality, PICTURE_MODEL } from "@/lib/pictures/quality";
 import { pictureEngineStatus, __setPictureStatusForTests, __setPictureStatusReaderForTests } from "@/lib/pictures/ready";
+import { pictureJobFor } from "@/lib/pictures/stack";
 import { chooseVideoQuality, QUICK_BASE } from "@/lib/videos/quality";
 import { videoEngineStatus, __setVideoStatusForTests, __setVideoStatusReaderForTests } from "@/lib/videos/ready";
-import type { StackImageStatus } from "@/lib/pictures/stack";
 import type { StackVideoStatus } from "@/lib/videos/stack";
 
 export const COMPANION_STILL_MODEL_MISSING_LINE = "The chosen picture model is not installed or available. An admin can install it in Settings, AI and models.";
 export const COMPANION_CLIP_MODEL_MISSING_LINE = "The chosen video model is not installed or available. An admin can add it in Settings, Models and storage.";
 export const COMPANION_MODEL_MISMATCH_LINE = "The picture came out different from the one chosen. Try again.";
-export const COMPANION_EDIT_MODEL = PICTURE_MODEL;
 
 export interface CompanionArtChoice { model: string; quality: "quick" | "detailed"; }
+/** A companion still or edit: the part the Stack says serves it (an opaque id Home records beside the picture), or null when the catalog could not say. Home sends no part with it; the Stack picks. */
+export interface CompanionStillChoice { model: string | null; quality: "quick" | "detailed"; }
 let statusReaders: { picture: typeof pictureEngineStatus; video: typeof videoEngineStatus } | null = null;
 export function __setCompanionArtStatusReadersForTests(readers: typeof statusReaders): void {
   statusReaders = readers;
@@ -29,19 +29,14 @@ export function __setCompanionArtStatusReadersForTests(readers: typeof statusRea
 export const promptHash = (prompt: string): string => createHash("sha256").update(prompt).digest("hex");
 
 function refusal(line: string): never { throw Object.assign(new Error(line), { status: 503 }); }
-function installedStill(engine: StackImageStatus | null, model: string): boolean {
-  const record = engine?.models.find((item) => item.id === model);
-  return Boolean(record?.installed && record.available !== false);
+/** What the jobs catalog says serves a companion's picture (the minor list: companion art is all-ages). A catalog that says no part is on refuses with the plain line; one that cannot be read leaves the part to the Stack. */
+export function resolveCompanionStillFromCatalog(view: { available: boolean; part: { id: string } | null } | null): CompanionStillChoice {
+  if (view && (!view.available || !view.part)) refusal(COMPANION_STILL_MODEL_MISSING_LINE);
+  return { model: view?.part?.id ?? null, quality: "quick" };
 }
-export function resolveCompanionStillFromStatus(engine: StackImageStatus | null): CompanionArtChoice {
-  const choice = chooseQuality({ engine });
-  if (choice.removed || choice.note === "detailed_off") refusal(COMPANION_STILL_MODEL_MISSING_LINE);
-  const model = choice.model ?? PICTURE_MODEL;
-  if (!installedStill(engine, model) || model !== PICTURE_MODEL) refusal(COMPANION_STILL_MODEL_MISSING_LINE);
-  return { model, quality: choice.quality };
-}
-export async function resolveCompanionStill(): Promise<CompanionArtChoice> { return resolveCompanionStillFromStatus(await (statusReaders?.picture ?? pictureEngineStatus)()); }
-export function resolveCompanionEdit(): CompanionArtChoice { return { model: COMPANION_EDIT_MODEL, quality: "quick" }; }
+export async function resolveCompanionStill(): Promise<CompanionStillChoice> { return resolveCompanionStillFromCatalog(await pictureJobFor("picture", "minor")); }
+/** An edit names no part: the Stack picks, and the record keeps none until the Stack reports one. */
+export function resolveCompanionEdit(): CompanionStillChoice { return { model: null, quality: "quick" }; }
 
 /** Adult companions ask for sound; picture starts use Quick until LTX-2.5 reports picture support. `lane` is the lane of the person who will see the take (`laneOf`): only the adult lane gets the sound maker, any other lane the silent Quick one (AGE-ROUTING-REMOVE-01). */
 export function resolveCompanionClipFromStatus(engine: StackVideoStatus | null, requested: "quick" | "detailed" = "quick", max = false, lane: Lane = "adult"): CompanionArtChoice {

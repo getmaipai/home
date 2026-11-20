@@ -22,15 +22,9 @@ import { promptCheck } from "./promptDoor";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineEdits, pictureEngineReferences, pictureEngineStatus, pictureReferenceLimit } from "./ready";
 import { StackPicturesError, submitEdit, waitPicture, cancelOrDelete } from "./stack";
-import { PICTURE_MODEL } from "./quality";
 import { asStackPic, hasProtectableFace, runLikenessEdit, type LikenessScope } from "./likeness/edit";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
-
-/** Every Stack edit operation, including reference edits, is handled by the one picture model. */
-export function nameEditModel(form: FormData): void {
-  form.set("model", PICTURE_MODEL);
-}
 
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
 const NOTHING_TO_CHANGE_LINE = "There is no picture to change yet. Attach one, or ask me to make one first.";
@@ -169,7 +163,6 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
     const form = new FormData();
     form.append("image", new File([new Uint8Array(base.bytes)], "picture", { type: base.mediaType }));
     form.append("operation", "edit");
-    nameEditModel(form);
     form.append("instruction", kid ? `${instruction}. Keep it a friendly children's cartoon drawing, not a photograph.` : instruction);
     form.append("image_source", baseSource);
     for (const [index, entry] of refPreps.entries()) {

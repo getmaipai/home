@@ -1,38 +1,23 @@
-// IMGGEN-QUALITY-01 / H3-SLOTS-HOME-01: one picture model, MiniMax H3-Image, makes every picture, edit and reference picture, and it
-// spells words itself. Quick and Detailed stay as person-facing levels (the level only changes the Stack's window, not the model).
-// ERNIE-Image-Turbo, Klein and Z-Image were removed on the owner's order (2026-11-16): none is a default or a choice any more, and a
-// request that names one gets the plain line below. Rule 0 is untouched: the age and surface gates ran before anything here.
-import type { StackImageStatus } from "./stack";
-
+// IMGGEN-QUALITY-01 / H3-SLOTS-HOME-01 / MODELPACK-HOME-02: Quick and Detailed stay as person-facing levels (the level only changes the Stack's
+// window). Home names no picture model: the Stack picks the part that serves a picture (`catalog.ts` reads its jobs catalog), and whether that part
+// spells words is the catalog's `capabilities.text`, not a list here. A style made for a model that was removed (2026-11-16) gets the plain line
+// below. Rule 0 is untouched: the age and surface gates ran before anything here.
 export type PictureQuality = "quick" | "detailed";
-/** The one picture model (the Stack's own default). Every default in Home points here, never at a removed model. */
-export const PICTURE_MODEL = "minimax-h3-image";
 /** Models that no longer exist on this computer. Matched only to refuse or to ignore an old saved pick; never offered. */
 const REMOVED_PICTURE_MODELS: ReadonlySet<string> = new Set(["flux2-klein-4b", "ernie-image-turbo", "z-image-turbo"]);
 export const isRemovedPictureModel = (model: string | null | undefined): boolean => Boolean(model && REMOVED_PICTURE_MODELS.has(model));
 /** What a person is told when something they asked for needs a picture model that was removed. */
 export const REMOVED_MODEL_LINE = "That picture maker is no longer on this computer. Home makes pictures with its one picture model now. Try again without that choice, or pick a different style.";
-export const TEXT_CAPABLE_MODELS: ReadonlySet<string> = new Set([PICTURE_MODEL]);
 /** Until media_template.words_blanks ships in the spec, these blank names mark exact picture text. */
 export const PICTURE_WORD_BLANKS = new Set(["headline", "title", "text", "caption", "tagline", "words", "name_text"]);
-export const modelCanSpell = (model: string | null | undefined): boolean => Boolean(model && TEXT_CAPABLE_MODELS.has(model));
 
-export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === PICTURE_MODEL ? "quick" : null);
 export const isPictureQuality = (value: unknown): value is PictureQuality => value === "quick" || value === "detailed";
-
-/** The model to name for a picture: the one picture model when the Stack has it installed, else left unnamed so the Stack uses its own default. */
-export function quickModelFor(engine: Pick<StackImageStatus, "models"> | null): string | undefined {
-  const model = engine?.models?.find((m) => m.id === PICTURE_MODEL);
-  return model?.installed && model.available !== false ? PICTURE_MODEL : undefined;
-}
 
 /** Why the quality is not the one that was wanted, as a code the tool turns into one sentence for the model to relay. */
 export type QualityNote = "detailed_off" | "style_needs_detailed" | "style_needs_quick" | null;
 
 export interface QualityChoice {
   quality: PictureQuality;
-  /** The Stack model to name; undefined lets the Stack use its own default. */
-  model?: string;
   note: QualityNote;
   /** True when the person or the model asked for Detailed outright, so the reply should say so. */
   announce: boolean;
@@ -41,15 +26,14 @@ export interface QualityChoice {
 }
 
 /** Detailed is a level of the one model, not a second model, so there is nothing separate to switch to. */
-export function detailedReady(_engine: Pick<StackImageStatus, "models"> | null): boolean {
+export function detailedReady(_engine: unknown): boolean {
   return false;
 }
 
-/** The quality for one picture. A style made for a removed model cannot run (`removed`); everything else is the one model. */
-export function chooseQuality(input: { requested?: PictureQuality | undefined; style?: { base_model: string } | null; engine: Pick<StackImageStatus, "models"> | null; household?: PictureQuality }): QualityChoice {
+/** The quality for one picture. A style made for a removed model cannot run (`removed`); everything else is Quick, and the Stack picks the part. */
+export function chooseQuality(input: { requested?: PictureQuality | undefined; style?: { base_model: string } | null; household?: PictureQuality }): QualityChoice {
   if (input.style && isRemovedPictureModel(input.style.base_model)) return { quality: "quick", note: null, announce: false, removed: true };
-  const model = quickModelFor(input.engine);
-  return { quality: "quick", ...(model ? { model } : {}), note: null, announce: false };
+  return { quality: "quick", note: null, announce: false };
 }
 
 /** The line the model relays for a quality note (plain words, no model names). */

@@ -16,7 +16,7 @@ import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { promptCheck } from "@/lib/pictures/promptDoor";
-import { resolveCompanionStill, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
+import { resolveCompanionStill, resolveCompanionEdit, promptHash } from "@/lib/companionArt";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { cancelOrDelete, fetchPicture, getGenerationJob, submitEdit, submitGeneration } from "@/lib/pictures/stack";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
@@ -47,7 +47,8 @@ export interface LookJob {
   key: string;
   sourceVersion: string | null;
   instruction: string | null;
-  model: string;
+  /** The part on record for the picture: the one the catalog named when it started, else the one the Stack reported. */
+  model: string | null;
   quality: "quick" | "detailed";
   promptHash: string;
   modelReported: string | null;
@@ -58,7 +59,7 @@ export interface LookJob {
   faceRef?: Uint8Array;
   finalising?: Promise<void>;
 }
-interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
+interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string | null; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
 const jobs = new Map<string, LookJob>();
 const activeByCompanion = new Map<string, string>();
 const startingCompanions = new Set<string>();
@@ -135,7 +136,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   const key = readLook(input.companionId).key;
   startingCompanions.add(input.companionId);
   try {
-    const submitted = await submitGeneration({ prompt, model: art.model, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
+    const submitted = await submitGeneration({ prompt, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
     register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null, model: art.model, quality: art.quality, promptHash: promptHash(prompt), modelReported: submitted.done?.[0]?.model ?? null, style });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
@@ -175,7 +176,6 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     form.append("image_source", originalPath && !input.forceKeyComposite && !input.body && !descendsFromUpload(input.companionId, version.id) ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
-    form.append("model", art.model);
     form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
     register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject, faceRef: input.body?.face });
@@ -261,7 +261,6 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
       if (!job.finalising) job.finalising = (async () => {
         const reported = stack.data.find((picture) => typeof picture.model === "string")?.model ?? null;
         job.modelReported = reported;
-        if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
         const images = await Promise.all(Array.from({ length: job.count }, (_, index) => fetchPicture(id, index)));
         // A swap that fails leaves the drawn picture as it is: a whole body with a redrawn face beats no body.
         if (job.faceRef) for (let index = 0; index < images.length; index++) images[index] = await swapHead({ drawn: images[index]!, face: job.faceRef, model: job.model, seed: companionSeed(job.companionId) }).catch(() => images[index]!);
@@ -289,7 +288,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const flat = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
           const normalized = job.fitSubject ? await fitToFrame(flat, imagingTargets.portrait).catch(() => flat) : flat;
           const clipped = Object.entries(await clippedEdges(normalized)).filter(([, value]) => value).map(([edge]) => edge as "left" | "right" | "top" | "bottom");
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? (job.sourceVersion ? readLook(job.companionId).versions.find((item) => item.id === job.sourceVersion)?.style : undefined) ?? "cartoon", clipped, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? (job.sourceVersion ? readLook(job.companionId).versions.find((item) => item.id === job.sourceVersion)?.style : undefined) ?? "cartoon", clipped, model: job.model ?? reported, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
@@ -321,8 +320,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       let keyedOut = await cutOut(actor, image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
       const reported = current.data.find((picture) => typeof picture.model === "string")?.model ?? null;
       job.modelReported = reported;
-      if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
-      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest, style: sourceVersion?.style ?? "cartoon", model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, image);
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest, style: sourceVersion?.style ?? "cartoon", model: job.model ?? reported, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, image);
       job.versions.push(saved.id);
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
@@ -330,7 +328,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "approved", approved_by: actor.displayName, approved_at: new Date().toISOString() }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
       const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(rest), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
-      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath) && !descendsFromUpload(companionId, look.rest)); nextForm.append("model", resolveCompanionEdit().model); nextForm.append("seed", String(companionSeed(companionId)));
+      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath) && !descendsFromUpload(companionId, look.rest)); nextForm.append("seed", String(companionSeed(companionId)));
       job.promptHash = promptHash(instruction);
       job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";
     })();

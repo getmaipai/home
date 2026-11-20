@@ -8,7 +8,8 @@ export interface HeadSwapRequest {
   drawn: Uint8Array;
   /** The real person's own picture, the source of the face. */
   face: Uint8Array;
-  model: string;
+  /** The part the picture was drawn with, when one is on record: the swap asks for it. Left out, the Stack picks. */
+  model?: string | null;
   seed: number;
   /** Seconds to wait for the engine before giving up. */
   waitSeconds?: number;
@@ -28,7 +29,7 @@ export async function swapHead(request: HeadSwapRequest, pause: (ms: number) => 
   form.append("image_source", "uploaded");
   form.append("audience", "all-ages");
   form.append("timeout_ms", "1");
-  form.append("model", request.model);
+  if (request.model) form.append("model", request.model);
   form.append("seed", String(request.seed));
   const { job } = await submitEdit(form);
   const deadline = Date.now() + (request.waitSeconds ?? 240) * 1000;

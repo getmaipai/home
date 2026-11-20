@@ -90,3 +90,81 @@ From the Stack session (pack data) and the spec owner (shape), in this order:
 3. Move the retired-base rule in `access.ts` and `sync.ts` to the Stack's retired flag and bench mark, with no `ltx-2.3` string left in Home.
 4. Frontend: `stylesApi.ts` (`BaseModelId`, `BrowseQuery.base`, `baseWords`), `StyleBrowser.tsx` (`BASE_PILL`), `StyleConfirm.tsx` and `StyleEditor.tsx` (the two hard-coded base choices) take their ids and labels from the backend (`GET /api/loras/bases` exists already and returns `{ id, label }` per base for one media).
 5. Tests: `lorasBases`, `lorasHfBrowse`, `lorasPictureBrowse` and `lorasReadiness` keep their behavior checks against a scripted Stack answer; new tests cover the Stack-down fallback and a retired base.
+
+## MODELPACK-HOME-02: pictures
+
+### What Home does now
+
+- No `PICTURE_MODEL` and no `TEXT_CAPABLE_MODELS`. A part is an opaque id the Stack gave, and "this part spells words" is the catalog's
+  `capabilities.text` (`lib/pictures/catalog.ts`, `lib/pictures/stack.ts`).
+- A picture or an edit that names no part is sent to the part the catalog says serves it: the adult list for an `adult` picture, the minor list
+  for every other one and for edits (rule E6). When the catalog cannot be read, no part is named and the Stack uses its own default.
+  A part the household picked for a level (a Boost or Max slot) is still sent as the part to ask for (rule E5).
+- Rule W1: a picture with words is never made on a part the catalog does not mark `text: true`. When the part shown does not spell but another
+  one in the list is on, the first take is asked of the generic `picture` job so the Stack picks the part. Rule W2 reads the same flag.
+- Rule W4: the spelling re-make asks the generic `picture` job with `words`, naming the next part after the one that ran (the part shown first,
+  then the alternatives, wrapping). The Stack refuses a part that cannot spell (`not_on_this_model`, and its `alternatives` list only parts that
+  do; with no part named it picks the first one that does), so Home needs no per-part flag and skips a refused part. When no part takes it, or
+  the picture is more than the generic job carries, the re-make goes to the size-and-prompt route as before.
+- A child's or teen's picture keeps its cartoon wording and Home's own checks. `CHILD_NEGATIVE_PROMPT` is still sent on the size route, but the
+  Stack says the picture models run without guidance and a negative prompt has no effect, so the generic job needs none and the protection is
+  Home's (the cartoon wording, the prompt checks and the output check, rules 0 and E6). What keeps a child's first take on the size route is gap 1,
+  not the child lane.
+
+### What stops the rest
+
+Read again on 2026-11-19 against the Stack's `origin/main` (`f5a696b`: `routes/jobsMake.ts`, `lib/makeDispatch.ts`, `lib/makePlan.ts`,
+`lib/jobsCatalog.ts`, the packs `flux3-image-klein` and `minimax-h3-image`, `lib/recipe.ts`) and the spec shapes of `spec-v0.1.424`. Home now
+takes its request, result and catalog types from the spec (`lib/stack/makeShape.ts`, `lib/stack/jobsCatalogShape.ts`), no hand copies of the enums.
+These are the gaps that are still true, and each one keeps a slice of Home on the older route:
+
+1. **The make route cannot answer at once.** `pictureBody` sends no `timeout_ms` and the request has no field for one, so the picture route
+   waits its default 120 seconds before it answers 202 with the id. Home needs the id at once to show progress and previews and to stop a job, so
+   first takes stay on `POST /v1/images/generations`; only the spelling re-make, which runs inside a job that already watches, asks the generic
+   job. Wanted: a way to ask for the job id now (an `immediate` flag in the request, or the route always answering 202 first).
+2. **No generic job read.** `POST /stack/v1/jobs/make` is the only route of the door. The result `id` of a `picture` is the old picture job id,
+   and Home polls `GET /v1/images/generations/{id}`, its `/{n}.png` files and `/preview.jpg`; a `picture_edit`'s files are
+   `/v1/images/edits/{id}`. The Stack row that deletes `POST /v1/images/*` must keep those reads or give the generic job its own (state, percent,
+   preview, files, cancel).
+3. **Pictures serve only `square`.** Both picture packs list `square` alone at all three levels. Home sends landscape, portrait, wide (16:9) and
+   tall (9:16) sizes today, so it asks the generic job only for a shape the catalog lists and keeps the size route for the rest. Wanted: the
+   shapes the engine really serves, and a place for wide and tall (more shapes, or an aspect field).
+4. **No styles.** `picture.styles[]` is in the spec, but `pictureBody` ignores it and the catalog says `styles.max: 0`. A picture with a style
+   (a LoRA) stays on the size route.
+5. **`words` is one string.** Home has up to six exact strings (chat rule W3). The recipe puts the whole value inside one pair of quotes
+   (`The exact words: "{words}"`), so how several strings are joined changes what the model is told. Home joins them with a newline, which is a
+   guess. Wanted: the Stack takes `words: string[]` and quotes each one, or says how to join.
+6. **`picture_edit` is missing what Home's edits use.** The request has no `seed` (companion looks keep one seed per companion), no
+   `image_source` (the route sends `uploaded` for every picture, so the `reference_not_generated` retry and the generated-or-uploaded mark
+   cannot be told), and it requires an `audience`, which the edit form leaves out on purpose (ADULT-LOCK-07); the reply has no immediate id
+   (gap 1). References can travel as `data:` URLs, which the route reads, so that part is fine. Edits stay on `POST /v1/images/edits`, with the
+   part from the catalog.
+7. **`all-ages` has no audience of its own.** The generic request has `adult` or `minor`; Home's picture has `adult` or `all-ages`, and an
+   adult can make an all-ages picture. Home maps `all-ages` to the minor list, so an adult's all-ages picture uses the Stack's own priority and
+   not the household's order. That mapping needs an owner ruling.
+8. **Readiness and counts still come from `GET /stack/v1/image`.** The catalog's `limits` carry levels, shapes, `max_references`, `max_words`
+   and `max_seconds`, but no maximum picture count, no LoRA support flag and no edit-ready flag, so `pictureEngineStatus` stays for those and
+   the Stack cannot delete that route yet.
+
+### Names still in Home source
+
+`lint:no-model-names` does not exist yet (MODELPACK-HOME-01 writes it), so it is not widened here. What is left, and which row owns it:
+
+- `lib/pictures/quality.ts`: the set of removed picture models, read only to refuse an old style. Style bases are MODELPACK-HOME-04.
+- `lib/tiers.ts`: `RECOMMENDED_MAX_IMAGE_MODEL`, the Max slot's fallback. Levels and slots are MODELPACK-HOME-03.
+- `lib/music`: covers and band and album pictures now name no model (they ask the picture job); the rest of music is MODELPACK-HOME-05.
+- `lib/pictures/policy.ts` and the AI card still speak of two Standard choices by name (`ernie`, `klein`); the card is replaced in the settings follow-up.
+
+### Picture tests that already fail on main
+
+Five tests in `tests/picture*.test.ts` fail on this branch and fail the same way on `origin/main`: neither the code they run nor the
+tests changed here. They are left alone for the row that owns each cause.
+
+- `pictureTool.test.ts` "picture card waiting labels come from the shared copy table": `phaseLabel` in `routes/pictures.ts` reads
+  `job.request.waited_note`, and the test passes a job with no `request`. Fix the test or read `job.request?.waited_note`.
+- `pictureMake.test.ts`, three tests (prompt-only Create job, CREATOR-16 set, USE-AS-REFERENCE limit line): TEXT-PIC-04 made
+  `makePictureFor` ask the chat model whether the prompt has words. The test Stack answers with plain text, not JSON, so the notice "I couldn't
+  check whether you want words on the picture..." is added to every reply. These tests need `__setWordsQuestionCompleterForTests`.
+- `pictureTemplateCreate.test.ts` "fills every bundled picture template...": two bundled templates (`mtpl-nostalgia-80s`,
+  `mtpl-productplacement`) have a `photo_*` slot (added in eb409b864). The test sends no photo, so the answer is "This template needs your own
+  photo", not the cast line. The test needs to send a reference for those two or accept that line.

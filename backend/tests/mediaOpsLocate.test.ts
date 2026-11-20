@@ -54,7 +54,7 @@ describe("picture people operations", () => {
     __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: [], reason: null }, true);
     __setPictureStatusForTests(readyStatusForTests());
     const edits: FormData[] = [];
-    __setPicturesFetchForTests((async (_input, init) => { edits.push(init?.body as FormData); return new Response(JSON.stringify({ job: "combine-job" }), { status: 202, headers: { "content-type": "application/json" } }); }) as typeof fetch);
+    __setPicturesFetchForTests((async (_input, init) => { if (!(init?.body instanceof FormData)) return new Response("{}", { status: 404 }); /* the jobs catalog read, which is not an edit */ edits.push(init?.body as FormData); return new Response(JSON.stringify({ job: "combine-job" }), { status: 202, headers: { "content-type": "application/json" } }); }) as typeof fetch);
     const changed = await runMediaOp(actor, "picture.change", { source: { kind: "picture", via: "chat", id: "registry-base", conversationId: "locate-conversation" }, args: { prompt: "combine these pictures", references: ["registry-ref-1", "registry-ref-2"].map((id) => ({ kind: "picture", via: "chat", id, conversationId: "locate-conversation" })) } });
     expect("job" in changed && changed.job.job).toBe("combine-job");
     expect(edits[0]?.get("reference_source")).toBe("generated");
@@ -165,6 +165,7 @@ describe("picture people operations", () => {
     __setPictureStatusForTests(readyStatusForTests());
     const submitted: FormData[] = [];
     __setPicturesFetchForTests((async (_input, init) => {
+      if (!(init?.body instanceof FormData)) return new Response("{}", { status: 404 }); // the jobs catalog read, which is not an edit
       submitted.push(init?.body as FormData);
       return new Response(JSON.stringify({ job: `edit-${submitted.length}` }), { status: 202, headers: { "content-type": "application/json" } });
     }) as typeof fetch);

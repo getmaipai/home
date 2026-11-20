@@ -26,13 +26,13 @@ import { packFolderProblems } from "@/lib/companionPack";
 import { createJob, updateJob } from "@/lib/jobs";
 import { getStackClient } from "@/lib/stackEngine";
 import { prepareEditSource } from "@/lib/pictures/editSources";
-import { fetchPicture } from "@/lib/pictures/stack";
+import { fetchPicture, servingPartFor } from "@/lib/pictures/stack";
 import { routeAudience } from "@/lib/pictures/audience";
 import { pictureDenial, PICTURE_DENIAL_LINE } from "@/lib/pictures/policy";
 import { videoDenial, VIDEO_DENIAL_LINE } from "@/lib/videos/policy";
 import { pictureEngineReady, pictureEngineStatus, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { videoEngineReady, videoEngineStatus, videoNotReadyReason } from "@/lib/videos/ready";
-import { resolveCompanionEdit, promptHash } from "@/lib/companionArt";
+import { promptHash } from "@/lib/companionArt";
 import { TALK_SHAPES, TALK_KEEP } from "@/lib/companionTalkMaker";
 import { PACK_FRAME_PX, cropToPack, packFrameOfSource, packLandmarks, packPoint, sizeOf, type Dims, type PackFrame } from "@/lib/companionPackFrame";
 
@@ -101,14 +101,16 @@ export const PACK_POLL_MS = 500;
 /** The real implementation over the Stack client. Request and result shapes follow the MAKER-H names in the brief; the Stack docs did not list them yet (see the report). */
 export const StackPackOps: PackOpsClient = {
   async imageEdit(input) {
-    const art = resolveCompanionEdit(), form = new FormData();
+    const form = new FormData();
     form.append("image", new File([new Uint8Array(input.image)], "picture.png", { type: "image/png" }));
     form.append("operation", "edit");
     form.append("instruction", input.instruction);
     form.append("image_source", input.imageSource);
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
-    form.append("model", art.model);
+    // The edit goes through the Stack client, not the picture module, so the part the catalog says serves it is named here (an opaque id the Stack gave).
+    const part = await servingPartFor("picture_edit", "minor");
+    if (part) form.append("model", part);
     form.append("seed", String(input.seed));
     const client = getStackClient(), reply = await client.imageEdit(form, input.signal ? { signal: input.signal } : undefined);
     input.onJob(reply.job);

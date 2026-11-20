@@ -335,7 +335,7 @@ describe("a painted area and second pictures reach the change", () => {
   test("a described change on a Library picture sends the painted area and both reference pictures to the engine", async () => {
     __setPictureStatusForTests(readyStatusForTests());
     const sent: FormData[] = [];
-    __setPicturesFetchForTests((async (_input, init) => { sent.push(init?.body as FormData); return new Response(JSON.stringify({ job: "library-change-job" }), { status: 202, headers: { "content-type": "application/json" } }); }) as typeof fetch);
+    __setPicturesFetchForTests((async (_input, init) => { if (!(init?.body instanceof FormData)) return new Response("{}", { status: 404 }); /* the jobs catalog read, which is not an edit */ sent.push(init?.body as FormData); return new Response(JSON.stringify({ job: "library-change-job" }), { status: 202, headers: { "content-type": "application/json" } }); }) as typeof fetch);
     const base = await libraryPicture(sageActor); const ref1 = await libraryPicture(sageActor, ALL_AGES, new Uint8Array(await sharp({ create: { width: 10, height: 10, channels: 3, background: "#123456" } }).png().toBuffer())); const ref2 = await libraryPicture(sageActor, ALL_AGES, new Uint8Array(await sharp({ create: { width: 12, height: 12, channels: 3, background: "#654321" } }).png().toBuffer()));
     const mask = Buffer.from(await sharp({ create: { width: 40, height: 30, channels: 3, background: "#ffffff" } }).png().toBuffer()).toString("base64");
     const res = await run(sage, "picture.change", { file_id: base.id, args: { prompt: "put them together" }, mask, references: [ref1.id, ref2.id] });

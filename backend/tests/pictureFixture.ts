@@ -2,12 +2,27 @@
 // (generation submit, job status with rising progress, the PNG files, cancel, engine status, the style library)
 // and records every request body so a test can assert what Home sent, and that a refused request sent nothing.
 import sharp from "sharp";
-import { __setPicturesFetchForTests, type StackLora } from "@/lib/pictures/stack";
+import { __resetJobsCatalogForTests, __setPicturesFetchForTests, type StackLora } from "@/lib/pictures/stack";
+import type { StackJobsCatalogRead } from "@/lib/stack/jobsCatalogShape";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __resetAdapterCacheForTests } from "@/lib/pictures/adapters";
 import { __resetPictureJobsForTests, __setPicturePollMsForTests } from "@/lib/pictures/jobs";
 
-export interface FakeJob { id: string; body: Record<string, unknown>; polls: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; deleted: boolean }
+export interface FakeJob { id: string; body: Record<string, unknown>; polls: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; deleted: boolean; /** The part that made it, for a job started through the generic make route. */ part?: string }
+
+/** One part the fake jobs catalog lists. `text`: it spells words (`capabilities.text`). `shapes`: the shapes it serves at Standard (default: square). */
+export interface FakeCatalogPart { id: string; label?: string; text: boolean; shapes?: Array<"square" | "landscape" | "portrait"> }
+/** The jobs catalog for one list: the first part is the one shown, the others are `alternatives`. An empty list says no part is on (`available: false`). */
+export function fakeJobsCatalog(audience: "adult" | "minor", parts: readonly FakeCatalogPart[]): StackJobsCatalogRead {
+  const shown = parts[0];
+  const job = (name: "picture" | "picture_edit") => ({
+    job: name, available: Boolean(shown), part: shown ? { id: shown.id, label: shown.label ?? shown.id } : null,
+    alternatives: parts.slice(1).map((part) => ({ part: part.id, label: part.label ?? part.id })),
+    limits: { levels: ["standard" as const], max_references: 2, shapes: Object.fromEntries((shown?.shapes ?? ["square"]).map((shape) => [shape, { standard: { width: 1024, height: 1024 } }])) },
+    capabilities: { text: shown?.text ?? false, end_picture: false, sound: false, keeps_likeness: false },
+  });
+  return { audience, jobs: [job("picture"), job("picture_edit")] };
+}
 export interface FakeImageStack {
   jobs: FakeJob[];
   submitted: Array<Record<string, unknown>>;
@@ -22,6 +37,14 @@ export interface FakeImageStack {
   /** GENPREVIEW-01: when set, running polls carry the step, stage and ETA, and a preview from the third poll. */
   live: { stage_label: string; eta_seconds: number } | null;
   previewFetches: number;
+  /** The jobs catalog each list gets (null: the route is not there, as on an older Stack). Set by a test that wants the Stack to name its parts. */
+  catalog: { adult: StackJobsCatalogRead | null; minor: StackJobsCatalogRead | null };
+  /** Both lists' catalogs from one list of parts (the first is shown, the rest are alternatives). */
+  serveCatalog(parts: readonly FakeCatalogPart[]): void;
+  /** The body of each POST /stack/v1/jobs/make. */
+  makes: Array<Record<string, unknown>>;
+  /** Parts that refuse a generic `picture` with words (they cannot spell): the Stack answers 409 `not_on_this_model`. */
+  cannotSpell: Set<string>;
   loras: StackLora[];
   /** The fields of each LoRA add (files as "file:<bytes>"). */
   loraAdds: Array<Record<string, unknown>>;
@@ -50,9 +73,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeImageStack(options: { pollsToFinish?: number } = {}): FakeImageStack {
   const fake: FakeImageStack = {
-    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_LORAS.map((l) => ({ ...l, trigger_words: [...l.trigger_words] })), loraAdds: [], loraRefusal: null,
+    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, catalog: { adult: null, minor: null }, serveCatalog(parts) { fake.catalog.adult = fakeJobsCatalog("adult", parts); fake.catalog.minor = fakeJobsCatalog("minor", parts); }, makes: [], cannotSpell: new Set(), loras: TEST_LORAS.map((l) => ({ ...l, trigger_words: [...l.trigger_words] })), loraAdds: [], loraRefusal: null,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
-    restore() { __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
+    restore() { __resetJobsCatalogForTests(); __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
   __resetAdapterCacheForTests();
@@ -65,9 +88,27 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.submitted.push(body);
       if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
-      const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false };
+      const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false, ...(typeof body.model === "string" ? { part: body.model } : {}) };
       fake.jobs.push(job);
       return json({ created: 1, job: job.id, data: [] }, 202);
+    }
+    if (method === "GET" && path === "/stack/v1/jobs/catalog") {
+      const list = url.searchParams.get("audience") === "adult" ? "adult" : "minor";
+      const catalog = fake.catalog[list];
+      return catalog ? json(catalog) : json({ error: "No such route.", code: "not_found" }, 404);
+    }
+    if (method === "POST" && path === "/stack/v1/jobs/make") {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      fake.makes.push(body);
+      const list = body.audience === "adult" ? "adult" : "minor";
+      const parts = [fake.catalog[list]?.jobs.find((entry) => entry.job === "picture")?.part?.id, ...(fake.catalog[list]?.jobs.find((entry) => entry.job === "picture")?.alternatives ?? []).map((alt) => alt.part)].filter((id): id is string => Boolean(id));
+      const part = typeof body.part === "string" ? body.part : parts[0];
+      if (!part) return json({ code: "not_available", line: "No model that can make pictures is turned on and ready." }, 409);
+      if (body.words !== undefined && fake.cannotSpell.has(part)) return json({ code: "not_on_this_model", line: "That model cannot spell words in a picture.", alternatives: [] }, 409);
+      if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
+      const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body: { prompt: body.description, n: body.count ?? 1, seed: body.seed, model: part, make: true }, polls: 0, state: "queued", deleted: false, part };
+      fake.jobs.push(job);
+      return json({ id: job.id, job: "picture", state: "running", percent: 0, status: "Making your picture", files: [], poster: null, made_with: { part, label: part, pack_version: "1.0.0", shape: body.shape, seconds: null, sound: false, notes: [] } }, 202);
     }
     if (method === "POST" && path === "/v1/images/edits") {
       const form = init?.body as FormData;
@@ -99,7 +140,7 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";
         const n = typeof job.body.n === "number" ? job.body.n : 1;
-        const data = Array.from({ length: n }, (_, i) => ({ url: `/v1/images/generations/${job.id}/${i}.png`, content_type: "image/png", seed: 1234 + i, width: 64, height: 64, model: "flux2-klein-4b", steps: 4, ms: 3900, lora_ids: [] }));
+        const data = Array.from({ length: n }, (_, i) => ({ url: `/v1/images/generations/${job.id}/${i}.png`, content_type: "image/png", seed: 1234 + i, width: 64, height: 64, model: job.part ?? "flux2-klein-4b", steps: 4, ms: 3900, lora_ids: [] }));
         return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data });
       }
       job.state = job.polls === 1 ? "queued" : "running";
@@ -146,6 +187,9 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
   __setPicturesFetchForTests(handler);
   return fake;
 }
+
+/** Lets a job that was just started reach the fake Stack: it asks the jobs catalog for its part first, which is a few turns of the event loop. */
+export const settleStack = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30));
 
 /** Waits until `check` is true, polling every 25 ms. */
 export async function until(check: () => boolean, ms = 8_000): Promise<void> {

@@ -69,6 +69,7 @@ describe("a change in words", () => {
     const made = await put(nadia, "made-1", { generated: true });
     const outcome = await run(nadia, { prompt: "make the sky clear blue with no clouds", change: "latest" }, []);
     expect(outcome.status).toBe("succeeded");
+    await until(() => stack.edits.length > 0); // the part is asked of the jobs catalog first
     expect(stack.edits).toHaveLength(1);
     expect(stack.edits[0]).toMatchObject({ operation: "edit", instruction: "make the sky clear blue with no clouds", image_source: "generated" });
     expect(stack.edits[0]!.reference).toBeUndefined();
@@ -86,6 +87,7 @@ describe("a change in words", () => {
   test("an attached photo is sent as an upload without an identity check", async () => {
     const photo = await put(nadia, "photo-1");
     const outcome = await run(nadia, { prompt: "change the car to bright yellow", change: "attached" }, [photo]);
+    await until(() => stack.edits.length > 0); // the part is asked of the jobs catalog first
     expect(stack.edits[0]).toMatchObject({ image_source: "uploaded" });
     expect(outcome.status).toBe("succeeded");
   });
