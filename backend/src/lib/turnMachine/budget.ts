@@ -202,11 +202,11 @@ const VOICEOVER_SWAP_ORDER = "make_speech make_sound show_images edit_picture".s
  * are the only sources; disabled or smoke-failed packages are excluded,
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
-/** In a full media turn, these lower-priority offers give way before music and video creation/editing. */
-const MUSIC_SHRINK_ORDER = `writing_format show_images ${START_PROJECT_TOOL_ID} make_song_style make_album edit_band edit_album edit_song_style make_sound edit_music make_band generate_music`.split(" ");
+/** In a full media turn, these lower-priority offers give way before music and video creation/editing. `get_score` (MUSIC-SCORE-01) is the newest music tool and goes first. */
+const MUSIC_SHRINK_ORDER = `get_score writing_format show_images ${START_PROJECT_TOOL_ID} make_song_style make_album edit_band edit_album edit_song_style make_sound edit_music make_band generate_music`.split(" ");
 
 /** Past the cap with no video clip: the creation tools go first, then the song edit when an object's own edit tool is in the set (the song is not in view then). Nothing else is dropped. */
-const STUDIO_SHRINK_ORDER = "house uptime writing_format make_song_style make_album make_sound edit_music".split(" ");
+const STUDIO_SHRINK_ORDER = "get_score house uptime writing_format make_song_style make_album make_sound edit_music show_images".split(" ");
 
 export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false, musicBandOk = false, videoEditOk = false, musicObject: MusicObjectGate = null, writingFormatOk = false, editPictureOk = false, voiceoverOk = false, filmOk = false, houseOk = false, uptimeOk = false, inspiredVoiceOk = false, referenceVideoOk = false, sceneOk = false, songNameOk = false, impressionOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;
@@ -257,7 +257,7 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   }
   const ordered = [...candidates.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
   if (ordered.length > cap) {
-    throw new Error(`Derived tool offer set (${ordered.length}) exceeds the model cap (${cap}).`);
+    throw new Error(`Derived tool offer set (${ordered.length}) exceeds the model cap (${cap}): ${ordered.map((tool) => tool.id).join(", ")}.`);
   }
   return { ...budget, tools_offered: ordered.map(({ id }) => id) };
 }

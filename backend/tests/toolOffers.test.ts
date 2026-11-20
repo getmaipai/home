@@ -152,6 +152,18 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
   });
 });
 
+describe("a full media turn can never throw (get_score and make_speech joined the offer set)", () => {
+  test("every combination of the gates stays at or under the model cap", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    const cap = base.max_tools!;
+    for (let mask = 0; mask < 1 << 13; mask++) {
+      const f = (bit: number) => (mask & (1 << bit)) !== 0;
+      const tools = withTurnToolGates(base, f(0), f(1), f(2), f(3), f(4), f(5), f(6), f(7), null, f(8), f(9), f(10), f(11), f(12)).tools_offered;
+      expect(tools.length).toBeLessThanOrEqual(cap);
+    }
+  }, 60000);
+});
+
 describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-tool cap", () => {
   test("a ready adult written chat offers sound creation through generate_music at the local Qwen cap", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
@@ -165,7 +177,10 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
     const music = listInstalledManifests().find((manifest) => manifest.id === "generate_music")!;
     expect((music.args as { properties: { kind: { enum: string[] } } }).properties.kind.enum).toContain("sound");
     expect(offered).toHaveLength(16);
-    expect(offered).toEqual(expect.arrayContaining(["generate_music", "edit_music", "edit_video", "make_film", "voiceover", "generate_image", "generate_video"]));
+    // get_score (MUSIC-SCORE-01) gives way first, then writing_format, show_images, start_project and the studio tools; make_speech joined the voiceover set, so in this
+    // everything-on worst case edit_music also gives way (the music shrink order reaches it before make_speech, which only yields to voiceover after that).
+    expect(offered).toEqual(expect.arrayContaining(["generate_music", "edit_video", "make_film", "voiceover", "generate_image", "generate_video"]));
+    expect(offered).not.toContain("get_score");
     expect(offered).toEqual(expect.arrayContaining(BASE_TOOL_IDS.filter((id) => id !== START_PROJECT_TOOL_ID)));
     expect(offered).not.toContain("make_sound");
     expect(offered).not.toEqual(expect.arrayContaining(["writing_format", "show_images", START_PROJECT_TOOL_ID]));
@@ -178,7 +193,8 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
     expect(make).toContain("generate_music"); expect(make).not.toContain("make_sound"); expect(make).not.toContain("edit_music");
     const both = withTurnToolGates(base, true, true, true, true, true).tools_offered;
     expect(both).toContain("generate_music"); expect(both).not.toContain("make_sound"); expect(both).toContain("edit_music");
-    expect(both).toHaveLength(15);
+    expect(both).toContain("get_score"); // below the cap nothing gives way
+    expect(both).toHaveLength(16);
   });
   test("the real worst case plus the planned link reader is exactly sixteen, and a seventeenth still throws", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
@@ -189,7 +205,8 @@ describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-too
       expect(full.tools_offered).toHaveLength(16);
       expect(full.tools_offered).toEqual(expect.arrayContaining([...BASE_TOOL_IDS, "show_images", "generate_image", "generate_video", "generate_music", "edit_music", "read_link"]));
       expect(full.tools_offered).not.toContain("make_sound");
-      expect(() => withTurnToolGates({ ...base, max_tools: 15 }, true, true, true, true, true)).toThrow(/exceeds the model cap/);
+      // show_images now gives way in the no-clip order (a full media turn must not throw), so a one-over cap sheds it; two over still fails explicitly.
+      expect(() => withTurnToolGates({ ...base, max_tools: 14 }, true, true, true, true, true)).toThrow(/exceeds the model cap/);
     } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
   });
   test("VIDEO-CHAT-01: edit_video needs the video gate and a clip; past sixteen the music set shrinks first and the video set stays", () => {
