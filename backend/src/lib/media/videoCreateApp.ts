@@ -26,7 +26,7 @@ import { householdActiveVideoJobs } from "@/lib/videos/jobs";
 import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
 import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
-import { getVideoJobFor } from "@/lib/videos/jobs";
+import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
 import { getLoraRecord } from "@/lib/loras/store";
 import { listFragments, listTemplates, templateBlanks } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
@@ -321,10 +321,9 @@ export function creationDetailsFor(person: PersonRow, fileId: string): Array<{ l
   add("Length", creation.generation?.duration_s ? `${creation.generation.duration_s} seconds` : creation.settings?.seconds ? `${creation.settings.seconds} seconds` : null);
   const { width, height } = creation.settings ?? {};
   add("Shape", width && height ? videoShape(width, height) : null);
-  const seed = creation.generation?.seed;
-  add("Seed", seed === null || seed === undefined ? null : String(seed));
+  // VF-EDIT-04: no seed in the person's view (a number they cannot use; the owner's record keeps it).
   const styles = (creation.settings?.styles ?? []).map((style) => getLoraRecord(style.style_id)?.name).filter((name): name is string => Boolean(name));
-  if (styles.length) add("LoRAs and styles", styles.join(", "));
+  if (styles.length) add("Styles", styles.join(", "));
   if (creation.sources.length) add("Started from", creation.sources.map((source) => source.role === "start" ? "source picture" : source.role === "sheet" ? "reference sheet" : source.role === "reference" ? "reference picture" : source.role === "edit_source" ? "source clip" : "source clip").join(", "));
   if (creation.cast.length) add("Cast", creation.cast.length === 1 ? "1 person or character" : `${creation.cast.length} people or characters`);
   if (creation.parent_id) add("Made from", "another clip (a take or an edit)");
@@ -458,14 +457,40 @@ function longTakeStage(person: PersonRow, newestClipIso: string): Array<Record<s
   }];
 }
 
-export function stageRows(person: PersonRow): Array<Record<string, unknown>> {
-  const row = feedRows(person, { limit: 1 })[0];
-  const take = longTakeStage(person, row && typeof row.created_at === "string" ? row.created_at : "");
+/** VF-EDIT-02: what an edited copy is called on the stage, from the job's own record of what was done (no model names, never the old clip's words). */
+const EDIT_TITLES: Record<string, string> = {
+  upscale: "Clearer copy", reframe: "New shape", grade: "Colorized copy", mix: "Sound added", speed: "Speed changed", captions: "Captions added", trim: "Trimmed copy",
+  join: "Joined clip", remove_background: "Background removed", spatial_sound: "Spatial sound added", restyle: "Restyled copy", swap: "Swapped copy", ingredients: "New clip from pictures",
+};
+
+/** What the stage says while an edit runs, when the job has no queue words of its own. */
+const EDIT_DOING: Record<string, string> = {
+  upscale: "Making a clearer copy", reframe: "Changing the shape", grade: "Colorizing it", mix: "Adding the sound", speed: "Changing the speed", captions: "Adding the captions", trim: "Trimming it",
+  join: "Joining the clips", remove_background: "Removing the background", spatial_sound: "Placing the sound", restyle: "Restyling it", swap: "Swapping the person", ingredients: "Making the clip",
+};
+
+/** The newest Create row made from `from` (a clip's job id or its file id): an edit of it (`request.edit.from`) or another take of it (`anotherOf`). */
+function newestMadeFrom(person: PersonRow, from: string): Record<string, unknown> | undefined {
+  const source = getVideoJobFor(person, from) ?? getVideoJobByFileFor(person, from);
+  const ids = new Set([from, ...(source ? [source.id, ...source.files.map((file: { id: string }) => file.id)] : [])]);
+  for (const row of feedRows(person, { limit: 30 })) {
+    if (typeof row.id !== "string" || row.locked === true) continue;
+    const job = getVideoJobFor(person, row.id);
+    const request = job?.request as { edit?: { from?: string }; anotherOf?: string } | undefined;
+    if (request && ((request.edit?.from && ids.has(request.edit.from)) || (request.anotherOf && ids.has(request.anotherOf)))) return row;
+  }
+  return undefined;
+}
+
+export function stageRows(person: PersonRow, filter: { from?: string } = {}): Array<Record<string, unknown>> {
+  const row = filter.from ? newestMadeFrom(person, filter.from) : feedRows(person, { limit: 1 })[0];
+  const take = filter.from ? [] : longTakeStage(person, row && typeof row.created_at === "string" ? row.created_at : "");
   if (take.length) return take;
   if (!row || typeof row.id !== "string" || row.locked === true || row.status === "locked" || row.status === "cancelled") return [];
-  const words = String(row.prompt ?? "").trim().split(/\s+/).filter(Boolean);
-  const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
   const job = getVideoJobFor(person, row.id);
+  const editChange = (job?.request as { edit?: { change?: string } } | undefined)?.edit?.change;
+  const words = String(row.prompt ?? "").trim().split(/\s+/).filter(Boolean);
+  const title = editChange && EDIT_TITLES[editChange] ? EDIT_TITLES[editChange]! : words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
   const [width, height] = (job?.request.size ?? "").split("x").map(Number);
   const seconds = job?.files[0]?.seconds ?? job?.request.seconds ?? null;
   const shape = width && height ? videoShape(width, height) : null;
@@ -479,7 +504,7 @@ export function stageRows(person: PersonRow): Array<Record<string, unknown>> {
     still, loop: made && typeof row.src === "string" ? row.src : null, position: null,
     description: title ? `The clip: ${title}` : "Your latest clip",
     stage_state: failed ? "error" : waiting ? "waiting" : made ? (typeof row.src === "string" ? "looping" : "idle") : "paused",
-    eyebrow: failed ? "Did not finish" : waiting ? (typeof row.phase === "string" && row.phase ? row.phase : "Waiting for its turn") : "Latest take",
+    eyebrow: failed ? "Did not finish" : waiting ? (editChange && EDIT_DOING[editChange] && (!row.phase || row.phase === "Making your video") ? EDIT_DOING[editChange]! : typeof row.phase === "string" && row.phase ? row.phase : "Waiting for its turn") : editChange && EDIT_TITLES[editChange] ? "Ready" : "Latest take",
     title, subtitle: facts || null,
     progress: waiting && typeof row.percent === "number" ? row.percent : null,
     error_message: failed ? String(row.error ?? "It did not finish. Try again.") : null,
@@ -508,7 +533,7 @@ registerMediaAppData("video", (person, dataId, params) => {
   switch (params.scope) {
     case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);
-    case "stage": return stageRows(person);
+    case "stage": return stageRows(person, { ...(typeof params.id === "string" && params.id ? { from: params.id } : {}) });
     // VOICED-ROUGH-CUT-HOME-01: the page binds one storyboard. A fresh voiced preview's rows (timed lines with their audio and waves) replace the silent animatic's; with none, or once the plan has changed, the silent rows stay.
     case "storyboard": { const voiced = voicedRows(person, params.id); return voiced.length ? voiced : storyboardRows(person, params.id); }
     case "storyboard-voiced": return voicedRows(person, params.id);

@@ -26,7 +26,11 @@ test("the maker sees the saved clip details and missing fields stay omitted", as
     generation: { kind: "video", job_id: "vjob-123456", task: "generate", model: { id: "ltx25-q8", revision: "unknown", licence: "unknown" }, engine: { id: "unknown", version: "unknown" }, seed: 71, duration_s: 6, bpm: null, key: null, parent_file_id: null, source_kind: "none", commercial_use: "unknown", commercial_basis: "unknown", made_at: new Date().toISOString(), tier: "standard" },
     settings: { width: 768, height: 448, seconds: 6, styles: [] }, checks: { findings: ["No findings"] },
   });
-  expect(creationDetailsFor(maker, clip.fileId)).toEqual(expect.arrayContaining([expect.objectContaining({ label: "Prompt", value: "A red kite crossing a quiet sky" }), expect.objectContaining({ label: "Engine and model", value: expect.stringContaining("LTX") }), expect.objectContaining({ label: "Length", value: "6 seconds" }), expect.objectContaining({ label: "Size", value: "768 × 448" }), expect.objectContaining({ label: "Seed", value: "71" })]));
+  // VF-UI-04 and VF-EDIT-04: what a person sees is the words, the length and the shape; no engine, model, pixel size or seed.
+  const shown = creationDetailsFor(maker, clip.fileId);
+  expect(shown).toEqual(expect.arrayContaining([{ label: "Prompt", value: "A red kite crossing a quiet sky" }, { label: "Length", value: "6 seconds" }, { label: "Shape", value: "wide" }]));
+  expect(shown.map((row) => row.label)).not.toEqual(expect.arrayContaining(["Engine and model"]));
+  for (const label of ["Engine and model", "Size", "Seed"]) expect(shown.map((row) => row.label)).not.toContain(label);
 });
 
 test("another person gets not found", async () => {
@@ -66,8 +70,9 @@ test("the watch page item carries the shot notes for the maker only", async () =
     settings: { width: 768, height: 448, seconds: 6, styles: [] },
   });
   const mine = mediaAppDataRaw(maker, "video", "item", { id: clip.fileId }) as { facts?: string } | null;
-  expect(mine?.facts).toContain("Seed: 71");
   expect(mine?.facts).toContain("Length: 6 seconds");
+  expect(mine?.facts).toContain("Shape: wide");
+  expect(mine?.facts).not.toContain("Seed");
   expect(mine?.facts).not.toContain("\n");
   const other = mediaAppDataRaw(h.row("Quill"), "video", "item", { id: clip.fileId }) as { facts?: string } | [] | null;
   expect((Array.isArray(other) ? "" : other?.facts) ?? "").not.toContain("Seed");

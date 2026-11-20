@@ -411,6 +411,38 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   });
 });
 
+describe("scope stage with a source clip (VF-EDIT-02)", () => {
+  test("`id` names the clip an edit was made from: the stage shows the newest edit or take of that clip, called what it is, and not a newer unrelated clip", async () => {
+    const { adult, row } = await household();
+    const first = await makeClip(adult.client, row("Marlow"), { prompt: BOAT });
+    const stamp = new Date(Date.now() - 1000).toISOString();
+    const insert = (id: string, request: Record<string, unknown>, state: string) => db.insert(videoJobs).values({ id, personId: row("Marlow").id, kind: "edit", state, percent: 40, phase: "generating", position: 0, prompt: BOAT, request: JSON.stringify({ size: "768x448", seconds: 3, audience: "all-ages", ...request }), files: "[]", createdAt: stamp, updatedAt: stamp, hlc: "h" }).run();
+    const other = await makeClip(adult.client, row("Marlow"), { prompt: "A lantern swings in the wind, soft light" });
+    // the edit is older than the unrelated clip, so only the filter can find it
+    insert("edit-clearer", { edit: { from: first.jobId, change: "upscale" } }, "running");
+    const mine = await data(adult.client, { scope: "stage", id: first.jobId });
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ id: "edit-clearer", title: "Clearer copy", description: "The clip: Clearer copy", stage_state: "waiting", eyebrow: "Making a clearer copy" });
+    // By the clip's file id too; the Create page's own stage (no id) is still the newest clip.
+    expect((await data(adult.client, { scope: "stage", id: first.fileId }))[0]).toMatchObject({ id: "edit-clearer" });
+    expect((await data(adult.client, { scope: "stage" }))[0]).toMatchObject({ id: other.jobId });
+    // A clip nothing was made from has no stage of its own.
+    expect(await data(adult.client, { scope: "stage", id: other.jobId })).toEqual([]);
+  }, 30000);
+});
+
+describe("the Create feed's clip menu (VF-EDIT-04)", () => {
+  test("Lock (Remove lock on a locked clip) is first, then Another take, Edit and make again, Open in Studio and How it was made; every other item is still there", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Row> };
+    const feed = page.body[page.body.length - 1]!.children[0];
+    const labels = feed.actions.map((action: { label: string }) => action.label);
+    expect(labels.slice(0, 6)).toEqual(["Remove lock", "Lock", "Another take", "Edit and make again", "Open in Studio", "How it was made"]);
+    expect(labels).toEqual(expect.arrayContaining(["Make it vertical", "Sharpen 2x", "Spatial sound", "Next shot", "Extend", "Colorize", "Hide or show again"]));
+    expect(feed.actions.slice(0, 2).map((action: { show_when?: string }) => action.show_when)).toEqual(["can_unmark", "can_mark"]);
+  });
+});
+
 describe("the manifest of three pages", () => {
   test("Create, Studio and My clips are the whole Create group; the three old pages and their files are gone, the data list is still 16 ids", async () => {
     const manifest = JSON.parse(await Bun.file(join(PACKAGES_DIR, "video", "manifest.json")).text()) as { contributes: { sidebar: { groups: Array<{ id: string; pages: string[] }> }; pages: Array<{ id: string; module: string; min_role?: string }>; data: Array<{ id: string }>; header: { modes: Array<{ id: string; page: string }>; search: { label: string } } } };

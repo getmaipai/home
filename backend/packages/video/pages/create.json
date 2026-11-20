@@ -87,7 +87,7 @@
         }
       },
       "size": "stage",
-    "aspect": "short",
+      "aspect": "short",
       "media": {
         "still": "still",
         "loop": "loop",
@@ -106,7 +106,7 @@
           "starts": "video",
           "icon": "rotate-ccw",
           "action": {
-                        "call": {
+            "call": {
               "target": "/api/plugins/video/actions/reshoot",
               "method": "POST",
               "args": {
@@ -154,7 +154,7 @@
           "starts": "video",
           "icon": "refresh-cw",
           "action": {
-                        "call": {
+            "call": {
               "target": "/api/plugins/video/actions/another",
               "method": "POST",
               "args": {
@@ -318,6 +318,56 @@
           },
           "actions": [
             {
+              "label": "Remove lock",
+              "icon": "key-round",
+              "show_when": "can_unmark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/adult-mark",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "action": "clear",
+                    "ticket": "{ticket}"
+                  },
+                  "fresh_confirm": {
+                    "title": "Remove the adult lock?",
+                    "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
+                    "action_label": "Remove lock"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Lock",
+              "icon": "lock",
+              "show_when": "can_mark",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/adult-mark",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}",
+                    "action": "mark"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Another take",
+              "icon": "rotate-ccw",
+              "starts": "video",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/video/actions/reshoot",
+                  "method": "POST",
+                  "args": {
+                    "id": "{id}"
+                  }
+                }
+              }
+            },
+            {
               "label": "Edit and make again",
               "icon": "pencil",
               "action": {
@@ -331,6 +381,33 @@
                     "tier": "{tier}",
                     "orientation": "{orientation}",
                     "start_frame": "{start_frame}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Open in Studio",
+              "icon": "audio-waveform",
+              "action": {
+                "navigate": {
+                  "to": "/apps/video/studio",
+                  "state": {
+                    "clip": "{id}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "How it was made",
+              "icon": "info",
+              "when": [
+                "ready"
+              ],
+              "action": {
+                "navigate": {
+                  "to": "/apps/video/how-made",
+                  "state": {
+                    "id": "{id}"
                   }
                 }
               }
@@ -453,20 +530,6 @@
               }
             },
             {
-              "label": "Another take",
-              "icon": "rotate-ccw",
-              "starts": "video",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/video/actions/reshoot",
-                  "method": "POST",
-                  "args": {
-                    "id": "{id}"
-                  }
-                }
-              }
-            },
-            {
               "label": "Next shot",
               "icon": "video",
               "starts": "video",
@@ -518,69 +581,6 @@
                   "target": "/api/plugins/video/actions/hide",
                   "method": "POST",
                   "args": {
-                    "id": "{id}"
-                  }
-                }
-              }
-            },
-            {
-              "label": "Open in Studio",
-              "icon": "audio-waveform",
-              "action": {
-                "navigate": {
-                  "to": "/apps/video/studio",
-                  "state": {
-                    "clip": "{id}"
-                  }
-                }
-              }
-            },
-            {
-              "label": "Remove lock",
-              "icon": "key-round",
-              "show_when": "can_unmark",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/video/actions/adult-mark",
-                  "method": "POST",
-                  "args": {
-                    "id": "{id}",
-                    "action": "clear",
-                    "ticket": "{ticket}"
-                  },
-                  "fresh_confirm": {
-                    "title": "Remove the adult lock?",
-                    "description": "This changes who can see it. It will show with its title and thumbnail in your feeds and lists, to anyone looking at your screen. People under 18 still never see it. Enter your passcode to continue.",
-                    "action_label": "Remove lock"
-                  }
-                }
-              }
-            },
-            {
-              "label": "Lock",
-              "icon": "lock",
-              "show_when": "can_mark",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/video/actions/adult-mark",
-                  "method": "POST",
-                  "args": {
-                    "id": "{id}",
-                    "action": "mark"
-                  }
-                }
-              }
-            },
-            {
-              "label": "How it was made",
-              "icon": "info",
-              "when": [
-                "ready"
-              ],
-              "action": {
-                "navigate": {
-                  "to": "/apps/video/how-made",
-                  "state": {
                     "id": "{id}"
                   }
                 }
