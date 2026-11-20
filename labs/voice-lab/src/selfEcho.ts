@@ -61,6 +61,7 @@ export const ECHO_DROP = { windowMs: 10_000, ratio: 0.7, graceMs: 1000, minWords
 /** Second layer behind the word matching: before a turn commits, a transcript that is mostly (70%+, fuzzy) made of words she said in the last 10 s, and that started while she was speaking (or within a second of it), is her own voice coming back, not a person. A person who repeats her last sentence after she has been quiet for more than a second still commits. */
 export function isOwnEchoTurn(i: { transcript: string; spoken: string; speechStartMs: number; lastSpokeMs: number; nowMs: number }, cfg = ECHO_DROP): { drop: boolean; ratio: number } {
   const hw = words(i.transcript); if (hw.length < cfg.minWords || !i.spoken || i.lastSpokeMs < 0) return { drop: false, ratio: 0 };
+  if (hw.some((w) => STOPPERS.has(w) && !SOFT.has(w))) return { drop: false, ratio: 0 };   // "wait", "stop": a command is never dropped, even if her story contains the same words (recorded: a person's "Wait, stop." was dropped with ratio 1)
   if (i.nowMs - i.lastSpokeMs > cfg.windowMs || i.speechStartMs > i.lastSpokeMs + cfg.graceMs) return { drop: false, ratio: 0 };
   const sw = [...new Set(words(i.spoken))]; const hit = hw.filter((w) => sw.some((x) => near(w, x))).length; const ratio = hit / hw.length;
   return { drop: ratio >= cfg.ratio, ratio: +ratio.toFixed(2) };

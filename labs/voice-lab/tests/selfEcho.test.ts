@@ -101,3 +101,6 @@ test("a real new turn is not dropped, and neither is the person repeating her la
   expect(echoTurn({ transcript: "Oh, I am so sorry.", spoken: "Oh, I am so sorry. That is a real loss.", speechStartMs: T0 + 2000, lastSpokeMs: T0, nowMs: T0 + 3500 }).drop).toBe(false);   // she was quiet for 2 s, then the person repeats her
   expect(echoTurn({ transcript: "I'm so sorry.", spoken: "Oh, I am so sorry.", speechStartMs: T0 - 300, lastSpokeMs: T0 - 15_000, nowMs: T0 }).drop).toBe(false);                       // she spoke more than 10 s ago
 });
+test("a command is never dropped as echo, even when her story contains the same words (recorded: a person's 'Wait, stop.' dropped with ratio 1)", () => {
+  expect(echoTurn({ transcript: "Wait, stop.", spoken: "He had to wait. Then he could not stop laughing.", speechStartMs: T0 - 200, lastSpokeMs: T0, nowMs: T0 + 700 }).drop).toBe(false);
+});

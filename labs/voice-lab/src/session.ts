@@ -152,7 +152,8 @@ export class VoiceSession {
       case "state": if (c.state === "user_speaking") activeSince.set(this, Date.now()); else if (c.state === "idle") activeSince.delete(this); this.send({ t: "state", state: c.state }); break;
       case "check_turn": void this.check(Number(c.revision ?? this.tm.checkRevision)); break;
       case "transcript_ready": { const echo = isOwnEchoTurn({ transcript: String(c.text), spoken: this.recentSpoken(), speechStartMs: this.speechOrigin, lastSpokeMs: this.lastSpokeAt, nowMs: this.now() });
-        if (echo.drop) { this.logStop("dropped-as-echo", { heard: String(c.text), ratio: echo.ratio, spokenTail: this.recentSpoken().slice(-120) }); this.send({ t: "state", state: "idle" }); for (const next of this.tm.dropTurn()) this.command(next); break; } }
+        const dropIt = echo.drop && !this.userInterrupted; this.userInterrupted = false;
+        if (dropIt) { this.logStop("dropped-as-echo", { heard: String(c.text), ratio: echo.ratio, spokenTail: this.recentSpoken().slice(-120) }); this.send({ t: "state", state: "idle" }); for (const next of this.tm.dropTurn()) this.command(next); break; } }
         for (const next of this.tm.transcriptReady(String(c.text), this.now(), Number(c.revision ?? this.tm.checkRevision))) this.command(next); break;
       case "start_reply_held":
         if (this.held && this.streamDraft) {
@@ -195,7 +196,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
+  private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -208,11 +209,11 @@ export class VoiceSession {
     const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
     if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
     let finalDecision = decision; let sustained: string[] = [];
-    if (!this.echoRef && decision === "echo" && text) { const r = sustainedNewWords(this.residHistory, this.now(), residualContent(text, this.recentSpoken())); sustained = r.words; if (r.interrupt) { finalDecision = "interrupt"; this.residHistory.length = 0; } }
+    if (!this.echoRef && decision === "echo" && text) { const r = sustainedNewWords(this.residHistory, this.now(), this.cutInLouder(audio) ? residualContent(text, this.recentSpoken()) : []); sustained = r.words; if (r.interrupt) { finalDecision = "interrupt"; this.residHistory.length = 0; } }
     else if (decision === "interrupt" || decision === "ack") this.residHistory.length = 0;
     for (const command of this.tm.cutTranscript(text, finalDecision)) this.command(command);
     this.logStop(`cut-in-${finalDecision}${finalDecision !== decision ? "-sustained" : ""}`, { heard: text, resid: sustained, seconds: +(audio.length / 16000).toFixed(2), louder: this.cutInLouder(audio), overlapMs: this.overlapMs, refMode: !!this.echoRef, spoken: this.playingNowText().slice(0, 80) });
-    if (finalDecision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
+    if (finalDecision === "interrupt") { this.userInterrupted = true; this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
   }
   private async check(revision: number) {
     if (revision !== this.tm.checkRevision) return;
