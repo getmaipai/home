@@ -582,6 +582,10 @@ NODE
   (cd frontend && bun run lint:i18n >/dev/null)
   # Catalogs current, placeholders intact, no needs-review flag on child, teen, crisis, consent, refusal, spoken, robot or SEARCH-DOWN-EMPTY-01 copy.
   (cd frontend && bun run i18n:check >/dev/null)
+  # CHECK-PRE-PACKAGES-01: every bundled package passes the loader's own check (a refused app vanishes at boot with no other sign). Always, not
+  # path-scoped: a spec pin bump can refuse a package without touching backend/packages. About 1.4 s, no server.
+  preflight_stage "pre: bundled packages load"
+  (cd backend && MAIPAI_TEST_NO_PORTS=1 bun test ./src/lib/bundledPackages.test.ts >/dev/null)
 
   # The typechecks are independent, so they run at once (about 170 s serial, the longest one alone in parallel).
   local -a tc_args=()
