@@ -425,26 +425,41 @@ export function filmShelfRows(person: PersonRow, states: FilmRunState[]): Array<
 
 /** VF-UI-03b: the newest take of the Create feed as the one row of the page's media_stage: a finished take loops, a take being made waits with its progress, a failed take shows
  * its plain error with Try again. Nothing here names a model or a pixel size; the facts line is the shape word and the length. A locked take (the feed's lock tile) makes no stage. */
-/** A long take being made is a media production, and its parts are background jobs with no page behind them, so the feed never lists them. While one runs it is the stage's one row:
- * the part it is on, how many it has, and the share done. Only a running take shows (a stopped or failed one has no job id the stage's pills could act on). */
-function runningTakeStage(person: PersonRow): Array<Record<string, unknown>> {
+/** A long take is a media production, and its parts are background jobs with no page behind them, so the feed never lists them. The newest take (running, stopped or failed) that is
+ * newer than the feed's newest clip is the stage's one row: running shows the part it is on and the share done; a take that did not finish says so in plain words, and "Try again"
+ * (the `another` action, which resumes a take) and "Change the words" act on it. A finished take is a normal clip in the feed. */
+function longTakeStage(person: PersonRow, newestClipIso: string): Array<Record<string, unknown>> {
+  let best: { production: ReturnType<typeof listMediaProductions>[number]; progress: NonNullable<ReturnType<typeof takeProgress>>; params: NonNullable<ReturnType<typeof decodeParams>> } | null = null;
   for (const production of listMediaProductions(person)) {
     if (production.owner_person_id !== person.id || !production.provenance.includes('"long-take"')) continue;
     const progress = takeProgress(person, production.id);
     const params = decodeParams(production.summary);
-    if (!progress || !params || progress.state !== "running") continue;
-    const words = params.prompt.trim().split(/\s+/).filter(Boolean);
-    const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
-    const part = Math.min(progress.parts_done + 1, progress.parts_total);
-    return [{ id: production.id, prompt: params.prompt, still: null, loop: null, position: null, description: `The clip: ${title}`, stage_state: "waiting", eyebrow: `Part ${part} of ${progress.parts_total}`, title, subtitle: `${progress.parts_total * params.per_part} seconds, made in ${progress.parts_total} parts`, progress: Math.round((progress.parts_done / progress.parts_total) * 100), error_message: null }];
+    if (!progress || !params || progress.state === "done") continue;
+    if (progress.state !== "running" && production.created_at < newestClipIso) continue;
+    if (!best || production.created_at > best.production.created_at) best = { production, progress, params };
   }
-  return [];
+  if (!best) return [];
+  const { production, progress, params } = best;
+  const words = params.prompt.trim().split(/\s+/).filter(Boolean);
+  const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");
+  const running = progress.state === "running";
+  const part = Math.min(progress.parts_done + 1, progress.parts_total);
+  const orientation = params.orientation ?? "landscape";
+  return [{
+    id: production.id, prompt: params.prompt, still: null, loop: null, position: null, description: `The clip: ${title}`,
+    look: "", camera: "none", start_frame: "", seconds: params.parts * params.per_part, tier: params.tier, orientation,
+    stage_state: running ? "waiting" : "error",
+    eyebrow: running ? `Part ${part} of ${progress.parts_total}` : "Did not finish",
+    title, subtitle: `${params.parts * params.per_part} seconds, made in ${params.parts} parts`,
+    progress: running ? Math.round((progress.parts_done / progress.parts_total) * 100) : null,
+    error_message: running ? null : progress.state === "stopped" ? `This long take was stopped after ${progress.parts_done} of ${progress.parts_total} parts. Try again to carry on, or change the words.` : `${progress.error_line ?? "A part of the long take did not finish."} Try again to carry on, or change the words.`,
+  }];
 }
 
 export function stageRows(person: PersonRow): Array<Record<string, unknown>> {
-  const making = runningTakeStage(person);
-  if (making.length) return making;
   const row = feedRows(person, { limit: 1 })[0];
+  const take = longTakeStage(person, row && typeof row.created_at === "string" ? row.created_at : "");
+  if (take.length) return take;
   if (!row || typeof row.id !== "string" || row.locked === true || row.status === "locked" || row.status === "cancelled") return [];
   const words = String(row.prompt ?? "").trim().split(/\s+/).filter(Boolean);
   const title = words.length > 8 ? `${words.slice(0, 8).join(" ")}…` : words.join(" ");

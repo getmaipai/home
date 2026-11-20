@@ -41,7 +41,7 @@ import { makeItMaxBody } from "@/lib/videos/editTool";
 import { startSpatialSound } from "@/lib/videos/spatialStart";
 import { addCredits, addTitle, burnCaptions, makeCaptions, saveCaptionText } from "@/lib/videos/captionsPage";
 import { isReshape, startReshape, startSharpen, startSplit, startClipCreation, startColorize, EXTEND_MAX_CHARS, NEXT_SHOTS } from "@/lib/videos/clipEditStart";
-import { ceilingFor, startLongTake } from "@/lib/videos/longTake";
+import { ceilingFor, resumeLongTake, startLongTake, takeProgress } from "@/lib/videos/longTake";
 import { startVoiceover } from "@/lib/videos/voiceoverStart";
 import { startSwap } from "@/lib/videos/swapStart";
 import { studioAdd } from "@/lib/videos/studio";
@@ -236,6 +236,11 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (appId !== "video") return next();
     if (!appRouteAllowed(person, appId, "actions", "another")) return next();
     const body = await jsonBody(c);
+    // A long take that stopped or failed has no clip to take again: Try again carries on from the first part with no clip (LONGTAKE-01 resume).
+    if (typeof body.id === "string" && takeProgress(person, body.id)) {
+      const resumed = resumeLongTake(person, body.id);
+      return resumed && "state" in resumed ? c.json({ ok: true as const, id: resumed.id, state: resumed.state, notice: null }, 200) : c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
+    }
     const source = typeof body.id === "string" ? getVideoJobFor(person, body.id) ?? getVideoJobByFileFor(person, body.id) : null;
     if (!source || source.conversationId || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Make a new one from the words above.", code: "gone" }, 404);
     // VIDEO-STUDIO-07: a clip made by editing others has no words of its own to make again; the original clip does.

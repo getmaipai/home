@@ -411,7 +411,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(fake.submitted[0]!.seconds).toBe(10);
     expect(fake.submitted[0]!.size).toBe(standardSize(false));
     const rows = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json() as Array<{ phase: string; seconds: number; tags: string[] }>;
-    expect(rows[0]!.phase).toBe("Waiting for its turn. It starts by itself, or tap Cancel.");
+    expect(rows[0]!.phase).toStartWith("You are next."); // the queue copy says who is first (468d2723e); the old "Waiting for its turn" line is for a held clip
     expect(rows[0]!.seconds).toBe(10);
     expect(rows[0]!.tags).toEqual(["Standard", "10 s"]);
   });
@@ -426,10 +426,12 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(body.notice).toBe("This is made in 2 parts of about 5 seconds, each carrying on from the one before, so it takes longer and the picture may drift a little.");
     expect(body.long_take).toBe(true);
     expect(body.notice).not.toContain("\u2014");
+    // the first part is submitted after the answer returns (the take runs in the background), so wait for it
+    for (let n = 0; n < 40 && fake.submitted.length === 0; n++) await new Promise((r) => setTimeout(r, 50));
     expect(fake.submitted[0]!.seconds).toBe(5);
     expect(fake.submitted[0]!.size).toBe(boostSize(false));
-    // one job is queued for the first part (state queued, kind generate)
-    expect(db.select().from((await import("@/db/schema")).videoJobs).all().map((row) => row.state)).toEqual(["queued"]);
+    // one job exists for the first part (kind generate), running once it is submitted
+    expect(db.select().from((await import("@/db/schema")).videoJobs).all().map((row) => row.state)).toEqual(["running"]);
   });
 
   // The parts of a long take are background jobs, so the feed lists none of them; the stage shows the take itself, once, with its part word (found 2026-11-20).
@@ -441,7 +443,16 @@ describe("V1b: look, length, voices, hint and Another take", () => {
     expect(stage).toHaveLength(1);
     expect(stage[0]).toMatchObject({ stage_state: "waiting", eyebrow: "Part 1 of 2", subtitle: "10 seconds, made in 2 parts", progress: 0 });
     expect(await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed" })).json()).toEqual([]);
-    await adult.client.post(`/api/videos/long/${(stage[0] as { id: string }).id}/cancel`, {}); // a take left running would refuse the next test's long take
+    // Stopping it leaves the person a plain error row, never an empty stage, and Try again resumes it.
+    const id = (stage[0] as { id: string }).id;
+    await adult.client.post(`/api/videos/long/${id}/cancel`, {});
+    let after: Array<Record<string, unknown>> = [];
+    for (let n = 0; n < 40; n++) { after = await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json() as typeof after; if (after[0]?.stage_state === "error") break; await new Promise((r) => setTimeout(r, 50)); }
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ id, stage_state: "error", eyebrow: "Did not finish", prompt: BOAT, seconds: 10, tier: "boost" });
+    expect(String(after[0]!.error_message)).toContain("Try again to carry on, or change the words.");
+    expect((await adult.client.post("/api/plugins/video/actions/another", { id })).status).toBe(200); // resumed, so it is running again
+    await adult.client.post(`/api/videos/long/${id}/cancel`, {}); // a take left running would refuse the next test's long take
   });
   test("an unknown look or voices choice is a plain 422", async () => {
     const { adult } = await household();
