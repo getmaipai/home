@@ -10,6 +10,6 @@ export async function sampleGpu(): Promise<{ util: number; jobs: string }> {
   } catch { return { util: -1, jobs: "" }; }
 }
 
-/** "free" when no other GPU job is running and the GPU is quiet; "shared" otherwise. */
-export const gpuClass = (g: { util: number; jobs: string }) => (g.jobs === "" && g.util < 30 ? "free" : "shared");
+/** "free" when no other GPU engine (hub video job, other MLX or llama process) is running; the utilization is recorded next to it but is not the class, because remote-desktop streaming alone keeps the GPU busy. */
+export const gpuClass = (g: { util: number; jobs: string }) => (g.jobs === "" ? "free" : "shared");
 export async function waitForGpuFree(maxMs = 20 * 60_000, quietSamples = 3): Promise<boolean> { const t0 = performance.now(); let ok = 0; while (performance.now() - t0 < maxMs) { ok = gpuClass(await sampleGpu()) === "free" ? ok + 1 : 0; if (ok >= quietSamples) return true; await Bun.sleep(5000); } return false; }
