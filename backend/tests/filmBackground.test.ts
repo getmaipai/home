@@ -9,7 +9,7 @@ import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
 
 function person(id:string):PersonRow { const now=new Date().toISOString(); db.insert(people).values({id,displayName:id,role:"adult",avatarSeed:id,source:"local",createdAt:now,updatedAt:now,hlc:"1:0:test"}).run(); return db.select().from(people).all().find(p=>p.id===id)!; }
-const plan={title:"Crossing",summary:"A short crossing.",cast:[{name:"Mira",kind:"character",locked:"Blue coat."}],shots:[{id:"one",subject_ids:[],framing:"wide",still:"Mira in a blue coat.",motion:"Walks slowly.",seconds:5},{id:"two",subject_ids:[],framing:"close",still:"Mira in a blue coat.",motion:"Looks up.",seconds:5}],music:"Soft piano.",credits:[]};
+const plan={title:"Crossing",summary:"A short crossing.",cast:[{name:"Willow",kind:"character",locked:"Blue coat."}],shots:[{id:"one",subject_ids:[],framing:"wide",still:"Willow in a blue coat.",motion:"Walks slowly.",seconds:5},{id:"two",subject_ids:[],framing:"close",still:"Willow in a blue coat.",motion:"Looks up.",seconds:5}],music:"Soft piano.",credits:[]};
 const wait=()=>new Promise(r=>setTimeout(r,10));
 async function until(fn:()=>boolean) { for(let i=0;i<100&&!fn();i++) await wait(); expect(fn()).toBe(true); }
 beforeEach(()=>resetDb()); afterEach(()=>{__setFilmPlanCompleterForTests(null);__setFilmEnginesForTests(null);});

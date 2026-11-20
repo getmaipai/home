@@ -6,10 +6,10 @@ import { __setFilmPlanCompleterForTests, FILM_PLAN_PROMPT, FILM_PLAN_RESPONSE_FO
 const productionShot = z.object({ id: z.string().min(1).max(80), subject_ids: z.array(z.string()), clip_file_id: z.string().nullable().optional(), picture_file_id: z.string().nullable().optional(), music_line_id: z.string().nullable().optional(), voice_line_id: z.string().nullable().optional() });
 const goodPlan: FilmPlan = {
   title: "The Quiet Crossing", summary: "A sailor meets a sea creature at dusk.",
-  cast: [{ name: "Mira", kind: "character", locked: "Blue coat, silver braid, three freckles, never a hat.", reveal_last: false }],
+  cast: [{ name: "Willow", kind: "character", locked: "Blue coat, silver braid, three freckles, never a hat.", reveal_last: false }],
   shots: [
-    { id: "shot-1", subject_ids: [], framing: "wide establishing", still: "Mira in a blue coat with a silver braid and three freckles, never a hat, beside a flat empty sea meeting a plain hazy sky.", motion: "The tide rolls gently.", seconds: 6, transition: "fade" },
-    { id: "shot-2", subject_ids: [], framing: "calm closing wide", still: "Mira in a blue coat with a silver braid and three freckles, never a hat, walks along the shore.", motion: "The water settles.", seconds: 6 },
+    { id: "shot-1", subject_ids: [], framing: "wide establishing", still: "Willow in a blue coat with a silver braid and three freckles, never a hat, beside a flat empty sea meeting a plain hazy sky.", motion: "The tide rolls gently.", seconds: 6, transition: "fade" },
+    { id: "shot-2", subject_ids: [], framing: "calm closing wide", still: "Willow in a blue coat with a silver braid and three freckles, never a hat, walks along the shore.", motion: "The water settles.", seconds: 6 },
   ],
   music: "A quiet instrumental piano and strings score.", credits: [],
 };

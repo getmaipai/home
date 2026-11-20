@@ -12,7 +12,7 @@ import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
 
 const plan = {
-  title: "The Blue Mug", summary: "s", cast: [{ name: "Mira", kind: "character" as const, locked: "Blue coat." }],
+  title: "The Blue Mug", summary: "s", cast: [{ name: "Willow", kind: "character" as const, locked: "Blue coat." }],
   shots: [
     { id: "a", subject_ids: [], framing: "wide", still: "x", motion: "m", seconds: 5 },
     { id: "b", subject_ids: [], framing: "medium", still: "x", motion: "m", seconds: 5, line: "Please put the blue mug back.", transition: "fade" as const },

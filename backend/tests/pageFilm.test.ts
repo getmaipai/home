@@ -13,10 +13,10 @@ import { owner as signedInOwner } from "./support/testAuth";
 import type { TestClient } from "./client";
 import type { PersonRow } from "@/types";
 
-const plan = { title: "Crossing", summary: "A short crossing.", cast: [{ name: "Mira", kind: "character", locked: "Blue coat." }], shots: [
-  { id: "one", subject_ids: [], framing: "wide", still: "Mira in a blue coat on a long pier.", motion: "Walks slowly.", seconds: 5 },
-  { id: "two", subject_ids: [], framing: "close", still: "Mira in a blue coat looking up.", motion: "Looks up.", seconds: 5 },
-  { id: "three", subject_ids: [], framing: "wide", still: "Mira in a blue coat at the far end.", motion: "Stops.", seconds: 5 },
+const plan = { title: "Crossing", summary: "A short crossing.", cast: [{ name: "Willow", kind: "character", locked: "Blue coat." }], shots: [
+  { id: "one", subject_ids: [], framing: "wide", still: "Willow in a blue coat on a long pier.", motion: "Walks slowly.", seconds: 5 },
+  { id: "two", subject_ids: [], framing: "close", still: "Willow in a blue coat looking up.", motion: "Looks up.", seconds: 5 },
+  { id: "three", subject_ids: [], framing: "wide", still: "Willow in a blue coat at the far end.", motion: "Stops.", seconds: 5 },
 ], music: "Soft piano.", credits: [] };
 const wait = () => new Promise((resolve) => setTimeout(resolve, 10));
 async function until(fn: () => boolean) { for (let i = 0; i < 300 && !fn(); i++) await wait(); expect(fn()).toBe(true); }
@@ -147,9 +147,9 @@ describe("plan, draft, keep or skip, finish", () => {
     const id = await planned(owner, row);
     await owner.post(`${T}/actions/film-draft`, { run: id });
     await until(() => getFilmRun(row, id)?.state === "waiting_for_go" && calls.filter((c) => c.startsWith("still:")).length === 3);
-    const res = await owner.post(`${T}/actions/film-shot`, { run: id, shot: "one", prompt: "Mira in a blue coat stands at the very end of a stormy pier.", shot_seconds: "8", camera: "pan_left" });
+    const res = await owner.post(`${T}/actions/film-shot`, { run: id, shot: "one", prompt: "Willow in a blue coat stands at the very end of a stormy pier.", shot_seconds: "8", camera: "pan_left" });
     expect(res.status).toBe(200);
-    expect(getFilmRun(row, id)!.plan!.shots[0]).toMatchObject({ still: "Mira in a blue coat stands at the very end of a stormy pier.", seconds: 8, motion: "pan left" });
+    expect(getFilmRun(row, id)!.plan!.shots[0]).toMatchObject({ still: "Willow in a blue coat stands at the very end of a stormy pier.", seconds: 8, motion: "pan left" });
     const shots = await rows(owner, "film-shots");
     expect(shots[0]).toMatchObject({ status: "Not drafted", thumbnail: null });
     expect(shots[1]!.status).toBe("Draft");

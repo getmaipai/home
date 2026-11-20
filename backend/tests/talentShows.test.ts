@@ -21,7 +21,7 @@ describe("TALENT-04 shows", () => {
   test("creates an invented-cast production and private production source", async () => {
     const { row } = await owner();
     __setTalentShowCompleterForTests((async () => ({ ok: true as const, text: JSON.stringify([
-      { part: "anchor", display_name: "Mira Vale", pronouns: "she/her", tagline: "Clear eyed", backstory: "A careful local reporter who likes maps and morning walks.", interests: ["maps", "gardening", "baking"], formality: "formal", complexity: "standard", engagement: "balanced", filler_density: "none", clock_style: "formal", hedging: "high", humor: "low", warmth: "medium", initiative: "high" },
+      { part: "anchor", display_name: "Willow Vale", pronouns: "she/her", tagline: "Clear eyed", backstory: "A careful local reporter who likes maps and morning walks.", interests: ["maps", "gardening", "baking"], formality: "formal", complexity: "standard", engagement: "balanced", filler_density: "none", clock_style: "formal", hedging: "high", humor: "low", warmth: "medium", initiative: "high" },
       { part: "reporter", display_name: "Theo Reed", pronouns: "he/him", tagline: "Curious neighbor", backstory: "A curious neighbor who enjoys asking questions and meeting people.", interests: ["walking", "music", "gardening"], formality: "neutral", complexity: "standard", engagement: "curious", filler_density: "light", clock_style: "plain", hedging: "medium", humor: "medium", warmth: "high", initiative: "medium" },
     ]) })) as never);
     __setTalentLifeCompleterForTests((async () => ({ ok: true as const, text: "{}" })) as never);

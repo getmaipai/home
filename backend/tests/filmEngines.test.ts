@@ -25,7 +25,7 @@ function person(id: string, role: "adult" | "teen" | "child" = "adult"): PersonR
   return db.select().from(people).all().find((row) => row.id === id)!;
 }
 
-const plan = { title: "Quiet crossing", summary: "A quiet crossing.", cast: [{ name: "Mira", kind: "character", locked: "A blue coat." }], shots: [1, 2].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Mira in a blue coat.", motion: "The tide rolls gently.", seconds: 5 })), music: "Soft instrumental piano.", credits: [] };
+const plan = { title: "Quiet crossing", summary: "A quiet crossing.", cast: [{ name: "Willow", kind: "character", locked: "A blue coat." }], shots: [1, 2].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Willow in a blue coat.", motion: "The tide rolls gently.", seconds: 5 })), music: "Soft instrumental piano.", credits: [] };
 
 describe("film engine entry", () => {
   let image: ReturnType<typeof installFakeImageStack>;
@@ -52,7 +52,7 @@ describe("film engine entry", () => {
     image = installFakeImageStack(); video = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); music = installFakeMusicStack(); edit = installFakeEditStack();
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
     __setKeyframesForTests(async () => [new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]);
-    const threeShotPlan = { ...plan, shots: [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Mira in a blue coat.", motion: "The tide rolls gently.", seconds: 5 })) };
+    const threeShotPlan = { ...plan, shots: [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Willow in a blue coat.", motion: "The tide rolls gently.", seconds: 5 })) };
     __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify(threeShotPlan) }));
     const actor = person("person-filmowner");
     const result = await makeFilm({ actor, idea: "A quiet crossing", signal: new AbortController().signal });
@@ -80,7 +80,7 @@ describe("film engine entry", () => {
     const stored = storeFile(actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: photo, provenance: `media-subject-reference:${JSON.stringify({ audience: "all-ages" })}`, deduplicate: false, retention: "kept" });
     if (!stored.ok) throw new Error("photo not stored");
     createMediaSubject(actor, { name: "Factory floor", kind: "place", look: "A bright indoor factory floor.", referenceIds: [stored.value.id] });
-    const placePlan = { title: "The floor", summary: "A look at the floor.", cast: [{ name: "Mira", kind: "character", locked: "A blue coat." }, { name: "Factory floor", kind: "place", locked: "A bright indoor factory floor." }], shots: [1, 2].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Factory floor, wide.", motion: "A slow push in.", seconds: 5 })), music: "Soft instrumental piano.", credits: [] };
+    const placePlan = { title: "The floor", summary: "A look at the floor.", cast: [{ name: "Willow", kind: "character", locked: "A blue coat." }, { name: "Factory floor", kind: "place", locked: "A bright indoor factory floor." }], shots: [1, 2].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Factory floor, wide.", motion: "A slow push in.", seconds: 5 })), music: "Soft instrumental piano.", credits: [] };
     __setFilmPlanCompleterForTests(async () => ({ ok: true, text: JSON.stringify(placePlan) }));
     const result = await makeFilm({ actor, idea: "A look at the floor", signal: new AbortController().signal });
     if (!("productionId" in result)) throw new Error(JSON.stringify(result));

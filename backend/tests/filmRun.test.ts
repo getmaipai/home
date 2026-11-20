@@ -14,8 +14,8 @@ function person(id: string): PersonRow {
   return db.select().from(people).all().find((row) => row.id === id)!;
 }
 const plan: FilmPlan = {
-  title: "Crossing", summary: "A quiet crossing.", cast: [{ name: "Mira", kind: "character", locked: "Blue coat and silver braid." }],
-  shots: [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Mira in a blue coat and silver braid.", motion: "Moves slowly.", seconds: 5 })),
+  title: "Crossing", summary: "A quiet crossing.", cast: [{ name: "Willow", kind: "character", locked: "Blue coat and silver braid." }],
+  shots: [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Willow in a blue coat and silver braid.", motion: "Moves slowly.", seconds: 5 })),
   music: "Soft piano.", credits: [],
 };
 function fake(record: string[], failClip?: string): FilmEngines {
@@ -36,7 +36,7 @@ describe("film runner", () => {
   test("runs in order, stores artifacts, then skips a completed film", async () => {
     const actor = person("film-owner"); actorForEngines = actor; const production = createMediaProduction(actor, { title: "Draft" }), calls: string[] = [], engines = fake(calls);
     const result = await runFilm({ actor, productionId: production.id, plan, engines, signal: new AbortController().signal });
-    expect(calls).toEqual(["cast:Mira", "still:shot-1", "still:shot-2", "still:shot-3", "clip:shot-1", "clip:shot-2", "clip:shot-3", "music", "assemble"]);
+    expect(calls).toEqual(["cast:Willow", "still:shot-1", "still:shot-2", "still:shot-3", "clip:shot-1", "clip:shot-2", "clip:shot-3", "music", "assemble"]);
     expect(result.episodes[0]?.scenes[0]?.shots.map((shot) => [shot.picture_file_id, shot.clip_file_id])).toEqual([["picture:shot-1", "clip:shot-1"], ["picture:shot-2", "clip:shot-2"], ["picture:shot-3", "clip:shot-3"]]);
     expect(result.music_line_ids).toEqual(["music-1"]); expect(result.finished_cut_file_ids).toEqual(["cut-1"]);
     calls.length = 0;
@@ -122,7 +122,7 @@ describe("film runner", () => {
     await expect(runFilm({ actor: outsider, productionId: production.id, plan, engines: fake(calls), signal: new AbortController().signal })).rejects.toThrow();
     const controller = new AbortController();
     const engines = fake(calls);
-    engines.ensureSubject = async () => { controller.abort(); return "subject-mira"; };
+    engines.ensureSubject = async () => { controller.abort(); return "subject-willow"; };
     await expect(runFilm({ actor: owner, productionId: production.id, plan, engines, signal: controller.signal })).rejects.toThrow();
     expect(calls).toEqual([]);
   });

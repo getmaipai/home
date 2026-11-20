@@ -44,7 +44,7 @@ async function finishedFilm(a: PersonRow, clipFileIds: string[]) {
   const run = createFilmRun(a, { idea: "A crossing", goAhead: true });
   const production = createMediaProduction(a, { title: "Crossing", summary: "A crossing." }, "film");
   updateMediaProduction(a, production.id, { episodes: [{ id: "e", scenes: [{ id: "s", shots: clipFileIds.map((id, i) => ({ id: `shot${i}`, subject_ids: [], clip_file_id: id })) }] }] });
-  const plan = { title: "Crossing", summary: "A crossing.", cast: [{ name: "Mira", kind: "character", locked: "Blue coat." }], shots: clipFileIds.map((_, i) => ({ id: `shot${i}`, subject_ids: [], framing: "wide", still: "Mira in a blue coat on a pier.", motion: "Walks.", seconds: 4 })), music: "Piano.", credits: [] };
+  const plan = { title: "Crossing", summary: "A crossing.", cast: [{ name: "Willow", kind: "character", locked: "Blue coat." }], shots: clipFileIds.map((_, i) => ({ id: `shot${i}`, subject_ids: [], framing: "wide", still: "Willow in a blue coat on a pier.", motion: "Walks.", seconds: 4 })), music: "Piano.", credits: [] };
   updateFilmRun(a, run.id, { plan: plan as never, production_id: production.id, state: "done", stage: "Assemble", film_file_id: clipFileIds[0] });
   return run.id;
 }

@@ -8,12 +8,12 @@ import { resetDb } from "./reset-db";
 
 beforeEach(() => resetDb());
 
-const base = { position: "transition" as const, prev: { title: "Paper Boats", artist: "Rivet Row" }, next: { title: "Blue Window", artist: "Mira Vale" }, factPrev: null, factNext: null, bio: null, stationName: "Night Drive", personName: "Sage", angle: DJ_ANGLES[0]!, mode: "full" as const };
+const base = { position: "transition" as const, prev: { title: "Paper Boats", artist: "Rivet Row" }, next: { title: "Blue Window", artist: "Willow Vale" }, factPrev: null, factNext: null, bio: null, stationName: "Night Drive", personName: "Sage", angle: DJ_ANGLES[0]!, mode: "full" as const };
 
 test("DJ writer uses a fake completion, bounds words, and caps minimal announcements", async () => {
-  const result = await writeDjLine(base, async (_role, messages) => ({ ok: true, value: { text: "Paper Boats by Rivet Row just ended. Up next, Blue Window by Mira Vale." } } as never));
-  expect(result).toBe("Paper Boats by Rivet Row just ended. Up next, Blue Window by Mira Vale.");
-  const minimal = await writeDjLine({ ...base, mode: "minimal" }, async () => ({ ok: true, value: { text: "Paper Boats by Rivet Row. Next is Blue Window by Mira Vale." } } as never));
+  const result = await writeDjLine(base, async (_role, messages) => ({ ok: true, value: { text: "Paper Boats by Rivet Row just ended. Up next, Blue Window by Willow Vale." } } as never));
+  expect(result).toBe("Paper Boats by Rivet Row just ended. Up next, Blue Window by Willow Vale.");
+  const minimal = await writeDjLine({ ...base, mode: "minimal" }, async () => ({ ok: true, value: { text: "Paper Boats by Rivet Row. Next is Blue Window by Willow Vale." } } as never));
   expect(minimal?.split(/\s+/).length).toBeLessThanOrEqual(14);
 });
 

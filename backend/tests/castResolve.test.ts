@@ -268,13 +268,13 @@ describe("the film runner", () => {
     const { sage } = await world();
     const synth = await makeSynth(sage, "Marlow Fox");
     const cast = (await resolveCast(sage, [synth.id])).members[0]!;
-    const plain = createMediaSubject(sage, { name: "Mira", kind: "character", look: "Blue coat." });
-    const ids: Record<string, string> = { "Marlow Fox": cast.subject_id, Mira: plain.id };
-    const plan: FilmPlan = { title: "T", summary: "S", music: "m", credits: [], cast: [{ name: "Marlow Fox", kind: "character", locked: "Fox coat." }, { name: "Mira", kind: "character", locked: "Blue coat." }], shots: [{ id: "shot-1", subject_ids: [], framing: "wide", still: "Both.", motion: "Walk.", seconds: 5 }] } as never;
+    const plain = createMediaSubject(sage, { name: "Willow", kind: "character", look: "Blue coat." });
+    const ids: Record<string, string> = { "Marlow Fox": cast.subject_id, Willow: plain.id };
+    const plan: FilmPlan = { title: "T", summary: "S", music: "m", credits: [], cast: [{ name: "Marlow Fox", kind: "character", locked: "Fox coat." }, { name: "Willow", kind: "character", locked: "Blue coat." }], shots: [{ id: "shot-1", subject_ids: [], framing: "wide", still: "Both.", motion: "Walk.", seconds: 5 }] } as never;
     const engines: FilmEngines = { async waitForIdle() {}, async ensureSubject(input) { return ids[input.name]!; }, async makeStill() { return "picture:1"; }, async makeClip() { return "clip:1"; }, async makeMusic() { return "music-1"; }, async assemble() { return "cut-1"; } };
     const production = createMediaProduction(sage, { title: "Draft" });
     await runFilm({ actor: sage, productionId: production.id, plan, engines, signal: new AbortController().signal });
-    expect(getMediaProduction(sage, production.id)!.cast.map((c) => [c.role, c.synth_id])).toEqual([["Marlow Fox", synth.id], ["Mira", null]]);
+    expect(getMediaProduction(sage, production.id)!.cast.map((c) => [c.role, c.synth_id])).toEqual([["Marlow Fox", synth.id], ["Willow", null]]);
   });
 });
 
