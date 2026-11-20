@@ -463,6 +463,7 @@ describe("V1b: look, length, voices, hint and Another take", () => {
 
 // VIDEO-CREATE-02 (U3): the Start frame (the Picture slot), the Camera cards and the per-person fill's loops.
 describe("U3: Start frame", () => {
+  beforeEach(() => { __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); });   // a start picture needs the Stack to report image_to_video; without it the person is told so (VF-WORDS-01), and these tests are about the start frame that is allowed
   const person = (name: string) => db.select().from(peopleTable).where(eq(peopleTable.displayName, name)).get()! as PersonRow;
   async function libraryPicture(owner: PersonRow, width = 64, height = 64, mediaType = "image/png"): Promise<{ id: string; png: Uint8Array }> {
     const png = new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer());
