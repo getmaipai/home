@@ -38,7 +38,7 @@ async function one(run: number, gain: number, delayMs: number) {
   const chunkStarts = new Map<number, number>(); let stopWordAt = -1;
   ws.onmessage = (e) => {
     if (typeof e.data === "string") { const j = JSON.parse(e.data);
-      if (["stop", "pause", "resume", "duck", "final", "reply_final", "error"].includes(j.t) || (j.t === "state")) ev.push({ t: j.t === "state" ? "state:" + j.state : j.t, at: rel() });
+      if (["stop", "pause", "duck", "final", "reply_final", "error"].includes(j.t) || (j.t === "state")) ev.push({ t: j.t === "state" ? "state:" + j.state : j.t, at: rel() });
       if (j.t === "stop") { const a = flat(); const target = wordEnd(a, playhead, 24000); stopWordAt = rel() + Math.max(0, (target - playhead) / 24); stopAt = rel(); stopped = true; }
       if (j.t === "pause") paused = true; if (j.t === "resume") paused = false;
       if (j.t === "reply_final") replyFinished = true;
@@ -84,7 +84,7 @@ async function one(run: number, gain: number, delayMs: number) {
     if (rel() - lastPlayedReport >= 100 && firstAudioAt && queue.length && !stopped) { lastPlayedReport = rel(); for (const [idx, s0] of chunkStarts) { const ms = Math.max(0, (playhead - s0) / 24); if (ms >= 0) ws.send(JSON.stringify({ t: "played", turn, chunk: idx, ms })); } }
   }
   ws.close(); await Bun.sleep(200);
-  const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final");
+  const stops = ev.filter((x) => x.t === "stop"), finals = ev.filter((x) => x.t === "final" && x.at > firstAudioAt);
   const afterUser = (t: string) => ev.filter((x) => x.t === t && (userStartAt < 0 || x.at >= userStartAt));
   const preStops = ev.filter((x) => x.t === "stop" && (userStartAt < 0 || x.at < userStartAt));
   const r: any = { run: run + 1, gain, delayMs, selfStop: preStops.length > 0 || (userStartAt < 0 && stops.length > 0), duck: ev.filter((x) => x.t === "duck").length, pauses: ev.filter((x) => x.t === "pause").length };

@@ -118,8 +118,8 @@ export class VoiceSession {
     }
   }
   private writeCutin(backchannel: boolean) { this.metricsFn(cutinsPath, { backchannel, duration_ms: this.tm.cutDuration, t_local_duck: this.metrics.t_local_duck } as TurnMetrics); }
-  /** What she has said in the last few phrases (the ones playing now and just before): her own voice coming back through the microphone is recognised as these words. */
-  private recentSpoken() { let last = -1; for (let i = 0; i < this.chunks.length; i++) if ((this.playedMs[i] ?? 0) > 0) last = i; if (last < 0) last = Math.min(this.chunks.length - 1, 0); return this.chunks.slice(Math.max(0, last - 2), last + 2).join(" "); }
+  /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
+  private recentSpoken() { return this.chunks.join(" "); }
   private async finishCutIn() {
     const audio = Float32Array.from(this.cutInSamples);
     let text = ""; try { text = await this.transcribeFn(encodeWav(audio), this.abort?.signal); } catch {}

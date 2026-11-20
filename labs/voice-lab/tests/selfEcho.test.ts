@@ -23,3 +23,9 @@ test("one or two stray words, such as half a name from her own voice, never stop
   expect(judgeCutIn("map massive", said)).toBe("echo");
   expect(judgeCutIn("no way", said)).toBe("ack"); // a reaction, not a stop
 });
+
+test("function words and a half-heard run of her own story never count as a person talking", () => {
+  expect(judgeCutIn("But while there was a", said)).toBe("echo");
+  expect(judgeCutIn("He wants to be a good idea", said + " He wants to be a good idea, I guess.")).toBe("echo");
+  expect(judgeCutIn("Everyone was afraid of the", said)).toBe("echo");
+});

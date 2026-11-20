@@ -1,7 +1,8 @@
 import { decideBackchannel, type BackchannelDecision } from "./backchannel";
 // A person's interruption is judged on the words that are NOT the assistant's own: when the page's microphone hears her voice
 // from the speakers, the recognizer writes her own words down, and those must never stop her.
-const STOPPERS = new Set(["stop", "wait", "hold", "shut", "no", "nope", "hang", "enough", "quiet", "pause", "hey", "sorry", "excuse", "actually", "but"]);
+const STOPPERS = new Set(["stop", "wait", "hold", "shut", "no", "nope", "hang", "enough", "quiet", "pause", "hey", "sorry", "excuse"]);
+const FUNCTION = new Set("the a an of to and in on at as is was were be been are am it its that this these those there then than so but while with for from by or if not we you i he she they me him her them us my your his their our what who which when where how just very really about into over out up down too also can could would should will did does do had has have get got let lets said say says one".split(" "));
 const words = (t: string) => t.toLowerCase().replace(/[^a-z'\s-]/g, " ").replace(/-/g, "").split(/\s+/).filter(Boolean);
 function near(a: string, b: string) {
   if (a === b) return true;
@@ -20,5 +21,5 @@ export function judgeCutIn(heard: string, spoken: string): EchoVerdict {
   if (!resid.length) return "echo";
   if (decideBackchannel(resid.join(" ")) === "ack") return "ack";
   if (resid.some((w) => STOPPERS.has(w))) return "interrupt";
-  return resid.length >= 3 ? "interrupt" : "echo";
+  return resid.filter((w) => w.length > 2 && !FUNCTION.has(w)).length >= 3 ? "interrupt" : "echo";
 }
