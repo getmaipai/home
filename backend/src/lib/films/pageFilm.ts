@@ -143,6 +143,8 @@ export function filmRows(person: PersonRow, id?: string): Array<Record<string, u
     // VF-UI-12: the finished film's file id, so Titles and credits and Edit and export open it in the existing pages.
     film_file_id: run.film_file_id ?? "",
     can_title: run.state === "done" && !!run.film_file_id,
+    // The film's own note (S6, no new status surface): what the voiced preview is doing, why it was not kept, or which lines were left out, in the plain words it was written in. Empty when there is none.
+    note: run.note ?? "",
   }];
 }
 

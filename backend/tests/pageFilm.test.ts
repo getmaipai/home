@@ -295,4 +295,17 @@ describe("refusals and access", () => {
     db.update(filmRuns).set({ planJson: JSON.stringify({ plan: changed }) }).where(eq(filmRuns.id, id)).run();
     expect((await rows(owner, "storyboard")).every((r) => r.line_audio === null)).toBe(true);
   });
+
+  test("the film card row carries the run's note as its own field, in the plain words written, empty when there is none; an adult only", async () => {
+    const { owner, teen, row } = await household();
+    const id = await planned(owner, row("Sage"));
+    const { updateFilmRun } = await import("@/lib/films/store");
+    expect((await rows(owner, "film", id))[0]!.note).toBe("");
+    const line = "One line was left out of the voiced preview because it could not be used. The rest are spoken.";
+    updateFilmRun(row("Sage"), id, { note: line });
+    expect((await rows(owner, "film", id))[0]!.note).toBe(line);
+    updateFilmRun(row("Sage"), id, { note: null });
+    expect((await rows(owner, "film", id))[0]!.note).toBe("");
+    expect((await teen.client.post(`${T}/data/recipes`, { scope: "film", id })).status).toBe(404);
+  });
 });
