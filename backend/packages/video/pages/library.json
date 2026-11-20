@@ -5,6 +5,18 @@
   "body": [
     {
       "type": "media_shelf",
+      "heading": "Making now",
+      "bind": { "source": "package", "path": "recipes", "params": { "scope": "making-films" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "layout": "rail",
+      "hide_when_empty": true,
+      "on_select": { "navigate": { "to": "/apps/video/film-maker" } }
+    },
+    {
+      "type": "media_shelf",
       "heading": "Playlists",
       "bind": {
         "source": "package",

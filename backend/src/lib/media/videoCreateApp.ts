@@ -32,6 +32,9 @@ import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
 import { meetsMinRole } from "@/lib/plugins";
 import { fillFilmMakerPage, filmRows, filmShotRows } from "@/lib/films/pageFilm";
+import { allowed as filmAllowed } from "@/lib/films/background";
+import { listFilmRunsInStates, type FilmRunState } from "@/lib/films/store";
+import { getMediaProduction } from "@/lib/mediaProductions";
 import type { PersonRow } from "@/types";
 import { captionEditRows, captionLineRows, captionMakeRows } from "@/lib/videos/captionsPage";
 import { MIX_LEVEL_IDS } from "@/lib/videos/editPlan";
@@ -405,6 +408,18 @@ export function shortClipRows(person: PersonRow): Array<Record<string, unknown>>
   return rows;
 }
 
+/** VF-UI-02: the viewer's own top-level film runs for the two library shelves. */
+export function filmShelfRows(person: PersonRow, states: FilmRunState[]): Array<Record<string, unknown>> {
+  if (!filmAllowed(person)) return [];
+  return listFilmRunsInStates(states).filter((run) => run.person_id === person.id && !run.parent_id).map((run) => {
+    const production = run.production_id ? getMediaProduction(person, run.production_id) : null;
+    const still = production?.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots)).find((shot) => shot.picture_file_id)?.picture_file_id;
+    const title = run.plan?.title || run.idea.trim().split(/\s+/).slice(0, 6).join(" ") || "Your film";
+    const subtitles: Record<string, string> = { planning: "Planning the film", running: "Making the shots", waiting_for_go: "Waiting for your go", failed: "Did not finish", cancelled: "Stopped" };
+    return { id: run.id, title, subtitle: subtitles[run.state], ...(still ? { thumbnail: `/api/files/${encodeURIComponent(still)}/thumb?w=320` } : {}) };
+  });
+}
+
 const levelWords = (job: Parameters<typeof feedRowOf>[1]): string => ({ standard: "Standard", boost: "Boost", max: "Max" })[levelOfJob(job)];
 
 /** VIDEO-UI-11: the "Try this" rail rows. A tile whose poster is not in the package is left out, never a broken picture. `look` and `camera` are the ids the Create panel's chips use
@@ -427,6 +442,8 @@ registerMediaAppData("video", (person, dataId, params) => {
   switch (params.scope) {
     case "templates": return listTemplates({ actor: person, kind: "video" }).slice(0, Math.min(params.limit ?? 100, 100)).map((row) => ({ id: row.id, title: row.title, subtitle: row.summary, thumbnail: templateCoverUrl(row.id) }));
     case "short": return shortClipRows(person);
+    case "making-films": return filmShelfRows(person, ["planning", "running"]);
+    case "unfinished-films": return filmShelfRows(person, ["waiting_for_go", "failed", "cancelled"]);
     case undefined: return VIDEO_RECIPES.map(({ id, label, hint }) => ({ id, label, hint }));
     case "showcase": return showcaseRows(params.limit);
     // VIDEO-STUDIO-08: shared header data for the Studio surface. The same for everyone who may open the page.
