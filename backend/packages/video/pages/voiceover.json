@@ -90,7 +90,8 @@
             }
           }
         }
-      ]
+      ],
+      "hide_when_empty": true
     },
     {
       "type": "prompt_bar",

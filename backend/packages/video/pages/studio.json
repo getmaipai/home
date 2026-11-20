@@ -185,7 +185,8 @@
             }
           }
         }
-      ]
+      ],
+      "hide_when_empty": true
     },
     {
       "type": "studio",
