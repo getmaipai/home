@@ -16,3 +16,10 @@ test("a job appearing during a run aborts it (not a failure) and the wait starts
   expect(at(true).start).toBe(false);                                // must wait the full window again
   at(true); expect(at(true).start).toBe(true);
 });
+import { isHotCommand } from "../src/gpuLoad";
+test("desktop app helpers are never a GPU job; real engines and jobs are", () => {
+  expect(isHotCommand("/Applications/Claude.app/Contents/Frameworks/Claude Helper (Renderer).app/Contents/MacOS/Claude Helper (Renderer) --type=renderer")).toBe(false);
+  expect(isHotCommand("/Users/x/video-bench/ltx25-new/src/.venv/bin/python generate.py")).toBe(true);
+  expect(isHotCommand("/usr/local/maipai-home/stack/data/engines/llama-server/b10797/llama-server --port 51700")).toBe(true);
+  expect(isHotCommand("bun test tests/foo.test.ts")).toBe(false);
+});

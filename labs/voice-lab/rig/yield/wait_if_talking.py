@@ -15,6 +15,8 @@ def wait_if_talking(path=DEFAULT_FILE, max_wait=8.0, poll=0.1, log=None):
     t0 = time.time(); reason = "none"
     if _holds(path):
         reason = "timeout"
+        mark = os.environ.get("HELPER_STARTED_FILE")  # tests: signals "I am now waiting" so they never race the interpreter start-up
+        if mark: open(mark, "w").write("1")
         while time.time() - t0 < max_wait:
             time.sleep(poll)
             if not _holds(path): reason = "clear"; break

@@ -65,6 +65,10 @@ if (!quick) {
     const files = out.match(/LISTEN FILES[^\n]*/)?.[0] ?? ""; line(ok, `listener, three-minute conversation (${label}; room is SIMULATED, not real speakers): ${ok ? "same person, right words, smooth, joins, timing and stumble pattern all pass" : out.split("\n").filter((l) => /^(RUN|  )/.test(l)).slice(0, 4).join(" / ").slice(0, 400)} ${ok ? "" : files}`);
   }
 } else { const out = await run(["bun", "rig/listen.ts", SECRET_FILE, "--runs", "1", "--quick"]); const ok = /ALL RUNS: PASS/.test(out); const t = out.match(/timing median (\d+) p90 (\d+) worst (\d+)/); line(ok, `listener, 8-turn conversation (room SIMULATED): ${ok ? "same person, right words, smooth, joins, stumbles, stops all pass" : out.split("\n").filter((l) => /^(RUN|  )/.test(l)).slice(0, 5).join(" / ").slice(0, 600)}${t ? `; first sound from the recording median ${t[1]} p90 ${t[2]} worst ${t[3]} ms` : ""} ${out.match(/LISTEN FILES[^\n]*/)?.[0] ?? ""}`); }
+// 9 the test suite is stable (rig/flaky.sh), not just green once
+{ const { flakyVerdict } = await import("../src/flakyStatus"); const { statSync, readdirSync, readFileSync } = await import("node:fs"); const T = import.meta.dir + "/../tests";
+  const newest = Math.max(...readdirSync(T).filter((f) => f.endsWith(".ts")).map((f) => statSync(`${T}/${f}`).mtimeMs)); let st = null; try { st = JSON.parse(readFileSync(import.meta.dir + "/../../../data-scratch/flaky-last.json", "utf8")); } catch {}
+  const v = flakyVerdict(st, newest); line(v.ok, `tests are stable: ${v.why}`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");

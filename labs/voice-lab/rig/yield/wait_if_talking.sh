@@ -7,7 +7,7 @@ now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000' 2>/dev/null |
 holds() { [ -r "$F" ] || return 1; local j exp; j=$(cat "$F" 2>/dev/null); case "$j" in *'"inFlight":true'*) ;; *) return 1;; esac
   exp=$(printf '%s' "$j" | sed -n 's/.*"expires_at_ms":\([0-9]*\).*/\1/p'); [ -n "$exp" ] && [ "$exp" -gt "$(now_ms)" ]; }
 t0=$(now_ms); reason=none
-if holds; then reason=timeout; deadline=$(( t0 + $(printf '%.0f' "$(echo "$MAX * 1000" | bc -l)") ))
+if holds; then reason=timeout; [ -n "$HELPER_STARTED_FILE" ] && echo 1 > "$HELPER_STARTED_FILE"; deadline=$(( t0 + $(printf '%.0f' "$(echo "$MAX * 1000" | bc -l)") ))
   while [ "$(now_ms)" -lt "$deadline" ]; do sleep "$POLL"; if ! holds; then reason=clear; break; fi; done; fi
 ms=$(( $(now_ms) - t0 )); echo "waited_ms=$ms reason=$reason"
 [ -n "$LOG" ] && [ "$reason" != none ] && echo "{\"at_ms\":$(now_ms),\"waited_ms\":$ms,\"reason\":\"$reason\"}" >> "$LOG"
