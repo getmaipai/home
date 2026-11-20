@@ -12,9 +12,12 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { startStackFixture } from "./stackFixture";
 import { __setHostGuardStateDirForTests } from "@/lib/hostGuard";
+import { __setDiskStatusReaderForTests } from "@/lib/storage";
 
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
-afterEach(() => __setHostGuardStateDirForTests(null));
+// The row's disk sentence reads the disk; a roomy fake keeps these tests off this computer's real free space.
+beforeEach(() => __setDiskStatusReaderForTests(() => ({ totalBytes: 2e12, freeBytes: 9e11, device: 1 })));
+afterEach(() => { __setHostGuardStateDirForTests(null); __setDiskStatusReaderForTests(null); });
 
 async function ownerClient(): Promise<TestClient> {
   const client = new TestClient();
@@ -150,6 +153,27 @@ describe("status routes", () => {
       await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
       const childBody = await (await child.get("/api/status/history")).json() as Record<string, unknown>;
       expect(childBody).not.toHaveProperty("host_guard");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // DISK-GUARD-06: the admin row carries one disk sentence in the Repairs items' words; nobody else gets the row.
+  test("the admin row says how much disk is free, says so when it is low, and a child gets no row at all", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "host-guard-disk-"));
+    __setHostGuardStateDirForTests(dir);
+    writeFileSync(join(dir, "config.json"), "{}");
+    try {
+      const owner = await ownerClient();
+      const roomy = (await (await owner.get("/api/status/history")).json() as { host_guard: { state: string; text: string } }).host_guard;
+      expect(roomy.text).toContain("Disk: about 900 GB free.");
+      expect(roomy.text).not.toContain("Settings, Models and storage");
+      __setDiskStatusReaderForTests(() => ({ totalBytes: 2e12, freeBytes: 8e9, device: 1 }));
+      const low = (await (await owner.get("/api/status/history")).json() as { host_guard: { state: string; text: string } }).host_guard;
+      expect(low.text).toContain("Disk: about 8 GB free, almost out of room. Open Settings, Models and storage to free up space.");
+      const created = await owner.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });
+      const child = new TestClient();
+      await child.post("/api/auth/verify-secret", { personId: ((await created.json()) as { id: string }).id, secret: "0000" });
+      const body = await (await child.get("/api/status/history")).json() as Record<string, unknown>;
+      expect(JSON.stringify(body)).not.toContain("Disk:");
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

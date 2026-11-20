@@ -133,3 +133,18 @@ export function withDevLease(view: HostGuardView, report: DevLease | null, now =
   const next = report.next ? ` Next in line: ${report.next.session}${report.waiting > 1 ? ` and ${report.waiting - 1} more` : ""}.` : "";
   return { ...view, text: `${view.text} The development machine is checked out by ${parts.join("; ")}.${next} It is returned when that work ends, or after ${Math.round(report.idle_s / 60)} idle minutes.` };
 }
+
+/** DISK-GUARD-06: one disk sentence on the admin row, in the words the Repairs items use. One volume reads "Disk: about 420 GB free."; when the AI models and Home's data
+ * sit on different volumes each is named. A low level says so and where to go; a normal level adds only the size. Admin only (the route), nothing for an unreadable disk. */
+export function withDisk(view: HostGuardView, volumes: ReadonlyArray<{ who: "home" | "stack"; freeBytes: number; level: "normal" | "warn" | "critical" }>): HostGuardView {
+  if (volumes.length === 0) return view;
+  const size = (bytes: number) => `about ${bytes >= 10e9 ? Math.round(bytes / 1e9) : Math.round(bytes / 1e8) / 10} GB free`;
+  const word = (level: string) => (level === "critical" ? ", almost out of room" : level === "warn" ? ", getting low" : "");
+  const named = volumes.length > 1;
+  const parts = volumes.map((volume) => `${named ? (volume.who === "stack" ? "the AI models have " : "Home's data has ") : ""}${size(volume.freeBytes)}${word(volume.level)}`);
+  const worst = volumes.some((volume) => volume.level === "critical") ? "critical" : volumes.some((volume) => volume.level === "warn") ? "warn" : "normal";
+  const advice = worst === "normal" ? "" : " Open Settings, Models and storage to free up space.";
+  const text = `${view.text} Disk: ${parts.join("; ")}.${advice}`;
+  const state = worst === "critical" && (view.state === "ok" || view.state === "watching") ? "failing" : worst === "warn" && view.state === "ok" ? "watching" : view.state;
+  return { ...view, state, text };
+}

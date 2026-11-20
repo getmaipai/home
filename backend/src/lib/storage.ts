@@ -194,6 +194,25 @@ export async function diskIsCritical(path: string = dataDir): Promise<boolean> {
   return local || stack?.level === "critical";
 }
 
+/** DISK-GUARD-06: the volumes the admin Status row reports, from the readers the guard already uses (Home's own data folder, and the Stack's volumes when one answers).
+ * One entry per physical volume: a Stack volume wins over Home's own reading of the same device, with the Stack's level, as the Repairs item does. No reading of its own. */
+export interface DiskStatusVolume { who: "home" | "stack"; freeBytes: number; level: DiskLevel }
+let statusReaderOverride: (() => DiskUsage) | null = null;
+export const __setDiskStatusReaderForTests = (read: (() => DiskUsage) | null): void => { statusReaderOverride = read; };
+export async function diskStatusVolumes(read: () => DiskUsage = () => (statusReaderOverride ?? diskUsage)()): Promise<DiskStatusVolume[]> {
+  const home = read();
+  const out: DiskStatusVolume[] = [];
+  const devices = new Set<number>();
+  const stack = await stackDiskReading();
+  if (stack) for (const volume of stack.volumes) {
+    let device: number | undefined; try { device = statSync(volume.path).dev; } catch { /* another computer */ }
+    if (device !== undefined) { if (devices.has(device)) continue; devices.add(device); }
+    out.push({ who: "stack", freeBytes: volume.free_bytes, level: volume.level });
+  }
+  if (home.freeBytes !== Number.POSITIVE_INFINITY && !(home.device !== undefined && devices.has(home.device))) out.push({ who: "home", freeBytes: home.freeBytes, level: levelOfDisk(home) });
+  return out;
+}
+
 const ISSUE_SOURCE = "storage";
 const ISSUE_KEY = "disk_full";
 const FIX_LINK = "/settings/models";
