@@ -282,6 +282,17 @@ export async function clipCatalog(): Promise<{ available: boolean | null; fields
   } catch { return { available: null, fields: null, sizes: {} }; }
 }
 
+/** VF-MINOR-RECIPE-01 (shadow): the ratings the Stack's minor list serves a clip at (`minor_ratings` on the clip entry of `catalog?audience=minor`), or null when the entry is absent (no part serves a minor's clip: the real answer until the speech check ships). */
+export async function minorClipRatings(): Promise<string[] | null> {
+  try {
+    const res = await request("/stack/v1/jobs/catalog?audience=minor", { method: "GET", timeoutMs: 5_000 });
+    if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
+    const catalog = await res.json() as { jobs?: Array<{ job?: string; available?: boolean; minor_ratings?: unknown }> };
+    const clip = catalog?.jobs?.find((item) => item.job === "clip");
+    return clip && clip.available !== false && Array.isArray(clip.minor_ratings) ? clip.minor_ratings.filter((rating): rating is string => typeof rating === "string") : null;
+  } catch { return null; }
+}
+
 /** VF-DOOR-01: whether the adult list's catalog shows a part serving the clip job now; null when the catalog cannot be read (that decides nothing). */
 export async function clipJobAvailable(): Promise<boolean | null> { return (await clipCatalog()).available; }
 
