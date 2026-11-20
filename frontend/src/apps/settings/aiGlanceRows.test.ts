@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
+import table from "../../../../shared/diskPlan.json";
+import type { DiskPlan } from "../../../../shared/diskPlanMath";
+import { buildAiCards } from "../../../../shared/aiChoices";
+import { fakeCopy } from "../setup/planFixtures";
 import { OFF, buildRows, counts, fill, missingRows, project, stageFor } from "./aiGlanceRows";
 
 function choice(id: string, over: Partial<AiChoice> = {}): AiChoice {
@@ -102,4 +106,31 @@ describe("project and missingRows", () => {
 
 describe("fill", () => {
   test("replaces known tokens and leaves unknown ones", () => expect(fill("{a} and {b}", { a: 1 })).toBe("1 and {b}"));
+});
+
+// WAN-DEFAULT-01: the minors-only video choice is an option in Settings, AI and models only where a child or teen lives, from the same card data as the wizard.
+describe("the minors-only video choice in AI and models", () => {
+  const plan = (table as unknown as { tiers: Record<string, DiskPlan> }).tiers.p128!;
+  const videosRow = (householdHasMinors: boolean) => {
+    const cards = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors }, freeBytes: null }).cards;
+    return buildRows(cards, new Set(), {}).find((row) => row.job === "videos")!;
+  };
+  test("a home with a teen or child is offered it, beside the LTX choice", () => {
+    const row = videosRow(true);
+    expect(row.options.map((option) => option.id)).toEqual(["videos.quick", "videos.detailed"]);
+    const quick = row.options.find((option) => option.id === "videos.quick")!;
+    expect(quick.rowIds[0]).toBe("video");
+    expect(quick.state).toBe("notInstalled");
+  });
+  test("an adult-only home sees nothing new", () => {
+    expect(videosRow(false).options.map((option) => option.id)).toEqual(["videos.detailed"]);
+  });
+  test("it reads as the video model in use but not installed, so the page's Install is for exactly that choice's rows (the video row and its engines)", () => {
+    const row = videosRow(true);
+    expect(row.live?.id).toBe("videos.quick");
+    expect(row.missing).toBe(true);
+    expect(missingRows([row]).map((missing) => missing.live?.rowIds.filter((id) => !id.startsWith("engine:")))).toEqual([["video"]]);
+    // The other option stays one pick away.
+    expect(stageFor(row, "videos.detailed")).toEqual({ choiceId: "videos.detailed", enabled: true });
+  });
 });
