@@ -273,7 +273,13 @@ class Core:
                 prev = self.reply_tails.get(reply_id)
                 if prev is not None and len(prev[0]) / SR <= 5.0:
                     try:
-                        prep = eng.prepare_cont(prep, prev[0], prev[1])
+                        if run_opts.get("cont") == "2":
+                            # tail plus the original reference together: the reference clip and its words first, then the previous phrase
+                            rv = vid if (vid not in (None, "builtin")) else self.default_voice()
+                            ref_a, ref_t = self.store.audio(rv, style_ref), self.store.text(rv, style_ref)
+                            prep = eng.prepare_cont(prep, np.concatenate([ref_a.astype(np.float32), prev[0]]), (ref_t + " " + prev[1]).strip())
+                        else:
+                            prep = eng.prepare_cont(prep, prev[0], prev[1])
                     except Exception as e:  # never fail the phrase over the experiment: fall back to the plain voice
                         log(f"cont prepare failed: {e}")
             txt = apply_tags(text, eng.native_tags)
@@ -477,8 +483,8 @@ class Handler(BaseHTTPRequestHandler):
             opts["seed"] = int(f["seed"])
         if f.get("reply") not in (None, ""):
             opts["reply"] = str(f["reply"])[:64]
-        if str(f.get("cont") or "") == "1":
-            opts["cont"] = True
+        if str(f.get("cont") or "") in ("1", "2"):
+            opts["cont"] = str(f.get("cont"))
         vid = f.get("voice") or None
         if c.maintenance:
             raise Busy("The server is busy building styled references. Try again in a minute.")
