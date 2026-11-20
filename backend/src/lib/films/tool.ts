@@ -24,7 +24,7 @@ export const makeFilmArgs = z.object({
   /** MP-06: a song of the person's own to use as the film's music instead of making one: a song's job id or Library file id, or "latest" for the newest finished song. */
   track: z.string().trim().min(1).max(80).optional(),
   go_ahead: z.boolean().optional(),
-  stills_first: z.boolean().optional().describe("Make the pictures first and stop, so the person can play the animatic before any clip is rendered."),
+  stills_first: z.boolean().optional().describe("Accepted and ignored: a film made in chat always stops after the pictures so the person can play the animatic before any clip is rendered."),
   faceless: z.boolean().optional().default(false),
 });
 
@@ -83,9 +83,9 @@ export function runMakeFilm(input: { state: FilmState; args: Record<string, unkn
     if (!checked.found.fileId || state.temporary === true) return refused(callId, args, "I can't find that song. A film can only use one of your saved songs.", "no_track");
     musicFileId = checked.found.fileId;
   }
-  const result = starter({ actor: actor as PersonRow, idea, musicFileId, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castSubjectIds: input.castSubjectIds, castHints: [...(parsed.data.cast_hints ?? []), ...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: parsed.data.stills_first === true });
+  const result = starter({ actor: actor as PersonRow, idea, musicFileId, shots: parsed.data.shots, seconds: parsed.data.seconds, look: parsed.data.look, castSubjectIds: input.castSubjectIds, castHints: [...(parsed.data.cast_hints ?? []), ...(parsed.data.characters ?? []), ...(parsed.data.picture_notes ?? [])], faceless: parsed.data.faceless, goAhead: parsed.data.go_ahead === true, stillsFirst: true });
   if ("line" in result) return refused(callId, args, result.line, "not_started");
   const awaitingGo = parsed.data.go_ahead !== true;
   return outcomeOf({ callId, packageId: MAKE_FILM_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
-    result: { reply: { text: awaitingGo ? "The film is planned and waiting for the person to press Go." : "The film has started." }, data: { filmRunId: result.id, awaitingGo }, actions: [] } });
+    result: { reply: { text: awaitingGo ? "The film is planned and waiting for the person to press Go." : "The film has started. It will stop after the pictures so the person can look at them before any clip is made." }, data: { filmRunId: result.id, awaitingGo }, actions: [] } });
 }

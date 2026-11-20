@@ -50,6 +50,14 @@ describe("FILM-04 make_film", () => {
     runMakeFilm({ state: state(), args: { idea: "Another crossing", go_ahead: true }, callId: "c2", spoken: false });
     expect(got).toEqual([false, true]);
   });
+  test("a chat go_ahead still stops after the pictures so the person approves them before any clip (FILM-APPROVAL-01)", () => {
+    const got: Array<boolean | undefined> = [];
+    __setStartFilmForTests((input) => { got.push(input.stillsFirst); return { id: `run-${got.length}` }; });
+    runMakeFilm({ state: state(), args: { idea: "A crossing", go_ahead: true }, callId: "c1", spoken: false });
+    runMakeFilm({ state: state(), args: { idea: "A crossing", go_ahead: false }, callId: "c2", spoken: false });
+    runMakeFilm({ state: state(), args: { idea: "A crossing", go_ahead: true, stills_first: false }, callId: "c3", spoken: false });
+    expect(got).toEqual([true, true, true]);
+  });
   test("blocks a directly detected CSAM idea without starting a run", () => {
     let starts = 0; __setStartFilmForTests(() => { starts++; return { id: "bad" }; });
     const result = runMakeFilm({ state: state(), args: { idea: "A child porn scene" }, callId: "c", spoken: false });
