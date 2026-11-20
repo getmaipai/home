@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { createMediaProduction, getMediaProduction, setShotClip, setShotPicture, updateMediaProduction } from "@/lib/mediaProductions";
-import { repairFinishedFilm, repairLine, type RepairInput } from "@/lib/films/repair";
+import { noteAfterRepair, repairFinishedFilm, repairLine, type RepairInput } from "@/lib/films/repair";
 import type { FilmPlan } from "@/lib/films/plan";
 import type { FilmFault } from "@/lib/films/verifyFinished";
 import type { PersonRow } from "@/types";
@@ -132,4 +132,33 @@ test("the card lines are the architect's, word for word", () => {
   expect(repairLine(2, { retries: 0, fault: "frozen", state: "flagged" })).toBe("Shot 2, which you kept, has a frozen picture. It was left as you kept it.");
   expect(repairLine(3, { retries: 1, fault: "frozen", state: "failed" })).toBe("Shot 3 still has a frozen picture after one more try. The film is ready with the first take.");
   expect(repairLine(3, { retries: 1, fault: "black", state: "withheld" })).toBe("Shot 3's new take couldn't be shown, so the first take stays.");
+});
+
+describe("the note after a repair keeps what the repair did not settle", () => {
+  const entries = [
+    { line: "Shot 3 is much quieter than the others. Render that shot again.", shots: ["shot-3"] },
+    { line: "Shot 2: the picture stops moving. Render that shot again.", shots: ["shot-2"] },
+    { line: "Shot 4: its line is heard twice. Render that shot again.", shots: ["shot-4"] },
+  ];
+  const check = { lines: entries.map((entry) => entry.line), entries };
+  test("the repair's lines replace the lines about the shots it dealt with; an advisory line for another shot stays, in order", () => {
+    const note = noteAfterRepair({ note: `The film is ready, but I couldn't make its music. ${check.lines.join(" ")}`, check, repaired: { lines: ["Shot 2 was made again and now passes."], handled: ["shot-2"] } });
+    expect(note).toBe("The film is ready, but I couldn't make its music. Shot 2 was made again and now passes. Shot 3 is much quieter than the others. Render that shot again. Shot 4: its line is heard twice. Render that shot again.");
+  });
+  test("a shot the repair could not touch (its retry was spent) keeps its own line; nothing handled drops nothing", () => {
+    expect(noteAfterRepair({ note: check.lines.join(" "), check, repaired: { lines: [], handled: [] } })).toBe(check.lines.join(" "));
+  });
+  test("a note that held only the check's lines and a repair that settled all of them reads as the repair's lines alone; nothing at all is no note", () => {
+    expect(noteAfterRepair({ note: check.lines[1], check: { lines: [check.lines[1]!], entries: [entries[1]!] }, repaired: { lines: [], handled: ["shot-2"] } })).toBeUndefined();
+  });
+  test("the repair reports the shots it dealt with: flagged, rebuilt for, and made again", async () => {
+    const flagged = await run([{ shot_id: "shot-2", kind: "frozen" }], basePlan({ "shot-2": true }), engines());
+    expect(flagged.handled).toEqual(["shot-2"]);
+    const rebuilt = await run([{ shot_id: "shot-2", kind: "no_speech" }], basePlan(), engines());
+    expect(rebuilt.handled).toEqual(["shot-2"]);
+    const taken = await run([{ shot_id: "shot-3", kind: "frozen" }], basePlan(), engines({ cutFaults: [[]] }));
+    expect(taken.handled).toEqual(["shot-3"]);
+    const spent = await run([{ shot_id: "shot-3", kind: "frozen" }], basePlan({}, { "shot-3": { retries: 1, fault: "frozen", state: "failed", first_clip_id: "clip-3", new_clip_id: "x" } }), engines());
+    expect(spent.handled).toEqual([]);
+  });
 });

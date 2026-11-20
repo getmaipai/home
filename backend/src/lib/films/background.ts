@@ -1,4 +1,4 @@
-import { repairFinishedFilm } from "./repair";
+import { noteAfterRepair, repairFinishedFilm } from "./repair";
 import type { PersonRow } from "@/types";
 import { recordFilmCreation, safely } from "@/lib/creations/writers";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -71,10 +71,7 @@ function launch(actor: PersonRow, run: FilmRun, mode: "plan" | "run" | "redo" | 
         const repaired=await repairFinishedFilm({actor,productionId:current.production_id,plan,cutId:found.cutId,musicFileId:found.musicFileId,faults:found.faults,engines,signal:controller.signal});
         if(controller.signal.aborted) return;
         plan=repaired.plan; updateFilmRun(actor,run.id,{plan});
-        if(repaired.acted || repaired.lines.length) {
-          const stripped=found.lines.reduce((text,line)=>text.replace(line,""),engines.note ?? "").replace(/\s+/g," ").trim();
-          engines.note=[stripped,...repaired.lines].filter(Boolean).join(" ") || undefined;
-        }
+        if(repaired.acted || repaired.lines.length) engines.note=noteAfterRepair({note:engines.note,check:{lines:found.lines,entries:found.entries},repaired});
       }
       const latest=getFilmRun(actor,run.id)!;
       const prod=(await import("@/lib/mediaProductions")).getMediaProduction(actor,latest.production_id!);

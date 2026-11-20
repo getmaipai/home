@@ -35,7 +35,7 @@ export interface VerifyReply { verdict: "pass" | "fail" | "incomplete"; checks: 
 /** VF-REPAIR-01 slice 1: the faults the repair rule acts on, by shot id. `no_speech`: no speech or no sound where a line is expected; `copied_sound`: the shot carries another shot's sound (or its line is heard in another shot); `frozen`, `black`: the picture. Everything else stays a plain line only. */
 export type FilmFaultKind = "no_speech" | "copied_sound" | "frozen" | "black";
 export interface FilmFault { shot_id: string; kind: FilmFaultKind }
-export interface FilmVerdict { checked: boolean; lines: string[]; /** Present when checked; empty when nothing the repair rule acts on failed. */ faults?: FilmFault[] }
+export interface FilmVerdict { checked: boolean; lines: string[]; /** The same lines with the shots each is about (present when checked). */ entries?: VerdictEntry[]; /** Present when checked; empty when nothing the repair rule acts on failed. */ faults?: FilmFault[] }
 
 /** The faults of a reply that the repair rule acts on, each once per shot and kind, in shot order. */
 export function faultsOf(reply: VerifyReply, shotIds: string[]): FilmFault[] {
@@ -54,33 +54,40 @@ export function faultsOf(reply: VerifyReply, shotIds: string[]): FilmFault[] {
 }
 const AGAIN = "Render that shot again.";
 
-/** The film's card lines for a verdict, by shot number in the film. Plain words, what is wrong and what to do. */
-export function verdictLines(reply: VerifyReply, shotIds: string[]): string[] {
+/** One card line and the shots (by id) it is about, so a repair that settles those shots can drop exactly that line and keep the rest. */
+export interface VerdictEntry { line: string; shots: string[] }
+
+/** The film's card lines for a verdict, by shot number in the film, each with the shots it is about. Plain words, what is wrong and what to do. */
+export function verdictEntries(reply: VerifyReply, shotIds: string[]): VerdictEntry[] {
   const n = (id?: string): number => shotIds.indexOf(id ?? "") + 1;
-  const out: string[] = [];
+  const out: VerdictEntry[] = [];
+  const push = (line: string, ...shots: Array<string | undefined>) => { if (!out.some((entry) => entry.line === line)) out.push({ line, shots: shots.filter((id): id is string => !!id) }); };
   // Shots that share sound form groups (3 and 4, 4 and 5 make one group of 3, 4 and 5): one line per group, not one per pair.
   const group = new Map<number, number>(); const find = (x: number): number => group.get(x) === undefined || group.get(x) === x ? x : find(group.get(x)!);
   for (const c of reply.checks) if (c.status === "fail" && c.check === "sound.copied") { const a = n(c.shot_id), b = n(c.other_shot_id); if (a && b) { if (!group.has(a)) group.set(a, a); if (!group.has(b)) group.set(b, b); group.set(find(a), find(b)); } }
   const members = new Map<number, number[]>(); for (const x of group.keys()) { const r = find(x); members.set(r, [...(members.get(r) ?? []), x]); }
   for (const list of [...members.values()].map((m) => m.sort((p, q) => p - q)).sort((p, q) => p[0]! - q[0]!)) {
     const names = list.length === 2 ? `${list[0]} and ${list[1]}` : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
-    out.push(`Shots ${names} carry the same sound. Render them again.`);
+    push(`Shots ${names} carry the same sound. Render them again.`, ...list.map((number) => shotIds[number - 1]));
   }
   for (const c of reply.checks.filter((item) => item.status === "fail" && item.check !== "sound.copied")) {
     const a = n(c.shot_id), b = n(c.other_shot_id);
     if (c.check === "speech.line") {
-      if (b) out.push(`Shot ${a}: its line is heard in shot ${b} instead. Render shot ${a} again.`);
-      else if (typeof c.value === "number" && c.value >= 2) out.push(`Shot ${a}: its line is heard twice. ${AGAIN}`);
-      else if (c.value === 0) out.push(`Shot ${a}: no speech is heard where a line is expected. ${AGAIN}`);
-      else out.push(`Shot ${a}: the words heard are not the line. ${AGAIN}`);
-    } else if (c.check === "sound.silent") out.push(`Shot ${a}: there is no sound where sound is expected. ${AGAIN}`);
-    else if (c.check === "sound.quiet") out.push(`Shot ${a} is much quieter than the others. ${AGAIN}`);
-    else if (c.check === "picture.black") out.push(a ? `Shot ${a}: the picture goes black. ${AGAIN}` : "Part of the film is black. Render the film again.");
-    else if (c.check === "picture.frozen") out.push(a ? `Shot ${a}: the picture stops moving. ${AGAIN}` : "Part of the film stops moving. Render the film again.");
-    else if (c.check.startsWith("shape.")) out.push("The finished film is not the size or length that was asked for. Make it again.");
+      if (b) push(`Shot ${a}: its line is heard in shot ${b} instead. Render shot ${a} again.`, c.shot_id, c.other_shot_id);
+      else if (typeof c.value === "number" && c.value >= 2) push(`Shot ${a}: its line is heard twice. ${AGAIN}`, c.shot_id);
+      else if (c.value === 0) push(`Shot ${a}: no speech is heard where a line is expected. ${AGAIN}`, c.shot_id);
+      else push(`Shot ${a}: the words heard are not the line. ${AGAIN}`, c.shot_id);
+    } else if (c.check === "sound.silent") push(`Shot ${a}: there is no sound where sound is expected. ${AGAIN}`, c.shot_id);
+    else if (c.check === "sound.quiet") push(`Shot ${a} is much quieter than the others. ${AGAIN}`, c.shot_id);
+    else if (c.check === "picture.black") push(a ? `Shot ${a}: the picture goes black. ${AGAIN}` : "Part of the film is black. Render the film again.", c.shot_id);
+    else if (c.check === "picture.frozen") push(a ? `Shot ${a}: the picture stops moving. ${AGAIN}` : "Part of the film stops moving. Render the film again.", c.shot_id);
+    else if (c.check.startsWith("shape.")) push("The finished film is not the size or length that was asked for. Make it again.");
   }
-  return [...new Set(out)];
+  return out;
 }
+
+/** The card lines alone (see `verdictEntries`). */
+export function verdictLines(reply: VerifyReply, shotIds: string[]): string[] { return verdictEntries(reply, shotIds).map((entry) => entry.line); }
 
 export interface VerifyDeps {
   submit(input: Record<string, unknown>): Promise<{ id: string; state: string; result?: unknown }>;
@@ -117,7 +124,8 @@ async function verifyAtPath(input: { path: string; shots: Array<{ id: string; st
     const actual = reply.file?.duration_s;
     if (typeof actual !== "number" || Math.abs(actual - input.total_s) > DURATION_SLACK_S) return unchecked;
     const ids = input.shots.map((s) => s.id);
-    return { checked: true, lines: verdictLines(reply, ids), faults: faultsOf(reply, ids) };
+    const entries = verdictEntries(reply, ids);
+    return { checked: true, lines: entries.map((entry) => entry.line), entries, faults: faultsOf(reply, ids) };
   } catch {
     return unchecked;
   }

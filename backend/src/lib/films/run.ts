@@ -21,7 +21,7 @@ export interface FilmEngines {
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; /** Null when the song could not be made: a film still ends with its picture and sound. */ musicFileId: string | null }, options: { signal: AbortSignal }): Promise<string>;
   /** VF-CHECK-01: check the finished file against the plan (shots, lines, sound, picture). Lines are plain sentences for the film's card; `checked: false` means it could not be checked. */
-  verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[]; faults?: import("./verifyFinished").FilmFault[] }>;
+  verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[]; entries?: import("./verifyFinished").VerdictEntry[]; faults?: import("./verifyFinished").FilmFault[] }>;
   /** VF-REPAIR-01 slice 1: one shot's stored clip checked alone (told apart from a fault in the cut). */
   verifyClip?(input: { shot: FilmPlan["shots"][number]; clipFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; faults?: import("./verifyFinished").FilmFault[] }>;
   /** Whether another take of this clip already exists, so the shot's one retry is spent (VF-REPAIR-01 slice 1; shared with the clip check's own retake). */
@@ -29,7 +29,7 @@ export interface FilmEngines {
   /** A plain progress line for the film's own card while the run works (S6: the run's note). */
   say?: (line: string) => void;
   /** What the finished-film check found on the cut just made, for the repair step after the run. */
-  lastCheck?: { cutId: string; musicFileId: string | null; faults: import("./verifyFinished").FilmFault[]; lines: string[] };
+  lastCheck?: { cutId: string; musicFileId: string | null; faults: import("./verifyFinished").FilmFault[]; lines: string[]; entries: import("./verifyFinished").VerdictEntry[] };
   waitForIdle(): Promise<void>;
   note?: string;
   onProgress?: (progress: { stage: FilmStage; done: number; total: number; shotId?: string }) => void;
@@ -170,7 +170,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
       engines.say?.("Checking the finished film.");
       const verdict = await engines.verifyCut({ plan, cutFileId: cutId }, { signal }).catch(() => ({ checked: false, lines: [] as string[], faults: undefined }));
       if (verdict.lines.length) engines.note = [engines.note, ...verdict.lines].filter(Boolean).join(" ");
-      if (verdict.checked && verdict.faults?.length) engines.lastCheck = { cutId, musicFileId: musicFileId ?? null, faults: verdict.faults, lines: verdict.lines };
+      if (verdict.checked && verdict.faults?.length) engines.lastCheck = { cutId, musicFileId: musicFileId ?? null, faults: verdict.faults, lines: verdict.lines, entries: verdict.entries ?? verdict.lines.map((line) => ({ line, shots: [] })) };
     }
     engines.onProgress?.({ stage: "keep", done: 1, total: 1 });
   }

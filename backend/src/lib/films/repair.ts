@@ -11,7 +11,7 @@ import { getMediaProduction, setShotClip, updateMediaProduction, type Production
 import type { PersonRow } from "@/types";
 import type { FilmEngines } from "./run";
 import type { FilmPlan, FilmShotRepair } from "./plan";
-import type { FilmFault, FilmFaultKind } from "./verifyFinished";
+import type { FilmFault, FilmFaultKind, VerdictEntry } from "./verifyFinished";
 import { shotReview } from "./review";
 import { speakerOfPlan } from "./speaker";
 
@@ -36,13 +36,24 @@ export interface RepairInput {
   actor: PersonRow; productionId: string; plan: FilmPlan; cutId: string; musicFileId: string | null; faults: FilmFault[];
   engines: Pick<FilmEngines, "assemble" | "makeClip" | "verifyCut" | "verifyClip" | "say" | "retakeSpent">; signal: AbortSignal;
 }
-export interface RepairResult { cutId: string; plan: FilmPlan; lines: string[]; /** Whether anything was done (a rebuild or a new take). */ acted: boolean }
+export interface RepairResult { cutId: string; plan: FilmPlan; lines: string[]; /** Whether anything was done (a rebuild or a new take). */ acted: boolean; /** The shots the repair dealt with (flagged, rebuilt for, or made again): the check's own lines about them are replaced by the repair's lines. */ handled: string[] }
+
+/**
+ * The film's note after a repair: what the note held besides the check's lines, then the repair's lines, then every line of the check that the repair did not deal with (a
+ * quieter shot, a line heard twice, a shot it could not touch): nothing the person was told is lost. Pure.
+ */
+export function noteAfterRepair(input: { note: string | undefined; check: { lines: string[]; entries: VerdictEntry[] }; repaired: Pick<RepairResult, "lines" | "handled"> }): string | undefined {
+  const rest = input.check.lines.reduce((text, line) => text.replace(line, ""), input.note ?? "").replace(/\s+/g, " ").trim();
+  const kept = input.check.entries.filter((entry) => !entry.shots.some((id) => input.repaired.handled.includes(id))).map((entry) => entry.line);
+  return [rest, ...input.repaired.lines, ...kept].filter(Boolean).join(" ") || undefined;
+}
 
 export async function repairFinishedFilm(input: RepairInput): Promise<RepairResult> {
   const { actor, productionId, engines, signal } = input;
   let plan = input.plan, cutId = input.cutId;
   const lines: string[] = [];
   let acted = false;
+  const handled = new Set<string>();
   const kept = plan.shots.filter((shot) => shotReview(shot) !== "skipped");
   const numberOf = (id: string): number => kept.findIndex((shot) => shot.id === id) + 1;
   const planShot = (id: string) => plan.shots.find((shot) => shot.id === id)!;
@@ -65,7 +76,7 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
     if (!shot || review === "skipped" || n === 0) continue;
     if (review === "kept") {
       const flagged: FilmShotRepair = { retries: shot.repair?.retries ?? 0, fault: kind, state: "flagged" };
-      lines.push(repairLine(n, flagged)); setRepair(id, flagged);
+      lines.push(repairLine(n, flagged)); setRepair(id, flagged); handled.add(id);
       continue;
     }
     const clipOfShot = stored.find((item) => item.id === id)?.clip_file_id;
@@ -87,6 +98,7 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
     const rebuilt = await assembleAndCheck();
     putCut(rebuilt.cutId);
     faultsNow = rebuilt.faults;
+    for (const id of cutOnly) handled.add(id);
     for (const id of cutOnly) {
       const still = faultsNow?.find((f) => f.shot_id === id);
       if (still) lines.push(`Shot ${numberOf(id)} still has ${WHAT[still.kind]} after the film was put back together. Make it again from the shot's card.`);
@@ -99,7 +111,7 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
     const row = shotsOf(getMediaProduction(actor, productionId)!).find((item) => item.id === id);
     const first = row?.clip_file_id, still = row?.picture_file_id;
     if (!first || !still) continue;
-    acted = true;
+    acted = true; handled.add(id);
     engines.say?.(`Fixing shot ${n}: ${WHY[kind]}.`);
     let fresh: string;
     try { fresh = await engines.makeClip({ shot, stillFileId: still, speaker: speakerOfPlan(plan).name, takeOf: first }, { signal }); }
@@ -143,5 +155,5 @@ export async function repairFinishedFilm(input: RepairInput): Promise<RepairResu
       // With nothing swapped the cut before this pass (already the last in the production) stays as it is.
     }
   }
-  return { cutId, plan, lines, acted };
+  return { cutId, plan, lines, acted, handled: [...handled] };
 }
