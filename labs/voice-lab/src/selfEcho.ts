@@ -18,7 +18,7 @@ function near(a: string, b: string) {
 export type EchoVerdict = BackchannelDecision | "echo";
 /** Only these, or three or more unrecognised words, count as a person asking her to stop. One or two stray words (a half-heard name, a
  * blur of her own voice) never do: a person who really wants her to stop says "wait" or "stop", or goes on talking, and the next check hears more. */
-export function judgeCutIn(heard: string, spoken: string, echoLikely = true, playingNow = spoken, personLouder = false): EchoVerdict {
+export function judgeCutIn(heard: string, spoken: string, echoLikely = true, playingNow = spoken, personLouder: boolean | undefined = undefined): EchoVerdict {
   const hw = words(heard); if (!hw.length) return "unknown";
   const spokenWords = [...new Set(words(spoken))];
   // A short utterance with a stop word in it is a command ("wait, stop", "stop here"), even if her story happens to contain the same words.
@@ -28,6 +28,11 @@ export function judgeCutIn(heard: string, spoken: string, echoLikely = true, pla
   if (hw.length <= 3 && strong) {
     const nowWords = [...new Set(words(playingNow))];
     const ownWords = hw.every((w) => nowWords.some((n) => near(w, n)));
+    // Her own voice garbled by the recognizer ("Stop the drag." from "...the dragon...", "Hey yeah." from her "me here") is not a command: half or more of its other words fuzzy-match what she said in the last 10 s.
+    { const others = hw.filter((w) => !STOPPERS.has(w) && !FUNCTION.has(w) && w.length > 2); const rest = [...new Set(words(spoken))];
+      if (others.length > 0 && others.filter((w) => rest.some((n) => near(w, n) || (w.length >= 4 && n.length >= 4 && (n.startsWith(w) || w.startsWith(n))))).length / others.length >= 0.5) return "echo"; }
+    // A hard command word needs a person: louder than her echo. Her echo garbled into "stop" is not louder (the sustained-burst route catches a real "wait, stop" that was misheard).
+    if (personLouder === false) return "echo";
     // Her own "Hey!" or "so sorry" coming back is echo even when the microphone level looks louder than her (early in a reply her echo level is not yet known); a hard command word still needs the loudness test.
     if (ownWords && (!personLouder || hw.every((w) => SOFT.has(w) || !STOPPERS.has(w)))) return "echo"; // unless the sound is clearly louder than her echo has been: then it is a person
     return decideBackchannel(heard) === "ack" ? "ack" : "interrupt";

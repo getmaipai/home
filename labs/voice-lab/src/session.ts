@@ -28,6 +28,7 @@ import { commitDelay } from "./commitDelay";
 const supported = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"];
 const commitsPath = fileURLToPath(new URL("../results/commits.jsonl", import.meta.url));
 const fallbackPath = fileURLToPath(new URL("../results/voice-fallbacks.jsonl", import.meta.url));
+const watchdogPath = fileURLToPath(new URL("../results/watchdog.jsonl", import.meta.url));
 const stopsPath = fileURLToPath(new URL("../results/stops.jsonl", import.meta.url));
 const metricsPath = fileURLToPath(new URL("../results/turns.jsonl", import.meta.url));
 const cutinsPath = fileURLToPath(new URL("../results/cutins.jsonl", import.meta.url));
@@ -71,6 +72,18 @@ export class VoiceSession {
   private stylesFn: typeof supportedStyles;
   private voicePreparedFn: typeof voicePrepared;
   private voiceChecked = new Set<string>();
+  private watchdogMs = 6000; private watchdogTimer: ReturnType<typeof setTimeout> | null = null; private commitSeq = 0; private retriedSeq = new Set<number>();
+  /** Silent-turn watchdog: a committed user turn with no reply audio 6 s later (a stuck chat request, a dropped reply) is logged, cancelled and retried once from the committed turn; a second silence tells the page. */
+  private armWatchdog(text: string) {
+    if (this.watchdogTimer) clearTimeout(this.watchdogTimer); const seq = ++this.commitSeq;
+    this.watchdogTimer = setTimeout(() => {
+      if (this.closed || seq !== this.commitSeq || this.chunkDurations.some((d) => d > 0)) return;
+      const info = { at: new Date().toISOString(), seq, text: text.slice(0, 80), chunks: this.chunks.length, held: this.held, failure: this.metrics.failure ?? "", generated: this.generatedText.length };
+      if (this.retriedSeq.has(seq)) { try { appendFileSync(watchdogPath, JSON.stringify({ ...info, action: "gave up after one retry" }) + "\n"); } catch {} this.send({ t: "error", code: "reply_failed" }); return; }
+      this.retriedSeq.add(seq); try { appendFileSync(watchdogPath, JSON.stringify({ ...info, action: "cancelled and retried once" }) + "\n"); } catch {} console.error(`SILENT TURN WATCHDOG: no reply audio 6 s after commit, retrying "${text.slice(0, 40)}"`);
+      this.abort?.abort(); void this.reply(text, true); this.watchdogTimer = setTimeout(() => { if (!this.closed && seq === this.commitSeq && !this.chunkDurations.some((d) => d > 0)) { try { appendFileSync(watchdogPath, JSON.stringify({ ...info, action: "gave up after one retry" }) + "\n"); } catch {} this.send({ t: "error", code: "reply_failed" }); } }, Math.round(this.watchdogMs * 1.33));
+    }, this.watchdogMs);
+  }
   private mood = new MoodPolicy(); private lastUserText = "";
   private styleFor(piece: string): string {
     if (!this.useStyles) return ""; const m = /\[(whisper|shout|angry|excited|happy|sad|sarcastic)\]/i.exec(piece);
@@ -186,6 +199,7 @@ export class VoiceSession {
         this.committedSamples = this.samples.slice(); this.committedSegments = this.transcriptSegments.slice(); this.committedAt = this.now(); this.samples = [];
         if (this.held) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.draftInterrupted = false; this.send({ t: "final", text: String(c.transcript), turn: this.turn }); this.held = false; for (const event of this.heldChunkEvents) this.send(event); this.heldChunkEvents = []; for (const f of this.heldFrames) this.ws.send(f); this.heldFrames = []; if (this.generatedComplete && this.heldFinalText) { this.history.commitAssistant(this.heldFinalText); this.send({ t: "reply_final", text: this.heldFinalText, turn: this.turn }); this.heldFinalText = ""; activeSince.delete(this); } }
         else { void this.reply(String(c.transcript), true); this.send({ t: "final", text: String(c.transcript), turn: this.turn }); }
+        this.armWatchdog(String(c.transcript));
         this.send({ t: "state", state: "thinking" }); break;
       case "cancel_held": { const wasHeld = this.held; this.streamDraft = ""; this.metrics.early_start = "discarded"; this.metrics.draft = "discarded"; this.metrics.ok = false; this.metrics.failure = "cancelled"; for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = ""; this.finishMetrics(); if (!wasHeld) this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
         break;
@@ -194,7 +208,7 @@ export class VoiceSession {
         this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = "";
         this.logStop("resume-committed"); this.samples = this.committedSamples.slice(); this.transcriptSegments = this.committedSegments.slice(); this.resumingCommitted = true;
         this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
-      case "interrupt": this.abort?.abort(); this.metrics.ok = false; this.metrics.failure = "cancelled"; if (this.held) { if (this.toolInFlight) this.draftInterrupted = true; else { this.history.messages.push(...this.draftMessages); this.draftMessages = []; if (this.generatedText) this.history.commitAssistant(`${this.generatedText} [answer was not spoken]`); } } else if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; this.metrics.t_stop_sent = this.metricNow(); } this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.heldFrames = []; this.held = false; this.send({ t: "state", state: c.tap ? "idle" : "user_speaking" }); break;
+      case "interrupt": if (this.watchdogTimer) clearTimeout(this.watchdogTimer); this.abort?.abort(); this.metrics.ok = false; this.metrics.failure = "cancelled"; if (this.held) { if (this.toolInFlight) this.draftInterrupted = true; else { this.history.messages.push(...this.draftMessages); this.draftMessages = []; if (this.generatedText) this.history.commitAssistant(`${this.generatedText} [answer was not spoken]`); } } else if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; this.metrics.t_stop_sent = this.metricNow(); } this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.heldFrames = []; this.held = false; this.send({ t: "state", state: c.tap ? "idle" : "user_speaking" }); break;
       case "duck": this.metrics.t_duck = this.metricNow(); this.send({ t: "duck" }); break;
       case "resume": this.send({ t: "resume" }); break;
       case "discard": this.samples = []; break;
@@ -214,7 +228,7 @@ export class VoiceSession {
     const audio = Float32Array.from(this.cutInSamples);
     let text = ""; try { text = await this.transcribeFn(encodeWav(audio), this.abort?.signal); } catch {}
     // Reference-based mode: the device says whether a person overlaps her; words only help. Otherwise the text-only judgement against her own words.
-    const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
+    const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.echoRms > 0.0005 ? this.cutInLouder(audio) : undefined /* echo level not known yet: no loudness gate */);
     if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
     let finalDecision = decision; let sustained: string[] = [];
     if (!this.echoRef && decision === "echo" && text) { const r = sustainedNewWords(this.residHistory, this.now(), this.cutInLouder(audio) ? residualContent(text, this.recentSpoken()) : []); sustained = r.words; if (r.interrupt) { finalDecision = "interrupt"; this.residHistory.length = 0; } }
@@ -418,7 +432,7 @@ export class VoiceSession {
     const maxPreRoll = config.sampleRate * config.prerollMs / 1000;
     if (this.preRoll.length > maxPreRoll) this.preRoll.splice(0, this.preRoll.length - maxPreRoll);
   }
-  close() { activeSince.delete(this); if (this.closed) return; this.closed = true; for (const timer of this.timers) this.timerClear(timer); this.timers.clear(); this.abort?.abort(); this.warming?.abort(); for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort = null; this.warming = null; this.samples = []; this.preRoll = []; this.cutInSamples = []; this.transcriptSegments = []; this.committedSamples = []; this.committedSegments = []; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.chunks = []; this.playedMs = []; this.chunkDurations = []; }
+  close() { activeSince.delete(this); if (this.closed) return; this.closed = true; if (this.watchdogTimer) clearTimeout(this.watchdogTimer); for (const timer of this.timers) this.timerClear(timer); this.timers.clear(); this.abort?.abort(); this.warming?.abort(); for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort = null; this.warming = null; this.samples = []; this.preRoll = []; this.cutInSamples = []; this.transcriptSegments = []; this.committedSamples = []; this.committedSegments = []; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.chunks = []; this.playedMs = []; this.chunkDurations = []; }
   message(data: string) {
     try {
       const j = JSON.parse(data);

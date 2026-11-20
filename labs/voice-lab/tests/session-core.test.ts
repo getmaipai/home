@@ -98,6 +98,7 @@ test("2 forced cut-in keeps its opening frame and 300 ms pre-roll once", async (
     transcribe: async (wav: Uint8Array) => { recognized.push(wavPcm(wav)); return recognized.length === 1 ? "the interruption" : "wait the interruption"; },
     chat: async function* () {},
   });
+  (h.session as any).trackEcho = () => {};   // this test is about the pre-roll, not the loudness gate: no echo level is learned
   h.feed(true, 4); h.feed(false, 8); await h.flush();
   expect(h.messages().some((message) => message.t === "final")).toBe(true);
   (h.session as any).heardAudio = true;
@@ -644,4 +645,17 @@ test("a restarted voice server with no model loaded yet does not make the sessio
     expect(await realVoicePrepared("casual")).toBe(true);        // exists, will be prepared on first use
     expect(await realVoicePrepared("nobody")).toBe(false);       // a voice that does not exist still falls back
   } finally { (globalThis as any).fetch = real; }
+});
+test("silent-turn watchdog: a committed turn with no reply audio is cancelled and retried once from the committed turn (recorded: a 60 s silent turn)", async () => {
+  let calls = 0;
+  const h = harness({
+    chat: async function* (_m: unknown, signal: AbortSignal) { calls++; if (calls === 1) { await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve())); return; } yield { type: "text", text: "Here I am." }; },
+    speech: async () => new Response(encodeWav(new Int16Array(2400).fill(2000))),
+  });
+  (h.session as any).watchdogMs = 60;
+  (h.session as any).command({ type: "commit", transcript: "Hello there friend", reason: "model" });
+  await new Promise((r) => setTimeout(r, 400)); await h.flush();
+  expect(calls).toBe(2);                                                         // the stuck request was cancelled and asked again once
+  expect(h.messages().some((m) => m.t === "error")).toBe(false);                 // the retry answered, no error to the page
+  h.session.close();
 });

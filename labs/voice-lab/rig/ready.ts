@@ -94,6 +94,9 @@ if (!quick) {
 // 12 no phrase was spoken in a voice other than the requested one during this run
 { const { existsSync, readFileSync } = await import("node:fs"); const f = import.meta.dir + "/../results/voice-fallbacks.jsonl"; const bad = existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((x) => x && x.at >= RUN_START) : [];
   line(bad.length === 0, `every phrase was spoken in the requested voice${bad.length ? `; ${bad.length} WERE NOT (first: chunk ${bad[0].chunk} in "${bad[0].used}" instead of "${bad[0].requested}", "${bad[0].text}")` : ""}`); }
+// 13 no committed turn went silent for 6 s (the watchdog never had to cancel and retry)
+{ const { existsSync, readFileSync } = await import("node:fs"); const f = import.meta.dir + "/../results/watchdog.jsonl"; const bad = existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((x) => x && x.at >= RUN_START) : [];
+  line(bad.length === 0, `no turn needed the silent-turn watchdog${bad.length ? `; ${bad.length} DID (first: "${bad[0].text}", chunks ${bad[0].chunks}, failure "${bad[0].failure}", ${bad[0].action})` : ""}`); }
 // 8 reconnect
 const reconnect = await run(["bun", "test", "tests/reconnect.test.ts"]);
 line(/ 1 pass/.test(reconnect) && /0 fail/.test(reconnect), "the page reconnects by itself after the server goes away (unit test of the reconnect logic; the page also says Reconnecting)");

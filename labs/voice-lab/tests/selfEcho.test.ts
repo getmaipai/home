@@ -112,3 +112,12 @@ test("non-words stop: a sustained louder burst (0.7 s or more) is a cut-in even 
   expect(slc({ decision: "ack", louder: false, durationMs: 1200 })).toBe(false);   // not louder than her echo
   expect(slc({ decision: "interrupt", louder: true, durationMs: 2000 })).toBe(false); // already handled
 });
+test("garbled echo is not a command (recorded: 'Stop the drag.' and 'Hey yeah.' written from her own speech), a loud real command still is", () => {
+  const story = "oh, um, I was just saying I was so sorry. The dragon named Ember hoarded sourdough starters in his cave";
+  expect(jc("Stop the drag.", story, false, "oh, um, I was just saying I was so sorry", true)).toBe("echo");         // fuzzy: drag ~ dragon, even if loud
+  expect(jc("Stop the drag.", "Just me here. Take your time.", false, "Just me here.", false)).toBe("echo");         // not louder than her echo
+  expect(jc("Hey yeah.", "Just... me here. I'm here if you want to talk.", false, "Just... me here.", false)).toBe("echo");
+  expect(jc("Wait, stop.", story, false, "oh, um, I was just saying", true)).toBe("interrupt");                       // louder: a person
+  expect(jc("Wait, stop.", story, false, "oh, um, I was just saying", false)).toBe("echo");                           // quiet: the sustained-burst route decides (tested below)
+  expect(jc("Wait, stop.", story, false, "oh, um, I was just saying", undefined)).toBe("interrupt");                  // echo level unknown: no gate
+});
