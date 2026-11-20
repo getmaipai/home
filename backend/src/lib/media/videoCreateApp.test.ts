@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { appPackageProblems } from "@/lib/apps";
 import { videoShape } from "./videoCreateApp";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -80,7 +82,7 @@ test("Film maker inspiration uses showcase rows to fill its prompt", () => {
   expect(shelf?.on_select.navigate.state.prompt).toBe("{prompt}");
 });
 
-test("a finished film offers Titles and credits and Edit and export on its own file; an unfinished one does not", async () => {
+test("a finished film's row carries its file id and opens it in Studio; an unfinished one has none", async () => {
   const { filmRows } = await import("@/lib/films/pageFilm");
   const adult = addPerson("finisher", "owner");
   addRun(adult.id, "film-open", "waiting_for_go", "A short story");
@@ -90,6 +92,12 @@ test("a finished film offers Titles and credits and Edit and export on its own f
   expect(filmRows(adult, "film-done")[0]).toMatchObject({ can_title: true, film_file_id: "file-film-1" });
   const page = JSON.parse(readFileSync(new URL("../../../packages/video/pages/film-maker.json", import.meta.url), "utf8")) as { body: Array<Record<string, any>> };
   const shelf = page.body.find((node) => node.heading === "Your film");
-  const labels = (shelf?.row_actions as Array<{ label: string; show_when_field?: string }>).filter((a) => a.show_when_field === "can_title").map((a) => a.label);
-  expect(labels).toEqual(["Titles and credits", "Edit and export"]);
+  expect(shelf?.on_select.navigate.to).toBe("/apps/video/studio");
+  expect(shelf?.on_select.navigate.state.clip).toBe("{film_file_id}");
+});
+
+test("the Video package passes the app loader's checks, so the app is not refused for everyone", () => {
+  const dir = fileURLToPath(new URL("../../../packages/video", import.meta.url));
+  const manifest = JSON.parse(readFileSync(`${dir}/manifest.json`, "utf8"));
+  expect(appPackageProblems(manifest, dir)).toEqual([]);
 });

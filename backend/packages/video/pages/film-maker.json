@@ -281,6 +281,7 @@
         ]
       },
       "making_field": "making",
+      "on_select": { "navigate": { "to": "/apps/video/studio", "state": { "clip": "{film_file_id}" } } },
       "row_actions": [
         {
           "icon": "images",
@@ -324,18 +325,6 @@
               }
             }
           }
-        },
-        {
-          "icon": "captions",
-          "label": "Titles and credits",
-          "show_when_field": "can_title",
-          "action": { "navigate": { "to": "/apps/video/captions", "state": { "clip": "{film_file_id}" } } }
-        },
-        {
-          "icon": "scissors",
-          "label": "Edit and export",
-          "show_when_field": "can_title",
-          "action": { "navigate": { "to": "/apps/video/studio", "state": { "clip": "{film_file_id}" } } }
         }
       ]
     },
