@@ -19,8 +19,8 @@ let fake: FakeVideoStack;
 beforeEach(() => {
   resetDb();
   fake = installFakeVideoStack();
-  fake.ltx25max = "ready";
-  const status = readyVideoStatusForTests({ ltx25max: "ready" });
+  fake.ltx25max = "ready"; fake.ltx25 = "ready"; // the sound maker is ready (an adult's video is ready only then, 534d4c229)
+  const status = readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" });
   status.qualities!.ltx25max = { ...status.qualities!.ltx25max!, extend: true, retake: true, extend_seconds: { min: 1, max: 10 }, retake_from_seconds: { min: 0, max: 9 } };
   __setVideoStatusForTests(status);
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);

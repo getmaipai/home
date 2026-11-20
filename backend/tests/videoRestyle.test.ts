@@ -31,8 +31,8 @@ const COLORIZER = { id: COLORIZER_ID, name: "ltx-ic-colorizer", sha256: "c".repe
 beforeEach(() => {
   resetDb();
   fake = installFakeVideoStack();
-  fake.ltx25max = "ready";
-  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25max: "ready" }));
+  fake.ltx25max = "ready"; fake.ltx25 = "ready"; // the sound maker is ready (an adult's video is ready only then, 534d4c229)
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25max: "ready" }));
   __setKeyframesForTests(async () => [testJpeg(), testJpeg(), testJpeg()]);
   fake.loras.push({ ...COLORIZER });
   restyles = []; restyleRefusal = null;
