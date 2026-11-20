@@ -18,5 +18,6 @@ test("a backend child band does not enqueue a selected picture when default phot
   const adapter = createLocalImageAttachmentAdapter({
     enabled: () => photoUploadsEnabledForBand(adultRoleChildBand.age_band, { value: true, source: "default" }),
   });
-  await expect(adapter.add({ file: new File(["photo"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("Photo uploads are turned off");
+  // UNSEEN-01 (RULES.md C10): unavailable features are absent, not reported as filtered.
+  await expect(adapter.add({ file: new File(["photo"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("That one isn't available here");
 });
