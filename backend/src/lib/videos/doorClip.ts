@@ -53,6 +53,7 @@ function buildClipRequest(body: VideoBody): StackMakeClipRequest | null {
     ...(body.image ? { start_picture: picture(body.image) } : {}),
     ...(body.identity_image ? { inputs: [{ role: "identity" as const, file: picture(body.identity_image) }] } : {}),
     ...(body.derived_start ? { intent: "derived_start" as const } : {}),
+    ...(body.take_of ? { take_of: body.take_of } : {}),
     // A film shot: the Stack picks the recipe from the operation and the level; Home sends the look, the line and, for another take, the first take's job.
     ...(body.film_shot ? { operation: "clip_film_shot" as const, ...(body.film_shot.look ? { look: body.film_shot.look } : {}), ...(body.film_shot.dialogue?.length ? { dialogue: body.film_shot.dialogue } : {}), ...(body.film_shot.take_of ? { take_of: body.film_shot.take_of } : {}) } : {}),
     ...(body.end_image ? { end_picture: picture(body.end_image) } : {}),

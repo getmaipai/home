@@ -158,6 +158,8 @@ export interface VideoBody {
   film_shot?: { look?: string; dialogue?: Array<{ speaker: string; text: string }>; take_of?: string };
   /** VF-ROUTE-DERIVE-01: `image` is the first picture Home derived after the Stack's `needs_start_picture`; the resend says so (intent `derived_start`). */
   derived_start?: boolean;
+  /** VF-TAKES-01: this clip is another take of the first take's Stack job (same route and recipe, a new seed). Sent only to the generic door, never the old one. */
+  take_of?: string;
   negative_prompt?: string;
   size?: string;
   seconds?: number;

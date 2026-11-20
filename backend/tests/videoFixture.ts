@@ -48,6 +48,11 @@ export interface FakeVideoStack {
   receipt: Record<string, unknown> | "fail" | null;
   /** VF-DOOR-01: the Stack answers the generic make door (clip) and its catalog, so a plain adult clip goes through it; off by default, so every other test stays on the old door. */
   door: boolean;
+  /** VF-TAKES-01: the Stack keeps a small take record after a result is deleted, so `take_of` still resolves (default on); off, only a live result resolves it. */
+  keepsTakeRecords: boolean;
+  takeRecords: Set<string>;
+  /** The `request_fields` the door catalog lists for the clip job; null leaves the field out (an older Stack). Left undefined, the full list. */
+  catalogFields?: string[] | null;
   /** The requests the generic make door received (VF-ROUTE-01: what Home sent as inputs). */
   makeRequests: Record<string, unknown>[];
   /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
@@ -87,7 +92,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], receipt: null, door: process.env.MAIPAI_TEST_DOOR === "1", makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], receipt: null, door: process.env.MAIPAI_TEST_DOOR === "1", keepsTakeRecords: true, takeRecords: new Set<string>(), makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -98,10 +103,11 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
-    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, request_fields: ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look"], part: { id: "part-a", label: "A" } }] });
+    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, ...(fake.catalogFields === null ? {} : { request_fields: fake.catalogFields ?? ["job","audience","part","description","shape","level","seconds","start_picture","end_picture","styles","seed","inputs","dialogue","intent","quiet_seconds","quiet_max_wait_seconds","wait","operation","at_seconds","take_of","look"] }), part: { id: "part-a", label: "A" } }] });
     if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.makeRequests.push(request);
+      if (typeof request.take_of === "string" && !(fake.jobs.some((j) => j.id === request.take_of && !j.deleted) || fake.takeRecords.has(request.take_of))) return json({ code: "not_available", line: "The clip you want another take of could not be found." }, 409);
       const legacy: Record<string, unknown> = { prompt: request.description, seconds: request.seconds, seed: request.seed, audience: request.audience === "adult" ? "adult" : "all-ages", ...(request.level === "boost" || request.level === "max" ? { tier: request.level } : {}), ...(request.level === "max" ? { model: "ltx25-max" } : {}), ...(request.operation === "extend" ? { extend_seconds: request.seconds } : {}), ...(request.operation === "retake_from" ? { retake_from_seconds: request.at_seconds } : {}), ...(Array.isArray(request.inputs) && (request.inputs as Array<{ role: string; file: string }>).find((input) => input.role === "edit_source") ? { source_video: (request.inputs as Array<{ role: string; file: string }>).find((input) => input.role === "edit_source")!.file } : {}), via: "door" };
       fake.submitted.push(legacy);
       if (fake.memoryRefusals > 0) { fake.memoryRefusals -= 1; fake.submitted.pop(); fake.refused = (fake.refused ?? 0) + 1; return json({ error: "Not enough free memory for video right now. Close other big jobs, or try again in a few minutes.", code: "no_memory" }, 503); }
@@ -133,7 +139,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     if (jobMatch) {
       const job = fake.jobs.find((j) => j.id === jobMatch[1]);
       if (!job) return json({ error: "No such job.", code: "unknown_job" }, 404);
-      if (method === "DELETE") { if (job.state === "queued" || job.state === "running") job.state = "cancelled"; job.deleted = true; return json({ ok: true }); }
+      if (method === "DELETE") { if (job.state === "queued" || job.state === "running") job.state = "cancelled"; job.deleted = true; if (fake.keepsTakeRecords) fake.takeRecords.add(job.id); return json({ ok: true }); }
       if (jobMatch[2] === "video.mp4") return new Response(testMp4(), { status: 200, headers: { "content-type": "video/mp4" } });
       if (jobMatch[2] === "preview.jpg") { fake.previewFetches += 1; return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } }); }
       if (jobMatch[2] === "poster.jpg") return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } });

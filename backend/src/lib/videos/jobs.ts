@@ -288,8 +288,8 @@ registerQueueProvider(() => {
 
 /** The old door never sees the identity or derived-start keys. A clip the generic door could not take starts from the cast's picture only when the Stack reported the old door can (`identity_legacy_start`); otherwise it ends with the plain no-picture-start line. */
 function legacyBodyFor(body: VideoBody & { timeout_ms: number }): VideoBody & { timeout_ms: number } {
-  const { identity_image, identity_legacy_start, derived_start, film_shot, ...rest } = body;
-  void derived_start; void film_shot;
+  const { identity_image, identity_legacy_start, derived_start, film_shot, take_of, ...rest } = body;
+  void derived_start; void film_shot; void take_of;
   if (identity_image && !rest.image) {
     if (!identity_legacy_start) throw new StackVideoError(422, "no_picture_start", NO_PICTURE_START_LINE);
     return { ...rest, image: identity_image };
@@ -309,6 +309,8 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
     // Another take of a film shot names the first take's Stack job (`take_of`: same route and recipe, a new seed); the old door never sees it.
     if (sendBody.film_shot && job.request.anotherOf && owner) { const first = getVideoJobFor(owner, job.request.anotherOf)?.stackJob; if (first) sendBody.film_shot = { ...sendBody.film_shot, take_of: first }; }
+    // Another take of a plain clip names the first take's Stack job the same way (the job named in `anotherOf` keeps its `stackJob`): the Stack resolves it from the live result or from its take record, and answers 409 not_available when it knows neither (the clip then goes on the old door, as before).
+    if (!sendBody.film_shot && job.request.anotherOf && owner) { const first = getVideoJobFor(owner, job.request.anotherOf)?.stackJob; if (first) sendBody.take_of = first; }
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
     const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); persistVideoJob(job); } };
     const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept, () => explicitlyStopped.has(job.id) || (job.state as string) === "cancelled") : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
@@ -611,6 +613,8 @@ export interface StartVideoInput {
   retakeOf?: string;
   /** TAKES-01: the first clip of a set of takes. A take after the first starts while only this set's clips are waiting (the one-at-a-time rule otherwise holds). */
   takeOf?: string;
+  /** The job this clip is another take of (VF-TAKES-01): set on the request at creation, before the first release. */
+  anotherOf?: string;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -635,7 +639,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.loop ? { loop: true } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.retakeOf ? { retake_of: input.retakeOf, anotherOf: input.retakeOf } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) },  } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === LTX25_MAX_MODEL ? LTX25_MAX_DEFAULTS.landscape : model === LTX25_MODEL ? LTX25_DEFAULTS.standard.landscape : "832x480"), seconds: input.body.seconds ?? (model === LTX25_MODEL && input.tier !== "boost" && input.tier !== "max" ? 10 : 5), quality: (model === LTX25_MODEL || model === LTX25_MAX_MODEL) && (input.tier === "boost" || input.tier === "max") ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, ...(input.endFileId ? { end_file_id: input.endFileId } : {}), ...(input.loop ? { loop: true } : {}), ...(input.productionId && input.shotId ? { production_id: input.productionId, shot_id: input.shotId } : {}), ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), audience: input.body.audience, ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.create ? { create: input.create } : {}), ...(input.retakeOf ? { retake_of: input.retakeOf, anotherOf: input.retakeOf } : {}), ...(mark.madeAudience === "adult-only" ? { adultOnly: true, adultLock: mark.lock } : {}), stackBody: { ...input.body, ...(wired.loras !== undefined ? { loras: wired.loras } : {}), ...(model ? { model } : {}) }, ...(input.anotherOf ? { anotherOf: input.anotherOf } : {}) } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);

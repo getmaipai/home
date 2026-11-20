@@ -104,6 +104,8 @@ export interface RunGenerateVideoInput {
   adultLock?: "on" | "off";
   /** TAKES-01: the first clip of the set this clip is a take of (the Create page's takes; not a tool argument, so the tool's size does not grow). */
   takeOf?: string;
+  /** The job this clip is another take of: known when the job is made, so the release (which may run at once) already sees it. */
+  anotherOf?: string;
   /** A film shot (films/engines.ts): the shot's look paragraph and spoken line, sent to the generic door as `operation: clip_film_shot` (VF-ROUTE-01 follow-up). */
   filmShot?: { look?: string; dialogue?: Array<{ speaker: string; text: string }> };
 }
@@ -341,6 +343,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   try {
     const job = await startVideoJob({
       ...(input.takeOf ? { takeOf: input.takeOf } : {}),
+      ...(input.anotherOf ? { anotherOf: input.anotherOf } : {}),
       actor,
       conversationId: state.conversationId,
       turnId: state.turnId,

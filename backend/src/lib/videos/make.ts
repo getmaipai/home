@@ -182,6 +182,7 @@ export async function makeVideoFor(actor: PersonRow, body: MakeVideoBody, contex
     state: context.state ?? { actor, persona: null, conversationId: null, turnId: null, temporary: false },
     args: { prompt: body.line ? `${body.prompt} The person says: "${body.line}"` : body.prompt, ...(body.cast ? { cast: body.cast } : {}), ...(body.seed ? { seed: body.seed } : {}), ...(body.orientation ? { orientation: body.orientation } : {}), ...(body.seconds ? { seconds: body.seconds } : {}), ...(body.tier ? { tier: body.tier } : {}), ...(body.recipe ? { recipe: body.recipe } : {}), ...(body.look ? { look: body.look } : {}), ...(body.voices ? { voices: body.voices } : {}), ...(body.loop ? { loop: true } : {}), ...(body.styles?.length && body.strength ? { strength: body.strength } : {}), ...(body.styles?.length ? { styles: body.styles } : {}), ...(body.template ? { template: body.template } : {}), ...(body.end_frame ? { end_frame: body.end_frame } : {}) },
     ...(context.takeOf ? { takeOf: context.takeOf } : {}),
+    ...(context.parent ? { anotherOf: context.parent.id } : {}),
     callId: context.callId ?? "make", spoken: false, audience, ...(context.adultOnly ? { adultOnly: true, ...(context.adultLock ? { adultLock: context.adultLock } : {}) } : {}), ...(context.prepared ? { prepared: context.prepared } : startFrame ? { prepared: { image: startFrame.base64, imageSource: "uploaded" as const, sourceFileId: startFrame.id, width: startFrame.width, height: startFrame.height } } : {}),
   });
   const data = outcome.result?.data as { videoJobId?: string; refused?: string } | undefined;
@@ -225,7 +226,7 @@ export function bodyOfVideoJob(source: VideoJob): MakeVideoBody {
 export async function anotherTakeFor(actor: PersonRow, source: VideoJob, context: MakeVideoContext = {}): Promise<MakeVideoResult> {
   // A Create-page clip that started from a Library picture keeps it (chat clips keep theirs through `prepareVideoRerun`).
   const start = !source.conversationId && source.kind === "animate" && source.request.source_file_id ? { start_frame: source.request.source_file_id } : {};
-  const made = await makeVideoFor(actor, { ...bodyOfVideoJob(source), ...start }, context);
+  const made = await makeVideoFor(actor, { ...bodyOfVideoJob(source), ...start }, { ...context, parent: context.parent ?? source });
   // CREATOR-02: the new clip's creation record names this clip's record as its parent.
   if (made.ok) markAnotherTake(made.job, source);
   return made;
