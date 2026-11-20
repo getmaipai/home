@@ -237,7 +237,10 @@
       "bind": {
         "source": "package",
         "path": "recipes",
-        "params": { "scope": "showcase", "limit": 3 }
+        "params": {
+          "scope": "showcase",
+          "limit": 3
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -250,7 +253,11 @@
       "on_select": {
         "navigate": {
           "to": "/apps/video/film-maker",
-          "state": { "prompt": "{prompt}", "look": "{look}", "camera": "{camera}" }
+          "state": {
+            "prompt": "{prompt}",
+            "look": "{look}",
+            "camera": "{camera}"
+          }
         }
       },
       "media_loop": true,
@@ -318,7 +325,79 @@
         "busy_label": "Rendering"
       },
       "reason": "reason",
-      "sticky": true
+      "sticky": false
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-voiced"
+        }
+      },
+      "primary": {
+        "label": "Hear it in your cast's voices",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-voiced-preview",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        }
+      },
+      "sticky": false,
+      "estimate": "reason"
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-stop"
+        }
+      },
+      "primary": {
+        "label": "Stop making the film",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-cancel",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        }
+      },
+      "sticky": false,
+      "estimate": "reason"
+    },
+    {
+      "type": "action_bar",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "film-resume"
+        }
+      },
+      "primary": {
+        "label": "Resume the film",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-resume",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        }
+      },
+      "sticky": false,
+      "estimate": "reason"
     },
     {
       "type": "media_shelf",
@@ -345,7 +424,14 @@
         ]
       },
       "making_field": "making",
-      "on_select": { "navigate": { "to": "/apps/video/studio", "state": { "clip": "{film_file_id}" } } },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/studio",
+          "state": {
+            "clip": "{film_file_id}"
+          }
+        }
+      },
       "row_actions": [
         {
           "icon": "images",

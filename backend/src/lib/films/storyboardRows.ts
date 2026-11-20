@@ -60,7 +60,7 @@ export function renderPlanRows(person: PersonRow, id?: string): Array<{ run_id: 
   if (!allowed(person)) return [];
   const run = pageFilmRun(person, id);
   if (!run?.plan) return [];
-  if (run.state !== "waiting_for_go") return [{ run_id: run.id, ready: false, reason: run.state === "done" ? "This film is finished." : run.state === "running" || run.state === "planning" ? "This film is being made." : "Plan the film again to render it." }];
+  if (run.state !== "waiting_for_go") return [{ run_id: run.id, ready: false, reason: run.state === "done" ? "This film is finished." : run.state === "cancelled" ? "This film was stopped. Press Resume to carry on." : run.state === "running" || run.state === "planning" ? "This film is being made." : "Plan the film again to render it." }];
   const rows = storyboardRows(person, id);
   const missing = rows.filter((row) => row.status === "no_picture").length;
   if (rows.length < 2) return [{ run_id: run.id, ready: false, reason: "Keep at least two shots to render a film." }];

@@ -394,4 +394,14 @@ describe("refusals and access", () => {
       for (const scope of ["film-stop", "film-resume"]) expect((await teen.client.post(`${T}/data/recipes`, { scope })).status).toBe(404);
     });
   });
+
+  test("the film page's bars: Render film, the voiced offer, Stop and Resume bind one-row scopes and are not sticky (a sticky bar sits under the phone's bottom bar)", async () => {
+    const page = JSON.parse((await import("node:fs")).readFileSync("packages/video/pages/film-maker.json", "utf8")) as { body: Array<Record<string, any>> };
+    const bars = page.body.filter((node) => node.type === "action_bar");
+    expect(bars.map((bar) => bar.bind.params.scope)).toEqual(["render-plan", "film-voiced", "film-stop", "film-resume"]);
+    expect(bars.map((bar) => bar.primary.action.call.target.split("/").pop())).toEqual(["film-finish", "film-voiced-preview", "film-cancel", "film-resume"]);
+    expect(bars.every((bar) => bar.sticky === false)).toBe(true);
+    // a `reason` blocks the button; only the Render film bar has one (the three offers word themselves as an estimate line)
+    expect(bars.map((bar) => bar.reason ?? null)).toEqual(["reason", null, null, null]);
+  });
 });
