@@ -50,7 +50,7 @@ async function startRun() {
   });
 }
 while (true) {
-  const g = await sampleGpu(); const bf = burst.push(Date.now(), g.jobs.split(" | ").filter(Boolean)); const rowsNow = (await readProcs()).rows; const unnamed = !win.running && unnamedGpuLoad(g, rowsNow); if (unnamed) busyJobs.add(`unnamed GPU load ${g.util}%`); const free = bf.free && !unnamed; const now = Date.now();
+  const g = await sampleGpu(); const bf = burst.push(Date.now(), g.jobs.split(" | ").filter(Boolean)); const rowsNow = (await readProcs()).rows; const unnamed = !win.running && unnamedGpuLoad(g, rowsNow); if (unnamed) busyJobs.add(`unnamed GPU load ${g.util}%`); const free = bf.free; /* an unnamed GPU load is labelled, not waited for (owner: label the load, run now); named engines still block */ if (unnamed) log({ event: "unnamed-gpu-load-labelled", util: g.util }); const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
   if (s.abort && child) { aborted = true; child.kill(); void stopOwnMatching(/rig\/(measure|echotest|listen|round1)\.ts/).then((r) => log({ event: "stopped-own", ...r })); log({ event: "aborted", why: g.jobs, attempt: attempts }); releaseLock(); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
