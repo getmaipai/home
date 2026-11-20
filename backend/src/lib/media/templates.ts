@@ -2,7 +2,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { MediaTemplate, type MediaTemplate as MediaTemplateRecord } from "@maipai/spec/gen/ts/media-template.js";
 import type { PersonRow } from "@/types";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { ContentRating } from "@maipai/spec/ratings/ts/contentRating";
+import { passForPerson } from "@/lib/filter/pass";
+import { stampAllowed } from "@/lib/filter/stampCompare";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
 import { videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 
@@ -41,7 +43,23 @@ function all(): { templates: PickableTemplate[]; fragments: FragmentRecord[] } {
   cache = { stamp, templates: parsed.filter((row): row is PickableTemplate => row.kind !== "fragment"), fragments: parsed.filter((row): row is FragmentRecord => row.kind === "fragment" && row.group !== undefined) };
   return cache;
 }
-const visibleTo = (actor: PersonRow, row: MediaTemplateRecord): boolean => row.audience === "all-ages" || (speakerAgeBand(actor, new Date()) === "adult" && adultStylesAllowed());
+/** TEMPLATE-02 (RULES.md C9): a bundled template's stamp is declared from its bundled audience, by a fixed mapping. */
+export function declaredTemplateStamp(audience: "all-ages" | "adult-only"): ContentRating {
+  return ContentRating.parse({ level: audience === "adult-only" ? "X" : "G", source: "declared", rater: "bundled-audience", rater_version: 1, rated_at: DECLARED_AT });
+}
+const DECLARED_AT = "2026-11-20T00:00:00.000Z";
+/** A made-content ceiling: pictures and clips a person makes are held to the "made" ceiling and its unrated override (OVERRIDES-01), never to the person's age band (C3). */
+function madeCeiling(actor: PersonRow): { ceiling: 0 | 1 | 2 | 3 | 4; unrated: boolean } {
+  const pass = passForPerson(actor);
+  return { ceiling: pass.ceiling.made, unrated: pass.unrated.has("made") };
+}
+/** The one filter, for bundled and saved rows alike: the stamp against the viewer's ceiling, then today's household check (`generation.styles.adult_only`), which the content filter never reads. */
+const visibleTo = (actor: PersonRow, row: MediaTemplateRecord): boolean => {
+  const { ceiling, unrated } = madeCeiling(actor);
+  if (!stampAllowed(declaredTemplateStamp(row.audience), ceiling, unrated)) return false;
+  return row.audience === "all-ages" || adultStylesAllowed();
+};
+export function bundledTemplates(kind?: "picture" | "video"): PickableTemplate[] { return all().templates.filter((row) => !kind || row.kind === kind); }
 export function listTemplates(input: { actor: PersonRow; kind?: "picture" | "video" }): PickableTemplate[] {
   return all().templates.filter((row) => (!input.kind || row.kind === input.kind) && visibleTo(input.actor, row));
 }

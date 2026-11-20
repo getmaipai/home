@@ -15,6 +15,8 @@ import { STORED_RATER_VERSION } from "./stamps";
 export type StoredInput =
   | { kind: "media_item"; explicit: boolean; title: string; description?: string | null; also?: ReadonlyArray<string | null | undefined>; lyrics?: string | null; bandOk?: "child" | "teen" | "adult" | null }
   | { kind: "shelf_item"; title: string; text?: string | null; bandOk?: "child" | "teen" | "adult" | null }
+  /** TEMPLATE-02: a saved template's words (title and prompt), rated like a shelf item's title and text. */
+  | { kind: "template"; title: string; text?: string | null; bandOk?: "child" | "teen" | "adult" | null }
   | { kind: "attachment" | "creation"; audience: "all-ages" | "adult-only" | null; provenance?: string };
 
 let hook: ((input: StoredInput) => void) | null = null;
@@ -61,7 +63,7 @@ export function rateStoredItem(input: StoredInput): ContentRating | null {
   try {
     hook?.(input);
     if (input.kind === "media_item") return rateMedia(input);
-    if (input.kind === "shelf_item") {
+    if (input.kind === "shelf_item" || input.kind === "template") {
       const text = input.text ? `${input.title}. ${input.text}` : input.title;
       return tripsMinorFloor(text) || input.bandOk === "adult" ? make("X", "minor-floor", "worked_out", { reasons: ["sexual"] }) : make("G", "minor-floor", "worked_out");
     }

@@ -13,7 +13,7 @@ import { passForPerson } from "./pass";
 import { stampAllowed } from "./stampCompare";
 import { contentRatings } from "@/db/schema";
 
-export type StampKind = "media_item" | "shelf_item" | "attachment" | "creation";
+export type StampKind = "media_item" | "shelf_item" | "attachment" | "creation" | "template";
 export type StoredStamp = ContentRating & { fingerprint: string };
 type CeilingLevel = 0 | 1 | 2 | 3 | 4;
 
@@ -97,7 +97,7 @@ export function isStale(stamp: StoredStamp | undefined | null, fingerprint: stri
   return !stamp || stamp.fingerprint !== fingerprint || stamp.rater_version < STORED_RATER_VERSION;
 }
 
-const SOURCES: Record<Exclude<StampKind, "shelf_item">, { table: string; fingerprint: string; live: string; order: string }> = {
+const SOURCES: Record<Exclude<StampKind, "shelf_item" | "template">, { table: string; fingerprint: string; live: string; order: string }> = {
   media_item: { table: "media_items", fingerprint: "coalesce(t.fingerprint, t.external_id, t.id)", live: "t.deleted_at IS NULL", order: "t.created_at DESC" },
   attachment: { table: "attachments", fingerprint: "t.sha256", live: "t.deleted_at IS NULL", order: "t.created_at DESC" },
   creation: { table: "creations", fingerprint: "t.made_audience || ':' || t.updated_at", live: "1=1", order: "t.created_at DESC" },
@@ -106,7 +106,7 @@ const SOURCES: Record<Exclude<StampKind, "shelf_item">, { table: string; fingerp
 /** Rows of that kind with no stamp, another fingerprint, or an older rater version, newest first. The shelf lives in another database
  * (knowledge.db), so `shelf_item` is swept from the shelf store by ratingsSweep.ts and answers [] here. */
 export function staleOrMissing(kind: StampKind, limit: number): Array<{ id: string; fingerprint: string }> {
-  if (kind === "shelf_item") return [];
+  if (kind === "shelf_item" || kind === "template") return [];   // the shelf lives in another database; saved templates are rated when they are saved (TEMPLATE-02)
   const s = SOURCES[kind];
   const rows = db.all<{ id: string; fingerprint: string }>(sql.raw(
     `SELECT t.id AS id, ${s.fingerprint} AS fingerprint FROM ${s.table} t
