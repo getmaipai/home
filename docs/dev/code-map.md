@@ -639,6 +639,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
+| `backend/src/lib/films/verifyFinished.ts` | filmShotList, verdictLines, verifyFinishedFilm, verifyFinishedFilmBytes |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, releaseSync |
 | `backend/src/lib/filter/nothingSuitable.ts` | NOTHING_SUITABLE_HINT |
