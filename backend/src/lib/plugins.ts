@@ -103,7 +103,7 @@ export type PluginOpResult<T> =
   // treated as if the package itself had said it.
   | { ok: false; status: 502; error: string; code: string; fallback_reply: PluginResult };
 
-function bundledPackageIds(): string[] {
+export function bundledPackageIds(): string[] {
   try {
     return readdirSync(PACKAGES_DIR, { withFileTypes: true })
       .filter((e) => e.isDirectory())

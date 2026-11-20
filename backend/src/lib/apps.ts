@@ -151,6 +151,11 @@ function loadApp(id: string): LoadedApp | null {
   return app;
 }
 
+/** What the loader itself found wrong with one app package (the very check that hides an app at boot), or null for a package that is not an app. */
+export function appLoadProblems(id: string): string[] | null {
+  return loadApp(id)?.problems ?? null;
+}
+
 // NEWS-SIDEBAR-01: a sidebar's `search`, `bind` and `open` objects are defined by the UI schema, not by the manifest schema; they are
 // checked here, against the same compiled UI schema a page is, when the package loads.
 const UI_SCHEMA_ID = (UI_SCHEMA as { $id: string }).$id;
