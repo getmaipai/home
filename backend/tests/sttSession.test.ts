@@ -88,14 +88,14 @@ function endpointConfig(endpointer: Endpointer, holdS = 0.8, overrides: Partial<
 }
 
 describe("SttSession reply pause", () => {
-  test("first voiced partial arrives at 0.5 seconds, once, and later partials keep configured cadence", async () => {
+  test("first voiced partial arrives at 0.5 seconds, once, and the next early partial follows 0.5 seconds later", async () => {
     scriptTranscript("spoken words");
     const events: SttTestEvent[] = [];
     const session = new SttSession(config({ partialIntervalS: 0.25 }), (event) => events.push(event));
     for (let i = 0; i < 50; i++) { session.pushPcm(loudFrame()); if (i === 48) await flush(); }
     await flush();
     expect(events.filter((event) => event.t === "partial")).toHaveLength(1);
-    for (let i = 0; i < 24; i++) session.pushPcm(loudFrame());
+    for (let i = 0; i < 49; i++) session.pushPcm(loudFrame());
     await flush();
     expect(events.filter((event) => event.t === "partial")).toHaveLength(1);
     for (let i = 0; i < 1; i++) { session.pushPcm(loudFrame()); await flush(); }
@@ -256,7 +256,10 @@ describe("SttSession speech clip callback", () => {
     await flush(); await flush();
     expect(predicateCalls).toBe(1);
     expect(callbackCalls).toBe(0);
-    expect(flattenSpy).toHaveBeenCalledTimes(2); // early cadence partial and final transcription; capture adds no flatten
+    // Early cadence partials (0.5 s and 1.0 s; with real sockets the second can be skipped while the first is still in flight) and the final
+    // transcription; capture adds no flatten.
+    expect(flattenSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(flattenSpy.mock.calls.length).toBeLessThanOrEqual(3);
     flattenSpy.mockRestore();
     session.close();
   });
@@ -527,6 +530,16 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await flush();
     expect(finals(events)).toEqual([{ t: "final", v: "edge words" }]);
     expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
+  test("barge-in: the first four partials of an utterance come every 0.5 s of speech, then the configured 1.5 s cadence", async () => {
+    scriptTranscript("talking over her");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(config({ partialIntervalS: 1.5 }), (e) => events.push(e));
+    for (let i = 0; i < 260; i++) { session.pushPcm(loudFrame()); if (i % 25 === 24) await flush(); }
+    await flush();
+    expect(events.filter((e) => e.t === "partial")).toHaveLength(4); // 0.5, 1.0, 1.5 and 2.0 s; the next is due at 3.5 s
     session.close();
   });
 

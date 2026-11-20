@@ -40,8 +40,10 @@ export interface SttSessionConfig {
  * a fragment. The transcription still starts at the first silent frame (so the text is ready early), but the partial is marked `edge`
  * only once the silence has lasted this long with no voice in between; a shorter gap sends it as a plain partial. */
 export const EDGE_SILENCE_S = 0.2;
-/** Emit the first cadence partial sooner, then keep the existing interval for later partials. */
+/** The first partials of an utterance come sooner (every 0.5 s for the first EARLY_PARTIALS), then the configured interval continues. A person
+ * talking over her is judged from these: the first one lands about 0.6 s after the person starts, the next ones follow at the same pace. */
 export const FIRST_PARTIAL_S = 0.5;
+export const EARLY_PARTIALS = 4;
 
 export interface Endpointer {
   isComplete(audio: Float32Array, sampleRate: number): Promise<boolean>;
@@ -240,7 +242,7 @@ export class SttSession {
       this.lastVoicedLen = this.speechLen;
       this.lastVoicedAtMs = this.now();
       this.samplesSincePartial += samples.length;
-      const partialIntervalS = this.partialsEmitted === 0 ? FIRST_PARTIAL_S : this.cfg.partialIntervalS;
+      const partialIntervalS = this.partialsEmitted < EARLY_PARTIALS ? FIRST_PARTIAL_S : this.cfg.partialIntervalS;
       if (this.samplesSincePartial >= partialIntervalS * this.cfg.sampleRate && !this.partialInFlight) {
         this.samplesSincePartial -= partialIntervalS * this.cfg.sampleRate;
         this.partialsEmitted++;
@@ -410,7 +412,7 @@ export class SttSession {
   }
 
   private emitPartial(edge = false): Promise<void> {
-    if (this.partialInFlight || this.speechLen === 0) { if (!edge) this.samplesSincePartial = Math.min(this.samplesSincePartial, this.cfg.sampleRate * (this.partialsEmitted === 0 ? FIRST_PARTIAL_S : this.cfg.partialIntervalS)); return Promise.resolve(); }
+    if (this.partialInFlight || this.speechLen === 0) { if (!edge) this.samplesSincePartial = Math.min(this.samplesSincePartial, this.cfg.sampleRate * (this.partialsEmitted < EARLY_PARTIALS ? FIRST_PARTIAL_S : this.cfg.partialIntervalS)); return Promise.resolve(); }
     this.partialInFlight = true;
     const run = async () => {
       const capturedVoicedLen = this.lastVoicedLen;
