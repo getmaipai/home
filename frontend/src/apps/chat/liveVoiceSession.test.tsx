@@ -150,6 +150,30 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
     expect(onVoiceTiming).toHaveBeenCalledWith({ sttMs: 240, phase: "final", talkOver: { edge_partials: 0, talk_over_reason: "unknown", pool_size: 0 } });
   });
+  test("ready waits for voice prewarm and continues after twenty seconds", async () => {
+    const voice = spyOn(api, "activeChatVoice").mockResolvedValue({ voice: "vera" } as Awaited<ReturnType<typeof api.activeChatVoice>>);
+    const prewarm = spyOn(api, "prewarmSpeech").mockImplementation(() => new Promise<Response>(() => {}));
+    const captureCalls: number[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} captureCalls={captureCalls} />);
+    await waitFor(() => expect(prewarm).toHaveBeenCalledWith("vera"));
+    expect(captureCalls).toHaveLength(0);
+    await waitFor(() => expect(view.getByText("Connecting")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 20_050));
+    expect(captureCalls.length).toBeGreaterThan(0);
+    voice.mockRestore(); prewarm.mockRestore();
+  }, 30_000);
+
+  test("prewarms a selected voice only once per session", async () => {
+    let readyHandler: ((message: SttServerMessage) => void) | undefined;
+    const voice = spyOn(api, "activeChatVoice").mockResolvedValue({ voice: "vera" } as Awaited<ReturnType<typeof api.activeChatVoice>>);
+    const prewarm = spyOn(api, "prewarmSpeech").mockResolvedValue(new Response());
+    render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} socketFactory={(handlers) => { readyHandler = handlers.onMessage; setTimeout(() => handlers.onMessage({ t: "ready" }), 0); return { sendAudio: () => {}, close: () => {} }; }} />);
+    await waitFor(() => expect(prewarm).toHaveBeenCalledTimes(1));
+    act(() => readyHandler?.({ t: "ready" }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(prewarm).toHaveBeenCalledTimes(1);
+    voice.mockRestore(); prewarm.mockRestore();
+  });
   test("a dropped listening connection reconnects once and the call goes back to Listening with no message", async () => {
     const onOpenChange = mock();
     const onProblem = mock();

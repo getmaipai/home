@@ -80,6 +80,12 @@ async function synthesizeViaStack(text: string, voiceUrl?: string, household?: {
   }
 }
 
+/** A short discarded utterance loads a selected voice after a speech engine restart. */
+async function prewarmVoice(voiceUrl: string): Promise<void> {
+  const result = await synthesizeViaStack("Hello.", voiceUrl);
+  if (result.ok) await result.value.stream.cancel().catch(() => undefined);
+}
+
 export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean; whisper?: boolean } = {}): Promise<TtsOpResult> {
   const resolveStarted = performance.now();
   // REG-02: a bracketed tag the active engine does not advertise is dropped here, the last step before the engine, so "[laugh]" is never read aloud.
@@ -113,9 +119,17 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
         else void ensureDefaultWhisperSample();
       }
     }
-    const result = household
+    const offered = household ? null : await getOfferedVoices();
+    const resolution = household ? null : resolveVoice(voiceUrl, offered);
+    let result = household
       ? await synthesizeViaStack(text, household.voiceUrl, household)
-      : await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);
+      : await synthesizeViaStack(text, resolution?.voiceUrl);
+    // A listed choice that fails to load must keep its identity. Warm it once, then retry once.
+    if (!household && resolution?.voiceUrl && !resolution.unavailable && !result.ok) {
+      await prewarmVoice(resolution.voiceUrl);
+      result = await synthesizeViaStack(text, resolution.voiceUrl);
+    }
+    if (resolution?.unavailable) console.info(JSON.stringify({ event: "tts.voice_fallback", count: 1 }));
     return result.ok ? { ...result, value: { ...result.value, tts_resolve_ms: Math.max(0, Math.round(performance.now() - resolveStarted - (result.value.tts_stack_ms ?? 0))) } } : { ...result, error: TTS_UNAVAILABLE_COPY };
   } catch {
     return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };

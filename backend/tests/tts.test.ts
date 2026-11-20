@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -313,6 +313,42 @@ describe("lib/tts.ts routed through a configured Stack", () => {
       expect(audio.byteLength).toBe(44);
     }
     expect(received).toEqual({ text: "good morning", voiceUrl: "alba" });
+  });
+
+  test("a listed voice is prewarmed and retried once with the same voice", async () => {
+    const received: string[] = [];
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/audio/speech": async (req) => {
+      const form = await req.formData();
+      received.push(String(form.get("voice_url")));
+      calls++;
+      return calls === 1 ? new Response("failed", { status: 503 }) : new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } });
+    } });
+    fixture.client.voices = async () => [{ id: "pocket-tts-voice-vera", name: "Vera", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+    __setOfferedVoicesForTests(await fixture.client.voices());
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const result = await synthesizeSpeech("hello", "vera");
+    expect(result.ok).toBe(true);
+    expect(received).toEqual(["vera", "vera", "vera"]);
+    __setOfferedVoicesForTests(undefined);
+  });
+
+  test("an unavailable listed voice falls back with one count-only log", async () => {
+    fixture = startStackFixture({ "POST /v1/audio/speech": async (req) => {
+      expect((await req.formData()).get("voice_url")).toBeNull();
+      return new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } });
+    } });
+    fixture.client.voices = async () => [{ id: "pocket-tts-voice-default", name: "Default", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+    __setOfferedVoicesForTests(await fixture.client.voices());
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const info = spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const result = await synthesizeSpeech("hello", "missing-voice");
+      expect(result.ok).toBe(true);
+      expect(info.mock.calls.filter(([line]) => String(line).includes("tts.voice_fallback"))).toEqual([[JSON.stringify({ event: "tts.voice_fallback", count: 1 })]]);
+    } finally { info.mockRestore(); __setOfferedVoicesForTests(undefined); }
   });
 
   test("a scripted 503 maps to unavailable and raises a Repairs entry carrying offline_reason", async () => {

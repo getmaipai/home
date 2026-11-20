@@ -113,6 +113,7 @@ export const REACTION_MIN_WORDS = 8;
 export const REACTION_PAUSE_MS = 400;
 export const REACTION_MIN_GAP_MS = 8000;
 export const REACTION_CHANCE = 0.4;
+export const VOICE_PREWARM_TIMEOUT_MS = 20_000;
 // rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md)
 // A reaction is one of these whole phrases, matched exactly after normalising, and nothing else: "mm-hm", "oh wow", "no way".
 // Benchmarks (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn. Anything
@@ -180,6 +181,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const [listenGeneration, setListenGeneration] = useState(0);
   const [idleActivity, setIdleActivity] = useState(0);
   const modeRef = useRef<VoiceMode>("connecting");
+  const warmedVoicesRef = useRef(new Set<string>());
+  const voicePrewarmStartedRef = useRef(false);
   const speakingStartedAtRef = useRef(0);
   const isSpeakingRef = useRef(isSpeaking);
   const activeSpeechRef = useRef(false);
@@ -564,8 +567,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 if (scheduler && isReplySpeaking()) socket.sendPlayed?.(activeTurnRef.current?.turnId ?? "reply", scheduler.playedMs());
               }, 250);
             }
-            if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("listening");
-            if (voiceBargeIn || (!isSpeakingRef.current && modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
+            const openMicrophone = () => {
+              if (cancelled || !(voiceBargeIn || (!isSpeakingRef.current && modeRef.current !== "thinking" && modeRef.current !== "speaking"))) return;
+              if (modeRef.current === "connecting") setCurrentMode("listening");
+              void startCapture({
               onFrame: (frame) => {
                 if (mutedRef.current) return;
                 // ECHO-GATE-01: while she plays, her own echo is dropped here; a voice well above it passes (a cut-in).
@@ -577,7 +582,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 clearInterval(levelTimer);
                 levelTimer = setInterval(() => setAmplitude(levelMeter?.read() ?? 0), 60);
               },
-            })
+              })
               .then((handle) => {
                 if (cancelled) {
                   handle.stop();
@@ -593,6 +598,21 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                   onOpenChange(false);
                 }
               });
+            };
+            // Best-effort selected-voice warm-up before the mic opens. The bounded wait avoids holding readiness forever.
+            void (async () => {
+              try {
+                if (voicePrewarmStartedRef.current) { openMicrophone(); return; }
+                voicePrewarmStartedRef.current = true;
+                const { voice } = await api.activeChatVoice();
+                if (voice && !warmedVoicesRef.current.has(voice)) {
+                  warmedVoicesRef.current.add(voice);
+                  const warming = api.prewarmSpeech(voice).then(async (response) => { await response.body?.cancel().catch(() => undefined); });
+                  await Promise.race([warming, new Promise<void>((resolve) => setTimeout(resolve, VOICE_PREWARM_TIMEOUT_MS))]);
+                }
+              } catch { /* readiness proceeds even when speech warm-up fails */ }
+              openMicrophone();
+            })();
             break;
           case "reply_pause":
             // The server heard the first voiced frame while a reply plays. That is too early to stop her: a breath or room noise would cut her
