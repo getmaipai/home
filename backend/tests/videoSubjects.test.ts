@@ -126,6 +126,19 @@ describe("generate_video saved subjects", () => {
     const job = db.select().from((await import("@/db/schema")).videoJobs).all()[0]!;
     expect(JSON.parse(job.request).adultOnly).toBe(true);
   });
+  test("VF-ROUTE-01 (C8, C10): a child and a teen naming a cast member with a picture never send the identity picture: the child is refused before anything is made, the teen never takes the identity route", async () => {
+    const { addBenchTeen } = await import("../scripts/bench/conversationRunner");
+    const teenRow = addBenchTeen({ owner } as never);
+    for (const role of ["child", "teen"] as const) {
+      const row = role === "teen" ? teenRow : db.select().from(people).all().find((p) => p.role === "child")!;
+      const own = await subject(row as typeof owner);
+      fake.makeRequests.length = 0; fake.submitted.length = 0; fake.door = true;
+      const result = await runGenerateVideo({ state: { actor: row as typeof owner, temporary: false, conversationId: null, turnId: null }, args: { prompt: "Pip waves hello", subjects: [own.name] }, callId: "c", spoken: false, audience: { actor: row, band: role === "child" ? "child" : "teen", surface: "chat", surfaceClass: "written", spoken: false } as never });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(fake.makeRequests.filter((r) => (r as { inputs?: unknown }).inputs)).toHaveLength(0);
+      expect(fake.makeRequests.filter((r) => (r as { job?: string }).job === "picture")).toHaveLength(0);
+    }
+  });
   test("child cannot use a shared real-person subject", async () => {
     const childRow = db.select().from(people).all().find((p) => p.role === "child")!;
     const real = createMediaSubject(owner, { name: "Real", kind: "character", look: "A person", real: true });
