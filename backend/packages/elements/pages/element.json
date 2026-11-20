@@ -157,7 +157,7 @@
           }
         }
       },
-      "note": "reason",
+      "reason": "reason",
       "sticky": true
     }
   ]

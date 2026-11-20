@@ -132,7 +132,7 @@
       "progress": "progress",
       "pills": [
         {
-          "label": "Use it in the Studio",
+          "label": "Open in Studio",
           "icon": "scissors",
           "action": {
             "navigate": {
@@ -144,7 +144,7 @@
           }
         },
         {
-          "label": "See it in Create",
+          "label": "See in Create",
           "icon": "film",
           "action": {
             "navigate": {
