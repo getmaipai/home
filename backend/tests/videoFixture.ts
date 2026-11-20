@@ -82,7 +82,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
-  __setVideoStatusForTests(readyVideoStatusForTests());
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   __resetVideoAdapterCacheForTests();
   __setVideoPollMsForTests(20);
   const handler = (async (input: string | URL | Request, init?: RequestInit) => {

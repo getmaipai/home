@@ -212,6 +212,7 @@ describe("the Create page and the make action", () => {
 
   test("the served Create page leads with a compact prompt bar and offers the recipes, lengths and allowed levels", async () => {
     const { adult } = await household();
+    __setVideoStatusForTests(readyVideoStatusForTests()); // this test was written for the status the fixture used before it reported the sound maker ready (534d4c229)
     const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Record<string, any>> };
     const bar = promptBarOf(page.body)!;
     expect(bar.submit.call.target).toBe("/api/plugins/video/actions/make");

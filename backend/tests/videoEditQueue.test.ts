@@ -1,6 +1,7 @@
 // QUEUE-HOME-S3S5 round 3: every video edit (a reference video, an extend, a restyle) joins the household queue like a clip made from words.
 // It waits behind a running Max job with the queue's line, goes back to waiting when the Stack refuses it, registers its level and class
 // with the queue, and a Home restart ends an edit the restart interrupted with the plain interrupted line.
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -101,6 +102,7 @@ describe("an edit joins the household queue", () => {
   });
 
   test("a Max edit asks the Stack to take chat to Reduced before it starts when the fit plan says so and there is a real shortfall (TIER-REDUCED-01: 32 GB free against a 40 GB peak plus 2 GB margin)", async () => {
+    __setVideoStatusForTests(readyVideoStatusForTests()); // written for the status the fixture used before it reported the sound maker ready (534d4c229)
     setHouseholdSettingValue("engines.chat.tier.reduced", { model: "recommended", options: {}, who: "everyone" }); // TIER-REDUCED-01: the switch must be on
     const calls: boolean[] = []; let reduced = false;
     __setStackClientForTests({ setReducedChat: async (on: boolean) => { calls.push(on); reduced = on; return { state: "ok", reduced }; }, memory: async () => ({ reduced_chat: reduced }) } as never);
