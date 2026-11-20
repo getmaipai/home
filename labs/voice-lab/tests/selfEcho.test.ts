@@ -56,3 +56,9 @@ test("her own \"hold on\" from the phrase playing right now is echo; the same wo
   expect(judgeCutIn("Wait.", said + " " + now, true, now)).toBe("echo");
   expect(judgeCutIn("Hold on.", said, true, said)).toBe("interrupt");
 });
+
+test("the same stop word from a clearly louder source than her echo is a person even when her phrase has the word", () => {
+  const now = "Oh, hold on, wait, the dragon had one more idea.";
+  expect(judgeCutIn("Wait.", said + " " + now, true, now, true)).toBe("interrupt");
+  expect(judgeCutIn("Wait.", said + " " + now, true, now, false)).toBe("echo");
+});

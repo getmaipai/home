@@ -14,7 +14,7 @@ function near(a: string, b: string) {
 export type EchoVerdict = BackchannelDecision | "echo";
 /** Only these, or three or more unrecognised words, count as a person asking her to stop. One or two stray words (a half-heard name, a
  * blur of her own voice) never do: a person who really wants her to stop says "wait" or "stop", or goes on talking, and the next check hears more. */
-export function judgeCutIn(heard: string, spoken: string, echoLikely = true, playingNow = spoken): EchoVerdict {
+export function judgeCutIn(heard: string, spoken: string, echoLikely = true, playingNow = spoken, personLouder = false): EchoVerdict {
   const hw = words(heard); if (!hw.length) return "unknown";
   const spokenWords = [...new Set(words(spoken))];
   // A short utterance with a stop word in it is a command ("wait, stop", "stop here"), even if her story happens to contain the same words.
@@ -23,7 +23,7 @@ export function judgeCutIn(heard: string, spoken: string, echoLikely = true, pla
   const strong = hw.some((w) => STOPPERS.has(w)) || hw.filter((w) => w === "no").length >= 2;
   if (hw.length <= 3 && strong) {
     const nowWords = [...new Set(words(playingNow))];
-    if (hw.every((w) => nowWords.some((n) => near(w, n)))) return "echo";
+    if (!personLouder && hw.every((w) => nowWords.some((n) => near(w, n)))) return "echo"; // unless the sound is clearly louder than her echo has been: then it is a person
     return decideBackchannel(heard) === "ack" ? "ack" : "interrupt";
   }
   const resid = hw.filter((w) => !spokenWords.some((s) => near(w, s)));
