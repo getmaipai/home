@@ -12,7 +12,7 @@ export function voicedStoryboardRows(person: PersonRow, id?: string): ReturnType
   if (!allowed(person)) return [];
   const run = pageFilmRun(person, id);
   if (!run?.production_id) return [];
-  const kept = latestVoicedPreview(person, run.production_id);
+  const kept = run.plan ? latestVoicedPreview(person, run.production_id, run.plan) : null;
   if (!kept) return [];
   const base = storyboardRows(person, id);
   const captions: Record<string, string> = {}, stills: Record<string, string> = {}, lineTexts: Record<string, string> = {};

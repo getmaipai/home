@@ -143,7 +143,8 @@ describe("makeRoughCut (voiced)", () => {
     expect(made.ok && made.note).toContain("left out");
     expect(sent[0]!.lines.map((l: any) => l.shot_id)).toEqual(["shot-2", "shot-5"]);
     expect(JSON.stringify(sent[0])).not.toContain("12 year old");
-    const found = latestVoicedPreview(sage, productionId);
+    const found = latestVoicedPreview(sage, productionId, plan);
+    expect(latestVoicedPreview(sage, productionId, { shots: plan.shots.map((s) => ({ ...s, seconds: 9 })) } as never)).toBeNull(); // made from other lengths: stale
     expect(found?.fileId).toBe(made.ok ? made.fileId : "");
     expect(found?.result.lines[0]!.audio).toMatch(/^\/api\/files\/.+\/content$/);
     __setStackHttpFetchForTests(null);

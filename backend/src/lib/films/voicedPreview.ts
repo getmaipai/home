@@ -18,6 +18,8 @@ export type VoicedStart = { ok: true; id: string; state: FilmRun["state"] } | { 
 export function startVoicedPreview(person: PersonRow, run: FilmRun | null): VoicedStart {
   if (!run || run.person_id !== person.id || person.role === "guest" || laneOfPerson(person) !== "adult") return { ok: false, status: 404, line: "That film isn't available any more.", code: "gone" };
   if (!run.plan || !run.production_id) return { ok: false, status: 422, line: "The shot list is not ready yet. Wait for the plan, then make the voiced preview.", code: "not_ready" };
+  // A film that is being planned or made keeps its own note (progress, verify lines); the voiced preview waits until it stops.
+  if (run.state === "planning" || run.state === "running") return { ok: false, status: 422, line: "Wait for the film to finish being made, then make the voiced preview.", code: "not_ready" };
   if (inFlight.has(run.id)) return { ok: false, status: 422, line: "The voiced preview is already being made.", code: "busy" };
   inFlight.add(run.id);
   updateFilmRun(person, run.id, { note: VOICED_WORKING_NOTE });

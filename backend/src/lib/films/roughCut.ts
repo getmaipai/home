@@ -182,7 +182,8 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   /** Test seams: the file check and the picture gate (the real ones need a Stack and ffmpeg). */
   seams?: { verify?: typeof verifyRoughCutBytes; gate?: (bytes: Uint8Array, seconds: number | null, prompt: string) => Promise<{ ok: true } | { ok: false; line: string }> } }): Promise<RoughCutOutcome> {
   const { actor, productionId, voiced, signal } = input;
-  const plan = { ...input.plan, shots: input.plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false) } as FilmPlan;
+  // The silent animatic has always held every planned shot; only the voiced preview leaves out a shot the person skipped.
+  const plan = voiced ? { ...input.plan, shots: input.plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false) } as FilmPlan : input.plan;
   if (actor.role === "guest" || laneOfPerson(actor) !== "adult") return { ok: false, line: "That film is not available to you." };
   const production = getMediaProduction(actor, productionId);
   if (!production || production.owner_person_id !== actor.id) return { ok: false, line: "That film is not available to you." };
@@ -244,19 +245,26 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
       keptLines.push({ ...line, audio: `/api/files/${encodeURIComponent(saved.value.id)}/content` });
     }
   }
-  const record = { v: 1, kind: voiced ? "film-rough-cut" : "film-animatic", production: productionId, shots: plan.shots.length, seconds: made.seconds, ...(voiced ? { result: { total_s: result.total_s, shots: result.shots, lines: keptLines } } : {}) };
+  const record = { v: 1, kind: voiced ? "film-rough-cut" : "film-animatic", production: productionId, shots: plan.shots.length, seconds: made.seconds, ...(voiced ? { plan: planFingerprint(plan) } : {}), ...(voiced ? { result: { total_s: result.total_s, shots: result.shots, lines: keptLines } } : {}) };
   const saved = storeFile(actor, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: made.bytes, provenance: `video-edit:${JSON.stringify(record)}`, retention: "kept", name: voiced ? "Film voiced preview" : "Film animatic", deduplicate: false });
   if (!saved.ok) return { ok: false, line: saved.error };
   return { ok: true, fileId: saved.value.id, seconds: made.seconds ?? 0, shots: plan.shots.length, lines: keptLines.length, note: dropped > 0 ? DROPPED_LINES_NOTE(dropped) : null };
 }
 
+/** A short fingerprint of what a voiced preview was made from (each kept shot's id, length, motion and line): a preview made from other words is stale. */
+export function planFingerprint(plan: Pick<FilmPlan, "shots">): string {
+  const text = plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false).map((shot) => [shot.id, shot.seconds, shot.motion, shot.line?.trim() ?? ""].join("|")).join("\n");
+  return new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 16);
+}
+
 /** The newest stored voiced preview of a production: its file and the result Home kept (shots, and each line's own audio address and wave). Null when there is none. */
-export function latestVoicedPreview(actor: PersonRow, productionId: string): { fileId: string; result: { total_s: number; shots: Array<{ id: string; start_s: number; end_s: number }>; lines: Array<{ shot_id: string; speaker: string; start_s: number; length_s: number; audio: string; wave?: number[] }> } } | null {
+export function latestVoicedPreview(actor: PersonRow, productionId: string, plan?: Pick<FilmPlan, "shots">): { fileId: string; result: { total_s: number; shots: Array<{ id: string; start_s: number; end_s: number }>; lines: Array<{ shot_id: string; speaker: string; start_s: number; length_s: number; audio: string; wave?: number[] }> } } | null {
   const rows = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), like(attachments.provenance, 'video-edit:%"kind":"film-rough-cut"%'))).orderBy(desc(attachments.createdAt)).all();
   for (const row of rows) {
     try {
-      const parsed = JSON.parse(row.provenance.slice("video-edit:".length)) as { production?: string; result?: never };
-      if (parsed.production === productionId && parsed.result) return { fileId: row.id, result: parsed.result };
+      const parsed = JSON.parse(row.provenance.slice("video-edit:".length)) as { production?: string; plan?: string; result?: never };
+      // A preview made from other shots, lengths or words than the plan has now is stale, and is not shown.
+      if (parsed.production === productionId && parsed.result && (!plan || parsed.plan === planFingerprint(plan))) return { fileId: row.id, result: parsed.result };
     } catch { /* an unreadable record is not a preview */ }
   }
   return null;
