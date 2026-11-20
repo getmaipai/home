@@ -34,7 +34,10 @@ export async function voicePrepared(voice: string): Promise<boolean> {
     const voiceData = await voiceResponse.json() as { voices?: Array<{ id: string; prepared_for?: Record<string, string[]> }> };
     const modelData = await modelResponse.json() as { models?: Record<string, { loaded?: boolean }> };
     const modelName = Object.entries(modelData.models ?? {}).find(([, entry]) => entry.loaded)?.[0];
-    return !!modelName && (voiceData.voices?.find((entry) => entry.id === voice)?.prepared_for?.[modelName] ?? []).includes("plain");
+    const entry = voiceData.voices?.find((e) => e.id === voice);
+    // No model loaded yet (the server was just restarted and loads on first use) is not "the voice is missing": the voice exists and will be prepared on first use. Falling back to the built-in voice here made the first phrase of a conversation come out in another speaker's voice (recorded: three sessions, first phrase spoken by "lj").
+    if (!modelName) return !!entry;
+    return (entry?.prepared_for?.[modelName] ?? []).includes("plain");
   } catch { return false; }
 }
 const PARAKEET = Bun.env.LAB_PARAKEET ?? "/usr/local/maipai-home/stack/data/models/parakeet-tdt-0.6b-v2-int8/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8";

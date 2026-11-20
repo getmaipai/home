@@ -635,3 +635,12 @@ test("mood policy in the session: a [whisper] on the first reply is stripped in 
   expect(sentStyles).toEqual([""]);
   h.session.close();
 });
+import { voicePrepared as realVoicePrepared } from "../src/stack";
+test("a restarted voice server with no model loaded yet does not make the session fall back to another voice", async () => {
+  const real = globalThis.fetch;
+  try {
+    (globalThis as any).fetch = async (url: string) => String(url).endsWith("/voices") ? Response.json({ voices: [{ id: "casual", prepared_for: {} }] }) : Response.json({ models: { voxcpm2: { loaded: false } } });
+    expect(await realVoicePrepared("casual")).toBe(true);        // exists, will be prepared on first use
+    expect(await realVoicePrepared("nobody")).toBe(false);       // a voice that does not exist still falls back
+  } finally { (globalThis as any).fetch = real; }
+});

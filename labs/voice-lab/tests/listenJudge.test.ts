@@ -32,3 +32,9 @@ test("joins: only the MEDIAN of a reply can fail it; outliers are a visible warn
   const loudBad = judgeJoins([{ at: 1, semitones: 1, db: 4.1 }, { at: 2, semitones: 1, db: -4.4 }, { at: 3, semitones: 1, db: 3.8 }]); expect(loudBad.fail).toContain("dB");
   expect(judgeJoins([{ at: 1, semitones: 2, db: 1 }]).fail).toBeNull();
 });
+import { voicedFraction, MIN_VOICED } from "../rig/listen/speaker";
+test("a window that is mostly pause is not judged for speaker identity (recorded: first windows of replies starting 'Hey!')", () => {
+  const rate = 24000, w = new Float32Array(rate * 1.5); for (let i = 0; i < rate * 0.4; i++) w[i] = Math.sin(i / 9) * 0.2;   // 0.4 s of sound, 1.1 s of pause
+  expect(voicedFraction(w, rate)).toBeLessThan(MIN_VOICED);
+  const full = new Float32Array(rate * 1.5).map((_, i) => Math.sin(i / 9) * 0.2); expect(voicedFraction(full, rate)).toBeGreaterThan(MIN_VOICED);
+});
