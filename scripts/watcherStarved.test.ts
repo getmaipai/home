@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as fixtures from "./tests/watcherFixtures";
-const { roots, git, fixture, run, records } = fixtures.createWatcherFixtures();
+const { roots, git, fixture, commit, run, records } = fixtures.createWatcherFixtures();
 
 // WATCHER-STARVED-01: the watcher never stops testing main. A T2 entry never blocks the main run, a red T2 is rerun at most once per six
 // hours, an obligation is discharged only by a finished main run at a head that contains it, and a long gap files one issue.
@@ -59,16 +59,19 @@ describe("watcher starvation protection", () => {
     expect(existsSync(join(f.data, "t2-wanted", older))).toBe(true); // a red T2 keeps its obligation
   });
 
-  test("a red main names the T2 obligations it discharged", () => {
+  test("a red main names the T2 obligations it discharged and still moves them", () => {
     const f = fixture();
-    const base = git(f.main, "rev-parse", "HEAD");
-    wanted(f, base, "landed-branch", "2026-01-01T00:00:00Z");
-    const out = run(f, "watcher.sh", ["run-once"], { ...f.env, MAIPAI_WATCH_LEGS: "backend", MAIPAI_WATCH_RUNNER_CMD: "false" });
-    expect(out.status).toBe(0);
-    const reds = existsSync(join(f.data, "reds")) ? readdirSync(join(f.data, "reds")) : [];
-    const note = reds.map((name) => readFileSync(join(f.data, "reds", name), "utf8")).join("\n");
-    if (records(f).some((r) => r.sha === base && r.result === "red")) expect(note).toContain(base.slice(0, 7));
-    expect(existsSync(join(f.data, "t2-wanted", base))).toBe(false);
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const landed = git(f.main, "rev-parse", "HEAD");
+    wanted(f, landed, "landed-branch", "2026-01-01T00:00:00Z");
+    const broken = commit(f, "break tests", { RED: "red\n" });
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    expect(records(f).at(-1).result).toBe("red");
+    const note = readFileSync(join(f.data, "reds", `${broken}.md`), "utf8");
+    expect(note).toContain("T2 obligations discharged by this run");
+    expect(note).toContain(landed.slice(0, 7));
+    expect(existsSync(join(f.data, "t2-wanted", landed))).toBe(false);
+    expect(existsSync(join(f.data, "t2-discharged", landed))).toBe(true);
   });
 
   test("a T2 red files one issue per sha; a 24 hour gap files one issue that the next green closes; status prints the gap", () => {
@@ -104,6 +107,8 @@ describe("watcher starvation protection", () => {
     writeFileSync(join(f.data, "watcher.log"), "x".repeat(5 * 1024 * 1024 + 10));
     expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
     expect(existsSync(join(f.data, "watcher.log.1"))).toBe(true);
+    expect(readFileSync(join(f.data, "watcher.log.1"), "utf8").length).toBeGreaterThan(5 * 1024 * 1024); // copy-truncate: the descriptor launchd holds keeps working
+    expect(statSync(join(f.data, "watcher.log")).size).toBeLessThan(100_000);
   });
 });
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });

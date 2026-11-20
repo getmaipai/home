@@ -601,15 +601,10 @@ checkout_lock_take() {
 checkout_lock_release() { [[ "$(cat "$checkout_lock/pid" 2>/dev/null || true)" != "$$" ]] || rm -rf "$checkout_lock"; }
 
 run_t2_wanted() {
-  local dir="$data/t2-wanted" sha branch files rc=0 output command item last red_at now rerun
+  local dir="$data/t2-wanted" sha branch files rc=0 output command item now rerun
   [[ -d "$dir" ]] || return 1
   sha="$(t2_pick_oldest)"; [[ -n "$sha" ]] || return 1
   now="$(date +%s)"; rerun="${MAIPAI_WATCH_T2_RERUN_SECONDS:-21600}"; [[ "$rerun" =~ ^[0-9]+$ ]] || rerun=21600
-  if [[ -f "$data/t2-red/$sha" ]]; then
-    red_at="$(head -n 1 "$data/t2-red/$sha" 2>/dev/null || true)"
-    last="$(tail -n 1 "$dir/$sha" 2>/dev/null || true)"
-    if [[ "$(cat "$data/t2-red/$sha.newer" 2>/dev/null || true)" == "$last" ]] && [[ "$red_at" =~ ^[0-9]+$ ]] && (( now-red_at < rerun )); then return 1; fi
-  fi
   IFS= read -r branch <"$dir/$sha" || branch=unknown
   files="$(sed -n '2,$p' "$dir/$sha" | sed '$d')"
   checkout_lock_take || { echo "checked T2 waiting: checkout busy"; return 0; }
@@ -642,7 +637,7 @@ run_t2_wanted() {
 run_once() {
   local rc=0
   # WATCHER-STARVED-01: one generation of rotation, checked every tick (the watcher runs for days).
-  if [[ -f "$data/watcher.log" ]] && (( $(wc -c <"$data/watcher.log") > 5242880 )); then mv -f "$data/watcher.log" "$data/watcher.log.1"; fi
+  if [[ -f "$data/watcher.log" ]] && (( $(wc -c <"$data/watcher.log") > 5242880 )); then cp -f "$data/watcher.log" "$data/watcher.log.1" && : > "$data/watcher.log"; fi
   run_once_body "$@" || rc=$?
   checkout_lock_release
   return "$rc"
@@ -650,10 +645,9 @@ run_once() {
 
 run_once_body() {
   local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
-  local bisect_started bisect_budget bisect_spent has_t2=0 passes=0 t2_every=3
+  local bisect_started bisect_budget bisect_spent has_t2=0
   mkdir -p "$data/t2-wanted" "$data/t2-green"
   [[ -z "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]] || has_t2=1
-  passes="$(cat "$data/main-passes-since-t2" 2>/dev/null || echo 0)"; [[ "$passes" =~ ^[0-9]+$ ]] || passes=0
   # OUTBOX-01: check the local landed main first, then check origin on the refresh interval.
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
@@ -670,7 +664,7 @@ run_once_body() {
     last_run="$(cat "$data/last-run" 2>/dev/null || true)"
     last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   fi
-  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; atomic_value "$data/main-passes-since-t2" 0; else echo "up to date at ${head:0:7}"; fi; return 0; fi
+  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; else echo "up to date at ${head:0:7}"; fi; return 0; fi
   head="$(pipeline_main_sha "$checkout")"
   # HOST-GUARD-09: no suite starts under memory pressure or while the host guard paused heavy work; the next tick tries again.
   local hostmem_lib="$main/scripts/lib/hostmem.sh" gate_line=""
@@ -694,7 +688,7 @@ run_once_body() {
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
-  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; atomic_value "$data/main-passes-since-t2" 0; else echo "up to date at ${head:0:7}"; fi; return 0; fi
+  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; else echo "up to date at ${head:0:7}"; fi; return 0; fi
   local checkout_error checkout_head
   # AUDIT-GATE-01: a tree that was not checked out is never tested or marked green. The failure is logged once per sha
   # (data/checkout-failed holds the last sha that failed) and retried on the next tick, since an index.lock is often transient.
@@ -764,7 +758,6 @@ run_once_body() {
     atomic_value "$data/last-green" "$head"
     atomic_value "$data/last-run" "$head"
     append_run "$head" green "$seconds" "" ""
-    atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
     t2_discharge "$head" green >/dev/null
     watch_unverified_alert
     rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
@@ -781,7 +774,6 @@ run_once_body() {
     atomic_value "$data/last-green" "$head"
     atomic_value "$data/last-run" "$head"
     append_run "$head" flaky "$seconds" "$files" ""
-    atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
     t2_discharge "$head" flaky >/dev/null
     watch_unverified_alert
     for file in $files; do file_flake_issue "$file"; done
@@ -811,7 +803,6 @@ run_once_body() {
   } > "$note_tmp"
   mv -f "$note_tmp" "$note"
   append_run "$head" red "$seconds" "$files" "$([[ "$culprit" == unknown ]] || printf %s "$culprit")"
-  atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
   t2_discharge "$head" red >"$data/.discharged-$head"
   if [[ -s "$data/.discharged-$head" ]]; then { printf "\n## T2 obligations discharged by this run\n\n"; sed "s/ /\n- /g" "$data/.discharged-$head" | sed "s/^/- /"; } >>"$note"; rm -f "$data/.discharged-$head"; fi
   watch_unverified_alert
