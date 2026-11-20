@@ -637,6 +637,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/lines.ts` | shotLines, shotText |
 | `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmRepairRows |
 | `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
+| `backend/src/lib/films/pinSong.ts` | pinFilmSong |
 | `backend/src/lib/films/plan.ts` | filmShotLineSchema, MAX_LINES_PER_SHOT, filmPlanShotSchema, NARRATION, filmShotRepairSchema, filmPlanSchema |
 | `backend/src/lib/films/progressStore.ts` | parseProgress, readProgress, recordShotNote, recordShotJob, recordShotFailure, filmShotJobIds |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
