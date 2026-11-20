@@ -871,7 +871,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/shotCard.ts` | validatePalette, composeShotPrompt, sameShotFourLights |
 | `backend/src/lib/media/songFacts.ts` | SONG_WIKIMEDIA_KEY, lookupSongFact, songFactFor, runSongFactPass, kickSongFacts |
 | `backend/src/lib/media/sources.ts` | ROOT_KINDS, TRASH_DAYS, pathsOverlap, liveRoots, createRootSource, removeSource |
-| `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, listTemplates, getTemplate, listFragments, getFragment |
+| `backend/src/lib/media/templates.ts` | videoTemplateSettings, validVideoTemplateSettings, declaredTemplateStamp, bundledTemplates, listTemplates, getTemplate |
 | `backend/src/lib/media/textMatch.ts` | titleMatch |
 | `backend/src/lib/media/videoByline.ts` | ageLabel, withVideoByline |
 | `backend/src/lib/media/videoCreateApp.ts` | videoTierSegment, createLengthOptions, VIDEO_STATUS_WARM_MS, VIDEO_TIME_WORDS, videoEngineLine, videoTimeLine |
