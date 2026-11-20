@@ -1,7 +1,7 @@
 // VF-DOOR-01: a plain clip goes through the Stack's generic make door; everything else stays on the old one, and the old one is the way back.
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __setVideosFetchForTests, fetchClipReceipt, type VideoBody } from "@/lib/videos/stack";
-import { clipRequestFor, submitVideoViaDoor } from "@/lib/videos/doorClip";
+import { clipRequestFor, doorWanted, submitVideoViaDoor } from "@/lib/videos/doorClip";
 
 const base = (over: Partial<VideoBody> = {}): VideoBody => ({ prompt: "a dog barks", audience: "adult", size: "864x480", seconds: 5, seed: 7, timeout_ms: 1, ...over });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -22,19 +22,20 @@ afterEach(() => { __setVideosFetchForTests(null); delete process.env.MAIPAI_VIDE
 
 test("a plain adult clip becomes a generic clip request with the level, the shape, the seconds, the seed and no wait", () => {
   expect(clipRequestFor(base())).toEqual({ job: "clip", audience: "adult", description: "a dog barks", shape: "landscape", level: "standard", seconds: 5, seed: 7, wait: 0 });
-  expect(clipRequestFor(base({ size: "480x864", tier: "max" }))).toMatchObject({ shape: "portrait", level: "max" });
+  expect(clipRequestFor(base({ size: "480x864", tier: "boost" }))).toMatchObject({ shape: "portrait", level: "boost" });
   expect(clipRequestFor(base({ size: "512x512", tier: "boost" }))).toMatchObject({ shape: "square", level: "boost" });
   expect(clipRequestFor(base({ quiet_seconds: 60, quiet_max_wait_seconds: null }))).toMatchObject({ quiet_seconds: 60, quiet_max_wait_seconds: null });
 });
 
 test("a start picture and an end picture travel as the clip's start and end pictures, and no model, size in pixels or step count is sent", () => {
-  const request = clipRequestFor(base({ image: "QUJD", end_image: "REVG", model: "some-model", tier: "max" }))!;
+  const request = clipRequestFor(base({ image: "QUJD", end_image: "REVG", model: "some-model", tier: "boost" }))!;
   expect(request).toMatchObject({ start_picture: "data:image/png;base64,QUJD", end_picture: "data:image/png;base64,REVG" });
   expect(Object.keys(request)).not.toContain("model"); expect(Object.keys(request)).not.toContain("size"); expect(Object.keys(request)).not.toContain("part");
 });
 
 test("what is not a plain clip stays on the old door: a young person's, negative words, a LoRA, an edit, a clip with no size or seconds", () => {
   expect(clipRequestFor(base({ audience: "all-ages" }))).toBeNull();
+  expect(clipRequestFor(base({ tier: "max" }))).toBeNull();   // Max stays on the old door for now
   expect(clipRequestFor(base({ negative_prompt: "no cats" }))).toBeNull();
   expect(clipRequestFor(base({ loras: [{ id: "style-1", strength: 1 }] }))).toBeNull();
   expect(clipRequestFor(base({ source_video: "/clips/a.mp4", extend_seconds: 2 }))).toBeNull();
@@ -81,4 +82,12 @@ test("a clip's receipt is read from the Stack's owner route, and a missing one i
   expect(await fetchClipReceipt("job-gone-404")).toEqual({ version: 1, job_id: "job-1" });   // the stub answers any receipt path
   __setVideosFetchForTests((async () => json({ error: "no", code: "no_receipt" }, 404)) as unknown as typeof fetch);
   expect(await fetchClipReceipt("job-1")).toBeNull();
+});
+
+test("a clip that stays on the old door is decided without waiting (no extra step before the old door runs)", () => {
+  expect(doorWanted(base())).toBe(true);
+  expect(doorWanted(base({ tier: "max" }))).toBe(false);
+  expect(doorWanted(base({ audience: "all-ages" }))).toBe(false);
+  process.env.MAIPAI_VIDEO_LEGACY_DOOR = "1";
+  expect(doorWanted(base())).toBe(false);
 });

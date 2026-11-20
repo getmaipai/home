@@ -16,6 +16,8 @@ export const legacyDoorForced = (): boolean => process.env.MAIPAI_VIDEO_LEGACY_D
 export function clipRequestFor(body: VideoBody): StackMakeClipRequest | null {
   if (body.audience !== "adult") return null;
   if (body.negative_prompt || (body.loras && body.loras.length > 0)) return null;
+  // Max stays on the old door for now: its memory holds and the Stack's Max stop are classed by Home's own retry policy (`holdMaxAfterMemoryRefusal`) and were not part of the first proof.
+  if (body.tier === "max") return null;
   if (body.source_video !== undefined || body.extend_seconds !== undefined || body.retake_from_seconds !== undefined) return null;
   if (body.size === undefined || body.seconds === undefined || body.seconds <= 0) return null;
   const size = /^(\d+)x(\d+)$/.exec(body.size);
@@ -34,6 +36,9 @@ export function clipRequestFor(body: VideoBody): StackMakeClipRequest | null {
     wait: 0,
   };
 }
+
+/** Whether this body goes through the generic door: decided without waiting, so a clip that stays on the old door runs exactly the same steps in the same order as before. */
+export const doorWanted = (body: VideoBody): boolean => !legacyDoorForced() && clipRequestFor(body) !== null;
 
 /**
  * Starts the clip on the generic door, or answers null when it must go on the old one. A Stack failure that is not a refusal (queue full, no memory,

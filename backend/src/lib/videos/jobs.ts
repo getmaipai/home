@@ -30,7 +30,7 @@ import { LTX25_DEFAULTS, LTX25_MAX_DEFAULTS, LTX25_MAX_MODEL, LTX25_MODEL } from
 import { videoEngineStatus } from "./ready";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
-import { submitVideoViaDoor } from "./doorClip";
+import { doorWanted, submitVideoViaDoor } from "./doorClip";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 import { checkClipFile } from "./stackClipCheck";
@@ -292,7 +292,7 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
-    const submitted = (await submitVideoViaDoor(sendBody)) ?? (await submitVideo(sendBody));
+    const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody) : null) ?? (await submitVideo(sendBody));
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job;
     // LTXD-18B: the Stack's own words about an old-base style ride the clip's existing muted line (`create.note`, read by the card, the feed and the make reply); no new status surface.
