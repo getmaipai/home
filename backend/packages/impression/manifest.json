@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Impression",
-  "description": "Call with action start and a synth name when asked for an impression of, or to act as, a synth or person; do not ask first. Call with action stop when told to stop. Keeps its voice and memories.",
+  "description": "Start or stop an impression of a synth or person.",
   "offer": {
     "mode": "conditional",
     "gate": "impressionAllowed",

@@ -179,6 +179,8 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
+import { TOOL_GUIDANCE } from "../toolGuidance";
+
 export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState): ToolSpec | null {
   if ((id === VOICEOVER_TOOL_ID || id === CHANGE_VOICE_TOOL_ID) && !state?.voiceoverAllowed) return null;
   if (id === MAKE_SPEECH_TOOL_ID && !state?.voiceoverAllowed) return null;
@@ -196,7 +198,8 @@ export function toolSpecFor(id: string, lane: Lane = "adult", state?: TurnState)
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
   let args = loaded.value.args;
-  let description = loaded.value.description;
+  // FAST-03: the manifest description is the short sentence; a tool tuned with longer instructions gives the model those instead (toolGuidance.ts).
+  let description = TOOL_GUIDANCE[id] ?? loaded.value.description;
   if (id === "generate_image" && state) ({ args, description } = generateImageSchema(args, description, state));
   const spec: ToolSpec = { id, description, args };
   // VIDEO-LORA-10: the video tools list the styles this person may name (none for a screen or a person that may not).
