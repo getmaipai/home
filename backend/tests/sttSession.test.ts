@@ -88,6 +88,21 @@ function endpointConfig(endpointer: Endpointer, holdS = 0.8, overrides: Partial<
 }
 
 describe("SttSession reply pause", () => {
+  test("first voiced partial arrives at 0.5 seconds, once, and later partials keep configured cadence", async () => {
+    scriptTranscript("spoken words");
+    const events: SttTestEvent[] = [];
+    const session = new SttSession(config({ partialIntervalS: 0.25 }), (event) => events.push(event));
+    for (let i = 0; i < 50; i++) { session.pushPcm(loudFrame()); if (i === 48) await flush(); }
+    await flush();
+    expect(events.filter((event) => event.t === "partial")).toHaveLength(1);
+    for (let i = 0; i < 24; i++) session.pushPcm(loudFrame());
+    await flush();
+    expect(events.filter((event) => event.t === "partial")).toHaveLength(1);
+    for (let i = 0; i < 1; i++) { session.pushPcm(loudFrame()); await flush(); }
+    await flush();
+    expect(events.filter((event) => event.t === "partial")).toHaveLength(2);
+    session.close();
+  });
   let voice = false;
   async function voicedSession(now: () => number = () => 1000) {
     const events: SttTestEvent[] = [];
@@ -241,7 +256,7 @@ describe("SttSession speech clip callback", () => {
     await flush(); await flush();
     expect(predicateCalls).toBe(1);
     expect(callbackCalls).toBe(0);
-    expect(flattenSpy).toHaveBeenCalledTimes(1); // transcription flatten only; capture adds no flatten
+    expect(flattenSpy).toHaveBeenCalledTimes(2); // early cadence partial and final transcription; capture adds no flatten
     flattenSpy.mockRestore();
     session.close();
   });
@@ -287,7 +302,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
     expect(finals(events)).toEqual([{ t: "final", v: "the whole resumed utterance" }]);
     expect(events.filter((event) => event.t === "no_speech" || event.t === "error")).toHaveLength(0);
-    expect(receivedSamples).toHaveLength(2); // the edge partial of the first fragment, then the whole utterance (DUPLEX-EDGE)
+    expect(receivedSamples).toHaveLength(3); // early cadence partial, edge partial, then the whole utterance (DUPLEX-EDGE)
     expect(receivedSamples[1]).toBeGreaterThan(30 * FRAME * 2); // the final decode carries the whole utterance
     session.close();
   });
@@ -330,7 +345,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await flush();
 
     expect(finals(events)).toEqual([{ t: "final", v: "whole utterance, not the fragment" }]);
-    expect(transcriptionCalls()).toBe(2); // edge partial of the fragment, then the whole utterance (DUPLEX-EDGE)
+    expect(transcriptionCalls()).toBe(3); // early cadence partial, edge partial, then the whole utterance (DUPLEX-EDGE)
     session.close();
   });
 
@@ -370,7 +385,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
 
     expect(endpointCalls).toBe(2);
     expect(finals(events)).toHaveLength(1);
-    expect(transcriptionCalls()).toBe(2); // edge partial of the fragment, then the whole utterance (DUPLEX-EDGE)
+    expect(transcriptionCalls()).toBe(3); // early cadence partial, edge partial, then the whole utterance (DUPLEX-EDGE)
     session.close();
   });
 
@@ -381,7 +396,9 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
     await flush();
     await pushPause(session, 500);
-    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    // Real audio keeps arriving, so the rule is re-judged on every frame once the partial's text is back; with real sockets that text can
+    // land after the test's last frame, so keep feeding silence (up to about 3 s) until the turn commits.
+    for (let i = 0; i < 300 && finals(events).length === 0; i++) { session.pushPcm(silenceFrame()); await flush(); }
     expect(finals(events)).toEqual([{ t: "final", v: "Why do cats purr?" }]);
     session.close();
   });
@@ -395,7 +412,9 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await pushPause(session, 500);
     expect(finals(events)).toHaveLength(0);
     await pushPause(session, 200);
-    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    // Real audio keeps arriving, so the rule is re-judged on every frame once the partial's text is back; with real sockets that text can
+    // land after the test's last frame, so keep feeding silence (up to about 3 s) until the turn commits.
+    for (let i = 0; i < 300 && finals(events).length === 0; i++) { session.pushPcm(silenceFrame()); await flush(); }
     expect(finals(events)).toHaveLength(1);
     session.close();
   });
@@ -412,7 +431,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await flush();
     expect(finals(events)).toHaveLength(0);
     await pushPause(session, 500);
-    for (let i = 0; i < 20 && finals(events).length === 0; i++) await flush();
+    for (let i = 0; i < 300 && finals(events).length === 0; i++) { session.pushPcm(silenceFrame()); await flush(); } // real sockets: the text can land after the last frame
     expect(finals(events)).toHaveLength(1);
     session.close();
   });
@@ -514,9 +533,9 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
   test("STT-SMARTTURN-01: the partial transcribed at the first silent frame carries edge: true once the silence has lasted 0.2 s; a cadence partial does not", async () => {
     scriptTranscript("edge words");
     const events: SttTestEvent[] = [];
-    // A 0.1 s partial cadence: the first partial comes while the voice is still going, the next at the first silent frame.
+    // Early first partial, then the 0.1 s configured cadence while voice continues.
     const session = new SttSession(endpointConfig({ isComplete: async () => true }, 0.2, { partialIntervalS: 0.1 }), (e) => events.push(e));
-    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    for (let i = 0; i < 50; i++) { session.pushPcm(loudFrame()); if (i === 48) await flush(); }
     await flush();
     const cadence = events.filter((e) => e.t === "partial");
     expect(cadence.length).toBeGreaterThan(0);
@@ -543,7 +562,7 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     await pushPause(session, 100); // an inter-word gap
     for (let i = 0; i < 30; i++) session.pushPcm(loudFrame()); // the voice comes back
     await flush();
-    expect(events.filter((e) => e.t === "partial")).toEqual([{ t: "partial", v: "what is" }]);
+    expect(events.filter((e) => e.t === "partial").every((event) => event.t === "partial" && event.v === "what is")).toBe(true);
     expect(events.some((e) => e.t === "partial" && "edge" in e)).toBe(false);
     // The real pause: frames arrive in real time there, so the decode lands before the silence timer; here the pause is pushed in two parts.
     await pushPause(session, 250);

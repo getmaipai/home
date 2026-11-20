@@ -40,6 +40,8 @@ export interface SttSessionConfig {
  * a fragment. The transcription still starts at the first silent frame (so the text is ready early), but the partial is marked `edge`
  * only once the silence has lasted this long with no voice in between; a shorter gap sends it as a plain partial. */
 export const EDGE_SILENCE_S = 0.2;
+/** Emit the first cadence partial sooner, then keep the existing interval for later partials. */
+export const FIRST_PARTIAL_S = 0.5;
 
 export interface Endpointer {
   isComplete(audio: Float32Array, sampleRate: number): Promise<boolean>;
@@ -132,6 +134,7 @@ export class SttSession {
   private speaking = false;
   private silenceSamples = 0;
   private samplesSincePartial = 0;
+  private partialsEmitted = 0;
   private partialInFlight = false;
   private partialPromise: Promise<void> | null = null;
   private finalizing = false;
@@ -237,8 +240,10 @@ export class SttSession {
       this.lastVoicedLen = this.speechLen;
       this.lastVoicedAtMs = this.now();
       this.samplesSincePartial += samples.length;
-      if (this.samplesSincePartial >= this.cfg.partialIntervalS * this.cfg.sampleRate) {
-        this.samplesSincePartial = 0;
+      const partialIntervalS = this.partialsEmitted === 0 ? FIRST_PARTIAL_S : this.cfg.partialIntervalS;
+      if (this.samplesSincePartial >= partialIntervalS * this.cfg.sampleRate && !this.partialInFlight) {
+        this.samplesSincePartial -= partialIntervalS * this.cfg.sampleRate;
+        this.partialsEmitted++;
         void this.emitPartial();
       }
     } else {
@@ -405,7 +410,7 @@ export class SttSession {
   }
 
   private emitPartial(edge = false): Promise<void> {
-    if (this.partialInFlight || this.speechLen === 0) return Promise.resolve();
+    if (this.partialInFlight || this.speechLen === 0) { if (!edge) this.samplesSincePartial = Math.min(this.samplesSincePartial, this.cfg.sampleRate * (this.partialsEmitted === 0 ? FIRST_PARTIAL_S : this.cfg.partialIntervalS)); return Promise.resolve(); }
     this.partialInFlight = true;
     const run = async () => {
       const capturedVoicedLen = this.lastVoicedLen;
@@ -549,6 +554,7 @@ export class SttSession {
     this.speaking = false;
     this.silenceSamples = 0;
     this.samplesSincePartial = 0;
+    this.partialsEmitted = 0;
     this.finalizing = false;
     this.sileroVoiced = false;
     this.preroll = [];

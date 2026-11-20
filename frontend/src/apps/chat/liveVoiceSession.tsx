@@ -85,7 +85,7 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
-  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; edgePartials?: number; echoDrops?: number }) => void;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; edgePartials?: number; echoDrops?: number; bargePauseMs?: number; bargeOutcome?: "stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none" }) => void;
   voiceTimingSocketRef?: { current: SttSocket | null };
   /** VOICE-TRACE-01: an owner's live trace for the next N utterances of this call (event names and numbers only; off when 0). */
   traceUtterances?: number;
@@ -175,6 +175,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const falseInterruptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const overlapPausedRef = useRef(false);
   const overlapTranscriptRef = useRef(false);
+  const bargeStartRef = useRef<number | null>(null);
+  const bargePauseMsRef = useRef<number | undefined>(undefined);
+  const bargeOutcomeRef = useRef<"stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none">("none");
   const mutedRef = useRef(false);
   const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
@@ -256,14 +259,17 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       // Real words since the pause: a cut-in. The reply stops for good; the final, when it lands, is the next turn.
       trace("pause_resolved", { reason: "deadline_interrupt", played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
       duplexCounters.interruptions++;
+      bargeOutcomeRef.current = "stopped";
       interrupt("voice");
     } else {
       trace("pause_resolved", { reason: "deadline_resume" });
+      bargeOutcomeRef.current = "resumed_noise";
       restoreVoice();
       overlapPausedRef.current = false;
     }
   };
   const pauseWithDeadline = () => {
+    if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargeStartRef.current);
     turnSchedulerRef.current?.pause();
     overlapPausedRef.current = true;
     clearPauseDeadline();
@@ -529,12 +535,15 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               const heard = normalizedTranscript(message.v);
               const ownVoice = Boolean(heard) && isOwnVoice(message.v);
               if (ownVoice) trace("echo_partial", { words: heard.split(" ").length });
+              // A stop word she has just said herself ("he had to wait") is not a reason to pause her: the microphone hears her own words back.
+              const stopMatch = /\b(?:stop|wait|hold|pause|quiet|enough|shush|shh)\b/.exec(heard);
+              const stopWord = stopMatch !== null && !homeVoiceWords().includes(stopMatch[0]);
               if (heard && !isReaction(heard, message.v) && !ownVoice) {
                 overlapTranscriptRef.current = true;
-                // Two real words are speech, not noise: pause now rather than wait out the confirm window.
-                if (heard.split(" ").length >= 2) {
+                // One explicit stop word is sufficient; ordinary speech keeps the existing two-word threshold.
+                if (stopWord || heard.split(" ").length >= 2) {
                   if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
-                  if (!overlapPausedRef.current) { trace("pause", { words: heard.split(" ").length }); pauseWithDeadline(); }
+                  if (!overlapPausedRef.current) { trace(stopWord ? "pause_stop_word" : "pause", { words: heard.split(" ").length }); pauseWithDeadline(); }
                 }
               }
             }
@@ -556,7 +565,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // she spoke was the "blip" the owner heard: the microphone hears her own reply, that sound lasts as long as the reply, and
               // the pause came before any transcript could say whose voice it was. Her words in a partial (two real words that are not
               // her own) pause her; the final decides the rest (Jesse, 2026-10-30: she pauses only once the sound is clearly speech).
-              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) overlapTranscriptRef.current = false;
+              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) { overlapTranscriptRef.current = false; bargeStartRef.current = Date.now(); bargePauseMsRef.current = undefined; bargeOutcomeRef.current = "none"; }
             } else {
               activeSpeechRef.current = false;
               edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
@@ -585,7 +594,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
                 falseInterruptionTimerRef.current = setTimeout(() => {
                   falseInterruptionTimerRef.current = null;
-                  if (overlapPausedRef.current) restoreVoice();
+                  if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_noise"; restoreVoice(); }
                   overlapPausedRef.current = false;
                 }, DUPLEX_FALSE_INTERRUPTION_MS);
               }
@@ -618,7 +627,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               overlapPauseTimerRef.current = null;
               if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
               falseInterruptionTimerRef.current = null;
-              if (overlapPausedRef.current) restoreVoice();
+              if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_echo"; restoreVoice(); }
               overlapPausedRef.current = false;
               discardSpeculation();
               if (speculativeOutcomeRef.current === "armed" || speculativeOutcomeRef.current === "echo") speculativeOutcomeRef.current = "armed";
@@ -636,12 +645,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 trace("reaction", { words: normalized ? normalized.split(" ").length : 0, paused: overlapPausedRef.current });
                 if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_reaction" });
                 if (normalized) duplexCounters.reactionResumes++;
-                if (overlapPausedRef.current) restoreVoice();
+                if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_reaction"; restoreVoice(); }
                 overlapPausedRef.current = false;
                 break;
               }
               overlapTranscriptRef.current = true;
               duplexCounters.interruptions++;
+              bargeOutcomeRef.current = "stopped";
               if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_interrupt" });
               trace("interrupt", { words: normalized.split(" ").length, played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
               interrupt("voice");
@@ -686,7 +696,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
             trace("turn_send", { words: text.split(/\s+/).filter(Boolean).length, speculative, edges: edgePartials, echo_drops: echoDrops });
             traceRef.current?.endUtterance();
-            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops });
+            onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops, ...(bargeStartRef.current !== null ? { bargeOutcome: bargeOutcomeRef.current, ...(bargePauseMsRef.current !== undefined ? { bargePauseMs: bargePauseMsRef.current } : {}) } : {}) });
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());

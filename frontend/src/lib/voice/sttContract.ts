@@ -47,6 +47,8 @@ export interface SttTimingExtras {
   edge_partials?: number;
   /** ECHO-GUARD-01: final transcripts that were Home's own voice and were dropped before this turn. */
   echo_drops?: number;
+  barge_pause_ms?: number;
+  barge_outcome?: "stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none";
 }
 
 /** Additive client timing report; all playback fields remain optional for older clients. */
@@ -57,5 +59,7 @@ export const SttTimingReportSchema = z.object({
   head_ms: z.number().finite().nonnegative().optional(), offer_ms: z.number().finite().nonnegative().optional(), emit_ms: z.number().finite().nonnegative().optional(),
   ctx_enqueue: z.string().max(20).optional(), ctx_emit: z.string().max(20).optional(),
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(),
+  barge_pause_ms: z.number().finite().nonnegative().optional(),
+  barge_outcome: z.enum(["stopped", "resumed_noise", "resumed_reaction", "resumed_echo", "none"]).optional(),
   early_release_ms: z.number().finite().optional(), edge_partials: z.number().int().nonnegative().optional(), echo_drops: z.number().int().nonnegative().optional(),
 }).strict();

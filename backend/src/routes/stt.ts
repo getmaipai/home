@@ -106,7 +106,7 @@ sttRoutes.get(
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });
                 // STT-SMARTTURN-01: client labels and counts for speculative start.
-                setVoiceOutcome(record, { speculative: value.speculative, early_release_ms: value.early_release_ms, edge_partials: value.edge_partials, echo_drops: value.echo_drops });
+                setVoiceOutcome(record, { speculative: value.speculative, early_release_ms: value.early_release_ms, edge_partials: value.edge_partials, echo_drops: value.echo_drops, barge_pause_ms: value.barge_pause_ms, barge_outcome: value.barge_outcome });
               }
             }
           } catch {

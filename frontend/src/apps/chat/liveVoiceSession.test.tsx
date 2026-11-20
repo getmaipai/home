@@ -625,6 +625,19 @@ describe("live voice session", () => {
     cancel.mockRestore();
   });
 
+  test("a single stop word pauses, ordinary one-word partial does not, and two words still pause", async () => {
+    const pause = mock(); const socket = controlledSocket();
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />));
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+    act(() => socket.send({ t: "partial", v: "maybe" }));
+    expect(pause).not.toHaveBeenCalled();
+    act(() => socket.send({ t: "partial", v: "wait" }));
+    expect(pause).toHaveBeenCalledTimes(1);
+  });
+
   test("PAUSE-EXIT-01: a pause whose words turn out to be noise resumes the same audio at the deadline; the hub's reply_resume resumes it sooner", async () => {
     const pause = mock(); const resume = mock(); const stop = mock();
     const socket = controlledSocket();

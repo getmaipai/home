@@ -108,5 +108,13 @@ test("the timing message schema accepts new optional stamps and old clients", ()
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240 }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, head_ms: 100, offer_ms: 250, emit_ms: 275, ctx_enqueue: "suspended", ctx_emit: "running" }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, cue_playback_ms: 300 }).success).toBe(true);
+  expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, barge_pause_ms: 180, barge_outcome: "stopped" }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, unexpected: true }).success).toBe(false);
+});
+
+test("stores and reports barge pause timings and outcomes", () => {
+  const record = beginVoiceTimingFor("barge-test", 100, 200);
+  setVoiceOutcome(record, { barge_pause_ms: 180, barge_outcome: "stopped" });
+  expect(voiceTimingRecords(1)[0]).toMatchObject({ barge_pause_ms: 180, barge_outcome: "stopped" });
+  expect(voiceTimingReport(1)).toContain("stopped 1");
 });
