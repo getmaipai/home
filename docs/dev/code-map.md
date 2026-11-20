@@ -1414,6 +1414,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/loraWire.ts` | LORAS_UNSUPPORTED_LINE, ltx25LorasSupported, wireLoras |
 | `backend/src/lib/videos/make.ts` | MAX_TAKES, MINOR_MAKE_LINE, makeAudienceOf, readMakeBody, makeVideoFor, bodyOfVideoJob |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, animatedFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
+| `backend/src/lib/videos/minorClip.ts` | MINOR_CLIP_KEYS, MINOR_DESCRIPTION_MAX, minorRatingOf, minorClipRequestFor, minorDoorWouldTake |
 | `backend/src/lib/videos/moments.ts` | MOMENT_PREFIX, MOMENT_GONE_PREFIX, MOMENT_CAP, momentsOf, addMoment, removeMoment |
 | `backend/src/lib/videos/musicBed.ts` | __setMusicBedPollMsForTests, startMusicBed, whenMusicDone, setPendingMix, takePendingMix |
 | `backend/src/lib/videos/nleExport.ts` | writeEdl, writeFcpxml, writeZip |
