@@ -36,6 +36,30 @@ describe("ECHO-GATE-01", () => {
     expect(results.at(-1)).toBe(true);
   });
 
+  test("the first reply calibrates but a loud frame at 300 ms of the second reply passes", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now });
+    gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.1), true, now, 0.5); now += 20; }
+    gate.replyStarted(now);
+    for (let i = 0; i < 15; i++) { expect(gate.pass(frame(0.1), true, now, 0.5)).toBe(false); now += 20; }
+    for (let i = 0; i < OPEN_AFTER_FRAMES; i++) { const passed = gate.pass(frame(0.3), true, now, 0.5); now += 20; if (i === OPEN_AFTER_FRAMES - 1) expect(passed).toBe(true); }
+  });
+
+  test("an unknown coupling keeps the first-window calibration fallback", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now });
+    gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { expect(gate.pass(frame(0.05), true, now, 0.5)).toBe(false); now += 20; }
+    expect(gate.report().coupling).toBeGreaterThan(0);
+  });
+
+  test("an unknown coupling falls back to calibration on a later reply", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now });
+    gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { gate.pass(frame(0.05), true, now); now += 20; }
+    gate.replyStarted(now);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { expect(gate.pass(frame(0.05), true, now)).toBe(false); now += 20; }
+  });
+
   test("steady echo remains blocked for a person below the barge-in ratio", () => {
     let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
     for (let i = 0; i < CALIBRATION_MS / 20 + 20; i++) { expect(gate.pass(frame(i < CALIBRATION_MS / 20 ? 0.1 : 0.12), true, now, 0.5)).toBe(false); now += 20; }

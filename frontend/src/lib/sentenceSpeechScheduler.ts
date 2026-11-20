@@ -76,6 +76,9 @@ export class SentenceSpeechScheduler implements SpeechSource {
   private streamDone = false;
   private stopped = false;
   private paused = false;
+  private pauseSuspendTimer: ReturnType<typeof setTimeout> | null = null;
+  private pauseSuspensionPending = false;
+  private pauseHasCompleted = false;
   private activeFetches = 0;
   private readonly waiters: Array<() => void> = [];
   private dispatchTail: Promise<void> = Promise.resolve();
@@ -208,15 +211,32 @@ export class SentenceSpeechScheduler implements SpeechSource {
   pause(): void {
     if (this.stopped || this.paused) return;
     this.paused = true;
+    this.pauseHasCompleted = false;
     this.onTrace?.("audio_suspend", { played_ms: Math.round(this.playedMs()) });
-    void this.audioContext.suspend?.().catch(() => {});
+    const gain = this.playbackBus.gain;
+    const suspend = () => { this.pauseSuspendTimer = null; if (!this.paused || this.stopped) return; this.pauseSuspensionPending = true; void this.audioContext.suspend?.().then(() => { this.pauseSuspensionPending = false; this.pauseHasCompleted = true; }).catch(() => { this.pauseSuspensionPending = false; }); };
+    if (gain?.setValueAtTime && gain.linearRampToValueAtTime && typeof this.audioContext.currentTime === "number") {
+      const at = this.audioContext.currentTime;
+      try { gain.cancelScheduledValues?.(at); gain.setValueAtTime(gain.value, at); gain.linearRampToValueAtTime(0, at + ANTI_CLICK_RAMP_MS / 1000); } catch { suspend(); return; }
+      this.pauseSuspendTimer = setTimeout(() => { this.pauseSuspendTimer = null; suspend(); }, ANTI_CLICK_RAMP_MS);
+    } else { suspend(); }
   }
 
   resume(): void {
     if (this.stopped || !this.paused) return;
     this.paused = false;
+    if (this.pauseSuspendTimer) { clearTimeout(this.pauseSuspendTimer); this.pauseSuspendTimer = null; }
+    this.pauseHasCompleted = false;
     this.onTrace?.("audio_resume", { played_ms: Math.round(this.playedMs()) });
-    void this.audioContext.resume?.().catch(() => {});
+    const ramp = () => {
+      const gain = this.playbackBus.gain;
+      if (gain?.setValueAtTime && gain.linearRampToValueAtTime && typeof this.audioContext.currentTime === "number") {
+        const at = this.audioContext.currentTime;
+        try { gain.cancelScheduledValues?.(at); gain.setValueAtTime(gain.value, at); gain.linearRampToValueAtTime(1, at + ANTI_CLICK_RAMP_MS / 1000); return; } catch { /* fallback below */ }
+      }
+      if (gain) gain.value = 1;
+    };
+    void Promise.resolve(this.audioContext.state === "suspended" || this.pauseSuspensionPending ? this.audioContext.resume?.() : undefined).then(ramp).catch(ramp);
   }
 
   private async acquireFetchSlot(): Promise<void> {
@@ -486,8 +506,12 @@ export class SentenceSpeechScheduler implements SpeechSource {
     this.heardEndAtStop = this.heardVisibleEnd();
     this.heardFineAtStop = this.heardVisibleEndFine();
     this.cutOff = !this.endedNaturally;
+    const wasPaused = this.paused || this.pauseSuspendTimer !== null || this.pauseSuspensionPending || this.pauseHasCompleted || this.audioContext.state === "suspended";
+    const mustResume = this.audioContext.state === "suspended";
+    if (mustResume) void this.audioContext.resume?.().catch(() => {});
     this.stopped = true;
     this.paused = false;
+    if (this.pauseSuspendTimer) { clearTimeout(this.pauseSuspendTimer); this.pauseSuspendTimer = null; }
     this.onTrace?.("audio_stop", { played_ms: Math.round(this.playedMs()), sources: this.sources.size, cut: this.cutOff });
     if (speechTapActive()) publishSpeechTap({ type: "stop", source: this });
     this.abortController.abort();
@@ -512,11 +536,14 @@ export class SentenceSpeechScheduler implements SpeechSource {
     };
     const gain = this.playbackBus.gain;
     if (gain?.setValueAtTime && gain.linearRampToValueAtTime && typeof this.audioContext.currentTime === "number") {
-      const at = this.audioContext.currentTime;
-      try { gain.cancelScheduledValues?.(at); gain.setValueAtTime(gain.value, at); gain.linearRampToValueAtTime(0, at + ANTI_CLICK_RAMP_MS / 1000); } catch { /* a closed context: cut at once */ }
-      setTimeout(cut, ANTI_CLICK_RAMP_MS);
+      const scheduleRamp = () => {
+        const at = this.audioContext.currentTime;
+        try { gain.cancelScheduledValues?.(at); gain.setValueAtTime(gain.value, at); gain.linearRampToValueAtTime(0, at + ANTI_CLICK_RAMP_MS / 1000); } catch { /* a closed context: cut at once */ }
+        setTimeout(cut, ANTI_CLICK_RAMP_MS);
+      };
+      if (wasPaused && mustResume) scheduleRamp();
+      else if (wasPaused) { void this.audioContext.resume?.().catch(() => {}); scheduleRamp(); }
+      else scheduleRamp();
     } else cut();
-    // A pause left the shared context suspended: the next reply needs it running.
-    if (this.audioContext.state === "suspended") void this.audioContext.resume?.().catch(() => {});
   }
 }

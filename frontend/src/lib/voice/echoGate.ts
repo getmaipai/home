@@ -35,9 +35,13 @@ export interface EchoGateReport {
 export interface EchoGate {
   /** Decide one 16 kHz frame. `playing` is whether Home's audio is playing right now; `now` in ms. */
   pass(frame: Float32Array, playing: boolean, now?: number, playbackLevel?: number): boolean;
+  /** Playback-relative person loudness test, before `pass` replaces a blocked frame. */
+  isLoud(frame: Float32Array, playbackLevel?: number): boolean;
+  /** The last raw frame was above threshold and dropped by the three-frame gate. */
+  lastLoudBlocked(): boolean;
   /** Snapshot for the trace; resets the frame counts. */
   report(): EchoGateReport;
-  /** The person's call ended or a new reply begins: a new reply re-calibrates (its first window) without forgetting the last level. */
+  /** The person's call ended or a new reply begins. The first reply (and an unknown coupling) calibrates for one window. */
   replyStarted(now?: number): void;
 }
 
@@ -53,6 +57,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
   let silenceRms: number | null = null;
   let calibrating: number[] = [];
   let calibrationEndsAt = 0;
+  let hasCalibratedReply = false;
   let loudRun = 0;
   let openUntil = 0;
   let blocked = 0;
@@ -62,6 +67,12 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
   let coupling: number | null = null;
   let couplingTarget: number | null = null;
   let thresholdRms: number | null = null;
+  let lastLoudWasBlocked = false;
+  const thresholdFor = (playbackLevel?: number, now = clock()) => {
+    const envelope = playbackLevel === undefined ? 0 : (playbackLevel < 0.1 ? playbackLevel : Math.max(0.01, ...playbackHistory.filter((sample) => now - sample.at <= PLAYBACK_ENVELOPE_MS).map((sample) => sample.level)));
+    const reference = playbackLevel === undefined ? Math.min(echoRms ?? Infinity, 0.06) : (coupling ?? 0) * envelope;
+    return Math.max(reference * BARGE_IN_RATIO, ABS_MIN);
+  };
   const finishCalibration = () => {
     if (calibrating.length === 0) return;
     const sorted = [...calibrating].sort((a, b) => a - b);
@@ -74,13 +85,17 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
     replyStarted(now = clock()) {
       finishCalibration();
       calibrating = [];
-      calibrationEndsAt = now + CALIBRATION_MS;
+      calibrationEndsAt = coupling === null || !hasCalibratedReply ? now + CALIBRATION_MS : 0;
+      hasCalibratedReply = true;
       loudRun = 0;
       openUntil = 0;
     },
+    isLoud(frame, playbackLevel) { return frameRms(frame) > thresholdFor(playbackLevel); },
+    lastLoudBlocked() { return lastLoudWasBlocked; },
     pass(frame, playing, now = clock(), playbackLevel) {
       const rms = frameRms(frame);
       if (!playing) {
+        lastLoudWasBlocked = false;
         // Room noise: the quietest tenth of what the microphone hears while nobody speaks, kept as a slow average.
         if (rms < (silenceRms ?? Infinity) * 1.5 || silenceRms === null) silenceRms = silenceRms === null ? Math.max(NOISE_FLOOR, rms) : silenceRms * 0.95 + Math.max(NOISE_FLOOR, rms) * 0.05;
         if (calibrating.length > 0) finishCalibration();
@@ -92,7 +107,8 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
         playbackHistory = playbackHistory.filter((sample) => now - sample.at <= PLAYBACK_ENVELOPE_MS);
       }
       // Home is playing. During the first window of a reply the frames calibrate the echo; nothing passes until a level is known.
-      if (now < calibrationEndsAt) {
+      if (calibrationEndsAt > 0 && now < calibrationEndsAt) {
+        lastLoudWasBlocked = false;
         calibrating.push(rms);
         if (playbackLevel !== undefined) {
           const envelope = Math.max(0.01, playbackLevel);
@@ -107,10 +123,9 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
         blocked += 1; return false;
       }
       if (calibrating.length > 0) finishCalibration();
-      const envelope = playbackLevel === undefined ? 0 : (playbackLevel < 0.1 ? playbackLevel : Math.max(0.01, ...playbackHistory.map((sample) => sample.level)));
-      const reference = playbackLevel === undefined ? Math.min(echoRms ?? Infinity, 0.06) : (coupling ?? 0) * envelope;
-      thresholdRms = Math.max(reference * BARGE_IN_RATIO, ABS_MIN);
+      thresholdRms = thresholdFor(playbackLevel, now);
       const loud = rms > thresholdRms;
+      lastLoudWasBlocked = loud;
       if (loud) { loudRun += 1; if (loudRun >= OPEN_AFTER_FRAMES) openUntil = now + HOLD_OPEN_MS; }
       else loudRun = 0;
       if (now < openUntil || (loud && loudRun >= OPEN_AFTER_FRAMES)) { passed += 1; return true; }

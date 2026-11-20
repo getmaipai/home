@@ -51,7 +51,7 @@ function controlledSocket() {
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation, traceUtterances }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback" }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } }; traceUtterances?: number }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation, traceUtterances }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback"; bargePauseMs?: number; bargeGateBlockedMs?: number; bargeSinceReplyMs?: number }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } }; traceUtterances?: number }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -496,7 +496,7 @@ describe("live voice session", () => {
       const adapter: ChatModelAdapter = { async *run({ messages }) { const last = messages[messages.length - 1]; const part = last?.content[0]; sentTexts.push(part && part.type === "text" ? part.text : ""); yield { content: [{ type: "text", text: "ok" }] }; } };
       const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
       const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
-      turnSchedulerRef.current = { stop: () => { stops.push(1); }, pause: () => { pauses.push(1); }, resume: () => {}, duck: () => {}, unduck: () => {}, readLevel: () => 0, playedMs: () => 500, recentlySpokenWords: () => schedulerWords } as unknown as SentenceSpeechScheduler;
+    turnSchedulerRef.current = { stop: () => { stops.push(1); }, pause: () => { pauses.push(1); }, resume: () => {}, duck: () => {}, unduck: () => {}, readLevel: () => 0, playedMs: () => 500, heardVisibleEndFine: () => 8, recentlySpokenWords: () => schedulerWords } as unknown as SentenceSpeechScheduler;
       const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef({ turnId: "turn-reply", heardVisibleEnd: () => 8 }), cancelRun: () => { cancels.push(1); }, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: fakeStartCapture(), onVoiceTiming: (timing) => timings.push(timing as never), speculation: { getConversationId: () => "conv-1", pendingRef: { current: null } } });
       return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
     }
@@ -625,7 +625,7 @@ describe("live voice session", () => {
     cancel.mockRestore();
   });
 
-  test("a single stop word pauses, ordinary one-word partial does not, and two words still pause", async () => {
+  test("nope, hang, and no pause alone, while an ordinary one-word partial does not", async () => {
     const pause = mock(); const socket = controlledSocket();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
@@ -1364,12 +1364,12 @@ describe("live voice session", () => {
     await waitFor(() => expect(connections).toEqual([0, 1]));
   });
 
-  test("tapping the interrupt control sends the heard length too", async () => {
+  test("tapping the interrupt control sends the fine heard length too", async () => {
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const cancelRun = mock();
     const stopScheduler = mock();
     const sentTexts: string[] = [];
-    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={sentTexts} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={sentTexts} cancelRun={cancelRun} stopScheduler={stopScheduler} activeTurn={{ turnId: "turn-test", heardVisibleEnd: () => 23 }} />);
     act(() => view.getByRole("button", { name: "Interrupt the assistant" }).click());
     expect(cancel).toHaveBeenCalledWith("turn-test", 23);
     expect(stopScheduler).toHaveBeenCalledTimes(1);

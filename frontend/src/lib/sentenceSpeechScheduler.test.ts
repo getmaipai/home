@@ -9,10 +9,11 @@ class FakeAudioContext {
   currentTime = 0;
   suspended = 0;
   resumed = 0;
+  gainCalls: string[] = [];
   state: AudioContextState = "running";
-  async suspend() { this.suspended++; }
-  async resume() { this.resumed++; }
-  createGain() { return { connect: () => {}, gain: { value: 1 } } as unknown as GainNode; }
+  async suspend() { this.suspended++; this.state = "suspended"; }
+  async resume() { this.resumed++; this.state = "running"; }
+  createGain() { return { connect: () => {}, disconnect: () => {}, gain: { value: 1, cancelScheduledValues: () => this.gainCalls.push("cancel"), setValueAtTime: (value: number) => this.gainCalls.push(`set:${value}`), linearRampToValueAtTime: (value: number, at: number) => this.gainCalls.push(`ramp:${value}:${at}`) } } as unknown as GainNode; }
   createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 8, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) } as unknown as AnalyserNode; }
   createBufferSource() { return { buffer: null, connect: () => {}, start: (when?: number) => { this.started++; this.startTimes.push(when ?? this.currentTime); }, onended: null } as unknown as AudioBufferSourceNode; }
   async decodeAudioData() { return { duration: 2 } as AudioBuffer; }
@@ -104,10 +105,28 @@ describe("sentence speech scheduler", () => {
   test("pause and resume suspend and resume once, and pause after stop is safe", async () => {
     const context = new FakeAudioContext();
     const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
-    scheduler.pause(); scheduler.pause(); scheduler.resume(); scheduler.resume();
+    scheduler.pause(); scheduler.pause(); await new Promise((resolve) => setTimeout(resolve, 20)); scheduler.resume(); scheduler.resume(); await settle();
     expect(context.suspended).toBe(1); expect(context.resumed).toBe(1);
     scheduler.stop(); scheduler.pause(); scheduler.resume();
     expect(context.suspended).toBe(1); expect(context.resumed).toBe(1);
+  });
+
+  test("pause and resume ramp the playback gain", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.pause(); scheduler.resume(); await settle();
+    expect(context.gainCalls).toContain("ramp:0:0.015");
+    expect(context.gainCalls).toContain("ramp:1:0.015");
+  });
+
+  test("stop after pause resumes before scheduling its stop ramp", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.pause(); await new Promise((resolve) => setTimeout(resolve, 20));
+    context.state = "suspended";
+    scheduler.stop(); await settle(); await settle();
+    expect(context.resumed).toBe(1);
+    expect(context.gainCalls.lastIndexOf("ramp:0:0.015")).toBeGreaterThanOrEqual(0);
   });
 
   test("heardVisibleEnd counts only sentences whose audio has started", async () => {
