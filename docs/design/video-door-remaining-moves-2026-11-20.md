@@ -52,7 +52,7 @@ Principle for every move: Home sends the request in plain words and generic fiel
 
 ### B4. Restyle (first)
 
-Restyle posts to its own route today (`submitVideoRestyle`). It needs the Stack's operation `restyle` with the clip as the `edit_source` input, the style id and a strength, the same shape extend and retake took. Adult and Max only, so no audience change. Home keeps the range checks and the refusal lines it has now. Stack row: VF-RESTYLE-OP-01 (spec first). Test: the existing restyle tests run with the door switched on (`MAIPAI_TEST_DOOR=1`), and a door test that a catalog without the keys sends it to the old door.
+Restyle posts to its own route today (`submitVideoRestyle`). It needs the Stack's operation `restyle` with the clip as the `edit_source` input, the style id and a strength, the same shape extend and retake took. Adult and Max only, so no audience change. Home keeps the range checks and the refusal lines it has now. The move deletes the model name `ltx25-max` and the style add-on file from `submitVideoRestyle` and `restyleBody` (`videos/stack.ts`, `videos/editPlan.ts`): Home sends the clip, the style id, the strength and the words, and the Stack's pack picks the model and the add-on (E2, E7). Stack row: VF-RESTYLE-OP-01 (spec first). Test: the existing restyle tests run with the door switched on (`MAIPAI_TEST_DOOR=1`), and a door test that a catalog without the keys sends it to the old door.
 
 ### B1. Companion takes
 
@@ -77,7 +77,7 @@ What Home sends today (`videos/tool.ts`): for a child, the prompt wrapped by `fo
 The door carries none of this and refuses non-adult audiences today (`clipRequestFor`).
 
 After the move: Home sends `audience: minor` (C3), a rating level (G or PG-13; spec first) and the child's words. The cartoon look belongs to rating G only (C8): a teen at PG-13 is not made a cartoon, and a child whose ceiling an admin raised gets the higher level's behavior. The Stack's recipe holds every safety term keyed on rating G (and the PG-13 set), so a caller cannot ask for less. Home's video code stops using `CHILD_NEGATIVE_PROMPT` and `forceCartoon`; the constants stay in `pictures/lane.ts` because the picture paths use them.
-For a minor the Stack refuses any field that would loosen the request: `prompt_mode`, negative words, a level change, sound, any operation other than a plain clip.
+For a minor the Stack refuses any field that would loosen the request: `prompt_mode`, negative words, a level change, sound, any operation other than a plain clip, except `companion_take` once that recipe has wording for each rating (a child's or teen's companion take then moves with B2, never before).
 
 Proof for B2, all with tests. The 40-request comparison is needed but not enough: negative terms only show the words were passed on, and the picture models and some video packs ignore them. So also:
 1. The Stack advertises the child recipe in its catalog (a flag). A Stack that does not advertise it sends the clip back to the old door with Home's own wording, never to the new door without the recipe.
@@ -88,7 +88,7 @@ Proof for B2, all with tests. The 40-request comparison is needed but not enough
 6. The receipt names the recipe and carries no prompt text.
 7. A refusal reaches the child as a redirect, never as a filter message (C10).
 8. The daily limit is not counted twice when a request falls back to the old door.
-9. The 40-request set (plain words, a photograph request, violence, a brand, text on screen, two languages) is run old door against new door: the words the engine receives are compared, and every request Home refuses today is still refused before the door is asked.
+9. The 40-request set (plain words, a photograph request, violence, a brand, text on screen, two languages) is run old door against new door: the words the engine receives are compared, and every request Home refuses today is still refused before the door is asked. Pass criterion for the comparison: on an engine that takes a negative prompt, every term of `CHILD_NEGATIVE_PROMPT` is present in what it receives; on an engine that does not, each term is covered by the recipe's positive wording in its fixed reference output (a golden file, one entry per term).
 10. The same set runs against the real Stack with a few finished clips opened and judged by a person.
 Review depth for B2: full `check.sh`, code review at high effort on both the Home and Stack diffs, and the architect again on the amended note. Stack row: VF-MINOR-RECIPE-01 (the rating-keyed recipe, the catalog flag, the refusals).
 Buildable before the owner is needed: the Stack child recipe and the comparison harness, run in shadow first. Only the Home switch waits for the architect and the review.
