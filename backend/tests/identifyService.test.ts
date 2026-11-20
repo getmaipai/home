@@ -19,7 +19,7 @@ const acoustAnswer = { status: "ok", results: [{ id: "x", score: 0.97, recording
 let server: ReturnType<typeof Bun.serve>;
 let requests: string[] = [];
 let respond: () => Response = () => Response.json(acoustAnswer);
-beforeAll(() => { server = Bun.serve({ port: 0, fetch: (req) => { requests.push(new URL(req.url).pathname + new URL(req.url).search); return respond(); } }); });
+beforeAll(() => { server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => { requests.push(new URL(req.url).pathname + new URL(req.url).search); return respond(); } }); });
 afterAll(() => { server.stop(true); });
 beforeEach(() => { requests = []; respond = () => Response.json(acoustAnswer); __resetIdentifyForTests(); });
 
