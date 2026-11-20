@@ -232,39 +232,6 @@
       }
     },
     {
-      "type": "media_shelf",
-      "heading": "Inspiration",
-      "bind": {
-        "source": "package",
-        "path": "recipes",
-        "params": {
-          "scope": "templates",
-          "limit": 3,
-          "filter": "inspiration"
-        }
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{subtitle}",
-      "item_media_field": "thumbnail",
-      "aspect": "wide",
-      "layout": "rail",
-      "variant": "plain",
-      "hide_when_empty": true,
-      "on_select": {
-        "navigate": {
-          "to": "/apps/video/film-maker",
-          "state": {
-            "prompt": "{prompt}",
-            "look": "{look}",
-            "camera": "{camera}"
-          }
-        }
-      },
-      "media_loop": true,
-      "item_loop_field": "loop"
-    },
-    {
       "type": "storyboard_player",
       "bind": {
         "source": "package",
@@ -326,7 +293,20 @@
         "busy_label": "Rendering"
       },
       "reason": "reason",
-      "sticky": true
+      "sticky": true,
+      "secondary": {
+        "label": "Draft all pictures",
+        "action": {
+          "call": {
+            "target": "/api/plugins/video/actions/film-draft",
+            "method": "POST",
+            "args": {
+              "run": "{run_id}"
+            }
+          }
+        },
+        "disabled_when": "ready"
+      }
     },
     {
       "type": "action_bar",
@@ -618,6 +598,39 @@
         }
       ],
       "orientation": "vertical"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Inspiration",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "templates",
+          "limit": 3,
+          "filter": "inspiration"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{subtitle}",
+      "item_media_field": "thumbnail",
+      "aspect": "wide",
+      "layout": "rail",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/video/film-maker",
+          "state": {
+            "prompt": "{prompt}",
+            "look": "{look}",
+            "camera": "{camera}"
+          }
+        }
+      },
+      "media_loop": true,
+      "item_loop_field": "loop"
     }
   ]
 }
