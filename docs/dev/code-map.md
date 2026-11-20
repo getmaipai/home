@@ -282,7 +282,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, ambientHistoryItems |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
-| `frontend/src/shell/InstallDock.tsx` | makingJobs, buildDock, finishedLine, InstallDock |
+| `frontend/src/shell/InstallDock.tsx` | makingJobs, filmDockItems, buildDock, finishedLine, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
 | `frontend/src/shell/MediaHubFrame.tsx` | MediaHubFrame |
@@ -628,10 +628,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
+| `backend/src/lib/films/filmProgress.ts` | shotProgressRow, filmProgressRows |
 | `backend/src/lib/films/junkCleanup.ts` | JUNK, deriveJunkRegion, JUNK_PROMPT, cleanJunk |
 | `backend/src/lib/films/pageFilm.ts` | FILM_PAGE_ACTIONS, FILM_CAMERAS, pageFilmRun, filmPageAction, filmRows, filmShotRows |
 | `backend/src/lib/films/pictures.ts` | prepareFilmPictures, pickStarter |
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
+| `backend/src/lib/films/progressStore.ts` | parseProgress, readProgress, recordShotNote, recordShotJob, recordShotFailure, filmShotJobIds |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
 | `backend/src/lib/films/roughCut.ts` | roughCutRequest, animaticRequest, ANIMATIC_OLD_STACK_LINE, ANIMATIC_FAILED_LINE, ANIMATIC_TIMEOUT_LINE, ANIMATIC_MISSING_LINE |
