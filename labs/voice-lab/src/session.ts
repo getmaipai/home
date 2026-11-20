@@ -303,7 +303,7 @@ export class VoiceSession {
       if (signal.aborted || this.closed) return;
       if (seg.type === "tag") {
         const sound = this.soundFn(choice.voice, seg.value, this.speechRms);
-        if (sound) { if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow(); this.metrics.sounds = (this.metrics.sounds ?? 0) + 1; for (let i = 0; i < sound.length; i += 15360) emit(sound.subarray(i, i + 15360)); if (seg.value === "laugh" || seg.value === "chuckle") { smile = true; this.smileChunk = index + 1; } }
+        if (sound) { if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow(); this.metrics.sounds = (this.metrics.sounds ?? 0) + 1; this.send({ t: "sound", tag: seg.value, chunk: index, atMs: Math.round(this.chunkDurations[index] ?? 0), ms: Math.round(sound.length / 24) }); for (let i = 0; i < sound.length; i += 15360) emit(sound.subarray(i, i + 15360)); if (seg.value === "laugh" || seg.value === "chuckle") { smile = true; this.smileChunk = index + 1; } }
         continue;
       }
       // A piece with no words has nothing for this voice to say; the engine refuses it, which used to fail the whole reply.
