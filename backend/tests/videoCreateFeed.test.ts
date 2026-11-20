@@ -453,6 +453,11 @@ describe("the Create feed's clip menu (VF-EDIT-04)", () => {
     expect(labels.slice(0, 6)).toEqual(["Remove lock", "Lock", "Another take", "Edit and make again", "Open in Studio", "How it was made"]);
     expect(labels).toEqual(expect.arrayContaining(["Make it vertical", "Sharpen 2x", "Spatial sound", "Next shot", "Extend", "Colorize", "Hide or show again"]));
     expect(feed.actions.slice(0, 2).map((action: { show_when?: string }) => action.show_when)).toEqual(["can_unmark", "can_mark"]);
+    // VF-EDIT-04: the six first-level items stay ungrouped; everything else opens from the one "Change this clip" submenu.
+    const grouped = feed.actions.filter((action: { group?: string }) => action.group);
+    expect(feed.actions.slice(0, 6).every((action: { group?: string }) => !action.group)).toBe(true);
+    expect(grouped.length).toBe(feed.actions.length - 6);
+    expect(new Set(grouped.map((action: { group: string }) => action.group))).toEqual(new Set(["Change this clip"]));
   });
 });
 

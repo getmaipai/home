@@ -425,7 +425,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Make it vertical",
@@ -440,7 +441,8 @@
                     "shape": "vertical"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Make it portrait",
@@ -455,7 +457,8 @@
                     "shape": "portrait"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Make it square",
@@ -470,7 +473,8 @@
                     "shape": "square"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Make it widescreen",
@@ -485,7 +489,8 @@
                     "shape": "wide"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Sharpen 2x",
@@ -499,7 +504,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Spatial sound",
@@ -513,7 +519,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Spatial sound with 5.1 file",
@@ -528,7 +535,8 @@
                     "surround": true
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Next shot",
@@ -543,7 +551,8 @@
                     "shot": "push_in"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Extend",
@@ -557,7 +566,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Colorize",
@@ -571,7 +581,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             },
             {
               "label": "Hide or show again",
@@ -585,7 +596,8 @@
                     "id": "{id}"
                   }
                 }
-              }
+              },
+              "group": "Change this clip"
             }
           ],
           "handlers": {
