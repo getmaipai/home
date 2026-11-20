@@ -1954,11 +1954,6 @@ msgid "setting.search.web_sources.option.ddgs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:819
-msgid "setting.generation.video_tier.option.boost"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1850
 msgid "setting.voice.talk_over.option.gentle"
 msgstr ""
@@ -10208,6 +10203,11 @@ msgid "Fast"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:816
+msgid "setting.generation.video_tier.help"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:785
 msgid "setting.generation.picture_quick_model.option.klein"
 msgstr ""
@@ -10920,6 +10920,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:905
 msgid "setting.music.dj.option_label.full"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:819
+msgid "setting.generation.video_tier.option.boost"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25934,11 +25939,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:820
 msgid "setting.generation.video_tier.option_label.standard"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:816
-msgid "setting.generation.video_tier.help"
 msgstr ""
 
 #. js-lingui-explicit-id
