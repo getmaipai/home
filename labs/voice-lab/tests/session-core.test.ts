@@ -575,3 +575,20 @@ test("reference mode: the page may stop her locally once a person is clearly tal
   expect(s.samples.length).toBeGreaterThan(0);          // the first words of the interruption are kept as the start of the next turn
   h.session.close();
 });
+
+test("after a laugh the words that follow (and the next phrase) are spoken from the happy sample, then back to the normal voice", async () => {
+  const used: Array<[string, string]> = [];
+  const h = harness({
+    speech: async (text: string, _s: AbortSignal, o: { voice?: string }) => { used.push([text.trim(), o.voice ?? ""]); return new Response(encodeWav(new Int16Array(2400).fill(2000))); },
+    sound: (_v: string, tag: string) => (tag === "laugh" ? new Int16Array(4800).fill(500) : null),
+    moodVoice: async (voice: string) => voice + "_mild_happy",
+    chat: async function* () { yield { type: "text", text: "Well [laugh] that is funny. And then it got better. Anyway, enough of that." }; },
+  });
+  (h.session as any).history.commitUser("q"); await (h.session as any).reply("q", true);
+  const v = Object.fromEntries(used.map(([t, voice]) => [t, voice]));
+  expect(v["Well"]).not.toContain("happy");
+  expect(v["that is funny."]).toContain("happy");
+  expect(v["And then it got better."]).toContain("happy");
+  expect(v["Anyway, enough of that."]).not.toContain("happy");
+  h.session.close();
+});

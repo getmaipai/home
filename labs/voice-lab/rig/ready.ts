@@ -1,11 +1,11 @@
 // "Ready to test" gate. Run `bun rig/ready.ts` in labs/voice-lab. It must pass before anyone tells the owner to test the lab.
 // One plain line per check. Options: --quick (4 runs instead of 20 / 10 turns, for development only; not valid for "ready").
-import { availableTags, pickSound } from "../src/sounds";
+import { availableTags, pickSound, refusedSounds } from "../src/sounds";
 import { buildPrompt } from "../src/prompt";
 import { TAGS } from "../src/tags";
 const SECRET_FILE = Bun.env.LAB_SECRET_FILE ?? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/voice-lab-secret.txt";
 const quick = process.argv.includes("--quick"), RUNS = quick ? 4 : 10, TURNS = quick ? 4 : 10;
-const FIRST_SOUND_TARGET_MS = 1350; // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
+const FIRST_SOUND_TARGET_MS = 1350, P90_LIMIT_MS = 2300, WORST_LIMIT_MS = 3500; // median 1.17 s, p90 1.93 s, worst about 2.6 s measured, plus 15 percent where the sample is stable // best honest first-byte median measured on this machine (1.17 s) plus 15 percent
 const secret = (await Bun.file(SECRET_FILE).text()).trim(), LAB = "127.0.0.1:9931";
 const results: Array<[boolean, string]> = []; const line = (ok: boolean, text: string) => { results.push([ok, text]); console.log(`${ok ? "PASS" : "FAIL"}  ${text}`); };
 const run = async (cmd: string[]) => { const p = Bun.spawn(cmd, { cwd: import.meta.dir + "/..", stdout: "pipe", stderr: "pipe" }); const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]); await p.exited; return out + "\n" + err; };
@@ -31,6 +31,7 @@ if (others.length || live !== 0) { console.log("Stopping here: running the check
 // 7 tags (cheap, before the slow runs)
 const offered = [...new Set((buildPrompt().match(/\[([a-z ]+)\]/g) ?? []).map((t) => t.slice(1, -1)))].filter((t) => (TAGS as readonly string[]).includes(t) && !["whisper", "shout", "excited", "happy", "angry", "sad", "sarcastic"].includes(t));
 const silent = offered.filter((t) => { const p = pickSound("casual", t, 0.08); return !p || p.length < 3600; });
+const refusedNow = refusedSounds("casual"); line(refusedNow.length === 0, `every library sound is from the voice's own speaker${refusedNow.length ? "; FROM ANOTHER SPEAKER: " + refusedNow.join(", ") : ""}`);
 line(offered.length > 0 && silent.length === 0, `every sound tag the prompt offers makes a real sound (${offered.join(", ") || "none offered"})${silent.length ? "; NO SOUND FOR: " + silent.join(", ") : ""}`);
 
 // 5 + 6 first sound and gaps over TURNS turns
@@ -38,6 +39,7 @@ const J = "/private/tmp/claude-501/ready-measure.json";
 await run(["bun", "rig/measure.ts", SECRET_FILE, "--n", String(TURNS), "--json", J]);
 try { const s = JSON.parse(await Bun.file(J).text()).summary;
   line(s.firstSoundMedianMs <= FIRST_SOUND_TARGET_MS, `median first sound over ${s.turns} turns is ${s.firstSoundMedianMs} ms (limit ${FIRST_SOUND_TARGET_MS} ms; worst ${s.firstSoundWorstMs} ms)`);
+  line(s.firstSoundP90Ms <= P90_LIMIT_MS && s.firstSoundWorstMs <= WORST_LIMIT_MS, `p90 first sound ${s.firstSoundP90Ms} ms (limit ${P90_LIMIT_MS}) and worst ${s.firstSoundWorstMs} ms (limit ${WORST_LIMIT_MS}): the outliers are what is felt`);
   line(s.totalGaps === 0, `audio gaps in those turns: ${s.totalGaps} (the page's playback gate, replayed on the real frame arrivals)`);
 } catch { line(false, "the measuring run produced no result"); line(false, "no gap result"); }
 

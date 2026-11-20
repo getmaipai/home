@@ -7,6 +7,9 @@ export const SOUND_DIR = Bun.env.LAB_SOUNDS ?? join(import.meta.dir, "..", "engi
 export type Sound = { pcm: Int16Array; seconds: number; level: number | null; kind: string; file: string };
 const KIND_OF_TAG: Record<string, string> = { laugh: "laugh", chuckle: "laugh", sigh: "sigh", gasp: "breath", breath: "breath", cough: "cough", "clear throat": "throat" };
 const cache = new Map<string, Record<string, Sound[]>>();
+/** Library entries refused because their speaker is not the voice's speaker (must always be empty). */
+export const refused: Record<string, string[]> = {};
+export function refusedSounds(voice: string, dir = SOUND_DIR) { loadSounds(voice, dir); return refused[soundVoice(voice, dir) ?? ""] ?? []; }
 
 /** "casual_mild_happy" and "casual" share the recordings in sounds/casual. */
 export function soundVoice(voice: string, dir = SOUND_DIR): string | null {
@@ -16,10 +19,13 @@ export function soundVoice(voice: string, dir = SOUND_DIR): string | null {
 export function loadSounds(voice: string, dir = SOUND_DIR): Record<string, Sound[]> {
   const base = soundVoice(voice, dir); if (!base) return {};
   const key = `${dir}/${base}`; const hit = cache.get(key); if (hit) return hit;
-  const index = JSON.parse(readFileSync(join(dir, base, "index.json"), "utf8")) as Record<string, { kind: string; seconds: number; level_vs_speech: number | null; use?: boolean }>;
+  const index = JSON.parse(readFileSync(join(dir, base, "index.json"), "utf8")) as Record<string, { kind: string; seconds: number; level_vs_speech: number | null; use?: boolean; speaker?: string }>;
+  // A sound may only come from the same speaker as the voice sample (the owner heard a stranger's laugh come out of the voice). Entries that do not say so are refused.
+  let voiceSpeaker = ""; try { voiceSpeaker = JSON.parse(readFileSync(join(dir, base, "speaker.json"), "utf8")).speaker ?? ""; } catch {}
   const out: Record<string, Sound[]> = {};
   for (const file of readdirSync(join(dir, base))) {
     const meta = index[file]; if (!meta || meta.use === false) continue;
+    if (!voiceSpeaker || meta.speaker !== voiceSpeaker) { (refused[base] ??= []).push(file); continue; }
     const b = readFileSync(join(dir, base, file)); const pcm = new Int16Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length - ((b.length - 44) % 2)));
     (out[meta.kind] ??= []).push({ pcm, seconds: pcm.length / 24000, level: meta.level_vs_speech, kind: meta.kind, file });
   }

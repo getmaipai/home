@@ -51,6 +51,7 @@ export class VoiceSession {
   private streamAsr: StreamingAsr | null = null; private streamEnabled = Bun.env.LAB_STREAM_DRAFT === "1"; private streamDraft = ""; private streamDraftEarlyMs = 64;
   private echoRef = false; private overlapMs = 0; private lastOverlapAt = -1e9;
   private nodEnabled = false; private nodClip: Int16Array | null = null; private lastNodAt = -1e9; private nodsThisTurn = 0; private nodSuppressUntil = 0; private nodRoll: () => number = Math.random;
+  private moodVoiceFn: typeof moodVoice = moodVoice; private smileChunk = -1;
   private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
   private metricsFn: typeof appendMetrics;
@@ -75,9 +76,9 @@ export class VoiceSession {
   /** The engine keeps the conversation it just wrote, so no warm-up is needed right after a reply. Warm again only after a long quiet spell. */
   private rewarmIfStale() { if (this.now() - this.lastWarmAt > 10 * 60_000 && !this.warming) this.prewarm("all"); }
   private proto = 1; private seqExpected = 0; private netSim = { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }; private inboundLink: LinkModel; private outboundLink: LinkModel; private toolPendingAudio = false; private captureOffset = 0; private offsetInitialized = false; private toolDelayMs = 2500;
-  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; sound: typeof pickSound; streamAsr: StreamingAsr; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
+  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; sound: typeof pickSound; moodVoice: typeof moodVoice; streamAsr: StreamingAsr; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
     this.now = deps.now ?? (() => performance.now()); this.tm = new TurnManager(this.now); this.inboundLink = new LinkModel(deps.random); this.outboundLink = new LinkModel(deps.random); this.speechOrigin = this.now(); this.lastVoiceAt = this.now();
-    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.soundFn = deps.sound ?? pickSound; if (deps.streamAsr) this.streamAsr = deps.streamAsr; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
+    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.soundFn = deps.sound ?? pickSound; if (deps.moodVoice) this.moodVoiceFn = deps.moodVoice; if (deps.streamAsr) this.streamAsr = deps.streamAsr; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
     this.metricsFn = deps.appendMetrics ?? appendMetrics;
     this.prewarmChatFn = deps.prewarmChat ?? prewarmChat; this.prewarmVoiceFn = deps.prewarmVoice ?? prewarmVoice;
     this.injected = !!deps.speech; this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
@@ -210,7 +211,7 @@ export class VoiceSession {
   private async reply(text: string, committed: boolean) {
     if (!text.trim()) return;
     if (!Object.keys(this.metrics).length || this.metricsWritten) { this.metrics = { failure: "none", draft: "off", ok: false }; this.metricsWritten = false; }
-    this.abort = new AbortController(); const signal = this.abort.signal; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
+    this.abort = new AbortController(); const signal = this.abort.signal; this.smileChunk = -1; this.chunks = []; this.chunkDurations = []; this.playedMs = []; this.generatedText = ""; this.generatedComplete = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.micEnvelope = []; this.refEnvelope = []; this.chunkRefEnvelopes = []; this.chunkRefWindows = []; this.heardAudio = false; this.turn++;
     const requestMessages: any[] = committed ? [...this.history.messages] : [...this.history.messages, { role: "user", content: datedUser(text) }];
     this.draftMessages = []; this.draftInterrupted = false;
     this.replyStyle = ""; this.warming?.abort(); this.warming = null;
@@ -270,8 +271,8 @@ export class VoiceSession {
       const frame = new Uint8Array(8 + pcm.length * 2), v = new DataView(frame.buffer); v.setUint32(0, this.turn, true); v.setUint16(4, index, true); for (let i = 0; i < pcm.length; i++) v.setInt16(8 + i * 2, pcm[i], true); this.sendFrame(frame);
     };
     let sent = 0;
-    const synth = async (style: string, part: string) => {
-      const response = await this.speechFn(forEngine(part, supported), signal, { voice: choice.voice, style });
+    const synth = async (style: string, part: string, voiceId: string = choice.voice) => {
+      const response = await this.speechFn(forEngine(part, supported), signal, { voice: voiceId, style });
       if (!response.body) throw new Error("empty voice response");
       const reader = response.body.getReader(), wavReader = new StreamingWavReader();
       while (true) {
@@ -286,22 +287,25 @@ export class VoiceSession {
     };
     const fail = () => { this.metrics.ok = false; this.metrics.failure = "voice_failed"; this.send({ t: "error", code: "voice_failed" }); this.abort?.abort(); this.finishMetrics(); };
     // The phrase is cut at its sound tags: words go to the voice, each tag becomes a real recorded sound from the same speaker (or nothing).
+    // After a laugh the next words carry the smile: they are spoken from the voice's mild happy sample, and so is the phrase after, then back to normal.
+    let smile = this.smileChunk === index;
     for (const seg of splitTags(text)) {
       if (signal.aborted || this.closed) return;
       if (seg.type === "tag") {
         const sound = this.soundFn(choice.voice, seg.value, this.speechRms);
-        if (sound) { if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow(); this.metrics.sounds = (this.metrics.sounds ?? 0) + 1; for (let i = 0; i < sound.length; i += 15360) emit(sound.subarray(i, i + 15360)); }
+        if (sound) { if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow(); this.metrics.sounds = (this.metrics.sounds ?? 0) + 1; for (let i = 0; i < sound.length; i += 15360) emit(sound.subarray(i, i + 15360)); if (seg.value === "laugh" || seg.value === "chuckle") { smile = true; this.smileChunk = index + 1; } }
         continue;
       }
       // A piece with no words has nothing for this voice to say; the engine refuses it, which used to fail the whole reply.
       if (!/[\p{L}\p{N}]/u.test(seg.value)) continue;
       const before = sent;
-      try { await synth(choice.style, seg.value); }
+      const segVoice = smile ? await this.moodVoiceFn(this.voice, "happy", voiceSettings(this.voice).moodStrength === "off" ? "mild" : voiceSettings(this.voice).moodStrength) : choice.voice;
+      try { await synth(choice.style, seg.value, segVoice); }
       catch {
         if (signal.aborted || this.closed) return;
         // A retry is only safe when nothing of this piece has been heard yet.
         if (sent !== before) { fail(); return; }
-        try { await synth("", seg.value); } catch { if (signal.aborted || this.closed) return; fail(); return; }
+        try { await synth("", seg.value, segVoice); } catch { if (signal.aborted || this.closed) return; fail(); return; }
       }
     }
     if (signal.aborted || this.closed) return;
