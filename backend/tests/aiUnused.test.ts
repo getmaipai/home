@@ -220,8 +220,8 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   const ltx = p.rows.find((row) => row.id === "video-ltx25")!;
   const klein = p.rows.find((row) => row.id === "pictures")!;
   // VIDEO-WAN-HIDE-01: with no child or teen in the household no card offers the silent video row, so it is unused too; the H3 picture
-  // model and the Best clearer rows are offered by no card yet.
-  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align", "music-transcribe", "talking-pictures", "video", "pictures-h3", "pictures-clearer"].map((id) => p.rows.find((row) => row.id === id)!);
+  // model, the Best clearer rows and the FLUX 3 Klein row (pictures-klein3, new with Pin Stack 2b1352e) are offered by no card yet.
+  const extras = ["music-boost", "music-max", "video-ltx25-max", "video-mask", "pictures-qwen", "align", "music-transcribe", "talking-pictures", "video", "pictures-h3", "pictures-clearer", "pictures-klein3"].map((id) => p.rows.find((row) => row.id === id)!);
   // VIDEO-WAN-HIDE-01: LTX-2.5 serves an adult's Standard and Boost videos, so it is in use whatever the level setting says.
   const expectedIds = [...zimage.model_ids, ...extras.flatMap((row) => row.model_ids)];
   for (const id of ltx.model_ids) expect(result.items.map((item) => item.id)).not.toContain(id);
