@@ -350,7 +350,8 @@ describe("Create is adult-only; Browse is unchanged", () => {
     for (const other of [teen, child]) {
       const row = await appRow(other.client);
       expect(row.sidebar.groups.map((g: { id: string }) => g.id)).toEqual(["play", "play-library", "play-discover"]);
-      expect(row.sidebar.groups.flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page))).toEqual(["index", "clips-feed", "library", "watch-later", "liked", "history", "playlists", "new-uploads", "channels", "categories"]);
+      // Family Picks is in the play-library group since 09cddba74 (VIDEO-LD-04, 2026-11-13); the list is exact on purpose.
+      expect(row.sidebar.groups.flatMap((g: { pages: Array<{ page: string }> }) => g.pages.map((p) => p.page))).toEqual(["index", "clips-feed", "library", "watch-later", "liked", "history", "family-picks", "playlists", "new-uploads", "channels", "categories"]);
       expect(row.header.modes.map((m: { id: string }) => m.id)).toEqual(["play"]);
       // Every Create page, including the coming-soon rows, is adult-only: a teen and a child get 404.
       for (const page of [...PAGES, "from-picture", "talking-avatar", "animate", "film-maker", "templates", "trim", "captions", "voiceover", "drafts", "make-video", "creations"]) expect((await other.client.get(`/api/plugins/video/pages/${page}`)).status).toBe(404);
