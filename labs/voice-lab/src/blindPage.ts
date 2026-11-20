@@ -1,0 +1,21 @@
+// Blind A/B page for the stumbling levels: each moment has two takes in a shuffled order; the page never names the level behind a take (the key stays in a separate file the listener does not see).
+export interface Take { id: string; src: string }
+export interface Moment { you: string; takes: Take[] }
+/** Deterministic shuffle of [0..n) so the A/B order is not always "natural first". */
+export function shuffleOrder(n: number, seed: number): number[] { const a = [...Array(n).keys()]; let s = Math.imul((seed + 1) >>> 0, 2654435761) >>> 0; s ^= s >>> 15; s = Math.imul(s, 2246822519) >>> 0; s ^= s >>> 13; const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j]!, a[i]!]; } return a; }
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+export function buildBlindPage(moments: Moment[], title = "Which sounds more like a person?"): string {
+  const sections = moments.map((m, i) => `<section data-m="${i + 1}"><h2>${i + 1}. You say: ${esc(m.you)}</h2>${m.takes.map((t, k) => `<div class="take"><b>Take ${k + 1}</b><audio controls preload="none" src="${esc(t.src)}"></audio></div>`).join("")}<div class="ask">More like a real person: <button data-m="${i + 1}" data-pick="1">Take 1</button><button data-m="${i + 1}" data-pick="2">Take 2</button><button data-m="${i + 1}" data-pick="0">Same</button> <span class="got"></span></div><div class="ask">Got in the way (a stumble that felt fake or hid the answer): <button data-m="${i + 1}" data-bad="1">Take 1</button><button data-m="${i + 1}" data-bad="2">Take 2</button><button data-m="${i + 1}" data-bad="0">Neither</button></div></section>`).join("");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>:root{color-scheme:light dark}body{font:16px system-ui;max-width:640px;margin:0 auto;padding:16px}section{border-top:1px solid #8884;padding:12px 0}.take{display:flex;gap:10px;align-items:center;margin:6px 0}.ask{margin:6px 0}button{padding:6px 10px;margin:2px;border-radius:8px;border:1px solid #8886;background:transparent;color:inherit}button.on{background:#3b82f6;color:#fff}</style></head><body><h1>${esc(title)}</h1><p>Listen to both takes without looking at anything else. Pick one per question. Answers stay in this browser until you press Copy answers.</p>${sections}<p><button id="copy">Copy answers</button> <span id="done"></span></p><script>
+const A={};try{Object.assign(A,JSON.parse(localStorage.stumbleBlind||"{}"))}catch{}
+const save=()=>{try{localStorage.stumbleBlind=JSON.stringify(A)}catch{}};
+document.querySelectorAll("button[data-m]").forEach(b=>{const m=b.dataset.m,k=b.dataset.pick!==undefined?"pick":"bad",v=Number(b.dataset.pick??b.dataset.bad);const mark=()=>{b.classList.toggle("on",(A[m]||{})[k]===v)};mark();b.onclick=()=>{(A[m]=A[m]||{})[k]=v;save();document.querySelectorAll('button[data-m="'+m+'"]').forEach(x=>{const kk=x.dataset.pick!==undefined?"pick":"bad";x.classList.toggle("on",A[m][kk]===Number(x.dataset.pick??x.dataset.bad))})}});
+document.getElementById("copy").onclick=async()=>{const t=JSON.stringify(A);try{await navigator.clipboard.writeText(t);document.getElementById("done").textContent="Copied."}catch{document.getElementById("done").textContent=t}};
+</script></body></html>`;
+}
+/** Turns the page's answers plus the key into a per-level tally. answers: {momentNo: {pick, bad}}, key: {momentNo: [levelOfTake1, levelOfTake2]}. */
+export function tally(answers: Record<string, { pick?: number; bad?: number }>, key: Record<string, string[]>) {
+  const t: Record<string, { moreHuman: number; gotInTheWay: number }> = {}; const bump = (l: string, f: "moreHuman" | "gotInTheWay") => ((t[l] ??= { moreHuman: 0, gotInTheWay: 0 })[f]++);
+  for (const [m, a] of Object.entries(answers)) { const lv = key[m]; if (!lv) continue; for (const l of lv) t[l] ??= { moreHuman: 0, gotInTheWay: 0 }; if (a.pick && lv[a.pick - 1]) bump(lv[a.pick - 1]!, "moreHuman"); if (a.bad && lv[a.bad - 1]) bump(lv[a.bad - 1]!, "gotInTheWay"); }
+  return t;
+}
