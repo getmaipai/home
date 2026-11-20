@@ -104,3 +104,11 @@ test("a real new turn is not dropped, and neither is the person repeating her la
 test("a command is never dropped as echo, even when her story contains the same words (recorded: a person's 'Wait, stop.' dropped with ratio 1)", () => {
   expect(echoTurn({ transcript: "Wait, stop.", spoken: "He had to wait. Then he could not stop laughing.", speechStartMs: T0 - 200, lastSpokeMs: T0, nowMs: T0 + 700 }).drop).toBe(false);
 });
+import { sustainedLouderCutIn as slc } from "../src/selfEcho";
+test("non-words stop: a sustained louder burst (0.7 s or more) is a cut-in even if the words were misheard as an ack; a short burst or a quiet one never is", () => {
+  expect(slc({ decision: "ack", louder: true, durationMs: 900 })).toBe(true);      // "Wait, stop." written as "Yeah."
+  expect(slc({ decision: "echo", louder: true, durationMs: 800 })).toBe(true);
+  expect(slc({ decision: "ack", louder: true, durationMs: 400 })).toBe(false);     // a real "mm-hm" is short
+  expect(slc({ decision: "ack", louder: false, durationMs: 1200 })).toBe(false);   // not louder than her echo
+  expect(slc({ decision: "interrupt", louder: true, durationMs: 2000 })).toBe(false); // already handled
+});

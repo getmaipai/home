@@ -42,7 +42,7 @@ for (let run = 0; run < RUNS; run++) {
   results.push(await one(run, gain, delayMs));
 }
 async function one(run: number, gain: number, delayMs: number) {
-  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true })); if (R1) ws.send(JSON.stringify({ t: "config", values: { echoReference: true, backchannel: true } }));
+  const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true })); if (R1) ws.send(JSON.stringify({ t: "config", values: { echoReference: true, backchannel: true } })); if (Bun.env.ECHO_CFG) ws.send(JSON.stringify({ t: "config", values: JSON.parse(Bun.env.ECHO_CFG) }));
   const texts: string[] = []; let askEndAt = -1; let nods = 0;
   const ev: Array<{ t: string; at: number; extra?: any }> = []; const T0 = performance.now(); const rel = () => performance.now() - T0;
   // virtual speaker

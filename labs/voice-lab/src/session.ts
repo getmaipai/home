@@ -16,7 +16,7 @@ import { pickSound, availableTags } from "./sounds";
 import { shouldNod } from "./listenerNod";
 import { StreamingAsr, norm } from "./streamingAsr";
 import { voiceSettings } from "./voiceSettings";
-import { judgeCutIn, residualContent, sustainedNewWords, isOwnEchoTurn } from "./selfEcho";
+import { judgeCutIn, residualContent, sustainedNewWords, isOwnEchoTurn, sustainedLouderCutIn } from "./selfEcho";
 import { decideYield } from "./yieldDecision";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -204,7 +204,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private requestedVoice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private contMode = Bun.env.LAB_CONT === "1"; private sessionTag = Math.random().toString(36).slice(2, 8); private levelMatch = Bun.env.LAB_LEVEL_MATCH === "1"; /* measured (rig/joincheck2.ts, 42 joins): it made the dB jumps worse, so it is OFF */ private levelMatcher = new LevelMatcher(); private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
+  private nonWordsStop = Bun.env.LAB_NONWORDS === "1"; private requestedVoice = Bun.env.LAB_DEFAULT_VOICE ?? "casual"; private contMode = Bun.env.LAB_CONT === "1"; private sessionTag = Math.random().toString(36).slice(2, 8); private levelMatch = Bun.env.LAB_LEVEL_MATCH === "1"; /* measured (rig/joincheck2.ts, 42 joins): it made the dB jumps worse, so it is OFF */ private levelMatcher = new LevelMatcher(); private userInterrupted = false; private lastSpokeAt = -1e9; private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -219,6 +219,7 @@ export class VoiceSession {
     let finalDecision = decision; let sustained: string[] = [];
     if (!this.echoRef && decision === "echo" && text) { const r = sustainedNewWords(this.residHistory, this.now(), this.cutInLouder(audio) ? residualContent(text, this.recentSpoken()) : []); sustained = r.words; if (r.interrupt) { finalDecision = "interrupt"; this.residHistory.length = 0; } }
     else if (decision === "interrupt" || decision === "ack") this.residHistory.length = 0;
+    if (!this.echoRef && this.nonWordsStop && finalDecision !== "interrupt" && sustainedLouderCutIn({ decision: finalDecision, louder: this.cutInLouder(audio), durationMs: this.tm.cutDuration })) { finalDecision = "interrupt"; this.residHistory.length = 0; sustained = ["<sustained-louder>"]; }
     for (const command of this.tm.cutTranscript(text, finalDecision)) this.command(command);
     this.logStop(`cut-in-${finalDecision}${finalDecision !== decision ? "-sustained" : ""}`, { heard: text, resid: sustained, seconds: +(audio.length / 16000).toFixed(2), louder: this.cutInLouder(audio), overlapMs: this.overlapMs, refMode: !!this.echoRef, spoken: this.playingNowText().slice(0, 80) });
     if (finalDecision === "interrupt") { this.userInterrupted = true; this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
@@ -430,6 +431,7 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
+        if (typeof j.values?.nonWordsStop === "boolean") this.nonWordsStop = j.values.nonWordsStop;
         if (typeof j.values?.cont === "boolean") this.contMode = j.values.cont;
         if (typeof j.values?.levelMatch === "boolean") this.levelMatch = j.values.levelMatch;
         if (typeof j.values?.prefill === "boolean") this.prefill = j.values.prefill;

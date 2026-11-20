@@ -66,3 +66,10 @@ export function isOwnEchoTurn(i: { transcript: string; spoken: string; speechSta
   const sw = [...new Set(words(i.spoken))]; const hit = hw.filter((w) => sw.some((x) => near(w, x))).length; const ratio = hit / hw.length;
   return { drop: ratio >= cfg.ratio, ratio: +ratio.toFixed(2) };
 }
+
+export const SUSTAINED_LOUDER_MS = 700;
+/** The route that does not depend on the recognizer: a person talking over her louder than her echo for about 0.7 s or more is a cut-in even when the words were misheard ("wait" written as "yeah"). A short burst that the text calls an ack (yeah, mm-hm) is a backchannel and never stops her. */
+export function sustainedLouderCutIn(i: { decision: string; louder: boolean; durationMs: number }): boolean {
+  if (!i.louder || i.durationMs < SUSTAINED_LOUDER_MS) return false;
+  return i.decision === "echo" || i.decision === "ack" || i.decision === "unknown";
+}
