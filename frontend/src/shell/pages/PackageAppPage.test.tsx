@@ -105,10 +105,10 @@ afterEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
 });
 
-function open(path: string | { pathname: string; state: unknown }, width = 1440) {
+function open(path: string | { pathname: string; state: unknown }, width = 1440, height = 900) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   window.matchMedia = ((query: string) => ({
-    matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
+    matches: query.includes("pointer: coarse") ? height < 500 : query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
     media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as typeof window.matchMedia;
   const client = createQueryClient();
@@ -138,6 +138,34 @@ describe("an app that declares a settings area", () => {
     const view = open("/apps/demo");
     await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
     expect(view.queryByRole("button", { name: /settings/i })).toBeNull();
+  });
+});
+
+describe("S3: the navigation on a package app page (PHONE-05-AMEND-01)", () => {
+  // 360 and 402 wide are the phone tier: the shell draws its main-apps bar (exactly one bottom bar). 744 and 874 x 402 are at or past the 640 breakpoint, so the shell
+  // draws its rail or menu instead and no bottom bar: the app's sections must still be the tab row, never a second bar.
+  const sizes = [{ w: 360, h: 780, phone: true }, { w: 402, h: 874, phone: true }, { w: 874, h: 402, phone: false }, { w: 744, h: 1000, phone: false }];
+  for (const size of sizes) {
+    test(`${size.w} x ${size.h}: ${size.phone ? "one bottom bar, the sections are the tab row under the header" : "no section bar; the sections are reachable as tabs"}`, async () => {
+      rows = [{ ...musicRow, sections: [{ page: "radio", label: "Radio", icon: null }, { page: "albums", label: "Albums", icon: null }] }];
+      const view = open("/apps/audio/radio", size.w, size.h);
+      await waitFor(() => expect(view.container.querySelector('[data-slot="app-section-tabs"]')).not.toBeNull());
+      const bars = view.container.querySelectorAll('[data-slot="phone-nav"]');
+      expect(bars.length).toBe(size.phone ? 1 : 0);
+      expect(view.container.querySelector('nav[aria-label$="sections"]')).toBeNull();
+      const tabs = view.getAllByRole("tab").map((tab) => tab.textContent);
+      expect(tabs).toEqual(expect.arrayContaining(["Radio", "Albums"]));
+      const row = view.container.querySelector('[data-slot="app-section-tabs"]')!;
+      const header = view.container.querySelector("header");
+      if (header) expect(header.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(view.getByRole("tab", { name: "Radio" }).getAttribute("aria-selected")).toBe("true");
+    });
+  }
+
+  test("Chat on a phone keeps its one bottom bar and has no section tabs", async () => {
+    const view = open("/", 402, 874);
+    await waitFor(() => expect(view.container.querySelectorAll('[data-slot="phone-nav"]').length).toBe(1));
+    expect(view.container.querySelector('[data-slot="app-section-tabs"]')).toBeNull();
   });
 });
 
