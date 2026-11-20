@@ -16,6 +16,11 @@ test("records ordered stage durations as counts only", () => {
   expect(JSON.stringify(saved)).not.toContain("text");
 });
 
+test("parses reason-specific refusal outcomes", () => {
+  const parsed = VoiceTimingMessageSchema.safeParse({ type: "timing", speculative: "refused_active_turn" });
+  expect(parsed.success).toBe(true);
+});
+
 test("ties an incoming spoken-turn measurement to its turn id without content", () => {
   const record = beginVoiceTimingFor("turn-123", 240, 1000);
   markVoiceTiming(record, "first_token_ms", 80);

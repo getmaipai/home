@@ -11,6 +11,18 @@ export const SPECULATIVE_START_KEY = "voice.speculative_start";
 export const SPECULATION_HOLD_MS = 20_000;
 /** LiveKit's guard: a long utterance is likelier mid-thought, and its discarded prefill is the costliest. */
 export const SPECULATION_MAX_WORDS = 40;
+export type SpeculationRefusalCode = "off" | "not_spoken" | "surface" | "age" | "pending_ask" | "active_turn" | "too_long";
+
+export function speculationRefusalCode(reason: string | null): SpeculationRefusalCode | undefined {
+  if (reason === "Speculative start is off.") return "off";
+  if (reason === "Speculative start is for spoken turns.") return "not_spoken";
+  if (reason === "Speculative start is not available on this surface.") return "surface";
+  if (reason === "Speculative start is for adults.") return "age";
+  if (reason === "A confirmation is waiting; the full message is needed.") return "pending_ask";
+  if (reason === "A turn is already running.") return "active_turn";
+  if (reason === "The message is long; the full message is needed.") return "too_long";
+  return undefined;
+}
 
 export interface SpeculationHold {
   readonly promise: Promise<boolean>;

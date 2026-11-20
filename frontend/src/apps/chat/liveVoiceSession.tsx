@@ -35,7 +35,7 @@ import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
 import type { SpeculationIds } from "@/apps/chat/useChatVoiceTurnState";
-import type { SpeculativeOutcome } from "@/lib/voice/sttContract";
+import { SPECULATIVE_REFUSAL_CODES, type SpeculativeOutcome } from "@/lib/voice/sttContract";
 import { createVoiceTrace, type VoiceTrace } from "@/lib/voice/voiceTrace";
 import { browserFamily, createEchoGate, type EchoGate } from "@/lib/voice/echoGate";
 import { isOwnEcho, isOwnEchoTurn, normalizeOwnEchoTranscript } from "@/lib/voice/ownEcho";
@@ -244,12 +244,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       speculationInFlightRef.current = null;
       if (epoch !== reactionEpochRef.current) return;
       const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: unknown }).status : undefined;
+      const reasonCode = typeof error === "object" && error !== null && "reasonCode" in error ? (error as { reasonCode?: unknown }).reasonCode : undefined;
       // Read only to recognise the hub's "speculative start is off" answer; it is never shown to the person.
       const message = typeof error === "object" && error !== null && "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
       trace(status === 400 ? "speculate_refused" : "speculate_failed", { status: typeof status === "number" ? status : 0 });
       if (status === 400 && message.startsWith("Speculative start is off")) { speculationOffRef.current = true; speculativeOutcomeRef.current = "off"; return; }
       refusedThisUtteranceRef.current = true;
-      speculativeOutcomeRef.current = status === 400 ? "refused" : "request_failed";
+      speculativeOutcomeRef.current = status === 400 ? (typeof reasonCode === "string" && SPECULATIVE_REFUSAL_CODES.includes(reasonCode as typeof SPECULATIVE_REFUSAL_CODES[number]) ? `refused_${reasonCode}` as SpeculativeOutcome : "refused") : "request_failed";
     });
   };
   const restoreVoice = () => {

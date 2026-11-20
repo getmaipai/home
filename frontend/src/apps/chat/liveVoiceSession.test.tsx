@@ -424,6 +424,25 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); }
   });
 
+  test.each([
+    [{ status: 400, message: "A turn is already running.", reasonCode: "active_turn" }, "refused_active_turn"],
+    [{ status: 400, message: "bad request" }, "refused"],
+  ] as const)("STT-SMARTTURN-01: a refusal records its stable category when available", async (error, expected) => {
+    const speculate = spyOn(api, "speculateTurn").mockRejectedValue(error);
+    try {
+      const socket = controlledSocket();
+      const timings: Array<{ phase?: string; speculative?: string }> = [];
+      render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef: { current: null } }} onVoiceTiming={(timing) => timings.push(timing as never)} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "what is the weather", edge: true }));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+      await act(async () => { socket.send({ t: "final", v: "what is the weather" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(timings.find((timing) => timing.phase === "final")?.speculative).toBe(expected);
+    } finally { speculate.mockRestore(); }
+  });
+
   test("STT-SMARTTURN-01: an edge partial during reply playback starts an interrupting held run without cancelling playback", async () => {
     const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });

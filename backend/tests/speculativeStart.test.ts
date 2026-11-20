@@ -12,7 +12,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { __resetSpeculationForTests, newSpeculationHold, speculationConfirmed, speculationCounters, speculationRefusal, SPECULATIVE_START_KEY } from "@/lib/speculation";
+import { __resetSpeculationForTests, newSpeculationHold, speculationConfirmed, speculationCounters, speculationRefusal, speculationRefusalCode, SPECULATIVE_START_KEY } from "@/lib/speculation";
 
 beforeEach(() => {
   resetDb();
@@ -56,7 +56,9 @@ describe("STT-SMARTTURN-01: the refusal (rule 0 gates first)", () => {
     setHouseholdSettingValue(SPECULATIVE_START_KEY, false);
     const res = await client.post("/api/turn/stream", { text: "what time is it", spoken: true, speculative: true });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("speculation_refused");
+    const body = await res.json() as { code: string; reason_code?: string };
+    expect(body.code).toBe("speculation_refused");
+    expect(body.reason_code).toBe("off");
     expect(speculationCounters.refused).toBe(1);
     expect(speculationCounters.started).toBe(0);
   });
@@ -78,6 +80,14 @@ describe("STT-SMARTTURN-01: the refusal (rule 0 gates first)", () => {
     expect(speculationRefusal({ ...base, activeTurns: 1, interrupting: true, wordCount: 41 })).toContain("long");
     expect(speculationRefusal({ ...base, wordCount: 41 })).toContain("long");
     expect(speculationRefusal({ ...base, enabled: false })).toContain("off");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, enabled: false }))).toBe("off");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, spoken: false }))).toBe("not_spoken");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, surface: "robot" }))).toBe("surface");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, actor: { id: "child-test", role: "child", birthdate: null } as never }))).toBe("age");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, pendingAsk: true }))).toBe("pending_ask");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, activeTurns: 1 }))).toBe("active_turn");
+    expect(speculationRefusalCode(speculationRefusal({ ...base, wordCount: 41 }))).toBe("too_long");
+    expect(speculationRefusalCode("unrecognized" )).toBeUndefined();
   });
 });
 

@@ -28,7 +28,7 @@ import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix, getConversation, nextTurnReplayMessages, getPendingAsk, onConversationFolded } from "@/lib/conversationHistory";
-import { newSpeculationHold, noteSpeculation, speculationRefusal, wordCount, SPECULATION_HOLD_MS, type SpeculationHold } from "@/lib/speculation";
+import { newSpeculationHold, noteSpeculation, speculationRefusal, speculationRefusalCode, wordCount, SPECULATION_HOLD_MS, type SpeculationHold } from "@/lib/speculation";
 import { abortConversationPrewarm, prewarmConversation, rewarmConversation } from "@/lib/prefixPrewarm";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { surfaceClassOf } from "@/lib/surfaceClass";
@@ -1243,7 +1243,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     const refused = speculationRefusal({ actor, surface, spoken: body.spoken === true, wordCount: wordCount(body.text ?? ""), pendingAsk: typeof body.conversation_id === "string" && getPendingAsk(body.conversation_id) !== null, activeTurns: activeTurnCount(), interrupting: body.interrupting === true });
     if (refused || body.bare === true || body.temporary === true || body.ephemeral === true || body.continuation_text !== undefined || body.supersedes !== undefined) {
       noteSpeculation("refused", refused ?? "turn shape");
-      return c.json({ error: refused ?? "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
+      return c.json({ error: refused ?? "Speculative start is not available for this turn.", code: "speculation_refused", reason_code: refused ? speculationRefusalCode(refused) : "turn_shape" }, 400);
     }
     hold = newSpeculationHold();
   }
@@ -1387,7 +1387,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     if (conversationInCrisis(result.conversationId) || result.cueSuppressed || result.signal.repair !== "none" || result.signal.target === "hub") {
       discardSpeculation(session, "aborted");
       noteSpeculation("refused", "crisis, repair or hub-target turn");
-      return c.json({ error: "Speculative start is not available for this turn.", code: "speculation_refused" }, 400);
+      return c.json({ error: "Speculative start is not available for this turn.", code: "speculation_refused", reason_code: "turn_shape" }, 400);
     }
     session.holdTimer = setTimeout(() => { discardSpeculation(session, "aborted"); }, SPECULATION_HOLD_MS);
     (session.holdTimer as { unref?: () => void }).unref?.();
