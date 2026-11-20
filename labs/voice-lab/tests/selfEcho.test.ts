@@ -29,3 +29,10 @@ test("function words and a half-heard run of her own story never count as a pers
   expect(judgeCutIn("He wants to be a good idea", said + " He wants to be a good idea, I guess.")).toBe("echo");
   expect(judgeCutIn("Everyone was afraid of the", said)).toBe("echo");
 });
+
+test("a stop word in the middle of her own blurred sentence is not a command, one at the start is", () => {
+  expect(judgeCutIn("you want to hold", said)).toBe("echo");
+  expect(judgeCutIn("No, I usually keep", said)).toBe("echo");
+  expect(judgeCutIn("please stop", said)).toBe("interrupt");
+  expect(judgeCutIn("hold on a second", said)).toBe("interrupt");
+});

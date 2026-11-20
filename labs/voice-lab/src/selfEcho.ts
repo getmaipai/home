@@ -20,6 +20,10 @@ export function judgeCutIn(heard: string, spoken: string): EchoVerdict {
   const resid = hw.filter((w) => !spokenWords.some((s) => near(w, s)));
   if (!resid.length) return "echo";
   if (decideBackchannel(resid.join(" ")) === "ack") return "ack";
-  if (resid.some((w) => STOPPERS.has(w))) return "interrupt";
-  return resid.filter((w) => w.length > 2 && !FUNCTION.has(w)).length >= 3 ? "interrupt" : "echo";
+  // A spoken "wait" or "stop" comes first (or right after one word like "okay" or "please") and has little else after it. The
+  // recognizer's blur of her own voice sometimes writes "hold" or "no" in the middle of a sentence; that is not a command.
+  const content = resid.filter((w) => w.length > 2 && !FUNCTION.has(w) && !STOPPERS.has(w));
+  const stopAt = resid.findIndex((w) => STOPPERS.has(w));
+  if (stopAt >= 0 && stopAt <= 1 && content.length <= 1) return "interrupt";
+  return content.length >= 3 ? "interrupt" : "echo";
 }
