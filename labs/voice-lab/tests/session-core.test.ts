@@ -530,3 +530,21 @@ test("the listener nod is off by default, and when on is made by the voice engin
   expect(long.messages().filter((m) => m.t === "nod").length).toBe(1);
   long.session.close();
 });
+
+function fakeStream(text: string) { let fed = 0; return { available: true, get fed() { return fed; }, reset() { fed = 0; }, accept(s: Float32Array) { fed += s.length; }, text() { return text; } } as any; }
+test("the reply draft starts from the streaming text during the first moments of silence, and the whole-utterance text keeps it only when the words match", async () => {
+  for (const [final, expectedChats] of [["Tell me a story about dragons?", 1], ["Tell me a story about wagons", 2]] as const) {
+    let chats = 0;
+    const h = harness({
+      streamAsr: fakeStream("tell me a story about dragons"),
+      transcribe: async () => final,
+      chat: async function* () { chats++; yield { type: "text", text: "Once upon a time." }; },
+    });
+    h.feed(true, 40); h.feed(false, 3);                  // 96 ms of silence: before the 160 ms check
+    await h.flush();
+    expect(chats).toBe(1);                               // the draft is already running, started before the check
+    h.feed(false, 12); await h.flush(300);
+    expect(chats).toBe(expectedChats);
+    h.session.close();
+  }
+});

@@ -9,6 +9,7 @@ import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
 import { pickSound, availableTags } from "./sounds";
 import { shouldNod } from "./listenerNod";
+import { StreamingAsr, norm } from "./streamingAsr";
 import { voiceSettings } from "./voiceSettings";
 import { judgeCutIn } from "./selfEcho";
 import { appendMetrics, type TurnMetrics } from "./metrics";
@@ -46,6 +47,7 @@ export class VoiceSession {
   private turnCheckFn: typeof turnCheck;
   private chatFn: typeof chat;
   private speechFn: typeof speech;
+  private streamAsr: StreamingAsr | null = null; private streamEnabled = Bun.env.LAB_STREAM_DRAFT !== "0"; private streamDraft = ""; private streamDraftEarlyMs = 64;
   private nodEnabled = false; private nodClip: Int16Array | null = null; private lastNodAt = -1e9; private nodsThisTurn = 0; private nodSuppressUntil = 0; private nodRoll: () => number = Math.random;
   private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
@@ -71,9 +73,9 @@ export class VoiceSession {
   /** The engine keeps the conversation it just wrote, so no warm-up is needed right after a reply. Warm again only after a long quiet spell. */
   private rewarmIfStale() { if (this.now() - this.lastWarmAt > 10 * 60_000 && !this.warming) this.prewarm("all"); }
   private proto = 1; private seqExpected = 0; private netSim = { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }; private inboundLink: LinkModel; private outboundLink: LinkModel; private toolPendingAudio = false; private captureOffset = 0; private offsetInitialized = false; private toolDelayMs = 2500;
-  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; sound: typeof pickSound; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
+  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; sound: typeof pickSound; streamAsr: StreamingAsr; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
     this.now = deps.now ?? (() => performance.now()); this.tm = new TurnManager(this.now); this.inboundLink = new LinkModel(deps.random); this.outboundLink = new LinkModel(deps.random); this.speechOrigin = this.now(); this.lastVoiceAt = this.now();
-    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.soundFn = deps.sound ?? pickSound; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
+    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.soundFn = deps.sound ?? pickSound; if (deps.streamAsr) this.streamAsr = deps.streamAsr; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
     this.metricsFn = deps.appendMetrics ?? appendMetrics;
     this.prewarmChatFn = deps.prewarmChat ?? prewarmChat; this.prewarmVoiceFn = deps.prewarmVoice ?? prewarmVoice;
     this.injected = !!deps.speech; this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
@@ -99,6 +101,14 @@ export class VoiceSession {
       if (all.length > 24000 * 0.15 && all.length < 24000 * 1.6) this.nodClip = all;
     } catch {}
   }
+  /** The person has gone quiet for a moment: start the reply draft from what the streaming recognizer already has, before the whole-utterance pass finishes. */
+  private maybeEarlyDraft(now: number) {
+    if (!this.streamEnabled || !this.streamAsr || this.held || this.streamDraft || this.tm.state !== "user_speaking") return;
+    if (this.tm.silenceMs(now) < this.streamDraftEarlyMs || this.streamAsr.fed !== this.samples.length) return;
+    const text = this.streamAsr.text(); if (norm(text).split(" ").filter(Boolean).length < 2) return;
+    this.metrics = { early_start: "used", draft: "used", failure: "none", ok: false, stream_draft: "started" }; this.metricsWritten = false; this.metrics.t_check = this.metricNow();
+    this.streamDraft = norm(text); this.command({ type: "start_reply_held", transcript: text, at: now, stream: true });
+  }
   private maybeNod(now: number) {
     if (!this.nodEnabled || !this.nodClip || this.tm.state !== "maybe_done") return;
     if (!shouldNod({ enabled: true, turnSpeechMs: now - this.speechOrigin, silenceMs: this.tm.silenceMs(now), turnProbability: this.tm.turnProbability, sinceLastNodMs: now - this.lastNodAt, nodsThisTurn: this.nodsThisTurn, roll: this.nodRoll() })) return;
@@ -111,11 +121,19 @@ export class VoiceSession {
       case "state": this.send({ t: "state", state: c.state }); break;
       case "check_turn": void this.check(Number(c.revision ?? this.tm.checkRevision)); break;
       case "transcript_ready": for (const next of this.tm.transcriptReady(String(c.text), this.now(), Number(c.revision ?? this.tm.checkRevision))) this.command(next); break;
-      case "start_reply_held": this.held = true; this.draftStartedAt = this.now(); this.metrics.early_start = "used"; this.metrics.draft = "used"; void this.reply(String(c.transcript), false); break;
+      case "start_reply_held":
+        if (this.held && this.streamDraft) {
+          // A draft was started from the streaming text. The whole-utterance text decides: same words keep it, different words discard it.
+          if (norm(String(c.transcript)) === this.streamDraft) { this.metrics.stream_draft = "kept"; this.streamDraft = "kept"; break; }
+          const had = this.streamDraft; this.command({ type: "cancel_held" }); this.metrics.stream_draft = "replaced"; void had;
+        }
+        this.held = true; this.draftStartedAt = this.now(); this.metrics.early_start = "used"; this.metrics.draft = "used"; void this.reply(String(c.transcript), false); break;
       case "transcribe_cut_in": if (c.forced) { this.writeCutin(false); this.samples = this.cutInSamples.slice(); this.cutInSamples = []; this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); } else void this.finishCutIn(); break;
       case "backchannel": this.send({ t: "resume" }); this.writeCutin(true); this.cutInSamples = []; this.samples = []; break;
       case "pause": this.send({ t: "pause" }); break;
       case "commit":
+        if (this.streamDraft === "kept") this.metrics.stream_draft = "kept";
+        this.streamDraft = "";
         this.metrics.t_commit = this.metricNow(); this.metrics.commit_reason = c.reason as "model" | "timeout";
         if (this.draftStartedAt >= 0) this.metrics.draft_head_start_ms = Math.max(0, this.now() - this.draftStartedAt);
         if (this.resumingCommitted) {
@@ -127,7 +145,7 @@ export class VoiceSession {
         if (this.held) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.draftInterrupted = false; this.send({ t: "final", text: String(c.transcript), turn: this.turn }); this.held = false; for (const event of this.heldChunkEvents) this.send(event); this.heldChunkEvents = []; for (const f of this.heldFrames) this.ws.send(f); this.heldFrames = []; if (this.generatedComplete && this.heldFinalText) { this.history.commitAssistant(this.heldFinalText); this.send({ t: "reply_final", text: this.heldFinalText, turn: this.turn }); this.heldFinalText = ""; } }
         else { void this.reply(String(c.transcript), true); this.send({ t: "final", text: String(c.transcript), turn: this.turn }); }
         this.send({ t: "state", state: "thinking" }); break;
-      case "cancel_held": this.metrics.early_start = "discarded"; this.metrics.draft = "discarded"; this.metrics.ok = false; this.metrics.failure = "cancelled"; for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = ""; this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
+      case "cancel_held": this.streamDraft = ""; this.metrics.early_start = "discarded"; this.metrics.draft = "discarded"; this.metrics.ok = false; this.metrics.failure = "cancelled"; for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = ""; this.finishMetrics(); this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); break;
       case "resume_committed":
         for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear();
         this.abort?.abort(); this.held = false; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.generatedText = "";
@@ -300,10 +318,13 @@ export class VoiceSession {
     if (speech) this.lastVoiceAt = now;
     if (prior === "idle") {
       for (const c of this.tm.frame(speech, now)) this.command(c);
-      if (this.tm.state === "user_speaking") { this.speechOrigin = this.lastVoiceAt; this.nodsThisTurn = 0; this.samples = [...priorPreRoll, ...frame]; this.transcriptSegments = []; }
+      if (this.tm.state === "user_speaking") { if (this.streamEnabled) { this.streamAsr ??= new StreamingAsr(); this.streamAsr.reset(); this.streamAsr.accept(Float32Array.from([...priorPreRoll, ...frame])); } this.speechOrigin = this.lastVoiceAt; this.nodsThisTurn = 0; this.samples = [...priorPreRoll, ...frame]; this.transcriptSegments = []; }
     } else if (prior === "user_speaking" || prior === "maybe_done") {
       this.samples.push(...frame);
+      if (this.streamEnabled && this.streamAsr) this.streamAsr.accept(frame);
+      if (speech && this.streamDraft && this.tm.state === "user_speaking") this.command({ type: "cancel_held" });
       for (const c of this.tm.frame(speech, now)) this.command(c);
+      this.maybeEarlyDraft(now);
       this.maybeNod(now);
     } else {
       this.micEnvelope.push(...rmsEnvelope(frame, config.sampleRate));
@@ -344,6 +365,7 @@ export class VoiceSession {
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
         if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.nodClip = null; if (this.nodEnabled) void this.makeNod(); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice), voiceSettings(this.voice).stumble); this.prewarm("voice"); }
+        if (typeof j.values?.streamingDraft === "boolean") this.streamEnabled = j.values.streamingDraft;
         if (typeof j.values?.backchannel === "boolean") { this.nodEnabled = j.values.backchannel; if (this.nodEnabled) void this.makeNod(); }
         if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles;
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
