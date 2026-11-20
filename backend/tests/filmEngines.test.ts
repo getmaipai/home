@@ -7,6 +7,7 @@ import type { PersonRow } from "@/types";
 import { resetDb } from "./reset-db";
 import { installFakeImageStack, until as waitForFake } from "./pictureFixture";
 import { installFakeVideoStack } from "./videoFixture";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { installFakeMusicStack } from "./musicFixture";
 import { installFakeEditStack } from "./videoEditStackFixture";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
@@ -48,7 +49,7 @@ describe("film engine entry", () => {
   });
 
   test("makes stills, clips, a song, and sequential film and mix edits, then keeps the artifacts on its production", async () => {
-    image = installFakeImageStack(); video = installFakeVideoStack(); music = installFakeMusicStack(); edit = installFakeEditStack();
+    image = installFakeImageStack(); video = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); music = installFakeMusicStack(); edit = installFakeEditStack();
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
     __setKeyframesForTests(async () => [new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]);
     const threeShotPlan = { ...plan, shots: [1, 2, 3].map((n) => ({ id: `shot-${n}`, subject_ids: [], framing: "wide", still: "Mira in a blue coat.", motion: "The tide rolls gently.", seconds: 5 })) };
@@ -71,7 +72,7 @@ describe("film engine entry", () => {
     await waitForFake(() => edit.jobs.every((job) => job.state === "done"));
   });
   test("a shot whose only picture is a supplied place uses that photo itself as its first frame, with no image model", async () => {
-    image = installFakeImageStack(); video = installFakeVideoStack(); music = installFakeMusicStack(); edit = installFakeEditStack();
+    image = installFakeImageStack(); video = installFakeVideoStack(); __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); music = installFakeMusicStack(); edit = installFakeEditStack();
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
     __setKeyframesForTests(async () => [new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]);
     const actor = person("person-filmplace");

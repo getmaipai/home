@@ -59,6 +59,14 @@ describe("FILM-04 make_film", () => {
     const result = await policyNode({ ...state(), filmAllowed: false } as TurnState, { calls: [{ id: "c", tool: MAKE_FILM_TOOL_ID, args: { idea: "A crossing" } }] }, new AbortController().signal);
     expect(result.output.entries[0]?.decision).toMatchObject({ allow: false });
   });
+  test("a guest whose controls are the adult band is still not offered make_film (toolGates.ts guest clause; scratch mutation: removing the clause alone changes nothing, another rule also stops a guest, so this guards the behavior, not the clause)", async () => {
+    __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
+    const base = { budget: resolveTurnBudgetBase(undefined, "adult"), actor, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false, temporary: false, bare: false, ephemeral: false, text: "make a film", musicEditAvailable: false } as never;
+    expect((await budgetWithTurnToolGates(base)).budget.tools_offered).toContain(MAKE_FILM_TOOL_ID);   // control: the same turn for the owner offers it
+    const guest = person("guest"); db.update(people).set({ controls: "adult" }).where(eq(people.id, guest.id)).run();
+    const adultGuest = db.select().from(people).where(eq(people.id, guest.id)).get() as PersonRow;
+    expect((await budgetWithTurnToolGates({ ...(base as object), actor: adultGuest } as never)).budget.tools_offered).not.toContain(MAKE_FILM_TOOL_ID);
+  });
   test("offer gate excludes children, teens, guests, spoken, overlay and TV turns", async () => {
     __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" })); // an adult's video is ready only when the sound maker is (534d4c229, VIDEO-WAN-HIDE-01); setup only
     const base = { budget: resolveTurnBudgetBase(undefined, "adult"), actor, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false, temporary: false, bare: false, ephemeral: false, text: "make a film", musicEditAvailable: () => false };

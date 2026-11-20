@@ -34,7 +34,7 @@ beforeEach(() => {
   __resetVideoAdapterCacheForTests();
   fake = installFakeVideoStack(); fake.silent = true; // AGE-ROUTING-REMOVE-01: these tests are about the audience of edits, so their clips are silent (a clip with sound is adult-only)
   fake.ltx25 = "ready";
-  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
+  __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); // the sound maker starts a clip from a picture only when the Stack says so (image_to_video), and an adult's picture clips need it (534d4c229): setup only
 });
 afterEach(() => { fake.restore(); __setVideoStatusForTests(undefined); });
 

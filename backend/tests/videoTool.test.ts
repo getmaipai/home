@@ -255,6 +255,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
 });
 
 describe("VIDEO-GEN-05: animating a picture the Stack made", () => {
+  beforeEach(() => { __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true })); }); // the sound maker starts a clip from a picture only when the Stack says so (image_to_video), and an adult's picture clips need it (534d4c229): setup only
   async function conversationWithPicture(provenance: string, bytes?: Uint8Array): Promise<{ conversationId: string; pictureId: string; png: Uint8Array }> {
     let conversationId = "";
     let turnId = "";
