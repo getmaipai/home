@@ -105,7 +105,7 @@ fi
 live_resolved="$(resolved_path "$live_root")"
 state_resolved="$(resolved_path "$state")"
 if [[ "$state_resolved/" == "$live_resolved/"* || "$state_resolved/" == "$live_root/"* ]]; then
-  echo "Dev data refuses to use the live install ($live_root)." >&2; exit 2
+  echo "Dev data refuses to use the live install: $state is inside the live install ($live_root), whose data the family's hub owns. Run it from a worktree instead." >&2; exit 2
 fi
 if ((workbench)); then
   [[ -n "$port_override" ]] || port_override="${MAIPAI_WORKBENCH_PORT:-8780}"
