@@ -67,3 +67,12 @@ export function renderPlanRows(person: PersonRow, id?: string): Array<{ run_id: 
   if (missing > 0) return [{ run_id: run.id, ready: false, reason: missing === 1 ? "One shot has no picture yet. Draft all makes them." : `${missing} shots have no picture yet. Draft all makes them.` }];
   return [{ run_id: run.id, ready: true, reason: null }];
 }
+
+/** FILM-CANCEL-01: the one-row scopes of the page's stop and resume bars. A bar with no row is not drawn: `film-stop` has a row only while the film is being made, `film-resume` only for a stopped film that can carry on. */
+export function filmControlRows(person: PersonRow, kind: "stop" | "resume", id?: string): Array<{ run_id: string; reason: string }> {
+  if (!allowed(person)) return [];
+  const run = pageFilmRun(person, id);
+  if (!run) return [];
+  if (kind === "stop") return run.state === "running" ? [{ run_id: run.id, reason: "Your film is being made. You can stop it and carry on later." }] : [];
+  return run.state === "cancelled" && run.plan && run.production_id ? [{ run_id: run.id, reason: "Stopped. The shots already made are kept. Press Resume to carry on." }] : [];
+}

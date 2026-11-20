@@ -6,6 +6,8 @@ import { bindCastSubjects, planFilm, type FilmPlan, type PlanFilmInput } from ".
 import { subjectViewById } from "@/lib/mediaSubjects";
 import { changeFilmMusic, realFilmEngines, redoFilmShot, resumeFilm } from "./engines";
 import { FilmStepError, runFilm, type FilmEngines, type FilmStage } from "./run";
+import { getVideoJobFor, cancelVideoJob } from "@/lib/videos/jobs";
+import { filmShotJobIds } from "./progressStore";
 import { createFilmRun, failInterruptedFilmRuns, getFilmRun, listFilmRunsInStates, updateFilmRun, type FilmRun } from "./store";
 
 const active = new Map<string, AbortController>();
@@ -106,7 +108,24 @@ export function cancelFilm(actor:PersonRow,id:string): FilmRun | null {
   const run=ownedAdult(actor,id); if(!run)return null;
   if(!["planning","running","waiting_for_go"].includes(run.state))return run;
   active.get(id)?.abort(new Error("Film cancelled."));
-  return updateFilmRun(actor,id,{state:"cancelled",error_line:null});
+  const stopped=updateFilmRun(actor,id,{state:"cancelled",error_line:null});
+  void cancelFilmShotJobs(actor,id);
+  return stopped;
+}
+/** FILM-CANCEL-01: the run's shot clip jobs that are still queued or running are cancelled through their own cancel (owner-checked inside; a finished job keeps its result and a
+ * half-made shot stores nothing). They are found one way only: VF-FILMPROGRESS-01's shot-to-job link. Counts only; no words or file names are logged. */
+export async function cancelFilmShotJobs(actor:PersonRow,runId:string): Promise<number> {
+  let stopped=0;
+  for(const jobId of filmShotJobIds(runId)){
+    try{
+      const before=getVideoJobFor(actor,jobId);
+      if(!before||before.state==="done"||before.state==="failed"||before.state==="cancelled") continue;
+      const after=await cancelVideoJob(actor,jobId);
+      if(after?.state==="cancelled") stopped++;
+    }catch{ /* one job that will not stop must not keep the others running */ }
+  }
+  if(stopped>0) console.info(`[film] stopped ${stopped} shot job${stopped===1?"":"s"}`);
+  return stopped;
 }
 export function resumeFilmRun(actor:PersonRow,id:string): FilmRun | {line:string} | null {
   const run=ownedAdult(actor,id); if(!run)return null;

@@ -330,4 +330,46 @@ describe("refusals and access", () => {
     const card = page.body.find((node) => node.type === "media_shelf" && node.heading === "Your film")!;
     expect(card.item_subtitle_field).toBe("{subtitle} {note}");
   });
+
+  // FILM-CANCEL-01
+  describe("stop and resume a film (FILM-CANCEL-01)", () => {
+    const addJob = (personId: string, jobId: string, state: string) => db.insert(videoJobs).values({ id: jobId, personId, kind: "generate", state, percent: 40, phase: "generating", position: 0, prompt: "A woman crosses a pier", request: JSON.stringify({ size: "832x480", seconds: 5, audience: "all-ages" }), files: "[]", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: "h" }).run();
+    const jobState = (jobId: string) => db.select().from(videoJobs).where(eq(videoJobs.id, jobId)).get()!.state;
+
+    test("Stop cancels the shot job in flight, keeps the finished one, shows Stopped (never Failed), and a second Stop does nothing", async () => {
+      const { client: owner, row } = await signedInOwner();
+      const id = await planned(owner, row);
+      addJob(row.id, "done-job", "done"); addJob(row.id, "live-job", "running");
+      db.update(filmRuns).set({ state: "running", progressJson: JSON.stringify({ shots: { one: { job_id: "done-job" }, two: { job_id: "live-job" } } }) }).where(eq(filmRuns.id, id)).run();
+      expect((await rows(owner, "film-stop"))).toEqual([{ run_id: id, reason: expect.stringMatching(/stop it and carry on later/) }]);
+      expect((await owner.post(`${T}/actions/film-cancel`, { run: id })).status).toBe(200);
+      await until(() => jobState("live-job") === "cancelled");
+      expect(jobState("done-job")).toBe("done");
+      expect(getFilmRun(row, id)!.state).toBe("cancelled");
+      const item = activityForViewer(row).items.find((entry) => entry.id === `film:${id}`)!;
+      expect(item).toMatchObject({ state: "waiting", line: "Stopped. The shots already made are kept. Press Resume to carry on." });
+      expect(await rows(owner, "film-stop")).toEqual([]);
+      expect(await rows(owner, "film-resume")).toEqual([{ run_id: id, reason: "Stopped. The shots already made are kept. Press Resume to carry on." }]);
+      expect((await owner.post(`${T}/actions/film-cancel`, { run: id })).status).toBe(200); // a second Stop changes nothing
+      expect(getFilmRun(row, id)!.state).toBe("cancelled");
+      expect(jobState("done-job")).toBe("done");
+    });
+
+    test("Resume starts the film again from the first unfinished shot; a teen cannot stop, resume or see the bars", async () => {
+      const { adult, teen, row } = await household();
+      const owner = adult.client;
+      const id = await planned(owner, row("Marlow"));
+      expect((await owner.post(`${T}/actions/film-draft`, { run: id })).status).toBe(200);
+      await until(() => getFilmRun(row("Marlow"), id)?.state === "waiting_for_go" && calls.filter((c) => c.startsWith("still:")).length === 3);
+      db.update(filmRuns).set({ state: "cancelled" }).where(eq(filmRuns.id, id)).run();
+      const stills = calls.filter((c) => c.startsWith("still:")).length;
+      expect((await owner.post(`${T}/actions/film-resume`, { run: id })).status).toBe(200);
+      await until(() => calls.includes("clip:one") && calls.includes("clip:three"));
+      expect(calls.filter((c) => c.startsWith("still:")).length).toBe(stills); // the pictures already made are kept, not made again
+      await until(() => getFilmRun(row("Marlow"), id)?.state === "done");
+      db.update(filmRuns).set({ state: "cancelled" }).where(eq(filmRuns.id, id)).run();
+      for (const action of ["film-cancel", "film-resume"]) expect((await teen.client.post(`${T}/actions/${action}`, { run: id })).status).toBeGreaterThanOrEqual(403);
+      for (const scope of ["film-stop", "film-resume"]) expect((await teen.client.post(`${T}/data/recipes`, { scope })).status).toBe(404);
+    });
+  });
 });

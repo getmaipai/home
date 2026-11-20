@@ -10,14 +10,14 @@ import { getMediaProduction } from "@/lib/mediaProductions";
 import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { startClipEdit } from "@/lib/videos/clipEditStart";
 import { getVideoJobByFileFor } from "@/lib/videos/jobs";
-import { allowed, draftFilmRun, editFilmShot, filmDraftedShots, finishKeptFilm, redoDraftShot, redoFilmRunShot, reviewFilmShot, startFilm } from "./background";
+import { allowed, cancelFilm, draftFilmRun, editFilmShot, filmDraftedShots, finishKeptFilm, redoDraftShot, redoFilmRunShot, resumeFilmRun, reviewFilmShot, startFilm } from "./background";
 import { getReelFormat, listReelFormats } from "./reelFormats";
 import { castHintsFor } from "./tool";
 import { getFilmRun, listFilmRunsInStates, type FilmRun, type FilmRunState } from "./store";
 
 export type FilmPageResult = { ok: true; id: string; state: string } | { ok: false; status: 403 | 404 | 422 | 423; error: string; code: string };
 const fail = (status: 403 | 404 | 422 | 423, error: string, code: string): FilmPageResult => ({ ok: false, status, error, code });
-export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview"] as const;
+export const FILM_PAGE_ACTIONS = ["film-plan", "film-draft", "film-review", "film-shot", "film-again", "film-finish", "film-beat", "film-voiced-preview", "film-cancel", "film-resume"] as const;
 export type FilmPageAction = (typeof FILM_PAGE_ACTIONS)[number];
 
 const GONE_LINE = "That film isn't available any more. Describe a new one and press Plan the film.";
@@ -102,6 +102,9 @@ export async function filmPageAction(person: PersonRow, action: FilmPageAction, 
   if (!run) return fail(404, GONE_LINE, "gone");
   if (action === "film-draft") return lineOr(draftFilmRun(person, run.id));
   if (action === "film-finish") return lineOr(finishKeptFilm(person, run.id));
+  // FILM-CANCEL-01: stop a film being made (its queued or running shot jobs are cancelled, finished shots are kept) and carry on from the first unfinished shot.
+  if (action === "film-cancel") return lineOr(cancelFilm(person, run.id));
+  if (action === "film-resume") return lineOr(resumeFilmRun(person, run.id));
   if (!shotId) return fail(422, "Pick a shot first.", "bad_arguments");
   if (action === "film-review") return lineOr(reviewFilmShot(person, run.id, shotId, body.keep === true || given(body.keep) === "true"));
   if (action === "film-again") return lineOr(run.state === "done" ? redoFilmRunShot(person, run.id, shotId) : redoDraftShot(person, run.id, shotId));
@@ -120,7 +123,7 @@ function statusOf(person: PersonRow, run: FilmRun): { line: string; making: bool
   if (run.state === "running") return { line: `${run.stage ?? "Working"}: step ${Math.min(run.done_steps, run.total_steps)} of ${run.total_steps}`, making: true };
   if (run.state === "waiting_for_go") return { line: drafted.size === 0 ? "The shot list is ready. Press Draft all to see a picture for each shot." : drafted.size < total ? `${drafted.size} of ${total} pictures are drafted. Press Draft all for the rest.` : "The drafts are ready. Keep or skip each shot, then press Finish kept.", making: false };
   if (run.state === "done") return { line: "The film is finished. It is in My clips.", making: false };
-  if (run.state === "cancelled") return { line: "This film was stopped. Describe a new one above.", making: false };
+  if (run.state === "cancelled") return { line: run.plan && run.production_id ? "Stopped. The shots already made are kept. Press Resume to carry on." : "This film was stopped. Describe a new one above.", making: false };
   return { line: run.error_line ?? "The film could not be finished. Describe it again above.", making: false };
 }
 const thumb = (fileId: string | null | undefined) => (fileId ? `/api/files/${encodeURIComponent(fileId)}/thumb?w=320` : null);
