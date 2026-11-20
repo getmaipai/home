@@ -42,12 +42,23 @@ export const STORAGE_SETTINGS_KEYS: SettingsKey[] = [
   // should rarely need to touch this, and a value that's too low defeats
   // the whole point of an early warning.
   SettingsKey.parse({
+    key: "storage.warn_free_gb",
+    scope: "household",
+    selector: "number",
+    default: 0,
+    label: "Warn when free disk space drops below (GB)",
+    help: "A Repairs item is raised below this. 0 uses the built-in rule: the larger of 30 GB and 10 percent of the drive.",
+    level: "advanced",
+    lives_in: "household.storage",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "storage.critical_free_gb",
     scope: "household",
     selector: "number",
-    default: 2,
-    label: "Warn when free disk space drops below (GB)",
-    help: "A Repairs item is raised once free space on the hub's own disk drops below this.",
+    default: 0,
+    label: "Stop big jobs when free disk space drops below (GB)",
+    help: "Downloads, backups and picture, video and music making are refused below this. 0 uses the built-in rule: the larger of 10 GB and 3 percent of the drive.",
     level: "advanced",
     lives_in: "household.storage",
     honoured_by: ["home"],

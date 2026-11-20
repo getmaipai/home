@@ -19,6 +19,7 @@ import { dataDir, modelsDir, enginesDir, wakewordDir, visionDir, sttDir, cacheDi
 import { getCacheStats } from "@/lib/packageCache";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { diskLevel, type DiskLevel, type DiskLevelOverrides } from "@maipai/spec/stack/ts/disk-levels.js";
 
 /** Recursive directory walk, calling `onFile` with every regular file's
  * full path - shared by dirSizeBytes() below and lib/storage/usage.ts's
@@ -149,37 +150,51 @@ export function checkPersonQuota(personId: string, additionalBytes: number): { o
   return { ok: true };
 }
 
-/** The same test checkDiskFull() raises its Repairs item on: free space is below the household's critical threshold. Background savers ask this before they write. */
+function diskOverrides(): DiskLevelOverrides {
+  return {
+    warnFreeGb: (getHouseholdSettingValue("storage.warn_free_gb") as number | undefined) ?? 0,
+    criticalFreeGb: (getHouseholdSettingValue("storage.critical_free_gb") as number | undefined) ?? 0,
+  };
+}
+
+/** The level of one disk reading, by the one shared rule (@maipai/spec disk-levels). statfs reads bavail (what a download can truly use,
+ * purgeable space excluded); an unreadable disk is "normal" so a sandbox never raises a false alarm. */
+export function levelOfDisk(disk: DiskUsage, previous: DiskLevel = "normal"): DiskLevel {
+  if (disk.freeBytes === Number.POSITIVE_INFINITY || disk.totalBytes === Number.POSITIVE_INFINITY) return "normal";
+  return diskLevel(disk.freeBytes, disk.totalBytes, previous, diskOverrides());
+}
+
+let lastLevel: DiskLevel = "normal";
+export const __resetDiskLevelForTests = (): void => { lastLevel = "normal"; };
+
+/** The test checkDiskFull() raises its error on: free space is under the critical line. Background savers ask this before they write. */
 export function diskIsLow(): boolean {
-  const criticalGb = (getHouseholdSettingValue("storage.critical_free_gb") as number | undefined) ?? 2;
-  const { freeBytes } = diskUsage();
-  return freeBytes !== Number.POSITIVE_INFINITY && freeBytes < criticalGb * 1024 * 1024 * 1024;
+  return levelOfDisk(diskUsage()) === "critical";
 }
 
 const ISSUE_SOURCE = "storage";
 const ISSUE_KEY = "disk_full";
+const FIX_LINK = "/settings/models";
 
-/** The core job (scheduler.ts's "storage.check_disk_full") that closes
- * the loop packageCache.ts's own automatic eviction cannot: once free
- * space is still below the household's own threshold AFTER caches have
- * done everything they can, real household data cannot shrink itself,
- * so the honest response is a Repairs item, not a crash the next write
- * would otherwise risk. */
-export function checkDiskFull(): void {
-  const criticalGb = (getHouseholdSettingValue("storage.critical_free_gb") as number | undefined) ?? 2;
-  let { freeBytes } = diskUsage();
-  if (freeBytes < criticalGb * 1024 * 1024 * 1024) { clearPreviews(); freeBytes = diskUsage().freeBytes; }
-  if (freeBytes === Number.POSITIVE_INFINITY) return; // statfs unavailable here - nothing to check
-  const freeGb = freeBytes / (1024 * 1024 * 1024);
-  if (freeGb < criticalGb) {
-    void raiseIssue({
-      source: ISSUE_SOURCE,
-      key: ISSUE_KEY,
-      severity: "error",
-      title: "The hub is almost out of disk space",
-      detail: `Only ${freeGb.toFixed(1)} GB free (below the ${criticalGb} GB threshold). Free up space or add storage soon.`,
-    });
-  } else {
-    resolveIssue(ISSUE_SOURCE, ISSUE_KEY);
-  }
+/** The core job (scheduler.ts's "storage.check_disk_full", hourly) with two levels (DISK-GUARD-03): a warning Repairs item when free space is
+ * under the warning line, an error (which notifies the admins once) under the critical line, resolved once free space is a margin above.
+ * Caches and previews are cleared first at critical; real household data never shrinks itself. */
+export async function checkDiskFull(read: () => DiskUsage = diskUsage): Promise<void> {
+  let disk = read();
+  let level = levelOfDisk(disk, lastLevel);
+  if (level === "critical") { clearPreviews(); disk = read(); level = levelOfDisk(disk, lastLevel); }
+  lastLevel = level;
+  if (level === "normal") { resolveIssue(ISSUE_SOURCE, ISSUE_KEY); return; }
+  const critical = level === "critical";
+  await raiseIssue({
+    source: ISSUE_SOURCE,
+    key: ISSUE_KEY,
+    severity: critical ? "error" : "warning",
+    title: critical ? "The hub is almost out of room" : "The hub's storage is getting full",
+    detail: critical
+      ? "There is not enough room left for new downloads, backups or picture, video and music making. Open Models and storage to free up space."
+      : "Free space is getting low. Open Models and storage to see what can be cleared safely before it runs short.",
+    learnMore: FIX_LINK,
+    notifyOnEscalation: true,
+  });
 }
