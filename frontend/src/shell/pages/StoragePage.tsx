@@ -200,8 +200,7 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
           {cleanupQuery.isError ? <StatusCard kind="problem" title={i18n._({ id: "Cleanup list did not load", message: "Cleanup list did not load" })} line={errorLine(cleanupQuery.error, i18n._({ id: "Check that Home is running, then reload this page.", message: "Check that Home is running, then reload this page." }))} /> : null}
           <DataTable<CleanupRow>
             columns={[
-              { id: "itemLabel", header: i18n._({ id: "Item", message: "Item" }), cell: (row) => row.itemLabel },
-              { id: "reason", header: i18n._({ id: "Details", message: "Details" }), cell: (row) => row.item.blocked ? i18n._({ id: "Kept: {reason}", message: "Kept: {reason}", values: { reason: row.item.blocked } }) : row.reason },
+              { id: "itemLabel", header: i18n._({ id: "Item", message: "Item" }), cell: (row) => (<div><div>{row.itemLabel}</div><div className="text-muted-foreground">{row.item.blocked ? i18n._({ id: "Kept: {reason}", message: "Kept: {reason}", values: { reason: row.item.blocked } }) : row.reason}</div></div>) },
               { id: "frees", header: i18n._({ id: "Frees", message: "Frees" }), cell: (row) => row.frees, align: "end" },
             ]}
             rows={(cleanupQuery.data ?? []).map((item) => ({ id: item.id, item, itemLabel: item.label, frees: item.blocked ? "" : formatBytes(item.bytes), reason: item.how }))}

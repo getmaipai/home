@@ -29,12 +29,12 @@ msgid " · Household voice"
 msgstr " · Household voice"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:88
+#: ../backend/src/routes/settings.ts:89
 msgid "settings.attention.backups.key_missing"
 msgstr " · key not saved"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:87
+#: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.backups.key_saved"
 msgstr " · key saved"
 
@@ -59,7 +59,7 @@ msgid " A reply being written right now will be cut off."
 msgstr " A reply being written right now will be cut off."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:96
+#: ../backend/src/routes/settings.ts:97
 msgid "settings.attention.robots.connected"
 msgstr " connected"
 
@@ -74,7 +74,7 @@ msgid " Plan for about {needGb} GB free there."
 msgstr " Plan for about {needGb} GB free there."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:97
+#: ../backend/src/routes/settings.ts:98
 msgid "settings.attention.robots.waiting"
 msgstr " waiting"
 
@@ -84,7 +84,7 @@ msgid " You can also turn off an extra above."
 msgstr " You can also turn off an extra above."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:233
+#: src/apps/settings/ModelsAndStorageSection.tsx:209
 #: src/apps/settings/ReferenceLibrarySettings.tsx:195
 msgid ", {size} free"
 msgstr ", {size} free"
@@ -258,7 +258,7 @@ msgid "{count, plural, one {# file other people can still see will stay, kept by
 msgstr "{count, plural, one {# file other people can still see will stay, kept by the household.} other {# files other people can still see will stay, kept by the household.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:84
+#: src/shell/pages/StoragePage.tsx:86
 msgid "{count, plural, one {# file} other {# files}}"
 msgstr "{count, plural, one {# file} other {# files}}"
 
@@ -404,7 +404,7 @@ msgid "{count} alarms"
 msgstr "{count} alarms"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:86
+#: ../backend/src/routes/settings.ts:87
 msgid "settings.attention.backups.many"
 msgstr "{count} backups"
 
@@ -445,7 +445,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr "{count} of {total} could not be forgotten: {reason}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:65
+#: ../backend/src/routes/settings.ts:66
 msgid "settings.attention.repairs.many"
 msgstr "{count} repairs need attention"
 
@@ -455,7 +455,7 @@ msgid "{count} restored"
 msgstr "{count} restored"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:95
+#: ../backend/src/routes/settings.ts:96
 msgid "settings.attention.robots.many"
 msgstr "{count} robots"
 
@@ -681,7 +681,7 @@ msgid "{kind, select, band {That band was not saved. Try again.} album {That alb
 msgstr "{kind, select, band {That band was not saved. Try again.} album {That album was not saved. Try again.} other {That style was not saved. Try again.}}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:70
+#: src/shell/pages/StoragePage.tsx:72
 msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
 
@@ -1324,7 +1324,7 @@ msgid "{size} MB"
 msgstr "{size} MB"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:162
+#: src/shell/pages/StoragePage.tsx:164
 msgid "{size} used, no cap set"
 msgstr "{size} used, no cap set"
 
@@ -1334,7 +1334,7 @@ msgid "{sizeGb} will be freed. {value} You can download them again later."
 msgstr "{sizeGb} will be freed. {value} You can download them again later."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:233
+#: src/apps/settings/ModelsAndStorageSection.tsx:209
 msgid "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer."
 msgstr "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer."
 
@@ -1547,7 +1547,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "0.1 to 2. Higher is livelier and also raises the pitch."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:85
+#: ../backend/src/routes/settings.ts:86
 msgid "settings.attention.backups.one"
 msgstr "1 backup"
 
@@ -1569,12 +1569,12 @@ msgid "1 hour"
 msgstr "1 hour"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:64
+#: ../backend/src/routes/settings.ts:65
 msgid "settings.attention.repairs.one"
 msgstr "1 repair needs attention"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:94
+#: ../backend/src/routes/settings.ts:95
 msgid "settings.attention.robots.one"
 msgstr "1 robot"
 
@@ -2820,17 +2820,17 @@ msgid "area.AI settings"
 msgstr "AI settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:78
+#: ../backend/src/routes/settings.ts:79
 msgid "settings.attention.ai.setup"
 msgstr "AI setup"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:73
+#: ../backend/src/routes/settings.ts:74
 msgid "settings.attention.install.running.title"
 msgstr "AI setup is still running."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:71
+#: ../backend/src/routes/settings.ts:72
 msgid "settings.attention.install.title"
 msgstr "AI setup needs attention."
 
@@ -3200,12 +3200,12 @@ msgid "notification.jobs.admin_stopped"
 msgstr "An admin stopped this job."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:230
+#: ../backend/src/lib/failureCopy.ts:237
 msgid "failure.composer.paused_by_admin.adult"
 msgstr "An admin turned chat off for now."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:231
+#: ../backend/src/lib/failureCopy.ts:238
 msgid "failure.composer.paused_by_admin.teen"
 msgstr "An admin turned chat off for now."
 
@@ -3215,7 +3215,7 @@ msgid "An encyclopedia written for children."
 msgstr "An encyclopedia written for children."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:221
+#: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.gpu.more"
 msgstr "An owner can reboot the Mac when it is quiet."
 
@@ -4740,7 +4740,7 @@ msgstr "Can use it now"
 #: src/shell/pages/settings/SettingsRenderer.tsx:179
 #: src/shell/pages/status/StatusBoard.tsx:72
 #: src/shell/pages/status/StatusComponents.tsx:161
-#: src/shell/pages/StoragePage.tsx:205
+#: src/shell/pages/StoragePage.tsx:236
 #: src/shell/pages/TrashPage.tsx:67
 #: src/shell/pages/UpdatesPage.tsx:198
 msgid "Cancel"
@@ -4814,7 +4814,7 @@ msgid "Cannot use it now"
 msgstr "Cannot use it now"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Cap"
 msgstr "Cap"
 
@@ -5143,7 +5143,7 @@ msgid "setting.engines.chat.tier.standard.label"
 msgstr "Chat at Standard"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:220
+#: ../backend/src/lib/failureCopy.ts:227
 msgid "failure.composer.reduced_swap.more"
 msgstr "Chat comes back by itself in a few seconds."
 
@@ -5189,12 +5189,12 @@ msgid "Chat is down"
 msgstr "Chat is down"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:79
+#: ../backend/src/routes/settings.ts:80
 msgid "settings.attention.health.title"
 msgstr "Chat is not ready."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:232
+#: ../backend/src/lib/failureCopy.ts:239
 msgid "failure.composer.paused_by_admin.child"
 msgstr "Chat is resting. Ask a grown-up."
 
@@ -5204,17 +5204,17 @@ msgid "setting.resources.quiet_seconds.help"
 msgstr "Chat is simplified only after nobody has chatted or spoken for this many seconds. The least is 20, because swapping the chat model takes 20 to 60 seconds."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:224
+#: ../backend/src/lib/failureCopy.ts:231
 msgid "failure.composer.upgrading.adult"
 msgstr "Chat is unavailable while the system upgrades."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:225
+#: ../backend/src/lib/failureCopy.ts:232
 msgid "failure.composer.upgrading.teen"
 msgstr "Chat is unavailable while the system upgrades."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:226
+#: ../backend/src/lib/failureCopy.ts:233
 msgid "failure.composer.upgrading.child"
 msgstr "Chat is unavailable while the system upgrades."
 
@@ -5241,12 +5241,12 @@ msgid "Chat models"
 msgstr "Chat models"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:221
+#: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.gpu.adult"
 msgstr "Chat needs a reboot of the Mac."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:221
+#: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.gpu.teen"
 msgstr "Chat needs a reboot. Ask a grown-up."
 
@@ -5345,7 +5345,7 @@ msgid "Check my computers again"
 msgstr "Check my computers again"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:180
+#: ../backend/src/lib/failureCopy.ts:187
 msgid "failure.composer.repairs.check"
 msgstr "Check Repairs"
 
@@ -5365,8 +5365,8 @@ msgid "Check that Home is running, then open Free up space again."
 msgstr "Check that Home is running, then open Free up space again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:222
-#: src/apps/settings/ModelsAndStorageSection.tsx:236
+#: src/apps/settings/ModelsAndStorageSection.tsx:212
+#: src/shell/pages/StoragePage.tsx:200
 msgid "Check that Home is running, then reload this page."
 msgstr "Check that Home is running, then reload this page."
 
@@ -5376,7 +5376,7 @@ msgid "Check that the engine is running, then try again."
 msgstr "Check that the engine is running, then try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:395
 msgid "failure.advice.unreachable.next_step"
 msgstr "Check that the MaiPai Stack is running in Repairs."
 
@@ -6181,7 +6181,7 @@ msgid "Cleans every recording above before the voice is made. When you edit a vo
 msgstr "Cleans every recording above before the voice is made. If the echo remover is not installed, a lighter fix is used. A recording made in a quiet, soft room still works best."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:222
+#: src/shell/pages/StoragePage.tsx:200
 msgid "Cleanup list did not load"
 msgstr "Cleanup list did not load"
 
@@ -6204,7 +6204,7 @@ msgid "Clear {count} locks"
 msgstr "Clear {count} locks"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:194
+#: src/shell/pages/StoragePage.tsx:225
 msgid "Clear {name}"
 msgstr "Clear {name}"
 
@@ -6214,8 +6214,8 @@ msgstr "Clear {name}"
 #: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/ActivityPage.tsx:107
 #: src/shell/pages/ActivityPage.tsx:157
-#: src/shell/pages/StoragePage.tsx:196
-#: src/shell/pages/StoragePage.tsx:206
+#: src/shell/pages/StoragePage.tsx:227
+#: src/shell/pages/StoragePage.tsx:237
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -6230,7 +6230,7 @@ msgid "Clear all finished activity?"
 msgstr "Clear all finished activity?"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:201
+#: src/shell/pages/StoragePage.tsx:232
 msgid "Clear all saved online data?"
 msgstr "Clear all saved online data?"
 
@@ -6255,13 +6255,13 @@ msgid "Clear locks"
 msgstr "Clear locks"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:229
-#: src/apps/settings/ModelsAndStorageSection.tsx:230
+#: src/shell/pages/StoragePage.tsx:212
+#: src/shell/pages/StoragePage.tsx:213
 msgid "Clear selected"
 msgstr "Clear selected"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:230
+#: src/shell/pages/StoragePage.tsx:213
 msgid "Clear selected items?"
 msgstr "Clear selected items?"
 
@@ -6276,13 +6276,13 @@ msgid "Clear this"
 msgstr "Clear this"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:129
+#: src/shell/pages/StoragePage.tsx:131
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}."
 msgstr "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from {source}."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AdminPages.es.test.tsx:117
-#: src/shell/pages/StoragePage.tsx:129
+#: src/shell/pages/StoragePage.tsx:131
 msgid "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources."
 msgstr "Cleared {count, plural, one {# saved copy} other {# saved copies}} ({size}) from all sources."
 
@@ -7218,11 +7218,6 @@ msgid "Could not forget those memories. Check your connection and try again."
 msgstr "Could not forget those memories. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:213
-msgid "Could not free up space. Try again."
-msgstr "Could not free up space. Try again."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:187
 msgid "Could not get that backup ready."
 msgstr "Could not get that backup ready."
@@ -7379,7 +7374,7 @@ msgid "Could not load skills."
 msgstr "Could not load skills."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:143
+#: src/shell/pages/StoragePage.tsx:145
 msgid "Could not load storage."
 msgstr "Could not load storage."
 
@@ -7661,7 +7656,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr "Could not reach Home. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:402
+#: ../backend/src/lib/failureCopy.ts:406
 msgid "failure.tool.unavailable.verb"
 msgstr "could not reach its service"
 
@@ -10178,7 +10173,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr "FAIL hop {id}: {detail} — Fix: {fix}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:405
+#: ../backend/src/lib/failureCopy.ts:409
 msgid "failure.tool.errored.verb"
 msgstr "failed"
 
@@ -10432,7 +10427,7 @@ msgid "Finish"
 msgstr "Finish"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:70
+#: ../backend/src/routes/settings.ts:71
 msgid "settings.attention.setup.todo"
 msgstr "Finish setting up"
 
@@ -10783,7 +10778,7 @@ msgid "Forward 30 seconds"
 msgstr "Forward 30 seconds"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:404
+#: ../backend/src/lib/failureCopy.ts:408
 msgid "failure.tool.found_nothing.verb"
 msgstr "found nothing"
 
@@ -10808,7 +10803,7 @@ msgid "Free memory"
 msgstr "Free memory"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.advice.memory.next_step"
 msgstr "Free some memory, then retry."
 
@@ -10865,11 +10860,15 @@ msgstr "Free up memory"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:59
-#: src/apps/settings/ModelsAndStorageSection.tsx:220
-#: src/apps/settings/ModelsAndStorageSection.tsx:221
 #: src/shell/pages/settings/settingsViews.tsx:114
+#: src/shell/pages/StoragePage.tsx:198
 msgid "Free up space"
 msgstr "Free up space"
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:392
+msgid "failure.advice.disk.next_step"
+msgstr "Free up space in Settings, Models and storage, then retry."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:69
@@ -10882,9 +10881,9 @@ msgid "Freeing"
 msgstr "Freeing"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:225
-msgid "Frees {size}"
-msgstr "Frees {size}"
+#: src/shell/pages/StoragePage.tsx:204
+msgid "Frees"
+msgstr "Frees"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/musicCreateForm.ts:45
@@ -11266,17 +11265,17 @@ msgid "Getting it ready…"
 msgstr "Getting it ready…"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:219
+#: ../backend/src/lib/failureCopy.ts:226
 msgid "failure.composer.mode_change.adult"
 msgstr "Getting ready. Back in about a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:219
+#: ../backend/src/lib/failureCopy.ts:226
 msgid "failure.composer.mode_change.teen"
 msgstr "Getting ready. Back in about a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:219
+#: ../backend/src/lib/failureCopy.ts:226
 msgid "failure.composer.mode_change.child"
 msgstr "Getting ready. Back in about a minute."
 
@@ -11480,7 +11479,7 @@ msgid "setting.content.filters.option_label.gore"
 msgstr "Gore"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:406
+#: ../backend/src/lib/failureCopy.ts:410
 msgid "failure.tool.bad_arguments.verb"
 msgstr "got a request it could not use"
 
@@ -11956,7 +11955,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again. If you never saw a permission prompt, open System Settings > Privacy & Security > Microphone and switch on this browser."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:100
+#: ../backend/src/routes/settings.ts:101
 msgid "settings.attention.search.line"
 msgstr "Home cannot reach your search service yet."
 
@@ -12049,7 +12048,7 @@ msgid "Home could not check the drive space"
 msgstr "Home could not check the drive space"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:133
+#: src/shell/pages/StoragePage.tsx:135
 msgid "Home could not clear the saved copies. Check that Home is running and try again."
 msgstr "Home could not clear the saved copies. Check that Home is running and try again."
 
@@ -12149,12 +12148,12 @@ msgid "Home could not make that voiceover. Try again."
 msgstr "Home could not make that voiceover. Try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:395
 msgid "failure.advice.unreachable.cause"
 msgstr "Home could not reach the chat engine."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:396
 msgid "failure.advice.engine_computer.cause"
 msgstr "Home could not reach the engine computer."
 
@@ -12459,7 +12458,7 @@ msgid "Home is checking that everything is ready."
 msgstr "Home is checking that everything is ready."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:219
+#: ../backend/src/lib/failureCopy.ts:226
 msgid "failure.composer.mode_change.more"
 msgstr "Home is getting ready for another job. Chat comes back by itself."
 
@@ -12610,7 +12609,7 @@ msgid "setting.voice.talk_over.option.off"
 msgstr "Home waits until you have clearly stopped before it makes a sound."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:74
+#: ../backend/src/routes/settings.ts:75
 msgid "settings.attention.install.running.line"
 msgstr "Home will finish setting up when it can."
 
@@ -12739,8 +12738,8 @@ msgid "Household synth"
 msgstr "Household synth"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:83
-#: src/shell/pages/StoragePage.tsx:153
+#: src/shell/pages/StoragePage.tsx:85
+#: src/shell/pages/StoragePage.tsx:155
 msgid "Household total"
 msgstr "Household total"
 
@@ -13132,12 +13131,12 @@ msgid "setting.person.voice_print.enrollment.consent_teen_self"
 msgstr "I agree to save my voice pattern on this Home."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:139
+#: ../backend/src/lib/failureCopy.ts:146
 msgid "failure.unreachable.minor"
 msgstr "I can't get to my thinking part right now. Please tell a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:144
+#: ../backend/src/lib/failureCopy.ts:151
 msgid "failure.engine_computer.minor"
 msgstr "I can't get to my thinking part right now. Please tell a grown-up."
 
@@ -13157,17 +13156,17 @@ msgid "failure.voice.listening_engine.minor"
 msgstr "I can't hear you right now. Please tell a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:143
+#: ../backend/src/lib/failureCopy.ts:150
 msgid "failure.engine_computer.adultAway"
 msgstr "I can't reach the AI computer from here. Your message is safe; send it again when you are home or once the connection is back."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:142
+#: ../backend/src/lib/failureCopy.ts:149
 msgid "failure.engine_computer.adult"
 msgstr "I can't reach the AI computer right now. Your message is safe; send it again once chat is back."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:138
+#: ../backend/src/lib/failureCopy.ts:145
 msgid "failure.unreachable.adult"
 msgstr "I can't reach the AI on this computer. Check it's running, then try again."
 
@@ -13197,12 +13196,12 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr "I can't use the microphone. Please tell a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:463
+#: ../backend/src/lib/failureCopy.ts:467
 msgid "failure.ask_form.unreachable"
 msgstr "I could not send the form. Check your connection, then submit it again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:464
+#: ../backend/src/lib/failureCopy.ts:468
 msgid "failure.ask_form.other"
 msgstr "I could not send the form. Submit it again in a moment."
 
@@ -13222,27 +13221,27 @@ msgid "I couldn't check on that video"
 msgstr "I couldn't check on that video"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:147
+#: ../backend/src/lib/failureCopy.ts:154
 msgid "failure.context_too_large.adult"
 msgstr "I couldn't hold all of that in my head at once. Send it again and I'll try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:424
+#: ../backend/src/lib/failureCopy.ts:428
 msgid "failure.partial.slow"
 msgstr "I had to stop there because the AI stopped answering. Ask me to continue if you want the rest."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:425
+#: ../backend/src/lib/failureCopy.ts:429
 msgid "failure.partial.other"
 msgstr "I had to stop there because the AI stopped working. Ask me to continue if you want the rest."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:423
+#: ../backend/src/lib/failureCopy.ts:427
 msgid "failure.partial.minor"
 msgstr "I had to stop there. Ask me again if you want the rest."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:131
+#: ../backend/src/lib/failureCopy.ts:138
 msgid "failure.stopped.minor"
 msgstr "I had to stop. Try again in a moment."
 
@@ -13283,12 +13282,12 @@ msgid "I looked at the starting picture and every animation."
 msgstr "I looked at the starting picture and every animation."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:221
+#: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.gpu.child"
 msgstr "I need a rest. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:210
+#: ../backend/src/lib/failureCopy.ts:217
 msgid "failure.composer.memory.child"
 msgstr "I need a rest. Try again soon."
 
@@ -13298,17 +13297,17 @@ msgid "I understand"
 msgstr "I understand"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:216
+#: ../backend/src/lib/failureCopy.ts:223
 msgid "failure.composer.not_installed.child"
 msgstr "I'm not ready yet. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:186
+#: ../backend/src/lib/failureCopy.ts:193
 msgid "failure.composer.paused.child"
 msgstr "I'm taking a break. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:238
+#: ../backend/src/lib/failureCopy.ts:245
 msgid "failure.composer.offline.child"
 msgstr "I'm taking a break. Ask a grown-up."
 
@@ -13318,7 +13317,7 @@ msgid "I'm taking a break. Ask a grown-up."
 msgstr "I'm taking a break. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:192
+#: ../backend/src/lib/failureCopy.ts:199
 msgid "failure.composer.starting.child"
 msgstr "I'm waking up. Send in a moment."
 
@@ -13348,7 +13347,7 @@ msgid "setting.person.vision.watch.help"
 msgstr "Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:67
+#: ../backend/src/routes/settings.ts:68
 msgid "settings.attention.backup_key.line"
 msgstr "If this computer breaks, nothing comes back."
 
@@ -13363,7 +13362,7 @@ msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr "If this computer breaks, this key restores your Home on a new one."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:83
+#: ../backend/src/routes/settings.ts:84
 msgid "settings.attention.backups.empty.line"
 msgstr "If this computer breaks, your family has nothing to restore."
 
@@ -13822,11 +13821,12 @@ msgstr "Italian"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:48
+#: src/shell/pages/StoragePage.tsx:203
 msgid "Item"
 msgstr "Item"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:223
+#: src/shell/pages/StoragePage.tsx:207
 msgid "Items that can free space"
 msgstr "Items that can free space"
 
@@ -14054,10 +14054,10 @@ msgstr "Keep the voice"
 #: src/apps/memory/PersonMemories.tsx:428
 #: src/apps/memory/PersonMemories.tsx:449
 #: src/apps/settings/FreeUpSpaceDialog.tsx:113
-#: src/apps/settings/ModelsAndStorageSection.tsx:230
 #: src/apps/settings/PersonMore.tsx:106
 #: src/apps/settings/UsersSection.tsx:241
 #: src/shell/library/LibraryTrash.tsx:28
+#: src/shell/pages/StoragePage.tsx:213
 msgid "Keep them"
 msgstr "Keep them"
 
@@ -14232,7 +14232,7 @@ msgid "Kept until {date}"
 msgstr "Kept until {date}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:225
+#: src/shell/pages/StoragePage.tsx:203
 msgid "Kept: {reason}"
 msgstr "Kept: {reason}"
 
@@ -15345,6 +15345,11 @@ msgid "Loading blocked sites"
 msgstr "Loading blocked sites"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/StoragePage.tsx:209
+msgid "Loading cleanup items…"
+msgstr "Loading cleanup items…"
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:477
 #: src/apps/setup/SetupWizard.tsx:477
 msgid "Loading coding setup"
@@ -15510,7 +15515,7 @@ msgid "Loading routing stats"
 msgstr "Loading routing stats"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:193
+#: src/shell/pages/StoragePage.tsx:224
 msgid "Loading saved data…"
 msgstr "Loading saved data…"
 
@@ -15542,7 +15547,7 @@ msgid "Loading skills"
 msgstr "Loading skills"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:144
+#: src/shell/pages/StoragePage.tsx:146
 msgid "Loading storage"
 msgstr "Loading storage"
 
@@ -17094,7 +17099,7 @@ msgid "Model:"
 msgstr "Model:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:219
+#: src/apps/settings/ModelsAndStorageSection.tsx:207
 msgid "Models and storage"
 msgstr "Models and storage"
 
@@ -18091,17 +18096,17 @@ msgid "No assistant keys"
 msgstr "No assistant keys"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:66
+#: ../backend/src/routes/settings.ts:67
 msgid "settings.attention.backup_key.title"
 msgstr "No backup key saved."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:89
+#: ../backend/src/routes/settings.ts:90
 msgid "settings.attention.backups.empty.summary"
 msgstr "No backups yet"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:82
+#: ../backend/src/routes/settings.ts:83
 msgid "settings.attention.backups.empty.title"
 msgstr "No backups yet."
 
@@ -18126,7 +18131,7 @@ msgid "No camera found"
 msgstr "No camera found"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:60
+#: src/shell/pages/StoragePage.tsx:62
 msgid "No cap set"
 msgstr "No cap set"
 
@@ -18229,12 +18234,12 @@ msgid "No family members yet."
 msgstr "No family members yet."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "No files yet."
 msgstr "No files yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:77
+#: ../backend/src/routes/settings.ts:78
 msgid "settings.attention.ai.no_install"
 msgstr "No install in progress"
 
@@ -18386,12 +18391,12 @@ msgid "No robot found on your network yet."
 msgstr "No robot found on your network yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:90
+#: ../backend/src/routes/settings.ts:91
 msgid "settings.attention.robots.title"
 msgstr "No robots connected yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:98
+#: ../backend/src/routes/settings.ts:99
 msgid "settings.attention.robots.empty"
 msgstr "No robots yet"
 
@@ -18416,7 +18421,7 @@ msgid "No saved networks reported."
 msgstr "No saved networks reported."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:193
+#: src/shell/pages/StoragePage.tsx:224
 msgid "No saved online data."
 msgstr "No saved online data."
 
@@ -18650,7 +18655,7 @@ msgid "none yet"
 msgstr "none yet"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:70
+#: src/shell/pages/StoragePage.tsx:72
 msgid "None yet"
 msgstr "None yet"
 
@@ -18890,7 +18895,7 @@ msgid "Note"
 msgstr "Note"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:228
+#: src/shell/pages/StoragePage.tsx:209
 msgid "Nothing can be cleared right now."
 msgstr "Nothing can be cleared right now."
 
@@ -19592,7 +19597,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr "Once total backup storage passes this, the oldest backups are deleted first - checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:462
+#: ../backend/src/lib/failureCopy.ts:466
 msgid "failure.ask_form.invalid"
 msgstr "One answer did not fit. Check each field, then submit the form again."
 
@@ -19603,47 +19608,47 @@ msgid "One computer"
 msgstr "One computer"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:124
+#: ../backend/src/lib/failureCopy.ts:126
 msgid "failure.memory.minor"
 msgstr "One moment. Ask again soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:220
+#: ../backend/src/lib/failureCopy.ts:227
 msgid "failure.composer.reduced_swap.adult"
 msgstr "One moment. Back in about 15 seconds."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:220
+#: ../backend/src/lib/failureCopy.ts:227
 msgid "failure.composer.reduced_swap.teen"
 msgstr "One moment. Back in about 15 seconds."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:220
+#: ../backend/src/lib/failureCopy.ts:227
 msgid "failure.composer.reduced_swap.child"
 msgstr "One moment. Back in about 15 seconds."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:202
+#: ../backend/src/lib/failureCopy.ts:209
 msgid "failure.composer.restarting.adult"
 msgstr "One moment. Back soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:203
+#: ../backend/src/lib/failureCopy.ts:210
 msgid "failure.composer.restarting.teen"
 msgstr "One moment. Back soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:204
+#: ../backend/src/lib/failureCopy.ts:211
 msgid "failure.composer.restarting.child"
 msgstr "One moment. Back soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:208
+#: ../backend/src/lib/failureCopy.ts:215
 msgid "failure.composer.memory.adult"
 msgstr "One moment. Back soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:209
+#: ../backend/src/lib/failureCopy.ts:216
 msgid "failure.composer.memory.teen"
 msgstr "One moment. Back soon."
 
@@ -19660,17 +19665,17 @@ msgid "One moment. Home will be back in about a minute."
 msgstr "One moment. Home will be back in about a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:119
+#: ../backend/src/lib/failureCopy.ts:121
 msgid "failure.busy.adult"
 msgstr "One moment. Send that again in a bit."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:123
+#: ../backend/src/lib/failureCopy.ts:125
 msgid "failure.memory.adult"
 msgstr "One moment. Try again in a bit."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:120
+#: ../backend/src/lib/failureCopy.ts:122
 msgid "failure.busy.minor"
 msgstr "One moment. Try again soon."
 
@@ -19828,12 +19833,12 @@ msgid "Open a song from your list, then choose Studio."
 msgstr "Open a song from your list, then choose Studio."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:75
+#: ../backend/src/routes/settings.ts:76
 msgid "settings.attention.ai.open"
 msgstr "Open AI and models"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:92
+#: ../backend/src/routes/settings.ts:93
 msgid "settings.attention.apps.open"
 msgstr "Open apps and devices"
 
@@ -19926,12 +19931,12 @@ msgid "Open one to play it and see everything you can do."
 msgstr "Open one to play it and see everything you can do."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:81
+#: ../backend/src/routes/settings.ts:82
 msgid "settings.attention.repairs.open"
 msgstr "Open Repairs"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:179
+#: ../backend/src/lib/failureCopy.ts:186
 msgid "failure.composer.repairs.open"
 msgstr "Open Repairs"
 
@@ -20436,7 +20441,7 @@ msgstr "Performance"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SiteBlocksSection.tsx:51
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Person"
 msgstr "Person"
 
@@ -21827,7 +21832,7 @@ msgid "Reading the details…"
 msgstr "Reading the details…"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:76
+#: ../backend/src/routes/settings.ts:77
 msgid "settings.attention.ai.ready"
 msgstr "Ready"
 
@@ -22176,6 +22181,11 @@ msgstr "Remove {name}"
 #: src/shell/pages/AllAppsPage.tsx:52
 msgid "Remove {name} from favorites"
 msgstr "Remove {name} from favorites"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/StoragePage.tsx:210
+msgid "Remove {name} from selection"
+msgstr "Remove {name} from selection"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:112
@@ -22726,12 +22736,12 @@ msgid "Retry"
 msgstr "Retry"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:402
+#: ../backend/src/lib/failureCopy.ts:406
 msgid "failure.tool.unavailable.next_step"
 msgstr "Retry once the service is back. If it stays down, check Repairs."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:396
 msgid "failure.advice.engine_computer.next_step"
 msgstr "Retry when the connection is back. If it stays down, check Repairs."
 
@@ -22741,32 +22751,32 @@ msgid "Retry with current companion"
 msgstr "Retry with current companion"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:397
 msgid "failure.advice.context_too_large.next_step"
 msgstr "Retry with less text, or start a new chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:406
+#: ../backend/src/lib/failureCopy.ts:410
 msgid "failure.tool.bad_arguments.next_step"
 msgstr "Retry; the model may word the request differently."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:403
+#: ../backend/src/lib/failureCopy.ts:407
 msgid "failure.tool.timed_out.next_step"
 msgstr "Retry; the service was slow to answer."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.advice.slow.next_step"
 msgstr "Retry. If it keeps happening, check Repairs."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:398
 msgid "failure.advice.other.next_step"
 msgstr "Retry. If it keeps happening, check Repairs."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:405
+#: ../backend/src/lib/failureCopy.ts:409
 msgid "failure.tool.errored.next_step"
 msgstr "Retry. If it keeps happening, check Repairs."
 
@@ -23082,7 +23092,7 @@ msgid "Robots found on your network"
 msgstr "Robots found on your network"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:93
+#: ../backend/src/routes/settings.ts:94
 msgid "settings.attention.robots.off"
 msgstr "Robots off"
 
@@ -23101,7 +23111,7 @@ msgstr "Rock"
 #: src/apps/people/NewPersonForm.tsx:109
 #: src/apps/settings/PersonAccessEditor.tsx:59
 #: src/shell/pages/EnginesPage.tsx:46
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Role"
 msgstr "Role"
 
@@ -23352,7 +23362,7 @@ msgid "Save audience"
 msgstr "Save audience"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:68
+#: ../backend/src/routes/settings.ts:69
 msgid "settings.attention.backup_key.action"
 msgstr "Save backup key"
 
@@ -23409,22 +23419,22 @@ msgid "Saved as a character"
 msgstr "Saved as a character"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:51
+#: src/shell/pages/StoragePage.tsx:53
 msgid "Saved copies"
 msgstr "Saved copies"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:187
+#: src/shell/pages/StoragePage.tsx:218
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks."
 msgstr "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:55
+#: src/shell/pages/StoragePage.tsx:57
 msgid "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks."
 msgstr "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:191
+#: src/shell/pages/StoragePage.tsx:222
 msgid "Saved data by source"
 msgstr "Saved data by source"
 
@@ -23464,7 +23474,7 @@ msgid "Saved on this device. It plays here without a connection."
 msgstr "Saved on this device. It plays here without a connection."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:185
+#: src/shell/pages/StoragePage.tsx:216
 msgid "Saved online data"
 msgstr "Saved online data"
 
@@ -24107,10 +24117,14 @@ msgstr "Seek 5 seconds"
 
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:156
-#: src/apps/settings/ModelsAndStorageSection.tsx:226
 #: src/shell/pages/FilesPage.tsx:402
 msgid "Select"
 msgstr "Select"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/StoragePage.tsx:210
+msgid "Select {name}"
+msgstr "Select {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:152
@@ -24154,11 +24168,6 @@ msgstr "Select memories"
 #: src/apps/settings/UsersSection.tsx:223
 msgid "Select people"
 msgstr "Select people"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:226
-msgid "Selected"
-msgstr "Selected"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:101
@@ -24303,7 +24312,7 @@ msgid "Set up away access"
 msgstr "Set up away access"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:84
+#: ../backend/src/routes/settings.ts:85
 msgid "settings.attention.backups.open"
 msgstr "Set up backups"
 
@@ -24338,12 +24347,12 @@ msgid "Set up standard coding"
 msgstr "Set up standard coding"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:101
+#: ../backend/src/routes/settings.ts:102
 msgid "settings.attention.search.open"
 msgstr "Set up web search"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:103
+#: ../backend/src/routes/settings.ts:104
 msgid "settings.attention.search.setup"
 msgstr "Set up web search"
 
@@ -24529,7 +24538,7 @@ msgid "setting.setup.checklist_dismissed.label"
 msgstr "Setup checklist items hidden"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:69
+#: ../backend/src/routes/settings.ts:70
 msgid "settings.attention.setup.complete"
 msgstr "Setup complete"
 
@@ -24603,7 +24612,7 @@ msgid "Shared"
 msgstr "Shared"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:80
+#: src/shell/pages/StoragePage.tsx:82
 msgid "Shared by people no longer here"
 msgstr "Shared by people no longer here"
 
@@ -25127,7 +25136,7 @@ msgstr "Six-digit code"
 #: src/apps/settings/styles/StyleEditor.tsx:158
 #: src/shell/library/LibraryViewer.tsx:163
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
-#: src/shell/pages/StoragePage.tsx:52
+#: src/shell/pages/StoragePage.tsx:54
 msgid "Size"
 msgstr "Size"
 
@@ -25519,7 +25528,7 @@ msgid "Something went wrong opening the camera. Try again."
 msgstr "Something went wrong opening the camera. Try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:151
+#: ../backend/src/lib/failureCopy.ts:158
 msgid "failure.other.adult"
 msgstr "Something went wrong while writing that. Send it again, or check Repairs."
 
@@ -25529,7 +25538,7 @@ msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:152
+#: ../backend/src/lib/failureCopy.ts:159
 msgid "failure.other.minor"
 msgstr "Something went wrong. Try asking again."
 
@@ -25659,7 +25668,7 @@ msgstr "Sounds you have saved."
 #: src/apps/settings/styles/StyleBrowser.tsx:130
 #: src/apps/settings/styles/StyleEditor.tsx:155
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/StoragePage.tsx:50
+#: src/shell/pages/StoragePage.tsx:52
 msgid "Source"
 msgstr "Source"
 
@@ -26014,7 +26023,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr "Start signing in again with your PIN or passkey."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:389
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.advice.stopped.next_step"
 msgstr "Start the chat engine in Repairs."
 
@@ -26116,12 +26125,12 @@ msgid "Starting up"
 msgstr "Starting up"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:190
+#: ../backend/src/lib/failureCopy.ts:197
 msgid "failure.composer.starting.adult"
 msgstr "Starting up. Send in a moment."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:191
+#: ../backend/src/lib/failureCopy.ts:198
 msgid "failure.composer.starting.teen"
 msgstr "Starting up. Send in a moment."
 
@@ -26357,7 +26366,7 @@ msgstr "Stopwatch running"
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/settings/settingsViews.tsx:114
-#: src/shell/pages/StoragePage.tsx:116
+#: src/shell/pages/StoragePage.tsx:118
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
@@ -26386,7 +26395,7 @@ msgid "Storage areas"
 msgstr "Storage areas"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:181
+#: src/shell/pages/StoragePage.tsx:195
 msgid "Storage usage by person"
 msgstr "Storage usage by person"
 
@@ -26906,6 +26915,11 @@ msgid "Tell Home what you want to hear. Add your own words, a saved style or a b
 msgstr "Tell Home what you want to hear. Add your own words, a saved style or a band's sound if you like."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:130
+msgid "failure.disk.adultNoRepairs"
+msgstr "Tell whoever looks after this hub."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:660
 msgid "setting.engines.stack.remote.host.does"
 msgstr "Tells Home which machine to reach for the engine."
@@ -27116,7 +27130,7 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
-#: src/apps/settings/ModelsAndStorageSection.tsx:238
+#: src/apps/settings/ModelsAndStorageSection.tsx:214
 #: src/apps/settings/ModelsSection.tsx:82
 #: src/apps/settings/ModelsSection.tsx:375
 #: src/apps/settings/PersonAccessEditor.tsx:122
@@ -27188,7 +27202,8 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/status/StatusBoard.tsx:133
 #: src/shell/pages/status/StatusComponents.tsx:125
 #: src/shell/pages/StatusPage.tsx:98
-#: src/shell/pages/StoragePage.tsx:186
+#: src/shell/pages/StoragePage.tsx:199
+#: src/shell/pages/StoragePage.tsx:217
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
@@ -27254,6 +27269,11 @@ msgid "api.error.grant_missing"
 msgstr "That grant is not there any more. Refresh the list and try again."
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:131
+msgid "failure.disk.minor"
+msgstr "That is paused for now."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:61
 msgid "api.error.coming_up_item_not_pending"
 msgstr "That item has already finished. Refresh Coming up to see what is next."
@@ -27279,7 +27299,7 @@ msgid "api.error.list_missing"
 msgstr "That list is not there any more. Refresh your lists and try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:447
+#: ../backend/src/lib/failureCopy.ts:451
 msgid "failure.prompt_limit.too_big.adult"
 msgstr "That message is more than I can read in one go on this computer, so I couldn't answer it."
 
@@ -27289,7 +27309,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "That message is no longer available. This chat is open at the end."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:448
+#: ../backend/src/lib/failureCopy.ts:452
 msgid "failure.prompt_limit.too_big.minor"
 msgstr "That message is too big for me to read all at once."
 
@@ -27374,7 +27394,7 @@ msgid "api.error.project_missing"
 msgstr "That project was not found. Refresh Projects and try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:130
+#: ../backend/src/lib/failureCopy.ts:137
 msgid "failure.stopped.adult"
 msgstr "That reply didn't finish. Send it again in a moment."
 
@@ -27437,12 +27457,12 @@ msgid "api.error.coming_up_timer_missing"
 msgstr "That timer was not found. Refresh Coming up and try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:135
+#: ../backend/src/lib/failureCopy.ts:142
 msgid "failure.slow.minor"
 msgstr "That took too long. Ask again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:134
+#: ../backend/src/lib/failureCopy.ts:141
 msgid "failure.slow.adult"
 msgstr "That took too long. Send it again."
 
@@ -27482,7 +27502,7 @@ msgid "That voice sample is not available right now."
 msgstr "That voice sample is not available right now."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:148
+#: ../backend/src/lib/failureCopy.ts:155
 msgid "failure.context_too_large.minor"
 msgstr "That was too much for me at once. Please ask me again."
 
@@ -27512,12 +27532,12 @@ msgid "The AI is installing. Chat works after."
 msgstr "The AI is installing. Chat works after."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:237
+#: src/apps/settings/ModelsAndStorageSection.tsx:213
 msgid "The AI is waiting for its helper to start. The Status page shows what is happening."
 msgstr "The AI is waiting for its helper to start. The Status page shows what is happening."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:236
+#: ../backend/src/lib/failureCopy.ts:243
 msgid "failure.composer.offline.adult"
 msgstr "The AI isn't answering."
 
@@ -27527,17 +27547,17 @@ msgid "The AI isn't answering."
 msgstr "The AI isn't answering."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:237
+#: ../backend/src/lib/failureCopy.ts:244
 msgid "failure.composer.offline.teen"
 msgstr "The AI isn't answering. Ask a grown-up."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:214
+#: ../backend/src/lib/failureCopy.ts:221
 msgid "failure.composer.not_installed.adult"
 msgstr "The AI isn't installed. Ask an owner."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:215
+#: ../backend/src/lib/failureCopy.ts:222
 msgid "failure.composer.not_installed.teen"
 msgstr "The AI isn't installed. Ask an owner."
 
@@ -27552,17 +27572,17 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr "The AI restarted while I was answering. Try again in a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:80
+#: ../backend/src/routes/settings.ts:81
 msgid "settings.attention.health.line"
 msgstr "The AI service needs attention before it can answer."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:72
+#: ../backend/src/routes/settings.ts:73
 msgid "settings.attention.install.failed"
 msgstr "The AI setup did not finish."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:461
+#: ../backend/src/lib/failureCopy.ts:465
 msgid "failure.ask_form.field"
 msgstr "The answer for \"{label}\" did not fit. Correct that field, then submit the form again."
 
@@ -27632,17 +27652,17 @@ msgid "The character could not be saved. Try again in a minute."
 msgstr "The character could not be saved. Try again in a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.advice.slow.cause"
 msgstr "The chat engine stopped answering before the reply finished."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:387
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.advice.busy.cause"
 msgstr "The chat engine was still starting or busy, so the reply never started."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:389
+#: ../backend/src/lib/failureCopy.ts:393
 msgid "failure.advice.stopped.cause"
 msgstr "The chat engine was stopped, so the reply never started."
 
@@ -27682,7 +27702,7 @@ msgid "setting.companions.enabled.help"
 msgstr "The companions you keep in Yours."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:388
+#: ../backend/src/lib/failureCopy.ts:391
 msgid "failure.advice.memory.cause"
 msgstr "The computer was too low on memory to run the chat engine."
 
@@ -27919,7 +27939,7 @@ msgstr "The line to say"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:65
-#: src/apps/settings/ModelsAndStorageSection.tsx:236
+#: src/apps/settings/ModelsAndStorageSection.tsx:212
 msgid "The list did not load"
 msgstr "The list did not load"
 
@@ -28251,12 +28271,12 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr "The remix could not start. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:398
 msgid "failure.advice.other.cause"
 msgstr "The reply failed, and the engine did not say why."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:397
 msgid "failure.advice.context_too_large.cause"
 msgstr "The request was too large for the chat engine's context window."
 
@@ -28684,9 +28704,19 @@ msgid "There is not enough room"
 msgstr "There is not enough room"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:129
+msgid "failure.disk.adult"
+msgstr "There is not enough room left on this computer for that. Free up space in Settings, Models and storage, then try again."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:82
 msgid "api.error.list_restore_none"
 msgstr "There is nothing left to restore. Refresh the list and try again."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:392
+msgid "failure.advice.disk.cause"
+msgstr "There was not enough room for this work."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:162
@@ -28795,12 +28825,12 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr "This cannot be undone. The file is gone from the Library; a copy that a chat still shows stays in that chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:443
+#: ../backend/src/lib/failureCopy.ts:447
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr "This chat has grown too long for me to keep in mind alongside that message. Start a new chat with New chat: I'll bring a summary of this one along, and I'll use it from your next message there."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:444
+#: ../backend/src/lib/failureCopy.ts:448
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr "This chat is really long now. Tap New chat and I'll bring along what we talked about."
 
@@ -28916,12 +28946,12 @@ msgid "api.error.file_belongs_to_item"
 msgstr "This file belongs to another item. Delete that item instead."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:460
+#: ../backend/src/lib/failureCopy.ts:464
 msgid "failure.ask_form.stale"
 msgstr "This form has expired or was already sent. Ask me again to get a new form."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:230
+#: src/shell/pages/StoragePage.tsx:213
 msgid "This frees {size}. Models can be installed again, and caches rebuild when needed."
 msgstr "This frees {size}. Models can be installed again, and caches rebuild when needed."
 
@@ -29233,7 +29263,7 @@ msgid "Time remaining"
 msgstr "Time remaining"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:403
+#: ../backend/src/lib/failureCopy.ts:407
 msgid "failure.tool.timed_out.verb"
 msgstr "timed out"
 
@@ -29400,7 +29430,7 @@ msgid "Tools using it will no longer connect to Home."
 msgstr "Tools using it will no longer connect to Home."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Top kind"
 msgstr "Top kind"
 
@@ -29503,7 +29533,7 @@ msgid "Translated"
 msgstr "Translated"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:164
+#: src/shell/pages/StoragePage.tsx:166
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:33
 msgid "Trash"
@@ -29639,7 +29669,7 @@ msgid "api.next.internal"
 msgstr "Try again. If it keeps happening, open Repairs."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:404
+#: ../backend/src/lib/failureCopy.ts:408
 msgid "failure.tool.found_nothing.next_step"
 msgstr "Try asking a different way."
 
@@ -30573,7 +30603,7 @@ msgid "setting.person.locale.option.household"
 msgstr "Use whatever the home uses."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/StoragePage.tsx:177
+#: src/shell/pages/StoragePage.tsx:191
 msgid "Used"
 msgstr "Used"
 
@@ -31116,7 +31146,7 @@ msgid "Volume"
 msgstr "Volume"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:387
+#: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.advice.busy.next_step"
 msgstr "Wait a moment, then retry."
 
@@ -31330,17 +31360,17 @@ msgid "area.Web search and memory settings"
 msgstr "Web search and memory settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:99
+#: ../backend/src/routes/settings.ts:100
 msgid "settings.attention.search.title"
 msgstr "Web search has no address."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:102
+#: ../backend/src/routes/settings.ts:103
 msgid "settings.attention.search.off"
 msgstr "Web search off"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:104
+#: ../backend/src/routes/settings.ts:105
 msgid "settings.attention.search.ready"
 msgstr "Web search ready"
 
@@ -32745,12 +32775,12 @@ msgid "YOUR LIST"
 msgstr "YOUR LIST"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:184
+#: ../backend/src/lib/failureCopy.ts:191
 msgid "failure.composer.paused.adult"
 msgstr "Your message is saved. Back soon."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:185
+#: ../backend/src/lib/failureCopy.ts:192
 msgid "failure.composer.paused.teen"
 msgstr "Your message is saved. Back soon."
 
@@ -32836,12 +32866,12 @@ msgid "api.error.upload_profile_gone"
 msgstr "Your profile is no longer available. Sign in again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:91
+#: ../backend/src/routes/settings.ts:92
 msgid "settings.attention.robots.line"
 msgstr "Your robots have not checked in with this home."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:63
+#: ../backend/src/routes/settings.ts:64
 msgid "settings.attention.personal.summary"
 msgstr "Your settings"
 
