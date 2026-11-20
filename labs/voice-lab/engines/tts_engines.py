@@ -307,7 +307,7 @@ class VoxCPM2(Engine):
     """VoxCPM2 (2B, bf16). Native 48 kHz, the server resamples to 24 kHz. The voice is the reference
     clip, cached as its two latent encodings plus the transcript. Streams through voxcpm_stream."""
     key = "voxcpm2"
-    repo = "mlx-community/VoxCPM2-bf16"
+    repo = os.environ.get("LAB_VOX_REPO", "mlx-community/VoxCPM2-bf16")   # LAB_VOX_REPO=mlx-community/VoxCPM2-4bit for the reduced voice
     mem_gb = 6.5
     needs_text = True
     builtin_voice = False
