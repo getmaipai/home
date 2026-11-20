@@ -30,6 +30,7 @@ import { measureClipDrift } from "./fidelity";
 import { runStackEdit } from "@/lib/videos/stackEdit";
 import { DEFAULT_CROSSFADE_S, filmOps, filmOverhead, MAX_EDIT_OPS, MAX_EDIT_SECONDS, overlayOp, seamJoinOps, type JoinTransition } from "@/lib/videos/editPlan";
 import { planFilm, type FilmPlan, type PlanFilmInput } from "./plan";
+import { verifyFinishedFilmBytes } from "./verifyFinished";
 import { changeMusic, isTransientStackError, redoShot, runFilm, type FilmEngines, type FilmStage } from "./run";
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
@@ -298,6 +299,12 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         engines.note = "The film is ready, but I couldn't add its music.";
         return cut;
       }
+    },
+    /** VF-CHECK-01: the Stack checks the finished file against the plan's shot list and lines. Advisory; never throws. */
+    async verifyCut({ plan, cutFileId }, options) {
+      const cut = readAttachment(actor, cutFileId);
+      if (!cut.ok) return { checked: false, lines: [] };
+      return verifyFinishedFilmBytes(cut.value.bytes, plan, options.signal);
     },
   };
   return engines;

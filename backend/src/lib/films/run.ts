@@ -19,6 +19,8 @@ export interface FilmEngines {
   makeMotionClip?(input: { shot: FilmPlan["shots"][number]; stillFileId: string; narrationFileId: string; seconds: number }, options: { signal: AbortSignal }): Promise<string>;
   makeMusic(input: { brief: string; seconds: number; faceless?: boolean }, options: { signal: AbortSignal }): Promise<string>;
   assemble(input: { plan: FilmPlan; clipFileIds: string[]; /** Null when the song could not be made: a film still ends with its picture and sound. */ musicFileId: string | null }, options: { signal: AbortSignal }): Promise<string>;
+  /** VF-CHECK-01: check the finished file against the plan (shots, lines, sound, picture). Lines are plain sentences for the film's card; `checked: false` means it could not be checked. */
+  verifyCut?(input: { plan: FilmPlan; cutFileId: string }, options: { signal: AbortSignal }): Promise<{ checked: boolean; lines: string[] }>;
   waitForIdle(): Promise<void>;
   note?: string;
   onProgress?: (progress: { stage: FilmStage; done: number; total: number; shotId?: string }) => void;
@@ -154,6 +156,11 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     const cutId = await callEngine("assemble", undefined, engines, signal, () => engines.assemble({ plan, clipFileIds: clips, musicFileId: musicFileId ?? null }, { signal }));
     engines.onProgress?.({ stage: "assemble", done: 1, total: 1 });
     current = updateMediaProduction(actor, productionId, { finished_cut_file_ids: [...current.finished_cut_file_ids, cutId] })!;
+    // VF-CHECK-01: the finished file is checked against the plan; what is wrong goes on the film's own card (the note), and the film stays usable.
+    if (!faceless && engines.verifyCut) {
+      const verdict = await engines.verifyCut({ plan, cutFileId: cutId }, { signal }).catch(() => ({ checked: false, lines: [] as string[] }));
+      if (verdict.lines.length) engines.note = [engines.note, ...verdict.lines].filter(Boolean).join(" ");
+    }
     engines.onProgress?.({ stage: "keep", done: 1, total: 1 });
   }
   return getMediaProduction(actor, productionId)!;
