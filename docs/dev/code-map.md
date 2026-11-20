@@ -624,7 +624,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fileRecordObject.ts` | FileObject |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/fillerEvents.ts` | reportFillerEvent |
-| `backend/src/lib/films/animatic.ts` | animaticRequest, ANIMATIC_OLD_STACK_LINE, ANIMATIC_FAILED_LINE, ANIMATIC_TIMEOUT_LINE, ANIMATIC_MISSING_LINE, runRoughCutJob |
+| `backend/src/lib/films/animatic.ts` | makeFilmAnimatic |
 | `backend/src/lib/films/background.ts` | __setFilmEnginesForTests, allowed, startPlannedFilm, startFilm, getFilmProgress, goFilm |
 | `backend/src/lib/films/engines.ts` | backgroundTurn, submitComposition, realFilmEngines, makeFilm, resumeFilm, redoFilmShot |
 | `backend/src/lib/films/fidelity.ts` | measureClipDrift |
@@ -634,13 +634,16 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/films/plan.ts` | filmPlanShotSchema, filmPlanSchema, facelessFilmPlanSchema, FILM_PLAN_RESPONSE_FORMAT, FACELESS_FILM_PLAN_RESPONSE_FORMAT, FILM_PLAN_PROMPT |
 | `backend/src/lib/films/reelFormats.ts` | listReelFormats, getReelFormat, listReelPresets, getReelPreset |
 | `backend/src/lib/films/referenceSheet.ts` | SHEET_WIDTH, SHEET_HEIGHT, SHEET_MAX_PANELS, sheetGrid, buildReferenceSheet |
+| `backend/src/lib/films/roughCut.ts` | roughCutRequest, animaticRequest, ANIMATIC_OLD_STACK_LINE, ANIMATIC_FAILED_LINE, ANIMATIC_TIMEOUT_LINE, ANIMATIC_MISSING_LINE |
 | `backend/src/lib/films/run.ts` | FilmStepError, isTransientStackError, __setFilmRetryDelaysForTests, runFilm, redoShot, changeMusic |
 | `backend/src/lib/films/sheetMaker.ts` | SHEET_W, cutOutPause, splitCutOutByMask, cutOutPeople, makeSheetFromPictures |
 | `backend/src/lib/films/sheetViews.ts` | FACE_MATCH_MIN, realViewTools, viewPlan, drawViews |
 | `backend/src/lib/films/store.ts` | createFilmRun, getFilmRun, updateFilmRun, listFilmRunsInStates, failInterruptedFilmRuns, listFilmRunsByParent |
 | `backend/src/lib/films/storyboardRows.ts` | storyboardRows, roughCutRows, renderPlanRows |
 | `backend/src/lib/films/tool.ts` | MAKE_FILM_TOOL_ID, makeFilmArgs, __setStartFilmForTests, castHintsFor, runMakeFilmTurn, runMakeFilm |
-| `backend/src/lib/films/verifyFinished.ts` | filmShotList, verdictLines, verifyFinishedFilm, verifyFinishedFilmBytes |
+| `backend/src/lib/films/verifyFinished.ts` | filmShotList, verdictLines, verifyFinishedFilm, verifyRoughCutFile, verifyRoughCutBytes, verifyFinishedFilmBytes |
+| `backend/src/lib/films/voicedPreview.ts` | VOICED_WORKING_NOTE, __setVoicedMakerForTests, startVoicedPreview |
+| `backend/src/lib/films/voicedRows.ts` | voicedRows, voicedStoryboardRows, voicedAvailable, voicedOfferRows |
 | `backend/src/lib/filter/ceiling.ts` | ceilingFor, kindOf, ceilingOf |
 | `backend/src/lib/filter/door.ts` | loadedModules, __resetForTests, buildDoor, checkRequest, release, releaseSync |
 | `backend/src/lib/filter/nothingSuitable.ts` | NOTHING_SUITABLE_HINT |
