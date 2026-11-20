@@ -490,3 +490,22 @@ test("a piece that is only a sound tag is skipped and does not fail the reply", 
   expect(spoken.every((t) => /[a-z]/i.test(t.replace(/\[[^\]]*\]/g, "")))).toBe(true);
   h.session.close();
 });
+
+test("a sound tag becomes the recorded sound between the two halves of the phrase, level-matched, and a tag with no sound is skipped", async () => {
+  const spoken: string[] = []; const asked: Array<[string, string, number]> = [];
+  const h = harness({
+    speech: async (text: string) => { spoken.push(text); return new Response(encodeWav(new Int16Array(2400).fill(2000))); },
+    sound: (voice: string, tag: string, rms: number) => { asked.push([voice, tag, rms]); return tag === "laugh" ? new Int16Array(7200).fill(1234) : null; },
+    chat: async function* () { yield { type: "text", text: "Ha [laugh] that is funny, [sigh] really." }; },
+  });
+  (h.session as any).history.commitUser("question");
+  await (h.session as any).reply("question", true);
+  await h.flush(200);
+  expect(spoken.map((t) => t.trim())).toEqual(["Ha", "that is funny,", "really."]);
+  expect(asked.map((a) => a[1])).toEqual(["laugh", "sigh"]);
+  expect(asked[0]![2]).toBeGreaterThan(0);
+  const frames = h.sent.filter((v): v is Uint8Array => typeof v !== "string");
+  const total = frames.reduce((n: number, f: Uint8Array) => n + (f.length - 8) / 2, 0);
+  expect(total).toBeGreaterThanOrEqual(2400 * 3 + 7200);
+  h.session.close();
+});

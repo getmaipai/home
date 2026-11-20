@@ -6,7 +6,8 @@ import { buildPrompt, datedUser } from "./prompt";
 import { encodeWav, StreamingWavReader } from "./wav";
 import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
-import { TagStream, forEngine } from "./tags";
+import { TagStream, forEngine, splitTags } from "./tags";
+import { pickSound } from "./sounds";
 import { judgeCutIn } from "./selfEcho";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -43,6 +44,7 @@ export class VoiceSession {
   private turnCheckFn: typeof turnCheck;
   private chatFn: typeof chat;
   private speechFn: typeof speech;
+  private soundFn: typeof pickSound; private speechRms = 0.06;
   private runToolFn: typeof runTool;
   private metricsFn: typeof appendMetrics;
   private vadDetector: { detect(frame: Float32Array): boolean };
@@ -66,9 +68,9 @@ export class VoiceSession {
   /** The engine keeps the conversation it just wrote, so no warm-up is needed right after a reply. Warm again only after a long quiet spell. */
   private rewarmIfStale() { if (this.now() - this.lastWarmAt > 10 * 60_000 && !this.warming) this.prewarm("all"); }
   private proto = 1; private seqExpected = 0; private netSim = { delayMs: 0, jitterMs: 0, lossPercent: 0, burstEveryMs: 0, burstStallMs: 0 }; private inboundLink: LinkModel; private outboundLink: LinkModel; private toolPendingAudio = false; private captureOffset = 0; private offsetInitialized = false; private toolDelayMs = 2500;
-  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
+  constructor(private ws: { readyState: number; send(data: string | Uint8Array): void }, private secret = "", deps: Partial<{ transcribe: typeof transcribe; turnCheck: typeof turnCheck; chat: typeof chat; speech: typeof speech; sound: typeof pickSound; runTool: typeof runTool; appendMetrics: typeof appendMetrics; prewarmChat: typeof prewarmChat; prewarmVoice: typeof prewarmVoice; supportedStyles: typeof supportedStyles; voicePrepared: typeof voicePrepared; now: () => number; setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; vad: { detect(frame: Float32Array): boolean }; random: () => number }> = {}) {
     this.now = deps.now ?? (() => performance.now()); this.tm = new TurnManager(this.now); this.inboundLink = new LinkModel(deps.random); this.outboundLink = new LinkModel(deps.random); this.speechOrigin = this.now(); this.lastVoiceAt = this.now();
-    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
+    this.transcribeFn = deps.transcribe ?? transcribe; this.turnCheckFn = deps.turnCheck ?? turnCheck; this.chatFn = deps.chat ?? chat; this.speechFn = deps.speech ?? speech; this.soundFn = deps.sound ?? pickSound; this.runToolFn = deps.runTool ?? runTool; this.vadDetector = deps.vad ?? this.vad;
     this.metricsFn = deps.appendMetrics ?? appendMetrics;
     this.prewarmChatFn = deps.prewarmChat ?? prewarmChat; this.prewarmVoiceFn = deps.prewarmVoice ?? prewarmVoice;
     this.injected = !!deps.speech; this.stylesFn = deps.supportedStyles ?? supportedStyles; this.voicePreparedFn = deps.voicePrepared ?? voicePrepared;
@@ -220,28 +222,39 @@ export class VoiceSession {
       const frame = new Uint8Array(8 + pcm.length * 2), v = new DataView(frame.buffer); v.setUint32(0, this.turn, true); v.setUint16(4, index, true); for (let i = 0; i < pcm.length; i++) v.setInt16(8 + i * 2, pcm[i], true); this.sendFrame(frame);
     };
     let sent = 0;
-    const synth = async (style: string) => {
-      const response = await this.speechFn(forEngine(text, supported), signal, { voice: choice.voice, style });
+    const synth = async (style: string, part: string) => {
+      const response = await this.speechFn(forEngine(part, supported), signal, { voice: choice.voice, style });
       if (!response.body) throw new Error("empty voice response");
       const reader = response.body.getReader(), wavReader = new StreamingWavReader();
       while (true) {
-        const part = await reader.read(); if (part.done) break;
-        const pcm = wavReader.push(part.value); if (!pcm.length) continue;
+        const piece = await reader.read(); if (piece.done) break;
+        const pcm = wavReader.push(piece.value); if (!pcm.length) continue;
         if (signal.aborted || this.closed) return;
         if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow();
+        let sum = 0; for (const v of pcm) sum += (v / 32768) ** 2; this.speechRms = this.speechRms * 0.7 + Math.sqrt(sum / pcm.length) * 0.3;
         sent += pcm.length; emit(pcm);
       }
       if (!sent) throw new Error("voice response contained no audio");
     };
     const fail = () => { this.metrics.ok = false; this.metrics.failure = "voice_failed"; this.send({ t: "error", code: "voice_failed" }); this.abort?.abort(); this.finishMetrics(); };
-    // A piece that is only a sound tag has no words for this voice; the engine refuses it, which used to fail the whole reply.
-    if (!/[\p{L}\p{N}]/u.test(forEngine(text, supported).replace(/\[[^\]]*\]/g, ""))) { if (!signal.aborted && !this.closed) { const t = new Uint8Array(488), tv2 = new DataView(t.buffer); tv2.setUint32(0, this.turn, true); tv2.setUint16(4, index, true); tv2.setUint16(6, 1, true); this.sendFrame(t); } return; }
-    try { await synth(choice.style); }
-    catch {
+    // The phrase is cut at its sound tags: words go to the voice, each tag becomes a real recorded sound from the same speaker (or nothing).
+    for (const seg of splitTags(text)) {
       if (signal.aborted || this.closed) return;
-      // A retry is only safe when nothing of this phrase has been heard yet.
-      if (sent) { fail(); return; }
-      try { await synth(""); } catch { if (signal.aborted || this.closed) return; fail(); return; }
+      if (seg.type === "tag") {
+        const sound = this.soundFn(choice.voice, seg.value, this.speechRms);
+        if (sound) { if (this.metrics.t_voice_first_audio === undefined) this.metrics.t_voice_first_audio = this.metricNow(); this.metrics.sounds = (this.metrics.sounds ?? 0) + 1; for (let i = 0; i < sound.length; i += 15360) emit(sound.subarray(i, i + 15360)); }
+        continue;
+      }
+      // A piece with no words has nothing for this voice to say; the engine refuses it, which used to fail the whole reply.
+      if (!/[\p{L}\p{N}]/u.test(seg.value)) continue;
+      const before = sent;
+      try { await synth(choice.style, seg.value); }
+      catch {
+        if (signal.aborted || this.closed) return;
+        // A retry is only safe when nothing of this piece has been heard yet.
+        if (sent !== before) { fail(); return; }
+        try { await synth("", seg.value); } catch { if (signal.aborted || this.closed) return; fail(); return; }
+      }
     }
     if (signal.aborted || this.closed) return;
     const tail = new Uint8Array(488), tv = new DataView(tail.buffer); tv.setUint32(0, this.turn, true); tv.setUint16(4, index, true); tv.setUint16(6, 1, true); this.sendFrame(tail);
