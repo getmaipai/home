@@ -5,13 +5,67 @@
   "category": "Utilities",
   "display": "Impression",
   "description": "Call with action start and a synth name when asked for an impression of, or to act as, a synth or person; do not ask first. Call with action stop when told to stop. Keeps its voice and memories.",
-  "offer": { "mode": "conditional", "gate": "impressionAllowed", "bench_row": "impression-tool", "priority": 999 },
+  "offer": {
+    "mode": "conditional",
+    "gate": "impressionAllowed",
+    "bench_row": "impression-tool",
+    "priority": 999
+  },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
-  "args": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["start", "stop"] }, "synth": { "type": "string", "minLength": 1, "maxLength": 120 } }, "additionalProperties": false },
-  "incognito": "ephemeral", "requires": [], "optional": [], "platforms": ["home"],
-  "min_role": "child", "consequential": false, "offline": "full", "config": [], "data_sources": [],
-  "permissions": [], "notifications": [], "backup": "hot", "background": false, "contributes": {},
-  "min_app": "0.1.0", "tier": 0, "quality_scale": "bronze"
+  "args": {
+    "type": "object",
+    "required": [
+      "action"
+    ],
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "start",
+          "stop"
+        ]
+      },
+      "synth": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      }
+    },
+    "additionalProperties": false
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "hot",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "routing": {
+    "examples": [
+      "do an impression of Marlow",
+      "act like Nova for a bit",
+      "pretend to be Sage",
+      "give me your best impression of a pirate",
+      "stop the impression"
+    ],
+    "patterns": []
+  },
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
 }

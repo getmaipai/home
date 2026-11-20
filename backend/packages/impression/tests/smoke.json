@@ -1,0 +1,1 @@
+{"description": "Starting an impression answers with the recipe reply.", "inputs": {"synth": "Marlow"}, "host_setup": {}, "expected": {"reply": {"text": "Impression ready.", "speech": "Impression ready."}, "actions": [], "scheduled_jobs": [], "home_calls": [], "memory_added": []}}

@@ -1,0 +1,1 @@
+{"description": "Noting a scene answers with the recipe reply.", "inputs": {"action": "observe"}, "host_setup": {}, "expected": {"reply": {"text": "Scene noted.", "speech": "Scene noted."}, "actions": [], "scheduled_jobs": [], "home_calls": [], "memory_added": []}}
