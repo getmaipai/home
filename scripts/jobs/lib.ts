@@ -146,7 +146,9 @@ export function findStrays(rows: PsRow[], managedPgids: Set<number>, cwdOf: (pid
   for (const r of rows) {
     if (lineage.has(r.pid) || !isTestCommand(r.command) || r.ageS < limitS || managedPgids.has(r.pgid) || pipelineOwned(r)) continue;
     const cwd = cwdOf(r.pid);
-    if (cwd && strayDir(cwd)) out.push({ pid: r.pid, ageS: r.ageS, cwd, command: r.command });
+    // MAIPAI_STRAY_SCOPE (tests): only runs under this folder count, so a test of the scan never sees (or stops) another session's `bun test` on the machine.
+    const scope = process.env.MAIPAI_STRAY_SCOPE;
+    if (cwd && strayDir(cwd) && (!scope || cwd === scope || cwd.startsWith(`${scope}/`))) out.push({ pid: r.pid, ageS: r.ageS, cwd, command: r.command });
   }
   return out;
 }

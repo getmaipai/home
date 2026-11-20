@@ -234,12 +234,12 @@ describe("stray test runs (GUARD-STRAY-01)", () => {
   const base = () => { const d = realpathSync(mkdtempSync(join(tmpdir(), "stray-"))); temps.push(d); return d; };
   const stop = (p: ReturnType<typeof spawn>) => { try { process.kill(p.pid!, "SIGKILL"); } catch { /* gone */ } };
   // Wait until the shell has exec'd and ps shows the `bun test` name (and lsof sees the cwd), up to 10 s.
-  const ready = async (p: ReturnType<typeof spawn>) => { for (let i = 0; i < 100; i++) { if (Bun.spawnSync(["/bin/ps", "-o", "command=", "-p", String(p.pid)]).stdout.toString().startsWith("bun test")) return; await Bun.sleep(100); } };
+  const ready = async (p: ReturnType<typeof spawn>, cwd = "") => { for (let i = 0; i < 100; i++) { if (Bun.spawnSync(["/bin/ps", "-o", "command=", "-p", String(p.pid)]).stdout.toString().startsWith("bun test") && (!cwd || Bun.spawnSync(["/usr/sbin/lsof", "-a", "-d", "cwd", "-p", String(p.pid), "-Fn"]).stdout.toString().includes(cwd))) return; await Bun.sleep(100); } };
 
   test("an old bun test in a wt/ folder is listed, and stopped only by --stop (audited)", async () => {
-    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "wt", "x"));
+    const root = base(); const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0", MAIPAI_STRAY_SCOPE: root }); const p = fake(join(root, "wt", "x"));
     try {
-      await ready(p);
+      await ready(p, root);
       const listed = job(e, "orphans").stdout.toString();
       expect(listed).toContain(String(p.pid)); expect(alive(p.pid!)).toBe(true);
       const ended = new Promise<void>((res) => p.on("exit", () => res()));
@@ -248,18 +248,28 @@ describe("stray test runs (GUARD-STRAY-01)", () => {
       expect(actions(e).some((x) => x.action === "stray-stopped" && (x.detail ?? "").includes(String(p.pid)) && x.worktree.includes("/wt/x"))).toBe(true);
     } finally { stop(p); }
   }, 30_000);
+  test("with a scope, a run in another worktree is neither listed nor stopped by --stop (the test of the scan never touches another session's tests)", async () => {
+    const mine = base(), other = base();
+    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0", MAIPAI_STRAY_SCOPE: mine }); const bystander = fake(join(other, "wt", "b"));
+    try {
+      await ready(bystander, other);
+      expect(job(e, "strays").stdout.toString()).not.toContain(String(bystander.pid));
+      job(e, "strays", "--stop");
+      expect(alive(bystander.pid!)).toBe(true);
+    } finally { stop(bystander); }
+  }, 30_000);
   test("a process outside wt/ and the warm checkouts is not listed", async () => {
-    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "elsewhere", "x"));
-    try { await ready(p); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
+    const root = base(); const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0", MAIPAI_STRAY_SCOPE: root }); const p = fake(join(root, "elsewhere", "x"));
+    try { await ready(p, root); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
   }, 30_000);
   test("a young process is not listed", async () => {
-    const e = env(); const p = fake(join(base(), "wt", "y"));
-    try { await ready(p); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
+    const root = base(); const e = env({ MAIPAI_STRAY_SCOPE: root }); const p = fake(join(root, "wt", "y"));
+    try { await ready(p, root); expect(job(e, "strays").stdout.toString()).not.toContain(String(p.pid)); } finally { stop(p); }
   }, 30_000);
   test("a process inside a job.sh process group is not listed", async () => {
-    const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0" }); const p = fake(join(base(), "wt", "z"));
+    const root = base(); const e = env({ MAIPAI_STRAY_TEST_MINUTES: "0", MAIPAI_STRAY_SCOPE: root }); const p = fake(join(root, "wt", "z"));
     try {
-      await ready(p);
+      await ready(p, root);
       const dir = join(e.MAIPAI_JOBS_DIR, "jobs"); Bun.spawnSync(["mkdir", "-p", dir]);
       const rec: JobRecord = { id: "m", type: "test", session: "s", worktree: tmpdir(), command: "bun test", pid: p.pid!, pgid: p.pid!, startedAt: 1, state: "running", log: "x" };
       writeFileSync(join(dir, "m.json"), JSON.stringify(rec));
