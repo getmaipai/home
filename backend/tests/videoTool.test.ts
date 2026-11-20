@@ -250,6 +250,44 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
+  test("a full Stack line holds spaced by the queue's timer (no spin), and a Stack that frees up makes the clip", async () => {
+    const { setNoRoomRecheckForTests } = await import("@/lib/jobs/householdQueue");
+    setNoRoomRecheckForTests(60);
+    try {
+      fake.refuseSubmit = { status: 429, code: "queue_full", error: "The queue is full." };
+      await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [BOAT]), reply: () => "On its way." }, async () => {
+        const { value } = await streamValue(people.owner, "make a short video of a paper boat");
+        await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "queued");
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const held = (getVideoJobFor(people.owner, value.video!.id)!.request as { submitQueueFullHolds?: number }).submitQueueFullHolds ?? 0;
+        expect(held).toBeGreaterThanOrEqual(2);
+        expect(held).toBeLessThanOrEqual(9);   // 400 ms at a 60 ms spacing: about six looks, never the 60 an instant retry loop burns
+        expect(getVideoJobFor(people.owner, value.video!.id)!.state).toBe("queued");
+        fake.refuseSubmit = null;
+        await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done", 8_000);
+      });
+    } finally { setNoRoomRecheckForTests(null); }
+  });
+
+  const ownerRow = async () => db.select().from(peopleTable).where(eq(peopleTable.id, people.owner.id)).get() as never;
+  test("Cancel works while the clip waits on a full Stack line, and nothing is sent after it", async () => {
+    const { setNoRoomRecheckForTests } = await import("@/lib/jobs/householdQueue");
+    const { cancelVideoJob } = await import("@/lib/videos/jobs");
+    setNoRoomRecheckForTests(40);
+    try {
+      fake.refuseSubmit = { status: 429, code: "queue_full", error: "The queue is full." };
+      await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [BOAT]), reply: () => "On its way." }, async () => {
+        const { value } = await streamValue(people.owner, "make a short video of a paper boat");
+        await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "queued");
+        await cancelVideoJob(await ownerRow(), value.video!.id);
+        fake.refuseSubmit = null;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(getVideoJobFor(people.owner, value.video!.id)!.state).toBe("cancelled");
+        expect(fake.jobs).toHaveLength(0);   // the fake records refused attempts in `submitted`; no Stack job was ever made
+      });
+    } finally { setNoRoomRecheckForTests(null); }
+  });
+
   test("a temporary chat keeps the job and the clip in memory: no job row, no file row, and the owner can still read it", async () => {
     await withStub(script(BOAT), async () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat", { temporary: true });

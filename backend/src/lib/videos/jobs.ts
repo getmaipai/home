@@ -313,7 +313,9 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     if (error instanceof StackVideoError && error.code === "queue_full") {
       const request = job.request as VideoRequest & { submitQueueFullHolds?: number };
       request.submitQueueFullHolds = (request.submitQueueFullHolds ?? 0) + 1;
-      if (request.submitQueueFullHolds <= 60) { job.state = "queued"; job.phase = "queued"; persistVideoJob(job); void releaseHouseholdQueue(); return; }
+      // A full Stack line is a wait, not a failure: the job stays queued ("Waiting for its turn") and the queue's own timer looks again every few seconds (never at once: a refusal that repeats must not spin the runner).
+      // The bound is real waiting time: 60 looks at the timer's spacing (about five minutes), then the plain full-line failure below.
+      if (request.submitQueueFullHolds <= 60) { job.state = "queued"; job.error = null; job.riseReason = "max_window"; job.phase = "held:max_window"; persistVideoJob(job); scheduleNoRoomRecheck(); return; }
     }
     if (error instanceof StackVideoError && (error.code === "no_memory" || error.code === MEMORY_CANCELLED_CODE) && holdMaxAfterMemoryRefusal(job.request)) {
       job.state = "queued"; job.phase = "requeued_memory"; job.error = null; persistVideoJob(job); scheduleNoRoomRecheck(); return;
