@@ -19,15 +19,15 @@ describe("main watcher", () => {
     expect(run(f, "watcher.sh", ["run-once"]).stdout).toContain("up to date");
   }, 60_000);
 
-  test("checked T2 wanted sha runs first, writes green, and clears wanted ancestors", () => {
+  test("a checked T2 obligation on a commit main contains is discharged by the main run (moved, not deleted); a T2 for a commit main lacks runs when main is tested", () => {
     const f = fixture();
     const sha = git(f.main, "rev-parse", "HEAD");
     const wanted = join(f.data, "t2-wanted"); mkdirSync(wanted, { recursive: true });
     writeFileSync(join(wanted, sha), "wt/checked\nbackend/src/db/migrations/1000_test.sql\n2026-11-14T00:00:00Z\n");
     const out = run(f, "watcher.sh", ["run-once"], { ...f.env, MAIPAI_LAND_T2_CMD: "echo t2-pass" });
-    expect(out.status).toBe(0); expect(out.stdout).toContain("checked T2 green");
-    expect(existsSync(join(f.data, "t2-green", sha))).toBe(true);
+    expect(out.status).toBe(0); expect(out.stdout).toContain("green at");
     expect(existsSync(join(wanted, sha))).toBe(false);
+    expect(existsSync(join(f.data, "t2-discharged", sha))).toBe(true);
   }, 60_000);
 
   test("LAND-FIRST-01: in direct mode a failing post-landing check (typecheck or boot) records red and skips the suite; gated and unset skip the check", () => {

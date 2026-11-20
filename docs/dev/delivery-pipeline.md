@@ -147,7 +147,7 @@ No gate stamp is needed for a T1 commit when the repo has `scripts/land.sh`: the
 
 ## 7. Testing after landing: the watcher
 
-The watcher runs the whole suite on the newest `origin/main` in its own checkout and answers one question: is main green, and if not, which commit broke it. Each leg has its own process group and 1500 s watchdog; a timed-out leg is `stalled`, advances last-run, and creates no red, issue or bisect.
+The watcher runs the whole suite on the newest `origin/main` in its own checkout and answers one question: is main green, and if not, which commit broke it. Each leg has its own process group and 1500 s watchdog; a timed-out leg is `stalled`, advances last-run, and creates no red, issue or bisect. A stall files no issue. T2 reds and a main gap of 24 hours without a finished run file an issue; status reports an unverified gap after six hours.
 
 - **Waits briefly before a run:** quiet means no landing queued, the CPU used by our own work (bun, node, codex, tsc, vite, eslint, the Stack) under 200% (two cores), and at least 40 GB free memory. The quiet wait is capped at 300 s. A lander-busy condition counts only during the first 120 s. The whole-machine load average is not used as a quiet test.
 - **Checks out before testing:** after detaching at the selected main SHA, the watcher verifies `HEAD` equals that SHA. A checkout failure is logged and skipped, so a previous tree cannot be marked green for the requested commit.
@@ -155,10 +155,12 @@ The watcher runs the whole suite on the newest `origin/main` in its own checkout
 - **Takes the machine gate lock** around the suite only (released before the reruns and the bisect), so it never overlaps a full `check.sh` gate from another repo and never holds the lock for hours.
 - **Runs three legs, one after another** (memory-safe): scripts, backend, frontend, each through `shardTests.ts`. A failing leg does not stop the next. A leg that dies without an exit status counts as failed (137).
 - **Classifies:** reruns wait once before the pass, then each failing file is rerun alone under `nice 10`, up to `MAIPAI_WATCH_RERUNS`. Passing on any rerun makes the run `flaky` (counted green, with the files named); failing every time makes it `red`.
+- **T2 obligations:** main runs first whenever its head is untested. At most one T2 entry runs per tick, oldest queued timestamp first; T2 runs only when main's head is already tested, so a T2 queue can never block a main run. A T2 red stays queued and is retried only when a newer entry arrives or six hours pass. An obligation is discharged only by a finished main run (green, flaky or red) at a head containing its SHA; the entry moves to `t2-discharged/`. A green T2 discharges as well.
 - **Red:** the bisect has a 600 s budget, tests at most four newest-first candidates and reruns each file once per candidate. It considers only files failing every isolated rerun. If the budget ends first, it records no culprit and `unknown (bisect budget spent)`. A confirmed culprit is written to `reds/<sha>.md`, and a GitHub issue is filed or updated (`Watcher: main red at <sha7>: <file>`).
 - **Repeat flakes:** a file flaky in three runs within seven days is reported once as an issue, so it gets moved to the serial or bench list with its cause.
 - **Green** writes `green/<sha>`, which is what `ship.sh` looks for.
-- `bash scripts/pipeline.sh status` prints the `main:` line (green, flaky, red with culprit); `land.sh` prints it before queueing and warns when the branch touches a failing file.
+- `bash scripts/pipeline.sh status` prints the `main:` line (green, flaky, red with culprit), plus `main unverified for N h (last finished run <timestamp>)` after six hours; `land.sh` prints the same gap line next to its main status.
+- A T2 red files one issue per SHA. A 24 hour unverified gap files one issue and the next green closes it.
 
 ## 8. The daemons
 
@@ -384,6 +386,8 @@ So an express entry waits for the current lander operation (a running safety-sur
 Every gated refusal of `ship.sh` says in plain words what is missing (GATED-PROOF-01, 2026-11-12): whether `stable` exists at all ("stable does not exist yet (the nightly run has never passed on any commit)") or how far behind the commit it is ("stable is at abc1234, 3 commits behind def5678"), whether the watcher has a green run of that exact commit and whether the watcher daemon is running, and the two ways through (`bash scripts/nightly.sh run-now`, or a watcher green run) next to the way out (`bash scripts/mode.sh direct`). While `stable` does not exist, a safety-surface change is judged against what is live (the install's `.installed-tag`, `sha-<7>` or a release tag) instead of being waved through on a green run alone: anything on a T2 path changed since the live commit is held until a nightly pass moves `stable` past it; a live tag the checkout cannot resolve holds the ship too, with the reason. Dry runs take the same path, so `bash scripts/ship.sh <sha> --dry-run` in gated mode is the way to read the verdict without touching the hub.
 | `rush-ship.sh`, `ship-now.sh` | allowed | refused with the way out |
 | `dev.sh --workbench` | allowed | refused (`bun run dev` stays) |
+
+Safety-surface obligations (WATCHER-STARVED-01, 2026-11-20): a T2 entry is discharged only by a finished main run (green, flaky or red, never stalled) at a head that contains its commit; the entry is moved to `watch/t2-discharged/`, never deleted, and a red main's note names the entries it discharged. A T2 run for a commit main lacks goes oldest first, only when main's head is tested; a red one is marked once (`watch/t2-red/`) and not rerun until a newer entry arrives or 6 hours pass.
 
 Proof: `scripts/mode.test.ts`.
 

@@ -194,6 +194,24 @@ else:
 PY
 }
 
+watch_unverified_status() {
+  python3 - "$watch_data" "$(date +%s)" "${MAIPAI_WATCH_UNVERIFIED_SECONDS:-21600}" <<'PY'
+import datetime,json,os,sys
+d,now,threshold=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]); newest=0; stamp='never'
+try:
+ for line in open(os.path.join(d,'runs.jsonl')):
+  try:r=json.loads(line)
+  except Exception:continue
+  if r.get('result') not in ('green','flaky','red'):continue
+  try:n=int(datetime.datetime.fromisoformat(r['ts'].replace('Z','+00:00')).timestamp())
+  except Exception:continue
+  if n>newest:newest=n;stamp=r['ts']
+except OSError: pass
+age=now-newest if newest else now
+if age>threshold: print('main unverified for %d h (last finished run %s)' % (age//3600,stamp))
+PY
+}
+
 # GITNET-01: say loudly when the lander or watcher is inside one operation past its bound or one landing phase with no progress,
 # and when a hung operation was killed recently. Reads the ops records and stuck log the bounded steps write; no new daemon.
 stuck_status() {
@@ -276,6 +294,7 @@ status() {
   code_status lander.sh
   code_status watcher.sh
   watch_main_status
+  watch_unverified_status
   outbox_status
   express_status
   stable_status
@@ -495,7 +514,7 @@ case "${1:-}" in
       pid=$!
       echo "lander started (pid $pid)"
     fi
-    if watch_is_running; then echo "watcher already running (pid $watch_pid)"; else
+    if [[ -f "$(service_plist watcher)" ]]; then echo "watcher service installed; start deferred to the user service"; elif watch_is_running; then echo "watcher already running (pid $watch_pid)"; else
       nohup bash "$bin/watcher.sh" serve >>"$watch_data/watcher.log" 2>&1 </dev/null &
       watch_pid=$!
       echo "watcher started (pid $watch_pid)"

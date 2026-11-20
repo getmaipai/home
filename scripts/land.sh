@@ -213,6 +213,24 @@ prequeue_checks
 ahead="$(git rev-list --count "$base..HEAD")" || die "could not compare your branch with main; fetch and repair the checkout, then retry."
 (( ahead > 0 )) || die "branch has no commit over origin/main or the landed main; make and commit a change, then run land.sh again."
 watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
+# WATCHER-STARVED-01: say so when main has had no finished watcher run for hours (the same line pipeline.sh status prints).
+if [[ -f "$watch_data/runs.jsonl" ]]; then
+  python3 - "$watch_data" "$(date +%s)" "${MAIPAI_WATCH_UNVERIFIED_SECONDS:-21600}" <<'PY' || true
+import datetime,json,os,sys
+d,now,threshold=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]); newest=0; stamp='never'
+try:
+ for line in open(os.path.join(d,'runs.jsonl')):
+  try:r=json.loads(line)
+  except Exception:continue
+  if r.get('result') not in ('green','flaky','red'):continue
+  try:n=int(datetime.datetime.fromisoformat(r['ts'].replace('Z','+00:00')).timestamp())
+  except Exception:continue
+  if n>newest:newest=n;stamp=r['ts']
+except OSError: pass
+age=now-newest if newest else now
+if newest and age>threshold: print('main unverified for %d h (last finished run %s)' % (age//3600,stamp))
+PY
+fi
 if [[ -f "$watch_data/last-run" ]]; then
   watch_sha="$(cat "$watch_data/last-run" 2>/dev/null || true)"
   watch_record="$(python3 - "$watch_data/runs.jsonl" "$watch_sha" <<'PY'

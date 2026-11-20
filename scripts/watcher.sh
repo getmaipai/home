@@ -23,6 +23,7 @@ checkout="${MAIPAI_WATCH_CHECKOUT:-$(cd "$main/.." && pwd -P)/home-watcher}"
 gate_lock="${MAIPAI_GATE_LOCK:-$(cd "$main/.." && pwd -P)/.github/standards/bin/gate-lock.sh}"
 watcher_lock_held=0
 mkdir -p "$data/green" "$data/reds"
+mkdir -p "$data/t2-wanted" "$data/t2-red" "$data/t2-discharged"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
 
@@ -116,6 +117,83 @@ atomic_value() {
   tmp="$(mktemp "$(dirname "$path")/.watch.XXXXXX")"
   printf '%s\n' "$value" > "$tmp"
   mv -f "$tmp" "$path"
+}
+
+watch_unverified_age() {
+  python3 - "$data" "${1:-$(date +%s)}" <<'PY'
+import datetime,json,os,sys
+d,now=sys.argv[1],int(sys.argv[2]); newest=0; stamp='never'
+try:
+ for line in open(os.path.join(d,'runs.jsonl')):
+  try: r=json.loads(line)
+  except Exception: continue
+  if r.get('result') not in ('green','flaky','red'): continue
+  ts=r.get('ts','')
+  try: n=int(datetime.datetime.fromisoformat(ts.replace('Z','+00:00')).timestamp())
+  except Exception: continue
+  if n>newest: newest=n; stamp=ts
+except OSError: pass
+print(max(0,now-newest) if newest else now, stamp)
+PY
+}
+
+watch_unverified_alert() {
+  local now age stamp threshold key="$data/main-unverified-gap" note="$data/main-unverified.md"
+  now="$(date +%s)"; read -r age stamp < <(watch_unverified_age "$now")
+  threshold="${MAIPAI_WATCH_UNVERIFIED_SECONDS:-86400}"; [[ "$threshold" =~ ^[0-9]+$ ]] || threshold=86400
+  if (( age >= threshold )); then
+    if [[ "$(cat "$key" 2>/dev/null || true)" != "$stamp" ]]; then
+      printf 'Main has no finished green, flaky or red run for %s hours. Last finished run: %s\n' "$((age/3600))" "$stamp" >"$note"
+      file_issue "Watcher: main unverified for $((age/3600)) hours" unverified "$note" || true
+      atomic_value "$key" "$stamp"
+    fi
+  elif [[ -f "$key" ]]; then
+    local title="Watcher: main unverified" number
+    number="$(cat "$key")"
+    if [[ -n "${MAIPAI_WATCH_ISSUE_CMD:-}" ]]; then
+      (cd "$main" && bash -c "${MAIPAI_WATCH_CLOSE_ISSUE_CMD:-:} \"\$1\" \"\$2\"" _ "$title" "Main verification resumed at $stamp") >>"$data/watcher.log" 2>&1 || echo "watcher.sh: could not close unverified issue" >>"$data/watcher.log"
+    else
+      number="$(gh issue list -R getmaipai/home --state open --search 'Watcher: main unverified' --limit 5 --json number -q '.[0].number' 2>/dev/null | head -n 1 || true)"
+      [[ -z "$number" ]] || gh issue close "$number" -R getmaipai/home --comment "Main verification resumed at $stamp" >>"$data/watcher.log" 2>&1 || echo "watcher.sh: could not close unverified issue" >>"$data/watcher.log"
+    fi
+    rm -f "$key"
+  fi
+}
+
+t2_pick_oldest() {
+  python3 - "$data/t2-wanted" "$data/t2-red" "${MAIPAI_WATCH_T2_RERUN_SECONDS:-21600}" <<'PY'
+import os,sys,datetime,time
+d,red,rerun=sys.argv[1],sys.argv[2],int(sys.argv[3]) if sys.argv[3].isdigit() else 21600
+now=time.time(); entries=[]
+for name in os.listdir(d):
+ p=os.path.join(d,name)
+ if not os.path.isfile(p): continue
+ lines=open(p,errors='replace').read().splitlines(); stamp=lines[-1] if lines else ''
+ try: n=datetime.datetime.fromisoformat(stamp.replace('Z','+00:00')).timestamp()
+ except Exception: n=os.stat(p).st_mtime
+ r=os.path.join(red,name)
+ if os.path.isfile(r):
+  try:
+   seen=open(r+'.newer').read().strip() if os.path.isfile(r+'.newer') else stamp
+   if now-int(open(r).read().split()[0])<rerun and seen==stamp: continue
+  except Exception: pass
+ entries.append((n,name))
+if entries: print(min(entries)[1])
+PY
+}
+
+t2_discharge() {
+  local head="$1" result="$2" discharged="" sha
+  [[ "$result" != stalled ]] || return 0
+  while IFS= read -r sha; do
+    [[ -n "$sha" ]] || continue
+    if git -C "$checkout" merge-base --is-ancestor "$sha" "$head" 2>/dev/null; then
+      mv -f "$data/t2-wanted/$sha" "$data/t2-discharged/$sha"
+      discharged="${discharged:+$discharged }${sha:0:7}"
+    fi
+  done < <(find "$data/t2-wanted" -maxdepth 1 -type f -exec basename {} \;)
+  if [[ -n "$discharged" ]]; then echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) T2 obligations discharged: $discharged" >>"$data/watcher.log"; fi
+  printf '%s' "$discharged"
 }
 
 checkout_warm() {
@@ -523,9 +601,15 @@ checkout_lock_take() {
 checkout_lock_release() { [[ "$(cat "$checkout_lock/pid" 2>/dev/null || true)" != "$$" ]] || rm -rf "$checkout_lock"; }
 
 run_t2_wanted() {
-  local dir="$data/t2-wanted" sha branch files rc=0 output command item
+  local dir="$data/t2-wanted" sha branch files rc=0 output command item last red_at now rerun
   [[ -d "$dir" ]] || return 1
-  sha="$(find "$dir" -maxdepth 1 -type f -exec basename {} \; | sort | tail -n 1)"; [[ -n "$sha" ]] || return 1
+  sha="$(t2_pick_oldest)"; [[ -n "$sha" ]] || return 1
+  now="$(date +%s)"; rerun="${MAIPAI_WATCH_T2_RERUN_SECONDS:-21600}"; [[ "$rerun" =~ ^[0-9]+$ ]] || rerun=21600
+  if [[ -f "$data/t2-red/$sha" ]]; then
+    red_at="$(head -n 1 "$data/t2-red/$sha" 2>/dev/null || true)"
+    last="$(tail -n 1 "$dir/$sha" 2>/dev/null || true)"
+    if [[ "$(cat "$data/t2-red/$sha.newer" 2>/dev/null || true)" == "$last" ]] && [[ "$red_at" =~ ^[0-9]+$ ]] && (( now-red_at < rerun )); then return 1; fi
+  fi
   IFS= read -r branch <"$dir/$sha" || branch=unknown
   files="$(sed -n '2,$p' "$dir/$sha" | sed '$d')"
   checkout_lock_take || { echo "checked T2 waiting: checkout busy"; return 0; }
@@ -542,11 +626,14 @@ run_t2_wanted() {
   mkdir -p "$data/t2-green" "$data/reds"
   if (( rc == 0 )); then
     : >"$data/t2-green/$sha"
-    while IFS= read -r item; do git -C "$checkout" merge-base --is-ancestor "$item" "$sha" 2>/dev/null && rm -f "$dir/$item"; done < <(find "$dir" -maxdepth 1 -type f -exec basename {} \;)
+    while IFS= read -r item; do if git -C "$checkout" merge-base --is-ancestor "$item" "$sha" 2>/dev/null; then mv -f "$dir/$item" "$data/t2-discharged/$item"; fi; done < <(find "$dir" -maxdepth 1 -type f -exec basename {} \;)
+    rm -f "$data/t2-red/$sha"
     echo "checked T2 green at ${sha:0:7} ($branch)"
   else
+    printf '%s\n' "$now" >"$data/t2-red/$sha"; tail -n 1 "$dir/$sha" >"$data/t2-red/$sha.newer"
     { printf 'checked T2 failed: %s\nbranch: %s\nsafety files: %s\n' "$sha" "$branch" "$files"; tail -n 80 "$output"; } >"$data/reds/t2-$sha.md"
     echo "checked T2 red at ${sha:0:7} ($branch); wanted entry retained"
+    if [[ ! -f "$data/t2-issue-filed/$sha" ]]; then mkdir -p "$data/t2-issue-filed"; file_issue "Watcher: T2 red at ${sha:0:7} ($branch)" "t2-$sha" "$data/reds/t2-$sha.md" || true; : >"$data/t2-issue-filed/$sha"; fi
   fi
   rm -f "$output"; checkout_lock_release
   return 0
@@ -554,6 +641,8 @@ run_t2_wanted() {
 
 run_once() {
   local rc=0
+  # WATCHER-STARVED-01: one generation of rotation, checked every tick (the watcher runs for days).
+  if [[ -f "$data/watcher.log" ]] && (( $(wc -c <"$data/watcher.log") > 5242880 )); then mv -f "$data/watcher.log" "$data/watcher.log.1"; fi
   run_once_body "$@" || rc=$?
   checkout_lock_release
   return "$rc"
@@ -561,9 +650,10 @@ run_once() {
 
 run_once_body() {
   local head last_run last_green started output seconds rc files file all_pass=1 result culprit subject title note_tmp note timed_leg timed_seconds red_files="" budget_spent=0
-  local bisect_started bisect_budget bisect_spent
+  local bisect_started bisect_budget bisect_spent has_t2=0 passes=0 t2_every=3
   mkdir -p "$data/t2-wanted" "$data/t2-green"
-  if [[ -n "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]]; then run_t2_wanted; return 0; fi
+  [[ -z "$(find "$data/t2-wanted" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]] || has_t2=1
+  passes="$(cat "$data/main-passes-since-t2" 2>/dev/null || echo 0)"; [[ "$passes" =~ ^[0-9]+$ ]] || passes=0
   # OUTBOX-01: check the local landed main first, then check origin on the refresh interval.
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
@@ -580,7 +670,7 @@ run_once_body() {
     last_run="$(cat "$data/last-run" 2>/dev/null || true)"
     last_green="$(cat "$data/last-green" 2>/dev/null || true)"
   fi
-  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
+  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; atomic_value "$data/main-passes-since-t2" 0; else echo "up to date at ${head:0:7}"; fi; return 0; fi
   head="$(pipeline_main_sha "$checkout")"
   # HOST-GUARD-09: no suite starts under memory pressure or while the host guard paused heavy work; the next tick tries again.
   local hostmem_lib="$main/scripts/lib/hostmem.sh" gate_line=""
@@ -604,7 +694,7 @@ run_once_body() {
   head="$(pipeline_main_sha "$checkout")"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
-  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
+  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then watch_unverified_alert; if (( has_t2 )); then run_t2_wanted || true; atomic_value "$data/main-passes-since-t2" 0; else echo "up to date at ${head:0:7}"; fi; return 0; fi
   local checkout_error checkout_head
   # AUDIT-GATE-01: a tree that was not checked out is never tested or marked green. The failure is logged once per sha
   # (data/checkout-failed holds the last sha that failed) and retried on the next tick, since an index.lock is often transient.
@@ -674,6 +764,9 @@ run_once_body() {
     atomic_value "$data/last-green" "$head"
     atomic_value "$data/last-run" "$head"
     append_run "$head" green "$seconds" "" ""
+    atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
+    t2_discharge "$head" green >/dev/null
+    watch_unverified_alert
     rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
     echo "green at ${head:0:7} ($seconds s)"
     return 0
@@ -688,6 +781,9 @@ run_once_body() {
     atomic_value "$data/last-green" "$head"
     atomic_value "$data/last-run" "$head"
     append_run "$head" flaky "$seconds" "$files" ""
+    atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
+    t2_discharge "$head" flaky >/dev/null
+    watch_unverified_alert
     for file in $files; do file_flake_issue "$file"; done
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) flaky at $head; isolated reruns passed: $files" >> "$data/watcher.log"
     rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
@@ -715,6 +811,10 @@ run_once_body() {
   } > "$note_tmp"
   mv -f "$note_tmp" "$note"
   append_run "$head" red "$seconds" "$files" "$([[ "$culprit" == unknown ]] || printf %s "$culprit")"
+  atomic_value "$data/main-passes-since-t2" "$((passes + 1))"
+  t2_discharge "$head" red >"$data/.discharged-$head"
+  if [[ -s "$data/.discharged-$head" ]]; then { printf "\n## T2 obligations discharged by this run\n\n"; sed "s/ /\n- /g" "$data/.discharged-$head" | sed "s/^/- /"; } >>"$note"; rm -f "$data/.discharged-$head"; fi
+  watch_unverified_alert
   atomic_value "$data/last-run" "$head"
   file="${files%% *}"; title="Watcher: main red at ${head:0:7}: ${file:-unknown}"
   file_issue "$title" "${file:-unknown}" "$note"
@@ -732,7 +832,7 @@ serve() {
   (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
-    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
+    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then if [[ ! -f "$data/.duplicate-logged" ]] || [[ -n "$(find "$data/.duplicate-logged" -mmin +60 2>/dev/null)" ]]; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; : > "$data/.duplicate-logged"; fi; return 0; fi
   fi
   echo "$$" > "$pidfile"
   local stop_requested=0 sleep_pid=""
