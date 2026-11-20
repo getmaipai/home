@@ -497,4 +497,18 @@ describe("the manifest of three pages", () => {
       expect(text).not.toMatch(/videos\/(make-video|creations)/);
     }
   });
+  test("VF-EDIT-02: the edit tools stay on their page and show the result in place (a polled media_stage on the stage scope, no redirect to Create)", async () => {
+    const { adult } = await household();
+    for (const file of ["studio", "voiceover", "swap", "talking-avatar"]) {
+      const page = await (await adult.client.get(`/api/plugins/video/pages/${file}`)).json() as { body: Array<Row> };
+      expect(PageNodeSchema.safeParse(page).success).toBe(true);
+      const stage = page.body.find((node) => node.type === "media_stage") as Row | undefined;
+      expect(stage).toBeDefined();
+      expect((stage as { bind: { params: { scope: string } } }).bind.params.scope).toBe("stage");
+      expect(stage).toHaveProperty("poll_while");
+      const text = await Bun.file(join(PACKAGES_DIR, "video", "pages", `${file}.json`)).text();
+      if (file !== "studio") expect(text).not.toContain('"then"'); // the Studio's export card keeps its Spatial sound hop to Create (SPATIAL-REACH)
+    }
+    expect(await data(adult.client, { scope: "stage", filter: "edit" })).toEqual([]); // no clip chosen on an edit tool: nothing, never the newest unrelated take
+  });
 });

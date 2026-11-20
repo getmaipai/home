@@ -4,6 +4,77 @@
   "title": "Talking avatar",
   "body": [
     {
+      "type": "media_stage",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "stage"
+        }
+      },
+      "poll_while": {
+        "field": "state",
+        "values": [
+          "queued",
+          "running"
+        ]
+      },
+      "size": "stage",
+      "aspect": "short",
+      "media": {
+        "still": "still",
+        "loop": "loop",
+        "position": "position"
+      },
+      "description": "description",
+      "scrim": "strong",
+      "state": "stage_state",
+      "eyebrow": "eyebrow",
+      "title": "title",
+      "subtitle": "subtitle",
+      "progress": "progress",
+      "pills": [
+        {
+          "label": "Use it in the Studio",
+          "icon": "scissors",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/studio",
+              "state": {
+                "clip": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "label": "See it in Create",
+          "icon": "film",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/create"
+            }
+          }
+        }
+      ],
+      "error_message": "error_message",
+      "error_actions": [
+        {
+          "label": "Try again",
+          "starts": "video",
+          "icon": "refresh-cw",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/another",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "type": "prompt_bar",
       "placement": "inline",
       "layout": "chat",
@@ -15,9 +86,32 @@
       "submit_label": "Generate",
       "starts": "video",
       "chips": [
-        { "state": "orientation", "label": "Shape", "default": "landscape", "options": [{ "value": "landscape", "label": "Landscape" }, { "value": "portrait", "label": "Portrait" }], "group": "Settings", "presentation": "popover" }
+        {
+          "state": "orientation",
+          "label": "Shape",
+          "default": "landscape",
+          "options": [
+            {
+              "value": "landscape",
+              "label": "Landscape"
+            },
+            {
+              "value": "portrait",
+              "label": "Portrait"
+            }
+          ],
+          "group": "Settings",
+          "presentation": "popover"
+        }
       ],
-      "references": [{ "state": "cast", "label": "Cast", "kind": "character", "placement": "in_field" }],
+      "references": [
+        {
+          "state": "cast",
+          "label": "Cast",
+          "kind": "character",
+          "placement": "in_field"
+        }
+      ],
       "submit": {
         "call": {
           "target": "/api/plugins/video/actions/make",

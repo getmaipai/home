@@ -99,9 +99,88 @@
       }
     },
     {
+      "type": "media_stage",
+      "bind": {
+        "source": "package",
+        "path": "recipes",
+        "params": {
+          "scope": "stage",
+          "id": "$state.clip",
+          "filter": "edit"
+        }
+      },
+      "poll_while": {
+        "field": "state",
+        "values": [
+          "queued",
+          "running"
+        ]
+      },
+      "size": "stage",
+      "aspect": "short",
+      "media": {
+        "still": "still",
+        "loop": "loop",
+        "position": "position"
+      },
+      "description": "description",
+      "scrim": "strong",
+      "state": "stage_state",
+      "eyebrow": "eyebrow",
+      "title": "title",
+      "subtitle": "subtitle",
+      "progress": "progress",
+      "pills": [
+        {
+          "label": "Use it in the Studio",
+          "icon": "scissors",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/studio",
+              "state": {
+                "clip": "{id}"
+              }
+            }
+          }
+        },
+        {
+          "label": "See it in Create",
+          "icon": "film",
+          "action": {
+            "navigate": {
+              "to": "/apps/video/create"
+            }
+          }
+        }
+      ],
+      "error_message": "error_message",
+      "error_actions": [
+        {
+          "label": "Try again",
+          "starts": "video",
+          "icon": "refresh-cw",
+          "action": {
+            "call": {
+              "target": "/api/plugins/video/actions/another",
+              "method": "POST",
+              "args": {
+                "id": "{id}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "type": "studio",
       "kind": "video",
-      "panels": ["volume", "fades", "crossfade", "titles", "level"],
+      "panels": [
+        "volume",
+        "fades",
+        "crossfade",
+        "titles",
+        "level"
+      ],
       "bind": {
         "source": "package",
         "path": "recipes",
@@ -153,11 +232,6 @@
               "method": "POST",
               "args": {
                 "id": "{clip}"
-              },
-              "then": {
-                "navigate": {
-                  "to": "/apps/video/create"
-                }
               }
             }
           }
@@ -172,11 +246,6 @@
               "args": {
                 "id": "{clip}",
                 "level": "quick"
-              },
-              "then": {
-                "navigate": {
-                  "to": "/apps/video/create"
-                }
               }
             }
           }
@@ -191,11 +260,6 @@
               "args": {
                 "id": "{clip}",
                 "level": "better"
-              },
-              "then": {
-                "navigate": {
-                  "to": "/apps/video/create"
-                }
               }
             }
           }

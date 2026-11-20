@@ -540,7 +540,8 @@ registerMediaAppData("video", (person, dataId, params) => {
     // carries its words, look and camera for the press, and its clip and poster from the package.
     case "templates": return templateRows(person, params.filter === "inspiration", params.limit);
     case "short": return shortClipRows(person);
-    case "stage": return stageRows(person, { ...(typeof params.id === "string" && params.id ? { from: params.id } : {}) });
+    // `filter: "edit"` (the edit tools' pages): the result of an edit of the chosen clip, so with no clip chosen there is nothing to show (never the newest unrelated take).
+    case "stage": return params.filter === "edit" && !(typeof params.id === "string" && params.id) ? [] : stageRows(person, { ...(typeof params.id === "string" && params.id ? { from: params.id } : {}) });
     // VOICED-ROUGH-CUT-HOME-01: the page binds one storyboard. A fresh voiced preview's rows (timed lines with their audio and waves) replace the silent animatic's; with none, or once the plan has changed, the silent rows stay.
     case "storyboard": { const voiced = voicedRows(person, params.id); return voiced.length ? voiced : storyboardRows(person, params.id); }
     case "storyboard-voiced": return voicedRows(person, params.id);
