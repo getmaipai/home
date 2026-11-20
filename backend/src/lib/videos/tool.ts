@@ -104,6 +104,8 @@ export interface RunGenerateVideoInput {
   adultLock?: "on" | "off";
   /** TAKES-01: the first clip of the set this clip is a take of (the Create page's takes; not a tool argument, so the tool's size does not grow). */
   takeOf?: string;
+  /** A film shot (films/engines.ts): the shot's look paragraph and spoken line, sent to the generic door as `operation: clip_film_shot` (VF-ROUTE-01 follow-up). */
+  filmShot?: { look?: string; dialogue?: Array<{ speaker: string; text: string }> };
 }
 
 function failed(callId: string, args: Record<string, unknown>, code: string, kind: "unavailable" | "errored" | "bad_arguments", detail?: string): ToolExecutionOutcome {
@@ -367,6 +369,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         ...(image ? { image, image_source: imageSource } : {}),
         ...(identityImage ? { identity_image: identityImage, image_source: imageSource, identity_legacy_start: pickFor(true) !== null } : {}),
         ...(endImage ? { end_image: endImage } : {}),
+        ...(input.filmShot && lane === "adult" ? { film_shot: input.filmShot } : {}),
         ...(adapters.length > 0 ? { loras: plan.loras } : {}),
         ...(plan.negative ? { negative_prompt: plan.negative } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),

@@ -53,6 +53,8 @@ function buildClipRequest(body: VideoBody): StackMakeClipRequest | null {
     ...(body.image ? { start_picture: picture(body.image) } : {}),
     ...(body.identity_image ? { inputs: [{ role: "identity" as const, file: picture(body.identity_image) }] } : {}),
     ...(body.derived_start ? { intent: "derived_start" as const } : {}),
+    // A film shot: the Stack picks the recipe from the operation and the level; Home sends the look, the line and, for another take, the first take's job.
+    ...(body.film_shot ? { operation: "clip_film_shot" as never /* the pinned spec predates spec-v0.1.452; the Stack and the catalog `fields` decide */, ...(body.film_shot.look ? { look: body.film_shot.look } : {}), ...(body.film_shot.dialogue?.length ? { dialogue: body.film_shot.dialogue } : {}), ...(body.film_shot.take_of ? { take_of: body.film_shot.take_of } : {}) } : {}),
     ...(body.end_image ? { end_picture: picture(body.end_image) } : {}),
     ...(body.quiet_seconds !== undefined ? { quiet_seconds: body.quiet_seconds } : {}),
     ...(body.quiet_max_wait_seconds !== undefined ? { quiet_max_wait_seconds: body.quiet_max_wait_seconds } : {}),
@@ -67,7 +69,7 @@ export const doorWanted = (body: VideoBody): boolean => !legacyDoorForced() && c
  * Starts the clip on the generic door, or answers null when it must go on the old one. A Stack failure that is not a refusal (queue full, no memory,
  * memory cancelled) is thrown exactly as the old door throws it, so the queue and the holds in the job runner behave as before.
  */
-export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void, isStopped?: () => boolean): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; derivedImage?: string } | null> {
+export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onDerived?: (image: string) => void, isStopped?: () => boolean): Promise<{ job: string; done: StackClip[] | null; warnings: StackLoraWarning[]; /** The Stack's one plain line on the route it chose (a film shot says whether it is full HD and why not). */ routeReason?: string | null; derivedImage?: string } | null> {
   if (legacyDoorForced()) return null;
   if (!clipRequestFor(body)) return null;
   // The catalog is asked first so a clip that no part serves does not cost a call (a catalog that cannot be read decides nothing: the door is tried), and
@@ -91,7 +93,7 @@ export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onD
       }
       return null;   // shape_not_served, level_not_served, too_long, not_on_this_model, not_available ...: the old door decides
     }
-    return { job: made.job, done: null, warnings: [] };
+    return { job: made.job, done: null, warnings: [], ...(made.routeReason ? { routeReason: made.routeReason } : {}) };
   } catch (error) {
     // A Stack older than the door (no such route) or one whose strict request schema does not know a key we send (the live build rejects `wait` with 400 and a raw validation line): the old door decides, and the person never sees the engine's words.
     if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status) && !String(error.code).startsWith("start_picture_")) return null;

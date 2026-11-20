@@ -154,6 +154,8 @@ export interface VideoBody {
   identity_image?: string;
   /** Whether the old door may start from the identity picture as a plain start picture (the Stack reported it can), for a clip the generic door cannot take. */
   identity_legacy_start?: boolean;
+  /** VF-ROUTE-01 follow-up: this clip is a film shot. The generic door sends `operation: clip_film_shot` with the shot's look paragraph and spoken line; the Stack, never Home, picks the recipe (full HD at Max when this computer can hold it, else the next one down), so there is no size. `take_of` is the Stack job id of the first take when this is another take of the shot. The old door never sees any of it. */
+  film_shot?: { look?: string; dialogue?: Array<{ speaker: string; text: string }>; take_of?: string };
   /** VF-ROUTE-DERIVE-01: `image` is the first picture Home derived after the Stack's `needs_start_picture`; the resend says so (intent `derived_start`). */
   derived_start?: boolean;
   negative_prompt?: string;
@@ -235,13 +237,14 @@ export async function fitPictureForStack(base64: string): Promise<string> {
  * to the same runner as the old door, so the job id is the one `getVideoJob` polls. A refusal of the planner (`code` and `line`) is returned, not thrown:
  * the caller decides what to try next. Any other non-success answer is the Stack's own failure, thrown as the old door's are (queue_full, no_memory ...).
  */
-export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; job: string; part: string | null } | { ok: false; refusal: StackMakeRefusalRead }> {
+export async function makeClip(body: StackMakeClipRequest): Promise<{ ok: true; job: string; part: string | null; routeReason: string | null } | { ok: false; refusal: StackMakeRefusalRead }> {
   const res = await request("/stack/v1/jobs/make", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 60_000 });
   if (res.status === 200 || res.status === 202) {
     const result = await res.json() as Partial<StackMakeResultRead>;
     if (!result.id) throw new StackVideoError(502, "bad_reply", "That did not work. Try again.");
     forgetMediaRefusal("video");
-    return { ok: true, job: result.id, part: result.made_with?.part ?? null };
+    const reason = (result.made_with as { route_reason?: unknown } | undefined)?.route_reason;
+    return { ok: true, job: result.id, part: result.made_with?.part ?? null, routeReason: typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 300) : null };
   }
   // A typed refusal (code and line) is a 409, or a 422 for `needs_start_picture` (spec-v0.1.448); a 422 without a code is the engine's validation and is thrown below.
   if (res.status === 409 || res.status === 422) {

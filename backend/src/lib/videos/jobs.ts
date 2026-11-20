@@ -288,8 +288,8 @@ registerQueueProvider(() => {
 
 /** The old door never sees the identity or derived-start keys. A clip the generic door could not take starts from the cast's picture only when the Stack reported the old door can (`identity_legacy_start`); otherwise it ends with the plain no-picture-start line. */
 function legacyBodyFor(body: VideoBody & { timeout_ms: number }): VideoBody & { timeout_ms: number } {
-  const { identity_image, identity_legacy_start, derived_start, ...rest } = body;
-  void derived_start;
+  const { identity_image, identity_legacy_start, derived_start, film_shot, ...rest } = body;
+  void derived_start; void film_shot;
   if (identity_image && !rest.image) {
     if (!identity_legacy_start) throw new StackVideoError(422, "no_picture_start", NO_PICTURE_START_LINE);
     return { ...rest, image: identity_image };
@@ -307,11 +307,16 @@ async function releaseVideo(job: VideoJob): Promise<void> {
     const slotted = owner ? videoBodyForSlot(base, requestTier(job.request), passForPerson(owner), laneOfPerson(owner), await videoEngineStatus()) : null;
     if (slotted) { job.request.quality = slotted.quality; if (slotted.body.seconds !== undefined) job.request.seconds = slotted.body.seconds; if (slotted.tier === "standard") delete (job.request as { tier?: unknown }).tier; }
     const sendBody = { ...(slotted?.body ?? base), timeout_ms: 1 };
+    // Another take of a film shot names the first take's Stack job (`take_of`: same route and recipe, a new seed); the old door never sees it.
+    if (sendBody.film_shot && job.request.anotherOf && owner) { const first = getVideoJobFor(owner, job.request.anotherOf)?.stackJob; if (first) sendBody.film_shot = { ...sendBody.film_shot, take_of: first }; }
     // VF-DOOR-01: a plain clip goes through the generic make door; anything it cannot take is sent on the old door as before.
     const kept = (image: string) => { if (storedBody) { Object.assign(storedBody, { image, derived_start: true }); persistVideoJob(job); } };
     const submitted = (doorWanted(sendBody) ? await submitVideoViaDoor(sendBody, owner, kept, () => explicitlyStopped.has(job.id) || (job.state as string) === "cancelled") : null) ?? (await submitVideo(legacyBodyFor(sendBody)));
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job;
+    // A film shot's route line (full HD, or why not) is kept on the job for the film that asked; the Stack words it, Home only carries it.
+    const routeReason = ("routeReason" in submitted ? submitted.routeReason : null) ?? null;
+    if (sendBody.film_shot && typeof routeReason === "string" && routeReason) (job.request as VideoRequest & { routeReason?: string }).routeReason = routeReason;
     // LTXD-18B: the Stack's own words about an old-base style ride the clip's existing muted line (`create.note`, read by the card, the feed and the make reply); no new status surface.
     const warned = [...new Set(submitted.warnings.map((w) => w.message.trim()).filter(Boolean))].join(" ");
     if (warned) job.request.create = { ...(job.request.create ?? {}), note: [job.request.create?.note, warned].filter(Boolean).join(" ") };

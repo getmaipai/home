@@ -1,6 +1,7 @@
 import { getMediaProduction, setShotClip, setShotPicture, setShotVoiceLine, updateMediaProduction, clearShotArtifacts, type Production, type Shot } from "@/lib/mediaProductions";
 import { synthIdOfSubject } from "@/lib/mediaSubjects";
 import type { PersonRow } from "@/types";
+import { speakerOfPlan } from "./roughCut";
 import type { FilmPlan } from "@/lib/films/plan";
 
 export type FilmStage = "cast" | "stills" | "clips" | "music" | "assemble" | "keep";
@@ -11,7 +12,7 @@ export class FilmStepError extends Error {
 export interface FilmEngines {
   ensureSubject(input: { name: string; kind: "character" | "place" | "prop"; locked: string; /** A cast member the person picked: its subject, used as it is. */ subjectId?: string }, options: { signal: AbortSignal }): Promise<string>;
   makeStill(input: { shot: FilmPlan["shots"][number]; castLocked: string[]; /** The name of a supplied product kept hidden until this shot: its own picture is the still (a model redraws writing as nonsense). */ exactReference?: string }, options: { signal: AbortSignal }): Promise<string>;
-  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
+  makeClip(input: { shot: FilmPlan["shots"][number]; stillFileId: string; /** Who speaks the shot's line (the film's one character, else "Narration"). */ speaker?: string; /** The exact picture this clip must end on (the closing product shot follows it). */ endStillFileId?: string }, options: { signal: AbortSignal }): Promise<string>;
   /** FILM-REAL-05: how far a finished clip drifted from its starting picture (measure only; null when it cannot be measured). */
   measureClip?(input: { stillFileId: string; clipFileId: string; seconds: number }): Promise<{ first: number; middle: number; last: number } | null>;
   makeNarration?(input: { shot: FilmPlan["shots"][number] }, options: { signal: AbortSignal }): Promise<{ fileId: string; seconds: number }>;
@@ -130,7 +131,7 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
       } else {
         const last = plan.shots[plan.shots.length - 1]!, lastStored = productionShots(current).find((shot) => shot.id === last.id);
         const endsOnReveal = i === plan.shots.length - 2 && !!lastStored?.picture_file_id && plan.cast.some((member) => member.reveal_last === true && last.still.toLocaleLowerCase().includes(member.name.toLocaleLowerCase()));
-        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
+        fileId = await callEngine("clips", planned.id, engines, signal, () => engines.makeClip({ shot: planned, stillFileId: stored.picture_file_id!, speaker: speakerOfPlan(plan).name, ...(endsOnReveal ? { endStillFileId: lastStored!.picture_file_id! } : {}) }, { signal }));
       }
       setShotClip(actor.id, productionId, planned.id, fileId);
       if (!faceless && engines.measureClip) { const drift = await engines.measureClip({ stillFileId: stored.picture_file_id!, clipFileId: fileId, seconds: planned.seconds }).catch(() => null); if (drift) console.log(`[film] drift ${planned.id} first ${drift.first} middle ${drift.middle} last ${drift.last}`); }

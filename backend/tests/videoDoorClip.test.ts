@@ -154,3 +154,42 @@ test("an extend or retake goes to the old door unless the Stack lists every key 
   const sent = calls.filter((c) => c.path === "/stack/v1/jobs/make").at(-1)!.body!;
   expect(sent).toMatchObject({ operation: "retake_from", at_seconds: 3, level: "max", inputs: [{ role: "edit_source", file: "/tmp/video-edit/x.mp4" }] });
 });
+
+// ---- VF-ROUTE-01 follow-up: a film shot is a generic clip marked `clip_film_shot` (the Stack picks the recipe; there is no size field) ----
+const shotBody = (over: Partial<VideoBody> = {}): VideoBody => base({ size: "1280x720", seconds: 5, tier: "max", image: "AAAA", film_shot: { look: "Warm kitchen light, a woman in a blue coat.", dialogue: [{ speaker: "Willow", text: "Please put the blue mug back." }] }, ...over });
+
+test("a film shot is sent as operation clip_film_shot with its look, its line, the start picture and the household's level, and never a size", () => {
+  const request = clipRequestFor(shotBody()) as Record<string, unknown>;
+  expect(request).toMatchObject({ job: "clip", operation: "clip_film_shot", level: "max", seconds: 5, look: "Warm kitchen light, a woman in a blue coat.", dialogue: [{ speaker: "Willow", text: "Please put the blue mug back." }], start_picture: "data:image/png;base64,AAAA" });
+  expect("size" in request).toBe(false);
+  // The level is the household's, never forced to max.
+  expect(clipRequestFor(shotBody({ tier: undefined }))).toMatchObject({ operation: "clip_film_shot", level: "standard" });
+  expect(clipRequestFor(shotBody({ tier: "boost" }))).toMatchObject({ level: "boost" });
+});
+
+test("a retry of a film shot carries take_of; a body that is not a film shot never carries the film keys", () => {
+  expect(clipRequestFor(shotBody({ film_shot: { look: "x", take_of: "stack-job-1" } }))).toMatchObject({ operation: "clip_film_shot", take_of: "stack-job-1" });
+  const plain = clipRequestFor(base()) as Record<string, unknown>;
+  for (const key of ["operation", "look", "dialogue", "take_of"]) expect(key in plain).toBe(false);
+});
+
+test("a Stack whose catalog does not list the film-shot keys gets the old door: the clip is not sent at all as a film shot", () => {
+  expect(clipRequestFor(shotBody(), new Set(OLD_CLIP_FIELDS))).toBeNull();
+  expect(clipRequestFor(shotBody(), new Set([...ALL_FIELDS, "operation", "look", "take_of"]))).not.toBeNull();
+});
+
+test("a typed refusal of the film shot answers null, so the old door makes the shot exactly as before", async () => {
+  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of"];
+  makeAnswer = () => json({ error: "A film shot is not served at this level.", code: "level_not_served" }, 422);
+  expect(await submitVideoViaDoor(shotBody())).toBeNull();
+  expect(calls.some((c) => c.path === "/stack/v1/jobs/make" && c.body?.operation === "clip_film_shot")).toBe(true);
+});
+
+test("the Stack's route line for a film shot comes back with the job, so the film that asked can say when a shot is not full HD", async () => {
+  catalogFields = [...ALL_FIELDS, "operation", "look", "take_of"];
+  makeAnswer = () => json({ id: "job-9", job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 8, sound: true, notes: [], route_reason: "A film shot, made at the standard Max size because the shot is longer than 5 seconds." } }, 202);
+  const made = await submitVideoViaDoor(shotBody({ seconds: 8 }));
+  expect(made).toMatchObject({ job: "job-9", routeReason: "A film shot, made at the standard Max size because the shot is longer than 5 seconds." });
+  makeAnswer = () => json({ id: "job-10", job: "clip", state: "running", percent: 0, status: "x", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [] } }, 202);
+  expect((await submitVideoViaDoor(shotBody()))?.routeReason ?? null).toBeNull();
+});

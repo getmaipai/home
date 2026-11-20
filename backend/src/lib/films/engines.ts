@@ -79,6 +79,9 @@ export async function submitComposition(pictured: ReadonlyArray<{ subject: { nam
   return { ...(await submitEdit(form)), done: null };
 }
 
+/** One plain line, once per film, when a Max shot was made below full HD. */
+const FULL_HD_NOTE = "Not every shot is full HD.";
+const fullHdLine = (route: string) => `${FULL_HD_NOTE} ${route.replace(/\s+/g, " ").trim()} A shot of 5 seconds or less is made in full HD when this computer can hold it.`;
 export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; productionId: string; faceless?: boolean }): FilmEngines {
   const { actor, signal, productionId, faceless = false } = input;
   let turn: ReturnType<typeof backgroundTurn> | null = null;
@@ -163,9 +166,11 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
         return saved.value.id;
       } catch (error) { void cancelOrDelete(submitted.job); throw error; }
     },
-    async makeClip({ shot, endStillFileId }) {
+    async makeClip({ shot, endStillFileId, speaker }) {
       const prompt = `${shot.motion}${shot.line ? ` Say "${shot.line}".` : ""}`;
-      const result = await runGenerateVideo({ state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
+      // VF-ROUTE-01 follow-up: the shot goes to the generic door as a film shot (its look paragraph and its line as one dialogue entry; the Stack picks the recipe and the size). A Stack that does not list those keys, or refuses the shot, takes the old door with the prompt above, as before.
+      const filmShot = { look: shot.still.slice(0, 1200), ...(shot.line?.trim() ? { dialogue: [{ speaker: speaker ?? "Narration", text: shot.line.trim().slice(0, 300) }] } : {}) };
+      const result = await runGenerateVideo({ filmShot, state, args: { prompt, production: productionId, shot: shot.id, seconds: shot.seconds, ...(endStillFileId ? { end_frame: endStillFileId } : {}) }, callId: `film-${shot.id}`, spoken: false, audience: makeAudienceOf(actor) });
       const jobId = (result.result?.data as { videoJobId?: string } | undefined)?.videoJobId;
       if (!jobId) {
         const why = JSON.stringify(result.result?.reply ?? result).slice(0, 500);
@@ -180,6 +185,9 @@ export function realFilmEngines(input: { actor: PersonRow; signal: AbortSignal; 
       const job = await poll(() => getVideoJobFor(actor, jobId), signal, 25 * 60_000, (value) => value.state === "failed" || value.state === "cancelled" ? "The video did not finish." : null).catch((error) => { recordShotFailure(productionId, shot.id, error instanceof Error && error.message ? error.message : "This shot did not finish."); throw error; });
       const id = job.files[0]?.id;
       if (!id) throw new Error("The finished video is unavailable.");
+      // At Max the Stack makes a film shot in full HD only when it is at most 5 seconds and this computer can hold it; its route line says when it did not. The plan's shot lengths decide, so say so once (no shot is split).
+      const route = (job.request as { routeReason?: string; tier?: string }).routeReason;
+      if (job.request.tier === "max" && route && !/full HD/i.test(route) && !engines.note?.includes(FULL_HD_NOTE)) engines.note = [engines.note, fullHdLine(route)].filter(Boolean).join(" ");
       return id;
     },
     async measureClip({ stillFileId, clipFileId, seconds }) {
