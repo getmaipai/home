@@ -44,3 +44,15 @@ export function judgeCutIn(heard: string, spoken: string, echoLikely = true, pla
   if (stopAt >= 0 && ((stopAt <= 1 && content.length <= 1) || stoppers >= 2)) return "interrupt";
   return content.length >= 3 ? "interrupt" : "echo";
 }
+
+/** The content words in what was heard that are NOT in what she has said (and are not stop words): per window these are 0 to 2 for her own garbled echo, and they pile up when a person talks over her with a new sentence. */
+export function residualContent(heard: string, spoken: string): string[] {
+  const spokenWords = [...new Set(words(spoken))];
+  return [...new Set(words(heard).filter((w) => !spokenWords.some((s) => near(w, s)) && w.length > 2 && !FUNCTION.has(w) && !STOPPERS.has(w)))];
+}
+export const SUSTAINED = { windowMs: 4000, needWords: 6 };
+/** A person who talks over her in a normal voice is heard in rolling 0.67 s windows with only one or two new words each, so no single window ever counts. Words that are new to her speech pile up over a few seconds: enough of them means a person is saying something, whatever the individual windows said. */
+export function sustainedNewWords(history: Array<{ at: number; words: string[] }>, at: number, resid: string[], cfg = SUSTAINED): { interrupt: boolean; words: string[] } {
+  history.push({ at, words: resid }); while (history.length && at - history[0]!.at > cfg.windowMs) history.shift();
+  const all = [...new Set(history.flatMap((h) => h.words))]; return { interrupt: all.length >= cfg.needWords, words: all };
+}

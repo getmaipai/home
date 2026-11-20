@@ -14,7 +14,7 @@ import { pickSound, availableTags } from "./sounds";
 import { shouldNod } from "./listenerNod";
 import { StreamingAsr, norm } from "./streamingAsr";
 import { voiceSettings } from "./voiceSettings";
-import { judgeCutIn } from "./selfEcho";
+import { judgeCutIn, residualContent, sustainedNewWords } from "./selfEcho";
 import { decideYield } from "./yieldDecision";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -193,7 +193,7 @@ export class VoiceSession {
   /** Everything she has said in this reply: her own voice coming back through the microphone is recognised as these words. */
   /** The phrase being played right now and its neighbours: the only words her own voice can be bringing back through the microphone at this moment. */
   /** How loud the microphone has been, on average, while she speaks: her echo's level. A person talking over her is clearly louder than that. */
-  private echoRms = 0;
+  private echoRms = 0; private residHistory: Array<{ at: number; words: string[] }> = [];
   private trackEcho(frame: Float32Array) { let sum = 0; for (const v of frame) sum += v * v; const r = Math.sqrt(sum / Math.max(1, frame.length)); this.echoRms = this.echoRms === 0 ? r : this.echoRms * 0.994 + r * 0.006; }
   private logStop(reason: string, extra: Record<string, unknown> = {}) { try { appendFileSync(stopsPath, JSON.stringify({ at: new Date().toISOString(), reason, turn: this.turn, state: this.tm.state, echoLikely: this.tm.echoLikely, echoRms: +this.echoRms.toFixed(5), heardAudio: this.heardAudio, ...extra }) + "\n"); } catch {} }
   private cutInLouder(audio: Float32Array) { let sum = 0; for (const v of audio) sum += v * v; const r = Math.sqrt(sum / Math.max(1, audio.length)); return this.echoRms > 0.0005 && r > this.echoRms * 1.6; }
@@ -205,9 +205,12 @@ export class VoiceSession {
     // Reference-based mode: the device says whether a person overlaps her; words only help. Otherwise the text-only judgement against her own words.
     const decision = this.echoRef ? (decideYield({ overlapMs: this.now() - this.lastOverlapAt < 500 ? this.overlapMs : 0, words: text, heardAnything: text.length > 0 }) === "yield" ? "interrupt" : "echo") : judgeCutIn(text, this.recentSpoken(), this.tm.echoLikely, this.playingNowText(), this.cutInLouder(audio));
     if (Bun.env.LAB_DEBUG_TEXT) console.log(`cut-in heard: ${JSON.stringify(text)} decision=${decision} seconds=${(audio.length / 16000).toFixed(2)} louder=${this.cutInLouder(audio)} echoRms=${this.echoRms.toFixed(4)}`);
-    for (const command of this.tm.cutTranscript(text, decision)) this.command(command);
-    this.logStop(`cut-in-${decision}`, { heard: text, seconds: +(audio.length / 16000).toFixed(2), louder: this.cutInLouder(audio), overlapMs: this.overlapMs, refMode: !!this.echoRef, spoken: this.playingNowText().slice(0, 80) });
-    if (decision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
+    let finalDecision = decision; let sustained: string[] = [];
+    if (!this.echoRef && decision === "echo" && text) { const r = sustainedNewWords(this.residHistory, this.now(), residualContent(text, this.recentSpoken())); sustained = r.words; if (r.interrupt) { finalDecision = "interrupt"; this.residHistory.length = 0; } }
+    else if (decision === "interrupt" || decision === "ack") this.residHistory.length = 0;
+    for (const command of this.tm.cutTranscript(text, finalDecision)) this.command(command);
+    this.logStop(`cut-in-${finalDecision}${finalDecision !== decision ? "-sustained" : ""}`, { heard: text, resid: sustained, seconds: +(audio.length / 16000).toFixed(2), louder: this.cutInLouder(audio), overlapMs: this.overlapMs, refMode: !!this.echoRef, spoken: this.playingNowText().slice(0, 80) });
+    if (finalDecision === "interrupt") { this.cutInSamples = []; this.writeCutin(false); this.samples = [...audio]; this.speechOrigin = this.now(); this.abort?.abort(); if (this.generatedText) { this.history.commitAssistant(this.generatedText); this.history.trimAssistantToHeard(this.chunks, this.playedMs, this.chunkDurations); this.generatedText = ""; } this.send({ t: "stop", turn: this.turn }); this.send({ t: "state", state: "user_speaking" }); }
   }
   private async check(revision: number) {
     if (revision !== this.tm.checkRevision) return;

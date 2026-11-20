@@ -77,3 +77,16 @@ test("contractions and curly apostrophes are the same speech (recorded self-stop
   expect(jc("that I'm sorry.", "Oh, just that I’m sorry *you’re* the one", false, "Oh, just that I’m sorry *you’re* the one", true)).toBe("echo");
   expect(jc("Wait, stop.", "Oh, I’m so sorry you’re hurting", false, "Oh, I’m so sorry you’re hurting", true)).toBe("interrupt");
 });
+import { sustainedNewWords as snw, residualContent as rc } from "../src/selfEcho";
+test("a person talking over her with a new sentence is recognised from the words that pile up, even when no single window counts (recorded: the story request over 'Aw, you’re the one who lost the dog')", () => {
+  const spoken = "Aw, you’re the one who lost the dog, so... I’m sorry *you’re* the one saying sorry. But yeah, it’s a heavy kind of quiet";
+  const heard = ["Can you tell me?", "Tell me along.", "Long story.", "story about", "about a drag", "Dragon who", "And who thinks?", "Baked bread."]; const h: any[] = []; let t = 0; let res: any = { interrupt: false };
+  for (const w of heard) res = snw(h, (t += 350), rc(w, spoken));
+  expect(res.interrupt).toBe(true);
+});
+test("her own garbled echo (one or two odd words per window) does not add up to an interruption", () => {
+  const spoken = "Once upon a time, in a cave filled with embers, there was a dragon named Barnaby who had a secret obsession with baking bread";
+  const heard = ["Once upon a", "in a cave.", "cave filled with", "with embers.", "They", "There was a", "was a dragon.", "Dragon named", "named Barnaby", "who had a C.", "a secret of", "Great obsession."]; const h: any[] = []; let t = 0; let res: any = { interrupt: false };
+  for (const w of heard) res = snw(h, (t += 380), rc(w, spoken));
+  expect(res.interrupt).toBe(false);
+});
