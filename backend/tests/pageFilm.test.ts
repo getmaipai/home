@@ -239,6 +239,8 @@ describe("refusals and access", () => {
     const player = page.body.find((node) => node.type === "storyboard_player")!;
     expect(Object.values(player.item_fields as Record<string, string>).sort()).toEqual(Object.keys(out[0]!).sort());
     expect(page.body.find((node) => node.type === "action_bar")!.primary.label).toBe("Render film");
+  });
+
   test("a running film is one Activity row: its shot clips are folded into it, other clips stay their own rows (VF-FILMDOCK-01)", async () => {
     const { client: owner, row } = await signedInOwner();
     const id = await planned(owner, row);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { db } from "@/db";
 import { filmRuns, people } from "@/db/schema";
 import { resetDb } from "../../../tests/reset-db";
-import { filmProgressRows, filmShotJobIds, parseProgress, readProgress, recordShotFailure, recordShotJob, recordShotNote, shotProgressRow } from "./filmProgress";
+import { filmProgressRows, filmShotJobIds, parseProgress, readProgress, recordShotFailure, recordShotJob, recordShotNote, pageShotRow, shotProgressRow } from "./filmProgress";
 import type { PersonRow } from "@/types";
 
 const stamp = new Date().toISOString();
@@ -43,17 +43,27 @@ describe("the progress column", () => {
 });
 
 describe("one shot's row", () => {
-  test("matches the shared job_progress shots fixture, with no time left invented", () => {
-    const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/jobProgressShots.json", import.meta.url), "utf8"));
+  test("has the shared job_progress fixture's fields for every state, with no time left invented", () => {
+    const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/jobProgressShots.json", import.meta.url), "utf8")) as Array<Record<string, unknown>>;
     const rows = [
       shotProgressRow({ id: "shot-1", label: "1 · Kitchen, wide", stillFileId: "pic-1", clipDone: true, note: { note: "Fixed on its own: a small noise at the start was trimmed." } }),
       shotProgressRow({ id: "shot-2", label: "2 · Kitchen, close", stillFileId: "pic-2", clipDone: false, job: { state: "running", percent: 45.4 } }),
       shotProgressRow({ id: "shot-3", label: "3 · Living room", stillFileId: "pic-3", clipDone: false }),
-      shotProgressRow({ id: "shot-4", label: "4 · Living room, close", stillFileId: "pic-4", clipDone: false, job: { state: "queued", percent: 0 }, note: { held_reason: "Waiting for another job" } }),
-      shotProgressRow({ id: "shot-5", label: "5 · Porch at dusk", stillFileId: "pic-5", clipDone: false, job: { state: "failed", percent: 0 }, note: { failure: "The face did not match, twice." } }),
+      shotProgressRow({ id: "shot-4", label: "4 · Living room, close", clipDone: false, job: { state: "queued", percent: 0 }, note: { held_reason: "Waiting for another job" } }),
+      shotProgressRow({ id: "shot-5", label: "5 · Porch at dusk", clipDone: false, job: { state: "failed", percent: 0 }, note: { failure: "The face did not match, twice." } }),
     ];
-    expect(rows).toEqual(fixture);
+    // The kit's file is the contract for the block's data: same state, and the same fields except the time left (`etaSeconds`, which Home leaves out until VF-PROFILE-01) and the failure's actions (the page builds them).
+    const keys = (row: Record<string, unknown>) => Object.keys(row).filter((key) => key !== "etaSeconds").sort();
+    expect(rows.map((row) => row.state as string)).toEqual(fixture.map((row) => row.state as string));
+    expect(rows.map((row) => keys(row as never))).toEqual(fixture.map((row) => keys(row)));
     expect(JSON.stringify(rows)).not.toContain("eta");
+  });
+
+  test("the page's rows use the block's field names, and a failed shot offers Try again on the Film maker's own action", () => {
+    const failed = pageShotRow("run-9", shotProgressRow({ id: "shot-5", label: "5 · Porch", clipDone: false, job: { state: "failed", percent: 0 }, note: { failure: "The face did not match, twice." } }));
+    expect(failed).toEqual({ shot_id: "shot-5", label: "5 · Porch", state: "failed", failure_message: "The face did not match, twice.", failure_actions: [{ label: "Try again", action: { call: { target: "/api/plugins/video/actions/film-again", method: "POST", args: { run: "run-9", shot: "shot-5" } } } }] });
+    const running = pageShotRow("run-9", shotProgressRow({ id: "s", label: "2", stillFileId: "p", clipDone: false, job: { state: "running", percent: 45 } }));
+    expect(running).toEqual({ shot_id: "s", label: "2", state: "running", progress: 45, thumb: "/api/files/p/thumb?w=320" });
   });
 
   test("a cancelled job is a failed shot, a bad percent is clamped, and no picture means no thumb key", () => {

@@ -39,6 +39,25 @@ export function shotProgressRow(input: { id: string; label: string; stillFileId?
   return { ...base, state: "queued" };
 }
 
+/** One shot row in the names the kit's `job_progress` block reads (its `item_fields`). A failed shot offers Try again, which is the Film maker's own `film-again` action; no other repair is offered until it exists. */
+export function pageShotRow(runId: string, row: ShotProgressRow): Record<string, unknown> {
+  return {
+    shot_id: row.id, label: row.label, state: row.state,
+    ...(row.progress !== undefined ? { progress: row.progress } : {}),
+    ...(row.thumb ? { thumb: row.thumb } : {}),
+    ...(row.note ? { note: row.note } : {}),
+    ...(row.heldReason ? { held_reason: row.heldReason } : {}),
+    ...(row.failure ? { failure_message: row.failure.message, failure_actions: [{ label: "Try again", action: { call: { target: "/api/plugins/video/actions/film-again", method: "POST", args: { run: runId, shot: row.id } } } }] } : {}),
+  };
+}
+
+/** Scope `film-progress` as the page binds it: the same rows as `filmProgressRows`, in the block's field names. */
+export function filmProgressPageRows(person: PersonRow, id?: string): Array<Record<string, unknown>> {
+  if (!allowed(person)) return [];
+  const run = pageFilmRun(person, id);
+  return run ? filmProgressRows(person, run.id).map((row) => pageShotRow(run.id, row)) : [];
+}
+
 /** Scope `film-progress`: the viewer's own newest film (or the one `id` names), adults only, one row per planned shot. No time left is invented here. */
 export function filmProgressRows(person: PersonRow, id?: string): ShotProgressRow[] {
   if (!allowed(person)) return [];
