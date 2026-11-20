@@ -7,7 +7,7 @@ import { encodeWav, StreamingWavReader } from "./wav";
 import { chat, transcribe, turnCheck, speech, prewarmChat, prewarmVoice, supportedStyles, voicePrepared, moodVoice } from "./stack";
 import { Chunker } from "./chunker";
 import { TagStream, forEngine, splitTags } from "./tags";
-import { pickSound } from "./sounds";
+import { pickSound, availableTags } from "./sounds";
 import { judgeCutIn } from "./selfEcho";
 import { appendMetrics, type TurnMetrics } from "./metrics";
 import { rmsEnvelope, selfVoiceVerdict } from "./echo";
@@ -322,7 +322,7 @@ export class VoiceSession {
         this.tm.configure(j.values ?? {});
         if (Number.isFinite(j.values?.echoThreshold)) this.echoThreshold = j.values.echoThreshold;
         if (typeof j.values?.earlyStart === "boolean") this.earlyStart = j.values.earlyStart;
-        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.prewarm("voice"); }
+        if (typeof j.values?.voice === "string" && j.values.voice.slice(0, 64) !== this.voice) { this.voice = j.values.voice.slice(0, 64); this.voiceChecked.delete(this.voice); this.history.messages[0]!.content = buildPrompt(availableTags(this.voice)); this.prewarm("voice"); }
         if (typeof j.values?.useStyles === "boolean") this.useStyles = j.values.useStyles;
         if (Number.isFinite(j.values?.toolDelayMs)) this.toolDelayMs = j.values.toolDelayMs;
         if (j.values?.netSim) this.netSim = j.values.netSim;
