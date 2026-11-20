@@ -9,7 +9,7 @@
       "layout": "chat",
       "chat_distribution": "start_end",
       "label": "Describe a video",
-      "placeholder": "Describe the video you want. Put each person's line in quotes. Type @ for your cast.",
+      "placeholder": "Describe the video you want. Put each person's line in quotes. Use Cast to bring in your characters, places and props.",
       "prompt_state": "prompt",
       "max_length": 1200,
       "submit_label": "Generate",
@@ -64,7 +64,8 @@
             "strength": "{strength}",
             "start_frame": "{start_frame}",
             "end_frame": "{end_frame}",
-            "takes": "{takes}"
+            "takes": "{takes}",
+            "cast": "{cast}"
           }
         }
       },
@@ -74,6 +75,13 @@
           "label": "Image",
           "kind": "picture",
           "placement": "in_field"
+        },
+        {
+          "state": "cast",
+          "label": "Cast",
+          "kind": "character",
+          "placement": "row",
+          "max": 3
         }
       ]
     },

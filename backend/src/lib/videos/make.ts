@@ -54,8 +54,9 @@ export function readMakeBody(raw: Record<string, unknown>): { ok: true; body: Ma
   }
   if (raw.loop === true || raw.loop === "true") body.loop = true;
   if (line) { if (line.length > 1200) return { ok: false, error: "Type a line up to 1200 characters, then try again." }; body.line = line; }
-  const castValue = raw.cast;
-  const cast = Array.isArray(castValue) ? castValue.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : typeof castValue === "string" && castValue.trim() ? [castValue.trim()] : [];
+  // CAST-CREATE-01: the Create page's Cast picker sends comma-joined ids (`cast`; a `place` argument is read the same way for the API); the API's `cast` may also be an array. Characters, places and props are all cast entries.
+  const ids = (value: unknown): string[] => Array.isArray(value) ? value.filter((v): v is string => typeof v === "string").flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean) : typeof value === "string" ? value.split(",").map((v) => v.trim()).filter(Boolean) : [];
+  const cast = [...new Set([...ids(raw.cast), ...ids(raw.place)])];
   if (cast.length) body.cast = cast;
   const orientation = text(raw.orientation);
   if (orientation) {

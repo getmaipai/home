@@ -247,7 +247,7 @@ describe("the Create page and the make action", () => {
     expect(bar.placement).toBe("inline");
     expect(bar.starts).toBe("video");
     expect(bar.submit_label).toBe("Generate");
-    expect(bar.references).toEqual([{ state: "start_frame", label: "Image", kind: "picture", placement: "in_field" }]);
+    expect(bar.references).toEqual([{ state: "start_frame", label: "Image", kind: "picture", placement: "in_field" }, { state: "cast", label: "Cast", kind: "character", placement: "row", max: 3 }]); // CAST-CREATE-01
     expect(bar.submit.call.args.start_frame).toBe("{start_frame}");
     expect(bar.suggestions).toBeUndefined();
     expect(chip("look")).toMatchObject({ presentation: "popover", group: "Style" });
@@ -614,7 +614,7 @@ describe("U3: Camera and Look cards from the one lists, with their loops", () =>
     expect(chip("camera").variant).toBe("cards");
     expect(chip("camera").default).toBe("none");
     expect(chip("camera").options).toEqual([{ value: "none", label: "Auto" }, ...VIDEO_RECIPES.map((r) => ({ value: r.id, label: r.label, ...(shipped(r.loop) ? { media: r.loop } : {}) }))]);
-    expect(bar.references).toHaveLength(1);
+    expect(bar.references).toHaveLength(2);
     expect(bar.submit.call.args).toMatchObject({ camera: "{camera}", look: "{look}", start_frame: "{start_frame}" });
     const source = await Bun.file(join(PACKAGES_DIR, "video", "pages", "create.json")).text();
     expect(source).not.toContain(".mp4");

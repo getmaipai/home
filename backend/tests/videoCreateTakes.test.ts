@@ -179,11 +179,11 @@ describe("End image slot", () => {
   test("is absent while the maker does not report end_image, present when it does", async () => {
     const { client } = await adultClient();
     __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
-    expect((await pagebar(client)).references.map((r: { state: string }) => r.state)).toEqual(["start_frame"]);
+    expect((await pagebar(client)).references.map((r: { state: string }) => r.state)).toEqual(["start_frame", "cast"]);
     __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }));
     const bar = await pagebar(client);
-    expect(bar.references.map((r: { state: string }) => r.state)).toEqual(["start_frame", "end_frame"]);
-    expect(bar.references[1]).toEqual({ state: "end_frame", label: "End image", kind: "picture" });
+    expect(bar.references.map((r: { state: string }) => r.state)).toEqual(["start_frame", "cast", "end_frame"]);
+    expect(bar.references[2]).toEqual({ state: "end_frame", label: "End image", kind: "picture" });
   });
 
   test("the end picture reaches the Stack as end_image", async () => {
