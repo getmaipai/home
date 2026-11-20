@@ -1,5 +1,5 @@
 import { PlaybackBuffer } from './playback-buffer.js';
-import { wordEnd } from './word-end.js';
+import { wordEnd, stopPlan } from './word-end.js';
 import { JitterGate } from './jitter.js';
 
 const ctx = new AudioContext();
@@ -81,10 +81,10 @@ function stopPlayback(turn) {
   if (Number.isInteger(turn) && turn < activeTurn) return;
   // When interrupted, a person finishes the word they are on. So does the voice: it plays on to the next gap between
   // words (at most 450 ms away), then fades out.
-  let wait = 0;
-  if (finishWord && !paused && buffer.length) { const from = playedPosition(); wait = Math.max(0, (wordEnd(buffer.samples, from, sampleRate) - from) / sampleRate); }
+  const plan = stopPlan(buffer.samples, playedPosition(), sampleRate, { finishWord: finishWord && !paused && buffer.length > 0 });
+  const wait = plan.waitMs / 1000;
   const now = ctx.currentTime;
-  gain.gain.cancelScheduledValues(now); gain.gain.setValueAtTime(gain.gain.value, now); gain.gain.setValueAtTime(gain.gain.value, now + wait); gain.gain.linearRampToValueAtTime(0, now + wait + .025);
+  gain.gain.cancelScheduledValues(now); gain.gain.setValueAtTime(gain.gain.value, now); gain.gain.setValueAtTime(gain.gain.value, now + wait); gain.gain.linearRampToValueAtTime(0, now + wait + plan.fadeMs / 1000);
   window.__lastStopWaitMs = Math.round(wait * 1000);
   const stoppedTurn = Number.isInteger(turn) ? turn : activeTurn;
   setTimeout(() => {

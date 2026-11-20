@@ -19,3 +19,10 @@ export function wordEnd(samples, from, sampleRate, maxMs = 450) {
   }
   return bestRms === Infinity ? end : best;
 }
+
+// How a stop is carried out: keep playing to the end of the word she is on (at most maxMs), then fade out over fadeMs. After totalMs nothing she
+// said is audible, however much audio is already queued; the queue is cleared right after. A hard cap, so a stop can never take longer.
+export function stopPlan(samples, from, sampleRate, { finishWord = true, maxMs = 450, fadeMs = 25 } = {}) {
+  const waitMs = finishWord && samples && samples.length ? Math.min(maxMs, Math.max(0, (wordEnd(samples, from, sampleRate, maxMs) - from) / sampleRate * 1000)) : 0;
+  return { waitMs, fadeMs, totalMs: waitMs + fadeMs, clearAfterMs: Math.round(waitMs) + 30 };
+}
