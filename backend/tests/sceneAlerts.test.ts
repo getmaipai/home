@@ -11,7 +11,8 @@ import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const alertId = "https://api.weather.gov/alerts/test-alert";
-const ends = "2026-11-15T00:00:00.000Z";
+// A week ahead of the run (a fixed date went stale and the alert expired out of the list), whole seconds so it reads back unchanged.
+const ends = new Date(Math.ceil(Date.now() / 1000) * 1000 + 7 * 24 * 3600 * 1000).toISOString();
 const props = { event: "Severe Thunderstorm Warning", headline: "Severe storms expected", severity: "Severe", areaDesc: "Private County, Private State", ends };
 const feed = (id = alertId, properties = props) => new Response(JSON.stringify({ features: [{ id, properties }] }), { status: 200 });
 const fetcher = (response: Response = feed()) => (async () => response.clone()) as unknown as typeof fetch;
