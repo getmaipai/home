@@ -118,7 +118,7 @@ Reading: close-ups hold on every recipe (0.6 and up). In medium shots every firs
 | D8 | One engine family per film until VF-EVAL-01 shows each works alone and mixing helps. Film A and B each used one family per shot type; mixing waits for a test | Different looks per shot were part of the "different crews" failure |
 | D9 | LTX Max is the house camera; H3 may be a specialist for a visible speaking close-up if its mouth wins in the actual edit; per-shot engine routing stays undecided until VF-EVAL-01 reports; Boost stays the fast default for casual clips | Evidence in 1.1 and 1.2; LTX-only install must do the whole workflow |
 | D10 | The turbo adapter is an explicit preview profile. A file on disk never selects quality | Today it switches on by itself when its file exists (a defect) |
-| D11 | Face-only swap first and only after its check is repaired; whole-head swap and fast-H3 as products are held until each wins a test | Section 8, section 10 |
+| D11 | AMENDED 2026-11-20 (owner: face, head and character swap must all work; the bench found face-only works only for look-alikes and that the owner called its result "awful", while head and character swap passed on his case): the build order is the model-free framework and its check first, then head swap, then character swap, then face swap as its own pack. Fast-H3 as a product stays held until it wins a test. The original D11 (face-only first) is replaced, not kept | Section 8, section 10, VF-SWAP-01 |
 
 ## 3. The clip pipeline (one for LTX and H3)
 
@@ -379,7 +379,7 @@ Paste-back comparison on seven frames: the swapper's own aligned paste is cleane
 
 **Decisions.**
 
-1. Face only first, only after the check is repaired; the actor's hair, body, blocking and original soundtrack stay. Voice conversion is a separate operation and a separate owner decision.
+1. (Amended 2026-11-20, see D11: the order is framework and check, then head swap, then character swap, then face swap; face-only works only when the two people look alike, and the owner judged the first face-only result "awful".) Face only first, only after the check is repaired; the actor's hair, body, blocking and original soundtrack stay. Voice conversion is a separate operation and a separate owner decision.
 2. The repaired check (above) replaces the old one before any further swap work.
 3. **Target selection.** The person picks the actor once; the identity is followed through the clip (accept at similarity 0.45, or 0.30 when continuing the same face from the previous frame; a face after a cut must match alone). When the target leaves, turns beyond recognition or is hidden, keep the source frames; reacquire after cuts. A missed swap can be reviewed; swapping the other actor is an immediate failure. Carry color and tracking state across chunks inside a shot; reset at real cuts. The thresholds were tuned on two clips only.
 4. Whole-head stays an experiment: keep hair, jaw, neck and the foreground occluder in the guide; compare two margins on the same turn.
