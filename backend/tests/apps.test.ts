@@ -7,9 +7,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { entities, packageInstalls, packageStatus, settingsValues } from "@/db/schema";
+import { entities, issues, packageInstalls, packageStatus, settingsValues } from "@/db/schema";
 import { PACKAGES_DIR, installedPackageVersionDir } from "@/lib/paths";
-import { __resetAppCachesForTests, appImageAllowed, appPackageProblems, appRouteAllowed, appVisibleTo, getAppData } from "@/lib/apps";
+import { __resetAppCachesForTests, appImageAllowed, appPackageProblems, appRouteAllowed, appVisibleTo, getAppData, listApps } from "@/lib/apps";
 import { __resetPackageCachesForTests, loadManifestOnly } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -514,5 +514,52 @@ describe("install-time page validation (appPackageProblems)", () => {
   test("a page that is not valid against the UI schema is reported", () => {
     const out = problemsFor((_m, dir) => writeFileSync(join(dir, "pages", "more.json"), JSON.stringify({ type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "/api/people" } }] })));
     expect(out.join("\n")).toContain("does not match the UI schema");
+  });
+});
+
+// PACKAGE-REFUSED-01 (S6): a refused app raises one plain Repairs item for the admin; the app stays absent for everyone.
+describe("a refused app raises one Repairs item", () => {
+  const badPage = { type: "page", id: "lists", title: "Lists", body: [{ type: "answer_blocks", bind: { source: "package", path: "/api/people" } }] };
+  const rows = () => db.select().from(issues).where(eq(issues.source, "apps")).all();
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+  test("a bad page raises exactly one item naming the app, with no file path or schema text", async () => {
+    installFixtureApp({ pages: badPage });
+    expect(listApps({ role: "owner" } as PersonRow).some((row) => row.package === ID)).toBe(false);
+    listApps({ role: "owner" } as PersonRow);
+    await settle();
+    const open = rows().filter((row) => row.key === `app_refused:${ID}` && row.resolvedAt === null);
+    expect(open).toHaveLength(1);
+    const text = `${open[0]!.title} ${open[0]!.detail}`;
+    expect(open[0]!.title).toBe("An app could not start");
+    expect(text).not.toMatch(/pages\/|\.json|schema|UI schema|must have|api\/people/i);
+    expect(open[0]!.severity).toBe("error");
+  });
+
+  test("fixing the page resolves it at the next file stamp", async () => {
+    const dir = installFixtureApp({ pages: badPage });
+    listApps({ role: "owner" } as PersonRow);
+    await settle();
+    expect(rows().filter((row) => row.resolvedAt === null)).toHaveLength(1);
+    writeFileSync(join(dir, "pages", "lists.json"), JSON.stringify(indexPage));
+    listApps({ role: "owner" } as PersonRow);
+    await settle();
+    expect(rows().filter((row) => row.resolvedAt === null)).toHaveLength(0);
+  });
+
+  test("a package above a viewer's floor raises nothing", async () => {
+    installFixtureApp({ minRole: "owner" });
+    listApps({ role: "child" } as PersonRow);
+    await settle();
+    expect(rows()).toHaveLength(0);
+  });
+
+  test("a disabled package raises nothing", async () => {
+    installFixtureApp({ pages: badPage });
+    db.insert(packageStatus).values({ packageId: ID, status: "disabled" } as never).onConflictDoUpdate({ target: packageStatus.packageId, set: { status: "disabled" } as never }).run();
+    __resetAppCachesForTests();
+    listApps({ role: "owner" } as PersonRow);
+    await settle();
+    expect(rows()).toHaveLength(0);
   });
 });

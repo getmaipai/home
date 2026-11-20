@@ -27,6 +27,7 @@ import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getPackageStatus, allPackageStatuses } from "@/lib/smoke";
+import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import type { PersonRow } from "@/types";
 
 const ajv = new Ajv2020({ strict: false });
@@ -107,6 +108,29 @@ function manifestDigest(manifest: PackageManifest): string {
   return digest;
 }
 
+// PACKAGE-REFUSED-01 (S6): a refused app is absent for everyone (404), so an admin needs one plain Repairs item saying which app and that
+// it can be tried again. Raised at load time only (a new file stamp), never on a timer. Only loader problems raise it: an app that is
+// merely above a viewer's floor never reaches here. The item names the app and nothing the loader printed (no file path, no schema text).
+const APPS_ISSUE_SOURCE = "apps";
+function appName(manifest: PackageManifest): string {
+  return typeof manifest.display === "string" && manifest.display.trim() ? manifest.display.trim() : manifest.id;
+}
+function reportAppLoad(manifest: PackageManifest, problems: string[]): void {
+  const key = `app_refused:${manifest.id}`;
+  try {
+    if (problems.length === 0) { resolveIssue(APPS_ISSUE_SOURCE, key); return; }
+    if (getPackageStatus(manifest.id).status !== "enabled") return;
+    registerFixHandler(`apps.reload:${manifest.id}`, () => { loadCache.delete(manifest.id); loadApp(manifest.id); });
+    void raiseIssue({
+      source: APPS_ISSUE_SOURCE, key, severity: "error",
+      title: "An app could not start",
+      detail: `${appName(manifest)} is switched off for everyone because one of its files is not in a form Home can read. Try loading it again; if it stays off, the app needs an update.`,
+      learnMore: "/settings/apps",
+      fix: { label: "Try loading it again", action: `apps.reload:${manifest.id}` },
+    }).catch(() => {});
+  } catch { /* reporting must never stop an app load */ }
+}
+
 /** Reads and validates one package's pages. Cached on the whole manifest and every page file's size and mtime. */
 function loadApp(id: string): LoadedApp | null {
   const loaded = loadManifestOnly(id);
@@ -146,6 +170,7 @@ function loadApp(id: string): LoadedApp | null {
     warned.add(`${id}|${stamp}`);
     console.warn(`[apps] ${id}: app refused: ${problems.join("; ")}`);
   }
+  reportAppLoad(manifest, problems);
   const app: LoadedApp = { manifest, contributes, pages, problems };
   loadCache.set(id, { stamp, app });
   return app;
