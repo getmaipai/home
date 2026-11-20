@@ -357,7 +357,7 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
       expect(VIDEO_LOOKS.map((l) => l.id)).toContain(row.look);
       expect(["none", ...VIDEO_RECIPES.map((r) => r.id)]).toContain(row.camera);
       expect(row.prompt.length).toBeGreaterThan(20);
-      expect(row.thumbnail).toMatch(/^\/api\/plugins\/video\/assets\/loops\/[a-z0-9-]+\.jpg$/);
+      expect(row.thumbnail).toMatch(/^\/api\/plugins\/video\/assets\/showcase\/[a-z0-9-]+\.jpg$/); // the rail serves its own real clips from assets/showcase (3abf29198), not the look and camera loops
       const res = await adult.client.get(row.thumbnail);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/jpeg");
@@ -400,13 +400,14 @@ describe("scope showcase: the Try this rail (VIDEO-UI-11)", () => {
   test("the served Create page puts the rail above the feed: a plain poster shelf whose press only navigates with prompt, look and camera; the empty feed keeps its one line", async () => {
     const { adult } = await household();
     const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Row> };
-    expect(page.body.map((node) => node.type)).toEqual(["prompt_bar", "media_shelf", "section"]);
+    // The page is the prompt bar, the newest take on the stage, the Templates shelf, the Inspiration rail, then the feed.
+    expect(page.body.map((node) => node.type)).toEqual(["prompt_bar", "media_stage", "media_shelf", "media_shelf", "section"]);
     expect(page.body[0]).toMatchObject({ type: "prompt_bar", placement: "inline", layout: "chat" });
-    const shelf = page.body[1]!;
+    const shelf = page.body.find((node) => node.heading === "Inspiration")!;
     expect(shelf).toMatchObject({ heading: "Inspiration", aspect: "wide", layout: "rail", variant: "plain", press_scale: true, item_media_field: "thumbnail", media_loop: true, item_loop_field: "loop", bind: { path: "recipes", params: { scope: "showcase", limit: 4 } } });
     expect(shelf.on_select).toEqual({ navigate: { to: "/apps/video/create", state: { prompt: "{prompt}", look: "{look}", camera: "{camera}" } } });
     expect(JSON.stringify(shelf)).not.toContain("call");
-    expect(page.body[2]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
+    expect(page.body[4]!.children[0].empty_state.text).toBe("Your clips show here. Pick an idea below or describe a video above and press Generate.");
   });
 });
 
