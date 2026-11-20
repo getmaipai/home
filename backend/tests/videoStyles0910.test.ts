@@ -232,7 +232,8 @@ describe("the Create page's style picker (served chips)", () => {
   test("no styles and none locked: no style chips at all, and the other five chips are as before", async () => {
     const { owner } = await household();
     engine({ max: true });
-    expect((await chipsOf(owner)).map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices"]);
+    // The chip list the Create page deliberately serves today, exactly: the Template chip (fe931cbfd, 2026-11-15), the Takes chip (136ba4468, 2026-11-15) and the shot-card chips (676eda264, 2026-11-13).
+    expect((await chipsOf(owner)).map((c) => c.state)).toEqual(["template", "orientation", "seconds", "takes", "look", "camera", "voices", "card_framing", "card_camera", "card_lens", "card_light", "card_film_stock", "card_look", "card_grade"]);
   });
 
   test("Styles and Characters are two groups in the Style popover; Characters is absent when empty; the note shows what a card adds", async () => {
@@ -240,7 +241,8 @@ describe("the Create page's style picker (served chips)", () => {
     const clay = putLora(row("Sage").id, { ...STYLE, name: "Clay look", description: "Looks like clay stop motion.", trigger_words: ["claymation"], positive_addins: ["soft studio light"] });
     stackHas(clay); engine({ max: true });
     let chips = await chipsOf(owner);
-    expect(chips.map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices", "style", "strength"]);
+    // Same list as above with the style and strength chips after voices (the style chips come with a style installed).
+    expect(chips.map((c) => c.state)).toEqual(["template", "orientation", "seconds", "takes", "look", "camera", "voices", "style", "strength", "card_framing", "card_camera", "card_lens", "card_light", "card_film_stock", "card_look", "card_grade"]);
     const style = chips.find((c) => c.state === "style")!;
     expect(style.group).toBe("Style");
     expect(style.options.map((o) => o.label)).toEqual(["No style", "Clay look"]);
@@ -250,7 +252,8 @@ describe("the Create page's style picker (served chips)", () => {
     const hero = putLora(row("Sage").id, { ...STYLE, name: "Rover the dog", kind: "character", availability: { who: "adults", people: [] } });
     stackHas(clay, hero);
     chips = await chipsOf(owner);
-    expect(chips.map((c) => c.state)).toEqual(["orientation", "seconds", "look", "camera", "voices", "style", "character", "strength"]);
+    // With a character style too the bar is at its 16-chip cap (the kit page schema allows 16), so the last shot-card chip (grade) is not offered; the list is exact on purpose.
+    expect(chips.map((c) => c.state)).toEqual(["template", "orientation", "seconds", "takes", "look", "camera", "voices", "style", "character", "strength", "card_framing", "card_camera", "card_lens", "card_light", "card_film_stock", "card_look"]);
     expect(chips.find((c) => c.state === "character")!.options.map((o) => o.label)).toEqual(["No character", "Rover the dog"]);
   });
 

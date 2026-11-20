@@ -213,7 +213,9 @@ describe("apps parity: chips, sort and search filters", () => {
   test("the watch page can be shared and turns on picture-in-picture, double tap and long press (the spec default is off)", () => {
     const player = pageOf("watch").body[0].main[0];
     expect(player).toMatchObject({ pip: true, double_tap_seek: true, long_press_speed: true });
-    expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Save to playlist", "Share"]);
-    expect(player.actions[3].action.share.to).toBe("/apps/video/watch?id={id}");
+    // The watch page deliberately serves these six actions today: Add to Family Picks and Save moment joined the original four (ef060d9a4, 2026-11-13). Exact on purpose.
+    expect(player.actions.map((action: { label: string }) => action.label)).toEqual(["Like", "Watch later", "Save to playlist", "Add to Family Picks", "Save moment", "Share"]);
+    expect(player.actions.at(-1).label).toBe("Share");
+    expect(player.actions.at(-1).action.share.to).toBe("/apps/video/watch?id={id}");
   });
 });

@@ -263,7 +263,8 @@ describe("the Videos pages", () => {
     expect(shelves("index").some((n) => n.item_avatar_field === "channel_avatar")).toBe(true);
     const search = (pageOf("search").body as Row[]).find((n) => n.type === "search")!;
     expect(search.suggest).toMatchObject({ bind: { path: "library", params: { scope: "suggest", q: "$state.q" } }, max: 8, min_chars: 2 });
-    expect(shelves("library")[0]!.heading).toBe("Playlists");
+    // VF-UI-02 (627f6b2b4, 2026-11-20) put the viewer's own "Making now" film shelf first on the library page; Playlists follow it. Exact on purpose.
+    expect(shelves("library").slice(0, 2).map((n) => n.heading)).toEqual(["Making now", "Playlists"]);
     expect(pageOf("watch").body[0].main[0].actions.map((a: { label: string }) => a.label)).toContain("Save to playlist");
   });
 });

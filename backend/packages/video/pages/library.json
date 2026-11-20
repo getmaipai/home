@@ -12,6 +12,7 @@
       "item_subtitle_field": "{subtitle}",
       "item_media_field": "thumbnail",
       "layout": "rail",
+      "card_radius": "soft",
       "hide_when_empty": true,
       "on_select": { "navigate": { "to": "/apps/video/film-maker" } }
     },
