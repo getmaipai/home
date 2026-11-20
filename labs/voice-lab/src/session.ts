@@ -25,6 +25,9 @@ import { commitDelay } from "./commitDelay";
 const supported = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"];
 const metricsPath = fileURLToPath(new URL("../results/turns.jsonl", import.meta.url));
 const cutinsPath = fileURLToPath(new URL("../results/cutins.jsonl", import.meta.url));
+/** Sessions in a conversation turn right now: from the start of the person's speech until the reply is fully synthesized. A heavy background job on the same GPU can look at this and pause between its steps (cooperative yielding: Metal has no queue priority). Entries expire after 25 s in case a clear is missed. */
+const activeSince = new Map<object, number>();
+export function conversationActiveCount(now = Date.now()) { let n = 0; for (const [k, t] of activeSince) { if (now - t > 25_000) activeSince.delete(k); else n++; } return n; }
 export class VoiceSession {
   private vad = new FrameVad(); private tm: TurnManager; private history = new History(buildPrompt());
   private samples: number[] = []; private preRoll: number[] = []; private cutInSamples: number[] = []; private transcriptSegments: string[] = [];
@@ -131,7 +134,7 @@ export class VoiceSession {
   private finishMetrics() { if (this.metricsWritten || !Object.keys(this.metrics).length) return; this.addEngineMetrics(); this.metricsWritten = true; this.metrics.chunks = this.chunks.length; this.metricsFn(metricsPath, this.metrics); this.send({ t: "timing", ...this.metrics }); }
   private command(c: { type: string; [key: string]: unknown }) {
     switch (c.type) {
-      case "state": this.send({ t: "state", state: c.state }); break;
+      case "state": if (c.state === "user_speaking") activeSince.set(this, Date.now()); else if (c.state === "idle") activeSince.delete(this); this.send({ t: "state", state: c.state }); break;
       case "check_turn": void this.check(Number(c.revision ?? this.tm.checkRevision)); break;
       case "transcript_ready": for (const next of this.tm.transcriptReady(String(c.text), this.now(), Number(c.revision ?? this.tm.checkRevision))) this.command(next); break;
       case "start_reply_held":
@@ -263,7 +266,7 @@ export class VoiceSession {
         if (this.draftInterrupted) { this.history.messages.push(...this.draftMessages); this.draftMessages = []; this.history.commitAssistant("[answer was not spoken]"); this.draftInterrupted = false; return; }
         if (signal.aborted || this.closed) return;
       }
-      for (const piece of chunker.push(tagger.flush())) schedule(piece); for (const piece of chunker.flush()) schedule(piece); await sendQueue;
+      for (const piece of chunker.push(tagger.flush())) schedule(piece); for (const piece of chunker.flush()) schedule(piece); await sendQueue; if (!this.held) activeSince.delete(this);
       if (signal.aborted || this.closed) return;
       this.generatedText = full; this.generatedComplete = true;
       if (!this.chunkDurations.some((duration) => duration > 0)) { this.metrics.ok = false; if (this.metrics.failure === "none") this.metrics.failure = "no_audio"; }
@@ -377,7 +380,7 @@ export class VoiceSession {
     const maxPreRoll = config.sampleRate * config.prerollMs / 1000;
     if (this.preRoll.length > maxPreRoll) this.preRoll.splice(0, this.preRoll.length - maxPreRoll);
   }
-  close() { if (this.closed) return; this.closed = true; for (const timer of this.timers) this.timerClear(timer); this.timers.clear(); this.abort?.abort(); this.warming?.abort(); for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort = null; this.warming = null; this.samples = []; this.preRoll = []; this.cutInSamples = []; this.transcriptSegments = []; this.committedSamples = []; this.committedSegments = []; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.chunks = []; this.playedMs = []; this.chunkDurations = []; }
+  close() { activeSince.delete(this); if (this.closed) return; this.closed = true; for (const timer of this.timers) this.timerClear(timer); this.timers.clear(); this.abort?.abort(); this.warming?.abort(); for (const check of this.checkControllers.values()) check.abort(); this.checkControllers.clear(); this.abort = null; this.warming = null; this.samples = []; this.preRoll = []; this.cutInSamples = []; this.transcriptSegments = []; this.committedSamples = []; this.committedSegments = []; this.heldFrames = []; this.heldChunkEvents = []; this.heldFinalText = ""; this.chunks = []; this.playedMs = []; this.chunkDurations = []; }
   message(data: string) {
     try {
       const j = JSON.parse(data);

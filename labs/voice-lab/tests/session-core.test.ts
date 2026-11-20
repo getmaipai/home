@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { VoiceSession } from "../src/session";
+import { VoiceSession, conversationActiveCount } from "../src/session";
 import { config } from "../src/config";
 import { TurnManager } from "../src/turnManager";
 import { chatRequestBody, lastChatTimings } from "../src/stack";
@@ -609,4 +609,13 @@ test("the page reports underruns, gate size and voice speed for every live turn 
   expect(s.metrics).toMatchObject({ page_underruns: 2, page_gate_ms: 320, page_audio_s: 7.5, page_voice_speed: 1.8 });
   s.message(JSON.stringify({ t: "stats", turn: 2, underruns: 9 })); expect(s.metrics.page_underruns).toBe(2); // another turn's numbers never land here
   h.session.close();
+});
+
+test("a conversation turn is flagged active from the start of his speech until the reply is fully synthesized, so a heavy job can pause between steps", async () => {
+  const h = harness({ chat: async function* () { yield { type: "text", text: "Sure thing." }; } });
+  expect(conversationActiveCount()).toBe(0);
+  h.feed(true, 12); expect(conversationActiveCount()).toBe(1);
+  h.feed(false, 14); await h.flush(300); await h.flush(300);
+  expect(conversationActiveCount()).toBe(0);                 // synthesis finished: the heavy job may run again
+  h.feed(true, 12); expect(conversationActiveCount()).toBe(1); h.session.close(); expect(conversationActiveCount()).toBe(0);
 });
