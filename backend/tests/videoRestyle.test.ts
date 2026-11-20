@@ -135,6 +135,8 @@ describe("edit_video restyle", () => {
     expect(sent).toMatchObject({ job: "clip", operation: "restyle", level: "max", styles: [COLORIZER_ID], style_strength: 1, conditioning: "source", inputs: [{ role: "edit_source", file: expect.stringContaining("video-edit") }] });
     expect(sent).not.toHaveProperty("model");
     expect(sent).not.toHaveProperty("lora");
+    // The pack's restyle recipe holds the colour wording: Home sends only the person's own words.
+    expect((sent as { description: string }).description).toBe("warm autumn leaves");
     expect(next.request.edit).toMatchObject({ from: job.id, change: "restyle", note: RESTYLE_NOTE });
     expect(getVideoJobFor(owner, job.id)?.state).toBe("done");
   });
@@ -162,6 +164,16 @@ describe("edit_video restyle", () => {
       expect(getVideoJobFor(ownerNew, made.job.id)?.state).toBe("done");
     });
   }
+
+  test("with no words the door gets the clip's own words, never Home's colour template", async () => {
+    fake.door = true;
+    const owner = person("owner");
+    const { job, state } = await makeClip(owner);
+    const before = fake.makeRequests.length;
+    await finished(owner, await edit(state, { clip: job.id, change: "restyle", restyle: "colorize" }));
+    expect((fake.makeRequests[before] as { description: string }).description).toBe(job.prompt);
+    expect((fake.makeRequests[before] as { description: string }).description).not.toContain("natural realistic colours");
+  });
 
   test("a catalog that does not list the restyle keys sends it on the old route exactly as before", async () => {
     fake.door = true;

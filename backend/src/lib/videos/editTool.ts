@@ -544,7 +544,7 @@ async function restyleClip(input: RunEditVideoInput, value: EditArgs, actor: Per
     try {
       const body = restyleBody({ source: staged.path, restyle: style.id, lora: installed.id, ...(value.words ? { words: value.words } : {}) });
       // VF-RESTYLE-OP-01: the generic door first (no model name, no add-on file: the Stack resolves the style id); the old restyle route takes it where the Stack does not list the keys or refuses.
-      const viaDoor = await submitRestyleViaDoor({ sourcePath: staged.path, styleId: installed.id, strength: body.strength, conditioning: body.conditioning, description: body.prompt, seconds: Math.max(1, Math.round(clipSeconds ?? source.request.seconds ?? 5)) });
+      const viaDoor = await submitRestyleViaDoor({ sourcePath: staged.path, styleId: installed.id, strength: body.strength, conditioning: body.conditioning, description: (value.words ?? "").trim() || source.prompt, seconds: Math.max(1, Math.round(clipSeconds ?? source.request.seconds ?? 5)) });
       const submitted: { job: string; done: Array<{ url?: string; seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }> | null } = viaDoor ? { job: viaDoor.job, done: null } : await submitVideoRestyle(body);
       const read = async (clip: { seconds?: number | null; width?: number | null; height?: number | null; audio?: boolean; ms?: number }) => ({ ok: true as const, clip: { video: await fetchClip(submitted.job), seconds: clip.seconds ?? null, width: clip.width ?? null, height: clip.height ?? null, audio: clip.audio === true, ms: clip.ms ?? 0, note: RESTYLE_NOTE } });
       if (submitted.done?.[0]?.url) return await read(submitted.done[0]);
