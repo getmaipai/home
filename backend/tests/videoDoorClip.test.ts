@@ -1,7 +1,7 @@
 // VF-DOOR-01: a plain clip goes through the Stack's generic make door; everything else stays on the old one, and the old one is the way back.
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __setVideosFetchForTests, fetchClipReceipt, type VideoBody } from "@/lib/videos/stack";
-import { OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitVideoViaDoor } from "@/lib/videos/doorClip";
+import { OLD_CLIP_FIELDS, clipRequestFor, doorWanted, submitEditViaDoor, submitVideoViaDoor } from "@/lib/videos/doorClip";
 
 const base = (over: Partial<VideoBody> = {}): VideoBody => ({ prompt: "a dog barks", audience: "adult", size: "864x480", seconds: 5, seed: 7, timeout_ms: 1, ...over });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -137,4 +137,20 @@ test("a Max clip is a clip request at level max with the shape and seconds, and 
   expect(doorWanted(base({ tier: "max" }))).toBe(true);
   makeAnswer = () => json({ code: "level_not_served", line: "This model does not make max quality." }, 409);
   expect(await submitVideoViaDoor(base({ tier: "max" }))).toBeNull();
+});
+
+test("an extend or retake goes to the old door unless the Stack lists every key it needs, and a planner refusal sends it back too", async () => {
+  const edit = { mode: "extend" as const, prompt: "a boat", sourcePath: "/tmp/video-edit/x.mp4", seconds: 4 };
+  catalogFields = "none";
+  expect(await submitEditViaDoor(edit)).toBeNull();
+  catalogFields = ALL_FIELDS.filter((key) => key !== "operation");
+  expect(await submitEditViaDoor(edit)).toBeNull();
+  expect(calls.filter((c) => c.path === "/stack/v1/jobs/make")).toHaveLength(0);
+  catalogFields = ALL_FIELDS;
+  makeAnswer = () => json({ code: "input_not_supported", line: "This model has no extend." }, 422);
+  expect(await submitEditViaDoor(edit)).toBeNull();
+  makeAnswer = () => json({ id: "job-9", job: "clip", state: "running", percent: 0, status: "Making", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 4, sound: true, notes: [] } }, 202);
+  expect(await submitEditViaDoor({ ...edit, mode: "retake", seconds: 5, atSeconds: 3 })).toEqual({ job: "job-9" });
+  const sent = calls.filter((c) => c.path === "/stack/v1/jobs/make").at(-1)!.body!;
+  expect(sent).toMatchObject({ operation: "retake_from", at_seconds: 3, level: "max", inputs: [{ role: "edit_source", file: "/tmp/video-edit/x.mp4" }] });
 });

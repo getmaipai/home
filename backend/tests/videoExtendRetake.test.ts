@@ -65,6 +65,25 @@ describe("edit_video extend and retake", () => {
     expect(getVideoJobFor(actor, job.id)?.state).toBe("done");
   });
 
+  test("VF-TAKES-01: on a Stack whose catalog lists the keys, extend and retake go through the generic door with the clip as the edit_source input; an old Stack keeps the old door", async () => {
+    fake.door = true;
+    const actor = person("owner");
+    const { job, state } = await makeClip(actor);
+    const before = fake.makeRequests.length;
+    const extended = await edit(state, { clip: job.id, change: "extend", seconds: 4 });
+    expect(extended.status).toBe("succeeded");
+    await until(() => fake.makeRequests.length > before);
+    expect(fake.makeRequests[before]).toMatchObject({ job: "clip", level: "max", operation: "extend", seconds: 4, inputs: [{ role: "edit_source", file: expect.stringContaining("video-edit") }] });
+    const id = (extended.result?.data as { videoJobId: string }).videoJobId;
+    await until(() => getVideoJobFor(actor, id)?.state === "done");
+    const retaken = await edit(chatState(actor, state.conversationId!), { clip: job.id, change: "retake", from_s: 3 });
+    expect(retaken.status).toBe("succeeded");
+    await until(() => fake.makeRequests.length > before + 1);
+    expect(fake.makeRequests[before + 1]).toMatchObject({ operation: "retake_from", at_seconds: 3 });
+    const retakeId = (retaken.result?.data as { videoJobId: string }).videoJobId;
+    await until(() => getVideoJobFor(actor, retakeId)?.state === "done");
+  });
+
   test("retake sends its start time and optional new words", async () => {
     const actor = person("owner");
     const { job, state } = await makeClip(actor);

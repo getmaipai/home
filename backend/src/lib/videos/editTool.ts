@@ -29,6 +29,7 @@ import { videoJobLockState, LOCKED_START_LINE } from "@/lib/videos/lock";
 import { allVideoAdapters } from "./adapters";
 import { EDIT_FAILED_PREFIX, activeVideoJobsFor, getVideoJobByFileFor, sourceVideoJob, startVideoEditJob, storeContinueFrame, type EditRun, type VideoJob, type VideoRequest } from "./jobs";
 import { fetchClip, getVideoJob as getStackVideoJob, StackVideoError, submitVideo, submitVideoRestyle } from "./stack";
+import { submitEditViaDoor } from "./doorClip";
 import { storedFilmCredits } from "@/lib/creations/credits";
 import { CAPTION_POSITIONS, filmOverhead, titleSubtitle, CROSSFADE_IN_STACK, DEFAULT_CROSSFADE_S, DEFAULT_MUSIC_LEVEL, DEFAULT_VOICE_LEVEL, FILM_LOOK_PRESETS, JOIN_TRANSITIONS, seamJoinOps, maxEffectAmount, LETTERBOX_RATIOS, MAX_CROSSFADE_S, MAX_EDIT_OPS, MAX_EDIT_SECONDS, MAX_JOIN_CLIPS, MIN_CROSSFADE_S, MIN_JOIN_CLIPS, MIX_LEVEL_IDS, VIDEO_ASPECTS, TRANSITION_KINDS, captionsOps, creditsOp, crossfadeProblem, cutoutOps, effectOps, filmLookOps, filmOps, frameOps, gradeOps, joinOps, lastFrameAt, letterboxOps, mixOps, reframeOps, speedOps, titleCardOp, spatialNote, spatialOps, trimOps, trimRange, upscaleOps, quickClearerOps, VIDEO_RESTYLES, restyleBody } from "./editPlan";
 import { runStackEdit, stageClipForStack, type EditFile } from "./stackEdit";
@@ -481,7 +482,10 @@ async function extendOrRetake(input: RunEditVideoInput, value: EditArgs, actor: 
     const staged = await stageClipForStack(sourceVideo);
     if (!staged) return { ok: false, line: MAX_EDIT_NOT_READY_LINE };
     try {
-      const submitted = await submitVideo({ prompt, audience: "adult", model: LTX25_MAX_MODEL, tier: "max", size: "1024x576", seconds: source.request.seconds, timeout_ms: 1, source_video: staged.path, ...(mode === "extend" ? { extend_seconds: Math.round(Math.min(range.max, Math.max(range.min, requested))) } : { retake_from_seconds: requested }) });
+      const edited = mode === "extend" ? { seconds: Math.round(Math.min(range.max, Math.max(range.min, requested))) } : { seconds: source.request.seconds, atSeconds: requested };
+      // VF-TAKES-01: the generic door first (where the Stack lists the keys and a row serves the operation); the old door takes it otherwise, as before.
+      const viaDoor = await submitEditViaDoor({ mode, prompt, sourcePath: staged.path, ...edited });
+      const submitted = viaDoor ? { job: viaDoor.job, done: null } : await submitVideo({ prompt, audience: "adult", model: LTX25_MAX_MODEL, tier: "max", size: "1024x576", seconds: source.request.seconds, timeout_ms: 1, source_video: staged.path, ...(mode === "extend" ? { extend_seconds: Math.round(Math.min(range.max, Math.max(range.min, requested))) } : { retake_from_seconds: requested }) });
       if (submitted.done?.[0]?.url) {
         const video = await fetchClip(submitted.job);
         const clip = submitted.done[0];

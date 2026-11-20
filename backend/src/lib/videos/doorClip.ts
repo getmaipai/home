@@ -98,3 +98,31 @@ export async function submitVideoViaDoor(body: VideoBody, actor?: PersonRow, onD
     throw error;
   }
 }
+
+/**
+ * VF-TAKES-01: an extend or a retake of a Max clip through the generic door (`operation` extend or retake_from with the clip as the `edit_source` input), or null
+ * when the Stack's catalog does not list every key the edit needs (or lists none: an older Stack), the planner refuses it (the pack has no row for the
+ * operation, an unreadable input) or the Stack is older than the door: the caller then sends it on the old door exactly as before. Home validates nothing
+ * here that it did not validate before (the ranges are the caller's); this only moves the transport.
+ */
+export async function submitEditViaDoor(edit: { mode: "extend" | "retake"; prompt: string; sourcePath: string; seconds: number; atSeconds?: number }): Promise<{ job: string } | null> {
+  if (legacyDoorForced()) return null;
+  const catalog = await clipCatalog();
+  if (catalog.available !== true || !catalog.fields) return null;
+  const request: Record<string, unknown> = {
+    job: "clip", audience: "adult", description: edit.prompt, shape: "landscape", level: "max", seconds: edit.seconds,
+    operation: edit.mode === "extend" ? "extend" : "retake_from",
+    ...(edit.mode === "retake" && edit.atSeconds !== undefined ? { at_seconds: edit.atSeconds } : {}),
+    inputs: [{ role: "edit_source", file: edit.sourcePath }], wait: 0,
+  };
+  for (const key of Object.keys(request)) {
+    if (!catalog.fields.has(key)) { if (key === "wait") delete request[key]; else return null; }
+  }
+  try {
+    const made = await makeClip(request as unknown as StackMakeClipRequest);
+    return made.ok ? { job: made.job } : null;
+  } catch (error) {
+    if (error instanceof StackVideoError && [400, 404, 405, 415, 422].includes(error.status)) return null;
+    throw error;
+  }
+}
