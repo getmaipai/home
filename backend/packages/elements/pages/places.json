@@ -30,7 +30,8 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "density": "compact"
     }
   ]
 }

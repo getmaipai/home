@@ -29,7 +29,8 @@
             "id": "{id}"
           }
         }
-      }
+      },
+      "density": "compact"
     }
   ]
 }

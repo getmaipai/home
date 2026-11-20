@@ -85,7 +85,8 @@
       "hide_when_empty": true,
       "card_radius": "soft",
       "look": "backdrop",
-      "layout": "rail"
+      "layout": "rail",
+      "density": "compact"
     },
     {
       "type": "picker",
