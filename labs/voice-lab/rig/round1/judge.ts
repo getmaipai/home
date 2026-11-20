@@ -1,7 +1,8 @@
 // Round-1 judges: what a person would notice about barge-in and duplex, read from the RECORDING of her speaker output plus the event times. Pure functions, calibrated by tests/round1Judge.test.ts.
 import { rms } from "../listen/audio";
 import { wer } from "../listen/judge";
-export const R1 = { finishWordMs: 1500, zeroRunMs: 250, dipDb: 6, wordsKept: 0.8, settleMs: 300 };
+/** silenceMaxMs: from the person's first word to her silence. The finish-the-word rule allows 450 ms plus detection time, so 700 ms; change it only with evidence from a real run. */
+export const R1 = { silenceMaxMs: 700, zeroRunMs: 250, dipDb: 6, wordsKept: 0.8, settleMs: 300 };
 /** Start (s) of the first run of digital silence of at least minMs at or after fromSec, or null. Underruns and stops leave exact zeros; her own pauses keep a little noise. */
 export function zeroRunStart(rec: Float32Array, rate: number, fromSec: number, minMs = R1.zeroRunMs): number | null {
   let run = 0; const need = Math.round(rate * minMs / 1000);
@@ -33,7 +34,7 @@ export function judgeRun(r: R1Run, rec: Float32Array, rate = 24000): R1Verdict {
     if (r.scenario !== "silent" && onset > 0) { dip = +dipDb(rec, rate, onset).toFixed(1); if (dip > R1.dipDb) reasons.push(`her voice dipped ${dip} dB`); }
   } else if (r.scenario === "stop" || r.scenario === "sentence") {
     if (!r.stops.some((t) => t >= r.userStartAt)) reasons.push("no stop after the person started");
-    silentMs = silentAfterMs(rec, rate, onset); if (silentMs === null) reasons.push("she never went silent (missed stop)"); else if (silentMs > R1.finishWordMs) reasons.push(`silent only after ${silentMs} ms`);
+    silentMs = silentAfterMs(rec, rate, onset); if (silentMs === null) reasons.push("she never went silent (missed stop)"); else if (silentMs > R1.silenceMaxMs) reasons.push(`silent only after ${silentMs} ms (limit ${R1.silenceMaxMs})`);
     if (r.selfStop) reasons.push("she interrupted herself before the person spoke");
   } else if (r.scenario === "overlap") {
     kept = +wordsKept(r.userText, heard).toFixed(2); if (kept < R1.wordsKept) reasons.push(`only ${Math.round(kept * 100)}% of the person's words reached the transcript`);

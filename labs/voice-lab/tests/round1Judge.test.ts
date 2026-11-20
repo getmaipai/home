@@ -20,7 +20,7 @@ test("known-bad: a missed stop (she keeps talking) and a late stop fail the cut-
   const cut = { ...base, scenario: "stop", stops: [5100] };
   expect(judgeRun(cut, cat(zeros(500), tone(8000))).reasons.join(" ")).toContain("missed stop");
   expect(judgeRun(cut, cat(zeros(500), tone(7000), zeros(500))).reasons.join(" ")).toContain("silent only after");
-  expect(judgeRun(cut, cat(zeros(500), tone(5400), zeros(2000))).pass).toBe(true);
+  expect(judgeRun(cut, cat(zeros(500), tone(5100), zeros(2000))).pass).toBe(true); expect(judgeRun(cut, cat(zeros(500), tone(5300), zeros(2000))).reasons.join(" ")).toContain("limit 700");
   expect(judgeRun({ ...cut, stops: [] }, cat(zeros(500), tone(5400), zeros(2000))).reasons.join(" ")).toContain("no stop");
 });
 test("lost user words and a cut person fail the overlap and nod cases", () => {
