@@ -114,6 +114,7 @@ export function recordClipCreation(actor: PersonRow, job: VideoJob, files: Video
   return recordCreation(actor, {
     ...(creationId ? { id: creationId } : {}),
     kind: "video", fileIds: ids, jobIds: [job.id],
+    ...(job.request.receipt && job.stackJob ? { receiptIds: [job.stackJob] } : {}),
     productionId: job.request.production_id ?? null, shotId: job.request.shot_id ?? null,
     recipe: { tool: writer === "video-edit" ? (job.request.edit ? `video-${job.request.edit.change}` : "video-edit") : job.request.create ? "video-create" : "video", route },
     // The reference recipe's own words (the person's request rewritten around the panels, and the whole prompt the Stack received).

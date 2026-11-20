@@ -1,3 +1,4 @@
+import { until } from "./pictureFixture";
 import { beforeEach, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
@@ -48,7 +49,7 @@ test("explicit settings beat template defaults and unknown template starts no jo
     const c = new TestClient(); await c.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const person = db.select().from(people).get()! as PersonRow; const template = listTemplates({ actor: person, kind: "video" })[0]!;
     const response = await c.post("/api/plugins/video/actions/make", { prompt: "Extra direction", template: template.id, seconds: 10, orientation: "landscape" });
-    expect(response.status).toBe(200); expect(fake.submitted[0]!.seconds).toBe(5); expect(fake.submitted[0]!.size).toMatch(/^\d+x\d+$/);
+    expect(response.status).toBe(200); await until(() => fake.submitted.length > 0); expect(fake.submitted[0]!.seconds).toBe(5); expect(fake.submitted[0]!.size).toMatch(/^\d+x\d+$/);
     const bad = await c.post("/api/plugins/video/actions/make", { prompt: "A video prompt", template: "mtpl-missing" });
     expect(bad.status).toBe(422); expect(fake.submitted).toHaveLength(1);
   } finally { fake.restore(); }
@@ -85,6 +86,7 @@ test("a blank left empty uses its example, and a malformed blanks value is refus
     const template = getTemplate("mtpl-vtpetmoment")!;
     const bare = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blank_subject: "{blank_subject}" });
     expect(bare.status).toBe(200);
+    await until(() => fake.submitted.length > 0);   // a plain clip first tries the generic door, so the submission lands a moment after the reply
     expect(fake.submitted[0]!.prompt).toContain(fillTemplateBlanks(template.prompt));
     const bad = await c.post("/api/plugins/video/actions/make", { prompt: "", template: template.id, blanks: "words" });
     expect(bad.status).toBe(422);

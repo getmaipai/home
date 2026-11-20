@@ -256,11 +256,12 @@ export async function clipJobAvailable(): Promise<boolean | null> {
 }
 
 /** VF-RECEIPT-01: the receipt the Stack wrote for a finished clip (the job owner's record; never logged), or null when there is none or it cannot be read. */
-export async function fetchClipReceipt(job: string): Promise<Record<string, unknown> | null> {
+export async function fetchClipReceipt(job: string, view?: FullView): Promise<Record<string, unknown> | null> {
   try {
-    const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/receipt.json`, { method: "GET", timeoutMs: 10_000 });
+    const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/receipt.json`, { method: "GET", timeoutMs: 10_000 }, view);
     if (!res.ok) { await res.arrayBuffer().catch(() => undefined); return null; }
-    return await res.json() as Record<string, unknown>;
+    const body = await res.json() as unknown;
+    return body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
   } catch { return null; }
 }
 

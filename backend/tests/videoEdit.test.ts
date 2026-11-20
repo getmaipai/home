@@ -310,6 +310,7 @@ describe("C2 review fixes", () => {
     const outcome = await edit(state, { clip: job.id, change: "another_take" });
     expect(outcome.result?.data).toHaveProperty("videoJobId");
     expect(screened).toBeGreaterThan(afterFirst);
+    await until(() => fake.submitted.length >= 2);   // a plain clip first tries the generic door, so the submission lands a moment after the call returns
     expect(fake.submitted).toHaveLength(2);
     expect(fake.submitted[1]).toMatchObject({ image_source: "uploaded" });
     expect(fake.submitted[1]!.image).toBe(fake.submitted[0]!.image);
@@ -321,6 +322,7 @@ describe("C2 review fixes", () => {
     const { job, state } = await clipFromPicture(owner, `picture-gen:${JSON.stringify({ v: 1, width: 64, height: 48 })}`, "latest");
     const outcome = await edit(state, { clip: job.id, change: "remix", prompt: "the fox winks at the camera" });
     expect(outcome.result?.data).toHaveProperty("videoJobId");
+    await until(() => fake.submitted.length >= 2);
     expect(fake.submitted).toHaveLength(2);
     expect(fake.submitted[1]!.image).toBe(fake.submitted[0]!.image);
   });

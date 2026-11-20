@@ -31,7 +31,7 @@ import { videoEngineStatus } from "./ready";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { doorWanted, submitVideoViaDoor } from "./doorClip";
-import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
+import { cancelOrDeleteVideo, fetchClip, fetchClipReceipt, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 import { fullViewForJob, type FullView } from "@/lib/stack/fullView";
 import { checkClipFile } from "./stackClipCheck";
 import { shouldRetake, keepBetter, type ClipCheck } from "./frameCheck";
@@ -116,6 +116,8 @@ export interface ReferenceRecipe {
 }
 
 export interface VideoRequest {
+  /** VF-RECEIPT-01: the Stack's receipt for this clip (what made it: runtime, steps, inputs by role and hash, the true sizes, the prompt as a byte count and hash, never its text). Part of the owner's own job record (rule 6a); read before the Stack's copy is deleted. Absent when the Stack had none or could not be read. */
+  receipt?: Record<string, unknown>;
   size: string;
   seconds: number;
   seed: number | null;
@@ -893,6 +895,9 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const poster = await fetchPoster(stackJob, view);
     if (signal.aborted) return;
     if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video didn't come out right. Try again.`; saveVideoJob(job); return; }
+    // VF-RECEIPT-01: the receipt is read before the Stack's copy goes. A missing or unreadable one never fails the clip (a failed tool never fails the answer).
+    const receipt = await fetchClipReceipt(stackJob, view);
+    if (receipt) job.request.receipt = receipt;
     await settleClip(job, actor, video, poster, clip, signal, "video-gen");
   } finally {
     // Done or not, Home has taken what it wanted: the Stack's copy goes (a failed save would otherwise leave a clip on its disk).

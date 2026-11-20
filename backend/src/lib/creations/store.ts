@@ -48,6 +48,8 @@ export interface CreationInput {
   sources?: Array<{ file_id: string; role: SourceEntry["role"] }>;
   generation?: Creation["generation"];
   settings?: Creation["settings"];
+  /** VF-RECEIPT-01: the Stack job ids whose receipts are kept in the owner's job record (ids only, never a receipt's content). */
+  receiptIds?: string[];
   checks?: Record<string, unknown> | null;
   /** The record this one was made from (another take, an edit): its mark is a floor for this one. */
   parentId?: string | null;
@@ -130,6 +132,7 @@ export function recordCreation(actor: PersonRow, input: CreationInput): Creation
       kind: input.kind,
       file_ids: [...new Set([...(old?.file_ids ?? []).filter((id) => !fileIds.includes(id)), ...fileIds])].sort((a, b) => (fileIds.includes(a) ? fileIds.indexOf(a) : 99) - (fileIds.includes(b) ? fileIds.indexOf(b) : 99)),
       job_ids: [...new Set([...(old?.job_ids ?? []), ...(input.jobIds ?? [])])],
+      receipt_ids: [...new Set([...(old?.receipt_ids ?? []), ...(input.receiptIds ?? [])])],
       production_id: clean(input.productionId) ?? old?.production_id ?? null,
       shot_id: input.shotId ?? old?.shot_id ?? null,
       recipe: input.recipe,

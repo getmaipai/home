@@ -44,6 +44,10 @@ export interface FakeVideoStack {
   /** AGE-ROUTING-REMOVE-01: the Stack reports no sound track on the LTX-2.5 clips it makes (a clip with sound is marked adult-only, so audience tests that need a clean clip ask for a silent one). */
   silent: boolean;
   ltx25maxPicture: boolean;
+  /** VF-RECEIPT-01: what the receipt route answers for a clip: a record (the default is none: 404), or "fail" for a server error. A record may use `{job}` in `job_id` and is cloned per job. */
+  receipt: Record<string, unknown> | "fail" | null;
+  /** VF-DOOR-01: the Stack answers the generic make door (clip) and its catalog, so a plain adult clip goes through it; off by default, so every other test stays on the old door. */
+  door: boolean;
   /** The fake's own request handler, for a test that wraps it (an enforcing Stack). */
   handler: typeof fetch;
   restore(): void;
@@ -81,7 +85,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], receipt: null, door: false, converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -92,6 +96,21 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
+    if (fake.door && method === "GET" && path === "/stack/v1/jobs/catalog") return json({ audience: "adult", jobs: [{ job: "clip", available: true, part: { id: "part-a", label: "A" } }] });
+    if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
+      const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      const legacy: Record<string, unknown> = { prompt: request.description, seconds: request.seconds, seed: request.seed, audience: request.audience === "adult" ? "adult" : "all-ages", ...(request.level === "boost" || request.level === "max" ? { tier: request.level } : {}), via: "door" };
+      fake.submitted.push(legacy);
+      const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body: legacy, polls: 0, state: "queued", deleted: false };
+      fake.jobs.push(job);
+      return json({ id: job.id, job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [], receipt: job.id } }, 202);
+    }
+    const receiptMatch = method === "GET" ? path.match(/^\/v1\/videos\/generations\/([^/]+)\/receipt\.json$/) : null;
+    if (receiptMatch) {
+      if (fake.receipt === "fail") return json({ error: "The Stack could not read it.", code: "failed" }, 500);
+      if (!fake.receipt) return json({ error: "There is no receipt for that clip.", code: "no_receipt" }, 404);
+      return json({ ...fake.receipt, job_id: receiptMatch[1] });
+    }
     if (method === "POST" && path === "/v1/videos/generations") {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.submitted.push(body);
