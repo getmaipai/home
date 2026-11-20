@@ -8,7 +8,7 @@ import { fileAudience } from "@/lib/access";
 import { lockItemOfProvenance, lockState } from "@/lib/adultLock";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { captureLook } from "@/lib/castLook";
-import { createMediaSubject, type MediaSubject } from "@/lib/mediaSubjects";
+import { createMediaSubject, type MediaSubject, type SubjectKind } from "@/lib/mediaSubjects";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import type { PersonRow } from "@/types";
 
@@ -34,7 +34,17 @@ const realStarter: Starter = (actor, subjectId) => {
   void captureLook(actor, subjectId).then((made) => { if (!made.ok) console.error("[save-character] look capture refused:", made.line); }).catch((error) => console.error("[save-character] look capture failed:", error instanceof Error ? error.message : error));
 };
 
-export async function saveCharacterFromPicture(actor: PersonRow, input: { fileId: string; name: string }): Promise<CharacterSave> {
+/** ELEMENTS-HOME-03: the same save for a place or a prop ("Save as an element"). The refusal lines say "character"; for another kind they say the kind. */
+const wording = (line: string, kind: SubjectKind) => kind === "character" ? line : line.replace(/\bcharacter\b/g, kind);
+export const ELEMENT_SAVED_LINE = "Saved.";
+
+export async function saveCharacterFromPicture(actor: PersonRow, input: { fileId: string; name: string; kind?: SubjectKind }): Promise<CharacterSave> {
+  const kind: SubjectKind = input.kind ?? "character";
+  const result = await saveElement(actor, input, kind);
+  return result.ok ? result : { ...result, line: wording(result.line, kind) };
+}
+
+async function saveElement(actor: PersonRow, input: { fileId: string; name: string }, kind: SubjectKind): Promise<CharacterSave> {
   if (actor.role === "guest") return { ok: false, status: 403, line: CHARACTER_GUEST_LINE };
   const name = input.name.trim();
   if (name.length < 1 || name.length > CHARACTER_NAME_MAX) return { ok: false, status: 400, line: CHARACTER_NAME_LINE };
@@ -47,8 +57,10 @@ export async function saveCharacterFromPicture(actor: PersonRow, input: { fileId
   if (lock === "locked") return { ok: false, status: 403, line: CHARACTER_LOCKED_LINE };
   if (file.retention !== "kept" && !file.provenance.startsWith("picture-gen:") && file.provenance !== "media-subject-reference") return { ok: false, status: 400, line: CHARACTER_KEEP_LINE };
   let subject: MediaSubject;
-  try { subject = createMediaSubject(actor, { name, kind: "character", look: name, referenceIds: [file.id], real: false }, "library:save-as-character"); }
+  try { subject = createMediaSubject(actor, { name, kind, look: name, referenceIds: [file.id], real: false }, "library:save-as-character"); }
   catch (error) { return { ok: false, status: 400, line: error instanceof Error ? error.message : "The character could not be saved. Try again." }; }
+  // The look capture builds a character sheet; a place or a prop is saved as it is.
+  if (kind !== "character") return { ok: true, subject, capture: "waiting", line: ELEMENT_SAVED_LINE };
   const engine = await pictureEngineStatus();
   if (!engine) return { ok: true, subject, capture: "waiting", line: CHARACTER_WAITING_LINE };
   (starterOverride ?? realStarter)(actor, subject.id);

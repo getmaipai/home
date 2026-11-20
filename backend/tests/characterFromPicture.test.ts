@@ -6,7 +6,7 @@ import { attachments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
 import { listCast } from "@/lib/cast";
-import { imageAppData } from "@/lib/imageApp";
+import { elementRows } from "@/lib/elementsApp";
 import { __setCharacterCaptureForTests, CHARACTER_LOCKED_LINE, CHARACTER_WAITING_LINE, CHARACTER_SAVED_LINE } from "@/lib/characterFromPicture";
 import { __setPictureStatusForTests } from "@/lib/pictures/ready";
 import type { StackImageStatus } from "@/lib/pictures/stack";
@@ -27,7 +27,25 @@ async function picture(actor: PersonRow, provenance = 'picture-gen:{"audience":"
 const save = (client: { post: (p: string, b?: unknown, h?: Record<string, string>) => Promise<Response> }, file_id: string, name: unknown, headers?: Record<string, string>) => client.post("/api/media-subjects/from-picture", { file_id, name }, headers);
 
 describe("save a picture as a character", () => {
-  test("the owner saves a picture: a character with that picture, in the cast list, the Characters rows and the @ mention list, and the look capture starts", async () => {
+  test("ELEMENTS-HOME-03: a place or a prop is saved the same way with no look capture, and its refusal lines name the kind", async () => {
+    const { adult, row } = await household();
+    const me = row("Marlow");
+    const file = await picture(me);
+    for (const kind of ["place", "prop"] as const) {
+      const res = await adult.client.post("/api/media-subjects/from-picture", { file_id: file, name: `Test ${kind}`, kind });
+      expect(res.status).toBe(201);
+      const body = await res.json() as { subject: { kind: string; reference_ids: string[] }; line: string };
+      expect(body.subject).toMatchObject({ kind, reference_ids: [file] });
+      expect(body.line).toBe("Saved.");
+      expect(elementRows(me, { kind }).map((item) => item.title)).toContain(`Test ${kind}`);
+    }
+    expect(started).toEqual([]);
+    const refused = await adult.client.post("/api/media-subjects/from-picture", { file_id: "nope", name: "Barn", kind: "place" });
+    expect(refused.status).toBe(404);
+    expect(((await refused.json()) as { error: string }).error).toContain("Choose one of your own pictures");
+  });
+
+  test("the owner saves a picture: a character with that picture, in the cast list, the Elements Characters rows and the @ mention list, and the look capture starts", async () => {
     const { adult, row } = await household();
     const me = row("Marlow");
     const file = await picture(me);
@@ -38,7 +56,7 @@ describe("save a picture as a character", () => {
     expect(body).toMatchObject({ capture: "started", line: CHARACTER_SAVED_LINE, job_id: null });
     expect(started).toEqual([body.subject.id]);
     expect(listCast(me).some((entry) => entry.subject_id === body.subject.id && entry.name === "Juniper")).toBe(true);
-    const rows = imageAppData(me, "characters", {}) as Array<{ id: string; title: string; thumbnail: string }>;
+    const rows = elementRows(me, { kind: "character" });
     const mine = rows.find((item) => item.title === "Juniper");
     expect(mine?.thumbnail).toBe(`/api/files/${file}/thumb?w=320`);
     expect((await (await adult.client.get("/api/media-subjects")).json() as { subjects: Array<{ id: string }> }).subjects.map((s) => s.id)).toContain(body.subject.id);
@@ -63,7 +81,7 @@ describe("save a picture as a character", () => {
     expect((await save(adult.client, file, "x".repeat(60))).status).toBe(201);
     expect((await save(adult.client, file, "Twin")).status).toBe(201);
     expect((await save(adult.client, file, "Twin")).status).toBe(201);
-    expect((imageAppData(row("Marlow"), "characters", {}) as Array<{ title: string }>).filter((item) => item.title === "Twin")).toHaveLength(2);
+    expect((elementRows(row("Marlow"), { kind: "character" }) as Array<{ title: string }>).filter((item) => item.title === "Twin")).toHaveLength(2);
   });
 
   test("a picture that is not the person's own, or is gone, is refused with a plain line", async () => {
@@ -107,7 +125,7 @@ describe("save a picture as a character", () => {
     const res = await save(teen.client, file, "Pip");
     expect(res.status).toBe(201);
     const id = (await res.json() as { subject: { id: string } }).subject.id;
-    expect((imageAppData(row("Nova"), "characters", {}) as Array<{ id: string }>).map((item) => item.id)).toContain(id);
+    expect((elementRows(row("Nova"), { kind: "character" }) as Array<{ id: string }>).map((item) => item.id)).toContain(id);
     expect((await (await adult.client.get("/api/media-subjects")).json() as { subjects: Array<{ id: string }> }).subjects.map((s) => s.id)).not.toContain(id);
   });
 

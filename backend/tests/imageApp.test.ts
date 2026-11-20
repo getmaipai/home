@@ -37,11 +37,11 @@ test("Image sidebar rows have distinct real icons, labels, and honest placeholde
   expect(loaded.ok).toBe(true);
   if (!loaded.ok) return;
   const contributes = loaded.value.contributes as { sidebar: { groups: Array<{ id: string; title?: string; pages: string[] }> }; pages: Array<{ id: string; label: string; icon: string; module: string; nav: boolean }> };
-  const iconNames = new Set(["heart", "layout-grid", "clock", "folder", "users", "file-text", "user-round", "box", "map-pin", "clapperboard", "wand-sparkles", "layout-dashboard", "image", "sparkles", "square-pen"]);
+  const iconNames = new Set(["heart", "layout-grid", "clock", "folder", "users", "file-text", "wand-sparkles", "layout-dashboard", "image", "sparkles", "square-pen"]);
   const rows = contributes.sidebar.groups.flatMap((group) => group.pages.map((id) => contributes.pages.find((page) => page.id === id)!));
   expect(new Set(rows.map((page) => page.icon)).size).toBe(rows.length);
   for (const page of rows) expect(iconNames.has(page.icon)).toBe(true);
-  expect(contributes.sidebar.groups.map((group) => [group.id, group.title ?? ""])).toEqual([["browse-home", ""], ["browse-library", "Library"], ["browse-cast", "Cast and places"], ["create-make", "Make"], ["create-edit", "Edit"]]);
+  expect(contributes.sidebar.groups.map((group) => [group.id, group.title ?? ""])).toEqual([["browse-home", ""], ["browse-library", "Library"], ["create-make", "Make"], ["create-edit", "Edit"]]);
   expect(contributes.pages.find((page) => page.id === "index")?.label).toBe("Home");
   expect(contributes.pages.find((page) => page.id === "create")?.label).toBe("New picture");
   const placeholders: Record<string, string> = {
@@ -49,9 +49,6 @@ test("Image sidebar rows have distinct real icons, labels, and honest placeholde
     collections: "Group pictures into named collections, like a trip or a project.",
     shared: "Pictures other people at home chose to share with you will show up here.",
     drafts: "Pictures you started and have not finished wait here.",
-    props: "Objects you reuse in pictures, like a favourite mug or a guitar, will live here.",
-    places: "Places you reuse in pictures, like your kitchen or a beach, will live here.",
-    productions: "Longer projects built from many pictures, like a comic or a storyboard, will live here.",
   };
   for (const [id, text] of Object.entries(placeholders)) {
     const page = contributes.pages.find((item) => item.id === id)!;
@@ -60,7 +57,7 @@ test("Image sidebar rows have distinct real icons, labels, and honest placeholde
     expect(state).toMatchObject({ type: "empty_state", icon: page.icon, text, action: { navigate: { to: "/apps/image/create" } }, action_label: "Make a picture" });
   }
   for (const page of contributes.pages) expect(readFileSync(join(PACKAGES_DIR, "image", "pages", `${page.module}.json`), "utf8")).not.toContain("coming soon");
-  for (const id of ["from-reference", "from-template", "character-sheet", "combine"]) expect(contributes.pages.find((page) => page.id === id)?.nav).toBe(false);
+  for (const id of ["from-reference", "from-template", "combine"]) expect(contributes.pages.find((page) => page.id === id)?.nav).toBe(false);
 });
 
 test("Image menu exposes working Create rows and keeps placeholders out of navigation", async () => {
@@ -74,7 +71,7 @@ test("Image menu exposes working Create rows and keeps placeholders out of navig
   expect(contributes.sidebar.groups.every((group) => group.pages.every((id) => contributes.pages.some((page) => page.id === id)))).toBe(true);
   expect(contributes.pages.find((page) => page.id === "creations")?.label).toBe("My creations");
   expect(contributes.pages.find((page) => page.id === "templates")?.label).toBe("Templates");
-  for (const id of ["from-reference", "from-template", "character-sheet", "combine"]) {
+  for (const id of ["from-reference", "from-template", "combine"]) {
     expect(contributes.sidebar.groups.some((group) => group.pages.includes(id))).toBe(false);
     expect(contributes.pages.find((page) => page.id === id)?.nav).toBe(false);
     const doc = JSON.parse(readFileSync(join(PACKAGES_DIR, "image", "pages", `${id}.json`), "utf8"));

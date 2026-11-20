@@ -1,4 +1,4 @@
-// SAVE-CHARACTER-01: the viewer's "Save as a character" button shows only for a picture the person owns and can open, asks for a name, posts it and offers the Characters page.
+// SAVE-CHARACTER-01: the viewer's "Save as an element" button shows only for a picture the person owns and can open, asks for a name, posts it and offers the Characters page.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,26 +48,38 @@ describe("canSaveAsCharacter", () => {
   });
 });
 
-describe("LibraryViewer Save as a character", () => {
+describe("LibraryViewer Save as an element", () => {
   test("the button needs a name, posts the picture and name, then says it saved and links to Characters", async () => {
     const view = mount(base);
-    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Save as a character" })));
-    const save = await waitFor(() => view.getByRole("button", { name: "Save character" }));
+    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Save as an element" })));
+    const save = await waitFor(() => view.getByRole("button", { name: "Save element" }));
     expect((save as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(view.getByLabelText("Name"), { target: { value: "  Juniper " } });
-    fireEvent.click(view.getByRole("button", { name: "Save character" }));
-    await waitFor(() => expect(view.getByText("Saved as a character")).toBeTruthy());
+    fireEvent.click(view.getByRole("button", { name: "Save element" }));
+    await waitFor(() => expect(view.getByText("Saved as an element")).toBeTruthy());
     expect(posts).toEqual([{ url: "/api/media-subjects/from-picture", body: { file_id: "pic-1", name: "Juniper" } }]);
     expect(view.getByText("Saved. The model sheet is being made.")).toBeTruthy();
     fireEvent.click(view.getByRole("link", { name: "Open" }));
-    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/image/characters"));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/elements/characters"));
+  });
+
+  test("ELEMENTS-HOME-03: choosing Place posts the kind and links to the Places page", async () => {
+    const view = mount(base);
+    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Save as an element" })));
+    fireEvent.click(await waitFor(() => view.getByRole("radio", { name: "Place" })));
+    fireEvent.change(view.getByLabelText("Name"), { target: { value: "Kitchen" } });
+    fireEvent.click(view.getByRole("button", { name: "Save element" }));
+    await waitFor(() => expect(view.getByText("Saved as an element")).toBeTruthy());
+    expect(posts).toEqual([{ url: "/api/media-subjects/from-picture", body: { file_id: "pic-1", name: "Kitchen", kind: "place" } }]);
+    fireEvent.click(view.getByRole("link", { name: "Open" }));
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/elements/places"));
   });
 
   test("a refusal shows the hub's plain line and keeps the name", async () => {
     const view = mount(base, me, () => Response.json({ error: "This picture is locked. Unlock your adult items, then save it as a character." }, { status: 403 }));
-    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Save as a character" })));
+    fireEvent.click(await waitFor(() => view.getByRole("button", { name: "Save as an element" })));
     fireEvent.change(await waitFor(() => view.getByLabelText("Name")), { target: { value: "Juniper" } });
-    fireEvent.click(view.getByRole("button", { name: "Save character" }));
+    fireEvent.click(view.getByRole("button", { name: "Save element" }));
     await waitFor(() => expect(view.getByText(/This picture is locked/)).toBeTruthy());
     expect((view.getByLabelText("Name") as HTMLInputElement).value).toBe("Juniper");
   });
@@ -75,14 +87,14 @@ describe("LibraryViewer Save as a character", () => {
   test("a locked Adult picture, a video and someone else's picture have no button", async () => {
     const locked = mount({ ...base, audience: "adult-only" } as LibraryItem);
     await waitFor(() => expect(locked.queryByRole("button", { name: "Rename" })).toBeTruthy());
-    expect(locked.queryByRole("button", { name: "Save as a character" })).toBeNull();
+    expect(locked.queryByRole("button", { name: "Save as an element" })).toBeNull();
     cleanup();
     const video = mount({ ...base, id: "vid-1", kind: "video", media_type: "video/mp4" } as LibraryItem);
     await waitFor(() => expect(video.queryByRole("button", { name: "Rename" })).toBeTruthy());
-    expect(video.queryByRole("button", { name: "Save as a character" })).toBeNull();
+    expect(video.queryByRole("button", { name: "Save as an element" })).toBeNull();
     cleanup();
     const theirs = mount({ ...base, owner: { id: "other", display_name: "Other" } } as LibraryItem);
     await waitFor(() => expect(theirs.getByText("Download")).toBeTruthy());
-    expect(theirs.queryByRole("button", { name: "Save as a character" })).toBeNull();
+    expect(theirs.queryByRole("button", { name: "Save as an element" })).toBeNull();
   });
 });

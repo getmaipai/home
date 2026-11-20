@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ELEMENTS-HOME-01 and -03: the Characters, Props, Places, Productions and Character sheet pages moved out: characters, places and props are in the Elements app (the old addresses redirect), Productions and Character sheet are gone, and Image Create no longer starts from "Character:". "Make pictures of them" is dropped with its page; the @ chip in Image Create is how a character is used.
 - MAKE-CLEARER-02: the Studio's Resize bar no longer has its own Upscale 2x and 4x buttons; Make clearer, Better is the one upscaler.
 - MAKE-CLEARER-01: Make clearer in the Studio under More. Quick (less grain, sharper, optionally 1.5 or 2 times bigger) runs on this computer in seconds; Better enlarges with AI; Best is shown and says what it needs until the AI restore is installed. The result is a new version you can Apply, Undo and Compare.
 

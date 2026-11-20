@@ -5035,6 +5035,7 @@ msgstr "Changing the voice…"
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
+#: src/shell/library/useSaveAsCharacter.tsx:48
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:264
 msgid "Character"
 msgstr "Character"
@@ -7162,7 +7163,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:448
+#: src/shell/Routes.tsx:455
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -7633,7 +7634,7 @@ msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:350
+#: src/shell/Routes.tsx:357
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -8050,7 +8051,7 @@ msgstr "Cover art"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:464
+#: src/shell/Routes.tsx:471
 msgid "Create"
 msgstr "Create"
 
@@ -10361,7 +10362,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:350
+#: src/shell/Routes.tsx:357
 msgid "Find me"
 msgstr "Find me"
 
@@ -11801,8 +11802,8 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:155
 #: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:462
-#: src/shell/Routes.tsx:516
+#: src/shell/Routes.tsx:469
+#: src/shell/Routes.tsx:523
 msgid "Home"
 msgstr "Home"
 
@@ -13891,7 +13892,7 @@ msgid "Jump to screen"
 msgstr "Jump to screen"
 
 #. js-lingui-explicit-id
-#: src/shell/library/useSaveAsCharacter.tsx:43
+#: src/shell/library/useSaveAsCharacter.tsx:53
 msgid "Juniper"
 msgstr "Juniper"
 
@@ -14287,6 +14288,7 @@ msgstr "Kids' news"
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:106
 #: src/apps/settings/styles/StyleEditor.tsx:90
+#: src/shell/library/useSaveAsCharacter.tsx:46
 #: src/shell/pages/performance/LabelsBody.tsx:28
 msgid "Kind"
 msgstr "Kind"
@@ -14926,7 +14928,7 @@ msgstr "Levels and models"
 #: src/shell/pages/personAccessCopy.ts:10
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:465
+#: src/shell/Routes.tsx:472
 msgid "Library"
 msgstr "Library"
 
@@ -16740,8 +16742,8 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:463
-#: src/shell/Routes.tsx:516
+#: src/shell/Routes.tsx:470
+#: src/shell/Routes.tsx:523
 msgid "Media"
 msgstr "Media"
 
@@ -17511,7 +17513,7 @@ msgstr "My styles"
 #: src/apps/settings/styles/StyleAddFile.tsx:52
 #: src/apps/settings/styles/StyleConfirm.tsx:85
 #: src/apps/settings/styles/StyleEditor.tsx:83
-#: src/shell/library/useSaveAsCharacter.tsx:42
+#: src/shell/library/useSaveAsCharacter.tsx:52
 #: src/shell/pages/FilesPage.tsx:434
 #: src/shell/pages/MusicComposer.tsx:194
 #: src/shell/pages/ProjectsPage.tsx:160
@@ -19809,7 +19811,7 @@ msgstr "Only when I ask"
 #: src/shell/AmbientCompanionPane.tsx:332
 #: src/shell/InstallDock.tsx:264
 #: src/shell/library/LibraryItems.tsx:35
-#: src/shell/library/useSaveAsCharacter.tsx:53
+#: src/shell/library/useSaveAsCharacter.tsx:63
 #: src/shell/NotificationBell.tsx:252
 #: src/shell/pages/ActivityPage.tsx:33
 #: src/shell/pages/ActivityPage.tsx:34
@@ -21061,6 +21063,7 @@ msgid "Pitch {value}"
 msgstr "Pitch {value}"
 
 #. js-lingui-explicit-id
+#: src/shell/library/useSaveAsCharacter.tsx:49
 #: src/shell/pages/PackageAppPage.tsx:326
 msgid "Place"
 msgstr "Place"
@@ -21514,6 +21517,11 @@ msgstr "Projects keep related chats together."
 #: src/shell/pages/CompanionsPage.tsx:351
 msgid "Pronouns: {pronouns}"
 msgstr "Pronouns: {pronouns}"
+
+#. js-lingui-explicit-id
+#: src/shell/library/useSaveAsCharacter.tsx:50
+msgid "Prop"
+msgstr "Prop"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/useCompanionStates.ts:53
@@ -23341,9 +23349,9 @@ msgstr "Save a song style for me. Ask me what sound I want if you need to."
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:117
-#: src/shell/library/useSaveAsCharacter.tsx:38
-msgid "Save as a character"
-msgstr "Save as a character"
+#: src/shell/library/useSaveAsCharacter.tsx:42
+msgid "Save as an element"
+msgstr "Save as an element"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:784
@@ -23366,9 +23374,9 @@ msgid "Save changes"
 msgstr "Save changes"
 
 #. js-lingui-explicit-id
-#: src/shell/library/useSaveAsCharacter.tsx:47
-msgid "Save character"
-msgstr "Save character"
+#: src/shell/library/useSaveAsCharacter.tsx:57
+msgid "Save element"
+msgstr "Save element"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:152
@@ -23408,9 +23416,9 @@ msgid "Saved"
 msgstr "Saved"
 
 #. js-lingui-explicit-id
-#: src/shell/library/useSaveAsCharacter.tsx:51
-msgid "Saved as a character"
-msgstr "Saved as a character"
+#: src/shell/library/useSaveAsCharacter.tsx:61
+msgid "Saved as an element"
+msgstr "Saved as an element"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:53
@@ -24512,7 +24520,7 @@ msgstr "Setting up your AI"
 #: src/shell/pages/FilesPage.tsx:304
 #: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
-#: src/shell/Routes.tsx:516
+#: src/shell/Routes.tsx:523
 msgid "Settings"
 msgstr "Settings"
 
@@ -24757,7 +24765,7 @@ msgid "Show keyboard shortcuts"
 msgstr "Show keyboard shortcuts"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:424
+#: src/shell/Routes.tsx:431
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -27160,7 +27168,7 @@ msgstr "That did not send. Try again."
 #: src/shell/library/LibraryViewer.tsx:134
 #: src/shell/library/LibraryViewer.tsx:141
 #: src/shell/library/TranscriptCaptionTracks.tsx:183
-#: src/shell/library/useSaveAsCharacter.tsx:46
+#: src/shell/library/useSaveAsCharacter.tsx:56
 #: src/shell/MediaPickerDialog.tsx:70
 #: src/shell/MediaPickerDialog.tsx:86
 #: src/shell/pages/CompanionAudienceDialog.tsx:49
@@ -27206,7 +27214,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:350
+#: src/shell/Routes.tsx:357
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
@@ -27646,11 +27654,6 @@ msgid "The character could not be made ready. Try again."
 msgstr "The character could not be made ready. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/library/useSaveAsCharacter.tsx:34
-msgid "The character could not be saved. Try again in a minute."
-msgstr "The character could not be saved. Try again in a minute."
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:394
 msgid "failure.advice.slow.cause"
 msgstr "The chat engine stopped answering before the reply finished."
@@ -27764,6 +27767,11 @@ msgstr "The download could not start. Check your connection, then try again."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:89
 msgid "The download failed. Cancel it, then switch the book on again to retry."
 msgstr "The download failed. Cancel it, then switch the book on again to retry."
+
+#. js-lingui-explicit-id
+#: src/shell/library/useSaveAsCharacter.tsx:38
+msgid "The element could not be saved. Try again in a minute."
+msgstr "The element could not be saved. Try again in a minute."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:97
@@ -29050,9 +29058,9 @@ msgid "setting.storage.person_quota_gb.label"
 msgstr "This person's storage quota (GB)"
 
 #. js-lingui-explicit-id
-#: src/shell/library/useSaveAsCharacter.tsx:44
-msgid "This picture becomes the character. Use the name with @ in chat or on Create."
-msgstr "This picture becomes the character. Use the name with @ in chat or on Create."
+#: src/shell/library/useSaveAsCharacter.tsx:54
+msgid "This picture becomes the element. Use the name with @ in chat or on Create."
+msgstr "This picture becomes the element. Use the name with @ in chat or on Create."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:319
@@ -29801,7 +29809,7 @@ msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:390
-#: src/shell/Routes.tsx:201
+#: src/shell/Routes.tsx:208
 msgid "Turn trace"
 msgstr "Turn trace"
 

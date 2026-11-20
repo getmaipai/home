@@ -54,8 +54,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/books/pages/read.json` | books | Reader |
 | `backend/packages/books/pages/series-detail.json` | books | Series |
 | `backend/packages/books/pages/series.json` | books | Series |
-| `backend/packages/image/pages/character-sheet.json` | image | Character sheet |
-| `backend/packages/image/pages/characters.json` | image | Characters |
+| `backend/packages/elements/pages/characters.json` | elements | Characters |
+| `backend/packages/elements/pages/index.json` | elements | Everything |
+| `backend/packages/elements/pages/make.json` | elements | Make an element |
+| `backend/packages/elements/pages/places.json` | elements | Places |
+| `backend/packages/elements/pages/props.json` | elements | Props |
+| `backend/packages/elements/pages/search.json` | elements | Search |
 | `backend/packages/image/pages/collections.json` | image | Collections |
 | `backend/packages/image/pages/combine.json` | image | Combine pictures |
 | `backend/packages/image/pages/create.json` | image | Image |
@@ -66,9 +70,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/image/pages/from-template.json` | image | From a template |
 | `backend/packages/image/pages/index.json` | image | Image |
 | `backend/packages/image/pages/library.json` | image | All images |
-| `backend/packages/image/pages/places.json` | image | Places |
-| `backend/packages/image/pages/productions.json` | image | Productions |
-| `backend/packages/image/pages/props.json` | image | Props |
 | `backend/packages/image/pages/recent.json` | image | Recently made |
 | `backend/packages/image/pages/shared.json` | image | Shared with home |
 | `backend/packages/image/pages/studio.json` | image | Studio |
@@ -313,7 +314,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/TranscriptCaptionTracks.tsx` | CaptionTracks |
 | `frontend/src/shell/library/TranscriptFindReplace.tsx` | FindReplace |
 | `frontend/src/shell/library/TranscriptPanel.tsx` | timeLabel, parseClock, useTranscriptWorkspace |
-| `frontend/src/shell/library/useSaveAsCharacter.tsx` | CHARACTER_NAME_MAX, CHARACTERS_PATH, canSaveAsCharacter, useSaveAsCharacter |
+| `frontend/src/shell/library/useSaveAsCharacter.tsx` | CHARACTER_NAME_MAX, ELEMENT_PATHS, CHARACTERS_PATH, canSaveAsCharacter, useSaveAsCharacter |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, getVisualizerEnabled, setVisualizerEnabled, useVisualizerEnabled |
 | `frontend/src/shell/media/EqualizerMenu.tsx` | eqLabel, EqualizerMenu |
 | `frontend/src/shell/media/MinimizeButton.tsx` | MinimizeButton |
@@ -602,6 +603,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/documentExtraction.ts` | MAX_DOCUMENT_BYTES, MAX_EXTRACTED_TEXT_BYTES, LOCAL_PARSER_TIMEOUT_MS, __setTikaRunnerForTests, __setRapidOcrRunnerForTests, extractDocument |
 | `backend/src/lib/documentMediaTypes.ts` | DOCUMENT_MEDIA_TYPES, isDocumentMediaType |
 | `backend/src/lib/echo.ts` | ECHO_WINDOW_MS, subjectOf, fingerprintOf, repeatNotes, resetEchoRecords |
+| `backend/src/lib/elementsApp.ts` | elementRows, elementsAppData |
+| `backend/src/lib/elementsMake.ts` | ELEMENT_WORDS_MAX, elementPrompt, makeElementFromWords |
 | `backend/src/lib/emergencyKit.ts` | generateEmergencyKit |
 | `backend/src/lib/engineAutotune.ts` | autotuneContextSize, resolveLaunchFlags, launchFlagsToArgs |
 | `backend/src/lib/engineBoot.ts` | engineWarmupsForStackRoles |
@@ -1022,7 +1025,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/carouselPlan.ts` | CAROUSEL_MIN, CAROUSEL_MAX, CAROUSEL_DEFAULT, CAROUSEL_PROMPT_MAX, CAROUSEL_UNAVAILABLE_LINE, CAROUSEL_BAD_PLAN_LINE |
 | `backend/src/lib/pictures/catalog.ts` | pictureJobView, servesShape, wordsCanStart, needsNoTextLine, partsAfter |
-| `backend/src/lib/pictures/characterFaces.ts` | CHARACTER_SCENES, CHARACTER_PROMPT_PREFIX, characterTraitsOf, characterFacesPrompt, characterScenePrompt, characterFacesForBand |
+| `backend/src/lib/pictures/characterFaces.ts` | characterFacesPrompt, characterFacesForBand |
 | `backend/src/lib/pictures/childRewrite.ts` | CHILD_REWRITE_SYSTEM_PROMPT, CHILD_REWRITE_SCHEMA, __setChildRewriteCompleterForTests, parseRewrite, rewriteForChild |
 | `backend/src/lib/pictures/combine.ts` | COMBINE_DEFAULT_WORDS, COMBINE_NEEDS_ONE_LINE, COMBINE_EXTRAS_LINE, combinePictureLimit, combineInstruction |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |

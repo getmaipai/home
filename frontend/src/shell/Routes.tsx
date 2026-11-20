@@ -192,6 +192,13 @@ function LegacyCreateRedirect() {
   return <Navigate to={{ pathname: "/apps/video/create", search: location.search, hash: location.hash }} replace />;
 }
 
+/** ELEMENTS-HOME-01: the Image app's cast pages moved to the Elements app (the package `elements`; not a kit Element). Productions and Character sheet had no new home: they go to Image's own front page. */
+const ELEMENTS_MOVED: Readonly<Record<string, string>> = { characters: "/apps/elements/characters", places: "/apps/elements/places", props: "/apps/elements/props", productions: "/apps/image", "character-sheet": "/apps/image" };
+function LegacyImageCastRedirect({ page }: { page: string }) {
+  const location = useLocation();
+  return <Navigate to={{ pathname: ELEMENTS_MOVED[page]!, search: location.search, hash: location.hash }} replace />;
+}
+
 function PageHeaderLayout() {
   const { pathname } = useLocation();
   useHeaderExtra(PageHeaderTitle, PageHeaderActions);
@@ -547,6 +554,11 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route path="apps/videos/*" element={<LegacyVideoRedirect />} />
           <Route path="apps/video/from-picture" element={<LegacyCreateRedirect />} />
           <Route path="apps/video/animate" element={<LegacyCreateRedirect />} />
+          <Route path="apps/image/characters" element={<LegacyImageCastRedirect page="characters" />} />
+          <Route path="apps/image/places" element={<LegacyImageCastRedirect page="places" />} />
+          <Route path="apps/image/props" element={<LegacyImageCastRedirect page="props" />} />
+          <Route path="apps/image/productions" element={<LegacyImageCastRedirect page="productions" />} />
+          <Route path="apps/image/character-sheet" element={<LegacyImageCastRedirect page="character-sheet" />} />
           <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
