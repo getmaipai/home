@@ -103,11 +103,14 @@ describe("the film runner reports the verdict on the film's own card", () => {
     expect(result.finished_cut_file_ids).toEqual(["cut-1"]);
     expect(e.note).toBe("Shot 2: no speech is heard where a line is expected. Render that shot again.");
   });
-  test("a check that throws, or an unchecked film, adds nothing and never fails the film", async () => {
+  test("a check that throws, or a film the check could not read, says so in one plain line and never fails the film (FILM-CHECKSILENT-01)", async () => {
     const actor = person("film-owner"); const production = createMediaProduction(actor, { title: "Draft" });
     const e = engines(actor, async () => { throw new Error("stack down"); });
     expect((await runFilm({ actor, productionId: production.id, plan, engines: e, signal: new AbortController().signal })).finished_cut_file_ids).toEqual(["cut-1"]);
-    expect(e.note).toBeUndefined();
+    expect(e.note).toBe("This film could not be checked, so play it through before you share it.");
+    const unread = engines(actor, async () => ({ checked: false, lines: [] }));
+    await runFilm({ actor, productionId: createMediaProduction(actor, { title: "Two" }).id, plan, engines: unread, signal: new AbortController().signal });
+    expect(unread.note).toBe("This film could not be checked, so play it through before you share it.");
   });
   test("resumeFilm uses the engines it is given, so the note the card saves is the one the run wrote (found on the real run: a resumed film's notes were lost)", async () => {
     const actor = person("film-owner"); const production = createMediaProduction(actor, { title: "Draft" });

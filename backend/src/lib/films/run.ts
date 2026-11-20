@@ -169,6 +169,8 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
     if (!faceless && engines.verifyCut) {
       engines.say?.("Checking the finished film.");
       const verdict = await engines.verifyCut({ plan, cutFileId: cutId }, { signal }).catch(() => ({ checked: false, lines: [] as string[], faults: undefined }));
+      // FILM-CHECKSILENT-01: a film the check could not read is not a film that passed; say so in one plain line (the film stays usable).
+      if (!verdict.checked) verdict.lines = [...verdict.lines, UNCHECKED_LINE];
       if (verdict.lines.length) engines.note = [engines.note, ...verdict.lines].filter(Boolean).join(" ");
       if (verdict.checked && verdict.faults?.length) engines.lastCheck = { cutId, musicFileId: musicFileId ?? null, faults: verdict.faults, lines: verdict.lines, entries: verdict.entries ?? verdict.lines.map((line) => ({ line, shots: [] })) };
     }
@@ -176,6 +178,8 @@ export async function runFilm(input: { actor: PersonRow; productionId: string; p
   }
   return getMediaProduction(actor, productionId)!;
 }
+
+const UNCHECKED_LINE = "This film could not be checked, so play it through before you share it.";
 
 export async function redoShot(input: { actor: PersonRow; productionId: string; plan: FilmPlan; shotId: string; engines: FilmEngines; signal: AbortSignal }): Promise<Production> {
   if (!input.plan.shots.some((shot) => shot.id === input.shotId)) throw new Error("That shot is not in the film plan.");
