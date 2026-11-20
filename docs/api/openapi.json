@@ -273,6 +273,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -375,6 +376,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -477,6 +479,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -579,6 +582,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -681,6 +685,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -783,6 +788,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -885,6 +891,7 @@
                               "enum": [
                                 "restarting",
                                 "memory",
+                                "disk",
                                 "never_fits",
                                 "not_installed",
                                 "paused_by_admin",
@@ -16359,6 +16366,16 @@
           },
           "403": {
             "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not enough room to start a backup",
             "content": {
               "application/json": {
                 "schema": {
@@ -57512,6 +57529,139 @@
           },
           "404": {
             "description": "No active store install to set a channel on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/cleanup": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "List safely clearable product files",
+        "responses": {
+          "200": {
+            "description": "Product-owned cleanup candidates; blocked candidates remain listed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "superseded",
+                          "orphan_folder",
+                          "partial_download",
+                          "package_cache",
+                          "previews"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "bytes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "reversible": {
+                        "type": "boolean"
+                      },
+                      "how": {
+                        "type": "string"
+                      },
+                      "blocked": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "label",
+                      "bytes",
+                      "reversible",
+                      "how",
+                      "blocked"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Clear selected safe product files",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bytes freed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bytes_freed": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "bytes_freed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown or blocked item",
             "content": {
               "application/json": {
                 "schema": {
