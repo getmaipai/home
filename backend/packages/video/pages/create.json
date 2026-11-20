@@ -87,6 +87,7 @@
         }
       },
       "size": "stage",
+    "compact": true,
       "media": {
         "still": "still",
         "loop": "loop",
@@ -255,6 +256,7 @@
             "path": "recipes",
             "params": {
               "scope": "feed",
+              "view": "after-stage",
               "favorites": "$state.favorites_only",
               "hidden": "$state.hidden_only",
               "type": "$state.type"

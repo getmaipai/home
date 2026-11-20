@@ -162,6 +162,11 @@ export function capChips(chips: Array<Record<string, unknown>>, max = 16): Array
 registerAppPageFill("video", "create", (person, page) => {
   // A card whose loop is not in the package (not made yet, or removed) is a plain tile with its label, never a broken video.
   const media = (loop: string): { media?: string } => (packageAssetFile("video", loop) ? { media: loop } : {});
+  // VF-UI-03b: while the video maker is not ready, the stage offers no start control (a control that looks live then fails). The kit has no `starts` on a stage action yet, so the page leaves these two out.
+  const stage = findNode(page.body, "media_stage");
+  if (stage && !videoStatusReady(peekVideoEngineStatus(), true)) {
+    for (const key of ["pills", "error_actions"] as const) if (Array.isArray(stage[key])) stage[key] = (stage[key] as Array<{ label?: string }>).filter((item) => item.label !== "Another take" && item.label !== "Try again");
+  }
   const bar = findNode(page.body, "prompt_bar");
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
@@ -480,7 +485,14 @@ registerMediaAppData("video", (person, dataId, params) => {
     case "header": return [{ title: "Make any video" }];
     // STYLES-04: up to two styles for the words typed so far. The matcher reads the person's own access (a locked or minor list never holds an adult style).
     case "style-suggestions": return suggestStyles({ person, media: "video", text: params.query ?? "", surface: "own_written", proof: requestProof() }).items.map((l) => ({ id: l.id, name: l.name, kind: l.kind === "character" ? "character" : "style" }));
-    case "feed": return feedRows(person, { favorites: params.favorites === true, hidden: params.hidden === true, type: params.type, limit: params.limit });
+    case "feed": {
+      const rows = feedRows(person, { favorites: params.favorites === true, hidden: params.hidden === true, type: params.type, limit: params.limit });
+      // VF-UI-03b: the stage above the feed shows the newest take, so the unfiltered feed starts at the second newest (one take, one place). A locked newest take makes no stage and stays in the feed.
+      const plain = params.favorites !== true && params.hidden !== true && (!params.type || params.type === "all");
+      // A failed take stays in the feed too: the stage's error strip can clip its words on a phone, and the feed row always shows them in full.
+      const onStage = params.view === "after-stage" && plain ? stageRows(person)[0] : undefined;
+      return onStage && onStage.stage_state !== "error" ? rows.slice(1) : rows;
+    }
     case "job": return feedRowById(person, params.id);
     // FILM-PAGE-01: the Film maker page (lib/films/pageFilm.ts): the newest film, and its shots as cards.
     case "film": return filmRows(person, params.id);

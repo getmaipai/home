@@ -112,6 +112,31 @@ describe("scope short: the clips feed rows", () => {
     expect((await teen.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).status).toBe(404);
   });
 
+  test("the feed after the stage starts at the second newest take; filtered feeds are unchanged", async () => {
+    const { adult, row } = await household();
+    const actor = row("Marlow");
+    const a = await makeClip(adult.client, actor);
+    const b = await makeClip(adult.client, actor, { prompt: "Sunrise over a misty green valley, birds crossing the sky" });
+    const feed = async (extra: Record<string, unknown>) => (await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "feed", ...extra })).json()) as Row[];
+    expect((await feed({})).map((r) => r.id)).toEqual([b.jobId, a.jobId]);
+    expect((await feed({ view: "after-stage" })).map((r) => r.id)).toEqual([a.jobId]);
+    expect((await feed({ view: "after-stage", favorites: true })).length).toBe(0);
+    const stage = (await (await adult.client.post("/api/plugins/video/data/recipes", { scope: "stage" })).json()) as Row[];
+    expect(stage[0]!.id).toBe(b.jobId);
+  });
+
+  test("the stage offers Another take and Try again only while the video maker is ready; Edit and make again and Favorite stay", async () => {
+    const { adult } = await household();
+    const labels = async () => {
+      const page = (await (await adult.client.get("/api/plugins/video/pages/create")).json()) as { body: Array<Record<string, any>> };
+      const stage = page.body.find((node) => node.type === "media_stage")!;
+      return { pills: (stage.pills as Array<{ label: string }>).map((p) => p.label), errors: (stage.error_actions as Array<{ label: string }>).map((p) => p.label) };
+    };
+    expect(await labels()).toEqual({ pills: ["Another take", "Edit and make again", "Favorite"], errors: ["Try again", "Change the words"] });
+    __setVideoStatusForTests(null);
+    expect(await labels()).toEqual({ pills: ["Edit and make again", "Favorite"], errors: ["Change the words"] });
+  });
+
   test("the heart is the Favorite mark: liking a clip shows it liked on the next read, per person", async () => {
     const { adult, other, row } = await household();
     const { fileId } = await makeClip(adult.client, row("Marlow"));
