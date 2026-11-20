@@ -2,17 +2,23 @@
 // GPU job appears mid-run, then goes back to waiting. Logs every busy stretch and which jobs caused it to data-scratch/gpu-log.jsonl, so we can say how rare free windows are.
 // Usage: bun rig/when-free.ts [--full] ; exits 0 when a clean run finished (its output is in data-scratch/ready-clean.txt), 1 if that run failed a check.
 import { appendFileSync } from "node:fs";
+import { ensureChat } from "../src/engineGuard";
 import { sampleGpu, gpuClass, FreeWindow } from "../src/gpuLoad";
 const W = "/Users/jessetorres/Developer/github.com/getmaipai/wt/home-brisk-panda-voice-lab/data-scratch"; const full = process.argv.includes("--full");
 const log = (o: object) => appendFileSync(`${W}/gpu-log.jsonl`, JSON.stringify({ at: new Date().toISOString(), ...o }) + "\n");
 const win = new FreeWindow(60_000); const t0 = Date.now(); let busySince: number | null = null, busyJobs = new Set<string>(); let child: ReturnType<typeof Bun.spawn> | null = null, aborted = false, attempts = 0;
-async function startRun() { attempts++; aborted = false; log({ event: "start", attempt: attempts }); child = Bun.spawn(["bun", "rig/ready.ts", ...(full ? [] : ["--quick"])], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/ready-clean.txt`), stderr: "ignore" }); void child.exited.then((code) => { if (!aborted) { log({ event: "finished", code, attempt: attempts }); console.log(`CLEAN RUN FINISHED (attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt`); process.exit(code === 0 ? 0 : 1); } }); }
+const ROOT = W.replace(/\/data-scratch$/, "");
+const chatDeps = { health: async () => { try { return (await fetch("http://127.0.0.1:9921/health", { signal: AbortSignal.timeout(3000) })).ok; } catch { return false; } },
+  start: async () => { Bun.spawn(["bash", "-c", `cd ${ROOT} && exec bash scripts/jobs/job.sh run --type server --lifetime 24h --session brisk-panda-voice-lab -- /usr/local/maipai-home/stack/data/engines/llama-server/b10797/llama-server -m /usr/local/maipai-home/stack/data/models/qwen3-8-27b-huihui-abliterated-iq4-xs/Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf --host 127.0.0.1 --port 9921 -c 16384 -fa on -ngl all --reasoning off -ub 1024 --jinja --no-webui --cache-reuse 256 --parallel 1 -ctk q8_0 -ctv q8_0 >> ${W}/lab-logs/llm.log 2>&1`], { stdout: "ignore", stderr: "ignore" }).unref(); },
+  warm: async () => { for (let i = 0; i < 2; i++) await fetch("http://127.0.0.1:9921/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Say hi." }], max_tokens: 8, stream: false }), signal: AbortSignal.timeout(120000) }); },
+  sleep: (ms: number) => Bun.sleep(ms), log };
+async function startRun() { attempts++; aborted = false; log({ event: "start", attempt: attempts }); child = Bun.spawn(["bun", "rig/ready.ts", ...(full ? [] : ["--quick"])], { cwd: import.meta.dir + "/..", stdout: Bun.file(`${W}/ready-clean.txt`), stderr: "ignore" }); void child.exited.then(async (code) => { if (!aborted) { if (code !== 0 && !(await chatDeps.health())) { log({ event: "waiting: memory", why: "chat engine died mid-run", attempt: attempts }); console.log("chat engine died mid-run; waiting, not a failure"); child = null; win.finish(); return; } log({ event: "finished", code, attempt: attempts }); console.log(`CLEAN RUN FINISHED (attempt ${attempts}, exit ${code}); output ${W}/ready-clean.txt`); process.exit(code === 0 ? 0 : 1); } }); }
 while (true) {
   const g = await sampleGpu(); const free = gpuClass(g) === "free"; const now = Date.now();
   if (!free) { if (busySince === null) busySince = now; for (const j of g.jobs.split(" | ").filter(Boolean)) busyJobs.add(j.slice(0, 90)); } else if (busySince !== null) { log({ event: "busy-ended", busyMinutes: +((now - busySince) / 60000).toFixed(1), jobs: [...busyJobs] }); busySince = null; busyJobs = new Set(); }
   const s = win.push(now, free);
   if (s.abort && child) { aborted = true; child.kill(); try { Bun.spawnSync(["pkill", "-f", "rig/(measure|echotest|listen)\\.ts"]); } catch {} log({ event: "aborted", why: g.jobs, attempt: attempts }); console.log(`ABORTED run ${attempts}: ${g.jobs}`); child = null; win.finish(); }
-  if (s.start) await startRun();
+  if (s.start) { if ((await ensureChat(chatDeps)) === "ready") await startRun(); else win.finish(); }
   await Bun.sleep(5000);
   if (Math.floor((now - t0) / 60000) !== Math.floor((Date.now() - t0) / 60000)) log({ event: "tick", util: g.util, free, freeMs: s.freeMs, jobs: g.jobs });
 }
