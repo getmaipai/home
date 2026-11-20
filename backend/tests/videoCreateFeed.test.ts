@@ -413,6 +413,17 @@ describe("scope templates with filter inspiration: the Inspiration rail (TEMPLAT
   });
 });
 
+describe("the Template chip (TEMPLATE-01)", () => {
+  test("it lists the starters, never the Inspiration ideas, and holds at most 24 options so the page the kit opens stays valid", async () => {
+    const { adult } = await household();
+    const page = await (await adult.client.get("/api/plugins/video/pages/create")).json() as { body: Array<Row> };
+    const chip = page.body[0]!.chips.find((c: { state: string }) => c.state === "template");
+    expect(chip.options.length).toBeLessThanOrEqual(24);
+    expect(chip.options[0]).toMatchObject({ value: "none" });
+    expect(chip.options.some((o: { value: string }) => o.value.startsWith("mtpl-inspiration"))).toBe(false);
+  });
+});
+
 describe("scope stage with a source clip (VF-EDIT-02)", () => {
   test("`id` names the clip an edit was made from: the stage shows the newest edit or take of that clip, called what it is, and not a newer unrelated clip", async () => {
     const { adult, row } = await household();

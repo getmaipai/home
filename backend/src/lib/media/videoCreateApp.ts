@@ -170,7 +170,9 @@ registerAppPageFill("video", "create", (person, page) => {
   if (!bar) return;
   const chips = Array.isArray(bar.chips) ? bar.chips as unknown[] : [];
   // The Template chip lists the starters; the Inspiration ideas (TEMPLATE-01) are their own rail, and the chip holds at most 24 options.
-  const templates = listTemplates({ actor: person, kind: "video" }).filter((row) => !row.id.startsWith(INSPIRATION_PREFIX));
+  // listTemplates returns the bundled starters first, then the viewer's saved ones (TEMPLATE-02): the cap keeps starters in and leaves saved ones to the Templates page once the chip is full
+  // (the kit allows 24 options, one of them "No template").
+  const templates = listTemplates({ actor: person, kind: "video" }).filter((row) => !row.id.startsWith(INSPIRATION_PREFIX)).slice(0, 23);
   const templateChip = { state: "template", label: "Template", group: "Template", icon: "sparkles", icon_only: true, presentation: "popover", default: "none", quiet_value: "none", options: [{ value: "none", label: "No template" }, ...templates.map((row) => ({ value: row.id, label: row.title }))] };
   const selectedTemplate = templates.find((row) => row.id === (page.state as Record<string, unknown> | undefined)?.template);
   if (selectedTemplate) {
