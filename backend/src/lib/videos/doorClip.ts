@@ -2,7 +2,7 @@
 // `/v1/videos/generations` door. Home sends what the person asked for (the level, the shape, the seconds, a start or end picture, the seed, the
 // household's quiet window) and the Stack plans the rest: it names the part and the pixel size, never Home (rules E1, E2, E4, E7).
 //
-// Only the plain path is moved tonight. A request that carries negative words or a LoRA, a child's or a teen's request (any audience but adult), a
+// Only the plain path is moved (Max joined it with VF-TAKES-01: a transport move, its holds pinned in videoMaxDoor). A request that carries negative words or a LoRA, a child's or a teen's request (any audience but adult), a
 // companion take and every edit (extend, retake, restyle, Ingredients, a reference clip) stay on the old door: their wording and their looks wait on
 // the Stack's prompt writer and style ids (docs/design/video-film-pipeline-2026-11-20.md, VF-DOOR-01). The old door is also the fallback when the
 // generic one cannot take the clip: the catalog says no part serves it, the planner refuses it, or the Stack is older than the door.
@@ -39,8 +39,6 @@ export function clipRequestFor(body: VideoBody, fields?: ReadonlySet<string> | n
 function buildClipRequest(body: VideoBody): StackMakeClipRequest | null {
   if (body.audience !== "adult") return null;
   if (body.negative_prompt || (body.loras && body.loras.length > 0)) return null;
-  // Max stays on the old door for now: its memory holds and the Stack's Max stop are classed by Home's own retry policy (`holdMaxAfterMemoryRefusal`) and were not part of the first proof.
-  if (body.tier === "max") return null;
   if (body.source_video !== undefined || body.extend_seconds !== undefined || body.retake_from_seconds !== undefined) return null;
   if (body.size === undefined || body.seconds === undefined || body.seconds <= 0) return null;
   const size = /^(\d+)x(\d+)$/.exec(body.size);

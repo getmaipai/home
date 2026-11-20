@@ -37,7 +37,6 @@ test("a start picture and an end picture travel as the clip's start and end pict
 
 test("what is not a plain clip stays on the old door: a young person's, negative words, a LoRA, an edit, a clip with no size or seconds", () => {
   expect(clipRequestFor(base({ audience: "all-ages" }))).toBeNull();
-  expect(clipRequestFor(base({ tier: "max" }))).toBeNull();   // Max stays on the old door for now
   expect(clipRequestFor(base({ negative_prompt: "no cats" }))).toBeNull();
   expect(clipRequestFor(base({ loras: [{ id: "style-1", strength: 1 }] }))).toBeNull();
   expect(clipRequestFor(base({ source_video: "/clips/a.mp4", extend_seconds: 2 }))).toBeNull();
@@ -97,7 +96,6 @@ test("a clip's receipt is read from the Stack's owner route, and a missing one i
 
 test("a clip that stays on the old door is decided without waiting (no extra step before the old door runs)", () => {
   expect(doorWanted(base())).toBe(true);
-  expect(doorWanted(base({ tier: "max" }))).toBe(false);
   expect(doorWanted(base({ audience: "all-ages" }))).toBe(false);
   process.env.MAIPAI_VIDEO_LEGACY_DOOR = "1";
   expect(doorWanted(base())).toBe(false);
@@ -132,4 +130,11 @@ test("the Stack's own list of request keys decides what is sent: a Stack that li
   calls = [];
   expect(await submitVideoViaDoor(base({ identity_image: "aWRlbnRpdHk=" }))).toBeNull();
   expect(calls.filter((c) => c.path === "/stack/v1/jobs/make")).toHaveLength(0);
+});
+
+test("a Max clip is a clip request at level max with the shape and seconds, and the planner's level_not_served sends it to the old door", async () => {
+  expect(clipRequestFor(base({ tier: "max", model: "ltx25-max", size: "1024x576" }))).toMatchObject({ job: "clip", level: "max", shape: "landscape", seconds: 5 });
+  expect(doorWanted(base({ tier: "max" }))).toBe(true);
+  makeAnswer = () => json({ code: "level_not_served", line: "This model does not make max quality." }, 409);
+  expect(await submitVideoViaDoor(base({ tier: "max" }))).toBeNull();
 });

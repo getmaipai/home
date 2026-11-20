@@ -87,7 +87,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], receipt: null, door: false, makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
+    jobs: [], submitted: [], receipt: null, door: process.env.MAIPAI_TEST_DOOR === "1", makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
@@ -102,8 +102,10 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     if (fake.door && method === "POST" && path === "/stack/v1/jobs/make") {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       fake.makeRequests.push(request);
-      const legacy: Record<string, unknown> = { prompt: request.description, seconds: request.seconds, seed: request.seed, audience: request.audience === "adult" ? "adult" : "all-ages", ...(request.level === "boost" || request.level === "max" ? { tier: request.level } : {}), via: "door" };
+      const legacy: Record<string, unknown> = { prompt: request.description, seconds: request.seconds, seed: request.seed, audience: request.audience === "adult" ? "adult" : "all-ages", ...(request.level === "boost" || request.level === "max" ? { tier: request.level } : {}), ...(request.level === "max" ? { model: "ltx25-max" } : {}), via: "door" };
       fake.submitted.push(legacy);
+      if (fake.memoryRefusals > 0) { fake.memoryRefusals -= 1; fake.submitted.pop(); fake.refused = (fake.refused ?? 0) + 1; return json({ error: "Not enough free memory for video right now. Close other big jobs, or try again in a few minutes.", code: "no_memory" }, 503); }
+      if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
       const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body: legacy, polls: 0, state: "queued", deleted: false };
       fake.jobs.push(job);
       return json({ id: job.id, job: "clip", state: "running", percent: 0, status: "Making your clip", files: [], poster: null, made_with: { part: "part-a", label: "A", pack_version: "1", shape: "landscape", seconds: 5, sound: true, notes: [], receipt: job.id } }, 202);
