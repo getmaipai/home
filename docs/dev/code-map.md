@@ -547,7 +547,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
-| `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
+| `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests, promptHash, resolveCompanionStillFromCatalog |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, __setCompanionArtCheckThrowForTests, checkCompanionArt, requireCompanionPictureOk |
 | `backend/src/lib/companionClipSize.ts` | takeClipSize |
 | `backend/src/lib/companionLook.ts` | TalkAnchor, TalkRecordSchema, LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE |
@@ -1011,11 +1011,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/carouselPlan.ts` | CAROUSEL_MIN, CAROUSEL_MAX, CAROUSEL_DEFAULT, CAROUSEL_PROMPT_MAX, CAROUSEL_UNAVAILABLE_LINE, CAROUSEL_BAD_PLAN_LINE |
+| `backend/src/lib/pictures/catalog.ts` | pictureJobView, servesShape, wordsCanStart, needsNoTextLine, partsAfter |
 | `backend/src/lib/pictures/characterFaces.ts` | CHARACTER_SCENES, CHARACTER_PROMPT_PREFIX, characterTraitsOf, characterFacesPrompt, characterScenePrompt, characterFacesForBand |
 | `backend/src/lib/pictures/childRewrite.ts` | CHILD_REWRITE_SYSTEM_PROMPT, CHILD_REWRITE_SCHEMA, __setChildRewriteCompleterForTests, parseRewrite, rewriteForChild |
 | `backend/src/lib/pictures/combine.ts` | COMBINE_DEFAULT_WORDS, COMBINE_NEEDS_ONE_LINE, COMBINE_EXTRAS_LINE, combinePictureLimit, combineInstruction |
 | `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
-| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, nameEditModel, latestPictureId, pictureIdsInConversation, runEditPicture |
+| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, latestPictureId, pictureIdsInConversation, runEditPicture |
 | `backend/src/lib/pictures/expand.ts` | EXPAND_SHAPES, EXPAND_BASE_PROMPT, EXPAND_NEEDS_ENGINE, EXPAND_SAME_SHAPE, isExpandShape, expandGeometry |
 | `backend/src/lib/pictures/finishedCheck.ts` | stricterLane, sha256Of, checkFinishedAssets |
 | `backend/src/lib/pictures/jobStore.ts` | SPELLING_PHASE, PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled |
@@ -1037,7 +1038,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_STYLES_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_TIER_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/pose.ts` | __setPoseVisionForTests, parsePose, parseSeatBox, readPose, readSeatBox |
 | `backend/src/lib/pictures/promptDoor.ts` | doorAudience, refusalOfVerdict, promptCheck, promptCheckAsync |
-| `backend/src/lib/pictures/quality.ts` | PICTURE_MODEL, isRemovedPictureModel, REMOVED_MODEL_LINE, TEXT_CAPABLE_MODELS, PICTURE_WORD_BLANKS, modelCanSpell |
+| `backend/src/lib/pictures/quality.ts` | isRemovedPictureModel, REMOVED_MODEL_LINE, PICTURE_WORD_BLANKS, isPictureQuality, detailedReady, chooseQuality |
 | `backend/src/lib/pictures/readWords.ts` | READ_WORDS_SCHEMA, parseWordLines, __setReadWordsRunnerForTests, readPictureWords, normalizeWords, compareWords |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, pictureEngineStatusPatient, peekPictureEngineStatus, dropPictureStatusCache |
 | `backend/src/lib/pictures/roles.ts` | PICTURE_ROLES, __setRolesVisionForTests, parseReading, readPictureRoles, kindOfRole |
