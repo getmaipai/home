@@ -41,3 +41,9 @@ test("a sound from another speaker is refused: every library entry must carry th
   expect(Object.values(loadSounds("v", d)).flat().map((x) => x.file)).toEqual(["laugh_1.wav"]);
   expect(refusedSounds("v", d).sort()).toEqual(["laugh_2.wav", "laugh_3.wav"]);
 });
+
+test("nowhere in the prompt does she hear about a sound tag that is not offered (no laugh text when laughs are off)", () => {
+  const prompt = buildPrompt(); const mood = ["excited", "sad", "whisper", "angry", "sarcastic"];
+  const tags = [...new Set([...prompt.matchAll(/\[([a-z ]+)\]/g)].map((m) => m[1]!))].filter((t) => !mood.includes(t));
+  for (const t of tags) expect(availableTags("casual")).toContain(t);
+});

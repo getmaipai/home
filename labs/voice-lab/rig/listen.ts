@@ -46,7 +46,7 @@ let burners: Array<ReturnType<typeof Bun.spawn>> = [];
 const startLoad = () => { for (let i = 0; i < 4; i++) burners.push(Bun.spawn(["/usr/bin/yes"], { stdout: "ignore", stderr: "ignore" })); };
 const stopLoad = () => { for (const p of burners) try { p.kill(); } catch {} burners = []; };
 
-type Rec = { turn: number; kind: string; heard: boolean; userEndAt: number; replyStartOut: number; replyEndOut: number; text: string; stops: number[]; sounds: Array<{ tag: string; outAt: number; ms: number }>; phraseOut: number[]; interjections: Array<{ say: string; expect: string; atRel: number }>; stopped: boolean; };
+type Rec = { firstAt: number; turn: number; kind: string; heard: boolean; userEndAt: number; replyStartOut: number; replyEndOut: number; text: string; stops: number[]; sounds: Array<{ tag: string; outAt: number; ms: number }>; phraseOut: number[]; interjections: Array<{ say: string; expect: string; atRel: number }>; stopped: boolean; };
 async function conversation(run: number) {
   const ws = new WebSocket(`ws://${LAB}/ws`); ws.binaryType = "arraybuffer"; await new Promise((r) => (ws.onopen = r)); ws.send(JSON.stringify({ t: "hello", secret, rig: true }));
   const T0 = performance.now(); const rel = () => performance.now() - T0;
@@ -96,7 +96,7 @@ async function conversation(run: number) {
     const outStart = outLen; let silentTicks = 0; const maxMs = 60000; const t1 = performance.now();
     while (performance.now() - t1 < maxMs) { await tick(); const done = events.slice(evStart).some((e) => e.t === "reply_final") && playhead >= qLen && qLen > 0 && !inter.some((i) => !(i as any).done); if (done || (stoppedTurn && rel() > stopWordAt + 600 && !inter.some((i) => !(i as any).done))) { if (++silentTicks > 25) break; } else silentTicks = 0; }
     ws.send(JSON.stringify({ t: "played_end", turn })); await runFor(300);
-    recs.push({ turn, kind: t.kind, heard: firstFrameAt > 0 && turn !== turnBefore, userEndAt: endAt, replyStartOut: outStart, replyEndOut: outLen, text: replyText, stops: events.slice(evStart).filter((e) => e.t === "stop").map((e) => e.at), sounds: curSounds.map((s) => ({ tag: s.tag, outAt: (chunkOut.get(turn * 1000 + s.chunk) ?? outStart) + s.atMs * 24, ms: s.ms })), phraseOut: [...chunkStarts.keys()].filter((i) => i > 0).map((i) => chunkOut.get(turn * 1000 + i) ?? -1).filter((x) => x >= 0), interjections: inter.map((i: any) => ({ say: i.say, expect: i.expect, atRel: i.startedAt ?? -1 })), stopped: stoppedTurn });
+    recs.push({ firstAt: speakAt, turn, kind: t.kind, heard: firstFrameAt > 0 && turn !== turnBefore, userEndAt: endAt, replyStartOut: outStart, replyEndOut: outLen, text: replyText, stops: events.slice(evStart).filter((e) => e.t === "stop").map((e) => e.at), sounds: curSounds.map((s) => ({ tag: s.tag, outAt: (chunkOut.get(turn * 1000 + s.chunk) ?? outStart) + s.atMs * 24, ms: s.ms })), phraseOut: [...chunkStarts.keys()].filter((i) => i > 0).map((i) => chunkOut.get(turn * 1000 + i) ?? -1).filter((x) => x >= 0), interjections: inter.map((i: any) => ({ say: i.say, expect: i.expect, atRel: i.startedAt ?? -1 })), stopped: stoppedTurn });
     await runFor(700);
   }
   ws.close(); return { recs, out: outAll.subarray(0, outLen), events, T0 };
@@ -146,7 +146,7 @@ for (let run = 1; run <= RUNS; run++) {
   const conv: string[] = []; const events = c.events;
   for (const r of c.recs) for (const j of r.interjections) { if (j.atRel < 0) continue; const stopAfter = r.stops.find((s) => s >= j.atRel); const latency = stopAfter === undefined ? null : Math.round(stopAfter - j.atRel);
     if (j.expect === "stop" && (latency === null || latency > 2500)) conv.push(`"${j.say}" did not stop her within 2.5 s`); if (j.expect === "continue" && latency !== null && latency < 2500) conv.push(`"${j.say}" stopped her but should not have`); }
-  const firstUserAt = c.recs.length ? c.recs[0]!.userEndAt : 0; const selfStops = events.filter((e) => e.t === "stop" && !c.recs.some((r) => r.interjections.some((j) => j.atRel >= 0 && e.at >= j.atRel - 50 && e.at <= j.atRel + 3000))).length;
+  const firstUserAt = c.recs.length ? c.recs[0]!.userEndAt : 0; const selfStops = events.filter((e) => e.t === "stop" && c.recs.some((r) => r.heard && e.at >= r.firstAt && e.at <= r.firstAt + 120000 && e.turn === r.turn) && !c.recs.some((r) => r.interjections.some((j) => j.atRel >= 0 && e.at >= j.atRel - 50 && e.at <= j.atRel + 3000))).length;
   // stops that happened with no interjection and no new user turn are self-interruptions; a stop right before a final is the draft discard path (nothing playing)
   const st = stumbleReport(replies);
   const timingFail = p90 > 2300 + 400 || worst > 3500 + 400; // recording-clock timing includes the page's start gate and the room clock: limits widened by 400 ms
