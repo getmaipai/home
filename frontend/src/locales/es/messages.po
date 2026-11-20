@@ -6267,13 +6267,13 @@ msgid "setting.search.page_text_cleaning.does"
 msgstr "Comprueba y limpia el texto obtenido de páginas web antes de que el asistente lo lea."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1625
-msgid "setting.storage.warn_free_gb.does"
+#: src/lib/settingCopy.generated.ts:437
+msgid "setting.content.policy.news.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:437
-msgid "setting.content.policy.news.does"
+#: src/lib/settingCopy.generated.ts:1625
+msgid "setting.storage.warn_free_gb.does"
 msgstr ""
 
 #. js-lingui-explicit-id
