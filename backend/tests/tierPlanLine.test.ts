@@ -11,6 +11,7 @@ import { setProfileSource } from "@/lib/jobs/admissionFit";
 import type { ProfileRow } from "@/lib/jobs/profileTable";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { setHouseholdSettingValue } from "@/lib/settings";
 
 type Mode = "ok" | "waiting" | "failing";
 let server: ReturnType<typeof Bun.serve>;
@@ -19,7 +20,7 @@ let reduced: boolean;
 let restoreProviders: () => void = () => undefined;
 
 function useRow(row: ProfileRow, peak: Record<string, Record<string, number>>) {
-  setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: peak, residentGb: { chat: { reduced: 5 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+  setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: peak, residentGb: { chat: { reduced: 5, standard: 20 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
 }
 beforeEach(() => {
   resetDb();
@@ -65,6 +66,12 @@ async function profile(): Promise<string | null> {
   expect(res.status).toBe(200);
   return ((await res.json()) as { profile: string | null }).profile;
 }
+// TIER-REDUCED-01 (468d2723e): chat goes Reduced only on a real shortfall, with the household's Reduced switch on. A Max job (40 GB) beside Standard chat (20 GB)
+// with 40 GB free is that shortfall; without it the job simply runs and no Reduced is claimed.
+function realShortfall() {
+  setHouseholdSettingValue("engines.chat.tier.reduced", { model: "recommended", options: {}, who: "everyone" });
+  setBudgetReader(async () => ({ freeMemoryBytes: 40e9, loaded: [] }));
+}
 const maxRow: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" } } };
 
 describe("the Status line claims Reduced chat only from the Stack", () => {
@@ -80,6 +87,7 @@ describe("the Status line claims Reduced chat only from the Stack", () => {
 
   test("a Max job whose swap the Stack refuses shows no Reduced, and a stale Home flag with the Stack false shows none", async () => {
     useRow(maxRow, { video: { max: 40 } });
+    realShortfall();
     mode = "failing";
     const { remove } = job("max-1", "video", "max");
     try {
@@ -91,6 +99,7 @@ describe("the Status line claims Reduced chat only from the Stack", () => {
 
   test("a Max job the Stack accepts shows Reduced", async () => {
     useRow(maxRow, { video: { max: 40 } });
+    realShortfall();
     const { remove } = job("max-2", "video", "max");
     try {
       await releaseHouseholdQueue();
@@ -101,6 +110,7 @@ describe("the Status line claims Reduced chat only from the Stack", () => {
 
   test("a Max job planned to need it that has not started says it will simplify", async () => {
     useRow(maxRow, { video: { max: 40 } });
+    realShortfall();
     mode = "waiting";
     const { job: j, remove } = job("max-3", "video", "max");
     try {
