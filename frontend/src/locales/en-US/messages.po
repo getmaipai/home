@@ -29,12 +29,12 @@ msgid " · Household voice"
 msgstr " · Household voice"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:89
+#: ../backend/src/routes/settings.ts:90
 msgid "settings.attention.backups.key_missing"
 msgstr " · key not saved"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:88
+#: ../backend/src/routes/settings.ts:89
 msgid "settings.attention.backups.key_saved"
 msgstr " · key saved"
 
@@ -59,7 +59,7 @@ msgid " A reply being written right now will be cut off."
 msgstr " A reply being written right now will be cut off."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:97
+#: ../backend/src/routes/settings.ts:98
 msgid "settings.attention.robots.connected"
 msgstr " connected"
 
@@ -74,7 +74,7 @@ msgid " Plan for about {needGb} GB free there."
 msgstr " Plan for about {needGb} GB free there."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:98
+#: ../backend/src/routes/settings.ts:99
 msgid "settings.attention.robots.waiting"
 msgstr " waiting"
 
@@ -404,7 +404,7 @@ msgid "{count} alarms"
 msgstr "{count} alarms"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:87
+#: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.backups.many"
 msgstr "{count} backups"
 
@@ -445,7 +445,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr "{count} of {total} could not be forgotten: {reason}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:66
+#: ../backend/src/routes/settings.ts:67
 msgid "settings.attention.repairs.many"
 msgstr "{count} repairs need attention"
 
@@ -455,7 +455,7 @@ msgid "{count} restored"
 msgstr "{count} restored"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:96
+#: ../backend/src/routes/settings.ts:97
 msgid "settings.attention.robots.many"
 msgstr "{count} robots"
 
@@ -1542,7 +1542,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "0.1 to 2. Higher is livelier and also raises the pitch."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:86
+#: ../backend/src/routes/settings.ts:87
 msgid "settings.attention.backups.one"
 msgstr "1 backup"
 
@@ -1564,12 +1564,12 @@ msgid "1 hour"
 msgstr "1 hour"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:65
+#: ../backend/src/routes/settings.ts:66
 msgid "settings.attention.repairs.one"
 msgstr "1 repair needs attention"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:95
+#: ../backend/src/routes/settings.ts:96
 msgid "settings.attention.robots.one"
 msgstr "1 robot"
 
@@ -2231,7 +2231,7 @@ msgstr "Add a place"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:123
+#: src/shell/pages/settings/settingsViews.tsx:124
 msgid "Add a robot"
 msgstr "Add a robot"
 
@@ -2815,17 +2815,17 @@ msgid "area.AI settings"
 msgstr "AI settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:79
+#: ../backend/src/routes/settings.ts:80
 msgid "settings.attention.ai.setup"
 msgstr "AI setup"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:74
+#: ../backend/src/routes/settings.ts:75
 msgid "settings.attention.install.running.title"
 msgstr "AI setup is still running."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:72
+#: ../backend/src/routes/settings.ts:73
 msgid "settings.attention.install.title"
 msgstr "AI setup needs attention."
 
@@ -5174,7 +5174,7 @@ msgid "Chat is down"
 msgstr "Chat is down"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:80
+#: ../backend/src/routes/settings.ts:81
 msgid "settings.attention.health.title"
 msgstr "Chat is not ready."
 
@@ -7436,6 +7436,11 @@ msgid "Could not load the synths. Check your connection and try again."
 msgstr "Could not load the synths. Check your connection and try again."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:27
+msgid "Could not load the voice choice."
+msgstr "Could not load the voice choice."
+
+#. js-lingui-explicit-id
 #: src/shell/reader/ReaderArticle.tsx:75
 msgid "Could not load this article."
 msgstr "Could not load this article."
@@ -7770,6 +7775,11 @@ msgstr "Could not save that change."
 #: src/apps/settings/SiteBlocksSection.tsx:38
 msgid "Could not save that change. Check your connection and try again."
 msgstr "Could not save that change. Check your connection and try again."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:38
+msgid "Could not save that choice."
+msgstr "Could not save that choice."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:139
@@ -10417,7 +10427,7 @@ msgid "Finish"
 msgstr "Finish"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:71
+#: ../backend/src/routes/settings.ts:72
 msgid "settings.attention.setup.todo"
 msgstr "Finish setting up"
 
@@ -10855,7 +10865,7 @@ msgstr "Free up memory"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpSpaceDialog.tsx:59
-#: src/shell/pages/settings/settingsViews.tsx:114
+#: src/shell/pages/settings/settingsViews.tsx:115
 #: src/shell/pages/StoragePage.tsx:198
 msgid "Free up space"
 msgstr "Free up space"
@@ -11945,7 +11955,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again. If you never saw a permission prompt, open System Settings > Privacy & Security > Microphone and switch on this browser."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:101
+#: ../backend/src/routes/settings.ts:102
 msgid "settings.attention.search.line"
 msgstr "Home cannot reach your search service yet."
 
@@ -12584,7 +12594,7 @@ msgid "Home uses the best model that fits this level."
 msgstr "Home uses the best model that fits this level."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:75
+#: ../backend/src/routes/settings.ts:76
 msgid "settings.attention.install.running.line"
 msgstr "Home will finish setting up when it can."
 
@@ -13317,7 +13327,7 @@ msgid "setting.person.vision.watch.help"
 msgstr "Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:68
+#: ../backend/src/routes/settings.ts:69
 msgid "settings.attention.backup_key.line"
 msgstr "If this computer breaks, nothing comes back."
 
@@ -13332,7 +13342,7 @@ msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr "If this computer breaks, this key restores your Home on a new one."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:84
+#: ../backend/src/routes/settings.ts:85
 msgid "settings.attention.backups.empty.line"
 msgstr "If this computer breaks, your family has nothing to restore."
 
@@ -14037,7 +14047,7 @@ msgid "Keep things as they are"
 msgstr "Keep things as they are"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:162
+#: src/shell/pages/settings/settingsViews.tsx:163
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr "Keep this app in the sidebar so it is one tap away."
 
@@ -14327,7 +14337,7 @@ msgstr "Lan"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:69
+#: src/shell/pages/settings/settingsViews.tsx:70
 msgid "Language"
 msgstr "Language"
 
@@ -18067,17 +18077,17 @@ msgid "No assistant keys"
 msgstr "No assistant keys"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:67
+#: ../backend/src/routes/settings.ts:68
 msgid "settings.attention.backup_key.title"
 msgstr "No backup key saved."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:90
+#: ../backend/src/routes/settings.ts:91
 msgid "settings.attention.backups.empty.summary"
 msgstr "No backups yet"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:83
+#: ../backend/src/routes/settings.ts:84
 msgid "settings.attention.backups.empty.title"
 msgstr "No backups yet."
 
@@ -18210,7 +18220,7 @@ msgid "No files yet."
 msgstr "No files yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:78
+#: ../backend/src/routes/settings.ts:79
 msgid "settings.attention.ai.no_install"
 msgstr "No install in progress"
 
@@ -18362,12 +18372,12 @@ msgid "No robot found on your network yet."
 msgstr "No robot found on your network yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:91
+#: ../backend/src/routes/settings.ts:92
 msgid "settings.attention.robots.title"
 msgstr "No robots connected yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:99
+#: ../backend/src/routes/settings.ts:100
 msgid "settings.attention.robots.empty"
 msgstr "No robots yet"
 
@@ -19804,12 +19814,12 @@ msgid "Open a song from your list, then choose Studio."
 msgstr "Open a song from your list, then choose Studio."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:76
+#: ../backend/src/routes/settings.ts:77
 msgid "settings.attention.ai.open"
 msgstr "Open AI and models"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:93
+#: ../backend/src/routes/settings.ts:94
 msgid "settings.attention.apps.open"
 msgstr "Open apps and devices"
 
@@ -19902,7 +19912,7 @@ msgid "Open one to play it and see everything you can do."
 msgstr "Open one to play it and see everything you can do."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:82
+#: ../backend/src/routes/settings.ts:83
 msgid "settings.attention.repairs.open"
 msgstr "Open Repairs"
 
@@ -20167,7 +20177,7 @@ msgid "Pair"
 msgstr "Pair"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:123
+#: src/shell/pages/settings/settingsViews.tsx:124
 msgid "Pair a robot with this home."
 msgstr "Pair a robot with this home."
 
@@ -20685,6 +20695,11 @@ msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:46
+msgid "Pick the voice that speaks the replies. Voices you made from recordings keep working. Saving restarts the voice for a moment."
+msgstr "Pick the voice that speaks the replies. Voices you made from recordings keep working. Saving restarts the voice for a moment."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:223
 msgid "Pick up to 8. Words only, never lyrics."
 msgstr "Pick up to 8. Words only, never lyrics."
@@ -20987,7 +21002,7 @@ msgstr "Pin example: {phrase}"
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:73
+#: src/shell/pages/settings/settingsViews.tsx:74
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr "PIN or password"
@@ -21442,7 +21457,7 @@ msgstr "Professional"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:63
+#: src/shell/pages/settings/settingsViews.tsx:64
 msgid "Profile"
 msgstr "Profile"
 
@@ -21806,7 +21821,7 @@ msgid "Reading the details…"
 msgstr "Reading the details…"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:77
+#: ../backend/src/routes/settings.ts:78
 msgid "settings.attention.ai.ready"
 msgstr "Ready"
 
@@ -23066,7 +23081,7 @@ msgid "Robots found on your network"
 msgstr "Robots found on your network"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:94
+#: ../backend/src/routes/settings.ts:95
 msgid "settings.attention.robots.off"
 msgstr "Robots off"
 
@@ -23331,7 +23346,7 @@ msgid "Save audience"
 msgstr "Save audience"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:69
+#: ../backend/src/routes/settings.ts:70
 msgid "settings.attention.backup_key.action"
 msgstr "Save backup key"
 
@@ -23458,6 +23473,7 @@ msgstr "Saved place"
 #: src/apps/settings/PersonAccessEditor.tsx:57
 #: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
+#: src/apps/settings/VoiceEngineSection.tsx:61
 msgid "Saved."
 msgstr "Saved."
 
@@ -24286,7 +24302,7 @@ msgid "Set up away access"
 msgstr "Set up away access"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:85
+#: ../backend/src/routes/settings.ts:86
 msgid "settings.attention.backups.open"
 msgstr "Set up backups"
 
@@ -24321,12 +24337,12 @@ msgid "Set up standard coding"
 msgstr "Set up standard coding"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:102
+#: ../backend/src/routes/settings.ts:103
 msgid "settings.attention.search.open"
 msgstr "Set up web search"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:104
+#: ../backend/src/routes/settings.ts:105
 msgid "settings.attention.search.setup"
 msgstr "Set up web search"
 
@@ -24512,7 +24528,7 @@ msgid "setting.setup.checklist_dismissed.label"
 msgstr "Setup checklist items hidden"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:70
+#: ../backend/src/routes/settings.ts:71
 msgid "settings.attention.setup.complete"
 msgstr "Setup complete"
 
@@ -24726,8 +24742,8 @@ msgid "Show in Library"
 msgstr "Show in Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:161
-#: src/shell/pages/settings/settingsViews.tsx:164
+#: src/shell/pages/settings/settingsViews.tsx:162
+#: src/shell/pages/settings/settingsViews.tsx:165
 msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
@@ -24949,7 +24965,7 @@ msgstr "Side chat"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:157
+#: src/shell/pages/settings/settingsViews.tsx:158
 msgid "Sidebar"
 msgstr "Sidebar"
 
@@ -25639,6 +25655,11 @@ msgid "Sounds"
 msgstr "Sounds"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:14
+msgid "Sounds very natural and copies a voice from a recording well. It needs a one-time download."
+msgstr "Sounds very natural and copies a voice from a recording well. It needs a one-time download."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:133
 msgid "Sounds you have saved."
 msgstr "Sounds you have saved."
@@ -25889,6 +25910,7 @@ msgstr "Staged"
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:54
 #: src/apps/settings/ReferenceLibrarySettings.tsx:67
+#: src/apps/settings/VoiceEngineSection.tsx:13
 #: src/shell/library/LibraryViewer.tsx:164
 #: src/shell/pages/musicComposerMode.ts:91
 msgid "Standard"
@@ -26344,7 +26366,7 @@ msgstr "Stopwatch running"
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/pages/settings/settingsViews.tsx:114
+#: src/shell/pages/settings/settingsViews.tsx:115
 #: src/shell/pages/StoragePage.tsx:118
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -27125,6 +27147,7 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:229
 #: src/apps/settings/UsersSection.tsx:166
+#: src/apps/settings/VoiceEngineSection.tsx:47
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/shell/AmbientCompanionPane.tsx:181
@@ -27546,12 +27569,12 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr "The AI restarted while I was answering. Try again in a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:81
+#: ../backend/src/routes/settings.ts:82
 msgid "settings.attention.health.line"
 msgstr "The AI service needs attention before it can answer."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:73
+#: ../backend/src/routes/settings.ts:74
 msgid "settings.attention.install.failed"
 msgstr "The AI setup did not finish."
 
@@ -28350,6 +28373,11 @@ msgid "The same seed with the same words makes a very similar song."
 msgstr "The same seed with the same words makes a very similar song."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:15
+msgid "The same voice in a smaller size, for a computer that is busy with other work. It needs a one-time download."
+msgstr "The same voice in a smaller size, for a computer that is busy with other work. It needs a one-time download."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicSongDetails.tsx:89
 msgid "The score could not start. Add Score transcription under Settings, AI and models, then try again."
 msgstr "The score could not start. Add Score transcription under Settings, AI and models, then try again."
@@ -28580,6 +28608,11 @@ msgstr "The voice Home and its robots speak with for anyone who has not chosen t
 #: src/apps/settings/VoiceBrowserSection.tsx:94
 msgid "The voice Home speaks with when it talks to {who}."
 msgstr "The voice Home speaks with when it talks to {who}."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:13
+msgid "The voice Home uses now. It is quick, and it can laugh and sigh."
+msgstr "The voice Home uses now. It is quick, and it can laugh and sigh."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:79
@@ -29153,6 +29186,11 @@ msgstr "This song is not available. Go back to Music and choose another."
 #: src/shell/pages/MusicLibrary.tsx:62
 msgid "This song's file is missing. Make it again."
 msgstr "This song's file is missing. Make it again."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:48
+msgid "This Stack is too old to offer a choice. Update it in Settings, then Engines."
+msgstr "This Stack is too old to offer a choice. Update it in Settings, then Engines."
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:120
@@ -29900,7 +29938,7 @@ msgid "Two computers"
 msgstr "Two computers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:76
+#: src/shell/pages/settings/settingsViews.tsx:77
 msgid "Two-step sign-in"
 msgstr "Two-step sign-in"
 
@@ -30956,7 +30994,7 @@ msgstr "Vocals, drums, bass and the rest. This takes a minute or two. The rows a
 #: src/shell/pages/CompanionsPage.tsx:367
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:178
+#: src/shell/pages/settings/settingsViews.tsx:179
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr "Voice"
@@ -31015,6 +31053,11 @@ msgstr "Voice cloning will no longer be able to use this token."
 #: src/shell/pages/ChatPage.tsx:1760
 msgid "Voice conversation"
 msgstr "Voice conversation"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:45
+msgid "Voice engine"
+msgstr "Voice engine"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:97
@@ -31085,7 +31128,7 @@ msgstr "Voiceover"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/pages/settings/settingsViews.tsx:97
+#: src/shell/pages/settings/settingsViews.tsx:98
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
@@ -31118,6 +31161,16 @@ msgstr "Voices with full power."
 #: src/shell/pages/MusicStudioView.tsx:34
 msgid "Volume"
 msgstr "Volume"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:14
+msgid "VoxCPM2 (natural)"
+msgstr "VoxCPM2 (natural)"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/VoiceEngineSection.tsx:15
+msgid "VoxCPM2 (smaller)"
+msgstr "VoxCPM2 (smaller)"
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:390
@@ -31334,17 +31387,17 @@ msgid "area.Web search and memory settings"
 msgstr "Web search and memory settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:100
+#: ../backend/src/routes/settings.ts:101
 msgid "settings.attention.search.title"
 msgstr "Web search has no address."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:103
+#: ../backend/src/routes/settings.ts:104
 msgid "settings.attention.search.off"
 msgstr "Web search off"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:105
+#: ../backend/src/routes/settings.ts:106
 msgid "settings.attention.search.ready"
 msgstr "Web search ready"
 
@@ -32845,12 +32898,12 @@ msgid "api.error.upload_profile_gone"
 msgstr "Your profile is no longer available. Sign in again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:92
+#: ../backend/src/routes/settings.ts:93
 msgid "settings.attention.robots.line"
 msgstr "Your robots have not checked in with this home."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:64
+#: ../backend/src/routes/settings.ts:65
 msgid "settings.attention.personal.summary"
 msgstr "Your settings"
 
