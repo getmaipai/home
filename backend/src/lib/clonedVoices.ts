@@ -329,9 +329,11 @@ export function saveStyleSample(id: string, style: "whisper" | "anger", wav: Uin
 
 /** The whisper form of a household voice: the same voice settings, with the address of its whisper sample, or null when it has none yet. */
 export function whisperVoiceSpeech(stored: unknown): { voiceUrl: string; temperature?: number; pitchSemitones?: number } | null {
-  const speech = householdVoiceSpeech(stored);
-  const id = speech ? /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(speech.voiceUrl)?.[1] : undefined;
-  if (!speech || !id || !existsSync(whisperSamplePath(id))) return null;
+  const found = householdVoiceSpeech(stored);
+  const id = found ? /\/cloned\/(voice-[a-z0-9]{6,})\/file/.exec(found.voiceUrl)?.[1] : undefined;
+  if (!found || !id || !existsSync(whisperSamplePath(id))) return null;
+  // The whisper sample is a different recording, so the main clip's words do not belong to it: no `voiceText`.
+  const { voiceText: _words, ...speech } = found;
   return { ...speech, voiceUrl: `${speech.voiceUrl}&w=1` };
 }
 
@@ -404,7 +406,7 @@ const VOICE_ADDRESS = /\/cloned\/(voice-[a-z0-9]{6,})\/file/;
 
 /** What a saved voice choice (`tts.voice_id`, `robot.voice.id`) means when it names a voice made at home: the clip's address and the
  * voice's own temperature and pitch. Both the plain token and the older address form are understood; null for anything else. */
-export function householdVoiceSpeech(stored: unknown): { voiceUrl: string; temperature?: number; pitchSemitones?: number } | null {
+export function householdVoiceSpeech(stored: unknown): { voiceUrl: string; temperature?: number; pitchSemitones?: number; voiceText?: string } | null {
   if (typeof stored !== "string") return null;
   const id = VOICE_TOKEN.test(stored) ? stored : VOICE_ADDRESS.exec(stored)?.[1];
   if (!id) return null;
@@ -414,13 +416,25 @@ export function householdVoiceSpeech(stored: unknown): { voiceUrl: string; tempe
     voiceUrl: clonedVoiceUrl(id),
     ...(row.temperature !== null ? { temperature: row.temperature } : {}),
     ...(row.pitchSemitones !== null ? { pitchSemitones: row.pitchSemitones } : {}),
+    // VOICE-VOXCPM2-01: the words spoken in the clip (the stored transcript), sent as `voice_text`; absent means the engine reads the clip itself.
+    ...(row.transcript?.trim() ? { voiceText: row.transcript.trim().slice(0, 2000) } : {}),
   };
 }
 
-/** The household's voices as entries of the voice list (speech engine: Chatterbox Turbo). */
-export function householdVoiceEntries(): StackVoice[] {
+/** Lazy backfill: a voice made before its words were stored gets them read once, in the background, the first time it is spoken. */
+export function fillMissingVoiceText(stored: unknown): void {
+  const id = typeof stored === "string" ? (VOICE_TOKEN.test(stored) ? stored : VOICE_ADDRESS.exec(stored)?.[1]) : undefined;
+  if (!id) return;
+  const row = db.select({ transcript: clonedVoices.transcript }).from(clonedVoices).where(eq(clonedVoices.id, id)).get();
+  if (!row || row.transcript?.trim()) return;
+  const clip = readClonedVoiceClip(id);
+  if (clip) void transcribeClonedVoiceOnce(id, clip.bytes, clip.mimeType).catch(() => null);
+}
+
+/** The household's voices as entries of the voice list (speech engine: the live clip engine, Chatterbox Turbo unless told otherwise). */
+export function householdVoiceEntries(engine = "chatterbox-turbo"): StackVoice[] {
   return db.select().from(clonedVoices).all().map((row) => ({
     id: row.id, name: row.label, description: "A voice made at home.", language: "en", country: "unknown", gender: "unknown" as const,
-    source: "cloned" as const, engine: "chatterbox-turbo", onDisk: true, licence: null, revision: "1",
+    source: "cloned" as const, engine, onDisk: true, licence: null, revision: "1",
   }));
 }

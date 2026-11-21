@@ -7,7 +7,7 @@ import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { toSpokenText } from "@/lib/spokenText";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
-import { householdVoiceSpeech, readClonedVoiceClip, whisperDefaultVoiceSpeech, whisperVoiceSpeech } from "@/lib/clonedVoices";
+import { fillMissingVoiceText, householdVoiceSpeech, readClonedVoiceClip, whisperDefaultVoiceSpeech, whisperVoiceSpeech } from "@/lib/clonedVoices";
 import { ensureDefaultWhisperSample, ensureWhisperSample } from "@/lib/whisperSample";
 import { fetchRecordedSpeech, recordedSpeechReferenceForTest, submitRecordedSpeech, waitForRecordedSpeech } from "@/lib/recordedSpeech";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
@@ -60,13 +60,15 @@ export async function plannedRecordedEngine(voiceUrl?: string): Promise<Recorded
  * already restricted by that setting key's own `select` options, not
  * anything this function re-checks. */
 /** The Stack's /v1/audio/speech accepts text and voice_url. */
-async function synthesizeViaStack(text: string, voiceUrl?: string, household?: { temperature?: number; pitchSemitones?: number }): Promise<TtsOpResult> {
+async function synthesizeViaStack(text: string, voiceUrl?: string, household?: { temperature?: number; pitchSemitones?: number; voiceText?: string }): Promise<TtsOpResult> {
   const form = new FormData();
   form.append("text", text);
   if (voiceUrl) form.append("voice_url", voiceUrl);
   // VOICES-04: a household voice carries its own sampling temperature and pitch offset (set when it was made, never per request).
   if (household?.temperature !== undefined) form.append("temperature", String(household.temperature));
   if (household?.pitchSemitones !== undefined && household.pitchSemitones !== 0) form.append("pitch_semitones", String(household.pitchSemitones));
+  // VOICE-VOXCPM2-01: the words spoken in the clip, when stored; the Stack hands them to VoxCPM2 only. Absent, the engine reads the clip itself.
+  if (household?.voiceText) form.append("voice_text", household.voiceText);
   form.append("model", "tts");
   try {
     const client = getStackClient();
@@ -107,6 +109,7 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts:
     // A voice an admin made from a clip is not on the Stack's list: Home sends its clip address and its own settings.
     // WHISPER-01: a whispered reply is spoken from the voice's whisper sample. A voice without one yet speaks normally, and one is made in the background.
     let household = householdVoiceSpeech(voiceUrl);
+    if (household && !household.voiceText) fillMissingVoiceText(voiceUrl);
     if (opts.whisper) {
       if (household) {
         const whispered = whisperVoiceSpeech(voiceUrl);

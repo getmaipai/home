@@ -26,6 +26,7 @@ import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
 import { Button } from "@maipai/ui/src/ui/button";
 import { useState } from "react";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
+import { VoiceEngineSection } from "@/apps/settings/VoiceEngineSection";
 import { PeopleAccess } from "@/apps/settings/PeopleAccess";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
@@ -106,7 +107,7 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   return <>
     {show("overview") ? <AiGlance person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <><HuggingFaceTokenSection /><AiStorageTidy /></> : null}
+    {show("advanced") ? <><VoiceEngineSection /><HuggingFaceTokenSection /><AiStorageTidy /></> : null}
   </>;
 }
 function AiStorageTidy() {

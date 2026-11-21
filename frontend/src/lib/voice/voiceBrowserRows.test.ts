@@ -20,6 +20,7 @@ describe("voice browser helpers", () => {
     expect(voiceFriendlyName({ id: "bill_boerst", name: "Bill Boerst" })).toBe("Bill Boerst");
     expect(voiceFriendlyName({ id: "chatterbox-turbo-voice-default", name: "Chatterbox default" })).toBe("Default");
     expect(voiceFriendlyName({ id: "chatterbox-turbo-voice-default", name: "Chatterbox" })).toBe("Default");
+    expect(voiceFriendlyName({ id: "voxcpm2-voice-default", name: "VoxCPM2 default" })).toBe("Default");
   });
   test("a description shows only when it is real and engine-free", () => {
     expect(voiceDescription({ description: "Warm, friendly" })).toBe("Warm, friendly");

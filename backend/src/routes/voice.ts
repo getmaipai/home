@@ -49,6 +49,8 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import type { StackVoice } from "@/lib/stack/types";
 import { StackError } from "@/lib/stack/errors";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { liveClipEngine } from "@/lib/clipVoiceEngine";
+import { applyVoiceEngineChoice, readVoiceEngineChoice, VOICE_ENGINE_CHOICES } from "@/lib/voiceEngineChoice";
 import { cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio, renderHouseholdVoice } from "@/lib/householdVoiceCheck";
 
 export const voiceRoutes = apiRouter();
@@ -121,8 +123,9 @@ voiceRoutes.openapi(stackVoicesRoute, async (c) => {
   if (!isStackConfigured()) return c.json({ error: `The Stack that speaks for Home is not running. ${outageHelp}` }, 503);
   try {
     const stackVoices: StackVoice[] = await getStackClient().voices();
-    // Voices made from a clip are spoken by Chatterbox Turbo, so they are offered only beside it, to every member but a guest.
-    const clipVoices = mayUseClipVoices(c.get("person")) && stackVoices.some((voice) => voice.engine === "chatterbox-turbo") ? householdVoiceEntries() : [];
+    // Voices made from a clip are offered only beside an engine that can speak a clip (Chatterbox Turbo or VoxCPM2), to every member but a guest.
+    const clipEngine = liveClipEngine(stackVoices);
+    const clipVoices = mayUseClipVoices(c.get("person")) && clipEngine ? householdVoiceEntries(clipEngine) : [];
     const all: StackVoice[] = [...stackVoices, ...clipVoices];
     // Owner ruling 2026-10-17: an owner or admin lists every voice (a voice not yet downloaded installs on first
     // preview); everyone else sees only voices already on disk, so Test never ends in a refusal.
@@ -542,6 +545,49 @@ voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
   } catch (err) {
     const failure = stackFailureResult(err, "tts");
     return c.json({ error: failure.error, next: "Check the engine computer in Repairs, then save the token again." }, failure.status);
+  }
+});
+
+// VOICE-VOXCPM2-01: the voice engine choice. Owner or admin only; the Stack keeps the value.
+const VoiceEngineViewSchema = z.object({ current: z.enum(VOICE_ENGINE_CHOICES), pending: z.enum(VOICE_ENGINE_CHOICES).nullable(), available: z.boolean() });
+const voiceEngineGetRoute = createRoute({
+  method: "get", path: "/engine", tags: ["Voice"], summary: "Which voice engine speaks",
+  description: "The voice engine choice kept by the Stack: Standard, VoxCPM2 or VoxCPM2 Reduced, and a saved choice that starts at the next voice restart.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: VoiceEngineViewSchema } }, description: "The choice." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
+  },
+});
+voiceRoutes.openapi(voiceEngineGetRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only owner or admin may change household settings" }, 403);
+  if (!isStackConfigured()) return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
+  try {
+    return c.json(await readVoiceEngineChoice(), 200);
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    return c.json({ error: failure.error }, failure.status);
+  }
+});
+
+const voiceEnginePutRoute = createRoute({
+  method: "put", path: "/engine", tags: ["Voice"], summary: "Choose the voice engine",
+  description: "Saves the choice in the Stack (stack.voice.engine). It starts when the voice service restarts.",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ engine: z.enum(VOICE_ENGINE_CHOICES) }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: VoiceEngineViewSchema } }, description: "The choice after saving." },
+    ...errorResponses({ 400: "Not one of the offered engines", 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
+  },
+});
+voiceRoutes.openapi(voiceEnginePutRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only owner or admin may change household settings" }, 403);
+  if (!isStackConfigured()) return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
+  try {
+    return c.json(await applyVoiceEngineChoice(c.req.valid("json").engine), 200);
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    return c.json({ error: failure.error }, failure.status);
   }
 });
 

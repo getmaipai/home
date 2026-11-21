@@ -2,7 +2,7 @@ import type { PersonRosterEntry, Roster, StackVoice } from "@/lib/api";
 
 // Engine and product names never reach a person's screen (owner, 2026-10-17):
 // this is the one place a voice gets its plain name and its description.
-const ENGINE_WORDS = /\b(chatterbox|pocket|orpheus|mlx|turbo|tts)\b/gi;
+const ENGINE_WORDS = /\b(chatterbox|pocket|orpheus|voxcpm2?|mlx|turbo|tts)\b/gi;
 const isUnknown = (value: unknown): value is "unknown" | "" | undefined => typeof value !== "string" || !value.trim() || value.trim() === "unknown";
 const titleCase = (text: string) => text.replace(/[-_]+/g, " ").trim().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
@@ -24,7 +24,7 @@ export function voiceDisplayName(voice: Pick<StackVoice, "id" | "name">): string
 
 /** Only a real descriptor from the catalog; "unknown" and engine talk are dropped. */
 export function voiceDescription(voice: Pick<StackVoice, "description">): string | null {
-  return isUnknown(voice.description) || /chatterbox|pocket|orpheus|mlx|\btts\b/i.test(voice.description) ? null : voice.description.trim();
+  return isUnknown(voice.description) || /chatterbox|pocket|orpheus|voxcpm|mlx|\btts\b/i.test(voice.description) ? null : voice.description.trim();
 }
 
 export function presetNameForVoice(id: unknown, options: readonly string[]): string | null {

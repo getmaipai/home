@@ -32,6 +32,7 @@ export async function renderHouseholdVoice(id: string, signal?: AbortSignal): Pr
   form.append("voice_url", household.voiceUrl);
   if (household.temperature !== undefined) form.append("temperature", String(household.temperature));
   if (household.pitchSemitones !== undefined && household.pitchSemitones !== 0) form.append("pitch_semitones", String(household.pitchSemitones));
+  if (household.voiceText) form.append("voice_text", household.voiceText);
   try {
     const response = await getStackClient().speak(form, { signal });
     return { ok: true, audio: new Uint8Array(await response.arrayBuffer()) };

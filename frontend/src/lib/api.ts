@@ -1096,6 +1096,9 @@ export interface PersonAccess { role: string; ceiling: Record<string, string>; o
 /** UNSEEN-01: household counts of what the filters held back since the hub started. Counts only. */
 export interface HeldBack { since: string; surfaces: Array<{ surface: "news" | "shelf" | "reference" | "search"; count: number }> }
 
+export type VoiceEngineChoice = "auto" | "voxcpm2" | "voxcpm2-reduced";
+export interface VoiceEngineView { current: VoiceEngineChoice; pending: VoiceEngineChoice | null; available: boolean }
+
 export const api = {
   aiFeatureModels: () => request<AiFeatureModels>("/api/ai/feature-models"),
   aiSetFeatureOrder: (feature: string, order: string[]) => request<{ ok: true }>(`/api/ai/feature-models/${encodeURIComponent(feature)}/order`, { method: "PUT", body: JSON.stringify({ order }) }),
@@ -1501,6 +1504,9 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
   removeHfToken: () => request<ResolvedSetting>("/api/voice/hf-token/remove", { method: "POST" }),
+  // VOICE-VOXCPM2-01: the admin's voice engine choice; the Stack keeps the value.
+  voiceEngine: () => request<VoiceEngineView>("/api/voice/engine"),
+  setVoiceEngine: (engine: VoiceEngineChoice) => request<VoiceEngineView>("/api/voice/engine", { method: "PUT", body: JSON.stringify({ engine }) }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",
