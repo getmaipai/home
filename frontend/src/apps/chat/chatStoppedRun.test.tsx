@@ -7,6 +7,7 @@ import { consumeContinuation, setPendingContinuation } from "@/apps/chat/chatCon
 import { ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
+import { markVoiceInterrupted, resetVoiceInterruptedTurns } from "@/apps/chat/voiceInterrupted";
 
 const PARTIAL = "The answer so far";
 const NOOP: ChatModelAdapter = { run: async function* () { /* seeded message */ } };
@@ -41,11 +42,13 @@ beforeEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   globalThis.fetch = mock(() => Promise.resolve(Response.json([]))) as unknown as typeof fetch;
   setPendingContinuation(null);
+  resetVoiceInterruptedTurns();
 });
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;
   setPendingContinuation(null);
+  resetVoiceInterruptedTurns();
 });
 
 describe("stopped reply Element", () => {
@@ -64,6 +67,20 @@ describe("stopped reply Element", () => {
     expect(stopped.textContent).toContain(PARTIAL);
     expect(stopped.textContent).toContain(reason);
     expect(view.queryByRole("button", { name: "Discard" })).toBeNull();
+  });
+
+  test("suppresses the notice and Continue for a voice interrupted reply", async () => {
+    markVoiceInterrupted("turn-stopped01");
+    const view = renderWithQueryClient(<MemoryRouter><Harness band="adult" /></MemoryRouter>);
+    await waitFor(() => expect(view.getByText(PARTIAL)).toBeTruthy());
+    expect(view.container.querySelector('[data-slot="stopped-run"]')).toBeNull();
+    expect(view.queryByRole("button", { name: "Continue" })).toBeNull();
+  });
+
+  test.each([["teen", "You stopped this reply"], ["adult", "You stopped this reply"]] as const)("%s tap cancellation keeps its notice", async (band, reason) => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness band={band} /></MemoryRouter>);
+    expect(await view.findByText(reason)).toBeTruthy();
+    expect(view.getByRole("button", { name: "Continue" })).toBeTruthy();
   });
 
   test.each([

@@ -26,6 +26,7 @@
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
+import { markVoiceInterrupted } from "@/apps/chat/voiceInterrupted";
 import { msSinceWakeCue, playWakeCue } from "@/lib/voice/wakeCue";
 import { playCallSound } from "@/lib/voice/callSounds";
 import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
@@ -354,7 +355,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       }
     } catch { /* diagnostics only */ }
   };
-  const interrupt = (_reason: "voice" | "tap") => {
+  const interrupt = (reason: "voice" | "tap") => {
     clearPauseDeadline();
     lastInterruptAtRef.current = Date.now();
     if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
@@ -363,6 +364,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     falseInterruptionTimerRef.current = null;
     overlapPausedRef.current = false;
     const active = activeTurnRef.current;
+    if (reason === "voice" && active) markVoiceInterrupted(active.turnId);
     if (active && interruptedTurnRef.current !== active.turnId) {
       interruptedTurnRef.current = active.turnId;
       const scheduler = turnSchedulerRef.current;

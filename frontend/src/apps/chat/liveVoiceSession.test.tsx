@@ -20,8 +20,9 @@ import type { SttServerMessage } from "@/lib/voice/sttContract";
 import type { MicCaptureHandle, MicCaptureOptions } from "@/lib/voice/mic-capture";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
+import { resetVoiceInterruptedTurns, wasVoiceInterrupted } from "@/apps/chat/voiceInterrupted";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); resetVoiceInterruptedTurns(); });
 
 let voiceRuntime: ReturnType<typeof useLocalRuntime> | undefined;
 
@@ -329,6 +330,7 @@ describe("live voice session", () => {
   });
 
   test("a wake-opened session lets an adult talk over Home's reply: speech stops, the turn is cancelled once, and the session stays open", async () => {
+    resetVoiceInterruptedTurns();
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const onOpenChange = mock();
     const stopScheduler = mock();
@@ -343,6 +345,7 @@ describe("live voice session", () => {
     act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} voiceBargeIn stopScheduler={stopScheduler} cancelRun={cancelRun} />));
     await new Promise((resolve) => setTimeout(resolve, 800));
     expect(cancel).toHaveBeenCalledTimes(1);
+    expect(wasVoiceInterrupted("turn-test")).toBe(true);
     expect(stopScheduler).toHaveBeenCalledTimes(1);
     expect(cancelRun).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
@@ -1419,6 +1422,7 @@ describe("live voice session", () => {
   });
 
   test("tapping the interrupt control sends the fine heard length too", async () => {
+    resetVoiceInterruptedTurns();
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const cancelRun = mock();
     const stopScheduler = mock();
@@ -1426,6 +1430,7 @@ describe("live voice session", () => {
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={sentTexts} cancelRun={cancelRun} stopScheduler={stopScheduler} activeTurn={{ turnId: "turn-test", heardVisibleEnd: () => 23 }} />);
     act(() => view.getByRole("button", { name: "Interrupt the assistant" }).click());
     expect(cancel).toHaveBeenCalledWith("turn-test", 23);
+    expect(wasVoiceInterrupted("turn-test")).toBe(false);
     expect(stopScheduler).toHaveBeenCalledTimes(1);
     expect(cancelRun).toHaveBeenCalledTimes(1);
     expect(sentTexts).toEqual([]);

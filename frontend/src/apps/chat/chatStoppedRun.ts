@@ -3,6 +3,7 @@ import { useAui, useAuiState } from "@assistant-ui/react";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { setPendingContinuation } from "@/apps/chat/chatContinue";
+import { wasVoiceInterrupted } from "@/apps/chat/voiceInterrupted";
 
 const STOP_REASON: Record<"child" | "teen" | "adult", string> = {
   child: "You stopped it",
@@ -21,8 +22,10 @@ export function useStoppedRun() {
 
   if (status?.type !== "incomplete" || status.reason !== "cancelled") return null;
 
-  const text = messageText(message);
   const turnId = message.metadata?.custom?.turnId;
+  if (typeof turnId === "string" && wasVoiceInterrupted(turnId)) return null;
+
+  const text = messageText(message);
   return {
     words: text.split(/\s+/).filter(Boolean),
     reason: STOP_REASON[band],
