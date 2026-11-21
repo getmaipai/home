@@ -23618,26 +23618,6 @@ msgid "setting.search.safe_search.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:619
-msgid "setting.engines.coding.tier.boost.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:622
-msgid "setting.engines.coding.tier.max.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:625
-msgid "setting.engines.coding.tier.reduced.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:628
-msgid "setting.engines.coding.tier.standard.does"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:604
 #, needs-review
 msgid "setting.engines.chat.tier.boost.does"
@@ -23660,6 +23640,26 @@ msgstr "Elige el modelo y la configuración para este nivel."
 #, needs-review
 msgid "setting.engines.chat.tier.standard.does"
 msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:619
+msgid "setting.engines.coding.tier.boost.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:622
+msgid "setting.engines.coding.tier.max.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:625
+msgid "setting.engines.coding.tier.reduced.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:628
+msgid "setting.engines.coding.tier.standard.does"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:637

@@ -20785,26 +20785,6 @@ msgid "setting.search.safe_search.does"
 msgstr "Picks how strictly web results are filtered, never looser than your content level gives."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:619
-msgid "setting.engines.coding.tier.boost.does"
-msgstr "Picks the model and settings for this level."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:622
-msgid "setting.engines.coding.tier.max.does"
-msgstr "Picks the model and settings for this level."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:625
-msgid "setting.engines.coding.tier.reduced.does"
-msgstr "Picks the model and settings for this level."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:628
-msgid "setting.engines.coding.tier.standard.does"
-msgstr "Picks the model and settings for this level."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:604
 msgid "setting.engines.chat.tier.boost.does"
 msgstr "Picks the model and settings for this level."
@@ -20822,6 +20802,26 @@ msgstr "Picks the model and settings for this level."
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:613
 msgid "setting.engines.chat.tier.standard.does"
+msgstr "Picks the model and settings for this level."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:619
+msgid "setting.engines.coding.tier.boost.does"
+msgstr "Picks the model and settings for this level."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:622
+msgid "setting.engines.coding.tier.max.does"
+msgstr "Picks the model and settings for this level."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:625
+msgid "setting.engines.coding.tier.reduced.does"
+msgstr "Picks the model and settings for this level."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:628
+msgid "setting.engines.coding.tier.standard.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
