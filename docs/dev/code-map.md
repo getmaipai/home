@@ -256,6 +256,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/TwoStepSignInSection.tsx` | TwoStepSignInSection |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
+| `frontend/src/apps/settings/VoiceEngineSection.tsx` | VoiceEngineSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
 | `frontend/src/apps/settings/styles/FreshConfirm.tsx` | useFreshConfirm |
 | `frontend/src/apps/settings/styles/StyleAddFile.tsx` | StyleAddFile |
@@ -537,6 +538,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatTransitions.ts` | DEFAULT_TRANSITION_SECONDS, RUNNING_LONG_FACTOR, RUNNING_LONG_LINE, __resetTransitionsForTests, recordTransition, estimateSeconds |
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
+| `backend/src/lib/clipVoiceEngine.ts` | CLIP_VOICE_ENGINES, liveClipEngine |
 | `backend/src/lib/clonedVoiceTranscript.ts` | __setClonedVoiceTranscriberForTests, normalizeVoiceTranscript, updateClonedVoiceTranscript, transcribeClonedVoiceOnce |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
@@ -1461,6 +1463,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/visionFocalAsset.ts` | visionAssetPath, VISION_FOCAL_CROP, ensureFocalCropAsset |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
+| `backend/src/lib/voiceEngineChoice.ts` | VOICE_ENGINE_SETTING_KEY, VOICE_ENGINE_CHOICES, readVoiceEngineChoice, applyVoiceEngineChoice |
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, companionOwnVoice, voiceForSpeech |
 | `backend/src/lib/voiceLibrary.ts` | buildVoiceLibrary, searchVoiceLibrary |
 | `backend/src/lib/voiceLibraryData.ts` | VCTK_SPEAKERS |

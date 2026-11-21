@@ -20506,6 +20506,194 @@
         }
       }
     },
+    "/api/voice/engine": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Which voice engine speaks",
+        "description": "The voice engine choice kept by the Stack: Standard, VoxCPM2 or VoxCPM2 Reduced, and a saved choice that starts at the next voice restart.",
+        "responses": {
+          "200": {
+            "description": "The choice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "voxcpm2",
+                        "voxcpm2-reduced"
+                      ]
+                    },
+                    "pending": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "auto",
+                        "voxcpm2",
+                        "voxcpm2-reduced",
+                        null
+                      ]
+                    },
+                    "available": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "current",
+                    "pending",
+                    "available"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Choose the voice engine",
+        "description": "Saves the choice in the Stack (stack.voice.engine). It starts when the voice service restarts.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "engine": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "voxcpm2",
+                      "voxcpm2-reduced"
+                    ]
+                  }
+                },
+                "required": [
+                  "engine"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The choice after saving.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "voxcpm2",
+                        "voxcpm2-reduced"
+                      ]
+                    },
+                    "pending": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "auto",
+                        "voxcpm2",
+                        "voxcpm2-reduced",
+                        null
+                      ]
+                    },
+                    "available": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "current",
+                    "pending",
+                    "available"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not one of the offered engines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/cloned": {
       "get": {
         "tags": [
