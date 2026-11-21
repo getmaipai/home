@@ -63,11 +63,12 @@ async function chatRole(): Promise<{ modelId: string | null; state: string; inst
 /** Starts the choice of one catalog chat model: loads it when the Stack has it, otherwise starts its downloads. */
 export async function startChatModelChoice(modelId: string): Promise<ChatSwitchState | { error: string; status: 404 | 409 | 502 }> {
   const entry = catalogEntries().find((model) => model.id === modelId && model.role === "chat" && model.implemented);
-  if (!entry?.download) return { error: "That model is not in the list. Pick one of the models shown on this page.", status: 404 };
   let role: Awaited<ReturnType<typeof chatRole>>;
   try { role = await chatRole(); }
   catch { return { error: "The MaiPai Stack did not answer. Check that it is running, then try again.", status: 502 }; }
   if (!role) return { error: "The MaiPai Stack is not set up on this computer yet. Finish setup, then choose a model.", status: 409 };
+  // A chat model the Stack itself lists as startable (an optional Stack part the chooser offers) loads without a Home catalog record.
+  if (!entry?.download && !role.installed.includes(modelId)) return { error: "That model is not in the list. Pick one of the models shown on this page.", status: 404 };
 
   if (role.installed.includes(modelId)) {
     if (role.modelId === modelId && (role.state === "ready" || role.state === "loaded")) return { modelId, status: "ready" };
@@ -88,6 +89,7 @@ export async function startChatModelChoice(modelId: string): Promise<ChatSwitchS
   try {
     const catalog = (await getStackClient().modelCatalog()) as { models?: StackPin[] };
     // An added model is not in the Stack's shipped pins: its own record is the pin (the hash is still checked on download).
+    if (!entry) return { error: "That model is not in the list. Pick one of the models shown on this page.", status: 404 };
     const pins = entry.origin === "added" ? [pinFromAddedRecord(entry)] : catalog.models ?? [];
     const pin = pins.find((candidate) => candidate.id === modelId && candidate.role === "chat");
     if (!pin) return { error: "The MaiPai Stack does not offer that model yet. Update the Stack, then try again.", status: 409 };

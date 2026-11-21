@@ -210,6 +210,18 @@ describe("POST /api/host/models/:id/select (MODEL-SWITCH-01)", () => {
     expect(pulled).toEqual([]);
   });
 
+  test("a chat model the Stack lists as installed loads even when Home's catalog has no record of it (an optional Stack part)", async () => {
+    const owner = await ownerClient();
+    const loaded: string[] = [];
+    let running = "other-chat-model";
+    await withStack({ roles: async () => chatRole(running, [running, "optional-stack-chat"]), modelAction: async (id: string, action: string) => { loaded.push(`${action}:${id}`); running = id; return { modelId: id, ok: true }; } }, async () => {
+      const res = await owner.post("/api/host/models/optional-stack-chat/select", {});
+      expect(res.status).toBe(202);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(loaded).toEqual(["load:optional-stack-chat"]);
+  });
+
   test("a model the Stack has not installed is pulled with its picture file first, from the Stack's own pin", async () => {
     const owner = await ownerClient();
     const pulled: Array<{ id: string; component?: string }> = [];
