@@ -34,6 +34,7 @@ import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscal
 import { closeRobotSttSockets } from "@/routes/stt";
 import { startRobotHosts, stopRobotHosts } from "@/lib/robotHost";
 import { getStackClient } from "@/lib/stackEngine";
+import { returnChatToTierModel } from "@/routes/aiChoices";
 import { StackError } from "@/lib/stack/errors";
 import { raiseIssue } from "@/lib/issues";
 import { isHostGuardSetting, writeHostGuardTuning } from "@/lib/hostGuardTuning";
@@ -198,6 +199,7 @@ async function applySettingSideEffects(scope: string, key: string, value: unknow
     if (scope === "household" && ["storage.warn_free_gb", "storage.critical_free_gb"].includes(key)) await syncStackDiskConfig();
     if (scope === "household" && ["home.base_url", "home.access_token"].includes(key)) refreshHomeAssistantEvents();
     if (scope === "household" && key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+    if (scope === "household" && key === "engines.chat.tier.standard" && (value as { model?: unknown } | null)?.model === "recommended") await returnChatToTierModel();
     if (scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(key)) scheduleHubRestart();
   }
   return null;

@@ -24,6 +24,7 @@ import { ensureVisionAssets, faceFinderState, removeVisionAssets } from "@/lib/v
 import { INGREDIENTS_BYTES, installIngredients, ingredientsState, removeIngredients, type IngredientsState } from "@/lib/videos/ingredientsAdapter";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { slotKey } from "@/lib/tiers";
+import { activeTurnCount } from "@/lib/turnActivity";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
@@ -309,10 +310,18 @@ const INGREDIENTS_CHOICE = "ingredients.adapter";
 const CHAT_MODEL_CHOICES = ["chat.standard", "chat.uncensored"];
 
 // The model "Standard chat AI" means on this computer: the last catalog chat model the tier's chat row holds (its starter model comes first).
-function standardChatModelId(state: AiState): string | null {
+function standardChatModelId(state: { plan: DiskPlan }): string | null {
   const row = state.plan.rows.find((candidate) => candidate.id === "chat");
   const ids = (row?.model_ids ?? []).filter((id) => catalogEntries().some((model) => model.id === id && model.role === "chat" && model.implemented && !model.tags?.includes("uncensored")));
   return ids.at(-1) ?? null;
+}
+/** CHAT-CHOOSER-01: "Use recommended" for chat Standard in Settings puts the running chat back on the tier's own model, through the same switch the Models settings use. Best effort and quiet: a chat in progress or a Stack that does not answer leaves the saved choice in place. */
+export async function returnChatToTierModel(): Promise<void> {
+  if (activeTurnCount() > 0) return;
+  try {
+    const modelId = standardChatModelId({ plan: await loadPlan() });
+    if (modelId) await startChatModelChoice(modelId);
+  } catch { /* the saved choice stands; the Models settings can switch it by hand */ }
 }
 const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": slotKey("image", "boost") };
 
@@ -495,7 +504,15 @@ aiChoicesRoutes.openapi(levelInstallRoute, async (c) => {
     if (!candidate.fits) return c.json({ error: candidate.refusal ?? "Too big for this level.", code: "model_refused" }, 409) as never;
     const component = list.components.find((item) => item.id === model);
     let jobId: string | null = null;
-    if (!component || component.state !== "installed") jobId = (await installStackComponent(model)).job ?? null;
+    // CHAT-CHOOSER-01: a catalog chat model chosen for Standard goes through the one chat model switch (download, then load), which also changes the running chat.
+    const switchesChat = job === "chat" && tier === "standard" && catalogEntries().some((entry) => entry.id === model && entry.role === "chat" && entry.implemented && entry.download);
+    if (switchesChat && activeTurnCount() > 0) return c.json({ error: "A chat is in progress and switching the chat model restarts the chat engine. Try again in a minute.", code: "chat_busy" }, 409) as never;
+    let chatStarted: Awaited<ReturnType<typeof startChatModelChoice>> | null = null;
+    if (switchesChat) {
+      chatStarted = await startChatModelChoice(model);
+      if ("error" in chatStarted) return c.json({ error: chatStarted.error, code: "chat_model" }, chatStarted.status === 404 ? 404 : chatStarted.status === 409 ? 409 : 503) as never;
+      jobId = chatStarted.jobs?.[0] ?? null;
+    } else if (!component || component.state !== "installed") jobId = (await installStackComponent(model)).job ?? null;
     const slotCategory = job === "pictures" ? "image" : job === "videos" ? "video" : job === "voice" ? "voice" : job;
     const write = tier === "reduced"
       ? (() => { const slot = readSlot(slotCategory, "reduced"); const saved = setHouseholdSettingValue(slotKey(slotCategory, "reduced"), { model, options: slot.options }); return saved.ok ? { ok: true as const } : { ok: false as const, status: saved.status, error: saved.error }; })()

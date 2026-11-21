@@ -24,6 +24,7 @@ import { recordLicenceAck } from "@/lib/licenceAcceptance";
 import { rmSync } from "node:fs";
 import { WAKEWORD_ALL_ASSETS, isWakewordAssetInstalled, wakewordAssetPath } from "@/lib/wakewordAssets";
 import { closeForJob, resetCloseAppsForTests, type CloseHelper } from "@/lib/jobs/closeApps";
+import { acquireTurnLease } from "@/lib/turnActivity";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -546,5 +547,95 @@ describe("the optional uncensored chat model (third Chat choice)", () => {
     expect(card.choices.find((choice) => choice.id === "chat.standard")).toMatchObject({ current: false, action: "use" });
     expect((await client.post("/api/ai/choices/chat", { choice: "chat.standard" })).status).toBe(200);
     expect(loaded).toEqual([standard()]);
+  });
+});
+
+describe("choosing a chat model for Standard in Settings switches the running chat (CHAT-CHOOSER-01)", () => {
+  const PICK = "qwen3-8-27b-huihui-abliterated-iq4-xs";
+  const PROJECTOR = "qwen3-8-27b-huihui-abliterated-mmproj-bf16";
+  const tierModel = () => rowFor("chat").model_ids.filter((id) => id !== PICK).at(-1)!;
+  let pulled: string[] = [];
+  let loaded: string[] = [];
+  let slotsInstalled: string[] = [];
+
+  function wire(installed: string[], running: string) {
+    const pin = (id: string, extra: object = {}) => ({ id, role: "chat", license: "Apache-2.0", revision: "r", download: { url: `https://example.com/${id}.gguf`, sha256: "a".repeat(64), approx_bytes: 1000 }, ...extra });
+    __setStackClientForTests({
+      ...(stackClient() as object),
+      roles: async () => ({ roles: [{ id: "chat", model: { id: running }, state: { state: "ready" }, models: installed.map((id) => ({ id, name: id })) }] }),
+      modelCatalog: async () => ({ models: [pin(PICK, { imageInput: { projector: PROJECTOR } }), pin(PROJECTOR), pin(tierModel())] }),
+      pullModel: async (body: { id: string }) => { pulled.push(body.id); return { job: `job-${body.id}` }; },
+      modelAction: async (id: string) => { loaded.push(id); return { ok: true }; },
+    } as unknown as StackClient);
+    __setComponentsFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/stack/v1/tiers/candidates") {
+        const ids = url.searchParams.get("category") === "chat" ? [PICK, tierModel()] : ["z-image-turbo"];
+        return Response.json({ category: url.searchParams.get("category"), profile: "p128", room_bytes: 90 * GIB, levels: ["standard", "boost", "max"].map((tier) => ({ tier, cap_bytes: 80 * GIB, recommended: ids[0], candidates: ids.map((id) => ({ id, label: id, family: "f", peak_bytes: 1e9, verified: true, fits: true, refusal: null })) })) });
+      }
+      if (url.pathname === "/stack/v1/components") return Response.json({ tier: "p128", free_disk_bytes: 800 * GIB, disk_margin_bytes: 5 * GIB, installed_bytes: 0, components: [] });
+      if ((init?.method ?? "GET") === "POST" && url.pathname.endsWith("/install")) { slotsInstalled.push(decodeURIComponent(url.pathname.split("/")[4] ?? "")); return Response.json({ job: "job-part" }, { status: 202 }); }
+      return Response.json({}, { status: 500 });
+    }) as never);
+  }
+  beforeEach(() => { pulled = []; loaded = []; slotsInstalled = []; });
+  const slot = (category: string, tier: string) => (getHouseholdSettingValue(`engines.${category}.tier.${tier}`) as { model: string } | undefined)?.model;
+
+  test("an installed chat model picked for Standard is loaded and saved", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], tierModel());
+    const res = await client.post("/api/ai/level/chat/standard/install", { model: PICK });
+    expect(res.status).toBe(200);
+    expect(loaded).toEqual([PICK]);
+    expect(slot("chat", "standard")).toBe(PICK);
+  });
+
+  test("a chat model that is not installed starts its downloads through the model switch, not a Stack part", async () => {
+    const { client } = await owner();
+    wire([tierModel()], tierModel());
+    const res = await client.post("/api/ai/level/chat/standard/install", { model: PICK });
+    expect(res.status).toBe(200);
+    expect(pulled).toEqual([PROJECTOR, PICK]);
+    expect(slotsInstalled).toEqual([]);
+    expect(((await res.json()) as { job: string | null }).job).toBe(`job-${PROJECTOR}`);
+    expect(slot("chat", "standard")).toBe(PICK);
+  });
+
+  test("other tiers and other jobs never touch the running chat", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], tierModel());
+    expect((await client.post("/api/ai/level/chat/boost/install", { model: PICK })).status).toBe(200);
+    expect((await client.post("/api/ai/level/pictures/standard/install", { model: "z-image-turbo" })).status).toBe(200);
+    expect(loaded).toEqual([]);
+    expect(pulled).toEqual([]);
+  });
+
+  test("a chat in progress holds the switch back with a plain sentence and saves nothing", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], tierModel());
+    const lease = acquireTurnLease();
+    try {
+      const res = await client.post("/api/ai/level/chat/standard/install", { model: PICK });
+      expect(res.status).toBe(409);
+      expect(((await res.json()) as { error: string }).error).toMatch(/chat is in progress/i);
+    } finally { lease.release(); }
+    expect(loaded).toEqual([]);
+    expect(slot("chat", "standard")).not.toBe(PICK);
+  });
+
+  test("Use recommended for chat Standard puts chat back on the tier model", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], PICK);
+    const res = await client.put("/api/settings", { scope: "household", key: "engines.chat.tier.standard", value: { model: "recommended", options: {} } });
+    expect(res.status).toBe(200);
+    expect(loaded).toEqual([tierModel()]);
+  });
+
+  test("Use recommended for another level or job does not load anything", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], PICK);
+    await client.put("/api/settings", { scope: "household", key: "engines.chat.tier.boost", value: { model: "recommended", options: {} } });
+    await client.put("/api/settings", { scope: "household", key: "engines.image.tier.standard", value: { model: "recommended", options: {} } });
+    expect(loaded).toEqual([]);
   });
 });
