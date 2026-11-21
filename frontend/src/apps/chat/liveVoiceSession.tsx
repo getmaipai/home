@@ -553,8 +553,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
               else if (isReaction(normalizedTranscript(edgeText), edgeText)) { /* reactions resume the reply; they do not start a held answer */ }
               else if (!mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && !overlapPausedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
-              // The session was not listening (the last reply still thinking or speaking, or the mic muted): labelled, so a live record names it.
-              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() || overlapPausedRef.current ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
+              // The session would not start early: the label names the real blocker (the mode value, a paused overlap, or the reply audio flag still set
+              // while the mode reads listening), never a catch-all, so a live record says why.
+              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : overlapPausedRef.current ? "refused_overlap_paused" : modeRef.current === "speaking" ? "refused_mode_speaking" : modeRef.current === "thinking" ? "refused_mode_thinking" : modeRef.current === "connecting" ? "refused_mode_connecting" : "refused_reply_speaking";
             }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;

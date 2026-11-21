@@ -467,6 +467,49 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); cancel.mockRestore(); discard.mockRestore(); }
   });
 
+  test("SPEC-REASON-01: after a reply has finished playing, the next turn's edge partial starts early (a normal conversation)", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const socket = controlledSocket();
+      const timings: Array<{ phase?: string; speculative?: string }> = [];
+      const props = { open: true, onOpenChange: () => {}, fixture: [], sentTexts: [] as string[], socketFactory: socket.createSocket, speculation: { getConversationId: () => "conv-1", pendingRef: { current: null } }, onVoiceTiming: (timing: { phase?: string; speculative?: string }) => timings.push(timing) };
+      const view = render(<Harness {...props} isSpeaking={false} speakingEndedAt={0} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      // Turn one: spoken, sent, answered.
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      await act(async () => { socket.send({ t: "final", v: "what is the capital of france" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      await act(async () => { view.rerender(<Harness {...props} isSpeaking={true} speakingEndedAt={0} />); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      await act(async () => { view.rerender(<Harness {...props} isSpeaking={false} speakingEndedAt={1} />); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      speculate.mockClear();
+      // Turn two: the reply has drained; the person speaks again.
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "and what about germany", edge: true }));
+      expect(speculate).toHaveBeenCalledTimes(1);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+      await act(async () => { socket.send({ t: "final", v: "and what about germany" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(timings.filter((t) => t.phase === "final").at(-1)?.speculative).toBe("confirmed");
+    } finally { speculate.mockRestore(); discard.mockRestore(); }
+  });
+
+  test.each([
+    ["isSpeaking true, mode speaking", true, "refused_mode_speaking"],
+  ] as const)("SPEC-REASON-01: an edge partial refused while the reply plays names the cause (%s)", async (_name, speaking, expected) => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    try {
+      const socket = controlledSocket();
+      const timings: Array<{ phase?: string; speculative?: string }> = [];
+      render(<Harness open onOpenChange={() => {}} isSpeaking={speaking} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef: { current: null } }} onVoiceTiming={(timing) => timings.push(timing)} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "tell me about the old lighthouse", edge: true }));
+      expect(speculate).not.toHaveBeenCalled();
+      await act(async () => { socket.send({ t: "final", v: "tell me about the old lighthouse" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(timings.find((t) => t.phase === "final")?.speculative).toBe(expected);
+    } finally { speculate.mockRestore(); cancel.mockRestore(); }
+  });
+
   test("STT-SMARTTURN-01: an edge partial while paused does not start a held run", async () => {
     const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
     try {

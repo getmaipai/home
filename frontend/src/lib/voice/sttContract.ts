@@ -37,8 +37,10 @@ export type SpeculativeOutcome = typeof SPECULATIVE_OUTCOMES[number];
 /** `unfinished`: every edge partial read as a mid-sentence fragment, so no run was started; `late_start`: the start request was still in
  * flight when the final came (the hub answered after the silence timer). */
 export const SPECULATIVE_REFUSAL_CODES = ["off", "not_spoken", "surface", "age", "pending_ask", "active_turn", "too_long", "turn_shape"] as const;
-export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "muted", "echo", "refused", "refused_off", "refused_not_spoken", "refused_surface", "refused_age", "refused_pending_ask", "refused_active_turn", "refused_too_long", "refused_turn_shape", "request_failed", "started", "interrupt_started", "confirmed", "discarded"] as const;
-/** `busy_*`: the edge partial came while the session was not listening (the last reply still thinking or speaking); `muted`: the mic was muted. */
+export const SPECULATIVE_OUTCOMES = ["off", "armed", "no_conversation", "too_long", "no_edge", "unfinished", "late_start", "busy_thinking", "busy_speaking", "busy_connecting", "refused_mode_thinking", "refused_mode_speaking", "refused_mode_connecting", "refused_reply_speaking", "refused_overlap_paused", "muted", "echo", "refused", "refused_off", "refused_not_spoken", "refused_surface", "refused_age", "refused_pending_ask", "refused_active_turn", "refused_too_long", "refused_turn_shape", "request_failed", "started", "interrupt_started", "confirmed", "discarded"] as const;
+/** `refused_mode_*` / `refused_reply_speaking` / `refused_overlap_paused`: the edge partial came while the session would not start early, named by the
+ * mode value (thinking, speaking, connecting), the reply audio flag alone, or a paused overlap; `muted`: the mic was muted. `busy_*` is the older
+ * catch-all label, kept so stored records still validate; nothing writes it any more. */
 export type TalkOverDecision = "none" | "confirmed" | "continued";
 /** The optional labels and counts a client adds to its timing report, beside the speech-path stamps. */
 export interface SttTimingExtras {
