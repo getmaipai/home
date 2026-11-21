@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-20T20:15:13.699Z",
-  "kitTag": "ui-v0.5.726",
+  "generatedAt": "2026-11-21T23:49:29.392Z",
+  "kitTag": "ui-v0.5.727",
   "items": [
     {
       "file": "ActionBarShowcase.tsx",
@@ -32,6 +32,14 @@
       "group": "character",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for the companion character parts (COMPANIONS-DOTS-01), covered by the Commons tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "CodeKitShowcase.tsx",
+      "name": "CodeKitShowcase",
+      "group": "CodeKitShowcase",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.727; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
@@ -510,6 +518,14 @@
       "group": "agent/workflow",
       "verdict": "later",
       "verdictReason": "Deferred until sandbox runtime.",
+      "implemented": false
+    },
+    {
+      "file": "code-view.tsx",
+      "name": "code-view",
+      "group": "code",
+      "verdict": "later",
+      "verdictReason": "New in ui-v0.5.727; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
       "implemented": false
     },
     {
