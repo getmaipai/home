@@ -8,7 +8,8 @@ const { scratch, origin, main, env, git, setup, cleanup } = fixtures.createLande
 // RULES.md, a safety surface, the gates or an existing test; the failing tests are re-run; nothing is landed, shipped or pushed.
 const data = () => join(scratch, "fixer-data");
 const wts = () => join(scratch, "fixer-wts");
-const day = () => new Date().toLocaleDateString("sv");
+// The script names its day with `date +%F` (the machine's local day); ask the same command, so the test agrees with it at any hour (toLocaleDateString gave the UTC day in this runtime, so the test broke every evening after 19:00 EST).
+const day = () => Bun.spawnSync(["date", "+%F"]).stdout.toString().trim();
 const conf = () => join(data(), "fixer.conf");
 const md = () => readFileSync(join(data(), day(), "fixer.md"), "utf8");
 const stubArgs = () => join(scratch, "stub-args");
