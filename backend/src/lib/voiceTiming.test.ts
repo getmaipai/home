@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, recordPrewarmTiming, setCuePlaybackTiming, setVoiceOutcome, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
+import { attachTurnStats, beginVoiceTiming, beginVoiceTimingFor, markVoiceTiming, markVoiceTtsSteps, recordPrewarmTiming, setCuePlaybackTiming, setFirstSentenceBeforeFinal, setVoiceOutcome, voicePrewarmRecords, voiceTimingRecords, voiceTimingReport, VoiceTimingMessageSchema } from "./voiceTiming";
 import { prewarmFailureReason } from "./prefixPrewarm";
 
 beforeEach(() => {
@@ -17,7 +17,7 @@ test("records ordered stage durations as counts only", () => {
 });
 
 test("parses reason-specific refusal outcomes", () => {
-  const parsed = VoiceTimingMessageSchema.safeParse({ type: "timing", speculative: "refused_active_turn" });
+  const parsed = VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-refused", stt_ms: 0, speculative: "refused_active_turn" });
   expect(parsed.success).toBe(true);
 });
 
@@ -115,6 +115,65 @@ test("the timing message schema accepts new optional stamps and old clients", ()
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, cue_playback_ms: 300 }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_paused: true, barge_outcome: "stopped" }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, unexpected: true }).success).toBe(false);
+});
+
+test("the headline adds p95, max, the share at or under target and the warm versus cold split", () => {
+  const stamp = (id: string, firstPlaybackMs: number, stats: Parameters<typeof attachTurnStats>[1]) => {
+    const record = beginVoiceTimingFor(id, 100, 200);
+    markVoiceTiming(record, "first_playback_ms", firstPlaybackMs);
+    attachTurnStats(id, stats);
+    return record;
+  };
+  // Seven warm turns: the prompt cache was reused, the turn extended a conversation warm, and the first token came back fast.
+  stamp("speed-warm-1", 1000, { prompt_tokens: 900, cache_reuse_tokens: 500, prewarm_hit: true, time_to_first_token_ms: 300 });
+  stamp("speed-warm-2", 1100, { prompt_tokens: 900, cache_reuse_tokens: 500, prewarm_hit: true, time_to_first_token_ms: 350 });
+  stamp("speed-warm-3", 1200, { prompt_tokens: 900, cache_reuse_tokens: 400, prewarm_hit: true, time_to_first_token_ms: 400 });
+  stamp("speed-warm-4", 1300, { prompt_tokens: 900, cache_reuse_tokens: 600, prewarm_hit: true, time_to_first_token_ms: 3000 });
+  stamp("speed-warm-5", 1400, { prompt_tokens: 900, cache_reuse_tokens: 700, prewarm_hit: true, time_to_first_token_ms: 600 });
+  stamp("speed-warm-6", 1500, { prompt_tokens: 900, cache_reuse_tokens: 800, prewarm_hit: true });
+  stamp("speed-warm-7", 1600, { prompt_tokens: 900, cache_reuse_tokens: 800, prewarm_hit: true, time_to_first_token_ms: 2999 });
+  // Three cold turns: the cache was not reused at all (twice) or the first token was slow. A turn without cache numbers is not cold.
+  stamp("speed-cold-1", 1700, { prompt_tokens: 900, cache_reuse_tokens: 0, prewarm_hit: true, time_to_first_token_ms: 300 });
+  stamp("speed-cold-2", 1900, { prompt_tokens: 900, cache_reuse_tokens: 0, prewarm_hit: false, time_to_first_token_ms: 300 });
+  stamp("speed-cold-3", 2100, { prompt_tokens: 900, cache_reuse_tokens: 500, prewarm_hit: true, time_to_first_token_ms: 3500 });
+  const report = voiceTimingReport(10);
+  // Stop-to-sound totals, sorted: 1100 1200 1300 1400 1500 1600 1700 1800 2000 2200.
+  expect(report).toContain("first sound after you stop talking (real answer): p95 2200 ms, max 2200 ms, 30% at or under 1300 ms (3 of 10 turns)");
+  expect(report).toContain("first sound after you stop talking, warm turns (cache reused, first token at most 3000 ms): median 1400 ms, p90 1700 ms, 7 turns");
+  expect(report).toContain("first sound after you stop talking, cold turns: median 2000 ms, p90 2200 ms, 3 turns");
+  // The existing headline line is unchanged in shape.
+  expect(report).toMatch(/FIRST SOUND AFTER YOU STOP TALKING \(real answer\): median 1550 ms, p90 2000 ms, 10 turns \(target 1300 ms\)/);
+});
+
+test("the speculation lines report the confirmed share, the before-the-final share and the first token split", () => {
+  const marked = beginVoiceTimingFor("spec-marked", 100, 200);
+  markVoiceTiming(marked, "first_playback_ms", 1000);
+  setVoiceOutcome(marked, { speculative: "confirmed" });
+  attachTurnStats("spec-marked", { time_to_first_token_ms: 300 });
+  setFirstSentenceBeforeFinal(marked, -120);
+  const markedAfter = beginVoiceTimingFor("spec-marked-after", 100, 200);
+  setVoiceOutcome(markedAfter, { speculative: "confirmed" });
+  attachTurnStats("spec-marked-after", { time_to_first_token_ms: 500 });
+  setFirstSentenceBeforeFinal(markedAfter, 50);
+  const unmarked = beginVoiceTimingFor("spec-unmarked", 100, 200);
+  setVoiceOutcome(unmarked, { speculative: "confirmed" });
+  attachTurnStats("spec-unmarked", { time_to_first_token_ms: 400 });
+  const started = beginVoiceTimingFor("spec-started", 100, 200);
+  setVoiceOutcome(started, { speculative: "started" });
+  attachTurnStats("spec-started", { time_to_first_token_ms: 900 });
+  beginVoiceTimingFor("spec-none", 100, 200);
+  const report = voiceTimingReport(5);
+  expect(report).toContain("speculative start confirmed: 60% of 5 turns (3)");
+  expect(report).toContain("confirmed, first sentence ready before the final transcript: 50% of marked confirmed turns (1 of 2)");
+  expect(report).toContain("time to first token median, confirmed: 400 ms (3 turns) vs not confirmed: 900 ms (1 turns)");
+});
+
+test("the before-the-final share says not recorded when no confirmed turn carries the field", () => {
+  const a = beginVoiceTimingFor("spec-na-a", 100, 200);
+  setVoiceOutcome(a, { speculative: "confirmed" });
+  const b = beginVoiceTimingFor("spec-na-b", 100, 200);
+  setVoiceOutcome(b, { speculative: "confirmed" });
+  expect(voiceTimingReport(2)).toContain("confirmed, first sentence ready before the final transcript: n/a (not recorded)");
 });
 
 test("stores independent overlap timings and reports pause medians and never-paused count", () => {

@@ -18,7 +18,7 @@ import { resolveSessionDeviceId } from "@/middleware/auth";
 import { getPersonSettingValue } from "@/lib/settings";
 import { countLiveVoicePrintsForPerson } from "@/lib/biometricPrints";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
+import { attachSpeechTiming, findVoiceTiming, setCuePlaybackTiming, setFirstSentenceBeforeFinal, setVoiceOutcome, setVoiceTiming, VoiceTimingMessageSchema } from "@/lib/voiceTiming";
 import { scoreEdgePartial } from "@/lib/turnEnd";
 import { noteListeningActivity } from "@/lib/turnActivity";
 import { computeVoiceVerdict } from "@/lib/voiceMatch";
@@ -101,7 +101,12 @@ sttRoutes.get(
               if (timing.success) {
                 const value = timing.data;
                 const record = findVoiceTiming(value.turn_id);
-                if (value.first_sentence_ms !== undefined) setVoiceTiming(record, "first_sentence_ms", value.first_sentence_ms);
+                if (value.first_sentence_ms !== undefined) {
+                  setVoiceTiming(record, "first_sentence_ms", value.first_sentence_ms);
+                  // Both stamps are known here: the first sentence time and the final transcript wait (this message's stt_ms), so the
+                  // before/after-the-final mark can be stored for the report (negative when the sentence was ready first).
+                  if (record) setFirstSentenceBeforeFinal(record, value.first_sentence_ms - (typeof record.stt_ms === "number" ? record.stt_ms : value.stt_ms));
+                }
                 if (value.first_playback_ms !== undefined) setVoiceTiming(record, "first_playback_ms", value.first_playback_ms);
                 if (value.cue_playback_ms !== undefined) setCuePlaybackTiming(record, value.cue_playback_ms);
                 attachSpeechTiming(value.turn_id, { head_ms: value.head_ms, offer_ms: value.offer_ms, emit_ms: value.emit_ms, ctx_enqueue: value.ctx_enqueue, ctx_emit: value.ctx_emit });

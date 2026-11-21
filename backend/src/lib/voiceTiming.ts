@@ -15,6 +15,9 @@ export interface VoiceTimingRecord {
   first_audio_ms: number | null;
   first_playback_ms: number | null;
   cue_playback_ms?: number | null;
+  /** First sentence ready minus the final transcript, in ms, negative when the sentence was ready before the final arrived. Computed in the
+   * timing route where both stamps are known, so a confirmed speculative start can be told apart from one that only began after the final. */
+  first_sentence_before_final_ms?: number | null;
   prompt_n?: number | null;
   cache_n?: number | null;
   /** CONVO-PREWARM-03: whether the turn's first request extended the conversation's last cache warm; null when no warm was sent. */
@@ -167,6 +170,11 @@ export function setCuePlaybackTiming(record: VoiceTimingRecord | undefined, elap
   if (record && Number.isFinite(elapsedMs) && elapsedMs >= 0) { record.cue_playback_ms = Math.round(elapsedMs); persist(); }
 }
 
+/** First sentence ready minus the final transcript wait, in ms (negative when the sentence was ready before the final arrived). */
+export function setFirstSentenceBeforeFinal(record: VoiceTimingRecord | undefined, ms: number): void {
+  if (record && Number.isFinite(ms)) { record.first_sentence_before_final_ms = Math.round(ms); persist(); }
+}
+
 export function attachTurnStats(turnId: string, stats: { prompt_tokens?: number | null; cache_reuse_tokens?: number | null; prewarm_hit?: boolean | null; time_to_first_token_ms?: number | null; nodes?: Array<{ node: string; startMs: number; endMs: number; stages?: { embed_ms?: number; count_ms?: number; count_calls?: number; window_ms?: number; shadows_ms?: number } }> }): void {
   const record = findVoiceTiming(turnId); if (!record) return;
   const context = stats.nodes?.find((node) => node.node === "context");
@@ -196,6 +204,12 @@ export function voiceTimingReport(limit = 50): string {
     values.sort((a, b) => a - b);
     return String(values[Math.ceil(values.length * 0.9) - 1]);
   };
+  const p95 = (values: number[]) => {
+    if (!values.length) return "n/a";
+    values.sort((a, b) => a - b);
+    return String(values[Math.ceil(values.length * 0.95) - 1]);
+  };
+  const maxOf = (values: number[]) => (values.length ? String(Math.max(...values)) : "n/a");
   const stages = ["stt_ms", "turn_start_ms", "first_token_ms", "first_sentence_ms", "first_audio_ms", "first_playback_ms"] as const;
   const prewarmRows = voicePrewarmRecords(limit);
   const promptDeltas = rows.flatMap((r) => r.prompt_n != null && r.cache_n != null ? [r.prompt_n - r.cache_n] : []);
@@ -212,11 +226,16 @@ export function voiceTimingReport(limit = 50): string {
   // The headline number: from the moment the person stops talking (final transcript wait stt_ms plus the time from the final to the first sound of the REAL answer). Cloud and other builders measure from the end of speech, so this one compares fairly.
   const stopFor2 = (list: readonly VoiceTimingRecord[]) => list.flatMap((r) => typeof r.stt_ms === "number" && typeof r.first_playback_ms === "number" ? [r.stt_ms + r.first_playback_ms] : []);
   const stopToSound = stopFor2(rows);
+  // Cold: the prompt cache was not reused at all (cache_n 0) or the first token took over 3000 ms; a record with no cache numbers is not called cold.
+  const isColdTurn = (r: VoiceTimingRecord) => r.cache_n === 0 || (r.time_to_first_token_ms != null && r.time_to_first_token_ms > 3000);
+  const soundRows = rows.filter((r) => typeof r.stt_ms === "number" && typeof r.first_playback_ms === "number");
+  const warmRows = soundRows.filter((r) => !isColdTurn(r));
+  const coldRows = soundRows.filter(isColdTurn);
   const stopToCue = rows.flatMap((r) => typeof r.stt_ms === "number" && typeof r.cue_playback_ms === "number" ? [r.stt_ms + r.cue_playback_ms] : []);
-  const stopReport = [`FIRST SOUND AFTER YOU STOP TALKING (real answer): median ${median([...stopToSound])} ms, p90 ${p90(stopToSound)} ms, ${stopToSound.length} turns (target 1300 ms)`, `first sound after you stop talking, filler cue only: median ${median([...stopToCue])} ms, ${stopToCue.length} turns`];
+  const stopReport = [`FIRST SOUND AFTER YOU STOP TALKING (real answer): median ${median([...stopToSound])} ms, p90 ${p90(stopToSound)} ms, ${stopToSound.length} turns (target 1300 ms)`, `first sound after you stop talking (real answer): p95 ${p95(stopToSound)} ms, max ${maxOf(stopToSound)} ms, ${stopToSound.length ? `${Math.round(stopToSound.filter((value) => value <= 1300).length / stopToSound.length * 100)}% at or under 1300 ms` : "n/a"} (${stopToSound.filter((value) => value <= 1300).length} of ${stopToSound.length} turns)`, `first sound after you stop talking, warm turns (cache reused, first token at most 3000 ms): median ${median(stopFor2(warmRows))} ms, p90 ${p90(stopFor2(warmRows))} ms, ${warmRows.length} turns`, `first sound after you stop talking, cold turns: median ${median(stopFor2(coldRows))} ms, p90 ${p90(stopFor2(coldRows))} ms, ${coldRows.length} turns`, `first sound after you stop talking, filler cue only: median ${median([...stopToCue])} ms, ${stopToCue.length} turns`];
   // STT-SMARTTURN-01: whether the speculative start fired, per turn, so a record that looks like "the silence timer sits in series" can be read against it.
   const speculativeCount = (outcome: SpeculativeOutcome) => rows.filter((r) => r.speculative === outcome).length;
-  const speculativeReport = [`speculative start: ${SPECULATIVE_OUTCOMES.map((outcome) => `${outcome} ${speculativeCount(outcome)}`).join(", ")}, no mark ${rows.filter((r) => r.speculative == null).length}`, `first sound after you stop, speculative start confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative === "confirmed")))} ms; not confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative !== "confirmed")))} ms`];
+  const speculativeReport = [`speculative start: ${SPECULATIVE_OUTCOMES.map((outcome) => `${outcome} ${speculativeCount(outcome)}`).join(", ")}, no mark ${rows.filter((r) => r.speculative == null).length}`, `first sound after you stop, speculative start confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative === "confirmed")))} ms; not confirmed: median ${median(stopFor2(rows.filter((r) => r.speculative !== "confirmed")))} ms`, `speculative start confirmed: ${Math.round(speculativeCount("confirmed") / Math.max(1, rows.length) * 100)}% of ${rows.length} turns (${speculativeCount("confirmed")})`, `confirmed, first sentence ready before the final transcript: ${(() => { const marked = rows.filter((r) => r.speculative === "confirmed" && typeof r.first_sentence_before_final_ms === "number"); if (!marked.length) return "n/a (not recorded)"; const before = marked.filter((r) => (r.first_sentence_before_final_ms as number) <= 0).length; return `${Math.round(before / marked.length * 100)}% of marked confirmed turns (${before} of ${marked.length})`; })()}`, `time to first token median, confirmed: ${median(rows.filter((r) => r.speculative === "confirmed").flatMap((r) => r.time_to_first_token_ms == null ? [] : [r.time_to_first_token_ms]))} ms (${rows.filter((r) => r.speculative === "confirmed" && r.time_to_first_token_ms != null).length} turns) vs not confirmed: ${median(rows.filter((r) => r.speculative !== "confirmed").flatMap((r) => r.time_to_first_token_ms == null ? [] : [r.time_to_first_token_ms]))} ms (${rows.filter((r) => r.speculative !== "confirmed" && r.time_to_first_token_ms != null).length} turns)`];
   const warmInFlight = rows.filter((r) => r.prewarm_in_flight === true);
   const contentionReport = [`turns that began while a conversation warm was still in flight: ${warmInFlight.length} (first token median ${median(warmInFlight.flatMap((r) => r.time_to_first_token_ms == null ? [] : [r.time_to_first_token_ms]))} ms) vs ${rows.filter((r) => r.prewarm_in_flight === false).length} that did not (median ${median(rows.flatMap((r) => r.prewarm_in_flight === false && r.time_to_first_token_ms != null ? [r.time_to_first_token_ms] : []))} ms)`];
   const edgeRows = rows.flatMap((r) => r.edge_partials == null ? [] : [r.edge_partials]);
