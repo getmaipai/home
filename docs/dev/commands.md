@@ -20,11 +20,11 @@ A landing names the backlog items it finishes (`bash scripts/land.sh --done ITEM
 Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scripts/check.sh --docs` for docs-only changes,
 `--pre` for the cheap preflight, plain `check.sh` for the full gate (it takes the machine-wide lock; never hand-roll a wait).
 
-A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](docs/PINNING.md) first.
+A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](../PINNING.md) first.
 
-Heavy dev work (tests, builds, temporary servers, video and image jobs) runs through `bash scripts/jobs/job.sh run ...` and `bash scripts/jobs/lease.sh run ...`: process-group cleanup, timeouts that report UNFINISHED, pause on memory pressure, an audit line per action, and a queue among sessions ([docs/dev/dev-jobs.md](docs/dev/dev-jobs.md)).
+Heavy dev work (tests, builds, temporary servers, video and image jobs) runs through `bash scripts/jobs/job.sh run ...` and `bash scripts/jobs/lease.sh run ...`: process-group cleanup, timeouts that report UNFINISHED, pause on memory pressure, an audit line per action, and a queue among sessions ([docs/dev/dev-jobs.md](dev-jobs.md)).
 
-The whole delivery path (preview, land, watcher, ship, recovery) is documented in [docs/dev/delivery-pipeline.md](docs/dev/delivery-pipeline.md).
+The whole delivery path (preview, land, watcher, ship, recovery) is documented in [docs/dev/delivery-pipeline.md](delivery-pipeline.md).
 
 ## Previewing a change (Jesse looks, and so do you)
 
