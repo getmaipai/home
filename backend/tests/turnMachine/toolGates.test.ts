@@ -48,7 +48,8 @@ async function offered(actor: PersonRow, overrides: Partial<Parameters<typeof bu
 
 function setReady(ready: boolean): void {
   __setPictureStatusForTests(ready ? readyStatusForTests() : null);
-  __setVideoStatusForTests(ready ? readyVideoStatusForTests() : null);
+  // VIDEO-WAN-HIDE-01: Wan is in no adult path, so an adult's video is ready only when LTX-2.5 is (the default fixture is the Wan-era status).
+  __setVideoStatusForTests(ready ? readyVideoStatusForTests({ ltx25: "ready", ltx25Picture: true }) : null);
   __setMusicStatusForTests(ready ? readyMusicStatusForTests() : null);
 }
 
