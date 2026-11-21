@@ -52,7 +52,7 @@ function controlledSocket() {
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation, traceUtterances }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback"; bargePauseMs?: number; bargeGateBlockedMs?: number; bargeSinceReplyMs?: number }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } }; traceUtterances?: number }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, pauseScheduler = () => {}, resumeScheduler = () => {}, onReady, onVoiceTiming, socketFactory, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false, speculation, traceUtterances }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; pauseScheduler?: () => void; resumeScheduler?: () => void; onReady?: () => void; onVoiceTiming?: (timing: { sttMs: number; phase?: "final" | "playback"; bargePauseMs?: number; bargeGateBlockedMs?: number; bargeSinceReplyMs?: number; bargePaused?: boolean }) => void; socketFactory?: (handlers: SttSocketHandlers) => ReturnType<typeof createMockSttSocket>; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean; speculation?: { getConversationId: () => string | undefined; pendingRef: { current: { turnId: string; resumeToken: string; conversationId: string } | null } }; traceUtterances?: number }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -645,6 +645,48 @@ describe("live voice session", () => {
     // The person talks over her, clearly louder than the echo: it reaches the hub as itself.
     for (let i = 0; i < 10; i++) onFrame!(level(0.3));
     expect(sent.slice(-5).some((frame) => frame.some((sample) => sample !== 0))).toBe(true);
+  });
+
+  test("barge metrics begin on the first raw frame before VAD and remain independent across overlaps", async () => {
+    const socket = controlledSocket();
+    let frame: ((samples: Float32Array) => void) | undefined;
+    let now = 1000;
+    const timings: Array<Record<string, unknown>> = [];
+    const gate = { pass: () => false, isLoud: () => true, lastFrameBlocked: () => true, lastLoudBlocked: () => true, replyStarted: () => {}, report: () => ({}) };
+    const capture = async (options: MicCaptureOptions) => { frame = options.onFrame; return { stop: () => {}, sampleRate: 16_000 }; };
+    function BargeHarness({ isSpeaking }: { isSpeaking: boolean }) {
+      const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
+      const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
+      const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+      turnSchedulerRef.current = { pause: () => {}, resume: () => {}, stop: () => {}, readLevel: () => 0, playedMs: () => 0 } as unknown as SentenceSpeechScheduler;
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never, createGate: () => gate as never, onVoiceTiming: (timing) => timings.push(timing as never) });
+      return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
+    }
+    const view = render(<BargeHarness isSpeaking={false} />);
+    await waitFor(() => expect(view.getByText("listening")).toBeTruthy());
+    view.rerender(<BargeHarness isSpeaking />);
+    await waitFor(() => expect(frame).toBeDefined());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    const realNow = performance.now;
+    try {
+      Object.defineProperty(performance, "now", { configurable: true, value: () => now });
+      act(() => frame!(new Float32Array(320).fill(0.2)));
+      now += 70;
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "please stop this now" }));
+      expect(timings).toHaveLength(0);
+      act(() => socket.send({ t: "final", v: "please stop this now" }));
+      await waitFor(() => expect(timings).toHaveLength(1));
+      expect(timings[0]).toMatchObject({ bargePauseMs: 70, bargeGateBlockedMs: 20, bargePaused: true });
+      now += 100;
+      act(() => frame!(new Float32Array(320).fill(0.2)));
+      now += 30;
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "please stop this now" }));
+      act(() => socket.send({ t: "final", v: "please stop this now" }));
+      await waitFor(() => expect(timings).toHaveLength(2));
+      expect(timings[1]).toMatchObject({ bargePauseMs: 30, bargePaused: true }); // independent of the first overlap's 70 ms (since-reply uses the real clock at reply start, so it is not pinned here)
+    } finally { Object.defineProperty(performance, "now", { configurable: true, value: realNow }); }
   });
 
   test("PAUSE-EXIT-01: the live sequence of 2026-11-13 (a pause with no final for 25 s) now resolves within 1.5 s: real words cut the reply for good, the turn is cancelled once, and the final becomes the next turn", async () => {

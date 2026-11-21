@@ -51,6 +51,7 @@ export interface SttTimingExtras {
   barge_pause_ms?: number;
   barge_gate_blocked_ms?: number;
   barge_since_reply_ms?: number;
+  barge_paused?: boolean;
   barge_outcome?: "stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none";
 }
 
@@ -64,6 +65,7 @@ export const SttTimingReportSchema = z.object({
   speculative: z.enum(SPECULATIVE_OUTCOMES).optional(),
   barge_pause_ms: z.number().finite().nonnegative().optional(),
   barge_gate_blocked_ms: z.number().finite().nonnegative().optional(), barge_since_reply_ms: z.number().finite().nonnegative().optional(),
+  barge_paused: z.boolean().optional(),
   barge_outcome: z.enum(["stopped", "resumed_noise", "resumed_reaction", "resumed_echo", "none"]).optional(),
   early_release_ms: z.number().finite().optional(), edge_partials: z.number().int().nonnegative().optional(), echo_drops: z.number().int().nonnegative().optional(),
 }).strict();

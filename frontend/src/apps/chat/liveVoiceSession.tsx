@@ -86,7 +86,7 @@ export interface LiveVoiceSessionProps {
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
   installationNotice?: boolean;
-  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; edgePartials?: number; echoDrops?: number; bargePauseMs?: number; bargeGateBlockedMs?: number; bargeSinceReplyMs?: number; bargeOutcome?: "stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none" }) => void;
+  onVoiceTiming?: (timing: { sttMs: number; firstPlaybackMs?: number; phase?: "final" | "playback"; speculative?: SpeculativeOutcome; edgePartials?: number; echoDrops?: number; bargePauseMs?: number; bargeGateBlockedMs?: number; bargeSinceReplyMs?: number; bargePaused?: boolean; bargeOutcome?: "stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none" }) => void;
   voiceTimingSocketRef?: { current: SttSocket | null };
   /** VOICE-TRACE-01: an owner's live trace for the next N utterances of this call (event names and numbers only; off when 0). */
   traceUtterances?: number;
@@ -179,12 +179,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const bargeStartRef = useRef<number | null>(null);
   const bargePauseStartedRef = useRef<number | null>(null);
   const bargePauseMsRef = useRef<number | undefined>(undefined);
+  const bargePausedRef = useRef<boolean | undefined>(undefined);
   const bargeGateBlockedMsRef = useRef<number | undefined>(undefined);
+  const bargeGatePassedRef = useRef(false);
   const bargeSinceReplyMsRef = useRef<number | undefined>(undefined);
   const replyStartedAtRef = useRef(0);
   const replyStartedPerfRef = useRef(0);
   const bargeOutcomeRef = useRef<"stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none">("none");
-  const resetBargeMetrics = () => { bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeSinceReplyMsRef.current = undefined; bargeOutcomeRef.current = "none"; };
+  const resetBargeMetrics = () => { bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargePausedRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeGatePassedRef.current = false; bargeSinceReplyMsRef.current = undefined; bargeOutcomeRef.current = "none"; };
   const mutedRef = useRef(false);
   const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
@@ -280,7 +282,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     }
   };
   const pauseWithDeadline = () => {
-    if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargeStartRef.current);
+    if (bargeStartRef.current !== null) { bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); bargePausedRef.current = true; }
     turnSchedulerRef.current?.pause();
     overlapPausedRef.current = true;
     clearPauseDeadline();
@@ -475,7 +477,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                     bargeSinceReplyMsRef.current = Math.max(0, performance.now() - replyStartedPerfRef.current);
                   }
                 }
-                if (loud && gate?.lastFrameBlocked()) bargeGateBlockedMsRef.current = (bargeGateBlockedMsRef.current ?? 0) + frame.length / 16;
+                if (loud && !bargeGatePassedRef.current) {
+                  if (passed) bargeGatePassedRef.current = true;
+                  else if (gate?.lastFrameBlocked()) bargeGateBlockedMsRef.current = (bargeGateBlockedMsRef.current ?? 0) + frame.length / 16;
+                }
                 socket.sendAudio(passed ? frame : silentFrame(frame.length));
               },
               onSource: (context, source) => {
@@ -591,7 +596,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // she spoke was the "blip" the owner heard: the microphone hears her own reply, that sound lasts as long as the reply, and
               // the pause came before any transcript could say whose voice it was. Her words in a partial (two real words that are not
               // her own) pause her; the final decides the rest (Jesse, 2026-10-30: she pauses only once the sound is clearly speech).
-              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) { overlapTranscriptRef.current = false; resetBargeMetrics(); }
+              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) overlapTranscriptRef.current = false;
             } else {
               activeSpeechRef.current = false;
               edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
@@ -721,10 +726,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             refusedThisUtteranceRef.current = false;
             const edgePartials = edgeCountRef.current; edgeCountRef.current = 0;
             const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
-            if (bargeStartRef.current !== null && overlapPausedRef.current && bargePauseMsRef.current === undefined) bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current);
+            if (bargeStartRef.current !== null && overlapPausedRef.current && bargePauseMsRef.current === undefined) { bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); bargePausedRef.current = true; }
             trace("turn_send", { words: text.split(/\s+/).filter(Boolean).length, speculative, edges: edgePartials, echo_drops: echoDrops });
             traceRef.current?.endUtterance();
-            const bargeFields = bargeStartRef.current !== null ? { ...(bargePauseMsRef.current !== undefined && bargePauseMsRef.current <= 60_000 ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined && bargeGateBlockedMsRef.current <= 60_000 ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined && bargeSinceReplyMsRef.current <= 60_000 ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}), bargeOutcome: bargeOutcomeRef.current } : {};
+            const bargeFields = bargeStartRef.current !== null ? { ...(bargePauseMsRef.current !== undefined && bargePauseMsRef.current <= 60_000 ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined && bargeGateBlockedMsRef.current <= 60_000 ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined && bargeSinceReplyMsRef.current <= 60_000 ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}), bargePaused: bargePausedRef.current ?? false, bargeOutcome: bargeOutcomeRef.current } : {};
             if (bargeStartRef.current !== null && [bargePauseMsRef.current, bargeGateBlockedMsRef.current, bargeSinceReplyMsRef.current].some((value) => value !== undefined && value > 60_000)) trace("barge_metric_out_of_range");
             onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops, ...bargeFields });
             resetBargeMetrics();

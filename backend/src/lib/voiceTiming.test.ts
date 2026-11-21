@@ -113,15 +113,22 @@ test("the timing message schema accepts new optional stamps and old clients", ()
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240 }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, head_ms: 100, offer_ms: 250, emit_ms: 275, ctx_enqueue: "suspended", ctx_emit: "running" }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, cue_playback_ms: 300 }).success).toBe(true);
-  expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_outcome: "stopped" }).success).toBe(true);
+  expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_paused: true, barge_outcome: "stopped" }).success).toBe(true);
   expect(VoiceTimingMessageSchema.safeParse({ t: "timing", turn_id: "turn-1", stt_ms: 240, unexpected: true }).success).toBe(false);
 });
 
-test("stores and reports barge pause timings and outcomes", () => {
+test("stores independent overlap timings and reports pause medians and never-paused count", () => {
   const record = beginVoiceTimingFor("barge-test", 100, 200);
-  setVoiceOutcome(record, { barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_outcome: "stopped" });
-  expect(voiceTimingRecords(1)[0]).toMatchObject({ barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_outcome: "stopped" });
-  expect(voiceTimingReport(1)).toContain("barge gate blocked median: 60 ms");
-  expect(voiceTimingReport(1)).toContain("barge since reply median: 300 ms");
-  expect(voiceTimingReport(1)).toContain("stopped 1");
+  setVoiceOutcome(record, { barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_paused: true, barge_outcome: "stopped" });
+  const neverPaused = beginVoiceTimingFor("barge-no-pause", 100, 200);
+  setVoiceOutcome(neverPaused, { barge_gate_blocked_ms: 20, barge_since_reply_ms: 400, barge_paused: false, barge_outcome: "stopped" });
+  const anotherPause = beginVoiceTimingFor("barge-second", 100, 200);
+  setVoiceOutcome(anotherPause, { barge_pause_ms: 220, barge_gate_blocked_ms: 100, barge_since_reply_ms: 500, barge_paused: true, barge_outcome: "stopped" });
+  expect(voiceTimingRecords(3)).toMatchObject([{ barge_pause_ms: 180, barge_gate_blocked_ms: 60, barge_since_reply_ms: 300, barge_paused: true, barge_outcome: "stopped" }, { barge_gate_blocked_ms: 20, barge_since_reply_ms: 400, barge_paused: false }, { barge_pause_ms: 220, barge_gate_blocked_ms: 100, barge_since_reply_ms: 500, barge_paused: true }]);
+  const report = voiceTimingReport(3);
+  expect(report).toContain("barge pause median: 200 ms (2 overlaps)");
+  expect(report).toContain("barge never paused: 1 overlaps");
+  expect(report).toContain("barge gate blocked median: 60 ms");
+  expect(report).toContain("barge since reply median: 400 ms");
+  expect(report).toContain("stopped 3");
 });
