@@ -446,7 +446,7 @@ describe("live voice session", () => {
     } finally { speculate.mockRestore(); }
   });
 
-  test("STT-SMARTTURN-01: an edge partial during reply playback starts an interrupting held run without cancelling playback", async () => {
+  test("STT-SMARTTURN-01: an edge partial during reply playback does not start a held run", async () => {
     const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const discard = spyOn(api, "discardTurn").mockResolvedValue({ cancelled: true });
@@ -458,15 +458,26 @@ describe("live voice session", () => {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
       act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
       act(() => socket.send({ t: "partial", v: "tell me about the old lighthouse", edge: true }));
-      expect(speculate).toHaveBeenCalledWith("tell me about the old lighthouse", "conv-1", true);
+      expect(speculate).not.toHaveBeenCalled();
       expect(cancel).not.toHaveBeenCalled();
       expect(stop).not.toHaveBeenCalled();
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
       await act(async () => { socket.send({ t: "final", v: "tell me about the old lighthouse" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
       expect(cancel.mock.calls[0]?.[0]).toBe("turn-test");
-      expect(api.discardTurn).not.toHaveBeenCalled();
       expect(stop).toHaveBeenCalledTimes(1);
     } finally { speculate.mockRestore(); cancel.mockRestore(); discard.mockRestore(); }
+  });
+
+  test("STT-SMARTTURN-01: an edge partial while paused does not start a held run", async () => {
+    const speculate = spyOn(api, "speculateTurn").mockResolvedValue({ turn_id: "turn-held", resume_token: "token-held", conversation_id: "conv-1" });
+    try {
+      const socket = controlledSocket();
+      render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} speculation={{ getConversationId: () => "conv-1", pendingRef: { current: null } }} />);
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+      act(() => socket.send({ t: "partial", v: "wait tell me about this" }));
+      act(() => socket.send({ t: "partial", v: "wait tell me about this please", edge: true }));
+      expect(speculate).not.toHaveBeenCalled();
+    } finally { speculate.mockRestore(); }
   });
 
   test("STT-SMARTTURN-01: an unfinished edge partial during playback does not start a held run", async () => {
@@ -652,7 +663,7 @@ describe("live voice session", () => {
     let frame: ((samples: Float32Array) => void) | undefined;
     let now = 1000;
     const timings: Array<Record<string, unknown>> = [];
-    const gate = { pass: () => false, isLoud: () => true, lastFrameBlocked: () => true, lastLoudBlocked: () => true, replyStarted: () => {}, report: () => ({}) };
+    const gate = { pass: () => false, isLoud: () => true, lastLoudBlocked: () => true, lastFrameBlocked: () => true, replyStarted: () => {}, report: () => ({}) };
     const capture = async (options: MicCaptureOptions) => { frame = options.onFrame; return { stop: () => {}, sampleRate: 16_000 }; };
     function BargeHarness({ isSpeaking }: { isSpeaking: boolean }) {
       const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
@@ -754,6 +765,66 @@ describe("live voice session", () => {
     expect(stop).not.toHaveBeenCalled();
     // A second pause with no further word and no final: the deadline resumes it (the words that paused her stand, so this one interrupts; a bare noise pause has no words).
     await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+
+  test("a reply that ends without a final clears barge metrics before the next turn", async () => {
+    const socket = controlledSocket();
+    let frame: ((samples: Float32Array) => void) | undefined;
+    const timings: Array<Record<string, unknown>> = [];
+    const gate = { pass: () => true, isLoud: () => true, acceptsPersonLoudness: () => true, lastLoudBlocked: () => true, lastFrameBlocked: () => true, replyStarted: () => {}, report: () => ({}) };
+    const capture = async (options: MicCaptureOptions) => { frame = options.onFrame; return { stop: () => {}, sampleRate: 16_000 }; };
+    function BargeHarness({ isSpeaking }: { isSpeaking: boolean }) {
+      const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
+      const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
+      const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+      turnSchedulerRef.current = { pause: () => {}, resume: () => {}, stop: () => {}, readLevel: () => 0, playedMs: () => 0 } as unknown as SentenceSpeechScheduler;
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never, createGate: () => gate as never, onVoiceTiming: (timing) => timings.push(timing as never) });
+      return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
+    }
+    const view = render(<BargeHarness isSpeaking={false} />);
+    await waitFor(() => expect(view.getByText("listening")).toBeTruthy());
+    act(() => view.rerender(<BargeHarness isSpeaking />));
+    await waitFor(() => expect(frame).toBeDefined());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    act(() => frame!(new Float32Array(320).fill(0.2)));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+    act(() => socket.send({ t: "partial", v: "wait please stop" }));
+    act(() => view.rerender(<BargeHarness isSpeaking={false} />));
+    await waitFor(() => expect(view.getByText("listening")).toBeTruthy());
+    await act(async () => { socket.send({ t: "final", v: "tell me something unrelated" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(timings).toHaveLength(1);
+    expect(timings[0]).not.toHaveProperty("bargePauseMs");
+    expect(timings[0]).not.toHaveProperty("bargeGateBlockedMs");
+    expect(timings[0]).not.toHaveProperty("bargeSinceReplyMs");
+    expect(timings[0]).not.toHaveProperty("bargePaused");
+  });
+
+  test("pause deadline records a small positive barge duration", async () => {
+    const socket = controlledSocket();
+    let frame: ((samples: Float32Array) => void) | undefined;
+    const timings: Array<Record<string, unknown>> = [];
+    const gate = { pass: () => false, isLoud: () => true, acceptsPersonLoudness: () => true, lastLoudBlocked: () => true, lastFrameBlocked: () => true, replyStarted: () => {}, report: () => ({}) };
+    const capture = async (options: MicCaptureOptions) => { frame = options.onFrame; return { stop: () => {}, sampleRate: 16_000 }; };
+    function DeadlineHarness() {
+      const adapter: ChatModelAdapter = { async *run() { yield { content: [{ type: "text", text: "ok" }] }; } };
+      const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: false });
+      const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+      turnSchedulerRef.current = { pause: () => {}, resume: () => {}, stop: () => {}, readLevel: () => 0, playedMs: () => 0 } as unknown as SentenceSpeechScheduler;
+      const session = useLiveVoiceSession({ composer: runtime.thread.composer, open: true, onOpenChange: () => {}, turnSchedulerRef, liveVoiceActiveRef: useRef(false), pendingSpeechRef: useRef(false), activeTurnRef: useRef(null), cancelRun: () => {}, voiceBargeIn: true, isSpeaking: true, speakingEndedAt: 0, createSocket: socket.createSocket, startCapture: capture as never, createGate: () => gate as never, onVoiceTiming: (timing) => timings.push(timing as never) });
+      return <AssistantRuntimeProvider runtime={runtime}><div>{session.mode}</div></AssistantRuntimeProvider>;
+    }
+    render(<DeadlineHarness />);
+    await waitFor(() => expect(frame).toBeDefined());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
+    act(() => frame!(new Float32Array(320).fill(0.2)));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.3 }));
+    act(() => socket.send({ t: "reply_pause" }));
+    act(() => socket.send({ t: "partial", v: "please stop the reply" }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1550)); });
+    act(() => socket.send({ t: "timing", speech_end_to_final_ms: 700, silence_wait_ms: 700 }));
+    await act(async () => { socket.send({ t: "final", v: "please stop the reply now" }); await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(timings[0]?.bargePauseMs).toBeGreaterThan(0);
+    expect(timings[0]?.bargePauseMs).toBeLessThan(60_000);
   });
 
   test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {

@@ -37,6 +37,8 @@ export interface EchoGate {
   pass(frame: Float32Array, playing: boolean, now?: number, playbackLevel?: number): boolean;
   /** Playback-relative person loudness test, before `pass` replaces a blocked frame. */
   isLoud(frame: Float32Array, playbackLevel?: number): boolean;
+  /** Person-loudness test accepted outside the reply calibration window. */
+  acceptsPersonLoudness?(frame: Float32Array, playbackLevel?: number, now?: number): boolean;
   /** The last raw frame was above threshold and dropped by the three-frame gate. */
   lastLoudBlocked(): boolean;
   /** True when the last loud frame was replaced by silence, including during the gate's opening run. */
@@ -94,6 +96,7 @@ export function createEchoGate(options: { now?: () => number } = {}): EchoGate {
       openUntil = 0;
     },
     isLoud(frame, playbackLevel) { return frameRms(frame) > thresholdFor(playbackLevel); },
+    acceptsPersonLoudness(frame, playbackLevel, now = clock()) { return !(calibrationEndsAt > 0 && now < calibrationEndsAt) && frameRms(frame) > thresholdFor(playbackLevel, now); },
     lastLoudBlocked() { return lastLoudWasBlocked; },
     lastFrameBlocked() { return lastFrameWasBlocked; },
     pass(frame, playing, now = clock(), playbackLevel) {

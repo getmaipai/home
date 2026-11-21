@@ -209,6 +209,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // One start request in flight at a time, carrying the text it was sent with; a newer edge partial with other words replaces it.
   const speculationInFlightRef = useRef<string | null>(null);
   const latestEdgeTextRef = useRef<string | null>(null);
+  // Kept for the server contract; interruption speculation is disabled pending interruption-aware context, see the Fable validation review.
   const latestEdgeInterruptingRef = useRef(false);
   const refusedThisUtteranceRef = useRef(false);
   const startSpeculation = (text: string, unfinished = false, interrupting = false) => {
@@ -270,7 +271,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     if (overlapTranscriptRef.current) {
       // Real words since the pause: a cut-in. The reply stops for good; the final, when it lands, is the next turn.
       trace("pause_resolved", { reason: "deadline_interrupt", played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
-      if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, Date.now() - bargeStartRef.current);
+      if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current);
       duplexCounters.interruptions++;
       bargeOutcomeRef.current = "stopped";
       interrupt("voice");
@@ -470,7 +471,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 const gate = echoGateRef.current;
                 const playbackLevel = turnSchedulerRef.current?.readLevel() ?? 0;
                 const passed = gate?.pass(frame, playing, undefined, playbackLevel) !== false;
-                const loud = playing && gate?.isLoud(frame, playbackLevel) === true;
+                const loud = playing && (gate?.acceptsPersonLoudness ? gate.acceptsPersonLoudness(frame, playbackLevel) : gate?.isLoud(frame, playbackLevel)) === true;
                 if (loud) {
                   if (bargeStartRef.current === null) {
                     bargeStartRef.current = performance.now();
@@ -551,9 +552,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               const edgeText = message.v.trim();
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
               else if (isReaction(normalizedTranscript(edgeText), edgeText)) { /* reactions resume the reply; they do not start a held answer */ }
-              else if (!mutedRef.current && (modeRef.current === "listening" || isReplySpeaking() || overlapPausedRef.current)) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, isReplySpeaking() || overlapPausedRef.current);
+              else if (!mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && !overlapPausedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
               // The session was not listening (the last reply still thinking or speaking, or the mic muted): labelled, so a live record names it.
-              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
+              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : isReplySpeaking() || overlapPausedRef.current ? "busy_speaking" : modeRef.current === "thinking" ? "busy_thinking" : modeRef.current === "connecting" ? "busy_connecting" : "busy_speaking";
             }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
@@ -815,7 +816,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     trace("mode", { mode: isSpeaking ? "speaking" : modeRef.current, speaking: isSpeaking });
     if (isSpeaking) {
       const wasSpeaking = modeRef.current === "speaking";
-      if (!wasSpeaking) { echoGateRef.current?.replyStarted(); replyStartedAtRef.current = Date.now(); replyStartedPerfRef.current = performance.now(); }
+      if (!wasSpeaking) { echoGateRef.current?.replyStarted(); replyStartedAtRef.current = performance.now(); replyStartedPerfRef.current = replyStartedAtRef.current; }
       modeRef.current = "speaking";
       if (!wasSpeaking) speakingStartedAtRef.current = Date.now();
       setMode("speaking");
@@ -823,6 +824,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       return () => clearInterval(timer);
     }
     lastSpeakingEndedAtRef.current = Date.now();
+    resetBargeMetrics();
     // The reply ended: what the microphone heard of it, as numbers (the echo's level over the room's silence, frames dropped and passed).
     if (echoGateRef.current && traceRef.current) { const report = echoGateRef.current.report(); trace("mic_echo", { ratio_db: report.ratio_db ?? -1, echo_rms: report.echo_rms ?? 0, silence_rms: report.silence_rms ?? 0, coupling: report.coupling ?? -1, threshold_rms: report.threshold_rms ?? 0 }); trace("mic_gate", { blocked: report.blocked, passed: report.passed }); }
     setMode((current) => {

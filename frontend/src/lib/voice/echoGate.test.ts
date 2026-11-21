@@ -75,6 +75,18 @@ describe("ECHO-GATE-01", () => {
     for (let i = 0; i < CALIBRATION_MS / 20 + 20; i++) { expect(gate.pass(frame(i < CALIBRATION_MS / 20 ? 0.1 : 0.12), true, now, 0.5)).toBe(false); now += 20; }
   });
 
+  test("calibration and below-threshold frames are not accepted person loudness", () => {
+    let now = 0; const gate = createEchoGate({ now: () => now }); gate.replyStarted(now);
+    expect(gate.isLoud(frame(0.3), 0.5)).toBe(true); // Raw loudness alone is not acceptance during calibration.
+    expect(gate.acceptsPersonLoudness?.(frame(0.3), 0.5, now)).toBe(false);
+    expect(gate.pass(frame(0.3), true, now, 0.5)).toBe(false);
+    for (let i = 0; i < CALIBRATION_MS / 20; i++) { now += 20; gate.pass(frame(0.1), true, now, 0.5); }
+    now += 20;
+    expect(gate.isLoud(frame(0.12), 0.5)).toBe(false);
+    expect(gate.acceptsPersonLoudness?.(frame(0.12), 0.5, now)).toBe(false);
+    expect(gate.pass(frame(0.12), true, now, 0.5)).toBe(false);
+  });
+
   test("coupling and threshold are null before calibration and populated after", () => {
     const gate = createEchoGate({ now: () => 0 });
     expect(gate.report().coupling).toBeNull();
