@@ -9,7 +9,7 @@ const state = (role = "adult", extra: Record<string, unknown> = {}) => ({
   surface: "chat", actor: actor(role), speakerEvidence: null, outcomes: [], memoryTrace: undefined, ...extra,
 } as never);
 
-beforeEach(() => { resetDb(); __resetSpecificsCheckCountersForTests(); __setSpecificsCheckRunnerForTests(async () => "flagged"); });
+beforeEach(() => { resetDb(); setHouseholdSettingValue("chat.specifics_check", "shadow"); __resetSpecificsCheckCountersForTests(); __setSpecificsCheckRunnerForTests(async () => "flagged"); });
 
 describe("released specifics hook", () => {
   test("checks an adult fact cue with no outcomes when shadow is on", async () => {

@@ -132,7 +132,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     scope: "household",
     selector: "select",
     range: { options: ["off", "shadow"] },
-    default: "shadow",
+    default: "off",
     label: "Count unsupported specifics in replies",
     help: "After an adult reply, Home can ask the Stack whether specific names, numbers, or dates lack a basis. Shadow only counts the result; it never changes the reply.",
     level: "advanced",
