@@ -128,6 +128,18 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "chat.specifics_check",
+    scope: "household",
+    selector: "select",
+    range: { options: ["off", "shadow"] },
+    default: "shadow",
+    label: "Count unsupported specifics in replies",
+    help: "After an adult reply, Home can ask the Stack whether specific names, numbers, or dates lack a basis. Shadow only counts the result; it never changes the reply.",
+    level: "advanced",
+    lives_in: "household.ai_advanced",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "stack.engines.stt.smart_turn",
     scope: "household",
     selector: "boolean",

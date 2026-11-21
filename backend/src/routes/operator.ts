@@ -9,6 +9,7 @@ import { DEFAULT_TURNS, MAX_TURNS, engineState, newsView, runCacheProbe, summary
 import { operatorEngineView, setOperatorEngine } from "@/lib/operatorEngine";
 import { tryConsume } from "@/lib/rateLimiter";
 import type { AppEnv } from "@/types";
+import { specificsCheckCounters } from "@/lib/specificsCheck/counters";
 
 export const operatorRoutes = new Hono<AppEnv>();
 
@@ -20,6 +21,11 @@ const slow = (c: { json: (body: unknown, status: 429, headers: Record<string, st
     : c.json({ error: "This key is sending requests too fast. Wait a minute and try again." }, 429, { "retry-after": "3" });
 
 operatorRoutes.get("/settings", requireApiKey("settings"), (c) => slow(c as never) ?? c.json({ settings: operatorSettingsView() }));
+
+operatorRoutes.get("/specifics-check", requireApiKey("diagnose"), (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  return c.json({ counters: specificsCheckCounters() });
+});
 
 operatorRoutes.put("/settings", requireApiKey("settings"), bodyLimit({ maxSize: 4 * 1024 }), async (c) => {
   const limited = slow(c as never);

@@ -603,6 +603,8 @@ export type TurnStreamResult =
        * tool round's single synchronous machine transition and strictly
        * before the phrasing round's first delta. */
       toolEvents?: ToolStreamEvent[];
+      /** Runs only after the final reply has been released to the client. */
+      afterRelease?: (reply: string) => void;
       /** GENUI-13c: the answer blocks placed so far, each with its `after_paragraph` stamped and the released-text
        * length it goes after (Infinity: after the whole reply). Undefined for every other producer. */
       placedBlocks?: () => import("@/lib/answerImages/turn").PlacedBlock[];

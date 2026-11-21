@@ -5,7 +5,7 @@ import { getRegistryKey } from "@/lib/settingsRegistry";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 
 /** To add a setting: a key that needs work after it is saved (routes/settings.ts runs follow-ups for the engine location, robots, the search address and a few more) must not be added until this route runs the same follow-up. To add one: add its key here, state why an assistant needs it in the backlog row, and run tests/operatorSettings.test.ts. */
-export const OPERATOR_SETTING_KEYS = ["chat.search_assist"] as const;
+export const OPERATOR_SETTING_KEYS = ["chat.search_assist", "chat.specifics_check"] as const;
 export type OperatorSettingKey = (typeof OPERATOR_SETTING_KEYS)[number];
 
 /** Key families that are never changeable by an assistant key, whatever someone adds above. */

@@ -108,6 +108,8 @@ interface ResumeSession {
   sttMs: number | null;
   timing?: VoiceTimingRecord;
   firstAudioAtMs?: number;
+  specificsReply?: string;
+  specificsCheckFired?: boolean;
   token: string;
   ownerId: string;
   // THIN-1E: who the stream is for, so the done value's raw error detail is admin-only.
@@ -270,6 +272,10 @@ export function markTurnFirstAudio(turnId: string, ownerId: string, elapsedMs: n
   if (!session || session.ownerId !== ownerId || !session.spokenTurn) return;
   if (session.firstAudioAtMs === undefined) session.firstAudioAtMs = session.startedAtMs + elapsedMs;
   markVoiceTiming(session.timing, "first_audio_ms", session.firstAudioAtMs - session.startedAtMs);
+  if (session.specificsReply !== undefined && !session.specificsCheckFired && session.result.kind === "stream") {
+    session.specificsCheckFired = true;
+    session.result.afterRelease?.(session.specificsReply);
+  }
 }
 
 export function markTurnTtsSteps(turnId: string, ownerId: string, steps: { tts_prep_ms: number; tts_resolve_ms: number; tts_stack_ms: number }): void {
@@ -683,6 +689,14 @@ function startResumeSession(session: ResumeSession): void {
         const delivered = streamEventForViewer(withLatency as TurnStreamEvent, session.viewer);
         appendSessionEvent(session, delivered);
         if ("type" in delivered && delivered.type === "delta") session.releasedText += delivered.text;
+        if ("type" in delivered && delivered.type === "done" && session.result.kind === "stream") {
+          if (!session.specificsCheckFired) {
+            if (!session.spokenTurn || session.firstAudioAtMs !== undefined) {
+              session.specificsCheckFired = true;
+              session.result.afterRelease?.(delivered.value.reply.text);
+            } else session.specificsReply = delivered.value.reply.text;
+          }
+        }
       }
     } catch (err) {
       // streamTurnEvents() maps generation failures to a terminal event. This

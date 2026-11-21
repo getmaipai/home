@@ -22,6 +22,7 @@ import { pageContextForTurn } from "@/lib/pageContext";
 // runTurnNextStream()) is the "stream" variant a live client actually
 // needs: routes/turn.ts's `/stream` route calls it.
 import { turnTotalWaitMs } from "./deadline";
+import { checkReleasedSpecifics } from "@/lib/specificsCheck/hook";
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnErrorDetail, TurnValue } from "@/wire";
@@ -1338,6 +1339,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // every live turn return "stream", so a real search on a live chat
     // never carried a tool_call/tool_result at all until this.
     toolEvents: state.toolEvents,
+    afterRelease: (reply) => { void checkReleasedSpecifics(state, text, reply).catch(() => {}); },
     // GENUI-13c and GENUI-05: the blocks the one placer put in the reply (a picture gallery is one), read by the wire
     // as it relays the released text (routes/turn.ts's streamTurnEvents()).
     placedBlocks: () => state.placedBlocks ?? [],

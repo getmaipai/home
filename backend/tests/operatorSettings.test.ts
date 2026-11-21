@@ -10,6 +10,7 @@ import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settin
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import { OPERATOR_DENIED_PREFIXES, OPERATOR_SETTING_KEYS, isOperatorSettingKey } from "@/lib/operatorSettings";
 import { app } from "@/app";
+import { __resetSpecificsCheckCountersForTests, bumpSpecificsCheckCounter } from "@/lib/specificsCheck/counters";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
 
@@ -98,6 +99,17 @@ describe("PUT /api/operator/settings", () => {
     expect((await call("GET", "/api/operator/settings", demoted.secret)).status).toBe(401);
     expect(listApiKeys({ ...admin, role: "adult" } as PersonRow)[0]!.status).toBe("suspended");
   });
+});
+
+test("GET /api/operator/specifics-check requires diagnose access and returns only counters", async () => {
+  __resetSpecificsCheckCountersForTests();
+  bumpSpecificsCheckCounter("checked");
+  const owner = person("owner");
+  const key = createApiKey(owner, { name: "Diagnostics", scopes: ["diagnose"], expires_in_days: 30 });
+  expect((await call("GET", "/api/operator/specifics-check", null)).status).toBe(401);
+  const response = await call("GET", "/api/operator/specifics-check", key.secret);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ counters: { "specifics_check.checked": 1 } });
 });
 
 describe("rate", () => {
