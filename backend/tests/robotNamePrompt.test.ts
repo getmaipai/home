@@ -9,6 +9,11 @@ describe("robot identity in turn prompts", () => {
     );
   });
 
+  test("written stable prefix remains byte-identical for a fixed input", () => {
+    const previous = "You are MaiPai, a private, self-hosted AI assistant for this household. Nothing you say leaves this house. You cannot tell who a person in a photo is.";
+    expect(buildStablePrefix(DEFAULT_PERSONA, "written")).toBe(previous);
+  });
+
   test("the robot name replaces the persona name in its identity line", () => {
     expect(identityLine(DEFAULT_PERSONA, "StackChan 2")).toBe(
       "You are StackChan 2, a private, self-hosted AI assistant for this household.",

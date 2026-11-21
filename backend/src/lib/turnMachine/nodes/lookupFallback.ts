@@ -15,9 +15,13 @@ import { quoteForPrompt } from "@/lib/composer";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { modelFacingArgs } from "./tool";
+import { usableReply } from "@/lib/composer";
+import { sayFields } from "@/lib/sayEvidence";
+import { EMPTY_LOOKUP_MISS_PACKAGES } from "@/lib/lookupPackages";
 
 /** UNSEEN-01 (C10, chat rule 6): `nothing_suitable` is a search whose rows a filter removed; the model is told that, never "found nothing". */
 export type LookupFailureKind = FailureKind | "nothing_suitable";
+
 
 /** Whether this outcome is a lookup that did not give the model anything:
  * a tool that failed (unavailable, errored, timed out), or a search that
@@ -33,9 +37,13 @@ export function lookupMissed(outcome: ToolExecutionOutcome): boolean {
   // Zero rows is "the search found nothing" only for a search: another tool
   // (a list, a schedule) can truthfully return an empty list, and that is
   // its answer, not a missed lookup.
-  if (outcome.packageId !== "websearch") return false;
-  const rows = (outcome.result?.data as { rows?: unknown } | undefined)?.rows;
-  return Array.isArray(rows) && rows.length === 0;
+  if (outcome.packageId === "websearch") {
+    const rows = (outcome.result?.data as { rows?: unknown } | undefined)?.rows;
+    return Array.isArray(rows) && rows.length === 0;
+  }
+  if (!EMPTY_LOOKUP_MISS_PACKAGES.has(outcome.packageId)) return false;
+  const result = outcome.result;
+  return !usableReply(outcome) && result?.data === undefined && !sayFields(outcome);
 }
 
 /** The kind the model is told: `lookupFailureKind`, except a search the filter emptied reads `nothing_suitable`. */

@@ -4,7 +4,7 @@
 // told, and the answering round's instruction. The end-to-end rows live in
 // turnNext.test.ts.
 import { describe, expect, test } from "bun:test";
-import { lookupMissed, lookupFailureKind, lookupMissedInstruction } from "@/lib/turnMachine/nodes/lookupFallback";
+import { lookupMissed, lookupFailureKind, lookupMissedInstruction, lookupMissKind, retryEligible, isRepeatOfFailed } from "@/lib/turnMachine/nodes/lookupFallback";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import * as lookupFallback from "@/lib/turnMachine/nodes/lookupFallback";
 
@@ -12,7 +12,7 @@ function outcome(overrides: Partial<ToolExecutionOutcome>): ToolExecutionOutcome
   return { callId: "test", packageId: "websearch", status: "succeeded", via: "tool_call", ...overrides };
 }
 
-/** Only `data` is read by lookupMissed(); the rest of a PluginResult is not built. */
+/** A minimal successful payload. */
 function resultWith(data: Record<string, unknown>): ToolExecutionOutcome["result"] {
   return { data } as unknown as ToolExecutionOutcome["result"];
 }
@@ -38,14 +38,40 @@ describe("lookupMissed: a lookup that gave the model nothing", () => {
     expect(lookupMissed(outcome({ result: resultWith({ rows: [] }) }))).toBe(true);
   });
 
+  test("empty factual lookup successes are misses with the found_nothing kind", () => {
+    const empty = outcome({ packageId: "weather", result: undefined });
+    expect(lookupMissed(empty)).toBe(true);
+    expect(lookupMissKind(empty)).toBe("found_nothing");
+    expect(lookupMissedInstruction("written", "weather?", [lookupMissKind(empty)])).toContain("found nothing");
+    for (const packageId of ["place-lookup", "currency", "book-lookup", "media-lookup"]) {
+      expect(lookupMissed(outcome({ packageId, result: {} as ToolExecutionOutcome["result"] }))).toBe(true);
+    }
+  });
+
+  test("empty lookup miss can be retried once and its identical call is recognized", () => {
+    const empty = outcome({ packageId: "weather", result: undefined, args: { place: "Oslo" } });
+    expect(retryEligible([empty])).toBe(true);
+    expect(isRepeatOfFailed({ tool: "weather", args: { place: "Oslo" } }, [empty])).toBe(true);
+    expect(retryEligible([outcome({ packageId: "weather", result: { data: { temperature: 12 } } as unknown as ToolExecutionOutcome["result"] })])).toBe(false);
+  });
+
   test("another tool's truthful empty list (nothing on the list today) is its answer, not a missed lookup", () => {
     expect(lookupMissed(outcome({ packageId: "remind", result: resultWith({ rows: [] }) }))).toBe(false);
+    for (const packageId of ["timer", "almanac-date", "recall", "remember", "remind", "lights-on", "convert", "math"]) {
+      expect(lookupMissed(outcome({ packageId, result: undefined }))).toBe(false);
+    }
   });
 
   test("a lookup with rows, or a tool with no rows at all, is not missed", () => {
     expect(lookupMissed(outcome({ result: resultWith({ rows: [{ title: "a" }] }) }))).toBe(false);
     expect(lookupMissed(outcome({ packageId: "almanac-date", result: resultWith({ today: "Tuesday" }) }))).toBe(false);
     expect(lookupMissed(outcome({ packageId: "timer", result: undefined }))).toBe(false);
+  });
+
+  test("any data, usable reply, or say field makes an allowed lookup a non-miss", () => {
+    expect(lookupMissed(outcome({ packageId: "weather", result: resultWith({}) }))).toBe(false);
+    expect(lookupMissed(outcome({ packageId: "weather", result: { reply: { text: "Ready" } } as ToolExecutionOutcome["result"] }))).toBe(false);
+    expect(lookupMissed(outcome({ packageId: "weather", result: { data: { temperature: 70 } } as unknown as ToolExecutionOutcome["result"] }))).toBe(false);
   });
 });
 

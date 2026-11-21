@@ -25,6 +25,7 @@
 // model call: the direct reply when an outcome has one, else the fixed
 // fallback.
 import { outcomeText, referenceFields, sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
+import { EMPTY_LOOKUP_MISS_PACKAGES } from "@/lib/lookupPackages";
 import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
@@ -1124,6 +1125,7 @@ export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?
           ...(usableReply(outcome) ? { reply: usableReply(outcome)!.text } : {}),
           ...(outcome.result?.data !== undefined ? { data: boundedData(outcome.result.data) } : {}),
           ...(sayFields(outcome) ? { say: sayFields(outcome) } : {}),
+          ...(EMPTY_LOOKUP_MISS_PACKAGES.has(outcome.packageId) && !usableReply(outcome) && outcome.result?.data === undefined && !sayFields(outcome) && typeof outcome.result?.synthesis_hint !== "string" ? { note: "The tool returned nothing." } : {}),
           ...(typeof outcome.result?.synthesis_hint === "string" ? { synthesis_hint: outcome.result.synthesis_hint } : {}),
         }
       : outcome.status === "pending"

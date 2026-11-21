@@ -496,6 +496,12 @@ describe("the tool message", () => {
     expect(JSON.parse(toolResultContent(failedOutcome()))).toEqual({ status: "failed", package: "knowledge", error: "not_found" });
     expect(JSON.parse(toolResultContent(outcome({ callId: "p", packageId: "lights", status: "pending", userMessage: "All of them?" })))).toEqual({ status: "pending", package: "lights", asked: "All of them?" });
   });
+
+  test("an empty successful result has a machine-written note without tool internals", () => {
+    expect(JSON.parse(toolResultContent(outcome({ callId: "e", packageId: "weather", status: "succeeded", result: undefined })))).toEqual({
+      status: "succeeded", package: "weather", note: "The tool returned nothing.",
+    });
+  });
 });
 
 describe("K6: the machine", () => {
